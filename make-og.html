@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>OG Image Generator</title></head>
+<body style="margin:0;background:#222;">
+<canvas id="c" width="1200" height="630"></canvas>
+<br>
+<button onclick="download()" style="margin:10px;padding:10px 24px;font-size:16px;cursor:pointer;">📥 og-image.png 다운로드</button>
+<script>
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+
+// 배경 그라데이션
+const grad = ctx.createLinearGradient(0,0,1200,630);
+grad.addColorStop(0, '#1d6e6b');
+grad.addColorStop(0.6, '#2a8a87');
+grad.addColorStop(1, '#3aa8a4');
+ctx.fillStyle = grad;
+ctx.fillRect(0,0,1200,630);
+
+// 반원 장식 (우측 상단)
+ctx.beginPath();
+ctx.arc(1100, 0, 300, 0, Math.PI*2);
+ctx.fillStyle = 'rgba(255,255,255,0.06)';
+ctx.fill();
+
+// 반원 장식 (좌측 하단)
+ctx.beginPath();
+ctx.arc(100, 630, 250, 0, Math.PI*2);
+ctx.fillStyle = 'rgba(255,255,255,0.05)';
+ctx.fill();
+
+// 로고 이미지 불러오기
+const logo = new Image();
+logo.src = 'preview.png';
+logo.onload = function(){
+  // 로고 흰 배경 원
+  ctx.beginPath();
+  ctx.arc(160, 200, 90, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.fill();
+
+  // 로고 그리기 (원형 클리핑)
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(160, 200, 78, 0, Math.PI*2);
+  ctx.clip();
+  ctx.drawImage(logo, 82, 122, 156, 156);
+  ctx.restore();
+
+  // 병원명
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 72px "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('아산정플란트치과', 100, 360);
+
+  // 슬로건
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  ctx.font = '36px "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+  ctx.fillText('한 사람을 위한 정직한 진료', 100, 440);
+
+  // 구분선
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(100, 480);
+  ctx.lineTo(700, 480);
+  ctx.stroke();
+
+  // 도구명
+  ctx.fillStyle = 'rgba(255,255,255,0.65)';
+  ctx.font = '28px "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+  ctx.fillText('치료계획 이미지 주석 도구  ·  STAFF ONLY', 100, 520);
+};
+logo.onerror = function(){
+  // 로고 없을 경우 텍스트만
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 72px sans-serif';
+  ctx.fillText('아산정플란트치과', 100, 360);
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  ctx.font = '36px sans-serif';
+  ctx.fillText('한 사람을 위한 정직한 진료', 100, 440);
+};
+
+function download(){
+  const link = document.createElement('a');
+  link.download = 'og-image.png';
+  link.href = c.toDataURL('image/png');
+  link.click();
+}
+</script>
+</body>
+</html>
