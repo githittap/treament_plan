@@ -445,7 +445,7 @@ let mouseCanvasPos = null;
 
 function getAnnBounds(a){
   if(a.type==='tooth'){
-    const r = a.size*1.4;
+    const r = a.size*0.55;
     return {x1:a.x-r, y1:a.y-r, x2:a.x+r, y2:a.y+r};
   } else if(a.type==='area'){
     return {x1:Math.min(a.x1,a.x2), y1:Math.min(a.y1,a.y2), x2:Math.max(a.x1,a.x2), y2:Math.max(a.y1,a.y2)};
@@ -472,7 +472,7 @@ function findHandleNear(x,y){
   if(!ann) return -1;
   const b = getAnnBounds(ann);
   if(!b) return -1;
-  const hr = Math.max(10, baseUnit()*0.2);
+  const hr = Math.max(5, baseUnit()*0.08);
   const hs = getHandles(b);
   for(let i=0;i<hs.length;i++){
     if(Math.hypot(hs[i].x-x, hs[i].y-y)<hr) return i;
@@ -484,7 +484,7 @@ function drawSelectionBox(){
   if(!ann) return;
   const b = getAnnBounds(ann);
   if(!b) return;
-  const hr = Math.max(7, baseUnit()*0.14);
+  const hr = Math.max(4, baseUnit()*0.07);
   ctx.save();
   ctx.setLineDash([7,4]);
   ctx.strokeStyle='#1d5fa8';
