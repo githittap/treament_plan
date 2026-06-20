@@ -324,6 +324,7 @@
       <div style="display:flex; justify-content:space-between;"><span>텍스트 모드 켜기/끄기</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">T</kbd></div>
       <div style="display:flex; justify-content:space-between;"><span>지우개 모드 켜기/끄기</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">E</kbd></div>
       <div style="display:flex; justify-content:space-between;"><span>다중 배치 모드 켜기/끄기</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">R</kbd></div>
+      <div style="display:flex; justify-content:space-between;"><span>실행취소</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">Ctrl+Z</kbd></div>
       <div style="display:flex; justify-content:space-between;"><span>이미지 복사 (클립보드)</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">Ctrl+C</kbd></div>
       <div style="display:flex; justify-content:space-between;"><span>이미지 붙여넣기</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">Ctrl+V</kbd></div>
       <div style="display:flex; justify-content:space-between;"><span>팝업 확인</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">Enter</kbd></div>
@@ -729,6 +730,13 @@ window.addEventListener('keydown', e=>{
   if(e.key==='Escape'){
     if(popupEl){ closePopup(); }
     else { clearImage(); }
+  }
+
+  // Ctrl+Z → 실행취소
+  if(e.key==='z' && (e.ctrlKey||e.metaKey)){
+    e.preventDefault();
+    document.getElementById('undoBtn').click();
+    return;
   }
 
   // Ctrl+C → 이미지 복사
