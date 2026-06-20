@@ -1,0 +1,1833 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>치료계획 이미지 주석 도구</title>
+<style>
+  :root{
+    --navy:#0f2942;
+    --blue:#1d5fa8;
+    --blue-light:#e8f1fb;
+    --ink:#1c2733;
+    --gray:#64748b;
+    --line:#d9e1e9;
+    --bg:#c8cdd4;
+    --white:#f0f2f4;
+    --danger:#c0392b;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+  }
+  .app{
+    display:grid;
+    grid-template-columns:300px 1fr 320px;
+    gap:14px;
+    padding:16px;
+    min-height:100vh;
+    align-items:start;
+  }
+  .panel{
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px;
+  }
+  h1{
+    grid-column:1/-1;
+    margin:0 0 4px 0;
+    font-size:18px;
+    color:var(--navy);
+    letter-spacing:-0.2px;
+  }
+  .sub{
+    grid-column:1/-1;
+    margin:-8px 0 6px 0;
+    font-size:12.5px;
+    color:var(--gray);
+  }
+  h2{
+    font-size:12px;
+    color:var(--blue);
+    text-transform:uppercase;
+    letter-spacing:0.6px;
+    margin:0 0 8px 0;
+    border-bottom:1px solid var(--line);
+    padding-bottom:6px;
+  }
+  .row{margin-bottom:12px;}
+  label.field-label{
+    display:block;
+    font-size:12px;
+    color:var(--gray);
+    margin-bottom:4px;
+  }
+  input[type=text], input[type=date], input[type=number]{
+    width:100%;
+    padding:6px 8px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    font-size:13px;
+    font-family:inherit;
+  }
+  .file-btn{
+    display:block;
+    width:100%;
+    padding:9px;
+    text-align:center;
+    background:var(--blue);
+    color:#fff;
+    border-radius:7px;
+    font-size:13px;
+    cursor:pointer;
+    border:none;
+  }
+  .file-btn:hover{background:var(--navy);}
+  input[type=file]{display:none;}
+
+  .mode-grid{display:flex; gap:6px; flex-wrap:wrap;}
+  .mode-btn{
+    flex:1 1 auto;
+    padding:7px 6px;
+    font-size:12px;
+    border:1px solid var(--line);
+    background:#fff;
+    border-radius:6px;
+    cursor:pointer;
+    color:var(--ink);
+  }
+  .mode-btn.active{
+    background:var(--navy);
+    border-color:var(--navy);
+    color:#fff;
+  }
+
+  .treat-list{display:flex; flex-direction:column; gap:5px; padding-right:2px;}
+  .treat-item{
+    display:flex; align-items:center; gap:7px;
+    padding:6px 7px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    cursor:pointer;
+    font-size:12.5px;
+    background:#fff;
+  }
+  .treat-item.active{
+    border-color:var(--navy);
+    box-shadow:0 0 0 1px var(--navy) inset;
+    font-weight:600;
+  }
+  .swatch{
+    width:20px;height:20px;border-radius:5px;flex:none;
+    display:flex;align-items:center;justify-content:center;
+    color:#fff;font-size:9px;font-weight:700;
+  }
+
+  #treatList{display:flex; gap:6px;}
+  .treat-col{display:flex; flex-direction:column; gap:5px; flex:1; min-width:0;}
+  .treat-item.grid-item{flex-direction:column; align-items:center; text-align:center; padding:6px 3px; gap:3px;}
+  .treat-item.grid-item .swatch{width:22px;height:22px;font-size:9px;}
+  .treat-item.grid-item .ti-label{font-size:10px; line-height:1.2; white-space:normal; word-break:keep-all;}
+
+  .add-treat{
+    display:flex; gap:5px; margin-top:8px;
+  }
+  .add-treat input[type=text]{flex:1;}
+  .add-treat input[type=color]{
+    width:30px;height:30px;border:1px solid var(--line);border-radius:6px;padding:0;cursor:pointer;
+  }
+  .small-btn{
+    padding:6px 9px;
+    border-radius:6px;
+    border:1px solid var(--line);
+    background:#fff;
+    font-size:12px;
+    cursor:pointer;
+  }
+  .small-btn:hover{background:var(--blue-light);}
+
+  .util-grid{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;}
+  .util-grid button{flex:1 1 45%;}
+
+  .toggle-row{display:flex; align-items:center; justify-content:space-between; font-size:12.5px; margin-top:8px;}
+
+  .slider-row{margin-top:10px;}
+  .slider-row .lab{display:flex; justify-content:space-between; font-size:12px; color:var(--gray); margin-bottom:3px;}
+  input[type=range]{width:100%;}
+
+  .canvas-wrap{
+    position:relative;
+    background:#11181f;
+    border-radius:10px;
+    border:1px solid var(--line);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-height:480px;
+    overflow:hidden;
+    padding:8px;
+  }
+  #mainCanvas{
+    max-width:100%;
+    max-height:78vh;
+    touch-action:none;
+    cursor:crosshair;
+    background:#000;
+  }
+  .placeholder{
+    color:#8aa0b4;
+    font-size:13px;
+    text-align:center;
+    padding:30px;
+    line-height:1.7;
+  }
+  .mini-popup{
+    position:absolute;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:8px;
+    box-shadow:0 6px 18px rgba(0,0,0,0.18);
+    padding:9px;
+    z-index:30;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    min-width:280px;
+    max-width:320px;
+  }
+  .mini-popup .fline{display:flex; gap:6px; align-items:center;}
+  .mini-popup label{font-size:11px; color:var(--gray); width:34px; flex:none;}
+  .mini-popup input[type=text]{flex:1; padding:5px 7px; font-size:12.5px;}
+  .mini-popup .btns{display:flex; gap:6px; justify-content:flex-end; margin-top:2px; flex-wrap:wrap;}
+
+  .opt-grid{display:flex; flex-wrap:wrap; gap:5px; margin:4px 0;}
+  .opt-btn{padding:6px 8px; font-size:11.5px; border:1px solid var(--line); border-radius:6px; background:#f6f8fa; cursor:pointer;}
+  .opt-btn.sel{background:var(--navy); color:#fff; border-color:var(--navy);}
+  .surf-grid{display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-top:2px;}
+  .surf-btn{padding:7px 4px; font-size:12px; border:1px solid var(--line); border-radius:6px; background:#f6f8fa; cursor:pointer; font-weight:600;}
+  .surf-btn:hover{background:var(--blue-light); border-color:var(--blue);}
+  .surf-btn.sel{background:var(--navy); color:#fff; border-color:var(--navy);}
+  .opt-hint{font-size:11px;color:var(--gray);margin-top:2px;}
+
+  .list-item{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:6px;
+    padding:6px 7px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    font-size:12px;
+    margin-bottom:5px;
+  }
+  .list-item .lbl{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .list-item .acts{display:flex; gap:4px; flex:none;}
+  .list-item .acts span{cursor:pointer; padding:0 4px; border-radius:4px;}
+  .list-item .rot{color:var(--blue);}
+  .list-item .sz{color:var(--blue);}
+  .list-item .x{color:var(--danger); font-weight:700;}
+  .list-empty{color:var(--gray); font-size:12px;}
+  .legend-toggle-label{font-size:12.5px;}
+  .clear-img-btn{
+    display:block;
+    width:100%;
+    padding:8px;
+    margin-top:6px;
+    background:#fff;
+    color:var(--danger);
+    border:1px solid var(--danger);
+    border-radius:7px;
+    font-size:12.5px;
+    font-weight:600;
+    cursor:pointer;
+  }
+  .clear-img-btn:hover{background:#fdf2f2;}
+  .download-btn{
+    width:100%;
+    padding:10px;
+    background:var(--navy);
+    color:#fff;
+    border:none;
+    border-radius:7px;
+    font-size:13.5px;
+    font-weight:600;
+    cursor:pointer;
+    margin-top:6px;
+  }
+  .download-btn:hover{background:#091a2c;}
+  .hint{font-size:11px; color:var(--gray); margin-top:6px; line-height:1.5;}
+
+  #batchPanel{display:none; margin-top:14px;}
+  #batchPanel .fline{display:flex; gap:6px; align-items:center; margin-bottom:5px;}
+  #batchPanel .fline label{font-size:11px; color:var(--gray); width:18px; flex:none;}
+  #batchPanel .fline input[type=text]{flex:1; padding:5px 7px; font-size:12.5px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>치료계획 이미지 주석 도구</h1>
+  <div class="sub">치료종류 선택 → 위치 클릭 → 치아/옵션 입력 후 Enter = 그 시점까지 선택된 내용만 표시됩니다. 마커는 드래그 이동, 더블클릭 수정.</div>
+
+  <!-- LEFT PANEL -->
+  <div class="panel">
+    <h2>이미지</h2>
+    <div class="row">
+      <label class="file-btn" for="fileInput">파노라마 이미지 업로드</label>
+      <input type="file" id="fileInput" accept="image/*">
+    </div>
+    <button class="clear-img-btn" id="clearImgBtn">🗑 현재 이미지 삭제 (ESC)</button>
+    <div class="hint">이미지를 복사한 뒤(Ctrl+C) 이 화면에서 <b>Ctrl+V</b>로 붙여넣어도 바로 불러올 수 있습니다.</div>
+
+    <h2 style="margin-top:14px;">기록 정보</h2>
+    <div class="row">
+      <label class="field-label">환자명</label>
+      <input type="text" id="patientName" placeholder="예: 홍길동">
+    </div>
+    <div class="row">
+      <label class="field-label">작성일</label>
+      <input type="date" id="planDate">
+    </div>
+
+    <h2>입력 모드</h2>
+    <div class="mode-grid">
+      <button class="mode-btn active" data-mode="tooth">치아 표시</button>
+      <button class="mode-btn" data-mode="erase">지우개 <span style="font-size:10px;opacity:0.7;">(E)</span></button>
+    </div>
+    <div class="hint" id="modeHint">치료종류를 고르고 위치를 클릭 → 치아/옵션 입력 후 Enter로 그 시점까지 선택된 내용만 표시됩니다.</div>
+
+    <div class="slider-row">
+      <div class="lab"><span>마커/글자 크기</span><span id="sizeVal">1.5x</span></div>
+      <input type="range" id="sizeSlider" min="0.5" max="3" step="0.1" value="1.5">
+    </div>
+
+    <div id="freeOptions" style="display:none;">
+      <h2 style="margin-top:12px;">펜 색상/굵기 조정</h2>
+      <div class="row" style="display:flex; gap:6px; align-items:center;">
+        <input type="color" id="customColor" value="#e6231e" style="width:34px;height:30px;padding:0;border:1px solid var(--line);border-radius:6px;">
+        <input type="number" id="customWidth" min="1" max="14" value="4" style="width:60px;">
+        <span style="font-size:11px;color:var(--gray);">굵기</span>
+      </div>
+    </div>
+
+    <h2 style="margin-top:14px;">실행</h2>
+    <div class="util-grid">
+      <button class="small-btn" id="undoBtn">실행취소</button>
+      <button class="small-btn" id="clearBtn">전체삭제</button>
+    </div>
+
+    <h2 style="margin-top:14px;">⌨️ 단축키 안내</h2>
+    <div style="font-size:12px; line-height:2; color:var(--ink);">
+      <div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--line); padding-bottom:3px; margin-bottom:3px;">
+        <span style="color:var(--gray);">기능</span><span style="color:var(--gray);">단축키</span>
+      </div>
+      <div style="display:flex; justify-content:space-between;"><span>텍스트 모드 켜기/끄기</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">T</kbd></div>
+      <div style="display:flex; justify-content:space-between;"><span>지우개 모드 켜기/끄기</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">E</kbd></div>
+      <div style="display:flex; justify-content:space-between;"><span>다중 배치 모드 켜기/끄기</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">R</kbd></div>
+      <div style="display:flex; justify-content:space-between;"><span>이미지 복사 (클립보드)</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">Ctrl+C</kbd></div>
+      <div style="display:flex; justify-content:space-between;"><span>이미지 붙여넣기</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">Ctrl+V</kbd></div>
+      <div style="display:flex; justify-content:space-between;"><span>팝업 확인</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">Enter</kbd></div>
+      <div style="display:flex; justify-content:space-between;"><span>팝업 닫기 / 이미지 삭제</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">ESC</kbd></div>
+      <div style="display:flex; justify-content:space-between;"><span>마커 크기 조절</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">마우스 휠</kbd></div>
+    </div>
+  </div>
+
+  <!-- CENTER CANVAS -->
+  <div class="canvas-wrap" id="canvasWrap">
+    <div class="placeholder" id="placeholder">이미지를 업로드하거나<br>이 영역을 클릭한 뒤 Ctrl+V로 붙여넣으세요.</div>
+    <canvas id="mainCanvas" style="display:none;"></canvas>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="panel">
+    <button class="small-btn" id="copyBtn" style="width:100%;padding:9px;margin-bottom:6px;">이미지 복사 <span style="font-size:10px;opacity:0.7;">(Ctrl+C)</span></button>
+    <button class="mode-btn" data-mode="text" id="textModeBtn" style="width:100%;margin-bottom:10px;">텍스트 <span style="font-size:10px;opacity:0.7;">(T)</span></button>
+    <div class="toggle-row" style="margin-top:0;">
+      <span class="legend-toggle-label">다중 배치 모드 <span style="font-size:11px;color:var(--gray);">(단축키: R)</span></span>
+      <input type="checkbox" id="batchToggle">
+    </div>
+
+    <h2 style="margin-top:12px;">표시 도구</h2>
+    <div class="treat-list" id="penToolsList"></div>
+    <div class="treat-list" id="stickerList" style="margin-top:6px;"></div>
+
+    <h2 style="margin-top:14px;">치료종류 선택</h2>
+    <div id="treatList"></div>
+    <div class="add-treat">
+      <input type="text" id="newTreatLabel" placeholder="새 항목명(원모양)">
+      <input type="color" id="newTreatColor" value="#444444">
+      <button class="small-btn" id="addTreatBtn">+</button>
+    </div>
+
+    <div id="batchPanel"></div>
+
+    <h2 style="margin-top:14px;">표시 옵션</h2>
+    <div class="toggle-row">
+      <span class="legend-toggle-label">범례 표시</span>
+      <input type="checkbox" id="legendToggle" checked>
+    </div>
+
+    <h2 style="margin-top:14px;">주석 목록</h2>
+    <div id="annList"><div class="list-empty">아직 표시된 항목이 없습니다.</div></div>
+
+    <button class="download-btn" id="downloadBtn">PNG로 다운로드</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('mainCanvas');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('canvasWrap');
+const placeholder = document.getElementById('placeholder');
+
+let img = null;
+let naturalW = 0, naturalH = 0;
+let annotations = [];
+let idSeq = 1;
+let mode = 'tooth';
+let activeTreatId = null;
+let activePenTool = null;
+let activeSticker = null;
+let showLegend = true;
+let sizeSliderVal = 1.5;
+
+let treatTypes = [
+  {id:'implant',     label:'임플',     shape:'implant'},
+  {id:'extraction',  label:'발치',     shape:'x',    color:'#d4150f'},
+  {id:'pontic',      label:'폰틱',     shape:'pontic'},
+  {id:'resin',       label:'레진',     shape:'dot',  color:'#0891b2', abbr:'R/F'},
+  {id:'inlay',       label:'인레이',   shape:'dot',  color:'#d4150f', abbr:'In'},
+  {id:'fu',          label:'F/U',     shape:'dot',  color:'#6b7280', abbr:'F/U'},
+  {id:'core_crown',  label:'코어Cr.', shape:'dot',  color:'#d97706', abbr:'Cr'},
+  {id:'rct',         label:'RCT-Cr',  shape:'dot',  color:'#7c3aed', abbr:'RCT'},
+  {id:'ca',          label:'CA',      shape:'ca',   color:'#d4150f'},
+  {id:'done',        label:'완료',    shape:'area', interaction:'area', fill:'rgba(34,197,94,0.22)',  stroke:'#16a34a', skipPopup:true},
+  {id:'hold',        label:'보류',    shape:'area', interaction:'area', fill:'rgba(245,158,11,0.22)', stroke:'#d97706'},
+  {id:'other',       label:'기타',    shape:'dot',  color:'#475569', abbr:'기타'},
+  {id:'crestal',     label:'크레스탈', shape:'dot', color:'#0d9488', abbr:'Cre.'},
+  {id:'lateral',     label:'라테랄',   shape:'dot', color:'#4f46e5', abbr:'Lat.'},
+  {id:'gbr',         label:'GBR',      shape:'dot', color:'#be185d', abbr:'GBR'},
+];
+activeTreatId = 'implant';
+
+const GRID_COLUMNS = [
+  ['extraction','implant','pontic'],
+  ['resin','inlay','fu'],
+  ['core_crown','rct'],
+  ['ca','done','hold','other']
+];
+const HIDE_NAME = new Set(['pontic','implant','extraction','core_crown','rct','resin','ca','fu','inlay']);
+const ROTATABLE = [];
+
+let freeColor = '#e6231e';
+let freeWidth = 4;
+let freeDash = [];
+
+let freeDragging = false;
+let drawingStroke = null;
+let popupEl = null;
+let draggingAnn = null;
+
+let arealDragging = false;
+let areaStart = null;
+let areaCurrent = null;
+
+let batchModeOn = false;
+let batchPoints = [];
+let batchTreatId = null;
+let batchState = null;
+let pendingMarker = null;
+
+let selectedAnnId = null;
+let resizingHandle = null;
+let pointerDownPos = null;
+let mouseCanvasPos = null;
+
+function getAnnBounds(a){
+  if(a.type==='tooth'){
+    const r = a.size*1.4;
+    return {x1:a.x-r, y1:a.y-r, x2:a.x+r, y2:a.y+r};
+  } else if(a.type==='area'){
+    return {x1:Math.min(a.x1,a.x2), y1:Math.min(a.y1,a.y2), x2:Math.max(a.x1,a.x2), y2:Math.max(a.y1,a.y2)};
+  } else if(a.type==='text'){
+    const w = a.text.length*a.fontSize*0.65;
+    return {x1:a.x, y1:a.y, x2:a.x+w+14, y2:a.y+a.fontSize*1.7};
+  } else if(a.type==='free'){
+    const xs=a.points.map(p=>p.x), ys=a.points.map(p=>p.y);
+    return {x1:Math.min(...xs)-8, y1:Math.min(...ys)-8, x2:Math.max(...xs)+8, y2:Math.max(...ys)+8};
+  }
+  return null;
+}
+function getHandles(b){
+  const mx=(b.x1+b.x2)/2, my=(b.y1+b.y2)/2;
+  return [
+    {x:b.x1,y:b.y1},{x:mx,y:b.y1},{x:b.x2,y:b.y1},
+    {x:b.x1,y:my},                  {x:b.x2,y:my},
+    {x:b.x1,y:b.y2},{x:mx,y:b.y2},{x:b.x2,y:b.y2}
+  ];
+}
+function findHandleNear(x,y){
+  if(selectedAnnId===null) return -1;
+  const ann = annotations.find(a=>a.id===selectedAnnId);
+  if(!ann) return -1;
+  const b = getAnnBounds(ann);
+  if(!b) return -1;
+  const hr = Math.max(10, baseUnit()*0.2);
+  const hs = getHandles(b);
+  for(let i=0;i<hs.length;i++){
+    if(Math.hypot(hs[i].x-x, hs[i].y-y)<hr) return i;
+  }
+  return -1;
+}
+function drawSelectionBox(){
+  const ann = annotations.find(a=>a.id===selectedAnnId);
+  if(!ann) return;
+  const b = getAnnBounds(ann);
+  if(!b) return;
+  const hr = Math.max(7, baseUnit()*0.14);
+  ctx.save();
+  ctx.setLineDash([7,4]);
+  ctx.strokeStyle='#1d5fa8';
+  ctx.lineWidth=2;
+  ctx.strokeRect(b.x1,b.y1,b.x2-b.x1,b.y2-b.y1);
+  ctx.setLineDash([]);
+  getHandles(b).forEach(h=>{
+    ctx.beginPath(); ctx.arc(h.x,h.y,hr,0,Math.PI*2);
+    ctx.fillStyle='#fff'; ctx.fill();
+    ctx.strokeStyle='#1d5fa8'; ctx.lineWidth=2; ctx.stroke();
+  });
+  ctx.restore();
+}
+
+function treatKind(t){
+  if(!t) return 'simple';
+  if(t.id==='implant') return 'implant';
+  if(t.id==='inlay') return 'surface';
+  return 'simple';
+}
+
+// ---------- UI: mode buttons ----------
+document.querySelectorAll('.mode-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const clickedMode = btn.dataset.mode;
+    // 텍스트·지우개는 같은 버튼 재클릭 시 치아표시로 복귀
+    if((clickedMode==='text'||clickedMode==='erase') && mode===clickedMode){
+      document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelector('.mode-btn[data-mode="tooth"]').classList.add('active');
+      mode='tooth'; activePenTool=null; activeSticker=null;
+      document.getElementById('freeOptions').style.display='none';
+      document.getElementById('modeHint').textContent='치료종류를 고르고 위치를 클릭 → 치아/옵션 입력 후 Enter로 그 시점까지 선택된 내용만 표시됩니다.';
+      renderPenTools(); renderStickers();
+      closePopup();
+      return;
+    }
+    document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    mode = clickedMode;
+    activePenTool = null;
+    activeSticker = null;
+    renderPenTools(); renderStickers();
+    document.getElementById('freeOptions').style.display = 'none';
+    const hint = document.getElementById('modeHint');
+    if(mode==='tooth') hint.textContent = '치료종류를 고르고 위치를 클릭 → 치아/옵션 입력 후 Enter로 그 시점까지 선택된 내용만 표시됩니다.';
+    if(mode==='text') hint.textContent = '이미지를 클릭하면 자유 텍스트를 입력할 수 있습니다. 기존 텍스트는 드래그로 이동, 더블클릭으로 수정.';
+    if(mode==='erase') hint.textContent = '지울 항목(마커·선·텍스트·영역·배치점)을 클릭하세요.';
+    closePopup();
+  });
+});
+
+document.getElementById('batchToggle').addEventListener('change', e=>{
+  batchModeOn = e.target.checked;
+  if(!batchModeOn){
+    batchPoints=[]; batchTreatId=null; batchState=null;
+    renderBatchPanel(); redraw();
+  }
+});
+
+// ---------- Size slider ----------
+const sizeSlider = document.getElementById('sizeSlider');
+sizeSlider.addEventListener('input', e=>{
+  sizeSliderVal = parseFloat(e.target.value);
+  document.getElementById('sizeVal').textContent = sizeSliderVal.toFixed(1)+'x';
+});
+
+// ---------- Pen tools ----------
+function selectPenTool(tool){
+  activePenTool = tool;
+  activeSticker = null;
+  mode = 'free';
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+  if(tool==='mark'){ freeColor='#e6231e'; freeWidth=4; freeDash=[]; }
+  else { freeColor='#1f9d55'; freeWidth=6; freeDash=[12,8]; }
+  document.getElementById('customColor').value = freeColor;
+  document.getElementById('customWidth').value = freeWidth;
+  document.getElementById('freeOptions').style.display='block';
+  document.getElementById('modeHint').textContent = '드래그하여 ' + (tool==='mark' ? '표시(빨간 펜)' : '연결선(초록 점선)') + '을 그립니다.';
+  renderPenTools(); renderStickers();
+  closePopup();
+}
+function renderPenTools(){
+  const c = document.getElementById('penToolsList');
+  c.innerHTML='';
+  const tools = [
+    {id:'mark', label:'표시', sw:'#e6231e', g:'✎'},
+    {id:'connect', label:'연결선', sw:'#1f9d55', g:'⌁'}
+  ];
+  tools.forEach(tl=>{
+    const div=document.createElement('div');
+    div.className='treat-item'+(activePenTool===tl.id?' active':'');
+    div.innerHTML = `<span class="swatch" style="background:${tl.sw}">${tl.g}</span><span>${tl.label}</span>`;
+    div.addEventListener('click', ()=> selectPenTool(tl.id));
+    c.appendChild(div);
+  });
+}
+renderPenTools();
+
+function renderStickers(){
+  const c = document.getElementById('stickerList');
+  c.innerHTML='';
+  ['crestal','lateral','gbr'].forEach(id=>{
+    const t = treatTypes.find(tt=>tt.id===id);
+    const div=document.createElement('div');
+    div.className='treat-item'+(activeSticker===id?' active':'');
+    div.innerHTML = `<span class="swatch" style="background:${t.color}">${t.abbr}</span><span>${t.label}</span>`;
+    div.addEventListener('click', ()=>{
+      activeSticker = id; activePenTool = null; mode='tooth';
+      document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelector('.mode-btn[data-mode="tooth"]').classList.add('active');
+      document.getElementById('freeOptions').style.display='none';
+      renderPenTools(); renderStickers(); renderTreatList();
+      closePopup();
+    });
+    c.appendChild(div);
+  });
+}
+renderStickers();
+
+document.getElementById('customColor').addEventListener('input', e=>{ freeColor = e.target.value; });
+document.getElementById('customWidth').addEventListener('input', e=>{ freeWidth = parseInt(e.target.value)||4; });
+
+// ---------- Treatment palette ----------
+function shapeGlyph(shape){
+  if(shape==='implant') return 'IM';
+  if(shape==='pontic') return 'P';
+  if(shape==='x') return 'X';
+  if(shape==='inlaySurface') return '⌐';
+  if(shape==='ca') return '∨';
+  if(shape==='area') return '▭';
+  return '●';
+}
+function renderTreatItem(t){
+  const div = document.createElement('div');
+  const isActive = (t.id===activeTreatId && mode==='tooth' && !activePenTool && !activeSticker);
+  div.className = 'treat-item grid-item' + (isActive?' active':'');
+  const swatchColor = t.color || t.stroke || '#444';
+  const swatchTxt = t.abbr || shapeGlyph(t.shape);
+  div.innerHTML = `<span class="swatch">${swatchTxt}</span><span class="ti-label">${t.label}</span>`;
+  div.querySelector('.swatch').style.background = swatchColor;
+  div.addEventListener('click', ()=>{
+    activeTreatId = t.id;
+    activePenTool = null; activeSticker = null;
+    mode = 'tooth';
+    document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelector('.mode-btn[data-mode="tooth"]').classList.add('active');
+    document.getElementById('freeOptions').style.display='none';
+    renderPenTools(); renderStickers(); renderTreatList();
+  });
+  return div;
+}
+function renderTreatList(){
+  const listWrap = document.getElementById('treatList');
+  listWrap.innerHTML = '';
+  GRID_COLUMNS.forEach(colIds=>{
+    const col = document.createElement('div');
+    col.className='treat-col';
+    colIds.forEach(id=>{
+      const t = treatTypes.find(tt=>tt.id===id);
+      if(t) col.appendChild(renderTreatItem(t));
+    });
+    listWrap.appendChild(col);
+  });
+}
+renderTreatList();
+
+document.getElementById('addTreatBtn').addEventListener('click', ()=>{
+  const labelInput = document.getElementById('newTreatLabel');
+  const colorInput = document.getElementById('newTreatColor');
+  const label = labelInput.value.trim();
+  if(!label) return;
+  const abbr = label.length<=4 ? label : label.slice(0,3);
+  const newT = {id:'custom'+idSeq++, label, abbr, color: colorInput.value, shape:'dot'};
+  treatTypes.push(newT);
+  GRID_COLUMNS[GRID_COLUMNS.length-1].push(newT.id);
+  labelInput.value='';
+  renderTreatList();
+});
+
+// ---------- Legend toggle ----------
+document.getElementById('legendToggle').addEventListener('change', e=>{
+  showLegend = e.target.checked;
+  redraw();
+});
+
+// ---------- Load image helper ----------
+function loadImageFromFile(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    const image = new Image();
+    image.onload = ()=>{
+      img = image;
+      naturalW = image.naturalWidth;
+      naturalH = image.naturalHeight;
+      canvas.width = naturalW;
+      canvas.height = naturalH;
+      canvas.style.display='block';
+      placeholder.style.display='none';
+      annotations = [];
+      batchPoints = []; batchState=null;
+      renderAnnList(); renderBatchPanel();
+      redraw();
+    };
+    image.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+document.getElementById('fileInput').addEventListener('change', e=>{
+  loadImageFromFile(e.target.files[0]);
+});
+
+// ---------- Image clear ----------
+function clearImage(){
+  if(!img) return;
+  if(confirm('현재 이미지와 모든 표시를 삭제할까요?')){
+    img = null; naturalW = 0; naturalH = 0;
+    annotations = []; selectedAnnId = null;
+    batchPoints = []; batchState = null;
+    canvas.style.display = 'none';
+    placeholder.style.display = 'block';
+    document.getElementById('fileInput').value = '';
+    document.getElementById('patientName').value = '';
+    document.getElementById('planDate').value = '';
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    renderAnnList(); renderBatchPanel();
+  }
+}
+document.getElementById('clearImgBtn').addEventListener('click', clearImage);
+
+window.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){
+    if(popupEl){ closePopup(); }
+    else { clearImage(); }
+  }
+
+  // Ctrl+C → 이미지 복사
+  if(e.key==='c' && (e.ctrlKey||e.metaKey)){
+    const tag = document.activeElement.tagName;
+    if(tag==='INPUT'||tag==='TEXTAREA') return;
+    document.getElementById('copyBtn').click();
+    e.preventDefault();
+    return;
+  }
+
+  if(e.ctrlKey||e.metaKey) return;
+  const tag = document.activeElement.tagName;
+  if(tag==='INPUT'||tag==='TEXTAREA') return;
+
+  // R → 다중 배치 모드 토글
+  if(e.key==='r'||e.key==='R'){
+    const toggle = document.getElementById('batchToggle');
+    toggle.checked = !toggle.checked;
+    toggle.dispatchEvent(new Event('change'));
+  }
+
+  // T → 텍스트 모드 토글
+  if(e.key==='t'||e.key==='T'){
+    const textBtn = document.getElementById('textModeBtn');
+    if(mode==='text'){
+      // 이미 텍스트 모드면 치아 표시로 복귀
+      document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelector('.mode-btn[data-mode="tooth"]').classList.add('active');
+      textBtn.classList.remove('active');
+      mode='tooth';
+      activePenTool=null; activeSticker=null;
+      document.getElementById('freeOptions').style.display='none';
+      document.getElementById('modeHint').textContent='치료종류를 고르고 위치를 클릭 → 치아/옵션 입력 후 Enter로 그 시점까지 선택된 내용만 표시됩니다.';
+      renderPenTools(); renderStickers();
+    } else {
+      document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+      textBtn.classList.add('active');
+      mode='text'; activePenTool=null; activeSticker=null;
+      document.getElementById('freeOptions').style.display='none';
+      document.getElementById('modeHint').textContent='이미지를 클릭하면 자유 텍스트를 입력할 수 있습니다. 기존 텍스트는 드래그로 이동, 더블클릭으로 수정.';
+      renderPenTools(); renderStickers(); renderTreatList();
+      closePopup();
+    }
+  }
+
+  // E → 지우개 모드 토글
+  if(e.key==='e'||e.key==='E'){
+    if(mode==='erase'){
+      // 이미 지우개 모드면 치아 표시로 복귀
+      document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelector('.mode-btn[data-mode="tooth"]').classList.add('active');
+      mode='tooth'; activePenTool=null; activeSticker=null;
+      document.getElementById('freeOptions').style.display='none';
+      document.getElementById('modeHint').textContent='치료종류를 고르고 위치를 클릭 → 치아/옵션 입력 후 Enter로 그 시점까지 선택된 내용만 표시됩니다.';
+      renderPenTools(); renderStickers();
+    } else {
+      document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelector('.mode-btn[data-mode="erase"]').classList.add('active');
+      mode='erase'; activePenTool=null; activeSticker=null;
+      document.getElementById('freeOptions').style.display='none';
+      document.getElementById('modeHint').textContent='지울 항목(마커·선·텍스트·영역·배치점)을 클릭하세요.';
+      renderPenTools(); renderStickers(); renderTreatList();
+      closePopup();
+    }
+  }
+});
+
+// ---------- Paste support ----------
+window.addEventListener('paste', e=>{
+  const items = e.clipboardData && e.clipboardData.items;
+  if(!items) return;
+  for(const item of items){
+    if(item.type && item.type.indexOf('image')===0){
+      const file = item.getAsFile();
+      loadImageFromFile(file);
+      e.preventDefault();
+      break;
+    }
+  }
+});
+
+// ---------- Size unit ----------
+function baseUnit(){ return Math.min(naturalW,naturalH) * 0.055; }
+function implantDir(toothNum){
+  if(!toothNum) return 1;
+  const first = String(toothNum).trim()[0];
+  return (first==='1' || first==='2') ? -1 : 1;
+}
+function quadrantOf(toothNum){
+  if(!toothNum) return null;
+  const f = String(toothNum).trim()[0];
+  return ['1','2','3','4'].includes(f) ? parseInt(f,10) : null;
+}
+
+// ---------- Shape drawing ----------
+function drawDot(c,x,y,s,color,abbr){
+  const r = s*0.45;
+  c.save();
+  c.beginPath(); c.arc(x,y,r,0,Math.PI*2);
+  c.fillStyle=color; c.fill();
+  c.lineWidth=Math.max(2,r*0.14); c.strokeStyle='#fff'; c.stroke();
+  c.fillStyle='#fff'; c.font=`700 ${r*0.72}px sans-serif`; c.textAlign='center'; c.textBaseline='middle';
+  c.fillText(abbr||'', x, y+1);
+  c.restore();
+  return {topY: y-r, bottomY: y+r};
+}
+
+function drawX(c,x,y,s,color){
+  const half = s*0.32;
+  c.save();
+  c.translate(x,y); c.rotate(8*Math.PI/180);
+  c.lineWidth = Math.max(3, s*0.13);
+  c.strokeStyle = color; c.lineCap='round';
+  c.beginPath(); c.moveTo(-half,-half); c.lineTo(half,half); c.stroke();
+  c.beginPath(); c.moveTo(half,-half); c.lineTo(-half,half); c.stroke();
+  c.restore();
+  return {topY: y-half, bottomY: y+half};
+}
+
+function drawImplant(c,x,y,s,dir){
+  dir = dir || 1;
+  const crownW=s*1.0, crownH=s*0.55;
+  const collarW=s*0.55, collarTaperW=collarW*0.85, collarH=s*0.22;
+  const fixtureTopW=s*0.5, fixtureH=s*1.25;
+
+  c.save();
+  const cTopY = y + (dir>0?0:-crownH);
+  c.beginPath();
+  if(c.roundRect){ c.roundRect(x-crownW/2, cTopY, crownW, crownH, crownH*0.35); }
+  else { c.rect(x-crownW/2, cTopY, crownW, crownH); }
+  c.fillStyle='#fafafa'; c.fill();
+  c.lineWidth=Math.max(1.5,s*0.025); c.strokeStyle='#9aa0a6'; c.stroke();
+  c.beginPath(); c.arc(x, y+dir*crownH*0.45, crownH*0.16,0,Math.PI*2);
+  c.fillStyle='#cfd4da'; c.fill();
+
+  const collarStartY = y + dir*crownH;
+  const collarEndY = y + dir*(crownH+collarH);
+  c.beginPath();
+  c.moveTo(x-collarW/2, collarStartY);
+  c.lineTo(x+collarW/2, collarStartY);
+  c.lineTo(x+collarTaperW/2, collarEndY);
+  c.lineTo(x-collarTaperW/2, collarEndY);
+  c.closePath();
+  c.fillStyle='#c9a23a'; c.fill();
+  c.lineWidth=Math.max(1,s*0.02); c.strokeStyle='#9c7c20'; c.stroke();
+
+  const fy0 = collarEndY;
+  const fy1 = y + dir*(crownH+collarH+fixtureH);
+  c.beginPath();
+  c.moveTo(x-fixtureTopW/2, fy0);
+  c.lineTo(x+fixtureTopW/2, fy0);
+  c.lineTo(x, fy1);
+  c.closePath();
+  c.fillStyle='#3b3f45'; c.fill();
+
+  c.strokeStyle='rgba(255,255,255,0.55)';
+  c.lineWidth=Math.max(1, s*0.018);
+  const nThreads = Math.max(5, Math.floor(fixtureH/(s*0.11)));
+  for(let i=1;i<nThreads;i++){
+    const t = i/nThreads;
+    const ty = fy0 + dir*t*fixtureH;
+    const w = fixtureTopW*(1-t);
+    c.beginPath();
+    c.moveTo(x-w/2, ty);
+    c.lineTo(x+w/2, ty);
+    c.stroke();
+  }
+  c.restore();
+
+  const bottomY = Math.max(y, fy1, collarEndY, cTopY+crownH);
+  const topY = Math.min(y, fy1, collarStartY, cTopY);
+  return {topY, bottomY};
+}
+
+function drawPontic(c,x,y,s){
+  const crownW=s*1.0, crownH=s*0.6;
+  c.save();
+  c.beginPath();
+  if(c.roundRect){ c.roundRect(x-crownW/2, y, crownW, crownH, crownH*0.35); }
+  else { c.rect(x-crownW/2, y, crownW, crownH); }
+  c.fillStyle='#9aa0a6'; c.fill();
+  c.lineWidth=Math.max(1.5,s*0.03); c.strokeStyle='#5f656b'; c.stroke();
+  c.restore();
+  return {topY: y, bottomY: y+crownH};
+}
+
+function drawInlay(c,x,y,s,color,surface,toothNum,manualRotation){
+  const q = quadrantOf(toothNum);
+  const mRight = q ? (q===1||q===4) : true;
+  const vUp = q ? (q===1||q===2) : true; // 상악(1,2): 꼭짓점이 위, 하악(3,4): 꼭짓점이 아래
+  const vDir = vUp ? 1 : -1;
+  const arm = s*0.85;
+  const lw = Math.max(3,s*0.16);
+  c.save();
+  c.translate(x,y);
+  c.rotate((manualRotation||0)*Math.PI/180);
+  c.strokeStyle=color; c.lineWidth=lw; c.lineCap='round'; c.lineJoin='round';
+  const sgn = mRight?1:-1;
+  c.beginPath();
+  if(surface==='O'){
+    c.moveTo(-arm*0.4,0); c.lineTo(arm*0.4,0);
+  } else if(surface==='MOD'){
+    c.moveTo(-arm/2,vDir*arm); c.lineTo(-arm/2,0); c.lineTo(arm/2,0); c.lineTo(arm/2,vDir*arm);
+  } else if(surface==='MO'){
+    c.moveTo(sgn*arm/2,vDir*arm); c.lineTo(sgn*arm/2,0); c.lineTo(-sgn*arm/2,0);
+  } else if(surface==='DO'){
+    c.moveTo(-sgn*arm/2,vDir*arm); c.lineTo(-sgn*arm/2,0); c.lineTo(sgn*arm/2,0);
+  } else {
+    c.moveTo(0,vDir*arm); c.lineTo(0,0); c.lineTo(arm,0);
+  }
+  c.stroke();
+  c.restore();
+  const topY = vDir>0 ? y-arm : y;
+  const bottomY = vDir>0 ? y : y+arm;
+  return {topY, bottomY};
+}
+
+function drawCA(c,x,y,s,color){
+  const halfAngle = (23/2) * Math.PI/180;
+  const armLen = s*0.45;
+  const lw = Math.max(3, s*0.16);
+  const vertexX = x - armLen*Math.cos(halfAngle);
+  const p1y = y - armLen*Math.sin(halfAngle);
+  const p2y = y + armLen*Math.sin(halfAngle);
+  c.save();
+  c.strokeStyle=color; c.lineWidth=lw; c.lineCap='round'; c.lineJoin='round';
+  c.beginPath();
+  c.moveTo(x, p1y);
+  c.lineTo(vertexX, y);
+  c.lineTo(x, p2y);
+  c.stroke();
+  c.restore();
+  return {topY: y-armLen*Math.sin(halfAngle), bottomY: y+armLen*Math.sin(halfAngle)};
+}
+
+function drawShapeForAnn(c,a){
+  const t = treatTypes.find(tt=>tt.id===a.treatId) || {shape:'dot', color:'#444', abbr:'?'};
+  const s = a.size;
+  switch(t.shape){
+    case 'implant': return drawImplant(c,a.x,a.y,s, implantDir(a.toothNum));
+    case 'pontic': return drawPontic(c,a.x,a.y,s);
+    case 'x': return drawX(c,a.x,a.y,s, t.color||'#d4150f');
+    case 'inlaySurface': return drawInlay(c,a.x,a.y,s, t.color||'#d4150f', a.surface, a.toothNum, a.rotation||0);
+    case 'ca': return drawCA(c,a.x,a.y,s, t.color||'#d4150f');
+    default: return drawDot(c,a.x,a.y,s, t.color||'#444', t.abbr||'');
+  }
+}
+
+function buildLabel(a){
+  if(a.noLabel) return '';
+  const t = treatTypes.find(tt=>tt.id===a.treatId) || {label:'?'};
+  let main = HIDE_NAME.has(a.treatId) ? '' : t.label;
+  if(a.toothNum){ main += (main?' ':'') + '#'+a.toothNum; }
+  const extras = [];
+  if(a.kinds && a.kinds.length) extras.push(...a.kinds);
+  if(a.periods && a.periods.length) extras.push(...a.periods);
+  if(a.surface) extras.push(a.surface);
+  if(a.note) extras.push(a.note);
+  if(extras.length) main += (main?' ':'') + '(' + extras.join(', ') + ')';
+  return main.trim();
+}
+
+function drawYellowLabel(c, cx, topY, text, fontSize){
+  if(!text) return;
+  c.save();
+  c.font = `700 ${fontSize}px sans-serif`;
+  const tw = c.measureText(text).width;
+  const padX = fontSize*0.45, padY = fontSize*0.35;
+  const boxW = tw + padX*2;
+  const boxH = fontSize + padY*2;
+  let bx = cx - boxW/2;
+  bx = Math.max(4, Math.min(bx, naturalW-boxW-4));
+  c.fillStyle = '#ffd400';
+  c.strokeStyle = '#bfa000';
+  c.lineWidth = 1;
+  c.fillRect(bx, topY, boxW, boxH);
+  c.strokeRect(bx, topY, boxW, boxH);
+  c.fillStyle = '#1a1a1a';
+  c.textAlign='left'; c.textBaseline='top';
+  c.fillText(text, bx+padX, topY+padY*0.9);
+  c.restore();
+}
+
+function computeLabelTopY(info, dir, fontSize, gap){
+  if(dir===-1){
+    return info.topY - gap - fontSize*1.7;
+  }
+  return info.bottomY + gap;
+}
+
+// ---------- Main render ----------
+function redraw(){
+  if(!img) return;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(img,0,0,naturalW,naturalH);
+
+  annotations.forEach(a=>{
+    if(a.type==='free'){
+      ctx.save();
+      ctx.strokeStyle = a.color;
+      ctx.lineWidth = a.width;
+      ctx.setLineDash(a.dash||[]);
+      ctx.lineJoin='round'; ctx.lineCap='round';
+      ctx.beginPath();
+      a.points.forEach((p,i)=>{ i===0? ctx.moveTo(p.x,p.y): ctx.lineTo(p.x,p.y); });
+      ctx.stroke();
+      ctx.restore();
+    } else if(a.type==='tooth'){
+      const info = drawShapeForAnn(ctx, a);
+      if(!a.noLabel){
+        const label = buildLabel(a);
+        const fontSize = Math.max(10, a.size*0.204);
+        const gap = a.size*0.15;
+        const dir = implantDir(a.toothNum);
+        const labelTopY = computeLabelTopY(info, dir, fontSize, gap);
+        drawYellowLabel(ctx, a.x, labelTopY, label, fontSize);
+      }
+    } else if(a.type==='area'){
+      const t = treatTypes.find(tt=>tt.id===a.treatId) || {fill:'rgba(0,0,0,0.2)', stroke:'#333'};
+      const rx=Math.min(a.x1,a.x2), ry=Math.min(a.y1,a.y2), rw=Math.abs(a.x2-a.x1), rh=Math.abs(a.y2-a.y1);
+      ctx.save();
+      ctx.fillStyle=t.fill; ctx.fillRect(rx,ry,rw,rh);
+      ctx.strokeStyle=t.stroke; ctx.lineWidth=Math.max(2, baseUnit()*sizeSliderVal*0.08); ctx.setLineDash([8,5]);
+      ctx.strokeRect(rx,ry,rw,rh);
+      ctx.restore();
+      const label = buildLabel(a);
+      const fontSize = Math.max(10, baseUnit()*sizeSliderVal*0.204);
+      drawYellowLabel(ctx, rx+rw/2, ry - fontSize*1.8, label, fontSize);
+    } else if(a.type==='text'){
+      drawYellowLabel(ctx, a.x + (a.boxW||40)/2, a.y, a.text, a.fontSize);
+    }
+  });
+
+  if(arealDragging && areaStart && areaCurrent){
+    const t = treatTypes.find(tt=>tt.id===activeTreatId);
+    if(t){
+      const rx=Math.min(areaStart.x,areaCurrent.x), ry=Math.min(areaStart.y,areaCurrent.y);
+      const rw=Math.abs(areaCurrent.x-areaStart.x), rh=Math.abs(areaCurrent.y-areaStart.y);
+      ctx.save();
+      ctx.fillStyle=t.fill; ctx.fillRect(rx,ry,rw,rh);
+      ctx.strokeStyle=t.stroke; ctx.lineWidth=3; ctx.setLineDash([8,5]); ctx.strokeRect(rx,ry,rw,rh);
+      ctx.restore();
+    }
+  }
+
+  if(batchModeOn && batchPoints.length){
+    batchPoints.forEach((p,i)=>{
+      ctx.save();
+      const r = baseUnit()*sizeSliderVal*0.4;
+      ctx.beginPath(); ctx.arc(p.x,p.y,r,0,Math.PI*2);
+      ctx.fillStyle='rgba(29,95,168,0.25)'; ctx.fill();
+      ctx.setLineDash([6,4]); ctx.strokeStyle='#1d5fa8'; ctx.lineWidth=3; ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle='#1d5fa8';
+      ctx.font='700 ' + Math.max(14, baseUnit()*sizeSliderVal*0.3) + 'px sans-serif';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(String(i+1), p.x, p.y);
+      ctx.restore();
+    });
+  }
+
+  const pname = document.getElementById('patientName').value.trim();
+  const pdate = document.getElementById('planDate').value;
+  if(pname || pdate){
+    ctx.save();
+    const fs = Math.max(13, Math.min(naturalW,naturalH)*0.016);
+    ctx.font = `600 ${fs}px sans-serif`;
+    const text = [pname, pdate].filter(Boolean).join('   |   ');
+    const tw = ctx.measureText(text).width;
+    ctx.fillStyle='rgba(255,255,255,0.85)';
+    ctx.fillRect(8,8,tw+14, fs*1.6);
+    ctx.fillStyle='#111';
+    ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.fillText(text, 15, 12);
+    ctx.restore();
+  }
+
+  if(showLegend) drawLegend();
+
+  if(selectedAnnId!==null) drawSelectionBox();
+
+  if(pendingMarker){
+    ctx.save();
+    const r = Math.max(5, baseUnit()*sizeSliderVal*0.18);
+    ctx.beginPath(); ctx.arc(pendingMarker.x, pendingMarker.y, r, 0, Math.PI*2);
+    ctx.fillStyle='#00e5ff';
+    ctx.fill();
+    ctx.lineWidth=2; ctx.strokeStyle='#003640'; ctx.stroke();
+    ctx.restore();
+  }
+
+  if(mouseCanvasPos){
+    ctx.save();
+    const mr = Math.max(5, baseUnit()*0.09);
+    ctx.beginPath(); ctx.arc(mouseCanvasPos.x, mouseCanvasPos.y, mr, 0, Math.PI*2);
+    ctx.fillStyle='rgba(220,30,30,0.85)';
+    ctx.fill();
+    ctx.lineWidth=Math.max(1.5, mr*0.25); ctx.strokeStyle='#fff'; ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawLegend(){
+  const fs = Math.max(13, Math.min(naturalW,naturalH)*0.016);
+  const pad = 10;
+  const itemH = fs*1.7;
+  const usedTreatIds = [...new Set(annotations.filter(a=>a.type==='tooth'||a.type==='area').map(a=>a.treatId))];
+  const items = treatTypes.filter(t=>usedTreatIds.includes(t.id));
+  if(items.length===0) return;
+  ctx.save();
+  ctx.font = `600 ${fs}px sans-serif`;
+  let maxW = 0;
+  items.forEach(t=>{ const w = ctx.measureText(t.label).width + fs*2.2; if(w>maxW) maxW=w; });
+  const boxW = maxW + pad*2;
+  const boxH = items.length*itemH + pad*2;
+  const x0 = naturalW - boxW - 14;
+  const y0 = naturalH - boxH - 14;
+  ctx.fillStyle='rgba(255,255,255,0.92)';
+  ctx.strokeStyle='#ccc';
+  ctx.lineWidth=1;
+  ctx.fillRect(x0,y0,boxW,boxH);
+  ctx.strokeRect(x0,y0,boxW,boxH);
+  items.forEach((t,i)=>{
+    const cy = y0 + pad + i*itemH + itemH/2;
+    ctx.fillStyle = t.color || t.stroke || '#444';
+    ctx.beginPath();
+    ctx.arc(x0+pad+fs*0.6, cy, fs*0.6, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle='#111';
+    ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillText(t.label, x0+pad+fs*1.6, cy);
+  });
+  ctx.restore();
+}
+
+document.getElementById('patientName').addEventListener('input', redraw);
+document.getElementById('planDate').addEventListener('input', redraw);
+
+// ---------- Coordinate mapping ----------
+function getCanvasCoords(evt){
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return { x:(evt.clientX-rect.left)*scaleX, y:(evt.clientY-rect.top)*scaleY };
+}
+function getWrapOffset(evt){
+  const rect = wrap.getBoundingClientRect();
+  return { left: evt.clientX-rect.left, top: evt.clientY-rect.top };
+}
+
+// ---------- Hit test for dragging ----------
+function findAnnotationNear(x,y){
+  for(let i=annotations.length-1;i>=0;i--){
+    const a = annotations[i];
+    if(a.type==='tooth'){
+      const r = a.size*1.1;
+      if(Math.hypot(a.x-x,a.y-y) < r) return a;
+    } else if(a.type==='text'){
+      const halfW = Math.max(30, a.text.length*a.fontSize*0.32);
+      const halfH = a.fontSize;
+      if(x > a.x-15 && x < a.x+halfW && y > a.y-15 && y < a.y+halfH+10) return a;
+    } else if(a.type==='area'){
+      const rx=Math.min(a.x1,a.x2), ry=Math.min(a.y1,a.y2), rx2=Math.max(a.x1,a.x2), ry2=Math.max(a.y1,a.y2);
+      if(x>=rx && x<=rx2 && y>=ry && y<=ry2) return a;
+    }
+  }
+  return null;
+}
+
+// ---------- Popup helpers ----------
+function closePopup(){
+  if(popupEl){ popupEl.remove(); popupEl=null; }
+  if(pendingMarker){ pendingMarker=null; if(img) redraw(); }
+}
+function positionPopup(div, evt){
+  const off = getWrapOffset(evt);
+  wrap.appendChild(div);
+  const w = div.offsetWidth || 280;
+  let left = Math.min(off.left, wrap.clientWidth-w-6);
+  left = Math.max(6,left);
+  let top = off.top - div.offsetHeight - 12;
+  if(top<4) top = off.top + 16;
+  div.style.left = left+'px';
+  div.style.top = top+'px';
+}
+
+function buildOptionsFields(container, kind, state, refresh){
+  container.innerHTML = '';
+  if(kind==='implant'){
+    const capt1 = document.createElement('div');
+    capt1.className='opt-hint';
+    capt1.textContent = '종류 (중복 선택, 클릭=선택만 됨)';
+    container.appendChild(capt1);
+    const kindWrap = document.createElement('div');
+    kindWrap.className='opt-grid';
+    ['EV','ST','DT','BD','보험'].forEach(k=>{
+      const b=document.createElement('button');
+      b.type='button';
+      b.className='opt-btn'+(state.kinds.includes(k)?' sel':'');
+      b.textContent=k;
+      b.addEventListener('click', ()=>{
+        state.kinds = state.kinds.includes(k) ? state.kinds.filter(v=>v!==k) : [...state.kinds,k];
+        refresh();
+      });
+      kindWrap.appendChild(b);
+    });
+    container.appendChild(kindWrap);
+
+    const capt2 = document.createElement('div');
+    capt2.className='opt-hint'; capt2.style.marginTop='4px';
+    capt2.textContent = '시기 (중복 선택, 클릭=선택만 됨)';
+    container.appendChild(capt2);
+    const periodWrap = document.createElement('div');
+    periodWrap.className='opt-grid';
+    ['발즉','1M후','2M후','3M후','4M후','5M후','6M후','언제든지'].forEach(p=>{
+      const b=document.createElement('button');
+      b.type='button';
+      b.className='opt-btn'+(state.periods.includes(p)?' sel':'');
+      b.textContent=p;
+      b.addEventListener('click', ()=>{
+        state.periods = state.periods.includes(p) ? state.periods.filter(v=>v!==p) : [...state.periods,p];
+        refresh();
+      });
+      periodWrap.appendChild(b);
+    });
+    container.appendChild(periodWrap);
+
+    const noteWrap=document.createElement('div'); noteWrap.className='fline'; noteWrap.style.marginTop='6px';
+    const noteLbl=document.createElement('label'); noteLbl.textContent='메모';
+    const noteInput=document.createElement('input'); noteInput.type='text'; noteInput.placeholder='추가 메모(선택)'; noteInput.value=state.note||'';
+    noteInput.addEventListener('input', e=>{ state.note=e.target.value; });
+    noteWrap.appendChild(noteLbl); noteWrap.appendChild(noteInput);
+    container.appendChild(noteWrap);
+
+  } else if(kind==='surface'){
+    const capt = document.createElement('div');
+    capt.className='opt-hint';
+    capt.textContent = '면 선택 (클릭 = 선택만 됨, 표시는 Enter) · 치아번호에 따라 모양이 자동 반전됩니다';
+    container.appendChild(capt);
+    const wrap=document.createElement('div'); wrap.className='surf-grid';
+    ['MO','DO','O','MOD'].forEach(s=>{
+      const b=document.createElement('button');
+      b.type='button';
+      b.className='surf-btn'+(state.surface===s?' sel':'');
+      b.textContent=s;
+      b.addEventListener('click', ()=>{ state.surface=(state.surface===s)?null:s; refresh(); });
+      wrap.appendChild(b);
+    });
+    container.appendChild(wrap);
+  } else {
+    const noteWrap=document.createElement('div'); noteWrap.className='fline'; noteWrap.style.marginTop='2px';
+    const noteLbl=document.createElement('label'); noteLbl.textContent='메모';
+    const noteInput=document.createElement('input'); noteInput.type='text'; noteInput.placeholder='메모(선택)'; noteInput.value=state.note||'';
+    noteInput.addEventListener('input', e=>{ state.note=e.target.value; });
+    noteWrap.appendChild(noteLbl); noteWrap.appendChild(noteInput);
+    container.appendChild(noteWrap);
+  }
+}
+
+function openToothPopup(treatId, x, y, evt, existingAnn){
+  closePopup();
+  pendingMarker = existingAnn ? null : {x,y};
+  if(img) redraw();
+  const t = treatTypes.find(tt=>tt.id===treatId);
+  const kind = treatKind(t);
+  const state = kind==='implant'
+    ? {kinds: existingAnn? (existingAnn.kinds||[]).slice() : [], periods: existingAnn? (existingAnn.periods||[]).slice() : [], note: existingAnn?existingAnn.note||'':''}
+    : kind==='surface'
+    ? {surface: existingAnn? existingAnn.surface||null : null}
+    : {note: existingAnn?existingAnn.note||'':''};
+
+  const div = document.createElement('div');
+  div.className='mini-popup';
+  div.innerHTML = `
+    <div style="font-size:12px;font-weight:700;color:var(--navy);">${t.label}${existingAnn?' (수정)':''}</div>
+    <div class="fline"><label>치아</label><input type="text" id="popToothNum" value="${existingAnn?existingAnn.toothNum:''}" placeholder="예: 36"></div>
+    <div id="popOptions"></div>
+    <div class="btns">
+      <button class="small-btn" id="popCancel">취소</button>
+      ${existingAnn?'<button class="small-btn" id="popDelete" style="color:var(--danger);">삭제</button>':''}
+      <button class="small-btn" id="popConfirm" style="background:var(--navy);color:#fff;border-color:var(--navy);">확인(Enter)</button>
+    </div>`;
+  div.style.position='absolute'; div.style.visibility='hidden';
+  wrap.appendChild(div);
+  positionPopup(div, evt);
+  div.style.visibility='visible';
+  popupEl = div;
+
+  const optionsContainer = div.querySelector('#popOptions');
+  const refresh = ()=> buildOptionsFields(optionsContainer, kind, state, refresh);
+  refresh();
+
+  const confirmFn = ()=>{
+    const toothNum = div.querySelector('#popToothNum').value.trim();
+    const ann = existingAnn || {id:idSeq++, type:'tooth', x, y, rotation:0, size: baseUnit()*sizeSliderVal};
+    ann.toothNum = toothNum;
+    ann.treatId = treatId;
+    ann.kinds = kind==='implant' ? state.kinds.slice() : [];
+    ann.periods = kind==='implant' ? state.periods.slice() : [];
+    ann.surface = kind==='surface' ? (state.surface||'') : '';
+    ann.note = state.note || '';
+    if(!existingAnn) annotations.push(ann);
+    closePopup();
+    redraw(); renderAnnList();
+  };
+
+  div.addEventListener('keydown', ev=>{
+    if(ev.key==='Enter'){ ev.preventDefault(); confirmFn(); }
+    if(ev.key==='Escape') closePopup();
+  });
+  div.querySelector('#popConfirm').addEventListener('click', confirmFn);
+  div.querySelector('#popCancel').addEventListener('click', closePopup);
+  if(existingAnn){
+    div.querySelector('#popDelete').addEventListener('click', ()=>{
+      annotations = annotations.filter(a=>a.id!==existingAnn.id);
+      closePopup(); redraw(); renderAnnList();
+    });
+  }
+  setTimeout(()=>{ const el=div.querySelector('#popToothNum'); if(el) el.focus(); }, 0);
+}
+
+function openAreaPopup(treatId, x1,y1,x2,y2, evt, existingAnn){
+  closePopup();
+  pendingMarker = existingAnn ? null : {x:(x1+x2)/2, y:(y1+y2)/2};
+  if(img) redraw();
+  const t = treatTypes.find(tt=>tt.id===treatId);
+  const div = document.createElement('div');
+  div.className='mini-popup';
+  div.innerHTML = `
+    <div style="font-size:12px;font-weight:700;color:var(--navy);">${t.label}${existingAnn?' (수정)':''}</div>
+    <div class="fline"><label>치아</label><input type="text" id="popToothNum" value="${existingAnn?existingAnn.toothNum:''}" placeholder="예: 16,17"></div>
+    <div class="fline"><label>사유</label><input type="text" id="popNote" value="${existingAnn?existingAnn.note:''}" placeholder="사유/메모(선택)"></div>
+    <div class="btns">
+      <button class="small-btn" id="popCancel">취소</button>
+      ${existingAnn?'<button class="small-btn" id="popDelete" style="color:var(--danger);">삭제</button>':''}
+      <button class="small-btn" id="popConfirm" style="background:var(--navy);color:#fff;border-color:var(--navy);">확인(Enter)</button>
+    </div>`;
+  div.style.position='absolute'; div.style.visibility='hidden';
+  wrap.appendChild(div);
+  positionPopup(div, evt);
+  div.style.visibility='visible';
+  popupEl = div;
+
+  const confirmFn = ()=>{
+    const toothNum = div.querySelector('#popToothNum').value.trim();
+    const note = div.querySelector('#popNote').value.trim();
+    const ann = existingAnn || {id:idSeq++, type:'area', treatId, x1,y1,x2,y2};
+    ann.toothNum = toothNum;
+    ann.note = note;
+    ann.treatId = treatId;
+    if(!existingAnn) annotations.push(ann);
+    closePopup(); redraw(); renderAnnList();
+  };
+  div.addEventListener('keydown', ev=>{
+    if(ev.key==='Enter'){ ev.preventDefault(); confirmFn(); }
+    if(ev.key==='Escape') closePopup();
+  });
+  div.querySelector('#popConfirm').addEventListener('click', confirmFn);
+  div.querySelector('#popCancel').addEventListener('click', closePopup);
+  if(existingAnn){
+    div.querySelector('#popDelete').addEventListener('click', ()=>{
+      annotations = annotations.filter(a=>a.id!==existingAnn.id);
+      closePopup(); redraw(); renderAnnList();
+    });
+  }
+  setTimeout(()=>{ const el=div.querySelector('#popToothNum'); if(el) el.focus(); }, 0);
+}
+
+function openTextPopup(x, y, evt, existingAnn){
+  closePopup();
+  pendingMarker = existingAnn ? null : {x,y};
+  if(img) redraw();
+  const div = document.createElement('div');
+  div.className='mini-popup';
+  const safeVal = existingAnn ? existingAnn.text.replace(/"/g,'&quot;') : '';
+  div.innerHTML = `
+    <div class="fline"><label>내용</label><input type="text" id="popText" value="${safeVal}" placeholder="자유 텍스트"></div>
+    <div class="btns">
+      <button class="small-btn" id="popCancel">취소</button>
+      ${existingAnn?'<button class="small-btn" id="popDelete" style="color:var(--danger);">삭제</button>':''}
+      <button class="small-btn" id="popConfirm" style="background:var(--navy);color:#fff;border-color:var(--navy);">확인(Enter)</button>
+    </div>`;
+  div.style.position='absolute'; div.style.visibility='hidden';
+  wrap.appendChild(div);
+  positionPopup(div, evt);
+  div.style.visibility='visible';
+  popupEl = div;
+
+  const confirmFn = ()=>{
+    const val = div.querySelector('#popText').value.trim();
+    if(val){
+      if(existingAnn){ existingAnn.text = val; }
+      else {
+        const fontSize = Math.max(10, baseUnit()*sizeSliderVal*0.204);
+        annotations.push({id:idSeq++, type:'text', x, y, text:val, fontSize});
+      }
+    }
+    closePopup(); redraw(); renderAnnList();
+  };
+  div.addEventListener('keydown', ev=>{
+    if(ev.key==='Enter'){ ev.preventDefault(); confirmFn(); }
+    if(ev.key==='Escape') closePopup();
+  });
+  div.querySelector('#popConfirm').addEventListener('click', confirmFn);
+  div.querySelector('#popCancel').addEventListener('click', closePopup);
+  if(existingAnn){
+    div.querySelector('#popDelete').addEventListener('click', ()=>{
+      annotations = annotations.filter(a=>a.id!==existingAnn.id);
+      closePopup(); redraw(); renderAnnList();
+    });
+  }
+  setTimeout(()=>{ const el=div.querySelector('#popText'); if(el) el.focus(); }, 0);
+}
+
+function placeStickerAt(x,y){
+  annotations.push({
+    id:idSeq++, type:'tooth', treatId:activeSticker, x, y,
+    toothNum:'', note:'', kinds:[], periods:[], surface:'', rotation:0,
+    size: baseUnit()*sizeSliderVal*0.6, noLabel:true
+  });
+  redraw(); renderAnnList();
+}
+
+// ---------- Batch placement ----------
+function addBatchPoint(x,y){
+  if(batchPoints.length===0){ batchTreatId = activeTreatId; batchState = {kinds:[], periods:[], note:'', surface:null}; }
+  batchPoints.push({id:idSeq++, x, y, toothNum:''});
+  renderBatchPanel();
+  redraw();
+}
+
+function renderBatchPanel(){
+  const panel = document.getElementById('batchPanel');
+  if(!batchModeOn || batchPoints.length===0){ panel.style.display='none'; panel.innerHTML=''; return; }
+  panel.style.display='block';
+  const t = treatTypes.find(tt=>tt.id===batchTreatId);
+  const kind = treatKind(t);
+  panel.innerHTML = `
+    <h2>다중 배치 (${t?t.label:''} · ${batchPoints.length}개)</h2>
+    <div id="batchOptions"></div>
+    <div id="batchRows" style="margin-top:6px;"></div>
+    <div class="util-grid" style="margin-top:6px;">
+      <button class="small-btn" id="batchApply" style="background:var(--navy);color:#fff;">전체 적용(Enter)</button>
+      <button class="small-btn" id="batchCancelAll">배치 취소</button>
+    </div>`;
+
+  const optsContainer = panel.querySelector('#batchOptions');
+  const refresh = ()=> buildOptionsFields(optsContainer, kind, batchState, refresh);
+  refresh();
+
+  const rowsContainer = panel.querySelector('#batchRows');
+  batchPoints.forEach((p,i)=>{
+    const row=document.createElement('div');
+    row.className='fline';
+    row.innerHTML = `<label>${i+1}</label><input type="text" data-bid="${p.id}" value="${p.toothNum}" placeholder="치아"><span class="small-btn" data-bid="${p.id}" style="color:var(--danger);padding:4px 7px;">✕</span>`;
+    rowsContainer.appendChild(row);
+  });
+  rowsContainer.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const bp = batchPoints.find(b=>String(b.id)===e.target.dataset.bid);
+      if(bp) bp.toothNum = e.target.value.trim();
+    });
+  });
+  rowsContainer.querySelectorAll('span.small-btn').forEach(xEl=>{
+    xEl.addEventListener('click', e=>{
+      const bid = e.target.dataset.bid;
+      batchPoints = batchPoints.filter(b=>String(b.id)!==String(bid));
+      renderBatchPanel(); redraw();
+    });
+  });
+
+  panel.querySelector('#batchApply').addEventListener('click', applyBatch);
+  panel.querySelector('#batchCancelAll').addEventListener('click', ()=>{
+    batchPoints=[]; batchState=null; renderBatchPanel(); redraw();
+  });
+
+  const allInputs = rowsContainer.querySelectorAll('input');
+  if(allInputs.length){ const firstInp = allInputs[0]; setTimeout(()=>firstInp.focus(), 0); }
+}
+
+document.getElementById('batchPanel').addEventListener('keydown', ev=>{
+  if(ev.key==='Enter' && ev.target.tagName==='INPUT'){ ev.preventDefault(); applyBatch(); }
+});
+
+function applyBatch(){
+  if(batchPoints.length===0) return;
+  const kind = treatKind(treatTypes.find(tt=>tt.id===batchTreatId));
+  batchPoints.forEach(p=>{
+    annotations.push({
+      id:idSeq++, type:'tooth', x:p.x, y:p.y, toothNum:p.toothNum||'',
+      treatId: batchTreatId,
+      kinds: kind==='implant' ? batchState.kinds.slice() : [],
+      periods: kind==='implant' ? batchState.periods.slice() : [],
+      surface: kind==='surface' ? (batchState.surface||'') : '',
+      note: batchState.note||'',
+      rotation:0, size: baseUnit()*sizeSliderVal
+    });
+  });
+  batchPoints=[]; batchState=null;
+  renderBatchPanel(); redraw(); renderAnnList();
+}
+
+// ---------- Pointer events on canvas ----------
+canvas.addEventListener('pointerdown', e=>{
+  if(!img) return;
+  if(mode==='tooth' || mode==='text') e.preventDefault();
+  const {x,y} = getCanvasCoords(e);
+  pointerDownPos = {x,y};
+
+  // 핸들 리사이즈 체크 (선택된 항목이 있을 때)
+  if(selectedAnnId!==null && (mode==='tooth'||mode==='text')){
+    const hi = findHandleNear(x,y);
+    if(hi>=0){
+      const ann = annotations.find(a=>a.id===selectedAnnId);
+      resizingHandle = {
+        handleIdx:hi,
+        origBounds: getAnnBounds(ann),
+        origSize: ann.size,
+        origX1:ann.x1, origY1:ann.y1, origX2:ann.x2, origY2:ann.y2
+      };
+      return;
+    }
+  }
+
+  if(mode==='tooth' || mode==='text'){
+    const hit = findAnnotationNear(x,y);
+    if(hit){
+      closePopup();
+      selectedAnnId = hit.id;
+      draggingAnn = hit;
+      if(hit.type==='area') hit._dragAnchor = {x,y};
+      redraw();
+      return;
+    }
+    // 빈 공간 클릭 시 선택 해제
+    selectedAnnId = null;
+  }
+
+  if(mode==='tooth'){
+    if(activeSticker){ placeStickerAt(x,y); return; }
+    const t = treatTypes.find(tt=>tt.id===activeTreatId);
+    if(t && t.interaction==='area'){
+      arealDragging = true;
+      areaStart = {x,y};
+      areaCurrent = {x,y};
+      return;
+    }
+    if(batchModeOn){ addBatchPoint(x,y); return; }
+    openToothPopup(activeTreatId, x, y, e, null);
+  } else if(mode==='text'){
+    openTextPopup(x, y, e, null);
+  } else if(mode==='free'){
+    freeDragging = true;
+    drawingStroke = {id:idSeq++, type:'free', points:[{x,y}], color:freeColor, width:freeWidth, dash:freeDash.slice()};
+  } else if(mode==='erase'){
+    eraseNear(x,y);
+  }
+});
+
+canvas.addEventListener('dblclick', e=>{
+  if(!img) return;
+  const {x,y} = getCanvasCoords(e);
+  const hit = findAnnotationNear(x,y);
+  if(!hit) return;
+  if(hit.type==='tooth') openToothPopup(hit.treatId, hit.x, hit.y, e, hit);
+  else if(hit.type==='text') openTextPopup(hit.x, hit.y, e, hit);
+  else if(hit.type==='area') openAreaPopup(hit.treatId, hit.x1, hit.y1, hit.x2, hit.y2, e, hit);
+});
+
+canvas.addEventListener('pointermove', e=>{
+  if(!img) return;
+  if(resizingHandle!==null){
+    const {x,y} = getCanvasCoords(e);
+    const ann = annotations.find(a=>a.id===selectedAnnId);
+    if(!ann){ resizingHandle=null; return; }
+    const hi = resizingHandle.handleIdx;
+    if(ann.type==='tooth'){
+      const b = resizingHandle.origBounds;
+      const cx=(b.x1+b.x2)/2, cy=(b.y1+b.y2)/2;
+      const origR = (b.x2-b.x1)/2;
+      const newR = Math.max(Math.hypot(x-cx,y-cy), baseUnit()*0.3);
+      ann.size = Math.max(baseUnit()*0.25, Math.min(baseUnit()*8, resizingHandle.origSize*(newR/origR)));
+    } else if(ann.type==='area'){
+      if(hi===0){ann.x1=x; ann.y1=y;}
+      else if(hi===1){ann.y1=y;}
+      else if(hi===2){ann.x2=x; ann.y1=y;}
+      else if(hi===3){ann.x1=x;}
+      else if(hi===4){ann.x2=x;}
+      else if(hi===5){ann.x1=x; ann.y2=y;}
+      else if(hi===6){ann.y2=y;}
+      else if(hi===7){ann.x2=x; ann.y2=y;}
+    }
+    redraw();
+    return;
+  }
+  if(draggingAnn){
+    const {x,y} = getCanvasCoords(e);
+    if(draggingAnn.type==='area'){
+      const anchor = draggingAnn._dragAnchor || {x,y};
+      const dx = x-anchor.x, dy = y-anchor.y;
+      draggingAnn.x1 += dx; draggingAnn.x2 += dx;
+      draggingAnn.y1 += dy; draggingAnn.y2 += dy;
+      draggingAnn._dragAnchor = {x,y};
+    } else {
+      draggingAnn.x = x; draggingAnn.y = y;
+    }
+    redraw();
+    return;
+  }
+  if(arealDragging){
+    const {x,y} = getCanvasCoords(e);
+    areaCurrent = {x,y};
+    redraw();
+    return;
+  }
+  if(!freeDragging || mode!=='free' || !drawingStroke) return;
+  const {x,y} = getCanvasCoords(e);
+  drawingStroke.points.push({x,y});
+  redraw();
+  ctx.save();
+  ctx.strokeStyle = drawingStroke.color;
+  ctx.lineWidth = drawingStroke.width;
+  ctx.setLineDash(drawingStroke.dash||[]);
+  ctx.lineJoin='round'; ctx.lineCap='round';
+  ctx.beginPath();
+  drawingStroke.points.forEach((p,i)=>{ i===0? ctx.moveTo(p.x,p.y): ctx.lineTo(p.x,p.y); });
+  ctx.stroke();
+  ctx.restore();
+});
+
+window.addEventListener('pointerup', (e)=>{
+  if(resizingHandle!==null){
+    resizingHandle=null;
+    redraw();
+    return;
+  }
+  if(draggingAnn){
+    delete draggingAnn._dragAnchor;
+    draggingAnn=null;
+    renderAnnList();
+    return;
+  }
+  if(arealDragging){
+    arealDragging = false;
+    let x1=areaStart.x, y1=areaStart.y, x2=areaCurrent.x, y2=areaCurrent.y;
+    if(Math.abs(x2-x1)<10 && Math.abs(y2-y1)<10){
+      const half = baseUnit()*sizeSliderVal*1.2;
+      x1 = areaStart.x-half; x2 = areaStart.x+half;
+      y1 = areaStart.y-half; y2 = areaStart.y+half;
+    }
+    const tArea = treatTypes.find(tt=>tt.id===activeTreatId);
+    if(tArea && tArea.skipPopup){
+      annotations.push({id:idSeq++, type:'area', treatId:activeTreatId, x1, y1, x2, y2, toothNum:'', note:''});
+      redraw(); renderAnnList();
+    } else {
+      openAreaPopup(activeTreatId, x1,y1,x2,y2, e, null);
+      redraw();
+    }
+    return;
+  }
+  if(freeDragging && drawingStroke){
+    if(drawingStroke.points.length>1){ annotations.push(drawingStroke); }
+    drawingStroke=null;
+    renderAnnList();
+  }
+  freeDragging=false;
+});
+
+canvas.addEventListener('mousemove', e=>{
+  if(!img) return;
+  mouseCanvasPos = getCanvasCoords(e);
+  redraw();
+});
+canvas.addEventListener('mouseleave', ()=>{
+  mouseCanvasPos = null;
+  if(img) redraw();
+});
+
+canvas.addEventListener('wheel', e=>{
+  if(!img) return;
+  const {x,y} = getCanvasCoords(e);
+  const hit = findAnnotationNear(x,y);
+  if(hit && hit.type==='tooth'){
+    e.preventDefault();
+    const factor = e.deltaY<0 ? 1.1 : (1/1.1);
+    hit.size = Math.max(baseUnit()*0.25, Math.min(baseUnit()*8, hit.size*factor));
+    redraw();
+  }
+}, {passive:false});
+
+function eraseNear(x,y){
+  const threshold = baseUnit()*sizeSliderVal*1.2;
+  for(let i=batchPoints.length-1;i>=0;i--){
+    if(Math.hypot(batchPoints[i].x-x, batchPoints[i].y-y) < threshold){
+      batchPoints.splice(i,1);
+      renderBatchPanel(); redraw();
+      return;
+    }
+  }
+  let idxToRemove = -1;
+  for(let i=annotations.length-1;i>=0;i--){
+    const a = annotations[i];
+    if(a.type==='tooth' || a.type==='text'){
+      const d = Math.hypot(a.x-x, a.y-y);
+      if(d < threshold){ idxToRemove=i; break; }
+    } else if(a.type==='area'){
+      const rx=Math.min(a.x1,a.x2), ry=Math.min(a.y1,a.y2), rx2=Math.max(a.x1,a.x2), ry2=Math.max(a.y1,a.y2);
+      if(x>=rx && x<=rx2 && y>=ry && y<=ry2){ idxToRemove=i; break; }
+    } else if(a.type==='free'){
+      const hit = a.points.some(p=>Math.hypot(p.x-x,p.y-y) < threshold*0.7);
+      if(hit){ idxToRemove=i; break; }
+    }
+  }
+  if(idxToRemove>=0){
+    if(annotations[idxToRemove].id===selectedAnnId) selectedAnnId=null;
+    annotations.splice(idxToRemove,1); redraw(); renderAnnList();
+  }
+}
+
+// ---------- Undo / Clear ----------
+document.getElementById('undoBtn').addEventListener('click', ()=>{
+  annotations.pop();
+  redraw(); renderAnnList();
+});
+document.getElementById('clearBtn').addEventListener('click', ()=>{
+  if(annotations.length===0) return;
+  if(confirm('모든 표시를 삭제할까요?')){ annotations=[]; selectedAnnId=null; redraw(); renderAnnList(); }
+});
+
+// ---------- Annotation list ----------
+function renderAnnList(){
+  const wrapEl = document.getElementById('annList');
+  if(annotations.length===0){ wrapEl.innerHTML='<div class="list-empty">아직 표시된 항목이 없습니다.</div>'; return; }
+  wrapEl.innerHTML='';
+  annotations.forEach(a=>{
+    let label='';
+    let rotatable = false;
+    let resizable = false;
+    if(a.type==='tooth'){
+      label = buildLabel(a) || (treatTypes.find(tt=>tt.id===a.treatId)||{label:'?'}).label;
+      const t = treatTypes.find(tt=>tt.id===a.treatId);
+      rotatable = t && ROTATABLE.includes(t.shape);
+      resizable = true;
+    } else if(a.type==='area'){
+      label = buildLabel(a);
+    } else if(a.type==='text'){
+      label = '텍스트: ' + a.text;
+    } else if(a.type==='free'){
+      label = (a.dash && a.dash.length) ? '연결선' : '표시';
+    }
+    const div = document.createElement('div');
+    div.className='list-item';
+    const sizeBtns = resizable ? `<span class="sz" data-act="dec" data-id="${a.id}">−</span><span class="sz" data-act="inc" data-id="${a.id}">+</span>` : '';
+    const rotBtn = rotatable ? `<span class="rot" data-id="${a.id}" title="90도 회전">⟳</span>` : '';
+    div.innerHTML = `<span class="lbl">${label}</span><span class="acts">${sizeBtns}${rotBtn}<span class="x" data-id="${a.id}">✕</span></span>`;
+    div.querySelectorAll('.sz').forEach(s=>{
+      s.addEventListener('click', ()=>{
+        const factor = s.dataset.act==='inc' ? 1.15 : (1/1.15);
+        a.size = Math.max(baseUnit()*0.25, Math.min(baseUnit()*8, a.size*factor));
+        redraw();
+      });
+    });
+    const rotEl = div.querySelector('.rot');
+    if(rotEl){
+      rotEl.addEventListener('click', ()=>{
+        a.rotation = ((a.rotation||0)+90)%360;
+        redraw();
+      });
+    }
+    div.querySelector('.x').addEventListener('click', ()=>{
+      annotations = annotations.filter(an=>an.id!==a.id);
+      redraw(); renderAnnList();
+    });
+    wrapEl.appendChild(div);
+  });
+}
+
+// ---------- Download ----------
+document.getElementById('downloadBtn').addEventListener('click', ()=>{
+  if(!img){ alert('먼저 이미지를 업로드하거나 붙여넣으세요.'); return; }
+  closePopup();
+  redraw();
+  const link = document.createElement('a');
+  const pname = document.getElementById('patientName').value.trim() || 'plan';
+  const pdate = document.getElementById('planDate').value || '';
+  link.download = `${pname}_${pdate || 'treatment'}.png`.replace(/\s+/g,'_');
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+});
+
+// ---------- Copy to clipboard ----------
+document.getElementById('copyBtn').addEventListener('click', async ()=>{
+  if(!img){ alert('먼저 이미지를 업로드하거나 붙여넣으세요.'); return; }
+  closePopup();
+  redraw();
+  const btn = document.getElementById('copyBtn');
+  const orig = btn.textContent;
+  try{
+    const blob = await new Promise(resolve=> canvas.toBlob(resolve, 'image/png'));
+    if(!blob) throw new Error('blob 생성 실패');
+    await navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]);
+    btn.textContent = '복사됨!';
+    setTimeout(()=>{ btn.textContent = orig; }, 1500);
+  } catch(err){
+    alert('클립보드 복사에 실패했습니다. 이 브라우저/환경에서는 지원되지 않을 수 있어요. PNG 다운로드를 이용해주세요.');
+  }
+});
+</script>
+</body>
+</html>
