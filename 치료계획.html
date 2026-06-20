@@ -2,18 +2,30 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>치료계획 이미지 주석 도구</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>아산정플란트치과 · 치료계획 도구</title>
+
+<!-- 카카오톡 / SNS 미리보기 -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="아산정플란트치과 · 치료계획 도구">
+<meta property="og:description" content="한 사람을 위한 정직한 진료 | 파노라마 이미지에 치료계획을 직접 표시하는 전용 도구">
+<meta property="og:image" content="https://githittap.github.io/treament_plan/preview.png">
+<meta property="og:url" content="https://githittap.github.io/treament_plan/치료계획.html">
+<meta name="theme-color" content="#1a7272">
+
 <style>
   :root{
-    --navy:#0f2942;
-    --blue:#1d5fa8;
-    --blue-light:#e8f1fb;
+    --navy:#1a7272;
+    --blue:#2a9d8f;
+    --blue-light:#e0f5f3;
     --ink:#1c2733;
     --gray:#64748b;
-    --line:#d9e1e9;
-    --bg:#c8cdd4;
-    --white:#f0f2f4;
+    --line:#b2d8d8;
+    --bg:#c4d4d4;
+    --white:#f4fafa;
     --danger:#c0392b;
+    --teal-dark:#145f5f;
+    --teal-light:#4db8b0;
   }
   *{box-sizing:border-box;}
   body{
@@ -36,12 +48,49 @@
     border-radius:10px;
     padding:14px;
   }
-  h1{
+  .clinic-header{
     grid-column:1/-1;
-    margin:0 0 4px 0;
-    font-size:18px;
-    color:var(--navy);
-    letter-spacing:-0.2px;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    background:linear-gradient(135deg, var(--teal-dark) 0%, var(--navy) 60%, var(--blue) 100%);
+    border-radius:12px;
+    padding:14px 20px;
+    box-shadow:0 4px 16px rgba(26,114,114,0.25);
+  }
+  .clinic-logo{
+    width:44px; height:44px;
+    background:#fff;
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:22px;
+    flex:none;
+    box-shadow:0 2px 8px rgba(0,0,0,0.15);
+  }
+  .clinic-title-wrap{ flex:1; }
+  h1{
+    margin:0;
+    font-size:20px;
+    color:#ffffff;
+    letter-spacing:-0.3px;
+    font-weight:800;
+    text-shadow:0 1px 3px rgba(0,0,0,0.2);
+  }
+  .clinic-slogan{
+    font-size:11.5px;
+    color:rgba(255,255,255,0.78);
+    margin-top:2px;
+    letter-spacing:0.3px;
+  }
+  .clinic-badge{
+    background:rgba(255,255,255,0.15);
+    border:1px solid rgba(255,255,255,0.3);
+    border-radius:20px;
+    padding:4px 12px;
+    font-size:11px;
+    color:#fff;
+    font-weight:600;
+    letter-spacing:0.5px;
   }
   .sub{
     grid-column:1/-1;
@@ -281,8 +330,14 @@
 </head>
 <body>
 <div class="app">
-  <h1>아산정임플란트치과</h1>
-  <div class="sub">치료종류 선택 → 위치 클릭 → 치아/옵션 입력 후 Enter = 그 시점까지 선택된 내용만 표시됩니다. 마커는 드래그 이동, 더블클릭 수정.</div>
+  <div class="clinic-header">
+    <div class="clinic-logo">🦷</div>
+    <div class="clinic-title-wrap">
+      <h1>아산정플란트치과</h1>
+      <div class="clinic-slogan">한 사람을 위한 정직한 진료 · 치료계획 도구</div>
+    </div>
+    <div class="clinic-badge">STAFF ONLY</div>
+  </div>
 
   <!-- LEFT PANEL -->
   <div class="panel">
