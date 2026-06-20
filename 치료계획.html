@@ -307,6 +307,7 @@
     <h2>입력 모드</h2>
     <div class="mode-grid">
       <button class="mode-btn active" data-mode="tooth">치아 표시</button>
+      <button class="mode-btn" data-mode="select" id="selectModeBtn">선택/이동 <span style="font-size:10px;opacity:0.7;">(A)</span></button>
       <button class="mode-btn" data-mode="erase">지우개 <span style="font-size:10px;opacity:0.7;">(E)</span></button>
     </div>
     <div class="hint" id="modeHint">치료종류를 고르고 위치를 클릭 → 치아/옵션 입력 후 Enter로 그 시점까지 선택된 내용만 표시됩니다.</div>
@@ -336,6 +337,7 @@
       <div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--line); padding-bottom:3px; margin-bottom:3px;">
         <span style="color:var(--gray);">기능</span><span style="color:var(--gray);">단축키</span>
       </div>
+      <div style="display:flex; justify-content:space-between;"><span>선택/이동 모드 켜기/끄기</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">A</kbd></div>
       <div style="display:flex; justify-content:space-between;"><span>텍스트 모드 켜기/끄기</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">T</kbd></div>
       <div style="display:flex; justify-content:space-between;"><span>지우개 모드 켜기/끄기</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">E</kbd></div>
       <div style="display:flex; justify-content:space-between;"><span>다중 배치 모드 켜기/끄기</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">R</kbd></div>
@@ -558,6 +560,7 @@ document.querySelectorAll('.mode-btn').forEach(btn=>{
     if(mode==='tooth') hint.textContent = '치료종류를 고르고 위치를 클릭 → 치아/옵션 입력 후 Enter로 그 시점까지 선택된 내용만 표시됩니다.';
     if(mode==='text') hint.textContent = '이미지를 클릭하면 자유 텍스트를 입력할 수 있습니다. 기존 텍스트는 드래그로 이동, 더블클릭으로 수정.';
     if(mode==='erase') hint.textContent = '지울 항목(마커·선·텍스트·영역·배치점)을 클릭하세요.';
+    if(mode==='select') hint.textContent = '마커를 클릭하여 선택 → 드래그로 이동, 모서리 핸들로 크기 조절. 더블클릭으로 수정.';
     closePopup();
   });
 });
@@ -772,6 +775,26 @@ window.addEventListener('keydown', e=>{
   if(e.ctrlKey||e.metaKey) return;
   const tag = document.activeElement.tagName;
   if(tag==='INPUT'||tag==='TEXTAREA') return;
+
+  // A → 선택/이동 모드 토글
+  if(e.key==='a'||e.key==='A'){
+    if(mode==='select'){
+      document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelector('.mode-btn[data-mode="tooth"]').classList.add('active');
+      mode='tooth'; activePenTool=null; activeSticker=null;
+      document.getElementById('freeOptions').style.display='none';
+      document.getElementById('modeHint').textContent='치료종류를 고르고 위치를 클릭 → 치아/옵션 입력 후 Enter로 그 시점까지 선택된 내용만 표시됩니다.';
+      renderPenTools(); renderStickers();
+    } else {
+      document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+      document.getElementById('selectModeBtn').classList.add('active');
+      mode='select'; activePenTool=null; activeSticker=null;
+      document.getElementById('freeOptions').style.display='none';
+      document.getElementById('modeHint').textContent='마커를 클릭하여 선택 → 드래그로 이동, 모서리 핸들로 크기 조절. 더블클릭으로 수정.';
+      renderPenTools(); renderStickers(); renderTreatList();
+      closePopup();
+    }
+  }
 
   // R → 다중 배치 모드 토글
   if(e.key==='r'||e.key==='R'){
@@ -1604,7 +1627,7 @@ canvas.addEventListener('pointerdown', e=>{
     }
   }
 
-  if(mode==='tooth' || mode==='text'){
+  if(mode==='tooth' || mode==='text' || mode==='select'){
     const hit = findAnnotationNear(x,y);
     if(hit){
       closePopup();
@@ -1616,6 +1639,7 @@ canvas.addEventListener('pointerdown', e=>{
     }
     // 빈 공간 클릭 시 선택 해제
     selectedAnnId = null;
+    if(mode==='select'){ redraw(); return; }
   }
 
   if(mode==='tooth'){
