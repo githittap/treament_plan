@@ -191,11 +191,30 @@
     color:#fff;font-size:9px;font-weight:700;
   }
 
-  #treatList{display:flex; gap:6px;}
+  #treatList{display:flex; gap:6px; flex-wrap:wrap;}
   .treat-col{display:flex; flex-direction:column; gap:5px; flex:1; min-width:0;}
+  .treat-sep{width:100%;border-top:1.5px solid var(--line);margin:4px 0 2px;flex-basis:100%;}
   .treat-item.grid-item{flex-direction:column; align-items:center; text-align:center; padding:6px 3px; gap:3px;}
   .treat-item.grid-item .swatch{width:22px;height:22px;font-size:9px;}
   .treat-item.grid-item .ti-label{font-size:10px; line-height:1.2; white-space:normal; word-break:keep-all;}
+
+  /* FDI 치식 차트 */
+  .fdi-chart{margin-bottom:8px;}
+  .fdi-row{display:flex;align-items:stretch;gap:1px;margin-bottom:2px;}
+  .fdi-cell{
+    flex:1;min-width:0;padding:3px 0 2px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-size:8px;font-weight:700;border:1px solid #ddd;border-radius:3px;
+    cursor:default;background:#f5f5f5;color:#777;line-height:1;gap:1px;
+    transition:all 0.12s;
+  }
+  .fdi-cell.has-ann{color:#fff !important;cursor:pointer;}
+  .fdi-cell.has-ann:hover{filter:brightness(1.12);}
+  .fdi-cell.is-sel{outline:2px solid #1d5fa8;outline-offset:1px;z-index:1;}
+  .fdi-sep{width:3px;background:#bbb;border-radius:1px;flex-shrink:0;margin:0 1px;}
+  .fdi-jaw-label{font-size:9px;color:var(--gray);text-align:center;margin-bottom:1px;}
+  .fdi-dots{display:flex;gap:1px;flex-wrap:wrap;justify-content:center;margin-top:1px;}
+  .fdi-dot{width:4px;height:4px;border-radius:50%;border:1px solid rgba(255,255,255,0.5);}
 
   .add-treat{
     display:flex; gap:5px; margin-top:8px;
@@ -589,8 +608,9 @@ let treatTypes = [
   {id:'core_crown',  label:'코어Cr.', shape:'dot',  color:'#d97706', abbr:'Cr'},
   {id:'rct',         label:'RCT',     shape:'rct_box', color:'#dc2626', abbr:'RCT'},
   {id:'ca',          label:'CA',      shape:'ca',   color:'#d4150f'},
+  {id:'ongoing',     label:'진행중',  shape:'area', interaction:'area', fill:'rgba(59,130,246,0.22)', stroke:'#2563eb', skipPopup:true},
   {id:'done',        label:'완료',    shape:'area', interaction:'area', fill:'rgba(34,197,94,0.22)',  stroke:'#16a34a', skipPopup:true},
-  {id:'hold',        label:'보류',    shape:'area', interaction:'area', fill:'rgba(245,158,11,0.22)', stroke:'#d97706'},
+  {id:'hold',        label:'보류',    shape:'area', interaction:'area', fill:'rgba(245,158,11,0.22)', stroke:'#d97706', skipPopup:true},
   {id:'other',       label:'기타',    shape:'dot',  color:'#475569', abbr:'기타'},
   {id:'crestal',     label:'크레스탈', shape:'dot', color:'#0d9488', abbr:'Cre.'},
   {id:'lateral',     label:'라테랄',   shape:'dot', color:'#4f46e5', abbr:'Lat.'},
@@ -602,7 +622,9 @@ const GRID_COLUMNS = [
   ['implant','pontic'],
   ['resin','inlay','fu'],
   ['core_crown'],
-  ['ca','done','hold','other']
+  ['ca','other'],
+  '---',
+  ['ongoing','done','hold']
 ];
 const HIDE_NAME = new Set(['pontic','implant','extraction','core_crown','rct','resin','ca','fu','inlay']);
 const ROTATABLE = [];
@@ -831,7 +853,7 @@ function shapeGlyph(shape){
 const TREAT_SHORTCUTS = {
   'implant':'2', 'pontic':'3',
   'core_crown':'C', 'inlay':'I', 'resin':'F',
-  'done':'D', 'hold':'H'
+  'ongoing':'W', 'done':'D', 'hold':'H'
 };
 function renderTreatItem(t){
   const div = document.createElement('div');
@@ -857,6 +879,9 @@ function renderTreatList(){
   const listWrap = document.getElementById('treatList');
   listWrap.innerHTML = '';
   GRID_COLUMNS.forEach(colIds=>{
+    if(colIds==='---'){
+      const sep=document.createElement('div'); sep.className='treat-sep'; listWrap.appendChild(sep); return;
+    }
     const col = document.createElement('div');
     col.className='treat-col';
     colIds.forEach(id=>{
@@ -942,16 +967,25 @@ function _doDeleteImage(){
 document.getElementById('clearImgBtn').addEventListener('click', clearImage);
 
 window.addEventListener('keydown', e=>{
-  // Delete → 이미지 삭제(확인 없음), Ctrl+Z로 복원 가능
+  // Delete → 선택된 마커 삭제 우선, 없으면 이미지 삭제
   if(e.key==='Delete' && !e.shiftKey && !e.ctrlKey && !e.altKey){
+    const tag = document.activeElement.tagName;
+    if(tag==='INPUT'||tag==='TEXTAREA') return;
     e.preventDefault();
-    altEscClearImage();
+    if(selectedAnnId!==null){
+      redoStack.push(annotations.map(a=>Object.assign({},a)));
+      annotations = annotations.filter(a=>a.id!==selectedAnnId);
+      selectedAnnId=null; redraw(); renderAnnList();
+    } else {
+      altEscClearImage();
+    }
     return;
   }
 
   if(e.key==='Escape'){
     if(popupEl){ closePopup(); return; }
     if(selectedAnnId!==null){
+      redoStack.push(annotations.map(a=>Object.assign({},a)));
       annotations = annotations.filter(a=>a.id!==selectedAnnId);
       selectedAnnId=null; redraw(); renderAnnList();
       return;
@@ -1085,6 +1119,7 @@ window.addEventListener('keydown', e=>{
   if(e.key==='c'||e.key==='C') selectTreat('core_crown');
   if(e.key==='v'||e.key==='V'){ activeSticker='rct'; activePenTool=null; mode='tooth'; document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active')); document.querySelector('.mode-btn[data-mode="tooth"]').classList.add('active'); renderPenTools(); renderStickers(); renderTreatList(); }
   if(e.key==='g'||e.key==='G'){ activeSticker='gbr'; activePenTool=null; mode='tooth'; document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active')); document.querySelector('.mode-btn[data-mode="tooth"]').classList.add('active'); renderPenTools(); renderStickers(); renderTreatList(); }
+  if(e.key==='w'||e.key==='W') selectTreat('ongoing');
   if(e.key==='d'||e.key==='D') selectTreat('done');
   if(e.key==='h'||e.key==='H') selectTreat('hold');
 });
@@ -1154,6 +1189,18 @@ function drawRctBox(c,x,y,s){
   c.fillText('RCT', x, y+1);
   c.restore();
   return {topY: by, bottomY: by+h};
+}
+
+function drawToothLabel(c, cx, topY, text, fontSize){
+  if(!text) return;
+  c.save();
+  c.font = `700 ${fontSize}px sans-serif`;
+  c.textAlign = 'center'; c.textBaseline = 'top';
+  c.shadowColor = 'rgba(0,0,0,0.9)'; c.shadowBlur = 4;
+  c.shadowOffsetX = 0; c.shadowOffsetY = 1;
+  c.fillStyle = '#ffffff';
+  String(text).split('\n').forEach((line,i)=>{ c.fillText(line, cx, topY + i*fontSize*1.25); });
+  c.restore();
 }
 
 function drawImplant(c,x,y,s,dir){
@@ -1362,19 +1409,32 @@ function redraw(){
         const gap = a.size*0.15;
         const dir = implantDir(a.toothNum);
         const labelTopY = computeLabelTopY(info, dir, fontSize, gap);
-        drawYellowLabel(ctx, a.x, labelTopY, label, fontSize, '#156f72');
+        drawToothLabel(ctx, a.x, labelTopY, label, fontSize);
       }
     } else if(a.type==='area'){
-      const t = treatTypes.find(tt=>tt.id===a.treatId) || {fill:'rgba(0,0,0,0.2)', stroke:'#333'};
+      const t = treatTypes.find(tt=>tt.id===a.treatId) || {fill:'rgba(0,0,0,0.2)', stroke:'#333', label:''};
       const rx=Math.min(a.x1,a.x2), ry=Math.min(a.y1,a.y2), rw=Math.abs(a.x2-a.x1), rh=Math.abs(a.y2-a.y1);
       ctx.save();
       ctx.fillStyle=t.fill; ctx.fillRect(rx,ry,rw,rh);
       ctx.strokeStyle=t.stroke; ctx.lineWidth=Math.max(2, baseUnit()*sizeSliderVal*0.08); ctx.setLineDash([8,5]);
       ctx.strokeRect(rx,ry,rw,rh);
+      // 텍스트를 박스 내부에 비례하게 그리기
+      const areaLabel = t.label || buildLabel(a) || '';
+      if(areaLabel && rw>30 && rh>20){
+        ctx.setLineDash([]);
+        let fs = Math.min(rw, rh)*0.55;
+        ctx.font = `800 ${fs}px sans-serif`;
+        const tw = ctx.measureText(areaLabel).width;
+        if(tw > rw*0.88) fs = fs*(rw*0.88/tw);
+        fs = Math.max(12, fs);
+        ctx.font = `800 ${fs}px sans-serif`;
+        ctx.fillStyle = t.stroke;
+        ctx.shadowColor = 'rgba(0,0,0,0.15)'; ctx.shadowBlur = 4;
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(areaLabel, rx+rw/2, ry+rh/2);
+        ctx.shadowBlur=0;
+      }
       ctx.restore();
-      const label = buildLabel(a);
-      const fontSize = Math.max(10, baseUnit()*sizeSliderVal*0.204);
-      drawYellowLabel(ctx, rx+rw/2, ry - fontSize*1.8, label, fontSize);
     } else if(a.type==='text'){
       drawYellowLabel(ctx, a.x + (a.boxW||40)/2, a.y, a.text, a.fontSize);
     }
@@ -2118,52 +2178,121 @@ document.getElementById('clearBtn').addEventListener('click', ()=>{
   if(confirm('모든 표시를 삭제할까요?')){ annotations=[]; selectedAnnId=null; redraw(); renderAnnList(); }
 });
 
-// ---------- Annotation list ----------
+// ---------- Annotation list (FDI 치식 차트) ----------
 function renderAnnList(){
   const wrapEl = document.getElementById('annList');
-  if(annotations.length===0){ wrapEl.innerHTML='<div class="list-empty">아직 표시된 항목이 없습니다.</div>'; return; }
   wrapEl.innerHTML='';
-  annotations.forEach(a=>{
-    let label='';
-    let rotatable = false;
-    let resizable = false;
-    if(a.type==='tooth'){
-      label = buildLabel(a) || (treatTypes.find(tt=>tt.id===a.treatId)||{label:'?'}).label;
-      const t = treatTypes.find(tt=>tt.id===a.treatId);
-      rotatable = t && ROTATABLE.includes(t.shape);
-      resizable = true;
-    } else if(a.type==='area'){
-      label = buildLabel(a);
-    } else if(a.type==='text'){
-      label = '텍스트: ' + a.text;
-    } else if(a.type==='free'){
-      label = (a.dash && a.dash.length) ? '연결선' : '표시';
-    }
-    const div = document.createElement('div');
-    div.className='list-item';
-    const sizeBtns = resizable ? `<span class="sz" data-act="dec" data-id="${a.id}">−</span><span class="sz" data-act="inc" data-id="${a.id}">+</span>` : '';
-    const rotBtn = rotatable ? `<span class="rot" data-id="${a.id}" title="90도 회전">⟳</span>` : '';
-    div.innerHTML = `<span class="lbl">${label}</span><span class="acts">${sizeBtns}${rotBtn}<span class="x" data-id="${a.id}">✕</span></span>`;
-    div.querySelectorAll('.sz').forEach(s=>{
-      s.addEventListener('click', ()=>{
-        const factor = s.dataset.act==='inc' ? 1.15 : (1/1.15);
-        a.size = Math.max(baseUnit()*0.25, Math.min(baseUnit()*8, a.size*factor));
-        redraw();
-      });
-    });
-    const rotEl = div.querySelector('.rot');
-    if(rotEl){
-      rotEl.addEventListener('click', ()=>{
-        a.rotation = ((a.rotation||0)+90)%360;
-        redraw();
-      });
-    }
-    div.querySelector('.x').addEventListener('click', ()=>{
-      annotations = annotations.filter(an=>an.id!==a.id);
-      redraw(); renderAnnList();
-    });
-    wrapEl.appendChild(div);
+  if(annotations.length===0){
+    wrapEl.innerHTML='<div class="list-empty">아직 표시된 항목이 없습니다.</div>'; return;
+  }
+
+  // 치아번호 있는 것 / 없는 것 분리
+  const toothAnns = annotations.filter(a=>a.type==='tooth' && a.toothNum && a.toothNum.trim());
+  const otherAnns = annotations.filter(a=>!(a.type==='tooth' && a.toothNum && a.toothNum.trim()));
+
+  // toothNum → annotations 매핑
+  const tMap = {};
+  toothAnns.forEach(a=>{
+    const n = a.toothNum.trim();
+    if(!tMap[n]) tMap[n]=[];
+    tMap[n].push(a);
   });
+
+  // FDI 차트 그리기
+  if(toothAnns.length > 0){
+    const FDI_ROWS = [
+      [18,17,16,15,14,13,12,11, 21,22,23,24,25,26,27,28],
+      [48,47,46,45,44,43,42,41, 31,32,33,34,35,36,37,38]
+    ];
+    const LABELS = ['상악 (Upper)', '하악 (Lower)'];
+
+    const chart = document.createElement('div');
+    chart.className='fdi-chart';
+
+    FDI_ROWS.forEach((row,ri)=>{
+      const lbl=document.createElement('div');
+      lbl.className='fdi-jaw-label'; lbl.textContent=LABELS[ri];
+      chart.appendChild(lbl);
+
+      const rowDiv=document.createElement('div');
+      rowDiv.className='fdi-row';
+
+      row.forEach((num,ci)=>{
+        if(ci===8){ const sep=document.createElement('div'); sep.className='fdi-sep'; rowDiv.appendChild(sep); }
+        const numStr=String(num);
+        const anns=tMap[numStr]||[];
+        const isSel=anns.some(a=>a.id===selectedAnnId);
+        const cell=document.createElement('div');
+        cell.className='fdi-cell'+(anns.length?' has-ann':'')+(isSel?' is-sel':'');
+
+        if(anns.length>0){
+          const pT=treatTypes.find(tt=>tt.id===anns[0].treatId);
+          const bg=pT?(pT.color||pT.stroke||'#156f72'):'#156f72';
+          cell.style.background=bg; cell.style.borderColor=bg;
+        }
+
+        const numEl=document.createElement('div'); numEl.textContent=numStr;
+        cell.appendChild(numEl);
+
+        if(anns.length>1){
+          const dotsDiv=document.createElement('div'); dotsDiv.className='fdi-dots';
+          anns.slice(0,5).forEach((a,i)=>{
+            const t2=treatTypes.find(tt=>tt.id===a.treatId);
+            const dc=t2?(t2.color||t2.stroke||'#fff'):'#fff';
+            const dot=document.createElement('div'); dot.className='fdi-dot';
+            dot.style.background=i===0?'rgba(255,255,255,0.35)':dc;
+            dotsDiv.appendChild(dot);
+          });
+          cell.appendChild(dotsDiv);
+        }
+
+        if(anns.length>0){
+          cell.title=anns.map(a=>{
+            const t2=treatTypes.find(tt=>tt.id===a.treatId);
+            return (t2?t2.label:'?')+(a.toothNum?` #${a.toothNum}`:'');
+          }).join(', ');
+          cell.addEventListener('click',()=>{ selectedAnnId=anns[0].id; redraw(); renderAnnList(); });
+        }
+        rowDiv.appendChild(cell);
+      });
+      chart.appendChild(rowDiv);
+      if(ri===0){ const g=document.createElement('div'); g.style.height='4px'; chart.appendChild(g); }
+    });
+    wrapEl.appendChild(chart);
+  }
+
+  // 기타 항목 목록 (영역, 텍스트, 자유선, 치아번호 없는 스티커)
+  if(otherAnns.length>0){
+    if(toothAnns.length>0){
+      const div=document.createElement('div');
+      div.style.cssText='border-top:1px solid var(--line);margin:6px 0 4px;font-size:10px;color:var(--gray);';
+      div.textContent='기타';
+      wrapEl.appendChild(div);
+    }
+    otherAnns.forEach(a=>{
+      let label=''; let resizable=false; let rotatable=false;
+      if(a.type==='tooth'){
+        label=(treatTypes.find(tt=>tt.id===a.treatId)||{label:'?'}).label;
+        resizable=true;
+        const t2=treatTypes.find(tt=>tt.id===a.treatId);
+        rotatable=t2&&ROTATABLE.includes(t2.shape);
+      } else if(a.type==='area'){
+        label=(treatTypes.find(tt=>tt.id===a.treatId)||{label:'영역'}).label;
+      } else if(a.type==='text'){
+        label='텍스트: '+a.text.replace(/\n/g,' ').slice(0,20);
+      } else if(a.type==='free'){
+        label=(a.dash&&a.dash.length)?'연결선':'표시';
+      }
+      const div=document.createElement('div'); div.className='list-item';
+      const sizeBtns=resizable?`<span class="sz" data-act="dec">−</span><span class="sz" data-act="inc">+</span>`:'';
+      const rotBtn=rotatable?`<span class="rot">⟳</span>`:'';
+      div.innerHTML=`<span class="lbl">${label}</span><span class="acts">${sizeBtns}${rotBtn}<span class="x">✕</span></span>`;
+      if(resizable){ div.querySelectorAll('.sz').forEach(s=>{ s.addEventListener('click',()=>{ const f=s.dataset.act==='inc'?1.15:(1/1.15); a.size=Math.max(baseUnit()*0.25,Math.min(baseUnit()*8,a.size*f)); redraw(); }); }); }
+      const rotEl=div.querySelector('.rot'); if(rotEl){ rotEl.addEventListener('click',()=>{ a.rotation=((a.rotation||0)+90)%360; redraw(); }); }
+      div.querySelector('.x').addEventListener('click',()=>{ annotations=annotations.filter(an=>an.id!==a.id); redraw(); renderAnnList(); });
+      wrapEl.appendChild(div);
+    });
+  }
 }
 
 // ---------- Download ----------
