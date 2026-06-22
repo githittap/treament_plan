@@ -213,8 +213,14 @@
   .fdi-cell.is-sel{outline:2px solid #1d5fa8;outline-offset:1px;z-index:1;}
   .fdi-sep{width:3px;background:#bbb;border-radius:1px;flex-shrink:0;margin:0 1px;}
   .fdi-jaw-label{font-size:9px;color:var(--gray);text-align:center;margin-bottom:1px;}
-  .fdi-dots{display:flex;gap:1px;flex-wrap:wrap;justify-content:center;margin-top:1px;}
-  .fdi-dot{width:4px;height:4px;border-radius:50%;border:1px solid rgba(255,255,255,0.5);}
+
+  /* 큰 FDI 차트 (캔버스 아래 전체폭) */
+  .fdi-big .fdi-row{gap:3px;margin-bottom:4px;}
+  .fdi-big .fdi-cell{font-size:11px;padding:7px 3px;min-height:52px;gap:3px;border-radius:5px;border-width:1.5px;}
+  .fdi-big .fdi-num{font-size:15px;font-weight:800;line-height:1;}
+  .fdi-big .fdi-treat{font-size:10px;line-height:1.2;font-weight:600;white-space:normal;word-break:keep-all;text-align:center;}
+  .fdi-big .fdi-jaw-label{font-size:13px;margin-bottom:4px;font-weight:700;}
+  .fdi-big .fdi-sep{width:6px;margin:0 2px;}
 
   .add-treat{
     display:flex; gap:5px; margin-top:8px;
@@ -491,6 +497,12 @@
 
     <button class="download-btn" id="downloadBtn">PNG로 다운로드</button>
   </div>
+
+  <!-- FDI 치식 차트 (캔버스 아래 전체폭) -->
+  <div class="panel" id="fdiPanel" style="grid-column:1/-1; display:none;">
+    <h2>치식 차트 (FDI)</h2>
+    <div id="fdiChartBig" class="fdi-big"></div>
+  </div>
 </div>
 
 <!-- 다중 배치 팝업 -->
@@ -663,8 +675,20 @@ function getAnnBounds(a){
   } else if(a.type==='area'){
     return {x1:Math.min(a.x1,a.x2), y1:Math.min(a.y1,a.y2), x2:Math.max(a.x1,a.x2), y2:Math.max(a.y1,a.y2)};
   } else if(a.type==='text'){
-    const w = a.text.length*a.fontSize*0.65;
-    return {x1:a.x, y1:a.y, x2:a.x+w+14, y2:a.y+a.fontSize*1.7};
+    const fontSize = a.fontSize;
+    ctx.save();
+    ctx.font = `700 ${fontSize}px sans-serif`;
+    const lines = String(a.text||'').split('\n');
+    const padX = fontSize*0.45, padY = fontSize*0.35;
+    const lineH = fontSize*1.35;
+    let maxTw = 0;
+    lines.forEach(l=>{ const w=ctx.measureText(l).width; if(w>maxTw) maxTw=w; });
+    ctx.restore();
+    const boxW = maxTw + padX*2;
+    const boxH = lines.length*lineH + padY*2;
+    let bx = (a.x + (a.boxW||40)/2) - boxW/2;
+    bx = Math.max(4, Math.min(bx, naturalW-boxW-4));
+    return {x1:bx, y1:a.y, x2:bx+boxW, y2:a.y+boxH};
   } else if(a.type==='free'){
     const xs=a.points.map(p=>p.x), ys=a.points.map(p=>p.y);
     return {x1:Math.min(...xs)-8, y1:Math.min(...ys)-8, x2:Math.max(...xs)+8, y2:Math.max(...ys)+8};
@@ -819,11 +843,13 @@ renderPenTools();
 function renderStickers(){
   const c = document.getElementById('stickerList');
   c.innerHTML='';
+  const STICKER_SHORTCUTS = {extraction:'1', gbr:'G', rct:'V'};
   ['extraction','crestal','lateral','gbr','rct'].forEach(id=>{
     const t = treatTypes.find(tt=>tt.id===id);
     const div=document.createElement('div');
     div.className='treat-item'+(activeSticker===id?' active':'');
-    div.innerHTML = `<span class="swatch" style="background:${t.color}">${t.abbr}</span><span>${t.label}</span>`;
+    const sc = STICKER_SHORTCUTS[id] ? `<span style="font-size:9px;opacity:0.6;margin-left:auto;">(${STICKER_SHORTCUTS[id]})</span>` : '';
+    div.innerHTML = `<span class="swatch" style="background:${t.color}">${t.abbr}</span><span>${t.label}</span>${sc}`;
     div.addEventListener('click', ()=>{
       activeSticker = id; activePenTool = null; mode='tooth';
       document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
@@ -1440,6 +1466,18 @@ function redraw(){
     }
   });
 
+  if(drawingStroke && drawingStroke.points.length){
+    ctx.save();
+    ctx.strokeStyle = drawingStroke.color;
+    ctx.lineWidth = drawingStroke.width;
+    ctx.setLineDash(drawingStroke.dash||[]);
+    ctx.lineJoin='round'; ctx.lineCap='round';
+    ctx.beginPath();
+    drawingStroke.points.forEach((p,i)=>{ i===0? ctx.moveTo(p.x,p.y): ctx.lineTo(p.x,p.y); });
+    ctx.stroke();
+    ctx.restore();
+  }
+
   if(arealDragging && areaStart && areaCurrent){
     const t = treatTypes.find(tt=>tt.id===activeTreatId);
     if(t){
@@ -2048,15 +2086,6 @@ canvas.addEventListener('pointermove', e=>{
   const {x,y} = getCanvasCoords(e);
   drawingStroke.points.push({x,y});
   redraw();
-  ctx.save();
-  ctx.strokeStyle = drawingStroke.color;
-  ctx.lineWidth = drawingStroke.width;
-  ctx.setLineDash(drawingStroke.dash||[]);
-  ctx.lineJoin='round'; ctx.lineCap='round';
-  ctx.beginPath();
-  drawingStroke.points.forEach((p,i)=>{ i===0? ctx.moveTo(p.x,p.y): ctx.lineTo(p.x,p.y); });
-  ctx.stroke();
-  ctx.restore();
 });
 
 window.addEventListener('pointerup', (e)=>{
@@ -2181,10 +2210,10 @@ document.getElementById('clearBtn').addEventListener('click', ()=>{
 // ---------- Annotation list (FDI 치식 차트) ----------
 function renderAnnList(){
   const wrapEl = document.getElementById('annList');
+  const fdiPanel = document.getElementById('fdiPanel');
+  const fdiBig = document.getElementById('fdiChartBig');
   wrapEl.innerHTML='';
-  if(annotations.length===0){
-    wrapEl.innerHTML='<div class="list-empty">아직 표시된 항목이 없습니다.</div>'; return;
-  }
+  fdiBig.innerHTML='';
 
   // 치아번호 있는 것 / 없는 것 분리
   const toothAnns = annotations.filter(a=>a.type==='tooth' && a.toothNum && a.toothNum.trim());
@@ -2198,8 +2227,9 @@ function renderAnnList(){
     tMap[n].push(a);
   });
 
-  // FDI 차트 그리기
+  // FDI 차트 그리기 (캔버스 아래 전체폭 패널)
   if(toothAnns.length > 0){
+    fdiPanel.style.display='block';
     const FDI_ROWS = [
       [18,17,16,15,14,13,12,11, 21,22,23,24,25,26,27,28],
       [48,47,46,45,44,43,42,41, 31,32,33,34,35,36,37,38]
@@ -2231,22 +2261,15 @@ function renderAnnList(){
           cell.style.background=bg; cell.style.borderColor=bg;
         }
 
-        const numEl=document.createElement('div'); numEl.textContent=numStr;
+        const numEl=document.createElement('div'); numEl.className='fdi-num'; numEl.textContent=numStr;
         cell.appendChild(numEl);
 
-        if(anns.length>1){
-          const dotsDiv=document.createElement('div'); dotsDiv.className='fdi-dots';
-          anns.slice(0,5).forEach((a,i)=>{
-            const t2=treatTypes.find(tt=>tt.id===a.treatId);
-            const dc=t2?(t2.color||t2.stroke||'#fff'):'#fff';
-            const dot=document.createElement('div'); dot.className='fdi-dot';
-            dot.style.background=i===0?'rgba(255,255,255,0.35)':dc;
-            dotsDiv.appendChild(dot);
-          });
-          cell.appendChild(dotsDiv);
-        }
-
         if(anns.length>0){
+          const labels=anns.map(a=>(treatTypes.find(tt=>tt.id===a.treatId)||{label:'?'}).label);
+          const tEl=document.createElement('div'); tEl.className='fdi-treat';
+          // 1~2개는 모두 표시, 3개 이상은 "첫항목 외 N" → 상세는 hover(title)로
+          tEl.textContent = labels.length<=2 ? labels.join(', ') : `${labels[0]} 외 ${labels.length-1}`;
+          cell.appendChild(tEl);
           cell.title=anns.map(a=>{
             const t2=treatTypes.find(tt=>tt.id===a.treatId);
             return (t2?t2.label:'?')+(a.toothNum?` #${a.toothNum}`:'');
@@ -2256,19 +2279,19 @@ function renderAnnList(){
         rowDiv.appendChild(cell);
       });
       chart.appendChild(rowDiv);
-      if(ri===0){ const g=document.createElement('div'); g.style.height='4px'; chart.appendChild(g); }
+      if(ri===0){ const g=document.createElement('div'); g.style.height='6px'; chart.appendChild(g); }
     });
-    wrapEl.appendChild(chart);
+    fdiBig.appendChild(chart);
+  } else {
+    fdiPanel.style.display='none';
   }
 
   // 기타 항목 목록 (영역, 텍스트, 자유선, 치아번호 없는 스티커)
-  if(otherAnns.length>0){
-    if(toothAnns.length>0){
-      const div=document.createElement('div');
-      div.style.cssText='border-top:1px solid var(--line);margin:6px 0 4px;font-size:10px;color:var(--gray);';
-      div.textContent='기타';
-      wrapEl.appendChild(div);
-    }
+  if(otherAnns.length===0){
+    wrapEl.innerHTML = toothAnns.length>0
+      ? '<div class="list-empty">치식 차트는 화면 아래에 표시됩니다.</div>'
+      : '<div class="list-empty">아직 표시된 항목이 없습니다.</div>';
+  } else {
     otherAnns.forEach(a=>{
       let label=''; let resizable=false; let rotatable=false;
       if(a.type==='tooth'){
