@@ -585,7 +585,7 @@ let treatTypes = [
   {id:'inlay',       label:'인레이',   shape:'dot',  color:'#d4150f', abbr:'In'},
   {id:'fu',          label:'F/U',     shape:'dot',  color:'#6b7280', abbr:'F/U'},
   {id:'core_crown',  label:'코어Cr.', shape:'dot',  color:'#d97706', abbr:'Cr'},
-  {id:'rct',         label:'RCT-Cr',  shape:'dot',  color:'#7c3aed', abbr:'RCT'},
+  {id:'rct',         label:'RCT',     shape:'rct_box', color:'#dc2626', abbr:'RCT'},
   {id:'ca',          label:'CA',      shape:'ca',   color:'#d4150f'},
   {id:'done',        label:'완료',    shape:'area', interaction:'area', fill:'rgba(34,197,94,0.22)',  stroke:'#16a34a', skipPopup:true},
   {id:'hold',        label:'보류',    shape:'area', interaction:'area', fill:'rgba(245,158,11,0.22)', stroke:'#d97706'},
@@ -599,7 +599,7 @@ activeTreatId = 'implant';
 const GRID_COLUMNS = [
   ['implant','pontic'],
   ['resin','inlay','fu'],
-  ['core_crown','rct'],
+  ['core_crown'],
   ['ca','done','hold','other']
 ];
 const HIDE_NAME = new Set(['pontic','implant','extraction','core_crown','rct','resin','ca','fu','inlay']);
@@ -776,7 +776,7 @@ renderPenTools();
 function renderStickers(){
   const c = document.getElementById('stickerList');
   c.innerHTML='';
-  ['extraction','crestal','lateral','gbr'].forEach(id=>{
+  ['extraction','crestal','lateral','gbr','rct'].forEach(id=>{
     const t = treatTypes.find(tt=>tt.id===id);
     const div=document.createElement('div');
     div.className='treat-item'+(activeSticker===id?' active':'');
@@ -809,8 +809,8 @@ function shapeGlyph(shape){
 }
 const TREAT_SHORTCUTS = {
   'implant':'2', 'pontic':'3',
-  'core_crown':'C', 'rct':'V', 'inlay':'I', 'resin':'F',
-  'gbr':'G', 'done':'D', 'hold':'H'
+  'core_crown':'C', 'inlay':'I', 'resin':'F',
+  'done':'D', 'hold':'H'
 };
 function renderTreatItem(t){
   const div = document.createElement('div');
@@ -1062,7 +1062,7 @@ window.addEventListener('keydown', e=>{
   if(e.key==='i'||e.key==='I') selectTreat('inlay');
   if(e.key==='f'||e.key==='F') selectTreat('resin');
   if(e.key==='c'||e.key==='C') selectTreat('core_crown');
-  if(e.key==='v'||e.key==='V') selectTreat('rct');
+  if(e.key==='v'||e.key==='V'){ activeSticker='rct'; activePenTool=null; mode='tooth'; document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active')); document.querySelector('.mode-btn[data-mode="tooth"]').classList.add('active'); renderPenTools(); renderStickers(); renderTreatList(); }
   if(e.key==='g'||e.key==='G'){ activeSticker='gbr'; activePenTool=null; mode='tooth'; document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active')); document.querySelector('.mode-btn[data-mode="tooth"]').classList.add('active'); renderPenTools(); renderStickers(); renderTreatList(); }
   if(e.key==='d'||e.key==='D') selectTreat('done');
   if(e.key==='h'||e.key==='H') selectTreat('hold');
@@ -1118,6 +1118,21 @@ function drawX(c,x,y,s,color){
   c.beginPath(); c.moveTo(half,-half); c.lineTo(-half,half); c.stroke();
   c.restore();
   return {topY: y-half, bottomY: y+half};
+}
+
+function drawRctBox(c,x,y,s){
+  const w = s*1.05, h = s*0.62;
+  const bx = x - w/2, by = y - h/2;
+  c.save();
+  c.fillStyle='#dc2626';
+  c.beginPath(); c.roundRect(bx,by,w,h,s*0.08); c.fill();
+  c.strokeStyle='rgba(0,0,0,0.18)'; c.lineWidth=Math.max(1,s*0.03); c.stroke();
+  c.fillStyle='#fff';
+  c.font=`800 ${s*0.38}px sans-serif`;
+  c.textAlign='center'; c.textBaseline='middle';
+  c.fillText('RCT', x, y+1);
+  c.restore();
+  return {topY: by, bottomY: by+h};
 }
 
 function drawImplant(c,x,y,s,dir){
@@ -1243,6 +1258,7 @@ function drawShapeForAnn(c,a){
     case 'implant': return drawImplant(c,a.x,a.y,s, implantDir(a.toothNum));
     case 'pontic': return drawPontic(c,a.x,a.y,s);
     case 'x': return drawX(c,a.x,a.y,s, t.color||'#d4150f');
+    case 'rct_box': return drawRctBox(c,a.x,a.y,s);
     case 'inlaySurface': return drawInlay(c,a.x,a.y,s, t.color||'#d4150f', a.surface, a.toothNum, a.rotation||0);
     case 'ca': return drawCA(c,a.x,a.y,s, t.color||'#d4150f');
     default: return drawDot(c,a.x,a.y,s, t.color||'#444', t.abbr||'');
