@@ -1,4 +1,13 @@
 <!DOCTYPE html>
+<!--
+  ============================================================
+  치과치료계획 도구 (Dental Treatment Plan Tool)
+  © 2026 Jung. All rights reserved.
+  본 소프트웨어의 코드·디자인·기능에 대한 저작권은 제작자(Jung)에게 있습니다.
+  무단 복제, 배포, 2차적 저작물 작성을 금합니다.
+  Unauthorized copying, distribution, or derivative works are prohibited.
+  ============================================================
+-->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -198,6 +207,15 @@
   .treat-item.grid-item .swatch{width:22px;height:22px;font-size:9px;}
   .treat-item.grid-item .ti-label{font-size:10px; line-height:1.2; white-space:normal; word-break:keep-all;}
 
+  /* 표시 도구 컴팩트 그리드 */
+  .tool-grid{display:flex; gap:6px; flex-wrap:wrap;}
+  .tool-grid .treat-item{flex:1 1 28%; min-width:0; flex-direction:column; align-items:center; text-align:center; padding:6px 3px; gap:3px; position:relative;}
+  .tool-grid .treat-item .swatch{width:22px;height:22px;font-size:9px;}
+  .tool-grid .treat-item .tool-sc{position:absolute; top:2px; right:4px; font-size:9px; opacity:0.55;}
+  /* 진행중/완료/보류 컴팩트(가로) */
+  .treat-item.compact-row{flex-direction:row !important; align-items:center !important; text-align:left !important; padding:5px 7px !important; gap:7px;}
+  .treat-item.compact-row .ti-label{font-size:11px;}
+
   /* FDI 치식 차트 */
   .fdi-chart{margin-bottom:8px;}
   .fdi-row{display:flex;align-items:stretch;gap:1px;margin-bottom:2px;}
@@ -248,6 +266,7 @@
   .slider-row .lab{display:flex; justify-content:space-between; font-size:12px; color:var(--gray); margin-bottom:3px;}
   input[type=range]{width:100%;}
 
+  .center-col{display:flex; flex-direction:column; gap:12px; min-width:0;}
   .canvas-wrap{
     position:relative;
     background:#11181f;
@@ -256,7 +275,7 @@
     display:flex;
     align-items:center;
     justify-content:center;
-    min-height:480px;
+    min-height:160px;
     overflow:hidden;
     padding:8px;
   }
@@ -374,8 +393,8 @@
   <div class="clinic-header">
     <div class="clinic-logo"><img src="preview.png" alt="아산정플란트치과 로고"></div>
     <div class="clinic-title-wrap">
-      <h1>아산정플란트치과</h1>
-      <div class="clinic-slogan">한 사람을 위한 정직한 진료 · 치료계획 도구</div>
+      <h1>치과치료계획 <span style="font-size:13px;font-weight:600;opacity:0.8;">by Jung</span></h1>
+      <div class="clinic-slogan">파노라마 이미지에 치료계획을 직접 표시하는 전용 도구</div>
     </div>
     <div class="clinic-badge">STAFF ONLY</div>
   </div>
@@ -411,8 +430,8 @@
     <div class="hint" id="modeHint">치료종류를 고르고 위치를 클릭 → 치아/옵션 입력 후 Enter로 그 시점까지 선택된 내용만 표시됩니다.</div>
 
     <div class="slider-row">
-      <div class="lab"><span>마커/글자 크기</span><span id="sizeVal">0.9x</span></div>
-      <input type="range" id="sizeSlider" min="0.5" max="3" step="0.1" value="0.9">
+      <div class="lab"><span>마커/글자 크기</span><span id="sizeVal">1.2x</span></div>
+      <input type="range" id="sizeSlider" min="0.5" max="3" step="0.1" value="1.2">
     </div>
 
     <div id="freeOptions" style="display:none;">
@@ -430,8 +449,16 @@
       <button class="small-btn" id="clearBtn">전체삭제</button>
     </div>
 
-    <h2 style="margin-top:14px;">⌨️ 단축키 안내</h2>
-    <div style="font-size:12px; line-height:2; color:var(--ink);">
+    <h2 style="margin-top:14px;">치료계획 저장 / 불러오기</h2>
+    <div class="util-grid">
+      <button class="small-btn" id="savePlanBtn">💾 파일로 저장</button>
+      <label class="small-btn" for="loadPlanInput" style="text-align:center;cursor:pointer;">📂 불러오기</label>
+      <input type="file" id="loadPlanInput" accept=".json,application/json">
+    </div>
+    <div class="hint">현재 환자의 이미지·표시·기록을 .json 파일로 저장하고, 나중에 다시 불러와 수정할 수 있습니다.</div>
+
+    <button onclick="(()=>{const d=document.getElementById('shortcutBox');d.style.display=d.style.display==='none'?'block':'none';})()" style="width:100%;padding:7px;margin-top:14px;background:var(--teal-dark);color:#fff;border:none;border-radius:7px;font-size:12.5px;font-weight:600;cursor:pointer;">⌨️ 단축키 안내 보기/숨기기</button>
+    <div id="shortcutBox" style="display:none;font-size:12px; line-height:2; color:var(--ink); margin-top:8px;">
       <div style="color:var(--gray);font-size:11px;margin-bottom:2px;">모드 전환</div>
       <div style="display:flex; justify-content:space-between;"><span>선택/이동 모드</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">A</kbd></div>
       <div style="display:flex; justify-content:space-between;"><span>텍스트 모드</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">T</kbd></div>
@@ -459,10 +486,16 @@
     </div>
   </div>
 
-  <!-- CENTER CANVAS -->
-  <div class="canvas-wrap" id="canvasWrap">
-    <div class="placeholder" id="placeholder">이미지를 업로드하거나<br>이 영역을 클릭한 뒤 Ctrl+V로 붙여넣으세요.</div>
-    <canvas id="mainCanvas" style="display:none;"></canvas>
+  <!-- CENTER: 캔버스 + FDI (붙여서 배치) -->
+  <div class="center-col">
+    <div class="canvas-wrap" id="canvasWrap">
+      <div class="placeholder" id="placeholder">이미지를 업로드하거나<br>이 영역을 클릭한 뒤 Ctrl+V로 붙여넣으세요.</div>
+      <canvas id="mainCanvas" style="display:none;"></canvas>
+    </div>
+    <div class="panel" id="fdiPanel" style="display:none;">
+      <h2>치식 차트 (FDI)</h2>
+      <div id="fdiChartBig" class="fdi-big"></div>
+    </div>
   </div>
 
   <!-- RIGHT PANEL -->
@@ -475,8 +508,8 @@
     <input type="checkbox" id="batchToggle" style="display:none;">
 
     <h2 style="margin-top:12px;">표시 도구</h2>
-    <div class="treat-list" id="penToolsList"></div>
-    <div class="treat-list" id="stickerList" style="margin-top:6px;"></div>
+    <div class="tool-grid" id="penToolsList"></div>
+    <div class="tool-grid" id="stickerList" style="margin-top:6px;"></div>
 
     <h2 style="margin-top:14px;">치료종류 선택</h2>
     <div id="treatList"></div>
@@ -498,10 +531,8 @@
     <button class="download-btn" id="downloadBtn">PNG로 다운로드</button>
   </div>
 
-  <!-- FDI 치식 차트 (캔버스 아래 전체폭) -->
-  <div class="panel" id="fdiPanel" style="grid-column:1/-1; display:none;">
-    <h2>치식 차트 (FDI)</h2>
-    <div id="fdiChartBig" class="fdi-big"></div>
+  <div style="grid-column:1/-1; text-align:center; font-size:11px; color:var(--gray); padding:6px 0 2px;">
+    © 2026 Jung · 치과치료계획 도구 · 무단 복제·배포 금지 (All rights reserved)
   </div>
 </div>
 
@@ -512,7 +543,7 @@
 <div id="helpModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:999;align-items:center;justify-content:center;">
   <div style="background:#fff;border-radius:14px;max-width:680px;width:95%;max-height:88vh;overflow-y:auto;box-shadow:0 12px 48px rgba(0,0,0,0.35);">
     <div style="background:linear-gradient(135deg,#1d6e6b,#2a8a87);padding:18px 22px;border-radius:14px 14px 0 0;display:flex;justify-content:space-between;align-items:center;">
-      <div style="color:#fff;font-size:17px;font-weight:800;">📖 아산정플란트치과 치료계획 도구 · 조작 설명서</div>
+      <div style="color:#fff;font-size:17px;font-weight:800;">📖 치과치료계획 도구 · 조작 설명서</div>
       <button onclick="document.getElementById('helpModal').style.display='none'" style="background:rgba(255,255,255,0.2);border:none;color:#fff;font-size:20px;cursor:pointer;border-radius:6px;padding:2px 10px;">✕</button>
     </div>
     <div style="padding:20px 24px;font-size:13px;line-height:1.8;color:#1c2733;">
@@ -571,7 +602,7 @@
       <div style="background:#f0faf9;border:1px solid #a8d5d3;border-radius:8px;padding:14px 16px;margin-top:8px;">
         <div style="font-weight:700;color:#1d6e6b;margin-bottom:8px;">📋 업데이트 로그</div>
         <div style="font-size:12px;color:#374151;line-height:1.9;">
-          <div><b>2026-06-22 (최신)</b> BY 정용태</div>
+          <div><b>2026-06-22 (최신)</b> BY Mr. jung</div>
           <ul style="margin:4px 0;padding-left:18px;">
             <li>단축키 전면 개정: C=코어Cr, V=RCT(스티커), G=GBR, D=완료, H=보류, 1=발치</li>
             <li>RCT → 표시도구로 이동 (빨간 박스 스티커, 팝업 없음)</li>
@@ -608,7 +639,7 @@ let activeTreatId = null;
 let activePenTool = null;
 let activeSticker = null;
 let showLegend = true;
-let sizeSliderVal = 0.9;
+let sizeSliderVal = 1.2;
 
 let treatTypes = [
   {id:'implant',     label:'임플',     shape:'implant'},
@@ -780,9 +811,11 @@ document.getElementById('batchToggle').addEventListener('change', e=>{
   if(batchModeOn){
     btn.style.background='#1d5fa8'; btn.style.color='#fff';
     btn.style.borderColor='#1d5fa8';
+    btn.innerHTML = '✅ 다중 배치 모드 <span id="batchBtnBadge" style="font-size:11px;font-weight:700;color:#fff;">· 선택됨</span>';
   } else {
     btn.style.background='#eef4fd'; btn.style.color='#1d5fa8';
     btn.style.borderColor='#1d5fa8';
+    btn.innerHTML = '🔲 다중 배치 모드 <span id="batchBtnBadge" style="font-size:11px;font-weight:400;color:#1d5fa8;">(R)</span>';
   }
   if(!batchModeOn){
     batchPoints=[]; batchTreatId=null; batchState=null;
@@ -833,7 +866,7 @@ function renderPenTools(){
   tools.forEach(tl=>{
     const div=document.createElement('div');
     div.className='treat-item'+(activePenTool===tl.id?' active':'');
-    div.innerHTML = `<span class="swatch" style="background:${tl.sw}">${tl.g}</span><span>${tl.label}</span>`;
+    div.innerHTML = `<span class="swatch" style="background:${tl.sw}">${tl.g}</span><span class="ti-label">${tl.label}</span>`;
     div.addEventListener('click', ()=> selectPenTool(tl.id));
     c.appendChild(div);
   });
@@ -848,8 +881,8 @@ function renderStickers(){
     const t = treatTypes.find(tt=>tt.id===id);
     const div=document.createElement('div');
     div.className='treat-item'+(activeSticker===id?' active':'');
-    const sc = STICKER_SHORTCUTS[id] ? `<span style="font-size:9px;opacity:0.6;margin-left:auto;">(${STICKER_SHORTCUTS[id]})</span>` : '';
-    div.innerHTML = `<span class="swatch" style="background:${t.color}">${t.abbr}</span><span>${t.label}</span>${sc}`;
+    const sc = STICKER_SHORTCUTS[id] ? `<span class="tool-sc">${STICKER_SHORTCUTS[id]}</span>` : '';
+    div.innerHTML = `<span class="swatch" style="background:${t.color}">${t.abbr}</span><span class="ti-label">${t.label}</span>${sc}`;
     div.addEventListener('click', ()=>{
       activeSticker = id; activePenTool = null; mode='tooth';
       document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
@@ -884,7 +917,8 @@ const TREAT_SHORTCUTS = {
 function renderTreatItem(t){
   const div = document.createElement('div');
   const isActive = (t.id===activeTreatId && mode==='tooth' && !activePenTool && !activeSticker);
-  div.className = 'treat-item grid-item' + (isActive?' active':'');
+  const isCompact = ['ongoing','done','hold'].includes(t.id);
+  div.className = 'treat-item grid-item' + (isCompact?' compact-row':'') + (isActive?' active':'');
   const swatchColor = t.color || t.stroke || '#444';
   const swatchTxt = t.abbr || shapeGlyph(t.shape);
   const shortcut = TREAT_SHORTCUTS[t.id] ? `<span style="font-size:9px;opacity:0.6;">(${TREAT_SHORTCUTS[t.id]})</span>` : '';
@@ -964,6 +998,73 @@ function loadImageFromFile(file){
 
 document.getElementById('fileInput').addEventListener('change', e=>{
   loadImageFromFile(e.target.files[0]);
+});
+
+// ---------- 치료계획 저장 / 불러오기 (JSON) ----------
+document.getElementById('savePlanBtn').addEventListener('click', ()=>{
+  if(!img){ alert('먼저 이미지를 업로드하거나 붙여넣으세요.'); return; }
+  const data = {
+    version: 1,
+    savedAt: new Date().toISOString(),
+    patientName: document.getElementById('patientName').value || '',
+    planDate: document.getElementById('planDate').value || '',
+    naturalW, naturalH,
+    sizeSliderVal,
+    idSeq,
+    treatTypes,
+    GRID_COLUMNS,
+    annotations,
+    imageData: img.src
+  };
+  const blob = new Blob([JSON.stringify(data)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const pname = (data.patientName.trim() || 'plan');
+  const pdate = data.planDate || 'plan';
+  link.download = `${pname}_${pdate}.json`.replace(/\s+/g,'_');
+  link.href = url;
+  link.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('loadPlanInput').addEventListener('change', e=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    let data;
+    try{ data = JSON.parse(ev.target.result); }
+    catch(err){ alert('치료계획 파일을 읽을 수 없습니다 (JSON 형식 오류).'); return; }
+    if(!data || !data.imageData){ alert('올바른 치료계획 파일이 아닙니다.'); return; }
+    const image = new Image();
+    image.onload = ()=>{
+      img = image;
+      naturalW = data.naturalW || image.naturalWidth;
+      naturalH = data.naturalH || image.naturalHeight;
+      canvas.width = naturalW;
+      canvas.height = naturalH;
+      canvas.style.display='block';
+      placeholder.style.display='none';
+      if(Array.isArray(data.treatTypes)) treatTypes = data.treatTypes;
+      if(Array.isArray(data.GRID_COLUMNS)){ GRID_COLUMNS.length=0; data.GRID_COLUMNS.forEach(c=>GRID_COLUMNS.push(c)); }
+      annotations = Array.isArray(data.annotations) ? data.annotations : [];
+      idSeq = data.idSeq || (annotations.reduce((m,a)=>Math.max(m,a.id||0),0)+1);
+      if(typeof data.sizeSliderVal==='number'){
+        sizeSliderVal = data.sizeSliderVal;
+        sizeSlider.value = sizeSliderVal;
+        document.getElementById('sizeVal').textContent = sizeSliderVal.toFixed(1)+'x';
+      }
+      document.getElementById('patientName').value = data.patientName || '';
+      document.getElementById('planDate').value = data.planDate || '';
+      selectedAnnId = null; batchPoints=[]; batchState=null;
+      renderTreatList(); renderPenTools(); renderStickers();
+      renderAnnList(); renderBatchPanel();
+      redraw();
+    };
+    image.src = data.imageData;
+  };
+  reader.readAsText(file);
+  e.target.value = '';
 });
 
 // ---------- Image clear ----------
