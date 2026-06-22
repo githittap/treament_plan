@@ -175,6 +175,23 @@ GitHub Desktop → Push origin
 https://githittap.github.io/treament_plan/치료계획.html (1~2분 후 반영)
 ```
 
+> **현재 배포 파일은 `치료계획.html`(읽기 가능 원본)** — 이전 방식 그대로 유지.
+
+### 난독화 빌드 (보유만, 현재 미배포)
+
+카피 방지용 난독화 도구를 만들어 두었으나 **현재 배포에는 사용하지 않음**.
+
+```
+node build_obfuscate.js   # 치료계획.html → 치료계획.min.html (난독화본) 생성
+```
+
+- `build_obfuscate.js` — 메인 `<script>`만 난독화 (변수명 mangling, 문자열 base64, 제어흐름 평탄화, selfDefending 등)
+- `치료계획.min.html` — 자동 생성물. **직접 수정 금지** (수정은 항상 원본 `치료계획.html`에서)
+- 의존성: `npm install javascript-obfuscator` (`node_modules`는 .gitignore 처리됨)
+- 나중에 난독화본을 배포하려면 → 원본을 `치료계획.src.html`로 보관하고 빌드 출력을 `치료계획.html`로 바꾸는 방식 권장 (URL 유지)
+
+저작권 표기: HTML 상단 주석 + 화면 하단 푸터에 `© 2026 Jung · 무단 복제·배포 금지`.
+
 ---
 
 ## 킵해둔 작업 (미구현 항목)
