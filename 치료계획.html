@@ -501,6 +501,7 @@
   <!-- RIGHT PANEL -->
   <div class="panel">
     <button class="small-btn" id="copyBtn" style="width:100%;padding:9px;margin-bottom:6px;">이미지 복사 <span style="font-size:10px;opacity:0.7;">(Ctrl+C)</span></button>
+    <button class="small-btn" id="copyAllBtn" style="width:100%;padding:9px;margin-bottom:6px;">🦷 이미지+FDI 복사 <span style="font-size:10px;opacity:0.7;">(B)</span></button>
     <button class="mode-btn" data-mode="text" id="textModeBtn" style="width:100%;margin-bottom:10px;">텍스트 <span style="font-size:10px;opacity:0.7;">(T)</span></button>
     <button id="batchToggleBtn" onclick="(()=>{const t=document.getElementById('batchToggle'); t.checked=!t.checked; t.dispatchEvent(new Event('change'));})()" style="width:100%;padding:10px 0;margin-bottom:2px;font-size:14px;font-weight:700;border-radius:8px;border:2px solid #1d5fa8;background:#eef4fd;color:#1d5fa8;cursor:pointer;letter-spacing:0.3px;">
       🔲 다중 배치 모드 <span id="batchBtnBadge" style="font-size:11px;font-weight:400;color:#1d5fa8;">(R)</span>
@@ -1249,6 +1250,7 @@ window.addEventListener('keydown', e=>{
   if(e.key==='w'||e.key==='W') selectTreat('ongoing');
   if(e.key==='d'||e.key==='D') selectTreat('done');
   if(e.key==='h'||e.key==='H') selectTreat('hold');
+  if(e.key==='b'||e.key==='B'){ const b=document.getElementById('copyAllBtn'); if(b) b.click(); }
 });
 
 // ---------- Paste support ----------
@@ -2445,6 +2447,99 @@ document.getElementById('copyBtn').addEventListener('click', async ()=>{
     await navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]);
     btn.textContent = '복사됨!';
     setTimeout(()=>{ btn.textContent = orig; }, 1500);
+  } catch(err){
+    alert('클립보드 복사에 실패했습니다. 이 브라우저/환경에서는 지원되지 않을 수 있어요. PNG 다운로드를 이용해주세요.');
+  }
+});
+
+// ---------- 이미지 + FDI 합성 복사 ----------
+function _roundRect(c,x,y,w,h,r){
+  c.beginPath();
+  c.moveTo(x+r,y);
+  c.arcTo(x+w,y,x+w,y+h,r);
+  c.arcTo(x+w,y+h,x,y+h,r);
+  c.arcTo(x,y+h,x,y,r);
+  c.arcTo(x,y,x+w,y,r);
+  c.closePath();
+}
+function _fdiLayout(W){
+  const pad = Math.round(W*0.012);
+  const cellGap = Math.round(W*0.004);
+  const centerSep = Math.round(W*0.014);
+  const usable = W - pad*2;
+  const sumGaps = 14*cellGap + centerSep;
+  const cellW = (usable - sumGaps)/16;
+  const cellH = Math.round(W*0.052);
+  const labelH = Math.round(W*0.028);
+  const vGap = Math.round(W*0.014);
+  const topPad = Math.round(W*0.014);
+  const totalH = topPad + (labelH + cellH)*2 + vGap + topPad;
+  return {pad,cellGap,centerSep,cellW,cellH,labelH,vGap,topPad,totalH};
+}
+function _drawFdiOnCanvas(c, oy, W, toothAnns, L){
+  const FDI_ROWS=[
+    [18,17,16,15,14,13,12,11,21,22,23,24,25,26,27,28],
+    [48,47,46,45,44,43,42,41,31,32,33,34,35,36,37,38]
+  ];
+  const LABELS=['상악 (Upper)','하악 (Lower)'];
+  const tMap={};
+  toothAnns.forEach(a=>{ const n=a.toothNum.trim(); (tMap[n]=tMap[n]||[]).push(a); });
+  let y = oy + L.topPad;
+  FDI_ROWS.forEach((row,ri)=>{
+    c.fillStyle='#1d6e6b'; c.textAlign='center'; c.textBaseline='middle';
+    c.font='700 '+Math.round(L.labelH*0.78)+'px sans-serif';
+    c.fillText(LABELS[ri], W/2, y + L.labelH/2);
+    y += L.labelH;
+    let x = L.pad;
+    row.forEach((num,ci)=>{
+      if(ci===8){ x += (L.centerSep - L.cellGap); }
+      const numStr=String(num);
+      const anns=tMap[numStr]||[];
+      let bg='#f5f5f5', fg='#777', border='#dddddd';
+      if(anns.length){
+        const pT=treatTypes.find(tt=>tt.id===anns[0].treatId);
+        bg=pT?(pT.color||pT.stroke||'#156f72'):'#156f72'; fg='#ffffff'; border=bg;
+      }
+      _roundRect(c,x,y,L.cellW,L.cellH,Math.round(L.cellH*0.12));
+      c.fillStyle=bg; c.fill();
+      c.lineWidth=Math.max(1,W*0.0011); c.strokeStyle=border; c.stroke();
+      c.fillStyle=fg; c.textAlign='center'; c.textBaseline='top';
+      c.font='800 '+Math.round(L.cellH*0.32)+'px sans-serif';
+      c.fillText(numStr, x+L.cellW/2, y + L.cellH*0.1);
+      if(anns.length){
+        const labels=anns.map(a=>(treatTypes.find(tt=>tt.id===a.treatId)||{label:'?'}).label);
+        let txt = labels.length<=2 ? labels.join(',') : (labels[0]+' 외'+(labels.length-1));
+        c.font='600 '+Math.round(L.cellH*0.2)+'px sans-serif';
+        while(c.measureText(txt).width > L.cellW*0.92 && txt.length>1){ txt=txt.slice(0,-1); }
+        c.fillText(txt, x+L.cellW/2, y + L.cellH*0.52);
+      }
+      x += L.cellW + (ci<15 ? L.cellGap : 0);
+    });
+    y += L.cellH + (ri===0 ? L.vGap : 0);
+  });
+}
+document.getElementById('copyAllBtn').addEventListener('click', async ()=>{
+  if(!img){ alert('먼저 이미지를 업로드하거나 붙여넣으세요.'); return; }
+  closePopup();
+  redraw();
+  const btn = document.getElementById('copyAllBtn');
+  const orig = btn.innerHTML;
+  const toothAnns = annotations.filter(a=>a.type==='tooth' && a.toothNum && a.toothNum.trim());
+  const L = _fdiLayout(naturalW);
+  const fdiH = toothAnns.length>0 ? L.totalH : 0;
+  const out = document.createElement('canvas');
+  out.width = naturalW;
+  out.height = naturalH + fdiH;
+  const octx = out.getContext('2d');
+  octx.fillStyle='#ffffff'; octx.fillRect(0,0,out.width,out.height);
+  octx.drawImage(canvas, 0, 0);
+  if(fdiH>0) _drawFdiOnCanvas(octx, naturalH, naturalW, toothAnns, L);
+  try{
+    const blob = await new Promise(resolve=> out.toBlob(resolve, 'image/png'));
+    if(!blob) throw new Error('blob 생성 실패');
+    await navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]);
+    btn.innerHTML = '복사됨!';
+    setTimeout(()=>{ btn.innerHTML = orig; }, 1500);
   } catch(err){
     alert('클립보드 복사에 실패했습니다. 이 브라우저/환경에서는 지원되지 않을 수 있어요. PNG 다운로드를 이용해주세요.');
   }
