@@ -2175,6 +2175,15 @@ document.getElementById('copyBtn').addEventListener('click', async ()=>{
     alert('클립보드 복사에 실패했습니다. 이 브라우저/환경에서는 지원되지 않을 수 있어요. PNG 다운로드를 이용해주세요.');
   }
 });
+
+// ---------- Ctrl+C copy event 직접 가로채기 ----------
+document.addEventListener('copy', e=>{
+  if(!img) return;
+  const tag = document.activeElement.tagName;
+  if(tag==='INPUT'||tag==='TEXTAREA') return;
+  e.preventDefault();
+  document.getElementById('copyBtn').click();
+});
 </script>
 </body>
 </html>
