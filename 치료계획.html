@@ -656,6 +656,8 @@ let treatTypes = [
   {id:'done',        label:'완료',    shape:'area', interaction:'area', fill:'rgba(34,197,94,0.22)',  stroke:'#16a34a', skipPopup:true},
   {id:'hold',        label:'보류',    shape:'area', interaction:'area', fill:'rgba(245,158,11,0.22)', stroke:'#d97706', skipPopup:true},
   {id:'need',        label:'치료필요', shape:'area', interaction:'area', fill:'rgba(239,68,68,0.22)',  stroke:'#dc2626', skipPopup:true},
+  {id:'tempset',     label:'T/S',     shape:'area', interaction:'area', fill:'rgba(14,165,233,0.22)', stroke:'#0284c7', skipPopup:true},
+  {id:'permset',     label:'F/S',     shape:'area', interaction:'area', fill:'rgba(16,185,129,0.22)', stroke:'#059669', skipPopup:true},
   {id:'other',       label:'기타',    shape:'dot',  color:'#475569', abbr:'기타'},
   {id:'crestal',     label:'크레스탈', shape:'dot', color:'#0d9488', abbr:'Cre.'},
   {id:'lateral',     label:'라테랄',   shape:'dot', color:'#4f46e5', abbr:'Lat.'},
@@ -669,7 +671,8 @@ const GRID_COLUMNS = [
   ['core_crown'],
   ['ca','other'],
   '---',
-  ['ongoing','done','hold','need']
+  ['ongoing','hold','tempset'],
+  ['done','need','permset']
 ];
 const HIDE_NAME = new Set(['pontic','implant','extraction','core_crown','rct','resin','ca','fu','inlay']);
 const ROTATABLE = [];
@@ -699,7 +702,11 @@ let pointerDownPos = null;
 let mouseCanvasPos = null;
 let _dblClickFired = false;
 let deletedImageState = null;
+let undoStack = [];
 let redoStack = [];
+let gestureSnapshotTaken = false;
+function snapshotAnns(){ return annotations.map(a=>Object.assign({},a)); }
+function pushUndo(){ undoStack.push(snapshotAnns()); redoStack=[]; }
 
 function getAnnBounds(a){
   if(a.type==='tooth'){
@@ -914,12 +921,13 @@ function shapeGlyph(shape){
 const TREAT_SHORTCUTS = {
   'implant':'2', 'pontic':'3',
   'core_crown':'C', 'inlay':'I', 'resin':'F',
-  'ongoing':'W', 'done':'D', 'hold':'H', 'need':'N'
+  'ongoing':'W', 'done':'D', 'hold':'H', 'need':'N',
+  'tempset':'S', 'permset':'P'
 };
 function renderTreatItem(t){
   const div = document.createElement('div');
   const isActive = (t.id===activeTreatId && mode==='tooth' && !activePenTool && !activeSticker);
-  const isCompact = ['ongoing','done','hold','need'].includes(t.id);
+  const isCompact = ['ongoing','done','hold','need','tempset','permset'].includes(t.id);
   div.className = 'treat-item grid-item' + (isCompact?' compact-row':'') + (isActive?' active':'');
   const swatchColor = t.color || t.stroke || '#444';
   const swatchTxt = t.abbr || shapeGlyph(t.shape);
@@ -1102,7 +1110,7 @@ window.addEventListener('keydown', e=>{
     if(tag==='INPUT'||tag==='TEXTAREA') return;
     e.preventDefault();
     if(selectedAnnId!==null){
-      redoStack.push(annotations.map(a=>Object.assign({},a)));
+      pushUndo();
       annotations = annotations.filter(a=>a.id!==selectedAnnId);
       selectedAnnId=null; redraw(); renderAnnList();
     } else {
@@ -1114,7 +1122,7 @@ window.addEventListener('keydown', e=>{
   if(e.key==='Escape'){
     if(popupEl){ closePopup(); return; }
     if(selectedAnnId!==null){
-      redoStack.push(annotations.map(a=>Object.assign({},a)));
+      pushUndo();
       annotations = annotations.filter(a=>a.id!==selectedAnnId);
       selectedAnnId=null; redraw(); renderAnnList();
       return;
@@ -1132,7 +1140,9 @@ window.addEventListener('keydown', e=>{
   if(e.key==='y' && (e.ctrlKey||e.metaKey)){
     e.preventDefault();
     if(redoStack.length===0) return;
+    undoStack.push(snapshotAnns());
     annotations = redoStack.pop();
+    selectedAnnId = null;
     redraw(); renderAnnList();
     return;
   }
@@ -1252,6 +1262,8 @@ window.addEventListener('keydown', e=>{
   if(e.key==='d'||e.key==='D') selectTreat('done');
   if(e.key==='h'||e.key==='H') selectTreat('hold');
   if(e.key==='n'||e.key==='N') selectTreat('need');
+  if(e.key==='s'||e.key==='S') selectTreat('tempset');
+  if(e.key==='p'||e.key==='P') selectTreat('permset');
   if(e.key==='m'||e.key==='M') selectPenTool('mark');
   if(e.key==='l'||e.key==='L') selectPenTool('connect');
   if(e.key==='b'||e.key==='B'){ const b=document.getElementById('copyAllBtn'); if(b) b.click(); }
@@ -1397,7 +1409,7 @@ function drawPontic(c,x,y,s){
   c.beginPath();
   if(c.roundRect){ c.roundRect(x-crownW/2, y, crownW, crownH, crownH*0.35); }
   else { c.rect(x-crownW/2, y, crownW, crownH); }
-  c.fillStyle='#9aa0a6'; c.fill();
+  c.fillStyle='#ffffff'; c.fill();
   c.lineWidth=Math.max(1.5,s*0.03); c.strokeStyle='#5f656b'; c.stroke();
   c.restore();
   return {topY: y, bottomY: y+crownH};
@@ -1857,6 +1869,7 @@ function openToothPopup(treatId, x, y, evt, existingAnn){
 
   const confirmFn = ()=>{
     const toothNum = div.querySelector('#popToothNum').value.trim();
+    pushUndo();
     const ann = existingAnn || {id:idSeq++, type:'tooth', x, y, rotation:0, size: baseUnit()*sizeSliderVal};
     ann.toothNum = toothNum;
     ann.treatId = treatId;
@@ -1864,7 +1877,7 @@ function openToothPopup(treatId, x, y, evt, existingAnn){
     ann.periods = kind==='implant' ? state.periods.slice() : [];
     ann.surface = kind==='surface' ? (state.surface||'') : '';
     ann.note = state.note || '';
-    if(!existingAnn){ annotations.push(ann); redoStack=[]; }
+    if(!existingAnn){ annotations.push(ann); }
     closePopup();
     redraw(); renderAnnList();
   };
@@ -1877,6 +1890,7 @@ function openToothPopup(treatId, x, y, evt, existingAnn){
   div.querySelector('#popCancel').addEventListener('click', closePopup);
   if(existingAnn){
     div.querySelector('#popDelete').addEventListener('click', ()=>{
+      pushUndo();
       annotations = annotations.filter(a=>a.id!==existingAnn.id);
       closePopup(); redraw(); renderAnnList();
     });
@@ -1909,11 +1923,12 @@ function openAreaPopup(treatId, x1,y1,x2,y2, evt, existingAnn){
   const confirmFn = ()=>{
     const toothNum = div.querySelector('#popToothNum').value.trim();
     const note = div.querySelector('#popNote').value.trim();
+    pushUndo();
     const ann = existingAnn || {id:idSeq++, type:'area', treatId, x1,y1,x2,y2};
     ann.toothNum = toothNum;
     ann.note = note;
     ann.treatId = treatId;
-    if(!existingAnn){ annotations.push(ann); redoStack=[]; }
+    if(!existingAnn){ annotations.push(ann); }
     closePopup(); redraw(); renderAnnList();
   };
   div.addEventListener('keydown', ev=>{
@@ -1924,6 +1939,7 @@ function openAreaPopup(treatId, x1,y1,x2,y2, evt, existingAnn){
   div.querySelector('#popCancel').addEventListener('click', closePopup);
   if(existingAnn){
     div.querySelector('#popDelete').addEventListener('click', ()=>{
+      pushUndo();
       annotations = annotations.filter(a=>a.id!==existingAnn.id);
       closePopup(); redraw(); renderAnnList();
     });
@@ -1954,10 +1970,11 @@ function openTextPopup(x, y, evt, existingAnn){
   const confirmFn = ()=>{
     const val = div.querySelector('#popText').value.trim();
     if(val){
+      pushUndo();
       if(existingAnn){ existingAnn.text = val; }
       else {
         const fontSize = Math.max(10, baseUnit()*sizeSliderVal*0.204*1.3);
-        annotations.push({id:idSeq++, type:'text', x, y, text:val, fontSize}); redoStack=[];
+        annotations.push({id:idSeq++, type:'text', x, y, text:val, fontSize});
       }
     }
     closePopup(); redraw(); renderAnnList();
@@ -1970,6 +1987,7 @@ function openTextPopup(x, y, evt, existingAnn){
   div.querySelector('#popCancel').addEventListener('click', closePopup);
   if(existingAnn){
     div.querySelector('#popDelete').addEventListener('click', ()=>{
+      pushUndo();
       annotations = annotations.filter(a=>a.id!==existingAnn.id);
       closePopup(); redraw(); renderAnnList();
     });
@@ -1979,13 +1997,13 @@ function openTextPopup(x, y, evt, existingAnn){
 
 function placeStickerAt(x,y){
   const isExtraction = activeSticker==='extraction';
+  pushUndo();
   annotations.push({
     id:idSeq++, type:'tooth', treatId:activeSticker, x, y,
     toothNum:'', note:'', kinds:[], periods:[], surface:'', rotation:0,
     size: isExtraction ? baseUnit()*sizeSliderVal*0.5 : baseUnit()*sizeSliderVal*0.6,
     noLabel:true
   });
-  redoStack=[];
   redraw(); renderAnnList();
 }
 
@@ -2052,6 +2070,7 @@ document.getElementById('batchPanel').addEventListener('keydown', ev=>{
 
 function applyBatch(){
   if(batchPoints.length===0) return;
+  pushUndo();
   const kind = treatKind(treatTypes.find(tt=>tt.id===batchTreatId));
   batchPoints.forEach(p=>{
     annotations.push({
@@ -2064,7 +2083,6 @@ function applyBatch(){
       rotation:0, size: baseUnit()*sizeSliderVal
     });
   });
-  redoStack=[];
   batchPoints=[]; batchState=null;
   // 적용 후 다중 배치 모드 자동 해제 (버튼 표시도 change 이벤트로 동기화)
   const toggle = document.getElementById('batchToggle');
@@ -2080,6 +2098,7 @@ canvas.addEventListener('pointerdown', e=>{
   if(mode==='tooth' || mode==='text') e.preventDefault();
   const {x,y} = getCanvasCoords(e);
   pointerDownPos = {x,y};
+  gestureSnapshotTaken = false;
 
   // 핸들 리사이즈 체크 (선택된 항목이 있을 때)
   if(selectedAnnId!==null && (mode==='tooth'||mode==='text')){
@@ -2180,7 +2199,7 @@ canvas.addEventListener('contextmenu', e=>{
   };
   if(hit.type!=='free') menu.appendChild(mk('✏️ 수정','#1d5fa8',()=> openAnnEditor(hit, e)));
   menu.appendChild(mk('🗑️ 삭제','#dc2626',()=>{
-    redoStack.push(annotations.map(a=>Object.assign({},a)));
+    pushUndo();
     annotations = annotations.filter(a=>a.id!==hit.id);
     selectedAnnId=null; redraw(); renderAnnList();
   }));
@@ -2195,6 +2214,7 @@ canvas.addEventListener('pointermove', e=>{
     const {x,y} = getCanvasCoords(e);
     const ann = annotations.find(a=>a.id===selectedAnnId);
     if(!ann){ resizingHandle=null; return; }
+    if(!gestureSnapshotTaken){ pushUndo(); gestureSnapshotTaken=true; }
     const hi = resizingHandle.handleIdx;
     if(ann.type==='tooth'){
       const b = resizingHandle.origBounds;
@@ -2217,6 +2237,7 @@ canvas.addEventListener('pointermove', e=>{
   }
   if(draggingAnn){
     const {x,y} = getCanvasCoords(e);
+    if(!gestureSnapshotTaken){ pushUndo(); gestureSnapshotTaken=true; }
     if(draggingAnn.type==='area'){
       const anchor = draggingAnn._dragAnchor || {x,y};
       const dx = x-anchor.x, dy = y-anchor.y;
@@ -2263,7 +2284,8 @@ window.addEventListener('pointerup', (e)=>{
     }
     const tArea = treatTypes.find(tt=>tt.id===activeTreatId);
     if(tArea && tArea.skipPopup){
-      annotations.push({id:idSeq++, type:'area', treatId:activeTreatId, x1, y1, x2, y2, toothNum:'', note:''}); redoStack=[];
+      pushUndo();
+      annotations.push({id:idSeq++, type:'area', treatId:activeTreatId, x1, y1, x2, y2, toothNum:'', note:''});
       redraw(); renderAnnList();
     } else {
       openAreaPopup(activeTreatId, x1,y1,x2,y2, e, null);
@@ -2272,7 +2294,7 @@ window.addEventListener('pointerup', (e)=>{
     return;
   }
   if(freeDragging && drawingStroke){
-    if(drawingStroke.points.length>1){ annotations.push(drawingStroke); redoStack=[]; }
+    if(drawingStroke.points.length>1){ pushUndo(); annotations.push(drawingStroke); }
     drawingStroke=null;
     renderAnnList();
   }
@@ -2330,6 +2352,7 @@ function eraseNear(x,y){
     }
   }
   if(idxToRemove>=0){
+    pushUndo();
     if(annotations[idxToRemove].id===selectedAnnId) selectedAnnId=null;
     annotations.splice(idxToRemove,1); redraw(); renderAnnList();
   }
@@ -2342,7 +2365,7 @@ document.getElementById('undoBtn').addEventListener('click', ()=>{
     naturalW = deletedImageState.naturalW;
     naturalH = deletedImageState.naturalH;
     canvas.width = naturalW; canvas.height = naturalH;
-    redoStack.push([...annotations]);
+    redoStack.push(snapshotAnns());
     annotations = deletedImageState.annotations;
     canvas.style.display='block';
     placeholder.style.display='none';
@@ -2350,9 +2373,10 @@ document.getElementById('undoBtn').addEventListener('click', ()=>{
     redraw(); renderAnnList();
     return;
   }
-  if(annotations.length===0) return;
-  redoStack.push(annotations.map(a=>Object.assign({},a)));
-  annotations.pop();
+  if(undoStack.length===0) return;
+  redoStack.push(snapshotAnns());
+  annotations = undoStack.pop();
+  selectedAnnId = null;
   redraw(); renderAnnList();
 });
 document.getElementById('clearBtn').addEventListener('click', ()=>{
