@@ -2669,6 +2669,23 @@ const ImplantRecorder = (function(){
     const p = n => String(n).padStart(2,'0');
     return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
   }
+  function pad2(n){ return String(n).padStart(2,'0'); }
+  function fmt(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+  // 식립일 + months개월. .5개월은 +15일. 월말 보정(없는 날짜는 해당 월 마지막 날로).
+  function addPeriod(dateStr, months){
+    const parts = dateStr.split('-').map(Number);
+    if(parts.length!==3 || parts.some(isNaN)) return '';
+    const [y,m,day] = parts;
+    const whole = Math.floor(months);
+    const half = (months - whole) >= 0.5;
+    const base = new Date(y, m-1, 1);
+    const target = new Date(y, m-1+whole, 1);
+    const lastDay = new Date(target.getFullYear(), target.getMonth()+1, 0).getDate();
+    target.setDate(Math.min(day, lastDay));
+    if(half) target.setDate(target.getDate()+15);
+    void base;
+    return fmt(target);
+  }
   function newDraft(){ return {date:todayStr(), type:null, teeth:[], months:null, memoMeasure:null, memoForce:null, memoEtc:''}; }
   function goStep(n){ step = n; render(); }
   function open(){ draft = newDraft(); step = 1; showMoreMonths = false; modal.style.display='flex'; render(); }
@@ -2745,7 +2762,35 @@ const ImplantRecorder = (function(){
     document.getElementById('irBack').onclick = ()=>goStep(2);
     document.getElementById('irNext').onclick = ()=>{ if(draft.teeth.length===0){ alert('치식을 1개 이상 선택하세요.'); return; } goStep(4); };
   }
-  function renderMonths(){ body.innerHTML='<div>months</div>'; }
+  function renderMonths(){
+    const baseMonths = [2.5,3,4,6];
+    const moreMonths = [5,7,8,9];
+    const lbl = v => (v===2.5?'2.5M':v+'M');
+    let btns = baseMonths.map(v=>`<button class="ir-btn${draft.months===v?' sel':''}" data-m="${v}">${lbl(v)}</button>`).join('');
+    if(showMoreMonths){
+      btns += moreMonths.map(v=>`<button class="ir-btn${draft.months===v?' sel':''}" data-m="${v}">${lbl(v)}</button>`).join('');
+    } else {
+      btns += `<button class="ir-btn" id="irMore">＋</button>`;
+    }
+    const isqDate = draft.months!=null ? addPeriod(draft.date, draft.months) : '';
+    body.innerHTML = `
+      <div class="ir-section">
+        <h4>4 / 5 · 경과 개월수</h4>
+        <div>${btns}</div>
+        <div style="font-size:12px;color:#555;margin-top:8px;">ISQ&SCAN 예정일: <b>${isqDate||'—'}</b></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;">
+        <button class="ir-btn" id="irBack">◀ 이전</button>
+        <button class="ir-primary" id="irNext">다음 ▶</button>
+      </div>`;
+    body.querySelectorAll('[data-m]').forEach(b=>{
+      b.onclick = ()=>{ draft.months = Number(b.dataset.m); render(); };
+    });
+    const moreBtn = document.getElementById('irMore');
+    if(moreBtn) moreBtn.onclick = ()=>{ showMoreMonths = true; render(); };
+    document.getElementById('irBack').onclick = ()=>goStep(3);
+    document.getElementById('irNext').onclick = ()=>{ if(draft.months==null){ alert('개월수를 선택하세요.'); return; } goStep(5); };
+  }
   function renderMemo(){ body.innerHTML='<div>memo</div>'; }
   return { open, close };
 })();
