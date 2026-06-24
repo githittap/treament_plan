@@ -683,8 +683,8 @@ let treatTypes = [
   {id:'tempset',     label:'T/S',     shape:'area', interaction:'area', fill:'rgba(14,165,233,0.22)', stroke:'#0284c7', skipPopup:true},
   {id:'permset',     label:'F/S',     shape:'area', interaction:'area', fill:'rgba(16,185,129,0.22)', stroke:'#059669', skipPopup:true},
   {id:'other',       label:'기타',    shape:'dot',  color:'#475569', abbr:'기타'},
-  {id:'crestal',     label:'크레스탈', shape:'dot', color:'#0d9488', abbr:'Cre.'},
-  {id:'lateral',     label:'라테랄',   shape:'dot', color:'#4f46e5', abbr:'Lat.'},
+  {id:'crestal',     label:'크레스탈', shape:'bar', bar:'v', color:'#dc2626', abbr:'Cre.'},
+  {id:'lateral',     label:'라테랄',   shape:'bar', bar:'h', color:'#dc2626', abbr:'Lat.'},
   {id:'gbr',         label:'GBR',      shape:'dot', color:'#be185d', abbr:'GBR'},
 ];
 activeTreatId = 'implant';
@@ -1335,6 +1335,30 @@ function drawDot(c,x,y,s,color,abbr){
   return {topY: y-r, bottomY: y+r};
 }
 
+// 크레스탈(세로)/라테랄(가로) — 원형 없이 작은 막대 + 옆 라벨
+function drawBar(c,x,y,s,color,orient,abbr){
+  const len = s*0.95, thick = Math.max(4, s*0.16);
+  const half = len/2;
+  c.save();
+  c.strokeStyle = color; c.lineCap='round'; c.lineWidth = thick;
+  c.beginPath();
+  if(orient==='h'){ c.moveTo(x-half, y); c.lineTo(x+half, y); }
+  else { c.moveTo(x, y-half); c.lineTo(x, y+half); }
+  c.stroke();
+  if(abbr){
+    c.font = `700 ${s*0.34}px sans-serif`;
+    c.textBaseline = 'middle';
+    let tx, ty;
+    if(orient==='h'){ c.textAlign='center'; tx=x; ty=y - thick - s*0.24; }
+    else { c.textAlign='left'; tx=x + thick*0.7 + s*0.12; ty=y; }
+    c.lineWidth = Math.max(2, s*0.07); c.strokeStyle='#fff'; c.lineJoin='round';
+    c.strokeText(abbr, tx, ty);
+    c.fillStyle = color; c.fillText(abbr, tx, ty);
+  }
+  c.restore();
+  return {topY: y-half, bottomY: y+half};
+}
+
 function drawX(c,x,y,s,color){
   const half = s*0.32;
   c.save();
@@ -1500,6 +1524,7 @@ function drawShapeForAnn(c,a){
     case 'rct_box': return drawRctBox(c,a.x,a.y,s);
     case 'inlaySurface': return drawInlay(c,a.x,a.y,s, t.color||'#d4150f', a.surface, a.toothNum, a.rotation||0);
     case 'ca': return drawCA(c,a.x,a.y,s, t.color||'#d4150f');
+    case 'bar': return drawBar(c,a.x,a.y,s, t.color||'#dc2626', t.bar||'v', t.abbr||'');
     default: {
       const dotTxt = (a.treatId==='inlay') ? (a.surface || '인') : (t.abbr||'');
       return drawDot(c,a.x,a.y,s, t.color||'#444', dotTxt);
