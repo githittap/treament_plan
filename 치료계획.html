@@ -386,6 +386,16 @@
   #batchPanel .fline{display:flex; gap:6px; align-items:center; margin-bottom:5px;}
   #batchPanel .fline label{font-size:11px; color:var(--gray); width:18px; flex:none;}
   #batchPanel .fline input[type=text]{flex:1; padding:5px 7px; font-size:12.5px;}
+  .ir-btn{display:inline-block;margin:3px;padding:8px 13px;border:1.5px solid #2a8a87;background:#eef9f8;color:#1d6e6b;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
+  .ir-btn:hover{background:#dbf1ef;}
+  .ir-btn.sel{background:#2a8a87;color:#fff;}
+  .ir-section{margin-bottom:14px;}
+  .ir-section h4{margin:0 0 8px;font-size:13px;color:#2a8a87;}
+  .ir-input{width:100%;padding:8px 10px;font-size:14px;border:1.5px solid #cdd8d6;border-radius:8px;box-sizing:border-box;}
+  .ir-primary{background:#1d6e6b;color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;}
+  .ir-primary:hover{background:#155653;}
+  .ir-row-item{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 10px;border:1px solid #e0eceb;border-radius:8px;margin-bottom:5px;font-size:13px;background:#fafdfd;}
+  .ir-del{background:none;border:none;color:#c0392b;cursor:pointer;font-size:14px;}
 </style>
 </head>
 <body>
@@ -396,6 +406,8 @@
       <h1>치과치료계획 <span style="font-size:13px;font-weight:600;opacity:0.8;">by Jung</span></h1>
       <div class="clinic-slogan">파노라마 이미지에 치료계획을 직접 표시하는 전용 도구</div>
     </div>
+    <button id="implantOpenBtn" onclick="ImplantRecorder.open()"
+      style="background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.35);color:#fff;font-size:13px;font-weight:700;padding:8px 14px;border-radius:10px;cursor:pointer;letter-spacing:0.2px;margin-right:10px;">🦷 임플란트 기록</button>
     <div class="clinic-badge">STAFF ONLY</div>
   </div>
 
@@ -534,6 +546,17 @@
 
   <div style="grid-column:1/-1; text-align:center; font-size:11px; color:var(--gray); padding:6px 0 2px;">
     © 2026 Jung · 치과치료계획 도구 · 무단 복제·배포 금지 (All rights reserved)
+  </div>
+</div>
+
+<!-- 임플란트 기록 생성기 모달 -->
+<div id="implantModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:14px;max-width:560px;width:95%;max-height:90vh;overflow-y:auto;box-shadow:0 12px 48px rgba(0,0,0,0.35);">
+    <div style="background:linear-gradient(135deg,#1d6e6b,#2a8a87);padding:16px 20px;border-radius:14px 14px 0 0;display:flex;justify-content:space-between;align-items:center;">
+      <div style="color:#fff;font-size:16px;font-weight:800;">🦷 임플란트 기록 생성기</div>
+      <button onclick="ImplantRecorder.close()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;font-size:20px;cursor:pointer;border-radius:6px;padding:2px 10px;">✕</button>
+    </div>
+    <div id="irBody" style="padding:18px 20px;font-size:14px;color:#1c2733;"></div>
   </div>
 </div>
 
@@ -2627,6 +2650,17 @@ document.addEventListener('copy', e=>{
   e.preventDefault();
   document.getElementById('copyBtn').click();
 });
+
+// ===== 임플란트 기록 생성기 (독립 모듈) =====
+const ImplantRecorder = (function(){
+  const modal = document.getElementById('implantModal');
+  const body  = document.getElementById('irBody');
+  function open(){ modal.style.display='flex'; render(); }
+  function close(){ modal.style.display='none'; }
+  function render(){ body.innerHTML = '<div style="text-align:center;color:#888;padding:20px;">준비 중</div>'; }
+  return { open, close };
+})();
+window.ImplantRecorder = ImplantRecorder;
 </script>
 </body>
 </html>
