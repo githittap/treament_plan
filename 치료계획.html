@@ -2659,10 +2659,15 @@ const ImplantRecorder = (function(){
   let draft = null;
   let step = 1;
   let showMoreMonths = false;
-  let advance = null;  // 현재 단계의 Enter 동작 (다음/추가)
+  let advance = null;  // 현재 단계의 진행 동작 (다음/추가)
   function onKey(e){
     if(modal.style.display==='none') return;
-    if(e.key==='Enter'){ e.preventDefault(); if(advance) advance(); }
+    const inEtc = document.activeElement && document.activeElement.id==='irEtc';
+    if(e.key==='Enter'){
+      if(inEtc && advance){ e.preventDefault(); advance(); }  // 기타(자유입력) 칸에서만 Enter=등록
+      return;
+    }
+    if(e.key===' ' && !inEtc){ e.preventDefault(); if(advance) advance(); }  // 그 외엔 Space=다음
   }
   const IMPLANT_TYPES = ['EV','ST','DT','BD','EV mini','ST mini','BD nc'];
   const FDI_ROWS = [
@@ -2707,7 +2712,7 @@ const ImplantRecorder = (function(){
       <div class="ir-section">
         <h4>1 / 5 · 식립 날짜</h4>
         <input id="irDate" class="ir-input" type="text" value="${draft.date}" placeholder="YYYY-MM-DD">
-        <div style="font-size:11px;color:#888;margin-top:6px;">오늘 날짜가 자동 입력됩니다. 수정 후 Enter 또는 다음.</div>
+        <div style="font-size:11px;color:#888;margin-top:6px;">오늘 날짜가 자동 입력됩니다. 수정 후 Space 또는 다음.</div>
       </div>
       <div style="text-align:right;"><button class="ir-primary" id="irNext">다음 ▶</button></div>`;
     const inp = document.getElementById('irDate');
