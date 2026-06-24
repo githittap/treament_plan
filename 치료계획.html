@@ -2655,9 +2655,44 @@ document.addEventListener('copy', e=>{
 const ImplantRecorder = (function(){
   const modal = document.getElementById('implantModal');
   const body  = document.getElementById('irBody');
-  function open(){ modal.style.display='flex'; render(); }
+  let records = [];
+  let draft = null;
+  let step = 1;
+  let showMoreMonths = false;
+  function todayStr(){
+    const d = new Date();
+    const p = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+  }
+  function newDraft(){ return {date:todayStr(), type:null, teeth:[], months:null, memoMeasure:null, memoForce:null, memoEtc:''}; }
+  function goStep(n){ step = n; render(); }
+  function open(){ draft = newDraft(); step = 1; showMoreMonths = false; modal.style.display='flex'; render(); }
   function close(){ modal.style.display='none'; }
-  function render(){ body.innerHTML = '<div style="text-align:center;color:#888;padding:20px;">준비 중</div>'; }
+  function render(){
+    if(step===1) return renderDate();
+    if(step===2) return renderType();
+    if(step===3) return renderTeeth();
+    if(step===4) return renderMonths();
+    if(step===5) return renderMemo();
+  }
+  function renderDate(){
+    body.innerHTML = `
+      <div class="ir-section">
+        <h4>1 / 5 · 식립 날짜</h4>
+        <input id="irDate" class="ir-input" type="text" value="${draft.date}" placeholder="YYYY-MM-DD">
+        <div style="font-size:11px;color:#888;margin-top:6px;">오늘 날짜가 자동 입력됩니다. 수정 후 Enter 또는 다음.</div>
+      </div>
+      <div style="text-align:right;"><button class="ir-primary" id="irNext">다음 ▶</button></div>`;
+    const inp = document.getElementById('irDate');
+    const next = ()=>{ draft.date = inp.value.trim(); goStep(2); };
+    inp.addEventListener('keydown', e=>{ if(e.key==='Enter') next(); });
+    document.getElementById('irNext').onclick = next;
+    inp.focus();
+  }
+  function renderType(){ body.innerHTML='<div>type</div>'; }
+  function renderTeeth(){ body.innerHTML='<div>teeth</div>'; }
+  function renderMonths(){ body.innerHTML='<div>months</div>'; }
+  function renderMemo(){ body.innerHTML='<div>memo</div>'; }
   return { open, close };
 })();
 window.ImplantRecorder = ImplantRecorder;
