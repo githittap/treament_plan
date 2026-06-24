@@ -2805,7 +2805,7 @@ const ImplantRecorder = (function(){
     document.getElementById('irNext').onclick = advance;
   }
   function renderMemo(){
-    const measures = ['ISQ + SCAN','ISQ만 측정','경과관찰'];
+    const measures = ['ISQ + SCAN','ISQ만 측정','경과관찰','2nd op'];
     const forces = ['0N','5N','10N','20N','30N이상'];
     const mBtns = measures.map(v=>`<button class="ir-btn${draft.memoMeasure===v?' sel':''}" data-meas="${v}">${v}</button>`).join('');
     const fBtns = forces.map(v=>`<button class="ir-btn${draft.memoForce===v?' sel':''}" data-force="${v}">${v}</button>`).join('');
@@ -2843,7 +2843,7 @@ const ImplantRecorder = (function(){
     step = 1; showMoreMonths = false;
     renderList();
   }
-  const MEASURE_OUT = { 'ISQ + SCAN':'ISQ & SCAN.', 'ISQ만 측정':'ISQ.', '경과관찰':'경과관찰.' };
+  const MEASURE_OUT = { 'ISQ + SCAN':'ISQ & SCAN.', 'ISQ만 측정':'ISQ.', '경과관찰':'경과관찰.', '2nd op':'2nd op.' };
   function lineOf(r){
     const isq = r.months!=null ? addPeriod(r.date, r.months) : '';
     const teeth = r.teeth.join(' ');
@@ -2873,18 +2873,19 @@ const ImplantRecorder = (function(){
         <button class="ir-btn" id="irAddNew" style="flex:1;">＋ 새 기록</button>
         <button class="ir-primary" id="irCopy" style="flex:1;">📋 복사</button>
       </div>`;
-    advance = null;
-    body.querySelectorAll('[data-i]').forEach(b=>{
-      b.onclick = ()=>{ records.splice(Number(b.dataset.i),1); renderList(); };
-    });
-    document.getElementById('irAddNew').onclick = ()=>{ draft = newDraft(); step = 1; showMoreMonths = false; render(); };
-    document.getElementById('irCopy').onclick = ()=>{
+    const doCopy = ()=>{
       if(records.length===0){ alert('기록이 없습니다.'); return; }
       navigator.clipboard.writeText(buildText()).then(()=>{
         const btn = document.getElementById('irCopy');
         btn.textContent = '✓ 복사됨'; setTimeout(()=>{ btn.textContent='📋 복사'; }, 1200);
       });
     };
+    advance = doCopy;  // 기록 목록에서 Space=복사
+    body.querySelectorAll('[data-i]').forEach(b=>{
+      b.onclick = ()=>{ records.splice(Number(b.dataset.i),1); renderList(); };
+    });
+    document.getElementById('irAddNew').onclick = ()=>{ draft = newDraft(); step = 1; showMoreMonths = false; render(); };
+    document.getElementById('irCopy').onclick = doCopy;
   }
   return { open, close };
 })();
