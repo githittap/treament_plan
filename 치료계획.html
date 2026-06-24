@@ -211,10 +211,11 @@
   .tool-grid{display:flex; gap:6px; flex-wrap:wrap;}
   .tool-grid .treat-item{flex:1 1 28%; min-width:0; flex-direction:column; align-items:center; text-align:center; padding:6px 3px; gap:3px; position:relative;}
   .tool-grid .treat-item .swatch{width:22px;height:22px;font-size:9px;}
-  .tool-grid .treat-item .tool-sc{position:absolute; top:2px; right:4px; font-size:9px; opacity:0.55;}
+  .tool-grid .treat-item .tool-sc{position:absolute; top:1px; right:2px; font-size:13px; font-weight:800; color:var(--navy); opacity:0.95; background:rgba(255,255,255,0.85); border-radius:4px; padding:0 3px; line-height:1.4;}
   /* 진행중/완료/보류 컴팩트(가로) */
   .treat-item.compact-row{flex-direction:row !important; align-items:center !important; text-align:left !important; padding:5px 7px !important; gap:7px;}
   .treat-item.compact-row .ti-label{font-size:11px;}
+  .treat-item.compact-row .swatch{font-size:12px; font-weight:800;}
 
   /* FDI 치식 차트 */
   .fdi-chart{margin-bottom:8px;}
@@ -953,8 +954,10 @@ function renderTreatItem(t){
   const isCompact = ['ongoing','done','hold','need','tempset','permset'].includes(t.id);
   div.className = 'treat-item grid-item' + (isCompact?' compact-row':'') + (isActive?' active':'');
   const swatchColor = t.color || t.stroke || '#444';
-  const swatchTxt = t.abbr || shapeGlyph(t.shape);
-  const shortcut = TREAT_SHORTCUTS[t.id] ? `<span style="font-size:9px;opacity:0.6;">(${TREAT_SHORTCUTS[t.id]})</span>` : '';
+  const scKey = TREAT_SHORTCUTS[t.id] || '';
+  // 영역 버튼(진행중·완료·보류·치료필요·T/S·F/S)은 □ 대신 단축키를 스와치에 표시
+  const swatchTxt = (isCompact && scKey) ? scKey : (t.abbr || shapeGlyph(t.shape));
+  const shortcut = (!isCompact && scKey) ? `<span style="font-size:9px;opacity:0.6;">(${scKey})</span>` : '';
   div.innerHTML = `<span class="swatch">${swatchTxt}</span><span class="ti-label">${t.label}${shortcut}</span>`;
   div.querySelector('.swatch').style.background = swatchColor;
   div.addEventListener('click', ()=>{
