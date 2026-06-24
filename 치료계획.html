@@ -2659,6 +2659,11 @@ const ImplantRecorder = (function(){
   let draft = null;
   let step = 1;
   let showMoreMonths = false;
+  const IMPLANT_TYPES = ['EV','ST','DT','BD','EV mini','ST mini','BD nc'];
+  const FDI_ROWS = [
+    [18,17,16,15,14,13,12,11, 21,22,23,24,25,26,27,28],
+    [48,47,46,45,44,43,42,41, 31,32,33,34,35,36,37,38]
+  ];
   function todayStr(){
     const d = new Date();
     const p = n => String(n).padStart(2,'0');
@@ -2689,8 +2694,57 @@ const ImplantRecorder = (function(){
     document.getElementById('irNext').onclick = next;
     inp.focus();
   }
-  function renderType(){ body.innerHTML='<div>type</div>'; }
-  function renderTeeth(){ body.innerHTML='<div>teeth</div>'; }
+  function renderType(){
+    const btns = IMPLANT_TYPES.map(t=>
+      `<button class="ir-btn${draft.type===t?' sel':''}" data-t="${t}">${t}</button>`).join('');
+    body.innerHTML = `
+      <div class="ir-section">
+        <h4>2 / 5 · 임플란트 종류</h4>
+        <div>${btns}</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;">
+        <button class="ir-btn" id="irBack">◀ 이전</button>
+        <button class="ir-primary" id="irNext">다음 ▶</button>
+      </div>`;
+    body.querySelectorAll('[data-t]').forEach(b=>{
+      b.onclick = ()=>{ draft.type = b.dataset.t; render(); };
+    });
+    document.getElementById('irBack').onclick = ()=>goStep(1);
+    document.getElementById('irNext').onclick = ()=>{ if(!draft.type){ alert('종류를 선택하세요.'); return; } goStep(3); };
+  }
+  function renderTeeth(){
+    const sel = new Set(draft.teeth);
+    let grid = '';
+    FDI_ROWS.forEach(row=>{
+      grid += '<div style="display:flex;gap:2px;margin-bottom:3px;justify-content:center;flex-wrap:nowrap;">';
+      row.forEach((num,ci)=>{
+        if(ci===8) grid += '<div style="width:8px;"></div>';
+        const s = sel.has(String(num));
+        grid += `<button class="ir-btn${s?' sel':''}" data-n="${num}" style="margin:0;padding:6px 0;width:28px;font-size:11px;">${num}</button>`;
+      });
+      grid += '</div>';
+    });
+    body.innerHTML = `
+      <div class="ir-section">
+        <h4>3 / 5 · 치식 선택 (FDI) — ${draft.type}</h4>
+        ${grid}
+        <div style="font-size:12px;color:#555;margin-top:8px;">선택: <b>${draft.teeth.join(' ') || '없음'}</b></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;">
+        <button class="ir-btn" id="irBack">◀ 이전</button>
+        <button class="ir-primary" id="irNext">다음 ▶</button>
+      </div>`;
+    body.querySelectorAll('[data-n]').forEach(b=>{
+      b.onclick = ()=>{
+        const n = b.dataset.n;
+        const i = draft.teeth.indexOf(n);
+        if(i>=0) draft.teeth.splice(i,1); else draft.teeth.push(n);
+        render();
+      };
+    });
+    document.getElementById('irBack').onclick = ()=>goStep(2);
+    document.getElementById('irNext').onclick = ()=>{ if(draft.teeth.length===0){ alert('치식을 1개 이상 선택하세요.'); return; } goStep(4); };
+  }
   function renderMonths(){ body.innerHTML='<div>months</div>'; }
   function renderMemo(){ body.innerHTML='<div>memo</div>'; }
   return { open, close };
