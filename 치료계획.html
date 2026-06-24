@@ -2791,7 +2791,44 @@ const ImplantRecorder = (function(){
     document.getElementById('irBack').onclick = ()=>goStep(3);
     document.getElementById('irNext').onclick = ()=>{ if(draft.months==null){ alert('개월수를 선택하세요.'); return; } goStep(5); };
   }
-  function renderMemo(){ body.innerHTML='<div>memo</div>'; }
+  function renderMemo(){
+    const measures = ['ISQ + SCAN','ISQ만 측정','경과관찰'];
+    const forces = ['0N','5N','10N','20N','30N이상'];
+    const mBtns = measures.map(v=>`<button class="ir-btn${draft.memoMeasure===v?' sel':''}" data-meas="${v}">${v}</button>`).join('');
+    const fBtns = forces.map(v=>`<button class="ir-btn${draft.memoForce===v?' sel':''}" data-force="${v}">${v}</button>`).join('');
+    body.innerHTML = `
+      <div class="ir-section">
+        <h4>5 / 5 · 메모 (선택)</h4>
+        <div style="font-size:12px;color:#666;margin:2px 0 4px;">측정</div>
+        <div>${mBtns}</div>
+        <div style="font-size:12px;color:#666;margin:10px 0 4px;">초기고정</div>
+        <div>${fBtns}</div>
+        <div style="font-size:12px;color:#666;margin:10px 0 4px;">기타</div>
+        <input id="irEtc" class="ir-input" type="text" value="${draft.memoEtc}" placeholder="자유 입력(선택)">
+      </div>
+      <div style="display:flex;justify-content:space-between;">
+        <button class="ir-btn" id="irBack">◀ 이전</button>
+        <button class="ir-primary" id="irAdd">기록 추가 ✔</button>
+      </div>`;
+    body.querySelectorAll('[data-meas]').forEach(b=>{
+      b.onclick = ()=>{ draft.memoMeasure = (draft.memoMeasure===b.dataset.meas?null:b.dataset.meas); render(); };
+    });
+    body.querySelectorAll('[data-force]').forEach(b=>{
+      b.onclick = ()=>{ draft.memoForce = (draft.memoForce===b.dataset.force?null:b.dataset.force); render(); };
+    });
+    document.getElementById('irBack').onclick = ()=>goStep(4);
+    document.getElementById('irAdd').onclick = ()=>{
+      draft.memoEtc = document.getElementById('irEtc').value.trim();
+      commitDraft();
+    };
+  }
+  function commitDraft(){
+    records.push(draft);
+    draft = newDraft();
+    step = 1; showMoreMonths = false;
+    renderList();
+  }
+  function renderList(){ body.innerHTML = `<div>저장된 기록: ${records.length}건</div>`; }
   return { open, close };
 })();
 window.ImplantRecorder = ImplantRecorder;
