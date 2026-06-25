@@ -211,7 +211,7 @@
   .tool-grid{display:flex; gap:6px; flex-wrap:wrap;}
   .tool-grid .treat-item{flex:1 1 28%; min-width:0; flex-direction:column; align-items:center; text-align:center; padding:6px 3px; gap:3px; position:relative;}
   .tool-grid .treat-item .swatch{width:22px;height:22px;font-size:9px;}
-  .tool-grid .treat-item .tool-sc{position:absolute; top:1px; right:2px; font-size:13px; font-weight:800; color:var(--navy); opacity:0.95; background:rgba(255,255,255,0.85); border-radius:4px; padding:0 3px; line-height:1.4;}
+  .tool-grid .treat-item .tool-sc{position:absolute; top:1px; right:2px; font-size:16px; font-weight:900; color:#fff; opacity:1; background:var(--navy); border-radius:5px; padding:0 5px; line-height:1.45; box-shadow:0 1px 2px rgba(0,0,0,0.25);}
   /* 진행중/완료/보류 컴팩트(가로) */
   .treat-item.compact-row{flex-direction:row !important; align-items:center !important; text-align:left !important; padding:5px 7px !important; gap:7px;}
   .treat-item.compact-row .ti-label{font-size:11px;}
@@ -486,7 +486,7 @@
       <div style="display:flex; justify-content:space-between;"><span>마커/텍스트 크기조절</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">휠</kbd></div>
       <div style="border-top:1px solid var(--line);margin:4px 0;"></div>
       <div style="color:var(--gray);font-size:11px;margin-bottom:2px;">치료종류 / 표시도구</div>
-      <div style="display:flex; justify-content:space-between;"><span>발치(표시도구)</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">1</kbd></div>
+      <div style="display:flex; justify-content:space-between;"><span>발치(표시도구)</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">X</kbd></div>
       <div style="display:flex; justify-content:space-between;"><span>임플</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">2</kbd></div>
       <div style="display:flex; justify-content:space-between;"><span>폰틱</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">3</kbd></div>
       <div style="display:flex; justify-content:space-between;"><span>코어Cr.</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">C</kbd></div>
@@ -591,7 +591,7 @@
       <h3 style="color:#2a8a87;margin:0 0 8px;border-bottom:2px solid #e0f5f4;padding-bottom:6px;">🗂️ 표시도구 (발치·RCT·GBR 등)</h3>
       <ul style="margin:0 0 16px;padding-left:20px;">
         <li>우측 패널 "표시 도구" 섹션에서 항목 선택 → 이미지 클릭 → 즉시 스티커 삽입 (팝업 없음)</li>
-        <li>발치(<kbd>1</kbd>): X 마크 / RCT(<kbd>V</kbd>): 빨간 박스 / GBR(<kbd>G</kbd>): GBR 스티커</li>
+        <li>발치(<kbd>X</kbd>): X 마크 / RCT(<kbd>V</kbd>): 빨간 박스 / GBR(<kbd>G</kbd>): GBR 스티커</li>
         <li>표시(빨간펜)·연결선(초록 점선): 드래그하여 그리기</li>
       </ul>
 
@@ -627,9 +627,15 @@
       <div style="background:#f0faf9;border:1px solid #a8d5d3;border-radius:8px;padding:14px 16px;margin-top:8px;">
         <div style="font-weight:700;color:#1d6e6b;margin-bottom:8px;">📋 업데이트 로그</div>
         <div style="font-size:12px;color:#374151;line-height:1.9;">
-          <div><b>2026-06-22 (최신)</b> BY Mr. jung</div>
+          <div><b>2026-06-25 (최신)</b> BY Mr. jung</div>
           <ul style="margin:4px 0;padding-left:18px;">
-            <li>단축키 전면 개정: C=코어Cr, V=RCT(스티커), G=GBR, D=완료, H=보류, 1=발치</li>
+            <li>발치 단축키 1 → <b>X</b>로 변경, 버튼 단축키 표시 확대</li>
+            <li>임플란트 기록 경과개월 ＋ 안에 6주뒤·한달뒤 추가</li>
+            <li>FDI 차트 상단 라벨 "상악/하악" → "상/하"로 간소화</li>
+          </ul>
+          <div><b>2026-06-22</b> BY Mr. jung</div>
+          <ul style="margin:4px 0;padding-left:18px;">
+            <li>단축키 전면 개정: C=코어Cr, V=RCT(스티커), G=GBR, D=완료, H=보류, X=발치</li>
             <li>RCT → 표시도구로 이동 (빨간 박스 스티커, 팝업 없음)</li>
             <li>발치 → 표시도구 항목으로 이동 (X마크 즉시 삽입)</li>
             <li>Ctrl+Y: 다시실행(redo) 추가</li>
@@ -911,13 +917,13 @@ renderPenTools();
 function renderStickers(){
   const c = document.getElementById('stickerList');
   c.innerHTML='';
-  const STICKER_SHORTCUTS = {extraction:'1', pontic:'3', gbr:'G', rct:'V'};
+  const STICKER_SHORTCUTS = {extraction:'X', pontic:'3', gbr:'G', rct:'V'};
   ['extraction','pontic','crestal','lateral','gbr','rct'].forEach(id=>{
     const t = treatTypes.find(tt=>tt.id===id);
     const div=document.createElement('div');
     div.className='treat-item'+(activeSticker===id?' active':'');
     const sc = STICKER_SHORTCUTS[id] ? `<span class="tool-sc">${STICKER_SHORTCUTS[id]}</span>` : '';
-    div.innerHTML = `<span class="swatch" style="background:${t.color}">${t.abbr}</span><span class="ti-label">${t.label}</span>${sc}`;
+    div.innerHTML = `<span class="swatch" style="background:${t.color}">${t.abbr || shapeGlyph(t.shape)}</span><span class="ti-label">${t.label}</span>${sc}`;
     div.addEventListener('click', ()=>{
       activeSticker = id; activePenTool = null; mode='tooth';
       document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
@@ -959,7 +965,7 @@ function renderTreatItem(t){
   const scKey = TREAT_SHORTCUTS[t.id] || '';
   // 영역 버튼(진행중·완료·보류·치료필요·T/S·F/S)은 □ 대신 단축키를 스와치에 표시
   const swatchTxt = (isCompact && scKey) ? scKey : (t.abbr || shapeGlyph(t.shape));
-  const shortcut = (!isCompact && scKey) ? `<span style="font-size:9px;opacity:0.6;">(${scKey})</span>` : '';
+  const shortcut = (!isCompact && scKey) ? `<span style="display:inline-block;margin-left:3px;font-size:13px;font-weight:900;color:#fff;background:var(--navy);border-radius:5px;padding:0 5px;box-shadow:0 1px 2px rgba(0,0,0,0.25);">${scKey}</span>` : '';
   div.innerHTML = `<span class="swatch">${swatchTxt}</span><span class="ti-label">${t.label}${shortcut}</span>`;
   div.querySelector('.swatch').style.background = swatchColor;
   div.addEventListener('click', (e)=>{
@@ -1300,8 +1306,8 @@ window.addEventListener('keydown', e=>{
     document.getElementById('freeOptions').style.display='none';
     renderPenTools(); renderStickers(); renderTreatList();
   }
-  // 발치(1) → 표시도구 스티커 모드
-  if(e.key==='1'){
+  // 발치(X) → 표시도구 스티커 모드
+  if(e.key==='x'||e.key==='X'){
     activeSticker='extraction'; activePenTool=null;
     mode='tooth';
     document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
@@ -2614,7 +2620,7 @@ function renderAnnList(){
       [18,17,16,15,14,13,12,11, 21,22,23,24,25,26,27,28],
       [48,47,46,45,44,43,42,41, 31,32,33,34,35,36,37,38]
     ];
-    const LABELS = ['상악 (Upper)', '하악 (Lower)'];
+    const LABELS = ['상', '하'];
 
     const chart = document.createElement('div');
     chart.className='fdi-chart';
@@ -2758,7 +2764,7 @@ function _drawFdiOnCanvas(c, oy, W, toothAnns, L){
     [18,17,16,15,14,13,12,11,21,22,23,24,25,26,27,28],
     [48,47,46,45,44,43,42,41,31,32,33,34,35,36,37,38]
   ];
-  const LABELS=['상악 (Upper)','하악 (Lower)'];
+  const LABELS=['상','하'];
   const tMap={};
   toothAnns.forEach(a=>{ const n=a.toothNum.trim(); (tMap[n]=tMap[n]||[]).push(a); });
   let y = oy + L.topPad;
@@ -2863,10 +2869,18 @@ const ImplantRecorder = (function(){
   function pad2(n){ return String(n).padStart(2,'0'); }
   function fmt(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
   // 식립일 + months개월. .5개월은 +15일. 월말 보정(없는 날짜는 해당 월 마지막 날로).
-  function addPeriod(dateStr, months){
+  function addPeriod(dateStr, period){
     const parts = dateStr.split('-').map(Number);
     if(parts.length!==3 || parts.some(isNaN)) return '';
     const [y,m,day] = parts;
+    // 주 단위 (예: '6w' = 6주뒤) → 일수로 더하기
+    if(typeof period === 'string' && /w$/.test(period)){
+      const weeks = parseInt(period, 10);
+      const d = new Date(y, m-1, day);
+      d.setDate(d.getDate() + weeks*7);
+      return fmt(d);
+    }
+    const months = Number(period);
     const whole = Math.floor(months);
     const half = (months - whole) >= 0.5;
     const base = new Date(y, m-1, 1);
@@ -2960,12 +2974,12 @@ const ImplantRecorder = (function(){
     document.getElementById('irNext').onclick = advance;
   }
   function renderMonths(){
-    const baseMonths = [2.5,3,4,6];
-    const moreMonths = [5,7,8,9];
-    const lbl = v => (v===2.5?'2.5M':v+'M');
-    let btns = baseMonths.map(v=>`<button class="ir-btn${draft.months===v?' sel':''}" data-m="${v}">${lbl(v)}</button>`).join('');
+    const baseItems = [{v:2.5,l:'2.5M'},{v:3,l:'3M'},{v:4,l:'4M'},{v:6,l:'6M'}];
+    const moreItems = [{v:5,l:'5M'},{v:7,l:'7M'},{v:8,l:'8M'},{v:9,l:'9M'},{v:'6w',l:'6주뒤'},{v:1,l:'한달뒤'}];
+    const mk = it=>`<button class="ir-btn${draft.months===it.v?' sel':''}" data-m="${it.v}">${it.l}</button>`;
+    let btns = baseItems.map(mk).join('');
     if(showMoreMonths){
-      btns += moreMonths.map(v=>`<button class="ir-btn${draft.months===v?' sel':''}" data-m="${v}">${lbl(v)}</button>`).join('');
+      btns += moreItems.map(mk).join('');
     } else {
       btns += `<button class="ir-btn" id="irMore">＋</button>`;
     }
@@ -2981,7 +2995,7 @@ const ImplantRecorder = (function(){
         <button class="ir-primary" id="irNext">다음 ▶</button>
       </div>`;
     body.querySelectorAll('[data-m]').forEach(b=>{
-      b.onclick = ()=>{ draft.months = Number(b.dataset.m); render(); };
+      b.onclick = ()=>{ const r=b.dataset.m; draft.months = /w$/.test(r)? r : Number(r); render(); };
     });
     const moreBtn = document.getElementById('irMore');
     if(moreBtn) moreBtn.onclick = ()=>{ showMoreMonths = true; render(); };
