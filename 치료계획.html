@@ -1654,6 +1654,8 @@ function redraw(){
       if(areaLabel && rw>30 && rh>20){
         ctx.setLineDash([]);
         let fs = Math.min(rw, rh)*0.55;
+        const fsCap = baseUnit()*sizeSliderVal*0.85;  // 글자 최대 크기 — 박스가 더 커져도 글자는 고정
+        fs = Math.min(fs, fsCap);
         ctx.font = `800 ${fs}px sans-serif`;
         const tw = ctx.measureText(areaLabel).width;
         if(tw > rw*0.88) fs = fs*(rw*0.88/tw);
@@ -1661,8 +1663,8 @@ function redraw(){
         ctx.font = `800 ${fs}px sans-serif`;
         ctx.fillStyle = t.stroke;
         ctx.shadowColor = 'rgba(0,0,0,0.15)'; ctx.shadowBlur = 4;
-        ctx.textAlign='center'; ctx.textBaseline='middle';
-        ctx.fillText(areaLabel, rx+rw/2, ry+rh/2);
+        ctx.textAlign='center'; ctx.textBaseline='top';  // 상단 정렬: 좌우중앙 + 맨위
+        ctx.fillText(areaLabel, rx+rw/2, ry + fs*0.28);
         ctx.shadowBlur=0;
       }
       ctx.restore();
