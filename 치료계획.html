@@ -686,6 +686,7 @@ let treatTypes = [
   {id:'crestal',     label:'크레스탈', shape:'bar', bar:'v', color:'#dc2626', abbr:'Cre.'},
   {id:'lateral',     label:'라테랄',   shape:'bar', bar:'h', color:'#dc2626', abbr:'Lat.'},
   {id:'gbr',         label:'GBR',      shape:'dot', color:'#be185d', abbr:'GBR'},
+  {id:'denture',     label:'틀니',     shape:'denture', color:'#7c3aed', abbr:'틀니'},
 ];
 activeTreatId = 'implant';
 
@@ -694,6 +695,7 @@ const GRID_COLUMNS = [
   ['resin','inlay','fu'],
   ['core_crown'],
   ['ca','other'],
+  ['denture'],
   '---',
   ['ongoing','hold','tempset'],
   ['done','need','permset']
@@ -960,7 +962,12 @@ function renderTreatItem(t){
   const shortcut = (!isCompact && scKey) ? `<span style="font-size:9px;opacity:0.6;">(${scKey})</span>` : '';
   div.innerHTML = `<span class="swatch">${swatchTxt}</span><span class="ti-label">${t.label}${shortcut}</span>`;
   div.querySelector('.swatch').style.background = swatchColor;
-  div.addEventListener('click', ()=>{
+  div.addEventListener('click', (e)=>{
+    if(t.id==='denture'){
+      if(!img){ alert('먼저 이미지를 업로드하거나 붙여넣으세요.'); return; }
+      openDenturePopup(e, null);
+      return;
+    }
     activeTreatId = t.id;
     activePenTool = null; activeSticker = null;
     mode = 'tooth';
@@ -2069,6 +2076,124 @@ function openTextPopup(x, y, evt, existingAnn){
     });
   }
   setTimeout(()=>{ const el=div.querySelector('#popText'); if(el){ el.focus(); el.select(); } }, 0);
+}
+
+const DENTURE_KINDS = [
+  {id:'CD',    label:'완전틀니', abbr:'CD'},
+  {id:'RPD',   label:'부분틀니', abbr:'RPD'},
+  {id:'IOD',   label:'오버덴쳐', abbr:'IOD'},
+  {id:'IARPD', label:'IARPD',   abbr:''},
+  {id:'etc',   label:'기타',    abbr:''}
+];
+function openDenturePopup(evt){
+  closePopup();
+  const state = { arch:'상악', kind:'CD', f:{} };  // f: 조건부 입력값
+  const div = document.createElement('div');
+  div.className='mini-popup';
+  div.style.minWidth='260px';
+  div.innerHTML = `
+    <div style="font-size:12px;font-weight:700;color:var(--navy);">틀니</div>
+    <div class="opt-hint">악궁</div>
+    <div class="opt-grid" id="dArch"></div>
+    <div class="opt-hint">종류</div>
+    <div class="opt-grid" id="dKind"></div>
+    <div id="dFields"></div>
+    <div class="btns">
+      <button class="small-btn" id="popCancel">취소</button>
+      <button class="small-btn" id="popConfirm" style="background:var(--navy);color:#fff;border-color:var(--navy);">확인(Enter)</button>
+    </div>`;
+  div.style.position='absolute'; div.style.visibility='hidden';
+  wrap.appendChild(div);
+  positionPopup(div, evt);
+  div.style.visibility='visible';
+  popupEl = div;
+
+  const archWrap = div.querySelector('#dArch');
+  ['상악','하악'].forEach(a=>{
+    const b=document.createElement('button');
+    b.type='button'; b.className='opt-btn'+(state.arch===a?' sel':''); b.textContent=a;
+    b.addEventListener('click', ()=>{ state.arch=a; archWrap.querySelectorAll('.opt-btn').forEach(x=>x.classList.remove('sel')); b.classList.add('sel'); });
+    archWrap.appendChild(b);
+  });
+
+  const fieldsWrap = div.querySelector('#dFields');
+  const fInput = (key, labelTxt, placeholder)=>{
+    const row=document.createElement('div'); row.className='fline';
+    row.innerHTML = `<label style="min-width:62px;">${labelTxt}</label><input type="text" data-fkey="${key}" value="${state.f[key]||''}" placeholder="${placeholder||''}" style="flex:1;">`;
+    const inp=row.querySelector('input');
+    inp.addEventListener('input', ()=>{ state.f[key]=inp.value; });
+    fieldsWrap.appendChild(row);
+    return inp;
+  };
+  const refreshFields = ()=>{
+    fieldsWrap.innerHTML='';
+    let first=null;
+    if(state.kind==='RPD'){
+      first=fInput('abut','지대치','예: 13,23');
+      fInput('surcr','sur., cr','예: 14,24');
+    } else if(state.kind==='IOD'){
+      first=fInput('loc','Locator/지대치','예: 13,23,33,43');
+    } else if(state.kind==='IARPD'){
+      first=fInput('impAbut','임플란트 지대','예: 16,26');
+      fInput('impPontic','임플란트 폰틱','예: 14,24');
+      fInput('natAbut','자연치 지대','예: 13,23');
+    } else if(state.kind==='etc'){
+      first=fInput('etc','내용','자유 텍스트');
+    }
+    if(first) setTimeout(()=>first.focus(),0);
+  };
+
+  const kindWrap = div.querySelector('#dKind');
+  DENTURE_KINDS.forEach(k=>{
+    const b=document.createElement('button');
+    b.type='button'; b.className='opt-btn'+(state.kind===k.id?' sel':''); b.textContent=k.label;
+    b.addEventListener('click', ()=>{ state.kind=k.id; kindWrap.querySelectorAll('.opt-btn').forEach(x=>x.classList.remove('sel')); b.classList.add('sel'); refreshFields(); });
+    kindWrap.appendChild(b);
+  });
+  refreshFields();
+
+  const buildDentureLabel = ()=>{
+    const k = DENTURE_KINDS.find(d=>d.id===state.kind);
+    const lines=[];
+    if(state.kind==='etc'){
+      const txt=(state.f.etc||'').trim();
+      lines.push(`${state.arch} ${txt}`.trim());
+    } else {
+      lines.push(`${state.arch} ${k.label}${k.abbr?` (${k.abbr})`:''}`);
+    }
+    if(state.kind==='RPD'){
+      if((state.f.abut||'').trim()) lines.push(`지대치: ${state.f.abut.trim()}`);
+      if((state.f.surcr||'').trim()) lines.push(`sur., cr: ${state.f.surcr.trim()}`);
+    } else if(state.kind==='IOD'){
+      if((state.f.loc||'').trim()) lines.push(`Locator/지대치: ${state.f.loc.trim()}`);
+    } else if(state.kind==='IARPD'){
+      if((state.f.impAbut||'').trim())   lines.push(`임플란트 지대: ${state.f.impAbut.trim()}`);
+      if((state.f.impPontic||'').trim()) lines.push(`임플란트 폰틱: ${state.f.impPontic.trim()}`);
+      if((state.f.natAbut||'').trim())   lines.push(`자연치 지대: ${state.f.natAbut.trim()}`);
+    }
+    return lines.join('\n');
+  };
+
+  const confirmFn = ()=>{
+    const text = buildDentureLabel();
+    if(!text){ closePopup(); return; }
+    const fontSize = Math.max(14, baseUnit()*sizeSliderVal*0.34);
+    const lines = text.split('\n').length;
+    const boxH = lines*fontSize*1.35 + fontSize*0.35*2;
+    const x = naturalW/2 - 20;  // drawYellowLabel: cx = x + 20 → 박스 가로중앙 정렬
+    const y = state.arch==='상악'
+      ? naturalH*0.03
+      : naturalH - boxH - naturalH*0.03;
+    pushUndo();
+    annotations.push({id:idSeq++, type:'text', x, y, text, fontSize});
+    closePopup(); redraw(); renderAnnList();
+  };
+  div.addEventListener('keydown', ev=>{
+    if(ev.key==='Enter'){ ev.preventDefault(); confirmFn(); }
+    if(ev.key==='Escape'){ ev.preventDefault(); closePopup(); }
+  });
+  div.querySelector('#popConfirm').addEventListener('click', confirmFn);
+  div.querySelector('#popCancel').addEventListener('click', closePopup);
 }
 
 function placeStickerAt(x,y){
