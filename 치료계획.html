@@ -495,7 +495,7 @@
       <div style="display:flex; justify-content:space-between;"><span>레진</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">F</kbd></div>
       <div style="display:flex; justify-content:space-between;"><span>GBR(표시도구)</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">G</kbd></div>
       <div style="display:flex; justify-content:space-between;"><span>완료</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">D</kbd></div>
-      <div style="display:flex; justify-content:space-between;"><span>보류</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">H</kbd></div>
+      <div style="display:flex; justify-content:space-between;"><span>설명X</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">H</kbd></div>
     </div>
   </div>
 
@@ -676,10 +676,10 @@ let treatTypes = [
   {id:'core_crown',  label:'코어Cr.', shape:'dot',  color:'#d4150f', abbr:'Cr'},
   {id:'rct',         label:'RCT',     shape:'rct_box', color:'#dc2626', abbr:'RCT'},
   {id:'ca',          label:'CA',      shape:'ca',   color:'#d4150f'},
-  {id:'ongoing',     label:'진행중',  shape:'area', interaction:'area', fill:'rgba(59,130,246,0.22)', stroke:'#2563eb', skipPopup:true},
-  {id:'done',        label:'완료',    shape:'area', interaction:'area', fill:'rgba(34,197,94,0.22)',  stroke:'#16a34a', skipPopup:true},
-  {id:'hold',        label:'보류',    shape:'area', interaction:'area', fill:'rgba(245,158,11,0.22)', stroke:'#d97706', skipPopup:true},
-  {id:'need',        label:'치료필요', shape:'area', interaction:'area', fill:'rgba(239,68,68,0.22)',  stroke:'#dc2626', skipPopup:true},
+  {id:'ongoing',     label:'진행중',  shape:'area', interaction:'area', fill:'rgba(59,130,246,0.15)', stroke:'#2563eb', skipPopup:true},
+  {id:'done',        label:'완료',    shape:'area', interaction:'area', fill:'rgba(34,197,94,0.15)',  stroke:'#16a34a', skipPopup:true},
+  {id:'hold',        label:'설명X',   shape:'area', interaction:'area', fill:'rgba(245,158,11,0.11)', stroke:'#d97706', skipPopup:true},
+  {id:'need',        label:'치료필요', shape:'area', interaction:'area', fill:'rgba(239,68,68,0.15)',  stroke:'#dc2626', skipPopup:true},
   {id:'tempset',     label:'T/S',     shape:'area', interaction:'area', fill:'rgba(14,165,233,0.22)', stroke:'#0284c7', skipPopup:true},
   {id:'permset',     label:'F/S',     shape:'area', interaction:'area', fill:'rgba(16,185,129,0.22)', stroke:'#059669', skipPopup:true},
   {id:'other',       label:'기타',    shape:'dot',  color:'#475569', abbr:'기타'},
@@ -1037,7 +1037,8 @@ document.getElementById('fileInput').addEventListener('change', e=>{
 });
 
 // ---------- 치료계획 저장 / 불러오기 (JSON) ----------
-document.getElementById('savePlanBtn').addEventListener('click', ()=>{
+let planFileHandle = null;  // File System Access API 핸들 — 같은 파일 덮어쓰기용
+document.getElementById('savePlanBtn').addEventListener('click', async ()=>{
   if(!img){ alert('먼저 이미지를 업로드하거나 붙여넣으세요.'); return; }
   const data = {
     version: 1,
@@ -1052,12 +1053,34 @@ document.getElementById('savePlanBtn').addEventListener('click', ()=>{
     annotations,
     imageData: img.src
   };
-  const blob = new Blob([JSON.stringify(data)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
+  const json = JSON.stringify(data);
   const pname = (data.patientName.trim() || 'plan');
   const pdate = data.planDate || 'plan';
-  link.download = `${pname}_${pdate}.json`.replace(/\s+/g,'_');
+  const suggested = `${pname}_${pdate}.json`.replace(/\s+/g,'_');
+  const flash = ()=>{ const b=document.getElementById('savePlanBtn'); const o=b.textContent; b.textContent='✓ 저장됨'; setTimeout(()=>{b.textContent=o;},1200); };
+  // 최초 저장 시 위치 선택 → 이후 같은 파일에 덮어쓰기 (Chrome 등 File System Access 지원 브라우저)
+  if(window.showSaveFilePicker){
+    try{
+      if(!planFileHandle){
+        planFileHandle = await window.showSaveFilePicker({
+          suggestedName: suggested,
+          types:[{description:'치료계획 JSON', accept:{'application/json':['.json']}}]
+        });
+      }
+      const w = await planFileHandle.createWritable();
+      await w.write(json); await w.close();
+      flash();
+      return;
+    }catch(err){
+      if(err && err.name==='AbortError') return;  // 사용자가 취소
+      planFileHandle = null;  // 실패 시 다운로드 폴백
+    }
+  }
+  // 폴백: 일반 다운로드
+  const blob = new Blob([json], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.download = suggested;
   link.href = url;
   link.click();
   URL.revokeObjectURL(url);
@@ -1093,6 +1116,7 @@ document.getElementById('loadPlanInput').addEventListener('change', e=>{
       document.getElementById('patientName').value = data.patientName || '';
       document.getElementById('planDate').value = data.planDate || '';
       selectedAnnId = null; batchPoints=[]; batchState=null;
+      planFileHandle = null;  // 불러온 계획은 새 위치로 저장(덮어쓰기 핸들 초기화)
       renderTreatList(); renderPenTools(); renderStickers();
       renderAnnList(); renderBatchPanel();
       redraw();
@@ -1116,6 +1140,7 @@ function altEscClearImage(){
   _doDeleteImage();
 }
 function _doDeleteImage(){
+  planFileHandle = null;
   img = null; naturalW = 0; naturalH = 0;
   annotations = []; selectedAnnId = null;
   batchPoints = []; batchState = null;
@@ -2698,6 +2723,7 @@ const ImplantRecorder = (function(){
     if(e.key===' ' && !inEtc){ e.preventDefault(); if(advance) advance(); }  // 그 외엔 Space=다음
   }
   const IMPLANT_TYPES = ['EV','ST','DT','BD','EV mini','ST mini','BD nc'];
+  const IMPLANT_ACTIONS = ['발치'];
   const FDI_ROWS = [
     [18,17,16,15,14,13,12,11, 21,22,23,24,25,26,27,28],
     [48,47,46,45,44,43,42,41, 31,32,33,34,35,36,37,38]
@@ -2752,10 +2778,14 @@ const ImplantRecorder = (function(){
   function renderType(){
     const btns = IMPLANT_TYPES.map(t=>
       `<button class="ir-btn${draft.type===t?' sel':''}" data-t="${t}">${t}</button>`).join('');
+    const actBtns = IMPLANT_ACTIONS.map(t=>
+      `<button class="ir-btn${draft.type===t?' sel':''}" data-t="${t}">${t}</button>`).join('');
     body.innerHTML = `
       <div class="ir-section">
         <h4>2 / 5 · 임플란트 종류</h4>
         <div>${btns}</div>
+        <div style="font-size:12px;color:#666;margin:10px 0 4px;">행위</div>
+        <div>${actBtns}</div>
       </div>
       <div style="display:flex;justify-content:space-between;">
         <button class="ir-btn" id="irBack">◀ 이전</button>
