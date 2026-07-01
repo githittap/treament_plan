@@ -893,8 +893,8 @@ function selectPenTool(tool){
   document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
   if(tool==='mark'){ freeColor='#e6231e'; freeWidth=4; freeDash=[]; }
   else if(tool==='connect'){ freeColor='#1f9d55'; freeWidth=6; freeDash=[12,8]; }
-  else if(tool==='line'){ freeColor='#111111'; freeWidth=4; freeDash=[]; }
-  else if(tool==='arrow'){ freeColor='#111111'; freeWidth=4; freeDash=[]; }
+  else if(tool==='line'){ freeColor='#156f72'; freeWidth=7; freeDash=[]; }
+  else if(tool==='arrow'){ freeColor='#156f72'; freeWidth=7; freeDash=[]; }
   document.getElementById('customColor').value = freeColor;
   document.getElementById('customWidth').value = freeWidth;
   document.getElementById('freeOptions').style.display='block';
@@ -910,8 +910,8 @@ function renderPenTools(){
   const tools = [
     {id:'mark', label:'표시', sw:'#e6231e', g:'✎', sc:'M'},
     {id:'connect', label:'연결선', sw:'#1f9d55', g:'⌁', sc:'L'},
-    {id:'line', label:'직선', sw:'#111111', g:'／', sc:'K'},
-    {id:'arrow', label:'화살표', sw:'#111111', g:'↗', sc:'J'}
+    {id:'line', label:'직선', sw:'#156f72', g:'／', sc:'K'},
+    {id:'arrow', label:'화살표', sw:'#156f72', g:'↗', sc:'J'}
   ];
   tools.forEach(tl=>{
     const div=document.createElement('div');
