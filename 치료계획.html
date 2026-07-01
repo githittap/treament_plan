@@ -496,6 +496,8 @@
       <div style="display:flex; justify-content:space-between;"><span>GBR(표시도구)</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">G</kbd></div>
       <div style="display:flex; justify-content:space-between;"><span>완료</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">D</kbd></div>
       <div style="display:flex; justify-content:space-between;"><span>설명X</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">H</kbd></div>
+      <div style="display:flex; justify-content:space-between;"><span>직선</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">K</kbd></div>
+      <div style="display:flex; justify-content:space-between;"><span>화살표</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">J</kbd></div>
     </div>
   </div>
 
@@ -593,6 +595,7 @@
         <li>우측 패널 "표시 도구" 섹션에서 항목 선택 → 이미지 클릭 → 즉시 스티커 삽입 (팝업 없음)</li>
         <li>발치(<kbd>X</kbd>): X 마크 / RCT(<kbd>V</kbd>): 빨간 박스 / GBR(<kbd>G</kbd>): GBR 스티커</li>
         <li>표시(빨간펜)·연결선(초록 점선): 드래그하여 그리기</li>
+        <li>직선(<kbd>K</kbd>)·화살표(<kbd>J</kbd>): 드래그하여 곧은 선 / Shift=수평·수직·45°</li>
       </ul>
 
       <h3 style="color:#2a8a87;margin:0 0 8px;border-bottom:2px solid #e0f5f4;padding-bottom:6px;">📝 텍스트 입력 (<kbd>T</kbd>)</h3>
@@ -889,11 +892,15 @@ function selectPenTool(tool){
   mode = 'free';
   document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
   if(tool==='mark'){ freeColor='#e6231e'; freeWidth=4; freeDash=[]; }
-  else { freeColor='#1f9d55'; freeWidth=6; freeDash=[12,8]; }
+  else if(tool==='connect'){ freeColor='#1f9d55'; freeWidth=6; freeDash=[12,8]; }
+  else if(tool==='line'){ freeColor='#111111'; freeWidth=4; freeDash=[]; }
+  else if(tool==='arrow'){ freeColor='#111111'; freeWidth=4; freeDash=[]; }
   document.getElementById('customColor').value = freeColor;
   document.getElementById('customWidth').value = freeWidth;
   document.getElementById('freeOptions').style.display='block';
-  document.getElementById('modeHint').textContent = '드래그하여 ' + (tool==='mark' ? '표시(빨간 펜)' : '연결선(초록 점선)') + '을 그립니다.';
+  const penHints = {mark:'표시(빨간 펜)', connect:'연결선(초록 점선)', line:'직선', arrow:'화살표'};
+  const straightTip = (tool==='line'||tool==='arrow') ? ' (Shift=수평/수직/45°)' : '';
+  document.getElementById('modeHint').textContent = '드래그하여 ' + penHints[tool] + '을(를) 그립니다.' + straightTip;
   renderPenTools(); renderStickers();
   closePopup();
 }
@@ -902,7 +909,9 @@ function renderPenTools(){
   c.innerHTML='';
   const tools = [
     {id:'mark', label:'표시', sw:'#e6231e', g:'✎', sc:'M'},
-    {id:'connect', label:'연결선', sw:'#1f9d55', g:'⌁', sc:'L'}
+    {id:'connect', label:'연결선', sw:'#1f9d55', g:'⌁', sc:'L'},
+    {id:'line', label:'직선', sw:'#111111', g:'／', sc:'K'},
+    {id:'arrow', label:'화살표', sw:'#111111', g:'↗', sc:'J'}
   ];
   tools.forEach(tl=>{
     const div=document.createElement('div');
@@ -913,6 +922,40 @@ function renderPenTools(){
   });
 }
 renderPenTools();
+// Shift 드래그 시 끝점 각도를 45° 배수로 스냅 (수평/수직/대각선)
+function snapAngle45(x0, y0, x, y){
+  const dx=x-x0, dy=y-y0;
+  const dist=Math.hypot(dx,dy);
+  if(dist<1) return {x, y};
+  const step=Math.PI/4;
+  const ang=Math.round(Math.atan2(dy,dx)/step)*step;
+  return {x:x0+Math.cos(ang)*dist, y:y0+Math.sin(ang)*dist};
+}
+// 점(px,py)과 선분(a→b) 사이 최단 거리 — 직선/화살표 지우개·선택용
+function distToSegment(px, py, a, b){
+  const dx=b.x-a.x, dy=b.y-a.y;
+  const len2=dx*dx+dy*dy;
+  if(len2<1e-6) return Math.hypot(px-a.x, py-a.y);
+  let t=((px-a.x)*dx+(py-a.y)*dy)/len2;
+  t=Math.max(0, Math.min(1, t));
+  return Math.hypot(px-(a.x+t*dx), py-(a.y+t*dy));
+}
+// 화살표 머리 그리기 (선 끝점 x1,y1 방향)
+function drawArrowHead(c, x0, y0, x1, y1, width, color){
+  const ang=Math.atan2(y1-y0, x1-x0);
+  const head=Math.max(10, width*3.2);
+  const a1=ang - Math.PI/7, a2=ang + Math.PI/7;
+  c.save();
+  c.setLineDash([]);
+  c.fillStyle=color;
+  c.beginPath();
+  c.moveTo(x1, y1);
+  c.lineTo(x1 - head*Math.cos(a1), y1 - head*Math.sin(a1));
+  c.lineTo(x1 - head*Math.cos(a2), y1 - head*Math.sin(a2));
+  c.closePath();
+  c.fill();
+  c.restore();
+}
 
 function renderStickers(){
   const c = document.getElementById('stickerList');
@@ -1330,6 +1373,8 @@ window.addEventListener('keydown', e=>{
   if(e.key==='p'||e.key==='P') selectTreat('permset');
   if(e.key==='m'||e.key==='M') selectPenTool('mark');
   if(e.key==='l'||e.key==='L') selectPenTool('connect');
+  if(e.key==='k'||e.key==='K') selectPenTool('line');
+  if(e.key==='j'||e.key==='J') selectPenTool('arrow');
   if(e.key==='b'||e.key==='B'){ const b=document.getElementById('copyAllBtn'); if(b) b.click(); }
 });
 
@@ -1638,6 +1683,10 @@ function redraw(){
       a.points.forEach((p,i)=>{ i===0? ctx.moveTo(p.x,p.y): ctx.lineTo(p.x,p.y); });
       ctx.stroke();
       ctx.restore();
+      if(a.arrow && a.points.length>=2){
+        const n=a.points.length;
+        drawArrowHead(ctx, a.points[n-2].x, a.points[n-2].y, a.points[n-1].x, a.points[n-1].y, a.width, a.color);
+      }
     } else if(a.type==='tooth'){
       const info = drawShapeForAnn(ctx, a);
       if(!a.noLabel){
@@ -1689,6 +1738,10 @@ function redraw(){
     drawingStroke.points.forEach((p,i)=>{ i===0? ctx.moveTo(p.x,p.y): ctx.lineTo(p.x,p.y); });
     ctx.stroke();
     ctx.restore();
+    if(drawingStroke.arrow && drawingStroke.points.length>=2){
+      const n=drawingStroke.points.length;
+      drawArrowHead(ctx, drawingStroke.points[n-2].x, drawingStroke.points[n-2].y, drawingStroke.points[n-1].x, drawingStroke.points[n-1].y, drawingStroke.width, drawingStroke.color);
+    }
   }
 
   if(arealDragging && areaStart && areaCurrent){
@@ -2358,7 +2411,9 @@ canvas.addEventListener('pointerdown', e=>{
     openTextPopup(x, y, e, null);
   } else if(mode==='free'){
     freeDragging = true;
-    drawingStroke = {id:idSeq++, type:'free', points:[{x,y}], color:freeColor, width:freeWidth, dash:freeDash.slice()};
+    const straight = (activePenTool==='line' || activePenTool==='arrow');
+    const arrow = (activePenTool==='arrow');
+    drawingStroke = {id:idSeq++, type:'free', points: straight ? [{x,y},{x,y}] : [{x,y}], color:freeColor, width:freeWidth, dash:freeDash.slice(), straight, arrow};
   } else if(mode==='erase'){
     eraseNear(x,y);
   }
@@ -2466,8 +2521,14 @@ canvas.addEventListener('pointermove', e=>{
     return;
   }
   if(!freeDragging || mode!=='free' || !drawingStroke) return;
-  const {x,y} = getCanvasCoords(e);
-  drawingStroke.points.push({x,y});
+  let {x,y} = getCanvasCoords(e);
+  if(drawingStroke.straight){
+    const p0 = drawingStroke.points[0];
+    if(e.shiftKey){ const s = snapAngle45(p0.x, p0.y, x, y); x=s.x; y=s.y; }
+    drawingStroke.points[1] = {x,y};
+  } else {
+    drawingStroke.points.push({x,y});
+  }
   redraw();
 });
 
@@ -2503,7 +2564,12 @@ window.addEventListener('pointerup', (e)=>{
     return;
   }
   if(freeDragging && drawingStroke){
-    if(drawingStroke.points.length>1){ pushUndo(); annotations.push(drawingStroke); }
+    let keep = drawingStroke.points.length>1;
+    if(drawingStroke.straight){
+      const p=drawingStroke.points;
+      keep = Math.hypot(p[1].x-p[0].x, p[1].y-p[0].y) > 5;
+    }
+    if(keep){ pushUndo(); annotations.push(drawingStroke); }
     drawingStroke=null;
     renderAnnList();
   }
@@ -2556,7 +2622,12 @@ function eraseNear(x,y){
       const rx=Math.min(a.x1,a.x2), ry=Math.min(a.y1,a.y2), rx2=Math.max(a.x1,a.x2), ry2=Math.max(a.y1,a.y2);
       if(x>=rx && x<=rx2 && y>=ry && y<=ry2){ idxToRemove=i; break; }
     } else if(a.type==='free'){
-      const hit = a.points.some(p=>Math.hypot(p.x-x,p.y-y) < threshold*0.7);
+      let hit;
+      if(a.straight && a.points.length>=2){
+        hit = distToSegment(x, y, a.points[0], a.points[1]) < threshold*0.7;
+      } else {
+        hit = a.points.some(p=>Math.hypot(p.x-x,p.y-y) < threshold*0.7);
+      }
       if(hit){ idxToRemove=i; break; }
     }
   }
@@ -2690,7 +2761,7 @@ function renderAnnList(){
       } else if(a.type==='text'){
         label='텍스트: '+a.text.replace(/\n/g,' ').slice(0,20);
       } else if(a.type==='free'){
-        label=(a.dash&&a.dash.length)?'연결선':'표시';
+        label=a.arrow?'화살표':a.straight?'직선':(a.dash&&a.dash.length)?'연결선':'표시';
       }
       const div=document.createElement('div'); div.className='list-item';
       const sizeBtns=resizable?`<span class="sz" data-act="dec">−</span><span class="sz" data-act="inc">+</span>`:'';
