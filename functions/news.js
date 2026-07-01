@@ -4,10 +4,11 @@
    Bing 뉴스 RSS를 서버 측에서 대신 받아와(같은 출처) CORS 문제를 제거한다.
    ※ 구글 뉴스 RSS는 클라우드 서버 IP를 차단하므로 Bing 사용.
    ===================================================================== */
+// ※ Bing 뉴스는 OR 연산자 미지원 → 각 카테고리당 단순 쿼리 하나
 const QUERIES = {
   dental: '치과',
-  insurance: '치과 건강보험 OR 치과 수가 OR 치과 보험',
-  law: '치과 소송 OR 의료 판결 OR 의료소송'
+  insurance: '치과 건강보험',
+  law: '치과 소송'
 };
 
 export async function onRequestGet(context) {
