@@ -604,6 +604,8 @@
       <h1>치과치료계획 <span style="font-size:13px;font-weight:600;opacity:0.8;">by Jung</span></h1>
       <div class="clinic-slogan">파노라마 이미지에 치료계획을 직접 표시하는 전용 도구</div>
     </div>
+    <a href="index.html" title="도구 모음 홈으로"
+      style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.35);color:#fff;font-size:13px;font-weight:700;padding:8px 14px;border-radius:10px;cursor:pointer;letter-spacing:0.2px;margin-right:10px;text-decoration:none;">← 도구 모음</a>
     <button id="implantOpenBtn" onclick="ImplantRecorder.open()"
       style="background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.35);color:#fff;font-size:13px;font-weight:700;padding:8px 14px;border-radius:10px;cursor:pointer;letter-spacing:0.2px;margin-right:10px;">🦷 임플란트 기록</button>
     <div class="clinic-badge">STAFF ONLY</div>
@@ -695,6 +697,21 @@
       <div style="display:flex; justify-content:space-between;"><span>설명X</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">H</kbd></div>
       <div style="display:flex; justify-content:space-between;"><span>직선</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">K</kbd></div>
       <div style="display:flex; justify-content:space-between;"><span>화살표</span><kbd style="background:#e8f1fb;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;">J</kbd></div>
+    </div>
+
+    <!-- 하단: 바로가기 + 치과 소식 -->
+    <div style="margin-top:16px;border-top:1px solid var(--line);padding-top:12px;">
+      <h2 style="margin-top:0;">바로가기</h2>
+      <div class="util-grid">
+        <a class="small-btn" href="사주.html" style="flex:1 1 45%;text-align:center;text-decoration:none;line-height:1.9;">🔮 사주</a>
+        <a class="small-btn" href="직원뽑기.html" style="flex:1 1 45%;text-align:center;text-decoration:none;line-height:1.9;">🎯 사다리</a>
+      </div>
+
+      <h2 style="margin-top:14px;">치과 소식</h2>
+      <div id="sideNews" style="display:flex;flex-direction:column;gap:7px;">
+        <div style="color:var(--gray);font-size:11.5px;padding:4px 0;">소식을 불러오는 중…</div>
+      </div>
+      <a href="뉴스.html" style="display:inline-block;margin-top:8px;font-size:11.5px;color:var(--teal-light);text-decoration:none;font-weight:600;">전체 소식 보기 →</a>
     </div>
   </div>
 
@@ -3357,6 +3374,67 @@ const ImplantRecorder = (function(){
   return { open, close };
 })();
 window.ImplantRecorder = ImplantRecorder;
+</script>
+
+<!-- 왼쪽 하단: 치과 소식 미리보기 (카테고리별 2건) -->
+<script>
+(function(){
+  'use strict';
+  var box=document.getElementById('sideNews');
+  if(!box) return;
+  var CATS=[
+    {cat:'dental',    label:'치과', q:'치과'},
+    {cat:'insurance', label:'보험', q:'치과 건강보험 OR 치과 보험 OR 치과 수가'},
+    {cat:'law',       label:'판결', q:'치과 판결 OR 치과 소송 OR 의료 판결 OR 의료소송'}
+  ];
+  var PROXIES=[
+    function(u){return 'https://api.allorigins.win/raw?url='+encodeURIComponent(u);},
+    function(u){return 'https://corsproxy.io/?url='+encodeURIComponent(u);}
+  ];
+  function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+  function rssUrl(q){return 'https://news.google.com/rss/search?q='+encodeURIComponent(q)+'&hl=ko&gl=KR&ceid=KR:ko';}
+  function parseRss(xmlText){
+    var doc=new DOMParser().parseFromString(xmlText,'text/xml');
+    var items=doc.querySelectorAll('item'); var out=[];
+    items.forEach(function(it){
+      var title=(it.querySelector('title')||{}).textContent||'';
+      var link=(it.querySelector('link')||{}).textContent||'';
+      var srcEl=it.getElementsByTagName('News:Source')[0]||it.getElementsByTagName('source')[0];
+      var src=srcEl?srcEl.textContent:''; src=src.replace(/\s+on\s+MSN$/i,'').trim();
+      if(!src){var m=title.lastIndexOf(' - ');if(m>0){src=title.slice(m+3);title=title.slice(0,m);}}
+      else{var m2=title.lastIndexOf(' - '+src);if(m2>0)title=title.slice(0,m2);}
+      if(link.indexOf('bing.com/news/apiclick')!==-1){var um=link.match(/[?&]url=([^&]+)/);if(um){try{link=decodeURIComponent(um[1]);}catch(e){}}}
+      out.push({title:title,link:link,src:src});
+    });
+    return out;
+  }
+  function fetchWithProxies(url,pi){
+    pi=pi||0; if(pi>=PROXIES.length) return Promise.reject('x');
+    return fetch(PROXIES[pi](url)).then(function(r){if(!r.ok)throw 0;return r.text();})
+      .catch(function(){return fetchWithProxies(url,pi+1);});
+  }
+  function fetchCat(c){
+    return fetch('news?cat='+encodeURIComponent(c.cat)).then(function(r){
+      if(!r.ok) throw 0; return r.text();
+    }).then(function(t){var it=parseRss(t); if(!it.length) throw 0; return it;})
+     .catch(function(){return fetchWithProxies(rssUrl(c.q)).then(parseRss);});
+  }
+  Promise.all(CATS.map(function(c){
+    return fetchCat(c).then(function(it){return {label:c.label,items:it.slice(0,2)};})
+      .catch(function(){return {label:c.label,items:[]};});
+  })).then(function(groups){
+    var html='';
+    groups.forEach(function(g){
+      g.items.forEach(function(n){
+        html+='<a href="'+esc(n.link)+'" target="_blank" rel="noopener noreferrer" '
+          +'style="display:block;text-decoration:none;color:var(--ink);line-height:1.4;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,0.03);">'
+          +'<span style="font-size:10px;color:var(--teal-light);font-weight:700;">['+g.label+']</span> '
+          +'<span style="font-size:11.5px;">'+esc(n.title)+'</span></a>';
+      });
+    });
+    box.innerHTML=html||'<div style="color:var(--gray);font-size:11.5px;padding:4px 0;">표시할 소식이 없습니다.</div>';
+  });
+})();
 </script>
 </body>
 </html>
