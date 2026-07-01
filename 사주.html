@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>사주 정밀풀이 · 아산정플란트치과</title>
+<meta name="description" content="생년월일시로 사주팔자·오행·십성·대운을 만세력 기반으로 정밀 계산합니다.">
+<style>
+  :root{
+    --bg:#070c0e; --ink:#e8f6f4; --gray:#8fb2ae;
+    --mint:#2fd9c4; --mint-2:#5fe6d6; --line:rgba(90,210,200,0.18);
+    --glass:rgba(20,34,36,0.55); --glass-strong:rgba(26,42,44,0.72);
+    --wood:#4ade80; --fire:#ff6b5e; --earth:#e6bb54; --metal:#d7dee6; --water:#4aa8ff;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    background:
+      radial-gradient(1100px 720px at 82% -10%, rgba(47,217,196,0.16) 0%, rgba(47,217,196,0) 55%),
+      radial-gradient(900px 640px at 4% 112%, rgba(29,110,107,0.22) 0%, rgba(29,110,107,0) 60%),
+      var(--bg);
+    background-attachment:fixed; color:var(--ink); min-height:100vh;
+    padding:28px 18px 60px;
+  }
+  ::-webkit-scrollbar{width:10px;height:10px;}
+  ::-webkit-scrollbar-thumb{background:rgba(90,210,200,0.25);border-radius:8px;}
+  a{color:inherit;}
+
+  .wrap{max-width:920px;margin:0 auto;}
+  .topbar{display:flex;align-items:center;gap:12px;margin-bottom:22px;
+    animation:riseIn .6s cubic-bezier(.22,.9,.32,1) both;}
+  .back{
+    text-decoration:none;font-size:13px;font-weight:700;color:var(--mint-2);
+    background:rgba(47,217,196,0.08);border:1px solid var(--line);
+    border-radius:10px;padding:8px 14px;transition:background .16s,transform .16s;
+  }
+  .back:hover{background:rgba(47,217,196,0.16);transform:translateX(-2px);}
+  .topbar h1{font-size:22px;font-weight:800;margin:0;letter-spacing:-0.3px;}
+  .topbar .em{font-size:24px;}
+
+  .panel{
+    background:var(--glass);border:1px solid var(--line);border-radius:18px;padding:22px;
+    backdrop-filter:blur(16px) saturate(1.25);-webkit-backdrop-filter:blur(16px) saturate(1.25);
+    box-shadow:0 10px 36px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+    margin-bottom:20px;
+    animation:riseIn .62s cubic-bezier(.22,.9,.32,1) both;
+  }
+  .panel h2{font-size:13px;letter-spacing:0.6px;text-transform:uppercase;color:var(--mint-2);
+    margin:0 0 14px;border-bottom:1px solid var(--line);padding-bottom:8px;
+    text-shadow:0 0 12px rgba(47,217,196,0.3);}
+
+  /* 폼 */
+  .frow{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:14px;}
+  .field{flex:1 1 150px;min-width:0;}
+  .field label{display:block;font-size:12px;color:var(--gray);margin-bottom:5px;}
+  input[type=text],input[type=number],select{
+    width:100%;padding:9px 11px;border-radius:9px;font-size:14px;font-family:inherit;
+    background:rgba(8,18,20,0.6);border:1px solid var(--line);color:var(--ink);
+    transition:border-color .16s,box-shadow .16s;
+  }
+  input:focus,select:focus{outline:none;border-color:var(--mint);
+    box-shadow:0 0 0 3px rgba(47,217,196,0.16),0 0 12px rgba(47,217,196,0.2);}
+  input::placeholder{color:rgba(143,178,174,0.55);}
+  .seg{display:flex;gap:8px;}
+  .seg button{
+    flex:1;padding:9px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;
+    background:rgba(255,255,255,0.045);border:1px solid var(--line);color:var(--ink);
+    transition:all .15s;
+  }
+  .seg button.on{background:linear-gradient(135deg,#2fd9c4,#1fb8a8);color:#062421;border-color:var(--mint);
+    box-shadow:0 0 14px rgba(47,217,196,0.35);font-weight:700;}
+  .chk{display:flex;align-items:flex-start;gap:9px;font-size:12.5px;color:var(--gray);
+    line-height:1.6;margin-top:6px;}
+  .chk input{margin-top:2px;accent-color:var(--mint);width:16px;height:16px;flex:none;}
+  .submit{
+    display:block;width:100%;margin-top:8px;padding:13px;border:none;border-radius:11px;
+    font-size:15px;font-weight:800;cursor:pointer;color:#062421;
+    background:linear-gradient(135deg,#2fd9c4,#1fb8a8);box-shadow:0 6px 22px rgba(47,217,196,0.32);
+    transition:filter .16s,transform .16s;
+  }
+  .submit:hover{filter:brightness(1.05);transform:translateY(-1px);}
+  .submit:disabled{filter:grayscale(.6) brightness(.7);cursor:not-allowed;transform:none;box-shadow:none;}
+  .err{color:#ff8a7a;font-size:12.5px;margin-top:8px;min-height:16px;}
+
+  /* 결과 */
+  #result{display:none;}
+  .person{font-size:13px;color:var(--gray);margin-bottom:16px;}
+  .person b{color:var(--ink);}
+
+  .pillars{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  .pillar{
+    background:rgba(255,255,255,0.035);border:1px solid var(--line);border-radius:14px;
+    padding:14px 8px;text-align:center;
+  }
+  .pillar .pname{font-size:12px;color:var(--gray);margin-bottom:10px;font-weight:600;}
+  .pillar .ss{font-size:12px;color:var(--mint-2);font-weight:700;min-height:16px;margin-bottom:4px;}
+  .pillar .han{font-size:40px;font-weight:800;line-height:1.1;}
+  .pillar .ko{font-size:12px;color:var(--gray);margin-top:2px;}
+  .pillar .divider{height:1px;background:var(--line);margin:10px 4px;}
+  .pillar .zhi-ss{font-size:11px;color:var(--gray);min-height:14px;margin-top:6px;line-height:1.4;}
+  .pillar .animal{font-size:11px;color:var(--mint-2);margin-top:3px;}
+
+  /* 오행 */
+  .wux{display:flex;flex-direction:column;gap:10px;}
+  .wbar{display:flex;align-items:center;gap:10px;}
+  .wbar .wlab{width:56px;font-size:13px;font-weight:700;flex:none;}
+  .wbar .track{flex:1;height:16px;background:rgba(255,255,255,0.05);border-radius:8px;overflow:hidden;
+    border:1px solid var(--line);}
+  .wbar .fill{height:100%;border-radius:8px;transition:width .6s cubic-bezier(.22,.9,.32,1);}
+  .wbar .wcnt{width:44px;text-align:right;font-size:12.5px;color:var(--gray);flex:none;}
+
+  /* 대운 */
+  .daeun{display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;}
+  .du{flex:none;min-width:74px;background:rgba(255,255,255,0.035);border:1px solid var(--line);
+    border-radius:12px;padding:12px 6px;text-align:center;}
+  .du .du-age{font-size:11px;color:var(--mint-2);font-weight:700;}
+  .du .du-gz{font-size:26px;font-weight:800;margin:6px 0 2px;line-height:1.1;}
+  .du .du-ko{font-size:11px;color:var(--gray);}
+  .du .du-year{font-size:10px;color:rgba(143,178,174,0.6);margin-top:3px;}
+
+  .note{font-size:12px;color:var(--gray);line-height:1.7;margin-top:14px;
+    background:rgba(47,217,196,0.05);border:1px solid var(--line);border-radius:10px;padding:12px 14px;}
+  .save-state{font-size:11.5px;color:rgba(143,178,174,0.7);margin-top:10px;}
+
+  @keyframes riseIn{from{opacity:0;transform:translateY(18px) scale(.985);}
+    to{opacity:1;transform:translateY(0) scale(1);}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;}}
+  @media (max-width:560px){
+    .pillar .han{font-size:32px;}
+    .pillars{gap:7px;}
+    .pillar{padding:10px 4px;}
+    .topbar h1{font-size:18px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <a class="back" href="index.html">← 홈</a>
+    <span class="em">🔮</span>
+    <h1>사주 정밀풀이</h1>
+  </div>
+
+  <!-- 입력 -->
+  <div class="panel">
+    <h2>생년월일시 입력</h2>
+    <div class="frow">
+      <div class="field" style="flex:1 1 100%;">
+        <label>이름 (선택)</label>
+        <input type="text" id="name" placeholder="예: 홍길동" maxlength="20" autocomplete="off">
+      </div>
+    </div>
+    <div class="frow">
+      <div class="field">
+        <label>성별</label>
+        <div class="seg" id="segGender">
+          <button type="button" data-v="M" class="on">남</button>
+          <button type="button" data-v="F">여</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>달력</label>
+        <div class="seg" id="segCal">
+          <button type="button" data-v="solar" class="on">양력</button>
+          <button type="button" data-v="lunar">음력</button>
+        </div>
+      </div>
+    </div>
+    <div class="frow">
+      <div class="field"><label>년</label><input type="number" id="y" placeholder="1990" min="1900" max="2100"></div>
+      <div class="field"><label>월</label><input type="number" id="mo" placeholder="5" min="1" max="12"></div>
+      <div class="field"><label>일</label><input type="number" id="d" placeholder="20" min="1" max="31"></div>
+    </div>
+    <div class="frow">
+      <div class="field"><label>시 (0~23)</label><input type="number" id="h" placeholder="14" min="0" max="23"></div>
+      <div class="field"><label>분</label><input type="number" id="mi" placeholder="30" min="0" max="59"></div>
+      <div class="field" style="display:flex;align-items:flex-end;">
+        <label class="chk" style="margin:0 0 4px;"><input type="checkbox" id="noTime"> 태어난 시간 모름</label>
+      </div>
+    </div>
+
+    <label class="chk">
+      <input type="checkbox" id="consent">
+      입력한 정보(이름·생년월일시)가 <b style="color:var(--ink)">원내 기록용</b>으로 저장되는 것에 동의합니다. (내부 참고용, 외부 공개 안 함)
+    </label>
+
+    <button class="submit" id="go" disabled>풀이 보기</button>
+    <div class="err" id="err"></div>
+  </div>
+
+  <!-- 결과 -->
+  <div id="result">
+    <div class="panel">
+      <h2>사주팔자</h2>
+      <div class="person" id="person"></div>
+      <div class="pillars" id="pillars"></div>
+      <div class="note" id="dayNote"></div>
+    </div>
+
+    <div class="panel">
+      <h2>오행 분포</h2>
+      <div class="wux" id="wux"></div>
+    </div>
+
+    <div class="panel">
+      <h2>대운 (10년 주기)</h2>
+      <div class="daeun" id="daeun"></div>
+      <div class="save-state" id="saveState"></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="lunar.js"></script>
+<script src="shared.js"></script>
+<script>
+(function(){
+  'use strict';
+  var GAN_KO={'甲':'갑','乙':'을','丙':'병','丁':'정','戊':'무','己':'기','庚':'경','辛':'신','壬':'임','癸':'계'};
+  var ZHI_KO={'子':'자','丑':'축','寅':'인','卯':'묘','辰':'진','巳':'사','午':'오','未':'미','申':'신','酉':'유','戌':'술','亥':'해'};
+  var ZHI_ANIMAL={'子':'쥐','丑':'소','寅':'호랑이','卯':'토끼','辰':'용','巳':'뱀','午':'말','未':'양','申':'원숭이','酉':'닭','戌':'개','亥':'돼지'};
+  var GAN_WX={'甲':'wood','乙':'wood','丙':'fire','丁':'fire','戊':'earth','己':'earth','庚':'metal','辛':'metal','壬':'water','癸':'water'};
+  var ZHI_WX={'子':'water','丑':'earth','寅':'wood','卯':'wood','辰':'earth','巳':'fire','午':'fire','未':'earth','申':'metal','酉':'metal','戌':'earth','亥':'water'};
+  var WX_KO={wood:'木 목',fire:'火 화',earth:'土 토',metal:'金 금',water:'水 수'};
+  var WX_COLOR={wood:'var(--wood)',fire:'var(--fire)',earth:'var(--earth)',metal:'var(--metal)',water:'var(--water)'};
+  var WX_DESC={
+    wood:'나무처럼 위로 뻗는 기운 — 성장·인정·계획을 상징합니다.',
+    fire:'불처럼 밝고 확산하는 기운 — 열정·표현·예의를 상징합니다.',
+    earth:'흙처럼 중심을 잡는 기운 — 신뢰·포용·안정을 상징합니다.',
+    metal:'쇠처럼 단단한 기운 — 결단·의리·정리를 상징합니다.',
+    water:'물처럼 흐르는 기운 — 지혜·유연함·소통을 상징합니다.'
+  };
+  var SS_KO={'正官':'정관','偏官':'편관','七杀':'편관','正印':'정인','偏印':'편인','比肩':'비견','劫财':'겁재','劫財':'겁재','食神':'식신','伤官':'상관','傷官':'상관','正财':'정재','正財':'정재','偏财':'편재','偏財':'편재','日主':'일간(나)','日元':'일간(나)'};
+  function ssko(s){return SS_KO[s]||s;}
+
+  // 세그먼트
+  function seg(id){var el=document.getElementById(id);el.addEventListener('click',function(e){
+    var b=e.target.closest('button');if(!b)return;
+    el.querySelectorAll('button').forEach(function(x){x.classList.remove('on');});
+    b.classList.add('on');el.dataset.v=b.dataset.v;});el.dataset.v=el.querySelector('.on').dataset.v;}
+  seg('segGender');seg('segCal');
+
+  var consent=document.getElementById('consent');
+  var goBtn=document.getElementById('go');
+  consent.addEventListener('change',function(){goBtn.disabled=!consent.checked;});
+  document.getElementById('noTime').addEventListener('change',function(e){
+    var on=e.target.checked;document.getElementById('h').disabled=on;document.getElementById('mi').disabled=on;});
+
+  function val(id){return document.getElementById(id).value.trim();}
+  function num(id){var v=parseInt(val(id),10);return isNaN(v)?null:v;}
+
+  document.getElementById('go').addEventListener('click',function(){
+    var err=document.getElementById('err');err.textContent='';
+    var y=num('y'),mo=num('mo'),d=num('d');
+    var noTime=document.getElementById('noTime').checked;
+    var h=noTime?12:num('h'), mi=noTime?0:num('mi');
+    if(y===null||mo===null||d===null){err.textContent='년·월·일을 모두 입력해 주세요.';return;}
+    if(mo<1||mo>12||d<1||d>31){err.textContent='월(1~12)·일(1~31)을 확인해 주세요.';return;}
+    if(!noTime&&(h===null||mi===null||h<0||h>23||mi<0||mi>59)){err.textContent='시(0~23)·분(0~59)을 확인하거나 "시간 모름"을 체크하세요.';return;}
+    var cal=document.getElementById('segCal').dataset.v;
+    var gender=document.getElementById('segGender').dataset.v;
+    try{
+      var lunar;
+      if(cal==='lunar'){ lunar=Lunar.fromYmdHms(y,mo,d,h,mi,0); }
+      else { lunar=Solar.fromYmdHms(y,mo,d,h,mi,0).getLunar(); }
+      var ec=lunar.getEightChar();
+      render(ec,{y:y,mo:mo,d:d,h:h,mi:mi,noTime:noTime,cal:cal,gender:gender,
+                 name:val('name'), solar:lunar.getSolar().toString()});
+    }catch(ex){ err.textContent='계산 중 오류가 발생했습니다: '+ex; }
+  });
+
+  function pillarHTML(name,gan,zhi,ganSS,zhiSSarr,showAnimal){
+    var gwx=GAN_WX[gan],zwx=ZHI_WX[zhi];
+    var zss=(zhiSSarr||[]).map(ssko).join('·');
+    var animal=showAnimal?('<div class="animal">'+ZHI_ANIMAL[zhi]+'띠</div>'):'';
+    return '<div class="pillar">'
+      +'<div class="pname">'+name+'</div>'
+      +'<div class="ss">'+ (ganSS?ssko(ganSS):'') +'</div>'
+      +'<div class="han" style="color:'+WX_COLOR[gwx]+'">'+gan+'</div>'
+      +'<div class="ko">'+GAN_KO[gan]+' · '+WX_KO[gwx]+'</div>'
+      +'<div class="divider"></div>'
+      +'<div class="han" style="color:'+WX_COLOR[zwx]+'">'+zhi+'</div>'
+      +'<div class="ko">'+ZHI_KO[zhi]+' · '+WX_KO[zwx]+'</div>'
+      + animal
+      +'<div class="zhi-ss">'+zss+'</div>'
+      +'</div>';
+  }
+
+  function render(ec,info){
+    var gy=ec.getYearGan(),gm=ec.getMonthGan(),gd=ec.getDayGan(),gt=ec.getTimeGan();
+    var zy=ec.getYearZhi(),zm=ec.getMonthZhi(),zd=ec.getDayZhi(),zt=ec.getTimeZhi();
+
+    // 인물 요약
+    var calKo=info.cal==='lunar'?'음력':'양력';
+    var timeKo=info.noTime?'시간 모름':((info.h<10?'0'+info.h:info.h)+':'+(info.mi<10?'0'+info.mi:info.mi));
+    document.getElementById('person').innerHTML=
+      (info.name?('<b>'+esc(info.name)+'</b> · '):'')
+      +(info.gender==='M'?'남':'여')+' · '+calKo+' '+info.y+'.'+info.mo+'.'+info.d+' '+timeKo
+      +' <span style="color:rgba(143,178,174,.6)">(양력 '+info.solar+')</span>';
+
+    // 팔자 기둥 (년·월·일·시)
+    var p='';
+    p+=pillarHTML('년주 (조상)',gy,zy,ec.getYearShiShenGan(),ec.getYearShiShenZhi(),true);
+    p+=pillarHTML('월주 (부모)',gm,zm,ec.getMonthShiShenGan(),ec.getMonthShiShenZhi(),false);
+    p+=pillarHTML('일주 (나)',gd,zd,'日主',ec.getDayShiShenZhi(),false);
+    if(info.noTime){
+      p+='<div class="pillar"><div class="pname">시주 (자녀)</div><div class="ss"></div>'
+        +'<div class="han" style="color:var(--gray)">?</div><div class="ko">시간 모름</div>'
+        +'<div class="divider"></div><div class="han" style="color:var(--gray)">?</div>'
+        +'<div class="ko">미상</div><div class="zhi-ss"></div></div>';
+    } else {
+      p+=pillarHTML('시주 (자녀)',gt,zt,ec.getTimeShiShenGan(),ec.getTimeShiShenZhi(),false);
+    }
+    document.getElementById('pillars').innerHTML=p;
+
+    // 일간 해설
+    var dayWX=GAN_WX[gd];
+    document.getElementById('dayNote').innerHTML=
+      '<b style="color:var(--ink)">일간(나)은 '+gd+GAN_KO[gd]+' · '+WX_KO[dayWX]+'</b> — '+WX_DESC[dayWX];
+
+    // 오행 분포 (8글자)
+    var chars=[gy,gm,gd,gt];var zchars=[zy,zm,zd,zt];
+    if(info.noTime){chars=[gy,gm,gd];zchars=[zy,zm,zd];}
+    var cnt={wood:0,fire:0,earth:0,metal:0,water:0};
+    chars.forEach(function(g){cnt[GAN_WX[g]]++;});
+    zchars.forEach(function(z){cnt[ZHI_WX[z]]++;});
+    var total=chars.length+zchars.length;
+    var order=['wood','fire','earth','metal','water'];
+    var w='';
+    order.forEach(function(k){
+      var pct=Math.round(cnt[k]/total*100);
+      w+='<div class="wbar"><div class="wlab" style="color:'+WX_COLOR[k]+'">'+WX_KO[k]+'</div>'
+        +'<div class="track"><div class="fill" style="width:0%;background:'+WX_COLOR[k]+'" data-w="'+pct+'"></div></div>'
+        +'<div class="wcnt">'+cnt[k]+'개</div></div>';
+    });
+    document.getElementById('wux').innerHTML=w;
+    setTimeout(function(){document.querySelectorAll('#wux .fill').forEach(function(f){f.style.width=f.dataset.w+'%';});},60);
+
+    // 대운
+    var du='';
+    try{
+      var yun=ec.getYun(info.gender==='M'?1:0);
+      var arr=yun.getDaYun();
+      for(var i=1;i<Math.min(arr.length,10);i++){
+        var dd=arr[i];var gz=dd.getGanZhi();
+        if(!gz){continue;}
+        var g=gz.charAt(0),z=gz.charAt(1);
+        du+='<div class="du"><div class="du-age">'+dd.getStartAge()+'세</div>'
+          +'<div class="du-gz"><span style="color:'+WX_COLOR[GAN_WX[g]]+'">'+g+'</span>'
+          +'<span style="color:'+WX_COLOR[ZHI_WX[z]]+'">'+z+'</span></div>'
+          +'<div class="du-ko">'+GAN_KO[g]+ZHI_KO[z]+'</div>'
+          +'<div class="du-year">'+dd.getStartYear()+'~</div></div>';
+      }
+    }catch(ex){ du='<div style="color:var(--gray);font-size:12px">대운 계산 불가</div>'; }
+    document.getElementById('daeun').innerHTML=du;
+
+    document.getElementById('result').style.display='block';
+    document.getElementById('result').scrollIntoView({behavior:'smooth',block:'start'});
+
+    // DB 저장 (동의 시)
+    var saveEl=document.getElementById('saveState');
+    if(document.getElementById('consent').checked && global_db()){
+      saveEl.textContent='기록 저장 중…';
+      ClinicDB.logEntry('saju', info.name||null, {
+        gender:info.gender, calendar:info.cal, noTime:info.noTime,
+        birth:{y:info.y,mo:info.mo,d:info.d,h:info.h,mi:info.mi}, solar:info.solar,
+        bazi:{year:gy+zy,month:gm+zm,day:gd+zd,time:info.noTime?null:gt+zt},
+        wuxing:cnt
+      }).then(function(r){
+        saveEl.textContent = (r.supabase&&r.supabase.ok) ? '✓ 원내 기록에 저장되었습니다.' : '저장 보류 (네트워크 확인 필요)';
+      });
+    } else { saveEl.textContent=''; }
+  }
+  function global_db(){return (typeof ClinicDB!=='undefined');}
+  function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+})();
+</script>
+</body>
+</html>
