@@ -150,11 +150,18 @@
       var title=(it.querySelector('title')||{}).textContent||'';
       var link=(it.querySelector('link')||{}).textContent||'';
       var pub=(it.querySelector('pubDate')||{}).textContent||'';
-      var srcEl=it.getElementsByTagName('source')[0];
+      // 언론사: Bing=<News:Source>, Google=<source>
+      var srcEl=it.getElementsByTagName('News:Source')[0]||it.getElementsByTagName('source')[0];
       var src=srcEl?srcEl.textContent:'';
+      src=src.replace(/\s+on\s+MSN$/i,'').trim();
       // Google 뉴스 제목은 "제목 - 언론사" 형식 → 언론사 분리
       if(!src){var m=title.lastIndexOf(' - ');if(m>0){src=title.slice(m+3);title=title.slice(0,m);}}
       else{var m2=title.lastIndexOf(' - '+src);if(m2>0)title=title.slice(0,m2);}
+      // Bing 리다이렉트 링크 → 실제 기사 URL 추출
+      if(link.indexOf('bing.com/news/apiclick')!==-1){
+        var um=link.match(/[?&]url=([^&]+)/);
+        if(um){try{link=decodeURIComponent(um[1]);}catch(e){}}
+      }
       out.push({title:title,link:link,pub:pub,src:src});
     });
     return out;
