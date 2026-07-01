@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>직원 뽑기 · 사다리 · 아산정플란트치과</title>
+<meta name="description" content="직원 명단으로 랜덤 뽑기 또는 사다리타기로 선물·당번을 정하는 도구.">
+<style>
+  :root{
+    --bg:#070c0e; --ink:#e8f6f4; --gray:#8fb2ae;
+    --mint:#2fd9c4; --mint-2:#5fe6d6; --line:rgba(90,210,200,0.18);
+    --glass:rgba(20,34,36,0.55); --danger:#ff6b6b;
+    --gold:#ffd36b; --gold-line:rgba(255,211,107,0.5);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    background:
+      radial-gradient(1100px 720px at 82% -10%, rgba(47,217,196,0.16) 0%, rgba(47,217,196,0) 55%),
+      radial-gradient(900px 640px at 4% 112%, rgba(29,110,107,0.22) 0%, rgba(29,110,107,0) 60%),
+      var(--bg);
+    background-attachment:fixed; color:var(--ink); min-height:100vh;
+    padding:28px 18px 60px;
+  }
+  ::-webkit-scrollbar{width:10px;height:10px;}
+  ::-webkit-scrollbar-thumb{background:rgba(90,210,200,0.25);border-radius:8px;}
+  .wrap{max-width:860px;margin:0 auto;}
+
+  .topbar{display:flex;align-items:center;gap:12px;margin-bottom:20px;
+    animation:riseIn .6s cubic-bezier(.22,.9,.32,1) both;}
+  .back{text-decoration:none;font-size:13px;font-weight:700;color:var(--mint-2);
+    background:rgba(47,217,196,0.08);border:1px solid var(--line);border-radius:10px;padding:8px 14px;
+    transition:background .16s,transform .16s;}
+  .back:hover{background:rgba(47,217,196,0.16);transform:translateX(-2px);}
+  .topbar h1{font-size:22px;font-weight:800;margin:0;letter-spacing:-0.3px;}
+  .topbar .em{font-size:24px;}
+
+  .panel{background:var(--glass);border:1px solid var(--line);border-radius:16px;
+    padding:18px;margin-bottom:16px;backdrop-filter:blur(16px) saturate(1.2);
+    -webkit-backdrop-filter:blur(16px) saturate(1.2);box-shadow:0 8px 30px rgba(0,0,0,0.36);
+    animation:riseIn .5s cubic-bezier(.22,.9,.32,1) both;}
+  .panel-title{font-size:14px;font-weight:800;margin-bottom:12px;color:var(--mint-2);}
+  .panel-title .count{color:var(--gray);font-weight:600;font-size:12.5px;margin-left:6px;}
+  .hint{font-size:11.5px;color:var(--gray);font-weight:500;}
+
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+  .chip{display:inline-flex;align-items:center;gap:7px;padding:8px 8px 8px 12px;border-radius:11px;
+    background:rgba(255,255,255,0.05);border:1px solid var(--line);font-size:13.5px;font-weight:600;
+    animation:pop .28s both;}
+  .chip .x{cursor:pointer;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;
+    justify-content:center;background:rgba(255,255,255,0.08);color:var(--gray);font-size:13px;line-height:1;}
+  .chip .x:hover{background:var(--danger);color:#fff;}
+  .chip.boss{border-color:var(--gold-line);background:rgba(255,211,107,0.1);color:var(--gold);
+    box-shadow:0 0 16px rgba(255,211,107,0.18);}
+
+  .add-row{display:flex;gap:8px;flex-wrap:wrap;}
+  input,textarea{font-family:inherit;background:rgba(10,20,22,0.7);border:1px solid var(--line);
+    color:var(--ink);border-radius:10px;padding:10px 12px;font-size:14px;outline:none;transition:border-color .15s,box-shadow .15s;}
+  input:focus,textarea:focus{border-color:var(--mint);box-shadow:0 0 0 3px rgba(47,217,196,0.15);}
+  #addName{flex:1;min-width:150px;}
+  #pickCount{width:84px;}
+  textarea{width:100%;min-height:88px;resize:vertical;margin-bottom:12px;line-height:1.6;}
+
+  button{font-family:inherit;cursor:pointer;border:none;border-radius:10px;padding:10px 16px;
+    font-size:13.5px;font-weight:700;transition:filter .15s,transform .15s,background .15s;}
+  button.primary{background:linear-gradient(135deg,#2fd9c4,#1fb8a8);color:#062421;
+    box-shadow:0 4px 16px rgba(47,217,196,0.3);}
+  button.primary:hover:not(:disabled){filter:brightness(1.06);transform:translateY(-1px);}
+  button.ghost{background:rgba(255,255,255,0.06);color:var(--ink);border:1px solid var(--line);}
+  button.ghost:hover:not(:disabled){background:rgba(255,255,255,0.1);}
+  button:disabled{opacity:.45;cursor:default;}
+
+  .tabs{display:flex;gap:8px;margin-bottom:16px;
+    animation:riseIn .55s .05s cubic-bezier(.22,.9,.32,1) both;}
+  .tab{flex:1;background:var(--glass);border:1px solid var(--line);color:var(--ink);border-radius:12px;
+    padding:13px;font-weight:700;font-size:14.5px;cursor:pointer;backdrop-filter:blur(10px);}
+  .tab.on{background:linear-gradient(135deg,#2fd9c4,#1fb8a8);color:#062421;border-color:var(--mint);
+    box-shadow:0 0 18px rgba(47,217,196,0.35);}
+
+  .ctrl-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+  .ctrl-row label{font-size:13px;color:var(--gray);font-weight:600;}
+
+  .slot{text-align:center;font-size:30px;font-weight:800;padding:40px 16px;border-radius:14px;
+    background:rgba(10,20,22,0.5);border:1px solid var(--line);min-height:64px;letter-spacing:-0.5px;
+    color:var(--ink);transition:color .2s;}
+  .slot.spinning{color:var(--mint-2);}
+  .slot .small{font-size:15px;font-weight:600;color:var(--gray);}
+  .winners{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:18px;}
+  .win{padding:12px 20px;border-radius:12px;font-size:19px;font-weight:800;
+    background:linear-gradient(135deg,rgba(47,217,196,0.18),rgba(47,217,196,0.05));
+    border:1px solid var(--mint);color:var(--mint-2);animation:pop .4s both;}
+  .win.boss{background:linear-gradient(135deg,rgba(255,211,107,0.22),rgba(255,211,107,0.05));
+    border-color:var(--gold);color:var(--gold);box-shadow:0 0 22px rgba(255,211,107,0.3);}
+
+  .ladder-scroll{overflow-x:auto;padding-bottom:8px;margin-top:4px;}
+  canvas#ladder{display:block;}
+  .ladder-result{margin-top:14px;display:flex;flex-direction:column;gap:6px;}
+  .lr{font-size:14px;padding:9px 13px;border-radius:9px;background:rgba(255,255,255,0.04);
+    border:1px solid var(--line);animation:pop .3s both;}
+  .lr b{color:var(--mint-2);}
+  .lr.boss{border-color:var(--gold-line);background:rgba(255,211,107,0.08);}
+  .lr.boss b{color:var(--gold);}
+
+  .foot{margin-top:22px;font-size:11.5px;color:rgba(143,178,174,0.6);text-align:center;line-height:1.7;}
+
+  @keyframes riseIn{from{opacity:0;transform:translateY(16px) scale(.985);}
+    to{opacity:1;transform:translateY(0) scale(1);}}
+  @keyframes pop{from{opacity:0;transform:scale(.7);}to{opacity:1;transform:scale(1);}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;}}
+  @media (max-width:560px){.topbar h1{font-size:18px;} .slot{font-size:24px;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <a class="back" href="index.html">← 홈</a>
+    <span class="em">🎯</span>
+    <h1>직원 뽑기 · 사다리</h1>
+  </div>
+
+  <!-- 공유 명단 -->
+  <div class="panel">
+    <div class="panel-title">직원 명단 <span class="count" id="rosterCount"></span></div>
+    <div class="chips" id="chips"></div>
+    <div class="add-row">
+      <input id="addName" placeholder="이름 입력 후 Enter 또는 +추가" maxlength="12">
+      <button class="ghost" id="addBtn">+ 추가</button>
+      <button class="ghost" id="resetBtn">기본 명단</button>
+    </div>
+  </div>
+
+  <!-- 탭 -->
+  <div class="tabs">
+    <button class="tab on" data-mode="pick">🎰 뽑기</button>
+    <button class="tab" data-mode="ladder">🪜 사다리타기</button>
+  </div>
+
+  <!-- 뽑기 -->
+  <div class="mode" id="mode-pick">
+    <div class="panel">
+      <div class="ctrl-row">
+        <label>몇 명 뽑기</label>
+        <input type="number" id="pickCount" min="1" value="1">
+        <button class="primary" id="pickBtn">뽑기 시작</button>
+      </div>
+      <div class="slot" id="slot"><span class="small">명단을 확인하고 <b>뽑기 시작</b>을 누르세요</span></div>
+      <div class="winners" id="winners"></div>
+    </div>
+  </div>
+
+  <!-- 사다리 -->
+  <div class="mode" id="mode-ladder" hidden>
+    <div class="panel">
+      <div class="panel-title">결과 항목 <span class="hint">(줄바꿈 또는 쉼표로 구분 · 비우면 자동으로 당첨/꽝)</span></div>
+      <textarea id="outcomes" placeholder="예)&#10;🎁 당첨&#10;꽝&#10;꽝&#10;커피 사기"></textarea>
+      <div class="ctrl-row">
+        <button class="primary" id="buildBtn">사다리 만들기</button>
+        <button class="ghost" id="revealAllBtn" disabled>전체 공개</button>
+        <span class="hint">사다리를 만든 뒤 이름(위쪽)을 클릭하면 하나씩 공개됩니다</span>
+      </div>
+      <div class="ladder-scroll"><canvas id="ladder"></canvas></div>
+      <div class="ladder-result" id="ladderResult"></div>
+    </div>
+  </div>
+
+  <div class="foot">결과는 원내 기록에 남을 수 있습니다 · 즐겁게 이용해 주세요 🙂</div>
+</div>
+
+<script src="shared.js"></script>
+<script>
+(function(){
+  'use strict';
+  var DEFAULT=['은쑥','소연','수연','영애','은영','수란','보영','지훈','동광','지윤','혜민','진주','주옥','메림'];
+  var BOSS='은쑥';
+  var LS_KEY='clinic_roster_v1';
+
+  function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+  function loadRoster(){try{var s=localStorage.getItem(LS_KEY);if(s){var a=JSON.parse(s);if(a&&a.length)return a;}}catch(e){}return DEFAULT.slice();}
+  function saveRoster(){try{localStorage.setItem(LS_KEY,JSON.stringify(roster));}catch(e){}}
+
+  var roster=loadRoster();
+
+  // ---------- 명단 ----------
+  var chipsEl=document.getElementById('chips');
+  var rosterCount=document.getElementById('rosterCount');
+  function renderChips(){
+    rosterCount.textContent='('+roster.length+'명)';
+    chipsEl.innerHTML=roster.map(function(nm,i){
+      var b=(nm===BOSS);
+      return '<span class="chip'+(b?' boss':'')+'">'+(b?'👑 ':'')+esc(nm)+(b?' <span style="font-size:11px;opacity:.85">실장님</span>':'')
+        +'<span class="x" data-i="'+i+'" title="삭제">✕</span></span>';
+    }).join('');
+  }
+  chipsEl.addEventListener('click',function(e){
+    var x=e.target.closest('.x'); if(!x)return;
+    roster.splice(parseInt(x.dataset.i),1); saveRoster(); renderChips();
+  });
+  var addName=document.getElementById('addName');
+  function addPerson(){
+    var v=addName.value.trim();
+    if(!v)return;
+    if(roster.indexOf(v)!==-1){addName.value='';return;}
+    roster.push(v); saveRoster(); renderChips(); addName.value=''; addName.focus();
+  }
+  document.getElementById('addBtn').addEventListener('click',addPerson);
+  addName.addEventListener('keydown',function(e){if(e.key==='Enter')addPerson();});
+  document.getElementById('resetBtn').addEventListener('click',function(){
+    roster=DEFAULT.slice(); saveRoster(); renderChips();
+  });
+  renderChips();
+
+  // ---------- 탭 ----------
+  document.querySelector('.tabs').addEventListener('click',function(e){
+    var b=e.target.closest('.tab'); if(!b)return;
+    document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on');});
+    b.classList.add('on');
+    var m=b.dataset.mode;
+    document.getElementById('mode-pick').hidden=(m!=='pick');
+    document.getElementById('mode-ladder').hidden=(m!=='ladder');
+  });
+
+  // ---------- 뽑기 ----------
+  var slot=document.getElementById('slot');
+  var winnersEl=document.getElementById('winners');
+  var pickBtn=document.getElementById('pickBtn');
+  var pickCount=document.getElementById('pickCount');
+  pickBtn.addEventListener('click',function(){
+    var names=roster.slice();
+    if(names.length<1){slot.innerHTML='<span class="small">먼저 직원을 추가해 주세요</span>';return;}
+    var count=Math.max(1,Math.min(parseInt(pickCount.value,10)||1,names.length));
+    pickCount.value=count;
+    pickBtn.disabled=true; winnersEl.innerHTML=''; slot.classList.add('spinning');
+    var t=0,dur=1800;
+    var iv=setInterval(function(){
+      slot.textContent=names[Math.floor(Math.random()*names.length)];
+      t+=70;
+      if(t>=dur){clearInterval(iv);finishPick(names,count);}
+    },70);
+  });
+  function finishPick(names,count){
+    var pool=names.slice(),winners=[];
+    for(var i=0;i<count;i++){winners.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);}
+    slot.classList.remove('spinning');
+    slot.innerHTML='<span class="small">'+(count===1?'🎉 당첨!':'🎉 '+count+'명 당첨!')+'</span>';
+    winnersEl.innerHTML=winners.map(function(w){
+      var b=(w===BOSS);
+      return '<div class="win'+(b?' boss':'')+'">'+(b?'👑 ':'')+esc(w)+(b?' 실장님':'')+'</div>';
+    }).join('');
+    pickBtn.disabled=false;
+    if(window.ClinicDB)ClinicDB.logEntry('picker',null,{roster:names,count:count,winners:winners});
+  }
+
+  // ---------- 사다리 ----------
+  var canvas=document.getElementById('ladder');
+  var ctx=canvas.getContext('2d');
+  var buildBtn=document.getElementById('buildBtn');
+  var revealAllBtn=document.getElementById('revealAllBtn');
+  var ladderResult=document.getElementById('ladderResult');
+  var outcomesEl=document.getElementById('outcomes');
+  var PALETTE=['#2fd9c4','#ffd36b','#7aa2ff','#ff7ea8','#8ce99a','#ffa94d','#b197fc','#63e6be','#ff8787','#4dd4ac'];
+
+  var L=null; // ladder state
+
+  function parseOutcomes(){
+    return outcomesEl.value.split(/[\n,]/).map(function(s){return s.trim();}).filter(function(s){return s;});
+  }
+
+  buildBtn.addEventListener('click',function(){
+    var parts=roster.slice(), n=parts.length;
+    if(n<2){alert('사다리타기는 최소 2명이 필요해요.');return;}
+    var outs=parseOutcomes();
+    if(outs.length===0){outs=['🎁 당첨'];while(outs.length<n)outs.push('꽝');}
+    while(outs.length<n)outs.push('꽝');
+    if(outs.length>n)outs=outs.slice(0,n);
+
+    var cols=n;
+    var rows=Math.max(9,cols+5);
+    var rung=[];
+    for(var r=0;r<rows;r++){
+      var row=[];
+      for(var c=0;c<cols-1;c++){
+        if(c>0&&row[c-1]){row.push(false);}         // 인접 가로줄 금지
+        else{row.push(Math.random()<0.4);}
+      }
+      rung.push(row);
+    }
+
+    var colGap=66,marginX=44,topLine=44;
+    var cssW=marginX*2+(cols-1)*colGap;
+    var rowGap=26, bottomLine=topLine+(rows+1)*rowGap;
+    var cssH=bottomLine+40;
+    function colX(c){return marginX+c*colGap;}
+    function rowY(r){return topLine+(r+1)*rowGap;}
+
+    // 매핑 계산
+    var mapping={};
+    function pathOf(startCol){
+      var col=startCol,pts=[{x:colX(col),y:topLine}];
+      for(var r=0;r<rows;r++){
+        var y=rowY(r);
+        pts.push({x:colX(col),y:y});
+        if(col<cols-1&&rung[r][col]){col++;pts.push({x:colX(col),y:y});}
+        else if(col>0&&rung[r][col-1]){col--;pts.push({x:colX(col),y:y});}
+      }
+      pts.push({x:colX(col),y:bottomLine});
+      return {pts:pts,end:col};
+    }
+    for(var i=0;i<cols;i++){mapping[parts[i]]=outs[pathOf(i).end];}
+
+    L={parts:parts,outs:outs,cols:cols,rows:rows,rung:rung,colGap:colGap,marginX:marginX,
+       topLine:topLine,bottomLine:bottomLine,cssW:cssW,cssH:cssH,colX:colX,rowY:rowY,
+       pathOf:pathOf,traced:{},shown:{},colorIdx:0};
+
+    // 캔버스 크기 (레티나 대응)
+    var dpr=window.devicePixelRatio||1;
+    canvas.width=Math.round(cssW*dpr); canvas.height=Math.round(cssH*dpr);
+    canvas.style.width=cssW+'px'; canvas.style.height=cssH+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+
+    drawBase();
+    revealAllBtn.disabled=false;
+    ladderResult.innerHTML='';
+    if(window.ClinicDB)ClinicDB.logEntry('ladder',null,{participants:parts,outcomes:outs,mapping:mapping});
+  });
+
+  function drawBase(){
+    if(!L)return;
+    ctx.clearRect(0,0,L.cssW,L.cssH);
+    // 세로줄
+    ctx.lineWidth=2; ctx.strokeStyle='rgba(143,178,174,0.45)';
+    for(var c=0;c<L.cols;c++){ctx.beginPath();ctx.moveTo(L.colX(c),L.topLine);ctx.lineTo(L.colX(c),L.bottomLine);ctx.stroke();}
+    // 가로줄
+    ctx.strokeStyle='rgba(47,217,196,0.5)';
+    for(var r=0;r<L.rows;r++){for(var cc=0;cc<L.cols-1;cc++){if(L.rung[r][cc]){var y=L.rowY(r);ctx.beginPath();ctx.moveTo(L.colX(cc),y);ctx.lineTo(L.colX(cc+1),y);ctx.stroke();}}}
+    // 라벨
+    ctx.textAlign='center'; ctx.font='700 13px system-ui,sans-serif';
+    for(var t=0;t<L.cols;t++){
+      var boss=(L.parts[t]===BOSS);
+      ctx.fillStyle=boss?'#ffd36b':'#e8f6f4';
+      ctx.fillText((boss?'👑':'')+L.parts[t],L.colX(t),L.topLine-13);
+    }
+    ctx.font='600 12.5px system-ui,sans-serif'; ctx.fillStyle='#8fb2ae';
+    for(var o=0;o<L.cols;o++){ctx.fillText(L.outs[o],L.colX(o),L.bottomLine+24);}
+    // 이미 공개된 경로
+    for(var key in L.traced){drawPathFull(L.pathOf(parseInt(key)).pts,L.traced[key]);}
+  }
+  function drawPathFull(pts,color){
+    ctx.strokeStyle=color; ctx.lineWidth=4; ctx.lineJoin='round'; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
+    for(var i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);
+    ctx.stroke();
+  }
+  function drawPartial(pts,segLen,limit,color){
+    ctx.strokeStyle=color; ctx.lineWidth=4; ctx.lineJoin='round'; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
+    var acc=0,dot=null;
+    for(var i=0;i<segLen.length;i++){
+      if(acc+segLen[i]<=limit){ctx.lineTo(pts[i+1].x,pts[i+1].y);acc+=segLen[i];dot={x:pts[i+1].x,y:pts[i+1].y};}
+      else{var t=(limit-acc)/segLen[i];var x=pts[i].x+(pts[i+1].x-pts[i].x)*t;var y=pts[i].y+(pts[i+1].y-pts[i].y)*t;ctx.lineTo(x,y);dot={x:x,y:y};break;}
+    }
+    ctx.stroke();
+    if(dot){ctx.fillStyle=color;ctx.beginPath();ctx.arc(dot.x,dot.y,6,0,Math.PI*2);ctx.fill();}
+  }
+  function trace(startCol,cb){
+    if(!L||L.traced[startCol]!==undefined)return;
+    var color=PALETTE[L.colorIdx++ % PALETTE.length];
+    var path=L.pathOf(startCol),pts=path.pts;
+    var segLen=[],total=0;
+    for(var i=1;i<pts.length;i++){var d=Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y);segLen.push(d);total+=d;}
+    var start=null,dur=Math.max(700,total*1.4);
+    function frame(now){
+      if(start===null)start=now;
+      var p=Math.min(1,(now-start)/dur);
+      drawBase(); drawPartial(pts,segLen,p*total,color);
+      if(p<1){requestAnimationFrame(frame);}
+      else{L.traced[startCol]=color;drawBase();showResult(startCol,path.end,color);if(cb)cb();}
+    }
+    requestAnimationFrame(frame);
+  }
+  function showResult(col,end,color){
+    if(!L||L.shown[col])return; L.shown[col]=true;
+    var nm=L.parts[col],out=L.outs[end],boss=(nm===BOSS);
+    var div=document.createElement('div');
+    div.className='lr'+(boss?' boss':'');
+    div.innerHTML='<b>'+(boss?'👑 ':'')+esc(nm)+(boss?' 실장님':'')+'</b> &nbsp;→&nbsp; '+esc(out);
+    ladderResult.appendChild(div);
+  }
+  canvas.addEventListener('click',function(e){
+    if(!L)return;
+    var rect=canvas.getBoundingClientRect();
+    var x=e.clientX-rect.left;
+    var best=-1,bd=1e9;
+    for(var c=0;c<L.cols;c++){var d=Math.abs(x-L.colX(c));if(d<bd){bd=d;best=c;}}
+    if(bd<L.colGap/2)trace(best);
+  });
+  revealAllBtn.addEventListener('click',function(){
+    if(!L)return;
+    for(var c=0;c<L.cols;c++){
+      if(L.traced[c]===undefined){
+        var color=PALETTE[L.colorIdx++ % PALETTE.length];
+        L.traced[c]=color; showResult(c,L.pathOf(c).end,color);
+      }
+    }
+    drawBase();
+  });
+
+})();
+</script>
+</body>
+</html>
