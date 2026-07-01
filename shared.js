@@ -12,7 +12,7 @@
   var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp2b2libGltdGh3dWhic3B3a3d1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4OTQ2MzMsImV4cCI6MjA5ODQ3MDYzM30.vzdsNsOl1saSil_Y9QrpiDAPR5ojLjr0U3IkY1_-Pmo';
 
   // ---- Google Apps Script 웹앱 URL (배포 후 여기에 채움) ----
-  var SHEETS_WEBAPP_URL = ''; // 예: 'https://script.google.com/macros/s/XXXX/exec'
+  var SHEETS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbya0wEwYNV1fEzXyGxo4FEtMOZxeIk-R79VAamT8UcoKttMKsMebwl-cM2dwnujVuF_/exec';
 
   function supabaseInsert(row) {
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return Promise.resolve({ ok: false, skipped: true });
