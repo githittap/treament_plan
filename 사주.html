@@ -181,12 +181,7 @@
       </div>
     </div>
 
-    <label class="chk">
-      <input type="checkbox" id="consent">
-      입력한 정보(이름·생년월일시)가 <b style="color:var(--ink)">원내 기록용</b>으로 저장되는 것에 동의합니다. (내부 참고용, 외부 공개 안 함)
-    </label>
-
-    <button class="submit" id="go" disabled>풀이 보기</button>
+    <button class="submit" id="go">풀이 보기</button>
     <div class="err" id="err"></div>
   </div>
 
@@ -242,9 +237,6 @@
     b.classList.add('on');el.dataset.v=b.dataset.v;});el.dataset.v=el.querySelector('.on').dataset.v;}
   seg('segGender');seg('segCal');
 
-  var consent=document.getElementById('consent');
-  var goBtn=document.getElementById('go');
-  consent.addEventListener('change',function(){goBtn.disabled=!consent.checked;});
   document.getElementById('noTime').addEventListener('change',function(e){
     var on=e.target.checked;document.getElementById('h').disabled=on;document.getElementById('mi').disabled=on;});
 
@@ -359,9 +351,9 @@
     document.getElementById('result').style.display='block';
     document.getElementById('result').scrollIntoView({behavior:'smooth',block:'start'});
 
-    // DB 저장 (동의 시)
+    // DB 저장 (원내 기록용 — 동의서 사전 확보)
     var saveEl=document.getElementById('saveState');
-    if(document.getElementById('consent').checked && global_db()){
+    if(global_db()){
       saveEl.textContent='기록 저장 중…';
       ClinicDB.logEntry('saju', info.name||null, {
         gender:info.gender, calendar:info.cal, noTime:info.noTime,
