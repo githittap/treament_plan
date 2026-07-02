@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 모델 지표 · 아산정플란트치과</title>
+<meta name="description" content="Artificial Analysis 벤치마크 기반 AI 모델 지표 — 코딩·장문추론·시각추론·비환각률·실무·고난도추론">
+<style>
+  :root{
+    --bg:#070c0e;
+    --ink:#e8f6f4;
+    --gray:#8fb2ae;
+    --mint:#2fd9c4;
+    --mint-2:#5fe6d6;
+    --line:rgba(90,210,200,0.18);
+    --glass:rgba(20,34,36,0.55);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    background:
+      radial-gradient(1100px 720px at 80% -10%, rgba(47,217,196,0.18) 0%, rgba(47,217,196,0) 55%),
+      radial-gradient(900px 640px at 6% 110%, rgba(29,110,107,0.24) 0%, rgba(29,110,107,0) 60%),
+      radial-gradient(760px 540px at 50% 42%, rgba(30,60,64,0.35) 0%, rgba(7,12,14,0) 70%),
+      var(--bg);
+    background-attachment:fixed;
+    color:var(--ink);
+    min-height:100vh;
+    padding:40px 20px 60px;
+  }
+  ::-webkit-scrollbar{width:10px;}
+  ::-webkit-scrollbar-thumb{background:rgba(90,210,200,0.25);border-radius:8px;}
+
+  .wrap{max-width:1040px;margin:0 auto;}
+
+  /* ---- 헤더 ---- */
+  .top{
+    display:flex;align-items:center;gap:14px;
+    margin-bottom:10px;
+  }
+  .back{
+    text-decoration:none;color:var(--mint-2);
+    font-size:13px;font-weight:700;
+    border:1px solid var(--line);
+    background:rgba(47,217,196,0.08);
+    padding:7px 13px;border-radius:10px;
+    transition:border-color .18s, background .18s;
+    white-space:nowrap;
+  }
+  .back:hover{border-color:rgba(47,217,196,0.42);background:rgba(47,217,196,0.14);}
+
+  .hero{margin:6px 0 26px;}
+  .hero h1{
+    font-size:30px;font-weight:800;letter-spacing:-0.5px;margin:0 0 8px;
+    background:linear-gradient(120deg,#eafffb 0%, #5fe6d6 55%, #2fd9c4 100%);
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  }
+  .hero p{font-size:14px;color:var(--gray);margin:0;line-height:1.6;}
+  .meta{
+    margin-top:10px;font-size:12px;color:rgba(143,178,174,0.8);
+    display:flex;gap:14px;flex-wrap:wrap;align-items:center;
+  }
+  .meta a{color:var(--mint-2);text-decoration:none;}
+  .meta a:hover{text-decoration:underline;}
+
+  .banner{
+    margin:0 0 22px;padding:12px 16px;border-radius:12px;
+    background:rgba(230,180,60,0.10);border:1px solid rgba(230,180,60,0.35);
+    color:#ffe6ad;font-size:13px;line-height:1.6;
+  }
+  .banner.hide{display:none;}
+  .err{
+    margin:0 0 22px;padding:12px 16px;border-radius:12px;
+    background:rgba(230,80,80,0.10);border:1px solid rgba(230,80,80,0.35);
+    color:#ffc7c7;font-size:13px;line-height:1.6;
+  }
+  .err.hide{display:none;}
+
+  /* ---- 지표 그리드 ---- */
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+    gap:20px;
+  }
+  .block{
+    background:var(--glass);
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:20px 20px 16px;
+    backdrop-filter:blur(16px) saturate(1.2);
+    -webkit-backdrop-filter:blur(16px) saturate(1.2);
+    box-shadow:0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+  .block h2{
+    font-size:16px;font-weight:800;margin:0 0 3px;letter-spacing:-0.2px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .block .sub{font-size:12px;color:var(--gray);margin:0 0 14px;}
+
+  /* ---- ⓘ 툴팁 ---- */
+  .info{
+    position:relative;display:inline-flex;align-items:center;justify-content:center;
+    width:18px;height:18px;border-radius:50%;
+    font-size:11px;font-weight:800;font-style:normal;
+    color:#062421;background:linear-gradient(135deg,#2fd9c4,#1fb8a8);
+    cursor:help;flex:none;
+  }
+  .info .tip{
+    position:absolute;left:50%;top:calc(100% + 10px);transform:translateX(-50%);
+    width:min(320px,78vw);
+    background:#0c1618;color:var(--ink);
+    border:1px solid rgba(90,210,200,0.35);
+    border-radius:12px;padding:12px 14px;
+    font-size:12.5px;font-weight:400;line-height:1.65;letter-spacing:0.1px;
+    box-shadow:0 14px 40px rgba(0,0,0,0.6);
+    opacity:0;visibility:hidden;transition:opacity .16s, transform .16s;
+    z-index:30;text-align:left;pointer-events:none;
+  }
+  .info .tip::before{
+    content:"";position:absolute;left:50%;top:-6px;transform:translateX(-50%) rotate(45deg);
+    width:11px;height:11px;background:#0c1618;
+    border-left:1px solid rgba(90,210,200,0.35);border-top:1px solid rgba(90,210,200,0.35);
+  }
+  .info:hover .tip, .info:focus-visible .tip{opacity:1;visibility:visible;transform:translateX(-50%) translateY(-2px);}
+
+  /* ---- 순위 행 ---- */
+  .row{display:flex;align-items:center;gap:11px;padding:7px 0;}
+  .row + .row{border-top:1px solid rgba(90,210,200,0.08);}
+  .rank{
+    flex:none;width:22px;height:22px;border-radius:7px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:800;color:var(--gray);
+    background:rgba(255,255,255,0.05);border:1px solid var(--line);
+  }
+  .row:first-of-type .rank{color:#062421;background:linear-gradient(135deg,#2fd9c4,#1fb8a8);border-color:transparent;}
+  .who{flex:1;min-width:0;}
+  .who .nm{font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .who .cr{font-size:11px;color:var(--gray);}
+  .bar{flex:none;width:54px;}
+  .bar .track{height:6px;border-radius:4px;background:rgba(255,255,255,0.07);overflow:hidden;}
+  .bar .fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#1fb8a8,#5fe6d6);}
+  .val{flex:none;width:58px;text-align:right;font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;}
+
+  footer{
+    margin-top:40px;font-size:12px;color:rgba(143,178,174,0.7);
+    text-align:center;line-height:1.7;
+  }
+  footer a{color:var(--mint-2);text-decoration:none;}
+  footer a:hover{text-decoration:underline;}
+
+  @media (max-width:560px){
+    body{padding:28px 14px 44px;}
+    .hero h1{font-size:24px;}
+    .bar{width:64px;}
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+
+    <div class="top">
+      <a class="back" href="index.html">← 도구 모음</a>
+    </div>
+
+    <div class="hero">
+      <h1>AI 모델 지표</h1>
+      <p>Artificial Analysis 독립 벤치마크 기반. 원장님 업무(코딩 툴 제작·장문 법률/의료 분석·차트 판독·서면 작성)에 직결되는 6개 지표를 지표별 상위 모델 순으로 봅니다.</p>
+      <div class="meta">
+        <span id="updated">최종 갱신: —</span>
+        <span id="version"></span>
+        <span>데이터 출처: <a href="https://artificialanalysis.ai/" target="_blank" rel="noopener">Artificial Analysis</a></span>
+      </div>
+    </div>
+
+    <div class="banner hide" id="banner"></div>
+    <div class="err hide" id="err"></div>
+
+    <div class="grid" id="grid"></div>
+
+    <footer>
+      벤치마크 데이터 © <a href="https://artificialanalysis.ai/" target="_blank" rel="noopener">Artificial Analysis</a> ·
+      화면 © 2026 Jung · 아산정플란트치과<br>
+      각 지표 제목 옆 <b>ⓘ</b>에 마우스를 올리면 설명이 나옵니다.
+    </footer>
+
+  </div>
+
+<script>
+// ── 6개 지표 정의 (key = aa-metrics.json 필드, info = ⓘ 설명) ──────────────
+const METRICS = [
+  {
+    key:'coding_index',
+    title:'Coding Agent Index',
+    sub:'코딩 · 엔드투엔드 SW 작업',
+    fmt:v=>v.toFixed(1),
+    info:`단순 코드 생성이 아니라 "끝까지 스스로 완성하는" 엔드투엔드 소프트웨어 작업 평가입니다. Claude Code로 스킬을 만들고 디버깅하는 작업, 파노라마 주석 툴 같은 HTML 툴 제작에 가장 직결되는 지표입니다. (DeepSWE + Terminal-Bench v2 + SWE-Atlas 종합 계열, coding-index)`
+  },
+  {
+    key:'aa_lcr',
+    title:'AA-LCR',
+    sub:'장문 맥락 추론',
+    fmt:v=>(v*100).toFixed(1)+'%',
+    info:`긴 입력을 끝까지 놓치지 않는 능력입니다. 169페이지 SureSmile 가이드 번역, 노동위 사건 전체 기록 분석, 하루치 예약 차트를 한 번에 읽는 브리핑 같은 작업. 초심 판정문·녹취록·기록을 모두 읽고 문서 간 모순 없이 일관된 사실관계를 재구성하는 능력으로, 상대 주장의 허점을 찾는 데도 쓰입니다.`
+  },
+  {
+    key:'mmmu_pro',
+    title:'MMMU-Pro',
+    sub:'시각 추론',
+    fmt:v=>(v*100).toFixed(1)+'%',
+    info:`스크린샷·차트·이미지 기반 시각 추론입니다. DentWeb 차트를 읽고 파노라마·세팔로 사진을 해석하는 원장님 워크플로우에서 사실상 가장 중요한 지표 중 하나입니다. 이 점수가 낮은 모델은 차트 오독 위험이 큽니다. (텍스트 전용 모델은 값이 없을 수 있음)`
+  },
+  {
+    key:'non_hallucination_rate',
+    title:'AA-Omniscience 비환각률',
+    sub:'모르면 모른다고 답하는 능력',
+    fmt:v=>(v*100).toFixed(1)+'%',
+    info:`그럴듯한 오답을 지어내지 않는 능력입니다. 의료·법률에서는 자신 있게 틀린 답이 가장 위험합니다 — 존재하지 않는 판례·사건번호·근로기준법 조항을 그럴듯하게 인용하면 서면 전체의 신뢰가 무너집니다. 임상 감별·법률 자문 용도에선 순수 지능 점수보다 이 값이 더 중요할 수 있습니다.`
+  },
+  {
+    key:'gdpval',
+    title:'GDPval-AA',
+    sub:'실제 직업 업무 산출물',
+    fmt:v=>(v*100).toFixed(1)+'%',
+    info:`변호사·회계사 등 전문직의 실제 업무 결과물을 사람이 선호 평가한 지표라 "서면으로서의 완성도"에 가장 근접한 대리지표입니다. 진정서 작성, 취업규칙 정리, 규제기관 제출 문서 같은 실무 지식노동 산출물의 품질을 반영합니다. 병렬 나열이 아닌 서사형 논증의 설득력·짜임새를 부분적으로 반영합니다.`
+  },
+  {
+    key:'hle',
+    title:"Humanity's Last Exam",
+    sub:'고난도 종합 추론',
+    fmt:v=>(v*100).toFixed(1)+'%',
+    info:`법리 구성은 결국 여러 사실을 하나의 일관된 행위 패턴으로 엮는 추론 작업입니다. 겸업 운영 + 외주업자 개입을 통합된 행위로 프레이밍하는 식의 논리 설계력은 이런 최상위 추론 지표와 상관이 높습니다. GPQA는 과학 편중이라 이쪽이 더 적합합니다.`
+  }
+];
+
+const TOP_N = 5;
+
+function esc(s){ const d=document.createElement('div'); d.textContent=(s==null?'':String(s)); return d.innerHTML; }
+
+function render(payload){
+  const models = Array.isArray(payload.models) ? payload.models : [];
+
+  // 갱신 정보
+  const up = document.getElementById('updated');
+  if(payload.generated_at){
+    const d = new Date(payload.generated_at);
+    up.textContent = isNaN(d) ? ('최종 갱신: ' + payload.generated_at)
+      : ('최종 갱신: ' + d.toLocaleString('ko-KR'));
+  }
+  if(payload.intelligence_index_version){
+    document.getElementById('version').textContent = 'Intelligence Index v' + payload.intelligence_index_version;
+  }
+  const banner = document.getElementById('banner');
+  if(payload.manual){
+    const src = payload.source ? (' 출처: ' + esc(payload.source) + '.') : '';
+    banner.innerHTML = '이 표는 <b>Artificial Analysis 공개 리더보드</b>를 손으로 정리한 스냅샷입니다 (실시간 자동 아님).' + src + ' 최신값으로 다시 채우려면 정용태 원장님이 “지표 갱신해줘”라고 하면 됩니다.';
+    banner.classList.remove('hide');
+  } else if(payload.placeholder){
+    banner.innerHTML = '⚠️ 지금은 <b>예시 데이터</b>입니다.';
+    banner.classList.remove('hide');
+  }
+
+  const grid = document.getElementById('grid');
+  grid.innerHTML = METRICS.map(m=>{
+    const ranked = models
+      .filter(x => x[m.key] !== null && x[m.key] !== undefined && !isNaN(x[m.key]))
+      .sort((a,b)=> b[m.key] - a[m.key])
+      .slice(0, TOP_N);
+
+    const max = ranked.length ? ranked[0][m.key] : 1;
+
+    const rows = ranked.length ? ranked.map((x,i)=>{
+      const pct = max>0 ? Math.max(4, (x[m.key]/max)*100) : 0;
+      return `<div class="row">
+        <div class="rank">${i+1}</div>
+        <div class="who"><div class="nm" title="${esc(x.name)}">${esc(x.name)}</div><div class="cr">${esc(x.creator||'')}</div></div>
+        <div class="bar"><div class="track"><div class="fill" style="width:${pct.toFixed(0)}%"></div></div></div>
+        <div class="val">${m.fmt(x[m.key])}</div>
+      </div>`;
+    }).join('') : `<div class="cr" style="padding:8px 0;color:var(--gray)">측정된 모델이 없습니다.</div>`;
+
+    return `<div class="block">
+      <h2>${esc(m.title)} <span class="info" tabindex="0">ⓘ<span class="tip">${esc(m.info)}</span></span></h2>
+      <p class="sub">${esc(m.sub)}</p>
+      ${rows}
+    </div>`;
+  }).join('');
+}
+
+fetch('aa-metrics.json', {cache:'no-store'})
+  .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+  .then(render)
+  .catch(e=>{
+    const el = document.getElementById('err');
+    el.innerHTML = '데이터를 불러오지 못했습니다 (' + esc(e.message) + '). ' +
+      'GitHub Pages에 <code>aa-metrics.json</code>이 배포되어 있는지 확인하세요. (로컬 file://로 열면 브라우저 보안상 막힐 수 있어 GitHub Pages 주소로 확인하세요.)';
+    el.classList.remove('hide');
+  });
+</script>
+</body>
+</html>
