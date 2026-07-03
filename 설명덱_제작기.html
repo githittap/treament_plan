@@ -227,6 +227,7 @@
         <button class="btn ghost" id="newBtn"><span class="ico">✦</span>새로</button>
         <button class="btn ghost" id="loadBtn"><span class="ico">↥</span>불러오기</button>
         <button class="btn ghost" id="saveBtn"><span class="ico">❒</span>저장</button>
+        <button class="btn ghost" id="tutorialBtn"><span class="ico">📖</span>튜토리얼</button>
         <button class="btn ghost" id="helpBtn2">?</button>
         <button class="btn primary" id="exportBtn"><span class="ico">↧</span>발표 파일 만들기</button>
       </div>
@@ -811,7 +812,7 @@ render(!!BOOT.atEnd);
 const q = s => document.querySelector(s);
 const B = {
   deckName:q('#deckName'), newBtn:q('#newBtn'), loadBtn:q('#loadBtn'), saveBtn:q('#saveBtn'),
-  helpBtn:q('#helpBtn2'), exportBtn:q('#exportBtn'), slideList:q('#slideList'), slideCount:q('#slideCount'),
+  helpBtn:q('#helpBtn2'), exportBtn:q('#exportBtn'), tutorialBtn:q('#tutorialBtn'), slideList:q('#slideList'), slideCount:q('#slideCount'),
   addBtn:q('#addSlideBtn'), typeBadge:q('#typeBadge'), miniActions:q('#miniActions'), editor:q('#editor'),
   pvPrev:q('#pvPrev'), pvLab:q('#pvLab'), pvNext:q('#pvNext'), pvReset:q('#pvReset'), frame:q('#previewFrame'),
   picker:q('#picker'), fileInput:q('#fileInput'), toast:q('#toast'), help:q('#helpOverlay'), closeHelp:q('#closeHelp2'),
@@ -861,6 +862,101 @@ function starterDeck(){
      nodes:[{id:id(), label:'중심 주제', sub:'허브', hub:true, step:0},
             {id:id(), label:'가지 1', step:1},{id:id(), label:'가지 2', step:2},{id:id(), label:'가지 3', step:3}],
      note:{text:'발표 중 상자를 마우스로 끌어 옮길 수 있어요.', step:1, tone:'gold'}}
+  ]};
+}
+/* ---- 기본 탑재 튜토리얼 덱 (모든 슬라이드 종류·기능 시연) ---- */
+function tutorialDeck(){
+  return {meta:{title:'설명덱 제작기 · 사용법 튜토리얼'}, slides:[
+    {type:'cover',
+     title:'설명덱 제작기 3분 사용법',
+     subtitle:'코딩 없이, 클릭 한 번으로 넘어가는 발표를 만드는 도구입니다. 이 튜토리얼이 모든 기능을 한 바퀴 보여줘요.',
+     hint:'화면을 클릭하거나 → 키로 넘겨보세요',
+     motif:['추가','작성','완성']},
+
+    {type:'statement', kicker:'한눈에', title:'이 도구가 하는 일',
+     lines:[
+       {text:'개념을 <b>한 장에 하나씩</b>, 요소는 클릭할 때마다 하나씩 나타나게 합니다.', step:0, small:false},
+       {text:'그래서 듣는 사람이 <b>지금 이 부분</b>에만 집중하게 돼요.', step:1, small:false},
+       {text:'완성하면 인터넷 없이 더블클릭으로 열리는 발표 파일이 됩니다.', step:2, small:true}
+     ]},
+
+    {type:'diagram', kicker:'화면 구성', title:'세 개의 칸으로 되어 있어요', layout:'force',
+     nodes:[
+       {id:id(), label:'설명덱 제작기', sub:'가운데가 중심', hub:true, step:0},
+       {id:id(), label:'① 슬라이드 목록', sub:'왼쪽 · 장 추가·정렬', tag:'왼쪽', role:'desk', step:1},
+       {id:id(), label:'② 편집', sub:'가운데 · 내용 입력', tag:'가운데', step:2},
+       {id:id(), label:'③ 미리보기', sub:'오른쪽 · 실시간 발표', tag:'오른쪽', role:'same', step:3}
+     ],
+     note:{text:'움직이는 그래프예요 — 발표 중 상자를 <b>마우스로 끌어</b> 옮길 수 있어요.', step:1, tone:'gold'}},
+
+    {type:'checklist', kicker:'순서', title:'만드는 법은 딱 3단계',
+     items:[
+       {text:'<b>추가</b> — 왼쪽 아래 ＋ 슬라이드 추가에서 종류를 고릅니다.', step:0},
+       {text:'<b>작성</b> — 가운데 칸을 타이핑하면 오른쪽에 바로 그려집니다.', step:1},
+       {text:'<b>내보내기</b> — 오른쪽 위 발표 파일 만들기를 누릅니다.', step:2}
+     ],
+     note:{text:'저장은 이 브라우저에 임시 보관(이어하기용), 발표 파일 만들기는 남에게 줄 완성본이에요.', step:3, tone:''}},
+
+    {type:'table', kicker:'핵심 개념', title:'등장 순서 = 클릭 몇 번째에 나올지',
+     head:['등장 순서','언제 보이나'],
+     rows:[
+       {cells:['0','장을 열자마자 바로'], step:0, hub:true},
+       {cells:['1','한 번 클릭하면'], step:1, hub:false},
+       {cells:['2','두 번 클릭하면'], step:2, hub:false}
+     ]},
+
+    {type:'diagram', kicker:'슬라이드 종류', title:'6가지 중에서 고르면 돼요', layout:'radial',
+     nodes:[
+       {id:id(), label:'슬라이드 종류', hub:true, step:0},
+       {id:id(), label:'표지', sub:'첫 장', step:1},
+       {id:id(), label:'요약', sub:'핵심 문장', step:1},
+       {id:id(), label:'도표', sub:'관계도', step:1},
+       {id:id(), label:'표', sub:'행·열 정리', step:1},
+       {id:id(), label:'비교', sub:'좌우 대조', step:1},
+       {id:id(), label:'체크', sub:'번호 목록', step:1}
+     ],
+     note:{text:'방사형 배치 — 중심 상자 둘레로 자동 정렬되고 연결선이 그려져요.', step:0, tone:''}},
+
+    {type:'compare', kicker:'헷갈리기 쉬움', title:'저장 vs 발표 파일 만들기',
+     left:{head:'저장', items:['이 브라우저에만 보관','다음에 불러오기로 이어서 작업','나만 봄'], step:0, tone:'muted'},
+     right:{head:'발표 파일 만들기', items:['HTML 파일로 내려받음','더블클릭이면 인터넷 없이 열림','남에게 보여줄 완성본'], step:1, tone:'accent'},
+     note:{text:'발표 전에는 꼭 발표 파일 만들기로 완성본을 뽑아두세요.', step:2, tone:'warn'}},
+
+    {type:'diagram', kicker:'상단 버튼', title:'맨 위 줄 버튼 안내', layout:'grid',
+     nodes:[
+       {id:id(), label:'새로', sub:'처음부터', step:0},
+       {id:id(), label:'불러오기', sub:'저장·파일 열기', step:1},
+       {id:id(), label:'저장', sub:'임시 보관', step:2},
+       {id:id(), label:'발표 파일 만들기', sub:'완성본 내보내기', role:'desk', step:3}
+     ],
+     note:{text:'격자 배치 — 상자들이 바둑판처럼 정렬돼요(연결선 없음).', step:0, tone:''}},
+
+    {type:'table', kicker:'정리', title:'어떤 종류를 언제 쓸까',
+     head:['슬라이드','이럴 때'],
+     rows:[
+       {cells:['표지','발표 제목·소개'], step:0, hub:false},
+       {cells:['요약','핵심 메시지 나열'], step:0, hub:false},
+       {cells:['도표','원인·구조·관계 설명'], step:0, hub:true},
+       {cells:['표','수치·항목 비교'], step:0, hub:false},
+       {cells:['비교','두 선택지 대조'], step:0, hub:false},
+       {cells:['체크','순서·주의사항 목록'], step:0, hub:false}
+     ]},
+
+    {type:'diagram', kicker:'고급', title:'자유 배치도 됩니다', layout:'free',
+     nodes:[
+       {id:id(), label:'원인', role:'desk', step:0, x:20, y:32},
+       {id:id(), label:'결과', step:1, x:76, y:32},
+       {id:id(), label:'해결', hub:true, step:2, x:50, y:74}
+     ],
+     note:{text:'각 상자의 가로 x·세로 y(0~100)를 직접 넣어 원하는 자리에 둘 수 있어요.', step:0, tone:'gold'}},
+
+    {type:'checklist', kicker:'이제', title:'직접 만들어 볼까요',
+     items:[
+       {text:'왼쪽 ＋ 슬라이드 추가로 첫 장을 넣어 보세요.', step:0},
+       {text:'가운데 칸을 채우면 오른쪽에 바로 나타나요.', step:1},
+       {text:'이 튜토리얼은 위 📖 튜토리얼 버튼으로 언제든 다시 열 수 있어요.', step:2}
+     ],
+     note:{text:'완전히 새로 시작하려면 위 ✦새로 버튼을 누르세요.', step:3, tone:'gold'}}
   ]};
 }
 function normalize(d){
@@ -1167,6 +1263,7 @@ function loadDeck(data){ if(!data || !Array.isArray(data.slides)) throw new Erro
 B.deckName.addEventListener('input', ()=>{ deck.meta.title=B.deckName.value; schedulePreview(); });
 B.saveBtn.onclick=()=>{ try{ localStorage.setItem(LS_KEY, JSON.stringify(deck)); toast('저장했어요 — 이 브라우저에서 이어서 작업할 수 있어요'); }catch(e){ toast('저장 실패 (용량 초과일 수 있어요)','err'); } };
 B.newBtn.onclick=()=>{ if(deck.slides.length && !confirm('지금 내용을 지우고 새로 시작할까요?\n(저장·내보내기 안 한 변경은 사라집니다)')) return; deck=starterDeck(); sel=0; B.deckName.value=deck.meta.title; renderAll(); bootPreview(); scheduleAutosave(); toast('새 덱을 시작했어요'); };
+B.tutorialBtn.onclick=()=>{ if(deck.slides.length && !confirm('지금 내용을 지우고 사용법 튜토리얼을 열까요?\n(저장·내보내기 안 한 변경은 사라집니다)')) return; deck=normalize(tutorialDeck()); sel=0; B.deckName.value=deck.meta.title; renderAll(); bootPreview(); scheduleAutosave(); toast('튜토리얼을 불러왔어요'); };
 B.loadBtn.onclick=()=> B.fileInput.click();
 B.fileInput.onchange=()=>{
   const f=B.fileInput.files&&B.fileInput.files[0]; if(!f) return;
@@ -1197,7 +1294,7 @@ B.help.addEventListener('click', e=>{ if(e.target===B.help) B.help.classList.rem
   buildPicker();
   let restored=null;
   try{ const raw=localStorage.getItem(LS_KEY); if(raw){ const p=JSON.parse(raw); if(p && Array.isArray(p.slides) && p.slides.length) restored=p; } }catch(_){}
-  deck = restored ? normalize(restored) : starterDeck();
+  deck = restored ? normalize(restored) : normalize(tutorialDeck());
   sel=0; B.deckName.value=deck.meta.title||'';
   renderAll(); bootPreview();
 })();
