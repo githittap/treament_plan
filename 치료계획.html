@@ -903,7 +903,7 @@ let treatTypes = [
   {id:'ca',          label:'CA',      shape:'ca',   color:'#d4150f'},
   {id:'ongoing',     label:'진행중',  shape:'area', interaction:'area', fill:'rgba(59,130,246,0.15)', stroke:'#2563eb', skipPopup:true},
   {id:'done',        label:'완료',    shape:'area', interaction:'area', fill:'rgba(34,197,94,0.15)',  stroke:'#16a34a', skipPopup:true},
-  {id:'hold',        label:'설명X',   shape:'area', interaction:'area', fill:'rgba(245,158,11,0.11)', stroke:'#d97706', skipPopup:true},
+  {id:'hold',        label:'설명X',   boxLabel:'계획만\n설명X', shape:'area', interaction:'area', fill:'rgba(245,158,11,0.077)', stroke:'#d97706', skipPopup:true},
   {id:'need',        label:'치료필요', shape:'area', interaction:'area', fill:'rgba(239,68,68,0.15)',  stroke:'#dc2626', skipPopup:true},
   {id:'tempset',     label:'T/S',     shape:'area', interaction:'area', fill:'rgba(14,165,233,0.22)', stroke:'#0284c7', skipPopup:true},
   {id:'permset',     label:'F/S',     shape:'area', interaction:'area', fill:'rgba(16,185,129,0.22)', stroke:'#059669', skipPopup:true},
@@ -1834,7 +1834,7 @@ function drawShapeForAnn(c,a){
   }
 }
 
-function buildLabel(a){
+function buildLabel(a, vertical){
   if(a.noLabel) return '';
   const t = treatTypes.find(tt=>tt.id===a.treatId) || {label:'?'};
   let main = HIDE_NAME.has(a.treatId) ? '' : t.label;
@@ -1844,7 +1844,11 @@ function buildLabel(a){
   if(a.periods && a.periods.length) extras.push(...a.periods);
   if(a.surface) extras.push(a.surface);
   if(a.note) extras.push(a.note);
-  if(extras.length) main += (main?' ':'') + '(' + extras.join(', ') + ')';
+  if(extras.length){
+    main += vertical
+      ? (main?'\n':'') + extras.join('\n')
+      : (main?' ':'') + '(' + extras.join(', ') + ')';
+  }
   return main.trim();
 }
 
@@ -1909,7 +1913,7 @@ function redraw(){
     } else if(a.type==='tooth'){
       const info = drawShapeForAnn(ctx, a);
       if(!a.noLabel){
-        const label = buildLabel(a);
+        const label = buildLabel(a, true);
         const fontSize = Math.max(10, a.size*0.204*1.35);
         const gap = a.size*0.15;
         const dir = implantDir(a.toothNum);
@@ -1924,21 +1928,22 @@ function redraw(){
       ctx.strokeStyle=t.stroke; ctx.lineWidth=Math.max(2, baseUnit()*sizeSliderVal*0.08); ctx.setLineDash([8,5]);
       ctx.strokeRect(rx,ry,rw,rh);
       // 텍스트를 박스 내부에 비례하게 그리기
-      const areaLabel = t.label || buildLabel(a) || '';
+      const areaLabel = t.boxLabel || t.label || buildLabel(a) || '';
       if(areaLabel && rw>30 && rh>20){
+        const lines = String(areaLabel).split('\n');
         ctx.setLineDash([]);
         let fs = Math.min(rw, rh)*0.55;
         const fsCap = baseUnit()*sizeSliderVal*0.85;  // 글자 최대 크기 — 박스가 더 커져도 글자는 고정
         fs = Math.min(fs, fsCap);
         ctx.font = `800 ${fs}px sans-serif`;
-        const tw = ctx.measureText(areaLabel).width;
+        const tw = Math.max(...lines.map(l=>ctx.measureText(l).width));
         if(tw > rw*0.88) fs = fs*(rw*0.88/tw);
         fs = Math.max(12, fs);
         ctx.font = `800 ${fs}px sans-serif`;
         ctx.fillStyle = t.stroke;
         ctx.shadowColor = 'rgba(0,0,0,0.15)'; ctx.shadowBlur = 4;
         ctx.textAlign='center'; ctx.textBaseline='top';  // 상단 정렬: 좌우중앙 + 맨위
-        ctx.fillText(areaLabel, rx+rw/2, ry + fs*0.28);
+        lines.forEach((line,i)=>{ ctx.fillText(line, rx+rw/2, ry + fs*0.28 + i*fs*1.1); });
         ctx.shadowBlur=0;
       }
       ctx.restore();
@@ -2146,7 +2151,7 @@ function buildOptionsFields(container, kind, state, refresh){
     container.appendChild(capt2);
     const periodWrap = document.createElement('div');
     periodWrap.className='opt-grid';
-    ['발즉','1M후','2M후','3M후','4M후','5M후','6M후','언제든지'].forEach(p=>{
+    ['발즉','1M후','6주후','2M후','3M후','4M후','5M후','6M후','언제든지'].forEach(p=>{
       const b=document.createElement('button');
       b.type='button';
       b.className='opt-btn'+(state.periods.includes(p)?' sel':'');
