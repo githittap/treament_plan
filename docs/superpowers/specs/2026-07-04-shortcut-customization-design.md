@@ -122,7 +122,7 @@ function activeKeymap(){ /* def 병합 + localStorage 오버라이드 */ }
   - `Delete`/`Backspace` = 그 기능을 '미지정'으로 비움.
   - 글자(a–z)·숫자(0–9)만 허용. 그 외(F1, Space 등)·시스템 예약키는 거부 + 짧은 안내.
 - **충돌**: 누른 키를 이미 다른 기능이 쓰면 → `confirm("그 키는 'RCT'가 쓰는 중. 바꿀까요?")` → 예: 새 기능이 키 획득, 기존 기능 '미지정'(빨강).
-- 변경 즉시 `localStorage` 저장 + 배지·버전 뱃지 재렌더.
+- 변경 즉시 `localStorage` 저장 + 관련 배지 재렌더 (설정창 배지 · 치료종류 버튼 배지).
 
 ## 범위 밖 (Out of scope)
 
