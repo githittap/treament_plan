@@ -1215,6 +1215,55 @@ function shapeGlyph(shape){
   if(shape==='area') return '▭';
   return '●';
 }
+// ===== 단축키 커스터마이즈 코어 =====
+const SHORTCUT_ACTIONS = [
+  { id:'mode_select', group:'모드', label:'선택/이동 모드', def:'A', run:()=>toggleSelectMode() },
+  { id:'mode_text',   group:'모드', label:'텍스트 모드',   def:'T', run:()=>toggleTextMode() },
+  { id:'mode_erase',  group:'모드', label:'지우개 모드',   def:'E', run:()=>toggleEraseMode() },
+  { id:'mode_batch',  group:'모드', label:'다중배치 토글', def:'R', run:()=>{ const t=document.getElementById('batchToggle'); if(t){ t.checked=!t.checked; t.dispatchEvent(new Event('change')); } } },
+  { id:'act_copyall', group:'모드', label:'이미지+FDI 합성복사', def:'B', run:()=>{ const b=document.getElementById('copyAllBtn'); if(b) b.click(); } },
+  { id:'treat_implant',    group:'치료종류', label:'임플란트', def:'2', treatId:'implant',    run:()=>selectTreat('implant') },
+  { id:'treat_inlay',      group:'치료종류', label:'인레이',   def:'I', treatId:'inlay',      run:()=>selectTreat('inlay') },
+  { id:'treat_resin',      group:'치료종류', label:'레진',     def:'F', treatId:'resin',      run:()=>selectTreat('resin') },
+  { id:'treat_core_crown', group:'치료종류', label:'코어Cr.',  def:'C', treatId:'core_crown', run:()=>selectTreat('core_crown') },
+  { id:'treat_ongoing',    group:'치료종류', label:'진행중',   def:'W', treatId:'ongoing',    run:()=>selectTreat('ongoing') },
+  { id:'treat_done',       group:'치료종류', label:'완료',     def:'D', treatId:'done',       run:()=>selectTreat('done') },
+  { id:'treat_hold',       group:'치료종류', label:'설명X',    def:'H', treatId:'hold',       run:()=>selectTreat('hold') },
+  { id:'treat_need',       group:'치료종류', label:'치료필요', def:'N', treatId:'need',       run:()=>selectTreat('need') },
+  { id:'treat_tempset',    group:'치료종류', label:'T/S 임시접착', def:'S', treatId:'tempset', run:()=>selectTreat('tempset') },
+  { id:'treat_permset',    group:'치료종류', label:'F/S 영구접착', def:'P', treatId:'permset', run:()=>selectTreat('permset') },
+  { id:'sticker_extraction', group:'스티커', label:'발치', def:'X', run:()=>selectSticker('extraction') },
+  { id:'sticker_pontic',     group:'스티커', label:'폰틱', def:'3', treatId:'pontic', run:()=>selectSticker('pontic') },
+  { id:'sticker_rct',        group:'스티커', label:'RCT',  def:'V', run:()=>selectSticker('rct') },
+  { id:'sticker_gbr',        group:'스티커', label:'GBR',  def:'G', run:()=>selectSticker('gbr') },
+  { id:'pen_mark',    group:'펜/표시', label:'표시(빨간펜)', def:'M', run:()=>selectPenTool('mark') },
+  { id:'pen_connect', group:'펜/표시', label:'연결선',       def:'L', run:()=>selectPenTool('connect') },
+  { id:'pen_line',    group:'펜/표시', label:'직선',         def:'K', run:()=>selectPenTool('line') },
+  { id:'pen_arrow',   group:'펜/표시', label:'화살표',       def:'J', run:()=>selectPenTool('arrow') },
+  { id:'pen_rect',    group:'펜/표시', label:'자유 네모',    def:'U', run:()=>selectPenTool('rect') },
+];
+const SHORTCUT_STORE_KEY = 'treatplan_shortcuts_v1';
+const SHORTCUT_GROUP_ORDER = ['모드','치료종류','스티커','펜/표시'];
+function normalizeShortcutKey(k){
+  if(typeof k!=='string' || k.length!==1) return null;
+  if(/[a-z]/i.test(k)) return k.toUpperCase();
+  if(/[0-9]/.test(k)) return k;
+  return null;
+}
+function shortcutDefaults(){ const m={}; SHORTCUT_ACTIONS.forEach(a=>{ m[a.id]=a.def; }); return m; }
+function mergeShortcutKeymap(defaults, overrides){ return Object.assign({}, defaults, overrides); }
+function findShortcutConflict(keymap, key, exceptId){
+  return Object.keys(keymap).find(id=>id!==exceptId && keymap[id]===key) || null;
+}
+function loadShortcutOverrides(){
+  try{ const raw=localStorage.getItem(SHORTCUT_STORE_KEY); return raw ? JSON.parse(raw) : {}; }
+  catch(e){ return {}; }
+}
+function saveShortcutOverrides(ov){ try{ localStorage.setItem(SHORTCUT_STORE_KEY, JSON.stringify(ov)); }catch(e){} }
+function activeShortcutKeymap(){ return mergeShortcutKeymap(shortcutDefaults(), loadShortcutOverrides()); }
+function setShortcutOverride(actionId, key){ const ov=loadShortcutOverrides(); ov[actionId]=key; saveShortcutOverrides(ov); }
+function resetShortcuts(){ try{ localStorage.removeItem(SHORTCUT_STORE_KEY); }catch(e){} }
+// ===== /단축키 코어 =====
 const TREAT_SHORTCUTS = {
   'implant':'2', 'pontic':'3',
   'core_crown':'C', 'inlay':'I', 'resin':'F',
