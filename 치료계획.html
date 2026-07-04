@@ -2585,16 +2585,46 @@ function openDenturePopup(evt){
 
   const confirmFn = ()=>{
     const text = buildDentureLabel();
-    if(!text){ closePopup(); return; }
-    const fontSize = Math.max(14, baseUnit()*sizeSliderVal*0.34);
-    const lines = text.split('\n').length;
-    const boxH = lines*fontSize*1.35 + fontSize*0.35*2;
-    const x = naturalW/2 - 20;  // drawYellowLabel: cx = x + 20 → 박스 가로중앙 정렬
-    const y = state.arch==='상악'
-      ? naturalH*0.03
-      : naturalH - boxH - naturalH*0.03;
+    const drawKinds = ['CD','RPD','IARPD','IOD'];
+    const makeArch = drawKinds.includes(state.kind);
+    if(!text && !makeArch){ closePopup(); return; }
     pushUndo();
-    annotations.push({id:idSeq++, type:'text', x, y, text, fontSize});
+
+    // 1) 도식(denturearch) 주석
+    let archH = 0, ay = 0;
+    const archW = naturalW*0.42;
+    if(makeArch){
+      archH = archW*0.28;
+      const nums = dentureArchNums(state.arch);
+      const states = {};
+      if(state.kind==='CD'){ nums.forEach(n=>{ states[n]='miss'; }); }
+      else { nums.forEach(n=>{ const s=state.states[n]; if(s && s!=='nat') states[n]=s; }); }
+      const ax = naturalW/2 - archW/2;
+      ay = state.arch==='상악' ? naturalH*0.02 : naturalH - archH - naturalH*0.02;
+      annotations.push({
+        id:idSeq++, type:'denturearch',
+        arch:state.arch, kind:state.kind,
+        attach: state.kind==='IOD' ? (state.attach||'loc') : null,
+        states, x:ax, y:ay, scale:1
+      });
+    }
+
+    // 2) 글자 라벨(type:'text') — 기존 동작 유지, 도식과 겹치지 않게 배치
+    if(text){
+      const fontSize = Math.max(14, baseUnit()*sizeSliderVal*0.34);
+      const lines = text.split('\n').length;
+      const boxH = lines*fontSize*1.35 + fontSize*0.35*2;
+      const x = naturalW/2 - 20;
+      let y;
+      if(state.arch==='상악'){
+        y = (makeArch ? (ay + archH + naturalH*0.02) : naturalH*0.03);
+      } else {
+        y = (makeArch ? (ay - boxH - naturalH*0.02) : (naturalH - boxH - naturalH*0.03));
+      }
+      y = Math.max(4, Math.min(y, naturalH - boxH - 4));
+      annotations.push({id:idSeq++, type:'text', x, y, text, fontSize});
+    }
+
     closePopup(); redraw(); renderAnnList();
   };
   div.addEventListener('keydown', ev=>{
