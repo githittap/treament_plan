@@ -2440,7 +2440,7 @@ const DENTURE_KINDS = [
 ];
 function openDenturePopup(evt){
   closePopup();
-  const state = { arch:'상악', kind:'CD', f:{} };  // f: 조건부 입력값
+  const state = { arch:'상악', kind:'CD', f:{}, states:{}, attach:'loc' };  // f: 조건부 입력값
   const div = document.createElement('div');
   div.className='mini-popup';
   div.style.minWidth='260px';
@@ -2451,6 +2451,8 @@ function openDenturePopup(evt){
     <div class="opt-hint">종류</div>
     <div class="opt-grid" id="dKind"></div>
     <div id="dFields"></div>
+    <div class="opt-hint">치아 상태 <span style="font-weight:400;color:#94a3b8;">(클릭할 때마다: 자연치→Sur.Cr→I-Sur.Cr→결손)</span></div>
+    <div id="dMiniArch" style="position:relative;width:236px;height:66px;margin:2px auto 4px;background:#0f172a;border-radius:8px;"></div>
     <div class="btns">
       <button class="small-btn" id="popCancel">취소</button>
       <button class="small-btn" id="popConfirm" style="background:var(--navy);color:#fff;border-color:var(--navy);">확인(Enter)</button>
@@ -2465,7 +2467,7 @@ function openDenturePopup(evt){
   ['상악','하악'].forEach(a=>{
     const b=document.createElement('button');
     b.type='button'; b.className='opt-btn'+(state.arch===a?' sel':''); b.textContent=a;
-    b.addEventListener('click', ()=>{ state.arch=a; archWrap.querySelectorAll('.opt-btn').forEach(x=>x.classList.remove('sel')); b.classList.add('sel'); });
+    b.addEventListener('click', ()=>{ state.arch=a; archWrap.querySelectorAll('.opt-btn').forEach(x=>x.classList.remove('sel')); b.classList.add('sel'); renderMini(); });
     archWrap.appendChild(b);
   });
 
@@ -2500,10 +2502,44 @@ function openDenturePopup(evt){
   DENTURE_KINDS.forEach(k=>{
     const b=document.createElement('button');
     b.type='button'; b.className='opt-btn'+(state.kind===k.id?' sel':''); b.textContent=k.label;
-    b.addEventListener('click', ()=>{ state.kind=k.id; kindWrap.querySelectorAll('.opt-btn').forEach(x=>x.classList.remove('sel')); b.classList.add('sel'); refreshFields(); });
+    b.addEventListener('click', ()=>{ state.kind=k.id; kindWrap.querySelectorAll('.opt-btn').forEach(x=>x.classList.remove('sel')); b.classList.add('sel'); refreshFields(); renderMini(); });
     kindWrap.appendChild(b);
   });
   refreshFields();
+
+  const miniWrap = div.querySelector('#dMiniArch');
+  const MINI_FILL = {nat:'#ffffff', sur:'#16a34a', imp:'#0d9488'};
+  const MINI_BORDER = {nat:'#94a3b8', sur:'#15803d', imp:'#0f766e', miss:'#9ca3af'};
+  function renderMini(){
+    miniWrap.innerHTML='';
+    const nums = dentureArchNums(state.arch);
+    const upper = (state.arch==='상악');
+    const W=236, H=60, R=11;
+    const layout = dentureArchLayout(nums, W, H, upper, R*1.3, R*2.0);
+    const cd = (state.kind==='CD');
+    nums.forEach((num,i)=>{
+      const p = layout[i];
+      const st = cd ? 'miss' : (state.states[num]||'nat');
+      const t=document.createElement('div');
+      t.textContent = num;
+      t.style.cssText =
+        'position:absolute;width:'+(R*2)+'px;height:'+(R*2)+'px;border-radius:50%;'
+        +'display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;box-sizing:border-box;'
+        +'transform:translate(-50%,-50%);left:'+p.x+'px;top:'+(p.y+3)+'px;'
+        +'border:2px '+(st==='miss'?'dashed':'solid')+' '+MINI_BORDER[st]+';'
+        +'background:'+(st==='miss'?'transparent':MINI_FILL[st])+';'
+        +'color:'+(st==='sur'||st==='imp'?'#fff':(st==='miss'?'#9ca3af':'#334155'))+';'
+        +'cursor:'+(cd?'default':'pointer')+';';
+      if(!cd){
+        t.addEventListener('click', ()=>{
+          state.states[num] = dentureNextState(state.states[num]||'nat');
+          renderMini();
+        });
+      }
+      miniWrap.appendChild(t);
+    });
+  }
+  renderMini();
 
   const buildDentureLabel = ()=>{
     const k = DENTURE_KINDS.find(d=>d.id===state.kind);
