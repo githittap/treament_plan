@@ -1333,20 +1333,19 @@ function saveShortcutOverrides(ov){ try{ localStorage.setItem(SHORTCUT_STORE_KEY
 function activeShortcutKeymap(){ return mergeShortcutKeymap(shortcutDefaults(), loadShortcutOverrides()); }
 function setShortcutOverride(actionId, key){ const ov=loadShortcutOverrides(); ov[actionId]=key; saveShortcutOverrides(ov); }
 function resetShortcuts(){ try{ localStorage.removeItem(SHORTCUT_STORE_KEY); }catch(e){} }
+function shortcutKeyForTreat(treatId){
+  const km = activeShortcutKeymap();
+  const act = SHORTCUT_ACTIONS.find(a=>a.treatId===treatId);
+  return act ? (km[act.id]||'') : '';
+}
 // ===== /단축키 코어 =====
-const TREAT_SHORTCUTS = {
-  'implant':'2', 'pontic':'3',
-  'core_crown':'C', 'inlay':'I', 'resin':'F',
-  'ongoing':'W', 'done':'D', 'hold':'H', 'need':'N',
-  'tempset':'S', 'permset':'P'
-};
 function renderTreatItem(t){
   const div = document.createElement('div');
   const isActive = (t.id===activeTreatId && mode==='tooth' && !activePenTool && !activeSticker);
   const isCompact = ['ongoing','done','hold','need','tempset','permset'].includes(t.id);
   div.className = 'treat-item grid-item' + (isCompact?' compact-row':'') + (isActive?' active':'');
   const swatchColor = t.color || t.stroke || '#444';
-  const scKey = TREAT_SHORTCUTS[t.id] || '';
+  const scKey = shortcutKeyForTreat(t.id);
   // 영역 버튼(진행중·완료·보류·치료필요·T/S·F/S)은 □ 대신 단축키를 스와치에 표시
   const swatchTxt = (isCompact && scKey) ? scKey : (t.abbr || shapeGlyph(t.shape));
   const shortcut = (!isCompact && scKey) ? `<span style="display:inline-block;margin-left:3px;font-size:13px;font-weight:900;color:#fff;background:var(--navy);border-radius:5px;padding:0 5px;box-shadow:0 1px 2px rgba(0,0,0,0.25);">${scKey}</span>` : '';
