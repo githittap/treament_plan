@@ -980,6 +980,10 @@ function getAnnBounds(a){
     let bx = (a.x + (a.boxW||40)/2) - boxW/2;
     bx = Math.max(4, Math.min(bx, naturalW-boxW-4));
     return {x1:bx, y1:a.y, x2:bx+boxW, y2:a.y+boxH};
+  } else if(a.type==='denturearch'){
+    const w = naturalW * 0.42 * (a.scale||1);
+    const h = w * 0.28;
+    return {x1:a.x - 4, y1:a.y - h*0.14, x2:a.x + w + 4, y2:a.y + h*1.14};
   } else if(a.type==='free'){
     const xs=a.points.map(p=>p.x), ys=a.points.map(p=>p.y);
     return {x1:Math.min(...xs)-8, y1:Math.min(...ys)-8, x2:Math.max(...xs)+8, y2:Math.max(...ys)+8};
@@ -2139,6 +2143,9 @@ function findAnnotationNear(x,y){
     } else if(a.type==='area'){
       const rx=Math.min(a.x1,a.x2), ry=Math.min(a.y1,a.y2), rx2=Math.max(a.x1,a.x2), ry2=Math.max(a.y1,a.y2);
       if(x>=rx && x<=rx2 && y>=ry && y<=ry2) return a;
+    } else if(a.type==='denturearch'){
+      const b = getAnnBounds(a);
+      if(b && x>=b.x1 && x<=b.x2 && y>=b.y1 && y<=b.y2) return a;
     }
   }
   return null;
@@ -2671,7 +2678,7 @@ canvas.addEventListener('pointerdown', e=>{
       closePopup();
       selectedAnnId = hit.id;
       draggingAnn = hit;
-      if(hit.type==='area') hit._dragAnchor = {x,y};
+      if(hit.type==='area' || hit.type==='denturearch') hit._dragAnchor = {x,y};
       redraw();
       return;
     }
@@ -2794,6 +2801,10 @@ canvas.addEventListener('pointermove', e=>{
       draggingAnn.x1 += dx; draggingAnn.x2 += dx;
       draggingAnn.y1 += dy; draggingAnn.y2 += dy;
       draggingAnn._dragAnchor = {x,y};
+    } else if(draggingAnn.type==='denturearch'){
+      const anchor = draggingAnn._dragAnchor || {x,y};
+      draggingAnn.x += x-anchor.x; draggingAnn.y += y-anchor.y;
+      draggingAnn._dragAnchor = {x,y};
     } else {
       draggingAnn.x = x; draggingAnn.y = y;
     }
@@ -2915,6 +2926,9 @@ function eraseNear(x,y){
     } else if(a.type==='area'){
       const rx=Math.min(a.x1,a.x2), ry=Math.min(a.y1,a.y2), rx2=Math.max(a.x1,a.x2), ry2=Math.max(a.y1,a.y2);
       if(x>=rx && x<=rx2 && y>=ry && y<=ry2){ idxToRemove=i; break; }
+    } else if(a.type==='denturearch'){
+      const b = getAnnBounds(a);
+      if(b && x>=b.x1 && x<=b.x2 && y>=b.y1 && y<=b.y2){ idxToRemove=i; break; }
     } else if(a.type==='free'){
       let hit;
       if(a.rect && a.points.length>=2){
@@ -3059,6 +3073,9 @@ function renderAnnList(){
         label=(treatTypes.find(tt=>tt.id===a.treatId)||{label:'영역'}).label;
       } else if(a.type==='text'){
         label='텍스트: '+a.text.replace(/\n/g,' ').slice(0,20);
+      } else if(a.type==='denturearch'){
+        const kindLabel = (DENTURE_KINDS.find(k=>k.id===a.kind)||{label:a.kind}).label;
+        label = '틀니도식: ' + a.arch + ' ' + kindLabel;
       } else if(a.type==='free'){
         label=a.rect?'네모':a.arrow?'화살표':a.straight?'직선':(a.dash&&a.dash.length)?'연결선':'표시';
       }
