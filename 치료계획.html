@@ -2363,6 +2363,27 @@ function openTextPopup(x, y, evt, existingAnn){
   setTimeout(()=>{ const el=div.querySelector('#popText'); if(el){ el.focus(); el.select(); } }, 0);
 }
 
+const DENTURE_UP = [17,16,15,14,13,12,11,21,22,23,24,25,26,27];
+const DENTURE_LO = [47,46,45,44,43,42,41,31,32,33,34,35,36,37];
+const DENTURE_STATE_ORDER = ['nat','sur','imp','miss'];
+function dentureNextState(cur){
+  const i = DENTURE_STATE_ORDER.indexOf(cur);
+  return DENTURE_STATE_ORDER[(i+1) % DENTURE_STATE_ORDER.length];
+}
+function dentureArchNums(arch){
+  return arch==='상악' ? DENTURE_UP.slice() : DENTURE_LO.slice();
+}
+function dentureArchLayout(nums, w, h, upper, pad, tooth){
+  const n = nums.length, out = [];
+  for(let i=0;i<n;i++){
+    const t = n>1 ? i/(n-1) : 0.5;
+    const x = pad + t*(w - 2*pad);
+    const s = Math.sin(Math.PI*t);
+    const y = upper ? (h - tooth)*(1 - s) + pad*0.5 : (h - tooth)*s + pad*0.5;
+    out.push({num:nums[i], x, y});
+  }
+  return out;
+}
 const DENTURE_KINDS = [
   {id:'CD',    label:'완전틀니', abbr:'CD'},
   {id:'RPD',   label:'부분틀니', abbr:'RPD'},
