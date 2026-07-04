@@ -1125,6 +1125,76 @@ function selectPenTool(tool){
   renderPenTools(); renderStickers();
   closePopup();
 }
+function selectTreat(id){
+  activeTreatId = id; activePenTool=null; activeSticker=null;
+  mode='tooth';
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector('.mode-btn[data-mode="tooth"]').classList.add('active');
+  document.getElementById('freeOptions').style.display='none';
+  renderPenTools(); renderStickers(); renderTreatList();
+}
+function selectSticker(kind){
+  activeSticker=kind; activePenTool=null; mode='tooth';
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector('.mode-btn[data-mode="tooth"]').classList.add('active');
+  renderPenTools(); renderStickers(); renderTreatList();
+}
+function toggleSelectMode(){
+  if(mode==='select'){
+    document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelector('.mode-btn[data-mode="tooth"]').classList.add('active');
+    mode='tooth'; activePenTool=null; activeSticker=null;
+    document.getElementById('freeOptions').style.display='none';
+    document.getElementById('modeHint').textContent='치료종류를 고르고 위치를 클릭 → 치아/옵션 입력 후 Enter로 그 시점까지 선택된 내용만 표시됩니다.';
+    renderPenTools(); renderStickers();
+  } else {
+    document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+    document.getElementById('selectModeBtn').classList.add('active');
+    mode='select'; activePenTool=null; activeSticker=null;
+    document.getElementById('freeOptions').style.display='none';
+    document.getElementById('modeHint').textContent='마커를 클릭하여 선택 → 드래그로 이동, 모서리 핸들로 크기 조절. 더블클릭으로 수정.';
+    renderPenTools(); renderStickers(); renderTreatList();
+    closePopup();
+  }
+}
+function toggleTextMode(){
+  const textBtn = document.getElementById('textModeBtn');
+  if(mode==='text'){
+    document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelector('.mode-btn[data-mode="tooth"]').classList.add('active');
+    textBtn.classList.remove('active');
+    mode='tooth'; activePenTool=null; activeSticker=null;
+    document.getElementById('freeOptions').style.display='none';
+    document.getElementById('modeHint').textContent='치료종류를 고르고 위치를 클릭 → 치아/옵션 입력 후 Enter로 그 시점까지 선택된 내용만 표시됩니다.';
+    renderPenTools(); renderStickers();
+  } else {
+    document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+    textBtn.classList.add('active');
+    mode='text'; activePenTool=null; activeSticker=null;
+    document.getElementById('freeOptions').style.display='none';
+    document.getElementById('modeHint').textContent='이미지를 클릭하면 자유 텍스트를 입력할 수 있습니다. 기존 텍스트는 더블클릭으로 수정.';
+    renderPenTools(); renderStickers(); renderTreatList();
+    closePopup();
+  }
+}
+function toggleEraseMode(){
+  if(mode==='erase'){
+    document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelector('.mode-btn[data-mode="tooth"]').classList.add('active');
+    mode='tooth'; activePenTool=null; activeSticker=null;
+    document.getElementById('freeOptions').style.display='none';
+    document.getElementById('modeHint').textContent='치료종류를 고르고 위치를 클릭 → 치아/옵션 입력 후 Enter로 그 시점까지 선택된 내용만 표시됩니다.';
+    renderPenTools(); renderStickers();
+  } else {
+    document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelector('.mode-btn[data-mode="erase"]').classList.add('active');
+    mode='erase'; activePenTool=null; activeSticker=null;
+    document.getElementById('freeOptions').style.display='none';
+    document.getElementById('modeHint').textContent='지울 항목(마커·선·텍스트·영역·배치점)을 클릭하세요.';
+    renderPenTools(); renderStickers(); renderTreatList();
+    closePopup();
+  }
+}
 function renderPenTools(){
   const c = document.getElementById('penToolsList');
   c.innerHTML='';
@@ -1538,116 +1608,16 @@ window.addEventListener('keydown', e=>{
   const tag = document.activeElement.tagName;
   if(tag==='INPUT'||tag==='TEXTAREA') return;
 
-  // A → 선택/이동 모드 토글
-  if(e.key==='a'||e.key==='A'){
-    if(mode==='select'){
-      document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
-      document.querySelector('.mode-btn[data-mode="tooth"]').classList.add('active');
-      mode='tooth'; activePenTool=null; activeSticker=null;
-      document.getElementById('freeOptions').style.display='none';
-      document.getElementById('modeHint').textContent='치료종류를 고르고 위치를 클릭 → 치아/옵션 입력 후 Enter로 그 시점까지 선택된 내용만 표시됩니다.';
-      renderPenTools(); renderStickers();
-    } else {
-      document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
-      document.getElementById('selectModeBtn').classList.add('active');
-      mode='select'; activePenTool=null; activeSticker=null;
-      document.getElementById('freeOptions').style.display='none';
-      document.getElementById('modeHint').textContent='마커를 클릭하여 선택 → 드래그로 이동, 모서리 핸들로 크기 조절. 더블클릭으로 수정.';
-      renderPenTools(); renderStickers(); renderTreatList();
-      closePopup();
+  // 사용자 지정 단축키(모드·치료종류·스티커·펜) — 설정표 기반 디스패치
+  const _scKey = normalizeShortcutKey(e.key);
+  if(_scKey){
+    const _km = activeShortcutKeymap();
+    const _actId = Object.keys(_km).find(id => _km[id] === _scKey);
+    if(_actId){
+      const _act = SHORTCUT_ACTIONS.find(a => a.id === _actId);
+      if(_act && _act.run) _act.run();
     }
-    return;
   }
-
-  // R → 다중 배치 모드 토글
-  if(e.key==='r'||e.key==='R'){
-    const toggle = document.getElementById('batchToggle');
-    toggle.checked = !toggle.checked;
-    toggle.dispatchEvent(new Event('change'));
-    return;
-  }
-
-  // T → 텍스트 모드 토글
-  if(e.key==='t'||e.key==='T'){
-    const textBtn = document.getElementById('textModeBtn');
-    if(mode==='text'){
-      document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
-      document.querySelector('.mode-btn[data-mode="tooth"]').classList.add('active');
-      textBtn.classList.remove('active');
-      mode='tooth'; activePenTool=null; activeSticker=null;
-      document.getElementById('freeOptions').style.display='none';
-      document.getElementById('modeHint').textContent='치료종류를 고르고 위치를 클릭 → 치아/옵션 입력 후 Enter로 그 시점까지 선택된 내용만 표시됩니다.';
-      renderPenTools(); renderStickers();
-    } else {
-      document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
-      textBtn.classList.add('active');
-      mode='text'; activePenTool=null; activeSticker=null;
-      document.getElementById('freeOptions').style.display='none';
-      document.getElementById('modeHint').textContent='이미지를 클릭하면 자유 텍스트를 입력할 수 있습니다. 기존 텍스트는 더블클릭으로 수정.';
-      renderPenTools(); renderStickers(); renderTreatList();
-      closePopup();
-    }
-    return;
-  }
-
-  // E → 지우개 모드 토글
-  if(e.key==='e'||e.key==='E'){
-    if(mode==='erase'){
-      document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
-      document.querySelector('.mode-btn[data-mode="tooth"]').classList.add('active');
-      mode='tooth'; activePenTool=null; activeSticker=null;
-      document.getElementById('freeOptions').style.display='none';
-      document.getElementById('modeHint').textContent='치료종류를 고르고 위치를 클릭 → 치아/옵션 입력 후 Enter로 그 시점까지 선택된 내용만 표시됩니다.';
-      renderPenTools(); renderStickers();
-    } else {
-      document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
-      document.querySelector('.mode-btn[data-mode="erase"]').classList.add('active');
-      mode='erase'; activePenTool=null; activeSticker=null;
-      document.getElementById('freeOptions').style.display='none';
-      document.getElementById('modeHint').textContent='지울 항목(마커·선·텍스트·영역·배치점)을 클릭하세요.';
-      renderPenTools(); renderStickers(); renderTreatList();
-      closePopup();
-    }
-    return;
-  }
-
-  // 치료종류 단축키
-  function selectTreat(id){
-    activeTreatId = id; activePenTool=null; activeSticker=null;
-    mode='tooth';
-    document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
-    document.querySelector('.mode-btn[data-mode="tooth"]').classList.add('active');
-    document.getElementById('freeOptions').style.display='none';
-    renderPenTools(); renderStickers(); renderTreatList();
-  }
-  // 발치(X) → 표시도구 스티커 모드
-  if(e.key==='x'||e.key==='X'){
-    activeSticker='extraction'; activePenTool=null;
-    mode='tooth';
-    document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
-    document.querySelector('.mode-btn[data-mode="tooth"]').classList.add('active');
-    renderPenTools(); renderStickers(); renderTreatList();
-    return;
-  }
-  if(e.key==='2') selectTreat('implant');
-  if(e.key==='3'){ activeSticker='pontic'; activePenTool=null; mode='tooth'; document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active')); document.querySelector('.mode-btn[data-mode="tooth"]').classList.add('active'); renderPenTools(); renderStickers(); renderTreatList(); }
-  if(e.key==='i'||e.key==='I') selectTreat('inlay');
-  if(e.key==='f'||e.key==='F') selectTreat('resin');
-  if(e.key==='c'||e.key==='C') selectTreat('core_crown');
-  if(e.key==='v'||e.key==='V'){ activeSticker='rct'; activePenTool=null; mode='tooth'; document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active')); document.querySelector('.mode-btn[data-mode="tooth"]').classList.add('active'); renderPenTools(); renderStickers(); renderTreatList(); }
-  if(e.key==='g'||e.key==='G'){ activeSticker='gbr'; activePenTool=null; mode='tooth'; document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active')); document.querySelector('.mode-btn[data-mode="tooth"]').classList.add('active'); renderPenTools(); renderStickers(); renderTreatList(); }
-  if(e.key==='w'||e.key==='W') selectTreat('ongoing');
-  if(e.key==='d'||e.key==='D') selectTreat('done');
-  if(e.key==='h'||e.key==='H') selectTreat('hold');
-  if(e.key==='n'||e.key==='N') selectTreat('need');
-  if(e.key==='s'||e.key==='S') selectTreat('tempset');
-  if(e.key==='p'||e.key==='P') selectTreat('permset');
-  if(e.key==='m'||e.key==='M') selectPenTool('mark');
-  if(e.key==='l'||e.key==='L') selectPenTool('connect');
-  if(e.key==='k'||e.key==='K') selectPenTool('line');
-  if(e.key==='j'||e.key==='J') selectPenTool('arrow');
-  if(e.key==='u'||e.key==='U') selectPenTool('rect');
-  if(e.key==='b'||e.key==='B'){ const b=document.getElementById('copyAllBtn'); if(b) b.click(); }
 });
 
 // ---------- Paste support ----------
