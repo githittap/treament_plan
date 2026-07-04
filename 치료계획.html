@@ -1949,6 +1949,8 @@ function redraw(){
       ctx.restore();
     } else if(a.type==='text'){
       drawYellowLabel(ctx, a.x + (a.boxW||40)/2, a.y, a.text, a.fontSize);
+    } else if(a.type==='denturearch'){
+      drawDentureArch(ctx, a);
     }
   });
 
@@ -2035,6 +2037,44 @@ function redraw(){
     ctx.lineWidth=Math.max(1.5, mr*0.25); ctx.strokeStyle='#fff'; ctx.stroke();
     ctx.restore();
   }
+}
+
+function drawDentureArch(ctx, a){
+  const upper = (a.arch==='상악');
+  const nums = dentureArchNums(a.arch);
+  const w = naturalW * 0.42 * (a.scale||1);
+  const h = w * 0.28;
+  const R = Math.max(9, w*0.028);
+  const layout = dentureArchLayout(nums, w, h, upper, R*1.4, R*2.2);
+  const numFs = R*0.82, subFs = R*0.72;
+  ctx.save();
+  ctx.translate(a.x, a.y);
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  layout.forEach(p=>{
+    const st = (a.states && a.states[p.num]) || 'nat';
+    ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, Math.PI*2);
+    ctx.lineWidth = Math.max(1.5, R*0.14);
+    ctx.setLineDash(st==='miss' ? [Math.max(3,R*0.3), Math.max(2,R*0.22)] : []);
+    if(st==='sur'){ ctx.fillStyle='#16a34a'; ctx.fill(); ctx.strokeStyle='#15803d'; }
+    else if(st==='imp'){ ctx.fillStyle='#0d9488'; ctx.fill(); ctx.strokeStyle='#0f766e'; }
+    else if(st==='miss'){ ctx.strokeStyle='#9ca3af'; }
+    else { ctx.fillStyle='#ffffff'; ctx.fill(); ctx.strokeStyle='#94a3b8'; }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = (st==='sur'||st==='imp') ? '#ffffff' : (st==='miss' ? '#9ca3af' : '#334155');
+    ctx.font = `700 ${numFs}px sans-serif`;
+    ctx.fillText(String(p.num), p.x, p.y);
+    let sub='';
+    if(st==='sur') sub='Sur.Cr';
+    else if(st==='imp') sub = (a.kind==='IOD' && a.attach) ? ({mag:'Mag',loc:'Loc',bar:'Bar'}[a.attach]) : 'I-Sur.Cr';
+    if(sub){
+      ctx.fillStyle = (st==='imp') ? '#5eead4' : '#4ade80';
+      ctx.font = `800 ${subFs}px sans-serif`;
+      const subY = upper ? (p.y - R - subFs*0.8) : (p.y + R + subFs*0.8);
+      ctx.fillText(sub, p.x, subY);
+    }
+  });
+  ctx.restore();
 }
 
 function drawLegend(){
