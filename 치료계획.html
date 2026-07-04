@@ -2438,6 +2438,11 @@ const DENTURE_KINDS = [
   {id:'IARPD', label:'IARPD',   abbr:''},
   {id:'etc',   label:'기타',    abbr:''}
 ];
+const DENTURE_ATTACH = [
+  {id:'mag', label:'마그네틱', abbr:'Mag'},
+  {id:'loc', label:'로케이터', abbr:'Loc'},
+  {id:'bar', label:'바',      abbr:'Bar'}
+];
 function openDenturePopup(evt){
   closePopup();
   const state = { arch:'상악', kind:'CD', f:{}, states:{}, attach:'loc' };  // f: 조건부 입력값
@@ -2451,6 +2456,10 @@ function openDenturePopup(evt){
     <div class="opt-hint">종류</div>
     <div class="opt-grid" id="dKind"></div>
     <div id="dFields"></div>
+    <div id="dAttachRow" style="display:none;">
+      <div class="opt-hint">부착장치</div>
+      <div class="opt-grid" id="dAttach"></div>
+    </div>
     <div class="opt-hint">치아 상태 <span style="font-weight:400;color:#94a3b8;">(클릭할 때마다: 자연치→Sur.Cr→I-Sur.Cr→결손)</span></div>
     <div id="dMiniArch" style="position:relative;width:236px;height:66px;margin:2px auto 4px;background:#0f172a;border-radius:8px;"></div>
     <div class="btns">
@@ -2502,7 +2511,7 @@ function openDenturePopup(evt){
   DENTURE_KINDS.forEach(k=>{
     const b=document.createElement('button');
     b.type='button'; b.className='opt-btn'+(state.kind===k.id?' sel':''); b.textContent=k.label;
-    b.addEventListener('click', ()=>{ state.kind=k.id; kindWrap.querySelectorAll('.opt-btn').forEach(x=>x.classList.remove('sel')); b.classList.add('sel'); refreshFields(); renderMini(); });
+    b.addEventListener('click', ()=>{ state.kind=k.id; kindWrap.querySelectorAll('.opt-btn').forEach(x=>x.classList.remove('sel')); b.classList.add('sel'); refreshFields(); renderMini(); refreshAttachRow(); });
     kindWrap.appendChild(b);
   });
   refreshFields();
@@ -2540,6 +2549,17 @@ function openDenturePopup(evt){
     });
   }
   renderMini();
+
+  const attachRow = div.querySelector('#dAttachRow');
+  const attachWrap = div.querySelector('#dAttach');
+  DENTURE_ATTACH.forEach(at=>{
+    const b=document.createElement('button');
+    b.type='button'; b.className='opt-btn'+(state.attach===at.id?' sel':''); b.textContent=at.label;
+    b.addEventListener('click', ()=>{ state.attach=at.id; attachWrap.querySelectorAll('.opt-btn').forEach(x=>x.classList.remove('sel')); b.classList.add('sel'); });
+    attachWrap.appendChild(b);
+  });
+  function refreshAttachRow(){ attachRow.style.display = (state.kind==='IOD') ? '' : 'none'; }
+  refreshAttachRow();
 
   const buildDentureLabel = ()=>{
     const k = DENTURE_KINDS.find(d=>d.id===state.kind);
