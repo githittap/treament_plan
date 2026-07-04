@@ -544,7 +544,7 @@
   }
 
   /* 모달(임플란트 기록·조작설명서) — 인라인 #fff 이라 !important 필요 */
-  #implantModal > div, #helpModal > div{
+  #implantModal > div, #helpModal > div, #shortcutModal > div{
     background:var(--glass-strong) !important;
     border:1px solid rgba(47,217,196,0.3) !important;
     backdrop-filter:blur(22px) saturate(1.3);
@@ -552,7 +552,8 @@
     box-shadow:0 16px 56px rgba(0,0,0,0.6) !important;
   }
   #helpModal div, #helpModal li, #helpModal ul, #helpModal span,
-  #implantModal div, #implantModal li, #implantModal span{color:#d3ebe8 !important;}
+  #implantModal div, #implantModal li, #implantModal span,
+  #shortcutModal div, #shortcutModal span{color:#d3ebe8 !important;}
   #helpModal h3{color:var(--teal-light) !important;border-bottom-color:var(--line) !important;}
   #helpModal b, #implantModal b{color:#f0fffd !important;}
   #helpModal [style*="#f0faf9"]{background:rgba(47,217,196,0.07) !important;border-color:var(--line) !important;}
@@ -608,6 +609,8 @@
       style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.35);color:#fff;font-size:13px;font-weight:700;padding:8px 14px;border-radius:10px;cursor:pointer;letter-spacing:0.2px;margin-right:10px;text-decoration:none;">← 도구 모음</a>
     <button id="implantOpenBtn" onclick="ImplantRecorder.open()"
       style="background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.35);color:#fff;font-size:13px;font-weight:700;padding:8px 14px;border-radius:10px;cursor:pointer;letter-spacing:0.2px;margin-right:10px;">🦷 임플란트 기록</button>
+    <button id="shortcutOpenBtn" onclick="openShortcutSettings()"
+      style="background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.35);color:#fff;font-size:13px;font-weight:700;padding:8px 14px;border-radius:10px;cursor:pointer;letter-spacing:0.2px;margin-right:10px;">⌨️ 단축키</button>
     <div class="clinic-badge">STAFF ONLY</div>
   </div>
 
@@ -781,6 +784,22 @@
 <!-- 다중 배치 팝업 -->
 <div id="batchPanel"></div>
 
+<div id="shortcutModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:999;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:14px;max-width:560px;width:95%;max-height:88vh;overflow-y:auto;box-shadow:0 12px 48px rgba(0,0,0,0.35);">
+    <div style="background:linear-gradient(135deg,#1d6e6b,#2a8a87);padding:18px 22px;border-radius:14px 14px 0 0;display:flex;justify-content:space-between;align-items:center;">
+      <div style="color:#fff;font-size:17px;font-weight:800;">⌨️ 단축키 설정</div>
+      <button onclick="document.getElementById('shortcutModal').style.display='none'" style="background:rgba(255,255,255,0.2);border:none;color:#fff;font-size:20px;cursor:pointer;border-radius:6px;padding:2px 10px;">✕</button>
+    </div>
+    <div style="padding:16px 20px;font-size:13px;color:#1c2733;">
+      <div style="margin-bottom:10px;color:#5b6b7a;font-size:12px;line-height:1.6;">항목의 키 배지를 클릭한 뒤 원하는 키를 누르세요. (ESC 취소 · Delete 미지정) · 시스템 키(Ctrl+Z/Y/C/V·Delete·ESC)는 고정입니다. 설정은 <b>이 컴퓨터에만</b> 저장됩니다.</div>
+      <div id="shortcutList"></div>
+      <div style="display:flex;justify-content:space-between;margin-top:16px;">
+        <button onclick="if(confirm('모든 단축키를 기본값으로 되돌릴까요?')){resetShortcuts();renderShortcutSettings();renderTreatList();}" style="background:#eef2f5;border:1px solid #d3dde5;color:#33475b;border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;">기본값으로 되돌리기</button>
+        <button onclick="document.getElementById('shortcutModal').style.display='none'" style="background:var(--teal-dark);border:none;color:#fff;border-radius:8px;padding:8px 18px;font-size:12.5px;font-weight:700;cursor:pointer;">닫기</button>
+      </div>
+    </div>
+  </div>
+</div>
 <!-- 조작 설명서 모달 -->
 <div id="helpModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:999;align-items:center;justify-content:center;">
   <div style="background:#fff;border-radius:14px;max-width:680px;width:95%;max-height:88vh;overflow-y:auto;box-shadow:0 12px 48px rgba(0,0,0,0.35);">
@@ -1618,6 +1637,36 @@ window.addEventListener('keydown', e=>{
     }
   }
 });
+
+// ---------- 단축키 설정 UI ----------
+let shortcutCaptureId = null;
+function openShortcutSettings(){ shortcutCaptureId=null; renderShortcutSettings(); document.getElementById('shortcutModal').style.display='flex'; }
+function renderShortcutSettings(){
+  const km = activeShortcutKeymap();
+  const wrap = document.getElementById('shortcutList');
+  wrap.innerHTML='';
+  SHORTCUT_GROUP_ORDER.forEach(g=>{
+    const h=document.createElement('div');
+    h.textContent=g;
+    h.style.cssText='font-weight:800;color:#2a8a87;margin:12px 0 6px;border-bottom:1px solid #e0f5f4;padding-bottom:4px;';
+    wrap.appendChild(h);
+    SHORTCUT_ACTIONS.filter(a=>a.group===g).forEach(a=>{
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:5px 2px;';
+      const lab=document.createElement('span'); lab.textContent=a.label;
+      const key=km[a.id];
+      const capturing=(shortcutCaptureId===a.id);
+      const btn=document.createElement('button');
+      btn.textContent = capturing ? '키 누르세요…' : (key ? key : '미지정');
+      btn.style.cssText='min-width:78px;border-radius:7px;padding:5px 10px;font-size:13px;font-weight:800;cursor:pointer;border:1px solid '+
+        (capturing?'#f0a500':(key?'#2a8a87':'#e0645a'))+';background:'+
+        (capturing?'#fff6e0':(key?'#eaf6f5':'#fdeceb'))+';color:'+
+        (capturing?'#a06a00':(key?'#1d6e6b':'#c0392b'))+';';
+      btn.addEventListener('click',()=>{ shortcutCaptureId = capturing ? null : a.id; renderShortcutSettings(); });
+      row.appendChild(lab); row.appendChild(btn); wrap.appendChild(row);
+    });
+  });
+}
 
 // ---------- Paste support ----------
 window.addEventListener('paste', e=>{
