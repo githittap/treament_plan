@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<!-- © 2026 Jung · 아산정플란트치과 · 내부용 · 무단 복제·배포 금지 -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>보철 처리 프로토콜 · 진단기</title>
+<meta name="description" content="아산정플란트치과 · 보철이 안 맞을 때 상황별 대응 진단기 (내부용)">
+<style>
+  :root{
+    --bg:#070c0e; --ink:#e8f6f4; --gray:#8fb2ae;
+    --mint:#2fd9c4; --mint-2:#5fe6d6;
+    --line:rgba(90,210,200,0.18); --glass:rgba(20,34,36,0.55);
+    --amber:#f5b74e; --blue:#5aa9ff; --purple:#b98cff; --pink:#ff6b8a;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    background:
+      radial-gradient(1100px 720px at 80% -10%, rgba(47,217,196,0.16) 0%, rgba(47,217,196,0) 55%),
+      radial-gradient(900px 640px at 6% 110%, rgba(29,110,107,0.22) 0%, rgba(29,110,107,0) 60%),
+      var(--bg);
+    background-attachment:fixed;
+    color:var(--ink); min-height:100vh;
+    display:flex; flex-direction:column; align-items:center;
+    padding:18px 14px calc(84px + env(safe-area-inset-bottom));
+  }
+  .wrap{width:100%; max-width:460px;}
+
+  /* 헤더 */
+  .hero{text-align:center; margin:6px 0 18px;}
+  .hero .brand{font-size:13px; font-weight:700; color:var(--mint-2); letter-spacing:.4px;}
+  .hero h1{
+    font-size:24px; font-weight:800; margin:6px 0 4px; letter-spacing:-.4px;
+    background:linear-gradient(120deg,#eafffb,#5fe6d6 55%,#2fd9c4);
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  }
+  .hero p{font-size:13px; color:var(--gray); margin:0;}
+
+  /* 상단 네비 */
+  .nav{display:flex; gap:8px; margin-bottom:12px;}
+  .nav button{
+    flex:1; font-family:inherit; font-size:14px; font-weight:700; color:var(--ink);
+    background:var(--glass); border:1px solid var(--line); border-radius:12px;
+    padding:11px 0; cursor:pointer; transition:border-color .18s, background .18s;
+  }
+  .nav button:hover{border-color:rgba(47,217,196,.4);}
+  .nav button:disabled{opacity:.35; cursor:default;}
+
+  /* 카드 */
+  .card{
+    background:var(--glass); border:1px solid var(--line); border-radius:20px;
+    padding:22px 20px; backdrop-filter:blur(16px) saturate(1.2);
+    -webkit-backdrop-filter:blur(16px) saturate(1.2);
+    box-shadow:0 12px 40px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.05);
+    animation:rise .38s cubic-bezier(.22,.9,.32,1) both;
+  }
+  @keyframes rise{from{opacity:0; transform:translateY(10px);}to{opacity:1; transform:none;}}
+  .badge{
+    display:inline-block; font-size:12px; font-weight:800; letter-spacing:.3px;
+    padding:5px 12px; border-radius:20px; margin-bottom:12px;
+    color:#062421; background:var(--mint);
+  }
+  .badge[data-b="B방법"]{background:var(--amber);}
+  .badge[data-b="기공실 콜"]{background:var(--blue); color:#04121f;}
+  .badge[data-b="원장 판단"]{background:var(--purple); color:#160a24;}
+  .badge[data-b="진료실"]{background:var(--mint-2);}
+  .badge[data-b="필수"]{background:var(--pink); color:#2a0410;}
+
+  .card h2{font-size:20px; font-weight:800; margin:0 0 6px; letter-spacing:-.3px; line-height:1.35;}
+  .card .desc{font-size:14px; color:var(--gray); margin:0 0 16px; line-height:1.6;}
+
+  /* 선택 버튼 */
+  .opts{display:flex; flex-direction:column; gap:10px; margin-top:4px;}
+  .opt{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    width:100%; text-align:left; font-family:inherit; font-size:15.5px; font-weight:700;
+    color:var(--ink); background:rgba(47,217,196,.06);
+    border:1px solid var(--line); border-radius:14px; padding:16px 16px; cursor:pointer;
+    min-height:56px; transition:transform .14s, border-color .18s, background .18s;
+  }
+  .opt:hover{border-color:rgba(47,217,196,.5); background:rgba(47,217,196,.1);}
+  .opt:active{transform:scale(.985);}
+  .opt .arw{color:var(--mint); font-weight:900; flex-shrink:0;}
+  .opt.ghost{background:rgba(255,255,255,.03); font-weight:700; font-size:14.5px; color:var(--gray);}
+
+  /* 결과 스텝 */
+  ol.steps,ul.steps{margin:2px 0 0; padding-left:0; list-style:none;}
+  ol.steps li,ul.steps li{
+    position:relative; font-size:15px; line-height:1.6; color:var(--ink);
+    padding:11px 0 11px 40px; border-bottom:1px solid rgba(90,210,200,.1);
+  }
+  ol.steps li:last-child,ul.steps li:last-child{border-bottom:none;}
+  ol.steps{counter-reset:st;}
+  ol.steps li::before{
+    counter-increment:st; content:counter(st);
+    position:absolute; left:0; top:10px; width:26px; height:26px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:13px; font-weight:800; color:#062421; background:var(--mint); border-radius:50%;
+  }
+  ul.steps li::before{
+    content:""; position:absolute; left:8px; top:19px; width:8px; height:8px;
+    background:var(--mint); border-radius:50%;
+  }
+  .note{
+    margin-top:14px; font-size:13.5px; line-height:1.6; color:var(--mint-2);
+    background:rgba(47,217,196,.07); border:1px solid var(--line);
+    border-left:3px solid var(--mint); border-radius:10px; padding:11px 13px;
+  }
+  .links{display:flex; flex-direction:column; gap:9px; margin-top:16px;}
+  .link-btn{
+    font-family:inherit; font-size:14.5px; font-weight:700; color:#062421;
+    background:linear-gradient(135deg,#2fd9c4,#1fb8a8); border:none; border-radius:12px;
+    padding:13px 0; cursor:pointer; box-shadow:0 4px 16px rgba(47,217,196,.28);
+  }
+
+  /* 하단 고정 리마인더 */
+  .reminder{
+    position:fixed; left:0; right:0; bottom:0; z-index:20;
+    padding:11px 16px calc(11px + env(safe-area-inset-bottom));
+    background:rgba(20,10,14,.9); border-top:1px solid rgba(255,107,138,.35);
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+    text-align:center; font-size:12.5px; font-weight:700; color:#ffb3c2;
+  }
+  .foot{text-align:center; font-size:11px; color:rgba(143,178,174,.55); margin:18px 0 4px;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <div class="brand">🦷 아산정플란트치과</div>
+      <h1>보철 처리 프로토콜</h1>
+      <p>안 맞을 때 · 상황을 눌러 대응법을 확인하세요</p>
+    </div>
+
+    <div class="nav">
+      <button id="backBtn" onclick="goBack()">← 뒤로</button>
+      <button id="homeBtn" onclick="goHome()">🏠 처음으로</button>
+    </div>
+
+    <div class="card" id="card"><!-- JS 렌더 --></div>
+
+    <div class="foot">© 2026 Jung · 내부용 · 무단 복제·배포 금지</div>
+  </div>
+
+  <div class="reminder">⚠ 퇴근 전 <b>리메이크 장부</b> 기입 필수 — 컨택값 · 교합값 · 에러 원인</div>
+
+<script>
+const N = {
+  home:{ type:'menu', title:'무엇을 도와드릴까요?', desc:'해당하는 상황을 선택하세요.',
+    options:[
+      {label:'🔧 보철이 안 맞아요', to:'notfit'},
+      {label:'🦷 전치부(앞니) 케이스', to:'anterior'},
+      {label:'📖 기준 보기 (A·B방법 / 호명 / 장부)', to:'refmenu', ghost:true},
+    ]},
+
+  notfit:{ type:'menu', title:'어떤 문제인가요?',
+    options:[
+      {label:'컨택 (인접면)', to:'contact'},
+      {label:'교합', to:'r_labcall'},
+      {label:'아답(장착)이 안 됨', to:'adapt'},
+      {label:'색상', to:'color'},
+      {label:'형태 (음식물 끼임 등)', to:'r_shape'},
+      {label:'마진', to:'r_margin'},
+      {label:'전치부 어벗 노출 (심미 불량)', to:'r_abut'},
+      {label:'시적 자체가 안 됨', to:'r_tryin'},
+    ]},
+
+  contact:{ type:'menu', title:'컨택이 어떤가요?',
+    options:[
+      {label:'빡빡함 (타이트)', to:'r_B'},
+      {label:'루즈함 (헐렁)', to:'r_labcall'},
+    ]},
+
+  adapt:{ type:'menu', title:'아답 상태는 어떤가요?',
+    options:[
+      {label:'시적 자체가 안 됨', to:'r_adapt_tryin'},
+      {label:'너무 헐렁함', to:'r_adapt_loose'},
+    ]},
+
+  color:{ type:'menu', title:'색상 문제 유형은?',
+    options:[
+      {label:'동의한 색상대로 나왔는데 변경 원함', to:'r_color_self'},
+      {label:'그 외 색상 문제', to:'r_color_lab'},
+    ]},
+
+  anterior:{ type:'result', badge:'A방법', title:'전치부(앞니)',
+    desc:'전치부는 기본적으로 A방법입니다.',
+    steps:['기본적으로 A방법', '지그 문제 → A방법', '헥사 / 논헥사 문제 (기공 문제) → A방법'],
+    links:[{label:'▶ A방법 자세히 보기', to:'ref_A'}] },
+
+  /* ── 결과 ── */
+  r_B:{ type:'result', badge:'B방법', title:'컨택이 빡빡한 경우',
+    steps:['진료실에서 자체적으로 처리(조정)합니다.'],
+    note:'컨택이 루즈하면 「기공실 콜」 표준 절차로 진행합니다.' },
+
+  r_labcall:{ type:'result', badge:'기공실 콜', title:'컨택 · 교합이 루즈한 경우 — 표준 절차',
+    ordered:true,
+    steps:[
+      '시적까지 해 둡니다.',
+      '기공실 콜 → 기공실에서 환자분께 인사, 상황 설명',
+      '치실이 몇 개 들어가는지 확인',
+      '환자분께 양해를 구하고 소요 시간 안내',
+      '기공실에서 조정',
+      '진료실로 가져와 맞게 조정',
+      '진료실 선생님께 인계',
+    ]},
+
+  r_adapt_tryin:{ type:'result', badge:'기공실 콜', title:'아답 안 됨 — 시적 자체가 안 되는 경우',
+    ordered:true,
+    steps:['건드리지 마세요.', '기공실 콜', '기공실에서 내면 값 조정', '진료실 선생님께 인계'] },
+
+  r_adapt_loose:{ type:'result', badge:'기공실 콜', title:'아답 안 됨 — 너무 헐렁한 경우',
+    ordered:true,
+    steps:['기공실 콜', '기공실에서 퍼밋으로 고정'] },
+
+  r_color_self:{ type:'result', badge:'진료실', title:'색상 — 동의한 색상인데 변경 원함',
+    steps:['진료실에서 자체 리메이크 의뢰서를 작성합니다.'] },
+
+  r_color_lab:{ type:'result', badge:'기공실 콜', title:'색상 — 그 외의 경우',
+    ordered:true,
+    steps:['기공실을 호출해 함께 상의', '상의 후 리메이크 (기존 방식과 동일)'] },
+
+  r_shape:{ type:'result', badge:'원장 판단', title:'형태 문제',
+    steps:['음식물 끼임 / 형태 수정 필요 / 환자가 형태에 불만인 경우', '→ 원장 · 부원장 판단'] },
+
+  r_margin:{ type:'result', badge:'원장 판단', title:'마진이 안 맞는 경우',
+    steps:['원장 판단하에 기공실 호출 여부를 결정합니다.'] },
+
+  r_abut:{ type:'result', badge:'A방법', title:'전치부 어벗이 잇몸 밖으로 노출 (심미 불량)',
+    steps:['A방법으로 진행합니다.'],
+    links:[{label:'▶ A방법 자세히 보기', to:'ref_A'}] },
+
+  r_tryin:{ type:'result', badge:'A방법', title:'시적 자체가 안 되는 경우',
+    steps:['확실한 기공 문제이면 A방법으로 진행합니다.'],
+    links:[{label:'▶ A방법 자세히 보기', to:'ref_A'}] },
+
+  /* ── 기준 ── */
+  refmenu:{ type:'menu', title:'기준 보기',
+    options:[
+      {label:'호명 원칙', to:'ref_call'},
+      {label:'A방법 (손 떼고 기공실 콜)', to:'ref_A'},
+      {label:'B방법 (진료실 처리)', to:'r_B'},
+      {label:'기공실 콜 표준 절차', to:'r_labcall'},
+      {label:'공통 절차 (기공차트 · 장부 · 체결/아답)', to:'ref_common'},
+      {label:'퇴근 전 리메이크 장부', to:'ref_ledger'},
+    ]},
+
+  ref_call:{ type:'result', title:'호명 원칙',
+    steps:[
+      '담당(주): 기공소 소장님, 팀장님',
+      '지원(부): 진료실, 데스크',
+      '“기공실 와주세요” → 소장님 · 팀장님 모두 호출',
+      '그 외에는 각자의 호칭에 맞게 개별 호출',
+    ]},
+
+  ref_A:{ type:'result', badge:'A방법', title:'A방법 — 손 떼고 기공실 콜',
+    ordered:true,
+    steps:[
+      '소장님 · 팀장님이 환자분께 직접 고지 (이유 · 수리 방법 · 소요 시간 설명 후 양해)',
+      '예: “제가 보철을 만든 사람입니다. 이런 방법으로 이 시간 안에 조정하겠습니다.”',
+      '당일 수리가 어려우면 다음 예약까지 직접 잡고 데스크에 고지',
+      '수리 후 소장님 · 팀장님이 직접 맞춰 보고, 잘 맞으면 진료실 선생님께 인계',
+    ],
+    note:'공통 절차(기공차트 기재 · 장부 기록 · 체결/아답 진료실)도 함께 지켜주세요.' },
+
+  ref_common:{ type:'result', title:'공통 절차',
+    steps:[
+      '차트에 기공 제작자 이름 등 기재 (이하 ‘기공차트’)',
+      '장부에 수기로 모두 기록 (환자 · 기공물 종류 · 개수 · 제작자)',
+      '체결과 아답까지는 진료실에서 진행',
+    ]},
+
+  ref_ledger:{ type:'result', badge:'필수', title:'퇴근 전 — 리메이크 장부 기입',
+    steps:[
+      '매일 컨택값 · 교합값 기록',
+      '보철이 맞지 않은 이유 기록',
+      '기재 항목: 제작자, 컨택값, 교합값, 에러 원인(상세히)',
+    ]},
+};
+
+let cur = 'home';
+const hist = [];
+
+function render(){
+  const n = N[cur];
+  const c = document.getElementById('card');
+  let h = '';
+  if(n.badge) h += '<span class="badge" data-b="'+n.badge+'">'+n.badge+'</span>';
+  h += '<h2>'+n.title+'</h2>';
+  if(n.desc) h += '<p class="desc">'+n.desc+'</p>';
+
+  if(n.type==='menu'){
+    h += '<div class="opts">';
+    n.options.forEach(o=>{
+      h += '<button class="opt'+(o.ghost?' ghost':'')+'" onclick="go(\''+o.to+'\')">'
+         + '<span>'+o.label+'</span><span class="arw">›</span></button>';
+    });
+    h += '</div>';
+  } else {
+    const tag = n.ordered ? 'ol' : 'ul';
+    h += '<'+tag+' class="steps">';
+    n.steps.forEach(s=> h += '<li>'+s+'</li>');
+    h += '</'+tag+'>';
+    if(n.note) h += '<div class="note">'+n.note+'</div>';
+    if(n.links){
+      h += '<div class="links">';
+      n.links.forEach(l=> h += '<button class="link-btn" onclick="go(\''+l.to+'\')">'+l.label+'</button>');
+      h += '</div>';
+    }
+  }
+  c.innerHTML = h;
+  c.style.animation='none'; void c.offsetWidth; c.style.animation='';
+  document.getElementById('backBtn').disabled = hist.length===0;
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+function go(to){ hist.push(cur); cur = to; render(); }
+function goBack(){ if(hist.length){ cur = hist.pop(); render(); } }
+function goHome(){ hist.length=0; cur='home'; render(); }
+render();
+</script>
+</body>
+</html>

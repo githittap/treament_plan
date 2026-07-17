@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>작업 진행판 · 아산정플란트치과</title>
+<meta name="robots" content="noindex,nofollow">
+<style>
+  :root{
+    --bg:#070c0e; --ink:#e8f6f4; --gray:#8fb2ae;
+    --mint:#2fd9c4; --mint-2:#5fe6d6;
+    --line:rgba(90,210,200,0.18); --glass:rgba(20,34,36,0.55);
+    --amber:#f2c14e; --red:#ff6b6b; --blue:#60a5fa;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    background:
+      radial-gradient(1100px 720px at 80% -10%, rgba(47,217,196,0.18) 0%, rgba(47,217,196,0) 55%),
+      radial-gradient(900px 640px at 6% 110%, rgba(29,110,107,0.24) 0%, rgba(29,110,107,0) 60%),
+      var(--bg);
+    background-attachment:fixed; color:var(--ink); min-height:100vh;
+    padding:28px 16px 60px;
+  }
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-thumb{background:rgba(90,210,200,0.25);border-radius:8px;}
+  .wrap{max-width:940px;margin:0 auto;}
+
+  /* ---------- 상단 바 ---------- */
+  .topbar{display:flex;align-items:center;gap:12px;margin-bottom:22px;flex-wrap:wrap;}
+  .topbar h1{font-size:22px;font-weight:800;margin:0;letter-spacing:-0.3px;
+    display:flex;align-items:center;gap:9px;}
+  .topbar h1 .dot{width:9px;height:9px;border-radius:50%;background:var(--gray);
+    box-shadow:0 0 0 0 rgba(47,217,196,.5);}
+  .topbar h1 .dot.live{background:var(--mint);animation:pulse 2s infinite;}
+  .spacer{flex:1;}
+  .btn{font-size:12.5px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);
+    border:1px solid var(--line);border-radius:9px;padding:8px 13px;cursor:pointer;
+    transition:background .15s,border-color .15s;}
+  .btn:hover{background:rgba(47,217,196,.12);border-color:rgba(47,217,196,.4);}
+  .stamp{font-size:12px;color:var(--gray);}
+
+  /* ---------- 비밀번호 화면 ---------- */
+  .gate{max-width:380px;margin:12vh auto 0;text-align:center;
+    animation:rise .5s cubic-bezier(.22,.9,.32,1) both;}
+  .gate .lock{font-size:44px;margin-bottom:14px;}
+  .gate h2{font-size:22px;font-weight:800;margin:0 0 6px;}
+  .gate p{font-size:13.5px;color:var(--gray);margin:0 0 22px;line-height:1.6;}
+  .gate input{width:100%;font-size:16px;text-align:center;color:var(--ink);
+    background:var(--glass);border:1px solid var(--line);border-radius:12px;
+    padding:14px;outline:none;margin-bottom:12px;}
+  .gate input:focus{border-color:rgba(47,217,196,.5);}
+  .gate .unlock{width:100%;font-size:15px;font-weight:800;color:#062421;
+    background:linear-gradient(135deg,#2fd9c4,#1fb8a8);border:none;border-radius:12px;
+    padding:14px;cursor:pointer;box-shadow:0 6px 20px rgba(47,217,196,.3);}
+  .gate .unlock:active{transform:translateY(1px);}
+  .gate .err{color:var(--red);font-size:13px;margin-top:12px;min-height:18px;}
+  .gate.cfg .lock{filter:grayscale(1);}
+
+  /* ---------- 탭 ---------- */
+  .tabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:18px;}
+  .tab{flex:0 0 auto;font-size:13px;font-weight:700;color:var(--gray);
+    background:var(--glass);border:1px solid var(--line);border-radius:20px;
+    padding:8px 15px;cursor:pointer;white-space:nowrap;transition:all .15s;}
+  .tab:hover{color:var(--ink);}
+  .tab.on{color:#062421;background:linear-gradient(135deg,#2fd9c4,#1fb8a8);border-color:transparent;}
+
+  /* ---------- 진행판 본체 ---------- */
+  .board{animation:rise .4s cubic-bezier(.22,.9,.32,1) both;}
+  .goal{background:linear-gradient(135deg,rgba(47,217,196,.14),rgba(47,217,196,.04));
+    border:1px solid rgba(47,217,196,.3);border-radius:16px;padding:18px 20px;margin-bottom:14px;}
+  .goal .lbl{font-size:11.5px;font-weight:800;letter-spacing:1px;color:var(--mint-2);
+    margin-bottom:7px;}
+  .goal .val{font-size:18px;font-weight:800;line-height:1.4;}
+  .cur{font-size:14px;color:var(--gray);margin-bottom:20px;padding-left:2px;}
+  .cur b{color:var(--mint-2);}
+
+  .progwrap{margin-bottom:22px;}
+  .progbar{height:10px;border-radius:6px;background:rgba(255,255,255,.07);overflow:hidden;}
+  .progfill{height:100%;background:linear-gradient(90deg,#2fd9c4,#5fe6d6);
+    border-radius:6px;transition:width .5s;}
+  .progtxt{font-size:12px;color:var(--gray);margin-top:7px;}
+  .stages{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
+  .stage{font-size:12.5px;padding:6px 12px;border-radius:9px;border:1px solid var(--line);
+    background:var(--glass);display:flex;align-items:center;gap:6px;}
+  .stage.done{color:var(--mint-2);border-color:rgba(47,217,196,.35);}
+  .stage.doing{color:var(--amber);border-color:rgba(242,193,78,.4);background:rgba(242,193,78,.08);}
+  .stage.blocked{color:var(--red);border-color:rgba(255,107,107,.4);background:rgba(255,107,107,.08);}
+  .stage.hold{color:var(--gray);opacity:.7;}
+
+  .sections{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media(max-width:640px){.sections{grid-template-columns:1fr;}}
+  .sec{background:var(--glass);border:1px solid var(--line);border-radius:14px;padding:16px 18px;}
+  .sec.full{grid-column:1 / -1;}
+  .sec h3{font-size:13px;font-weight:800;margin:0 0 11px;display:flex;align-items:center;gap:7px;}
+  .sec h3 .ic{font-size:15px;}
+  .sec ul{margin:0;padding:0;list-style:none;}
+  .sec li{font-size:13.5px;line-height:1.55;color:var(--ink);padding:5px 0 5px 18px;
+    position:relative;}
+  .sec li::before{content:"";position:absolute;left:2px;top:11px;width:6px;height:6px;
+    border-radius:50%;background:var(--mint);}
+  .sec.blk li::before{background:var(--red);}
+  .sec.q li::before{background:var(--amber);}
+  .sec .empty{font-size:13px;color:rgba(143,178,174,.5);}
+  .sec.blk{border-color:rgba(255,107,107,.3);}
+  .sec.blk h3{color:var(--red);}
+
+  footer{margin-top:40px;text-align:center;font-size:11.5px;color:rgba(143,178,174,.55);}
+
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(47,217,196,.5);}
+    70%{box-shadow:0 0 0 8px rgba(47,217,196,0);}100%{box-shadow:0 0 0 0 rgba(47,217,196,0);}}
+  @keyframes rise{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 비밀번호 화면 -->
+  <div id="gate" class="gate">
+    <div class="lock">🔒</div>
+    <h2>작업 진행판</h2>
+    <p>비밀번호를 입력하면 최신 진행 상황을 볼 수 있습니다.</p>
+    <input id="pw" type="password" placeholder="비밀번호" autocomplete="off">
+    <button class="unlock" id="unlockBtn">열기</button>
+    <div class="err" id="gateErr"></div>
+  </div>
+
+  <!-- 진행판 화면 -->
+  <div id="app" style="display:none;">
+    <div class="topbar">
+      <h1><span class="dot" id="liveDot"></span> 작업 진행판</h1>
+      <div class="spacer"></div>
+      <span class="stamp" id="stamp"></span>
+      <button class="btn" id="refreshBtn">↻ 새로고침</button>
+      <button class="btn" id="lockBtn">잠그기</button>
+    </div>
+    <div class="tabs" id="tabs"></div>
+    <div id="boardHost"></div>
+  </div>
+
+  <footer>© 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지</footer>
+</div>
+
+<script>
+/* ===================================================================
+   ★ 설정 — 여기 두 줄만 원장님 Supabase 값으로 바꾸면 끝 ★
+   Supabase 대시보드 → Settings → API 에서 복사:
+     - Project URL     → SUPABASE_URL 에
+     - anon public 키  → SUPABASE_ANON 에
+=================================================================== */
+const SUPABASE_URL  = "https://jvoiblimthwuhbspwkwu.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp2b2libGltdGh3dWhic3B3a3d1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4OTQ2MzMsImV4cCI6MjA5ODQ3MDYzM30.vzdsNsOl1saSil_Y9QrpiDAPR5ojLjr0U3IkY1_-Pmo";
+/* =================================================================== */
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s==null?"":s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const notConfigured = () => SUPABASE_URL.indexOf("여기에")===0 || SUPABASE_ANON.indexOf("여기에")===0;
+
+let PW = null, boards = [], currentSlug = null, pollTimer = null;
+
+const STATUS = {
+  done:   {ic:"✅", cls:"done"},
+  doing:  {ic:"🟨", cls:"doing"},
+  todo:   {ic:"⬜", cls:""},
+  blocked:{ic:"⚠️", cls:"blocked"},
+  hold:   {ic:"⏸", cls:"hold"}
+};
+
+async function rpc(fn, args){
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, {
+    method:"POST",
+    headers:{ "apikey":SUPABASE_ANON, "Authorization":"Bearer "+SUPABASE_ANON,
+              "Content-Type":"application/json" },
+    body: JSON.stringify(args)
+  });
+  if(!r.ok) throw new Error((await r.text()) || ("HTTP "+r.status));
+  return r.json();
+}
+
+/* ---------- 로그인 ---------- */
+async function unlock(){
+  const gate = $("#gate"), err = $("#gateErr");
+  if(notConfigured()){
+    gate.classList.add("cfg");
+    $(".gate .lock").textContent = "⚙️";
+    $(".gate h2").textContent = "아직 설정 전이에요";
+    $(".gate p").innerHTML = "이 파일 <b>진행판.html</b> 위쪽 설정 두 줄에<br>Supabase 주소·anon 키를 먼저 넣어주세요.";
+    $("#pw").style.display="none"; $("#unlockBtn").style.display="none";
+    return;
+  }
+  const pw = $("#pw").value.trim();
+  if(!pw){ err.textContent="비밀번호를 입력하세요."; return; }
+  $("#unlockBtn").textContent="확인 중…";
+  try{
+    boards = await rpc("boards_read", {pw});
+    PW = pw;
+    sessionStorage.setItem("board_pw", pw);
+    err.textContent="";
+    showApp();
+  }catch(e){
+    err.textContent = /비밀번호/.test(e.message) ? "비밀번호가 틀렸습니다." : ("연결 오류: "+e.message);
+  }finally{
+    $("#unlockBtn").textContent="열기";
+  }
+}
+
+function lock(){
+  PW=null; boards=[]; currentSlug=null;
+  sessionStorage.removeItem("board_pw");
+  stopPoll();
+  $("#app").style.display="none";
+  $("#gate").style.display="";
+  $("#pw").value="";
+}
+
+/* ---------- 화면 ---------- */
+function showApp(){
+  $("#gate").style.display="none";
+  $("#app").style.display="";
+  render();
+  startPoll();
+}
+
+function render(){
+  if(!boards.length){
+    $("#tabs").innerHTML="";
+    $("#boardHost").innerHTML='<div class="sec full"><div class="empty">아직 등록된 진행판이 없습니다.</div></div>';
+    return;
+  }
+  if(!currentSlug || !boards.find(b=>b.slug===currentSlug)) currentSlug = boards[0].slug;
+
+  $("#tabs").innerHTML = boards.map(b =>
+    `<div class="tab ${b.slug===currentSlug?'on':''}" data-slug="${esc(b.slug)}">${esc(b.title)}</div>`
+  ).join("");
+  document.querySelectorAll(".tab").forEach(t =>
+    t.onclick = () => { currentSlug = t.dataset.slug; render(); });
+
+  const b = boards.find(x=>x.slug===currentSlug);
+  $("#boardHost").innerHTML = renderBoard(b.data || {});
+  stamp(b.updated_at);
+}
+
+function listSec(icon, title, arr, extra=""){
+  const items = Array.isArray(arr) ? arr.filter(x=>x&&String(x).trim()) : [];
+  const body = items.length
+    ? `<ul>${items.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`
+    : `<div class="empty">없음</div>`;
+  return `<div class="sec ${extra}"><h3><span class="ic">${icon}</span>${title}</h3>${body}</div>`;
+}
+
+function renderBoard(d){
+  const stages = Array.isArray(d.stages)?d.stages:[];
+  const doneN = stages.filter(s=>s.status==="done").length;
+  const pct = stages.length ? Math.round(doneN/stages.length*100) : 0;
+
+  const stageChips = stages.map(s=>{
+    const st = STATUS[s.status] || STATUS.todo;
+    return `<span class="stage ${st.cls}">${st.ic} ${esc(s.label)}</span>`;
+  }).join("");
+
+  return `
+    <div class="board">
+      <div class="goal">
+        <div class="lbl">🎯 최종 목표</div>
+        <div class="val">${esc(d.goal)||"—"}</div>
+      </div>
+      <div class="cur">📍 현재 위치 — <b>${esc(d.current)||"—"}</b></div>
+
+      <div class="progwrap">
+        <div class="progbar"><div class="progfill" style="width:${pct}%"></div></div>
+        <div class="progtxt">전체 단계 ${doneN}/${stages.length} 완료 (${pct}%)</div>
+        <div class="stages">${stageChips||'<span class="stage">단계 없음</span>'}</div>
+      </div>
+
+      <div class="sections">
+        ${listSec("✅","완료", d.done)}
+        ${listSec("🟨","진행 중", d.doing)}
+        ${listSec("⚠️","막힌 부분", d.blocked, "blk")}
+        ${listSec("❓","보류 질문", d.questions, "q")}
+        ${listSec("📌","결정 사항", d.decisions)}
+        ${listSec("➡️","다음 행동", d.next)}
+        ${listSec("🏁","완료 기준", d.criteria, "full")}
+      </div>
+    </div>`;
+}
+
+/* ---------- 폴링 ---------- */
+async function refresh(silent){
+  try{
+    boards = await rpc("boards_read", {pw:PW});
+    render();
+    live(true);
+  }catch(e){
+    live(false);
+    if(!silent && /비밀번호/.test(e.message)) lock();
+  }
+}
+function startPoll(){ stopPoll(); pollTimer = setInterval(()=>refresh(true), 7000); }
+function stopPoll(){ if(pollTimer) clearInterval(pollTimer); pollTimer=null; }
+
+function live(ok){ $("#liveDot").classList.toggle("live", ok); }
+function stamp(ts){
+  if(!ts){ $("#stamp").textContent=""; return; }
+  const dt = new Date(ts);
+  const p = n => String(n).padStart(2,"0");
+  $("#stamp").textContent = `수정 ${p(dt.getMonth()+1)}/${p(dt.getDate())} ${p(dt.getHours())}:${p(dt.getMinutes())} · 7초마다 자동 갱신`;
+}
+
+/* ---------- 시작 ---------- */
+$("#unlockBtn").onclick = unlock;
+$("#pw").addEventListener("keydown", e=>{ if(e.key==="Enter") unlock(); });
+$("#refreshBtn").onclick = ()=>refresh(false);
+$("#lockBtn").onclick = lock;
+
+// 세션 중 새로고침하면 다시 로그인
+(function(){
+  const saved = sessionStorage.getItem("board_pw");
+  if(saved && !notConfigured()){
+    $("#pw").value = saved;
+    unlock();
+  } else if(notConfigured()){
+    unlock(); // 설정 안내 화면 표시
+  }
+})();
+</script>
+</body>
+</html>
