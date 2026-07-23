@@ -365,40 +365,46 @@ function excelToDate(v){ // v = Date(cellDates) or serial number
 }
 function buildPreview(aoa){
   const hdr=aoa[0]||[];
+  const cName=findCol(hdr,['성명','이름','사원명','직원']);
   const cId=findCol(hdr,['사번','USERID','USER ID','아이디']);
   const cDate=findCol(hdr,['발생일','일자','날짜']);
   const cTime=findCol(hdr,['입실시간','발생시각','시간','시각']);
-  if(cId<0||cDate<0){alert('열을 찾지 못했습니다(사번/발생일). 다른 형식이면 알려주세요.');return;}
-  // fp_id → user
-  const fpMap={};PROFILES.forEach(p=>{if(p.fp_id)fpMap[String(p.fp_id).trim()]=p;});
+  if((cId<0&&cName<0)||cDate<0){alert('열을 찾지 못했습니다(직원 식별/발생일). 지문기 원본을 그대로 올려보세요.');return;}
+  // 이름 또는 사번(fp_id) 어느 쪽이든 직원 명부와 대조
+  const resolve=tok=>{const t=String(tok).trim();return PROFILES.find(p=>(p.name&&p.name===t)||(p.fp_id&&String(p.fp_id).trim()===t))||null;};
   const group={},unmapped=new Set();
   for(let i=1;i<aoa.length;i++){
-    const r=aoa[i];if(!r||r[cId]==null||r[cId]==='')continue;
-    const fp=String(r[cId]).trim();
+    const r=aoa[i];if(!r)continue;
+    let tok=(cName>=0&&r[cName]!=null&&String(r[cName]).trim()!=='')?String(r[cName]).trim():(cId>=0&&r[cId]!=null?String(r[cId]).trim():'');
+    if(!tok)continue;
     const dt=excelToDate(r[cDate]);if(!dt)continue;
     const ds=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
     let tmin=null;
     if(cTime>=0){const tv=excelToDate(r[cTime]);if(tv)tmin=tv.getHours()*60+tv.getMinutes();}
     if(tmin==null && dt.getHours()+dt.getMinutes()>0)tmin=dt.getHours()*60+dt.getMinutes();
-    const key=fp+'|'+ds;
-    if(!group[key])group[key]={fp,ds,times:[]};
+    const key=tok+'|'+ds;
+    if(!group[key])group[key]={tok,ds,times:[]};
     if(tmin!=null)group[key].times.push(tmin);
-    if(!fpMap[fp])unmapped.add(fp);
+    if(!resolve(tok))unmapped.add(tok);
   }
   xlRows=Object.values(group).map(g=>{
     g.times.sort((a,b)=>a-b);
     const ci=g.times.length?g.times[0]:null, co=g.times.length>1?g.times[g.times.length-1]:null;
-    const prof=fpMap[g.fp];
-    return {fp:g.fp, user_id:prof?prof.user_id:null, name:prof?prof.name:('사번 '+g.fp), ds:g.ds, ci, co, evening:false, single:g.times.length<2};
+    const prof=resolve(g.tok);
+    return {tok:g.tok, user_id:prof?prof.user_id:null, name:prof?prof.name:g.tok, ds:g.ds, ci, co, evening:false, single:g.times.length<2};
   }).sort((a,b)=>a.ds<b.ds?-1:1);
   const um=[...unmapped];
   $('#xlSummary').innerHTML=`총 <b>${xlRows.length}</b>행 · 직원 매핑 <b>${xlRows.filter(r=>r.user_id).length}</b> / 미매핑 <b style="color:var(--red)">${xlRows.filter(r=>!r.user_id).length}</b>`;
-  $('#xlUnmapped').innerHTML=um.length?`<div class="hint" style="color:var(--gold)">⚠ 미매핑 사번: ${um.map(f=>`${f} <select class="mini" onchange="mapFp('${f}',this.value)"><option value="">직원 선택</option>${PROFILES.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select>`).join(' ')}</div>`:'';
+  $('#xlUnmapped').innerHTML=um.length?`<div class="hint" style="color:var(--gold)">⚠ 미매핑 (직원 명부에 없음): ${um.map(f=>`<b>${esc(f)}</b> <select class="mini" onchange="mapToken('${esc(f)}',this.value)"><option value="">이 직원으로</option>${PROFILES.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select>`).join(' &nbsp; ')}</div>`:'';
   renderXlTable();
   show('xlMask');
 }
-window.mapFp=async(fp,uid)=>{if(!uid)return;await sb.from('profiles').update({fp_id:fp}).eq('user_id',uid);await loadProfiles();
-  const prof=PROFILES.find(p=>p.user_id===uid);xlRows.forEach(r=>{if(r.fp===fp){r.user_id=uid;r.name=prof.name;}});renderXlTable();$('#xlUnmapped').innerHTML='';setStatus('saved');};
+window.mapToken=async(tok,uid)=>{if(!uid)return;const prof=PROFILES.find(p=>p.user_id===uid);
+  xlRows.forEach(r=>{if(r.tok===tok){r.user_id=uid;r.name=prof.name;}});
+  if(/^[0-9]+$/.test(tok)){await sb.from('profiles').update({fp_id:tok}).eq('user_id',uid);await loadProfiles();} // 숫자면 지문 사번 기억
+  renderXlTable();buildUnmappedAfter();setStatus('saved');};
+function buildUnmappedAfter(){const um=[...new Set(xlRows.filter(r=>!r.user_id).map(r=>r.tok))];
+  $('#xlUnmapped').innerHTML=um.length?`<div class="hint" style="color:var(--gold)">⚠ 미매핑: ${um.map(f=>`<b>${esc(f)}</b> <select class="mini" onchange="mapToken('${esc(f)}',this.value)"><option value="">이 직원으로</option>${PROFILES.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select>`).join(' &nbsp; ')}</div>`:'<div class="hint" style="color:var(--mint)">✓ 전원 매핑됨</div>';}
 function calcRow(r){
   const late = r.ci!=null ? Math.max(0, r.ci - toMin(LATE_CUT)) : 0;
   let ot=0; if(r.co!=null){const je=toMin(jongeop(r.ds,r.evening)); ot=Math.max(0, r.co-je); ot=Math.floor(ot/OT_UNIT)*OT_UNIT;}
