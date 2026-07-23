@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<!-- © 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지 -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>직원 허브 · 아산정플란트치과</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#0d1715; --card:#14201d; --panel:#182823; --ink:#e6f2ef; --gray:#8fa5a0; --line:#24332f;
+  --mint:#2fd9c4; --mint-dk:#0e2b27; --gold:#e3b341; --gold-bg:#2a2312; --red:#ff7b76; --red-bg:#2b1512;
+  --blue:#6fb2ff; --blue-bg:#13202e; --purple:#a98ef0; --purple-bg:#211a35; --brand:#156f72;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;font-size:14px}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:13.5px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 9px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:rgba(47,217,196,.55)}
+textarea{resize:vertical;min-height:60px}
+input[type=date]{color-scheme:dark}
+a{color:var(--blue);text-decoration:none}
+
+/* 로그인 */
+.gate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100}
+.gate .box{width:min(360px,92vw);background:var(--card);border:1px solid var(--line);border-radius:16px;padding:28px 26px;text-align:center}
+.gate h1{font-size:19px;margin:6px 0 4px}
+.gate p{font-size:12.5px;color:var(--gray);margin-bottom:16px}
+.gate input{width:100%;margin-bottom:8px;font-size:15px;padding:10px}
+.gate .lg{width:100%;background:var(--mint);color:#062421;border:none;border-radius:9px;padding:11px;font-size:15px;font-weight:800}
+.gate .msg{font-size:12.5px;margin-top:10px;min-height:16px;color:var(--gray)}
+
+/* 헤더 */
+header{position:sticky;top:0;z-index:30;background:var(--bg);border-bottom:1px solid var(--line);padding:9px 14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+header .ttl{font-weight:800;font-size:16px}
+header .ttl small{color:var(--mint);font-weight:700;font-size:12px}
+.nav{display:flex;flex-wrap:wrap;gap:4px;margin-left:6px}
+.nav button{background:var(--card);border:1px solid var(--line);color:var(--gray);border-radius:9px;padding:6px 11px;font-size:13px;font-weight:700}
+.nav button.on{background:var(--mint-dk);border-color:var(--mint);color:var(--mint)}
+.nav .cnt{display:inline-block;min-width:16px;padding:0 4px;background:var(--red);color:#fff;border-radius:8px;font-size:10.5px;margin-left:3px}
+.me{margin-left:auto;font-size:12px;color:var(--gray);display:flex;align-items:center;gap:8px}
+.rolechip{background:var(--brand);color:#fff;border-radius:6px;padding:1px 8px;font-size:11px;font-weight:800}
+.hbtn{background:var(--card);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:6px 11px;font-size:12.5px;font-weight:700}
+.hbtn:hover{border-color:var(--mint)}
+.hbtn.pri{background:var(--mint);color:#062421;border-color:var(--mint)}
+
+/* 컨텐츠 */
+main{padding:16px 16px 70px;max-width:1080px;margin:0 auto}
+.pane{display:none}.pane.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:14px}
+.card h2{font-size:16px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.card h3{font-size:13.5px;color:var(--mint);margin:12px 0 6px}
+.big{font-size:30px;font-weight:800;color:var(--mint)}
+.sub{font-size:12px;color:var(--gray)}
+.rowflex{display:flex;flex-wrap:wrap;gap:10px}
+.stat{flex:1;min-width:130px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+table{width:100%;border-collapse:collapse;margin:8px 0;font-size:13px}
+th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--panel);color:var(--gray);font-size:12px;position:sticky;top:0}
+.tblwrap{max-height:60vh;overflow:auto;border-radius:8px}
+tr.warn td{background:var(--red-bg)}
+tr.new td{background:var(--mint-dk)}
+.b{display:inline-block;border-radius:5px;padding:1px 7px;font-size:11px;font-weight:700}
+.b.wait{background:var(--gold-bg);color:var(--gold)} .b.ok{background:var(--mint-dk);color:var(--mint)}
+.b.no{background:var(--red-bg);color:var(--red)} .b.mid{background:var(--blue-bg);color:var(--blue)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.mini{background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:7px;padding:3px 9px;font-size:12px;font-weight:700}
+.mini:hover{border-color:var(--mint);color:var(--mint)}
+.mini.stamp{background:var(--gold-bg);border-color:var(--gold);color:var(--gold)}
+.mini.rej{background:var(--red-bg);border-color:#5c2420;color:var(--red)}
+.empty{color:var(--gray);font-size:12.5px;padding:10px 2px}
+#saveTag{font-size:11.5px;color:var(--gray)} #saveTag.err{color:var(--red)}
+.hint{font-size:11.5px;color:var(--gray);margin-top:6px}
+.stub{border:1px dashed var(--line);border-radius:10px;padding:22px;text-align:center;color:var(--gray);font-size:13px}
+
+/* 모달 */
+.mask{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:5vh 10px}
+.mask.show{display:flex}
+.modal{background:var(--card);border:1px solid var(--line);border-radius:16px;width:min(560px,96vw);padding:18px 20px;margin-bottom:6vh}
+.modal.wide{width:min(920px,97vw)}
+.modal h3{font-size:16px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.modal .x{margin-left:auto;background:none;border:none;color:var(--gray);font-size:20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 10px}
+.fld{display:flex;flex-direction:column;gap:3px}.fld.w2{grid-column:span 2}.fld.w4{grid-column:1/-1}
+.fld label{font-size:11px;color:var(--gray);font-weight:700}
+.msg{font-size:12px;margin-top:8px;min-height:15px}
+footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px;color:#4a5f5a;padding:4px;background:var(--bg);border-top:1px solid var(--line);z-index:20}
+@media(max-width:640px){.nav button{padding:5px 8px;font-size:12px} main{padding:12px 10px 66px}}
+</style>
+</head>
+<body>
+
+<!-- 로그인 -->
+<div class="gate" id="gate" style="display:none">
+  <div class="box">
+    <div style="font-size:30px">👥</div>
+    <h1>직원 허브</h1>
+    <p>기공차트와 같은 직원 계정으로 로그인하세요.</p>
+    <input type="email" id="lgEmail" placeholder="이메일" autocomplete="username">
+    <input type="password" id="lgPw" placeholder="비밀번호" autocomplete="current-password">
+    <button class="lg" id="lgBtn">로그인</button>
+    <div class="msg" id="lgMsg"></div>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+<header>
+  <span class="ttl">👥 직원 허브</span>
+  <nav class="nav" id="nav"></nav>
+  <span class="me">
+    <span id="saveTag">✓ 자동 저장</span>
+    <span id="meName"></span><span class="rolechip" id="meRole"></span>
+    <button class="hbtn" id="logoutBtn">로그아웃</button>
+  </span>
+</header>
+<main id="main"></main>
+</div>
+
+<!-- 연차 신청 -->
+<div class="mask" id="lvMask"><div class="modal">
+  <h3>📅 연차 신청<button class="x" onclick="hide('lvMask')">✕</button></h3>
+  <div class="grid">
+    <div class="fld"><label>유형</label><select id="lvType"><option>연차</option><option>반차</option><option>기타</option></select></div>
+    <div class="fld" id="lvNoteWrap" style="display:none"><label>기타 사유(타이핑)</label><input id="lvNote"></div>
+    <div class="fld"><label>시작일</label><input type="date" id="lvFrom"></div>
+    <div class="fld"><label>종료일</label><input type="date" id="lvTo"></div>
+    <div class="fld w4"><label>사유(선택)</label><input id="lvReason"></div>
+    <div class="fld w4" id="lvSpecialWrap" style="display:none">
+      <label style="color:var(--gold)">⚠ 그날 이미 휴가자가 있습니다. 특별사정이면 사유를 적고 신청하세요.</label>
+      <input id="lvSpecial" placeholder="특별사정 사유">
+    </div>
+  </div>
+  <button class="hbtn pri" style="margin-top:12px" onclick="submitLeave()">신청</button>
+  <div class="msg" id="lvMsg"></div>
+</div></div>
+
+<!-- 결재 기안 -->
+<div class="mask" id="apMask"><div class="modal">
+  <h3>🖊 결재 올리기<button class="x" onclick="hide('apMask')">✕</button></h3>
+  <div class="grid">
+    <div class="fld"><label>종류</label><select id="apKind"><option>사직서</option><option>보고</option><option>소명</option><option>기타</option></select></div>
+    <div class="fld w2"><label>제목</label><input id="apTitle"></div>
+    <div class="fld w4"><label>내용</label><textarea id="apBody"></textarea></div>
+  </div>
+  <div class="hint">결재선: 나 → 실장 → 원장 (각 단계 도장). 사직서는 취업규칙상 최소 4주 전 제출입니다.</div>
+  <button class="hbtn pri" style="margin-top:10px" onclick="submitApproval()">올리기</button>
+  <div class="msg" id="apMsg"></div>
+</div></div>
+
+<!-- 공지 작성 -->
+<div class="mask" id="ntMask"><div class="modal">
+  <h3>📢 공지 작성<button class="x" onclick="hide('ntMask')">✕</button></h3>
+  <div class="grid">
+    <div class="fld w4"><label>제목</label><input id="ntTitle"></div>
+    <div class="fld w4"><label>내용(짧게)</label><textarea id="ntBody"></textarea></div>
+    <div class="fld w4"><label>긴 글은 노션 링크(선택)</label><input id="ntUrl" placeholder="https://notion.so/..."></div>
+    <div class="fld"><label><input type="checkbox" id="ntPin"> 상단 고정</label></div>
+  </div>
+  <button class="hbtn pri" style="margin-top:10px" onclick="submitNotice()">게시</button>
+  <div class="msg" id="ntMsg"></div>
+</div></div>
+
+<!-- 엑셀 미리보기 -->
+<div class="mask" id="xlMask"><div class="modal wide">
+  <h3>🗂 지문 근태 업로드 — 미리보기<button class="x" onclick="hide('xlMask')">✕</button></h3>
+  <div id="xlSummary" class="sub"></div>
+  <div id="xlUnmapped"></div>
+  <div class="tblwrap" style="margin-top:8px"><table id="xlTable"></table></div>
+  <div class="hint">지각 컷 09:40(시업 10:00) · 연장 10분 단위 버림 · 야간조 체크 시 종업 20:00 기준. 저장하면 해당 월 attendance에 기록됩니다.</div>
+  <button class="hbtn pri" style="margin-top:10px" id="xlSaveBtn" onclick="saveAttendance()">저장</button>
+  <div class="msg" id="xlMsg"></div>
+</div></div>
+
+<footer>© 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지</footer>
+
+<script>
+/* ═══════ 설정(원장 수정 구역) ═══════ */
+const LATE_CUT = '09:40';                 // 이 시각 초과 = 지각 (시업 10:00)
+const OT_UNIT = 10;                        // 연장 분 단위(버림)
+function jongeop(dateStr, evening){        // 종업시각 (요일·야간조)
+  const d = new Date(dateStr+'T00:00:00').getDay(); // 0일 6토
+  if(d===0) return '14:00';
+  if(d===6) return '17:00';
+  return evening ? '20:00' : '18:30';
+}
+/* ════════════════════════════════════ */
+
+const SB_URL = 'https://texevhsxttfoqkrucfzl.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRleGV2aHN4dHRmb3FrcnVjZnpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMTMyNTIsImV4cCI6MjA5ODc4OTI1Mn0.v6zejbNx4Z4otGNc8hQeQum4c_wdst1azUkLx6s_9CM';
+const sb = (typeof supabase!=='undefined') ? supabase.createClient(SB_URL, SB_KEY) : null;
+
+let ME={id:'',email:'',name:'',role:'staff'}, PROFILES=[], TAB='home', xlRows=[];
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const today=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());};
+const md=s=>s?String(s).slice(5).replace('-','/'):'';
+const isLead=()=>['chief','owner'].includes(ME.role);
+const isMgr=()=>['manager','chief','owner'].includes(ME.role);
+const nameOf=uid=>{const p=PROFILES.find(x=>x.user_id===uid);return p?p.name:(uid||'').slice(0,6);};
+const toMin=t=>{if(!t)return null;const[h,m]=String(t).slice(0,5).split(':').map(Number);return h*60+m;};
+const minToT=m=>{const h=Math.floor(m/60),mm=m%60,p=n=>String(n).padStart(2,'0');return p(h)+':'+p(mm);};
+function setStatus(k){const el=$('#saveTag');if(!el)return;el.classList.remove('err');
+  if(k==='saving')el.textContent='저장 중…';else if(k==='saved'){el.textContent='✓ 저장됨';setTimeout(()=>el.textContent='✓ 자동 저장',1200);}
+  else if(k==='error'){el.textContent='⚠ 저장 안됨 · 인터넷 확인';el.classList.add('err');}else el.textContent='✓ 자동 저장';}
+function show(id){$('#'+id).classList.add('show');}function hide(id){$('#'+id).classList.remove('show');}
+
+/* ── 탭 정의 (role 노출) ── */
+const TABS=[
+  {key:'home',  label:'홈',        roles:['staff','manager','chief','owner']},
+  {key:'att',   label:'출퇴근',    roles:['staff','manager','chief','owner']},
+  {key:'leave', label:'연차',      roles:['staff','manager','chief','owner']},
+  {key:'appr',  label:'결재함',    roles:['staff','manager','chief','owner']},
+  {key:'notice',label:'공지',      roles:['staff','manager','chief','owner']},
+  {key:'onbo',  label:'입사서류',  roles:['staff','manager','chief','owner']},
+  {key:'owner', label:'원장',      roles:['owner']},
+];
+let BADGE={};
+function renderNav(){
+  $('#nav').innerHTML=TABS.filter(t=>t.roles.includes(ME.role)).map(t=>{
+    const c=BADGE[t.key]?`<span class="cnt">${BADGE[t.key]}</span>`:'';
+    return `<button class="${t.key===TAB?'on':''}" onclick="go('${t.key}')">${t.label}${c}</button>`;
+  }).join('');
+}
+function go(k){TAB=k;renderNav();render();}
+
+/* ── 데이터 로드 ── */
+async function loadProfiles(){
+  const {data}=await sb.from('profiles').select('*').order('name');
+  PROFILES=data||[];
+}
+async function refreshBadges(){
+  BADGE={};
+  // 내 미읽음 공지
+  const {data:nt}=await sb.from('notices').select('id');
+  const {data:rd}=await sb.from('notice_reads').select('notice_id').eq('user_id',ME.id);
+  const readset=new Set((rd||[]).map(r=>r.notice_id));
+  BADGE.notice=(nt||[]).filter(n=>!readset.has(n.id)).length||0;
+  // 결재 대기(내가 처리자)
+  if(isLead()){
+    const {data:st}=await sb.from('approval_steps').select('id,approver_role,status').eq('status','대기').eq('approver_role',ME.role);
+    BADGE.appr=(st||[]).length||0;
+    const {data:lv}=await sb.from('leave_requests').select('id,status');
+    BADGE.leave=(lv||[]).filter(r=>ME.role==='chief'?r.status==='대기':r.status==='1차승인').length||0;
+  }
+  // 내 미제출 온보딩
+  const {data:oi}=await sb.from('onboarding_items').select('id').eq('active',true);
+  const {data:oc}=await sb.from('onboarding_checks').select('item_id,status').eq('user_id',ME.id);
+  const done=new Set((oc||[]).filter(c=>c.status!=='미제출').map(c=>c.item_id));
+  BADGE.onbo=(oi||[]).filter(i=>!done.has(i.id)).length||0;
+  renderNav();
+}
+
+/* ── 렌더 라우터 ── */
+async function render(){
+  const m=$('#main');m.innerHTML='<div class="empty">불러오는 중…</div>';
+  try{
+    if(TAB==='home')await renderHome(m);
+    else if(TAB==='att')await renderAtt(m);
+    else if(TAB==='leave')await renderLeave(m);
+    else if(TAB==='appr')await renderAppr(m);
+    else if(TAB==='notice')await renderNotice(m);
+    else if(TAB==='onbo')await renderOnbo(m);
+    else if(TAB==='owner')renderOwner(m);
+  }catch(e){console.error(e);m.innerHTML='<div class="card"><div class="empty">오류: '+esc(e.message)+'</div></div>';}
+}
+
+/* ── 홈 ── */
+async function renderHome(m){
+  const {data:bal}=await sb.from('v_leave_balance').select('*').eq('user_id',ME.id).maybeSingle();
+  const {data:notices}=await sb.from('notices').select('*').order('pinned',{ascending:false}).order('created_at',{ascending:false}).limit(5);
+  const {data:oi}=await sb.from('onboarding_items').select('*').eq('active',true);
+  const {data:oc}=await sb.from('onboarding_checks').select('*').eq('user_id',ME.id);
+  const doneItems=new Set((oc||[]).filter(c=>c.status!=='미제출').map(c=>c.item_id));
+  const undone=(oi||[]).filter(i=>!doneItems.has(i.id));
+  m.innerHTML=`
+  <div class="card"><h2>안녕하세요, ${esc(ME.name)}님</h2>
+    <div class="rowflex">
+      <div class="stat"><div class="sub">내 연차 잔여</div><div class="big">${bal?bal.balance:0}<span style="font-size:14px"> 일</span></div></div>
+      <div class="stat"><div class="sub">안 읽은 공지</div><div class="big">${BADGE.notice||0}</div></div>
+      <div class="stat"><div class="sub">미제출 서류</div><div class="big" style="color:${undone.length?'var(--gold)':'var(--mint)'}">${undone.length}</div></div>
+    </div>
+    ${undone.length?`<div class="hint" style="color:var(--gold)">⚠ 미제출: ${undone.map(i=>esc(i.label)).join(', ')} — [입사서류] 탭에서 제출하세요.</div>`:''}
+  </div>
+  <div class="card"><h2>📢 최근 공지</h2>${(notices||[]).length?(notices||[]).map(n=>
+    `<div style="padding:6px 0;border-bottom:1px dashed var(--line)">${n.pinned?'📌 ':''}<b>${esc(n.title)}</b> <span class="sub">${md(n.created_at)}</span>
+     ${n.notion_url?` · <a href="${esc(n.notion_url)}" target="_blank" rel="noopener">전문 보기 ↗</a>`:''}
+     <div class="sub">${esc(n.body||'')}</div></div>`).join(''):'<div class="empty">공지 없음</div>'}</div>`;
+  // 읽음 처리
+  for(const n of (notices||[])) sb.from('notice_reads').upsert({notice_id:n.id,user_id:ME.id},{onConflict:'notice_id,user_id'}).then(()=>{});
+  refreshBadges();
+}
+
+/* ── 출퇴근 ── */
+async function renderAtt(m){
+  const month=(new Date().toISOString().slice(0,7));
+  if(isMgr()){
+    const {data:mrow}=await sb.from('att_months').select('*').eq('month',month).maybeSingle();
+    const {data:iss}=await sb.from('attendance_issues').select('*').order('created_at',{ascending:false}).limit(30);
+    m.innerHTML=`
+    <div class="card"><h2>🗂 지문 근태 — 월 마감 <span class="sub">(${month})</span></h2>
+      <p class="sub">지문인식기 엑셀(.xls/.xlsx)을 올리면 출근·퇴근·지각·연장을 자동 판정합니다. (하루 최초 인식=출근, 최후=퇴근)</p>
+      <div style="margin:10px 0"><input type="file" id="xlFile" accept=".xls,.xlsx" onchange="parseXls(event)"></div>
+      <div class="sub">이번 달 상태: <b class="${mrow&&mrow.status==='확정'?'':'b wait'}">${mrow?mrow.status:'미집계'}</b>
+        ${ME.role==='owner'?`<button class="mini" style="margin-left:8px" onclick="closeMonth('${month}')">이번 달 확정</button>`:''}</div>
+    </div>
+    <div class="card"><h2>🙋 지문누락 소명 <span class="sub">(실장·원장 승인)</span></h2>
+      ${(iss||[]).length?`<div class="tblwrap"><table><tr><th>직원</th><th>날짜</th><th>유형</th><th>사유</th><th>상태</th><th></th></tr>
+      ${(iss||[]).map(i=>`<tr><td>${esc(nameOf(i.user_id))}</td><td>${md(i.work_date)}</td><td>${esc(i.type||'')}</td><td>${esc(i.reason||'')}</td>
+        <td><span class="b ${i.status==='원장확정'?'ok':(i.status==='반려'?'no':'wait')}">${esc(i.status)}</span></td>
+        <td>${issueBtns(i)}</td></tr>`).join('')}</table></div>`:'<div class="empty">소명 없음</div>'}
+    </div>`;
+  } else {
+    const {data:att}=await sb.from('attendance').select('*').eq('user_id',ME.id).gte('work_date',month+'-01').order('work_date',{ascending:false});
+    m.innerHTML=`
+    <div class="card"><h2>🕘 내 출퇴근 <span class="sub">(${month})</span></h2>
+      ${(att||[]).length?`<div class="tblwrap"><table><tr><th>날짜</th><th>출근</th><th>퇴근</th><th>지각</th><th>연장</th></tr>
+      ${(att||[]).map(a=>`<tr class="${a.late_min>0?'warn':''}"><td>${md(a.work_date)}</td><td>${a.clock_in||'-'}</td><td>${a.clock_out||'-'}</td>
+        <td>${a.late_min>0?'<span class="b no">지각 '+a.late_min+'분</span>':'-'}</td><td>${a.overtime_min>0?a.overtime_min+'분':'-'}</td></tr>`).join('')}</table></div>`
+      :'<div class="empty">이번 달 기록 없음 (지문은 월말 일괄 입력)</div>'}
+      <div class="hint">기록이 실제와 다르면 관리자에게 <b>지문누락 소명</b>을 요청하세요.
+        <button class="mini" onclick="openIssue()">소명 올리기</button></div>
+    </div>`;
+  }
+}
+function issueBtns(i){
+  if(ME.role==='chief'&&i.status==='대기')return `<button class="mini stamp" onclick="issueAct(${i.id},'chief')">실장 승인</button> <button class="mini rej" onclick="issueAct(${i.id},'rej')">반려</button>`;
+  if(ME.role==='owner'&&i.status==='실장승인')return `<button class="mini stamp" onclick="issueAct(${i.id},'owner')">원장 확정</button> <button class="mini rej" onclick="issueAct(${i.id},'rej')">반려</button>`;
+  return '';
+}
+async function issueAct(id,act){
+  const patch=act==='rej'?{status:'반려'}:(act==='chief'?{status:'실장승인',chief_by:ME.name,chief_at:new Date().toISOString()}:{status:'원장확정',owner_by:ME.name,owner_at:new Date().toISOString()});
+  await sb.from('attendance_issues').update(patch).eq('id',id);setStatus('saved');render();
+}
+async function openIssue(){
+  const wd=prompt('소명할 근무일 (YYYY-MM-DD):',today());if(!wd)return;
+  const reason=prompt('사유 (예: 지문 찍었으나 인식 누락):');if(!reason)return;
+  await sb.from('attendance_issues').insert({user_id:ME.id,work_date:wd,type:'정정',reason});setStatus('saved');alert('소명을 올렸습니다. 실장 승인 후 반영됩니다.');
+}
+async function closeMonth(month){
+  if(!confirm(month+' 근태를 확정할까요? (이후 수정은 소명/정정으로)'))return;
+  await sb.from('att_months').upsert({month,status:'확정',closed_by:ME.name,closed_at:new Date().toISOString()},{onConflict:'month'});setStatus('saved');render();
+}
+
+/* 엑셀 파싱 */
+function parseXls(ev){
+  const f=ev.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true});
+      buildPreview(aoa);
+    }catch(err){alert('엑셀을 읽지 못했습니다: '+err.message);}
+  };
+  rd.readAsArrayBuffer(f);
+}
+function findCol(hdr,keys){return hdr.findIndex(h=>h&&keys.some(k=>String(h).replace(/\s/g,'').includes(k)));}
+function excelToDate(v){ // v = Date(cellDates) or serial number
+  if(v instanceof Date) return v;
+  if(typeof v==='number'){const d=new Date(Date.UTC(1899,11,30)+v*864e5);return d;}
+  return null;
+}
+function buildPreview(aoa){
+  const hdr=aoa[0]||[];
+  const cId=findCol(hdr,['사번','USERID','USER ID','아이디']);
+  const cDate=findCol(hdr,['발생일','일자','날짜']);
+  const cTime=findCol(hdr,['입실시간','발생시각','시간','시각']);
+  if(cId<0||cDate<0){alert('열을 찾지 못했습니다(사번/발생일). 다른 형식이면 알려주세요.');return;}
+  // fp_id → user
+  const fpMap={};PROFILES.forEach(p=>{if(p.fp_id)fpMap[String(p.fp_id).trim()]=p;});
+  const group={},unmapped=new Set();
+  for(let i=1;i<aoa.length;i++){
+    const r=aoa[i];if(!r||r[cId]==null||r[cId]==='')continue;
+    const fp=String(r[cId]).trim();
+    const dt=excelToDate(r[cDate]);if(!dt)continue;
+    const ds=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+    let tmin=null;
+    if(cTime>=0){const tv=excelToDate(r[cTime]);if(tv)tmin=tv.getHours()*60+tv.getMinutes();}
+    if(tmin==null && dt.getHours()+dt.getMinutes()>0)tmin=dt.getHours()*60+dt.getMinutes();
+    const key=fp+'|'+ds;
+    if(!group[key])group[key]={fp,ds,times:[]};
+    if(tmin!=null)group[key].times.push(tmin);
+    if(!fpMap[fp])unmapped.add(fp);
+  }
+  xlRows=Object.values(group).map(g=>{
+    g.times.sort((a,b)=>a-b);
+    const ci=g.times.length?g.times[0]:null, co=g.times.length>1?g.times[g.times.length-1]:null;
+    const prof=fpMap[g.fp];
+    return {fp:g.fp, user_id:prof?prof.user_id:null, name:prof?prof.name:('사번 '+g.fp), ds:g.ds, ci, co, evening:false, single:g.times.length<2};
+  }).sort((a,b)=>a.ds<b.ds?-1:1);
+  const um=[...unmapped];
+  $('#xlSummary').innerHTML=`총 <b>${xlRows.length}</b>행 · 직원 매핑 <b>${xlRows.filter(r=>r.user_id).length}</b> / 미매핑 <b style="color:var(--red)">${xlRows.filter(r=>!r.user_id).length}</b>`;
+  $('#xlUnmapped').innerHTML=um.length?`<div class="hint" style="color:var(--gold)">⚠ 미매핑 사번: ${um.map(f=>`${f} <select class="mini" onchange="mapFp('${f}',this.value)"><option value="">직원 선택</option>${PROFILES.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select>`).join(' ')}</div>`:'';
+  renderXlTable();
+  show('xlMask');
+}
+window.mapFp=async(fp,uid)=>{if(!uid)return;await sb.from('profiles').update({fp_id:fp}).eq('user_id',uid);await loadProfiles();
+  const prof=PROFILES.find(p=>p.user_id===uid);xlRows.forEach(r=>{if(r.fp===fp){r.user_id=uid;r.name=prof.name;}});renderXlTable();$('#xlUnmapped').innerHTML='';setStatus('saved');};
+function calcRow(r){
+  const late = r.ci!=null ? Math.max(0, r.ci - toMin(LATE_CUT)) : 0;
+  let ot=0; if(r.co!=null){const je=toMin(jongeop(r.ds,r.evening)); ot=Math.max(0, r.co-je); ot=Math.floor(ot/OT_UNIT)*OT_UNIT;}
+  return {late,ot};
+}
+function renderXlTable(){
+  $('#xlTable').innerHTML=`<tr><th>날짜</th><th>직원</th><th>출근</th><th>퇴근</th><th>지각</th><th>연장</th><th>야간조</th><th>비고</th></tr>`+
+  xlRows.map((r,i)=>{const c=calcRow(r);const bad=!r.user_id||r.single;
+    return `<tr class="${bad?'warn':''}"><td>${md(r.ds)}</td><td>${esc(r.name)}</td><td>${r.ci!=null?minToT(r.ci):'-'}</td><td>${r.co!=null?minToT(r.co):'-'}</td>
+    <td>${c.late>0?'<span class="b no">'+c.late+'분</span>':'-'}</td><td>${c.ot>0?c.ot+'분':'-'}</td>
+    <td><input type="checkbox" ${r.evening?'checked':''} onchange="xlRows[${i}].evening=this.checked;renderXlTable()"></td>
+    <td>${!r.user_id?'<span class="b no">미매핑</span>':(r.single?'<span class="b wait">단일 인식(누락?)</span>':'')}</td></tr>`;
+  }).join('');
+}
+async function saveAttendance(){
+  const rows=xlRows.filter(r=>r.user_id);
+  if(!rows.length){$('#xlMsg').textContent='매핑된 행이 없습니다.';return;}
+  $('#xlMsg').textContent='저장 중…';setStatus('saving');
+  const holi=new Set((await sb.from('holidays').select('date')).data?.map(h=>h.date)||[]);
+  const payload=rows.map(r=>{const c=calcRow(r);return {user_id:r.user_id,work_date:r.ds,clock_in:r.ci!=null?minToT(r.ci)+':00':null,clock_out:r.co!=null?minToT(r.co)+':00':null,
+    source:'fp',late_min:c.late,overtime_min:c.ot,evening:r.evening,is_holiday:holi.has(r.ds)};});
+  const {error}=await sb.from('attendance').upsert(payload,{onConflict:'user_id,work_date'});
+  if(error){$('#xlMsg').textContent='실패: '+error.message;setStatus('error');return;}
+  // 소명 자동 생성: 단일 인식(누락 의심)
+  const miss=rows.filter(r=>r.single);
+  for(const r of miss){await sb.from('attendance_issues').upsert({user_id:r.user_id,work_date:r.ds,type:r.ci!=null&&r.co==null?'종업누락':'시업누락',reason:'지문 단일 인식(자동 감지)',rule_label:'자동'},{onConflict:'user_id,work_date'}).then(()=>{}).catch(()=>{});}
+  setStatus('saved');$('#xlMsg').textContent=`저장 완료: ${payload.length}건${miss.length?` · 누락 의심 ${miss.length}건 소명 대기 생성`:''}`;
+  setTimeout(()=>{hide('xlMask');render();},1200);
+}
+
+/* ── 연차 ── */
+async function renderLeave(m){
+  const {data:bal}=await sb.from('v_leave_balance').select('*').eq('user_id',ME.id).maybeSingle();
+  const {data:mine}=await sb.from('leave_requests').select('*').eq('user_id',ME.id).order('created_at',{ascending:false}).limit(20);
+  let leadHtml='';
+  if(isLead()){
+    const {data:pend}=await sb.from('leave_requests').select('*').in('status',['대기','1차승인']).order('date_from');
+    const forme=(pend||[]).filter(r=>ME.role==='chief'?r.status==='대기':r.status==='1차승인');
+    leadHtml=`<div class="card"><h2>✅ 승인 대기 <span class="sub">(${ME.role==='chief'?'실장 1차':'원장 최종'})</span></h2>
+      ${forme.length?`<div class="tblwrap"><table><tr><th>직원</th><th>유형</th><th>기간</th><th>일수</th><th>사유</th><th></th></tr>
+      ${forme.map(r=>`<tr class="${r.special?'warn':''}"><td>${esc(nameOf(r.user_id))}</td><td>${esc(r.type)}${r.type_note?'('+esc(r.type_note)+')':''}</td>
+        <td>${md(r.date_from)}~${md(r.date_to)}</td><td>${r.days}</td><td>${esc(r.reason||'')}${r.special?' <span class="b no">특별사정</span> '+esc(r.special_reason||''):''}</td>
+        <td><button class="mini stamp" onclick="leaveAct(${r.id},'ok')">${ME.role==='chief'?'실장 승인':'원장 승인'}</button> <button class="mini rej" onclick="leaveAct(${r.id},'rej')">반려</button></td></tr>`).join('')}</table></div>`:'<div class="empty">대기 없음</div>'}</div>`;
+  }
+  let grantHtml=ME.role==='owner'?`<div class="card"><h2>➕ 연차 부여/조정 <span class="sub">(원장)</span></h2>
+    <div class="rowflex"><select id="gvUser" class="mini">${PROFILES.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select>
+    <select id="gvKind" class="mini"><option>부여</option><option>조정</option></select>
+    <input id="gvDays" class="mini" type="number" step="0.5" placeholder="일수" style="width:80px">
+    <input id="gvNote" class="mini" placeholder="메모(예: 2026년 정기부여)">
+    <button class="mini stamp" onclick="grantLeave()">기록</button></div>
+    <div class="hint">입사 1년(365일) 도달 시 15일 일괄 부여가 원칙. 1년 미만은 월 개근 1일.</div></div>`:'';
+  m.innerHTML=`
+  <div class="card"><h2>📅 내 연차</h2>
+    <div class="rowflex"><div class="stat"><div class="sub">잔여</div><div class="big">${bal?bal.balance:0}<span style="font-size:14px"> 일</span></div></div></div>
+    <button class="hbtn pri" style="margin-top:10px" onclick="openLeave()">연차 신청</button>
+    <h3>내 신청 내역</h3>
+    ${(mine||[]).length?`<div class="tblwrap"><table><tr><th>유형</th><th>기간</th><th>일수</th><th>상태</th></tr>
+    ${(mine||[]).map(r=>`<tr><td>${esc(r.type)}</td><td>${md(r.date_from)}~${md(r.date_to)}</td><td>${r.days}</td>
+      <td><span class="b ${r.status==='승인'?'ok':(r.status==='반려'?'no':'wait')}">${esc(r.status)}</span></td></tr>`).join('')}</table></div>`:'<div class="empty">신청 내역 없음</div>'}
+  </div>${leadHtml}${grantHtml}`;
+}
+$('#lvType') && $('#lvType').addEventListener('change',e=>{$('#lvNoteWrap').style.display=e.target.value==='기타'?'':'none';});
+function openLeave(){$('#lvFrom').value=today();$('#lvTo').value=today();$('#lvReason').value='';$('#lvNote').value='';$('#lvSpecial').value='';$('#lvSpecialWrap').style.display='none';$('#lvMsg').textContent='';show('lvMask');checkClash();}
+['lvFrom','lvTo'].forEach(id=>{const el=$('#'+id);if(el)el.addEventListener('change',checkClash);});
+async function checkClash(){
+  const f=$('#lvFrom').value,t=$('#lvTo').value;if(!f||!t)return;
+  const {data}=await sb.from('leave_requests').select('user_id,date_from,date_to').eq('status','승인');
+  const clash=(data||[]).some(r=>!(t<r.date_from||f>r.date_to)&&r.user_id!==ME.id);
+  $('#lvSpecialWrap').style.display=clash?'':'none';
+}
+async function submitLeave(){
+  const f=$('#lvFrom').value,t=$('#lvTo').value;if(!f||!t){$('#lvMsg').textContent='기간을 입력하세요.';return;}
+  if(t<f){$('#lvMsg').textContent='종료일이 시작일보다 빠릅니다.';return;}
+  const type=$('#lvType').value;
+  const clashVisible=$('#lvSpecialWrap').style.display!=='none';
+  const special=clashVisible&&$('#lvSpecial').value.trim()!=='';
+  if(clashVisible&&!special){$('#lvMsg').textContent='그날 이미 휴가자가 있습니다. 특별사정 사유를 적어야 신청됩니다.';return;}
+  const days=type==='반차'?0.5:((new Date(t)-new Date(f))/864e5+1);
+  const {error}=await sb.from('leave_requests').insert({user_id:ME.id,type,type_note:type==='기타'?$('#lvNote').value:null,
+    date_from:f,date_to:t,days,reason:$('#lvReason').value||null,special,special_reason:special?$('#lvSpecial').value:null});
+  if(error){$('#lvMsg').textContent='실패: '+error.message;return;}
+  hide('lvMask');setStatus('saved');render();refreshBadges();
+}
+async function leaveAct(id,act){
+  const {data:r}=await sb.from('leave_requests').select('*').eq('id',id).single();
+  if(act==='rej'){await sb.from('leave_requests').update({status:'반려'}).eq('id',id);}
+  else if(ME.role==='chief'){await sb.from('leave_requests').update({status:'1차승인',chief_by:ME.name,chief_at:new Date().toISOString()}).eq('id',id);}
+  else if(ME.role==='owner'){await sb.from('leave_requests').update({status:'승인',owner_by:ME.name,owner_at:new Date().toISOString()}).eq('id',id);
+    await sb.from('leave_ledger').insert({user_id:r.user_id,kind:'사용',days:r.days,ref:id,note:`${r.type} ${r.date_from}~${r.date_to}`});}
+  setStatus('saved');render();refreshBadges();
+}
+async function grantLeave(){
+  const uid=$('#gvUser').value,kind=$('#gvKind').value,days=parseFloat($('#gvDays').value);
+  if(!days){alert('일수를 입력하세요');return;}
+  await sb.from('leave_ledger').insert({user_id:uid,kind,days,note:$('#gvNote').value||null});setStatus('saved');render();
+}
+
+/* ── 결재함 ── */
+async function renderAppr(m){
+  const {data:mine}=await sb.from('approval_docs').select('*').eq('author',ME.id).order('created_at',{ascending:false}).limit(20);
+  let inbox='';
+  if(isLead()){
+    const {data:steps}=await sb.from('approval_steps').select('*').eq('status','대기').eq('approver_role',ME.role);
+    const ids=[...new Set((steps||[]).map(s=>s.doc_id))];
+    let docs=[];
+    if(ids.length){const {data:d}=await sb.from('approval_docs').select('*').in('id',ids).eq('status','진행');docs=d||[];}
+    inbox=`<div class="card"><h2>📥 내 결재 대기</h2>${docs.length?docs.map(d=>docCard(d,true)).join(''):'<div class="empty">대기 없음</div>'}</div>`;
+  }
+  m.innerHTML=`<div class="card"><h2>🖊 결재</h2><button class="hbtn pri" onclick="show('apMask');$('#apMsg').textContent='';">결재 올리기</button></div>
+  ${inbox}
+  <div class="card"><h2>📄 내가 올린 문서</h2>${(mine||[]).length?(mine||[]).map(d=>docCard(d,false)).join(''):'<div class="empty">없음</div>'}</div>`;
+}
+function docCard(d,actable){
+  const st=d.status==='완결'?'ok':(d.status==='반려'?'no':'wait');
+  return `<div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px">
+    <b>[${esc(d.kind)}] ${esc(d.title)}</b> <span class="b ${st}">${esc(d.status)}</span> <span class="sub">${md(d.created_at)} · ${esc(nameOf(d.author))}</span>
+    <div class="sub" style="margin:4px 0;white-space:pre-wrap">${esc(d.body||'')}</div>
+    <div id="steps-${d.id}" class="sub">…</div>
+    ${actable?`<div style="margin-top:6px"><button class="mini stamp" onclick="apprAct(${d.id},'ok')">🔴 도장(승인)</button> <button class="mini rej" onclick="apprAct(${d.id},'rej')">반려</button></div>`:''}
+  </div>`;
+}
+async function loadSteps(){
+  document.querySelectorAll('[id^="steps-"]').forEach(async el=>{
+    const id=el.id.split('-')[1];
+    const {data}=await sb.from('approval_steps').select('*').eq('doc_id',id).order('seq');
+    el.innerHTML='결재선: '+(data||[]).map(s=>`${s.approver_role==='chief'?'실장':'원장'} ${s.status==='승인'?'🔴':(s.status==='반려'?'✖':'⬜')}`).join(' → ');
+  });
+}
+async function apprAct(docId,act){
+  const {data:steps}=await sb.from('approval_steps').select('*').eq('doc_id',docId).order('seq');
+  const cur=(steps||[]).find(s=>s.status==='대기'&&s.approver_role===ME.role);
+  if(!cur){alert('현재 단계가 아닙니다.');return;}
+  if(act==='rej'){await sb.from('approval_steps').update({status:'반려',approver_id:ME.id,acted_at:new Date().toISOString()}).eq('id',cur.id);
+    await sb.from('approval_docs').update({status:'반려'}).eq('id',docId);}
+  else{await sb.from('approval_steps').update({status:'승인',approver_id:ME.id,stamp:ME.stamp||ME.name,acted_at:new Date().toISOString()}).eq('id',cur.id);
+    const rest=(steps||[]).filter(s=>s.status==='대기'&&s.id!==cur.id);
+    if(!rest.length)await sb.from('approval_docs').update({status:'완결'}).eq('id',docId);}
+  setStatus('saved');render();refreshBadges();
+}
+async function submitApproval(){
+  const kind=$('#apKind').value,title=$('#apTitle').value.trim();
+  if(!title){$('#apMsg').textContent='제목을 입력하세요.';return;}
+  const {data:doc,error}=await sb.from('approval_docs').insert({kind,title,body:$('#apBody').value,author:ME.id}).select().single();
+  if(error){$('#apMsg').textContent='실패: '+error.message;return;}
+  await sb.from('approval_steps').insert([{doc_id:doc.id,seq:1,approver_role:'chief'},{doc_id:doc.id,seq:2,approver_role:'owner'}]);
+  hide('apMask');$('#apTitle').value='';$('#apBody').value='';setStatus('saved');render();
+}
+
+/* ── 공지 ── */
+async function renderNotice(m){
+  const {data:list}=await sb.from('notices').select('*').order('pinned',{ascending:false}).order('created_at',{ascending:false});
+  m.innerHTML=`<div class="card"><h2>📢 공지</h2>${isLead()?'<button class="hbtn pri" onclick="show(\'ntMask\')">공지 작성</button>':''}
+    ${(list||[]).length?(list||[]).map(n=>`<div style="padding:8px 0;border-bottom:1px dashed var(--line)">
+      ${n.pinned?'📌 ':''}<b>${esc(n.title)}</b> <span class="sub">${md(n.created_at)} · ${esc(n.author||'')}</span>
+      ${n.notion_url?` · <a href="${esc(n.notion_url)}" target="_blank" rel="noopener">전문 ↗</a>`:''}
+      <div class="sub" style="white-space:pre-wrap">${esc(n.body||'')}</div>
+      ${isLead()?`<button class="mini rej" style="margin-top:4px" onclick="delNotice(${n.id})">삭제</button>`:''}</div>`).join(''):'<div class="empty">공지 없음</div>'}
+  </div>`;
+  for(const n of (list||[])) sb.from('notice_reads').upsert({notice_id:n.id,user_id:ME.id},{onConflict:'notice_id,user_id'}).then(()=>{});
+  refreshBadges();
+}
+async function submitNotice(){
+  const title=$('#ntTitle').value.trim();if(!title){$('#ntMsg').textContent='제목을 입력하세요.';return;}
+  await sb.from('notices').insert({title,body:$('#ntBody').value,notion_url:$('#ntUrl').value||null,pinned:$('#ntPin').checked,author:ME.name});
+  hide('ntMask');$('#ntTitle').value='';$('#ntBody').value='';$('#ntUrl').value='';$('#ntPin').checked=false;setStatus('saved');render();
+}
+async function delNotice(id){if(!confirm('삭제할까요?'))return;await sb.from('notices').delete().eq('id',id);setStatus('saved');render();}
+
+/* ── 온보딩 ── */
+async function renderOnbo(m){
+  const {data:items}=await sb.from('onboarding_items').select('*').eq('active',true).order('order_no');
+  const {data:checks}=await sb.from('onboarding_checks').select('*').eq('user_id',ME.id);
+  const cmap={};(checks||[]).forEach(c=>cmap[c.item_id]=c);
+  m.innerHTML=`<div class="card"><h2>📋 내 입사 제출물</h2>
+    <table><tr><th>항목</th><th>상태</th><th></th></tr>
+    ${(items||[]).map(it=>{const c=cmap[it.id];const s=c?c.status:'미제출';
+      return `<tr><td>${esc(it.label)}${it.required?' <span class="sub">(필수)</span>':''}</td>
+      <td><span class="b ${s==='확인'?'ok':(s==='제출'?'mid':'no')}">${s}</span></td>
+      <td>${s==='미제출'?`<button class="mini" onclick="submitOnbo(${it.id})">제출함</button>`:(s==='제출'&&isLead()?`<button class="mini stamp" onclick="confirmOnbo(${it.id})">확인</button>`:'')}</td></tr>`;}).join('')}
+    </table>${isLead()?'<div style="margin-top:8px"><input id="oiNew" class="mini" placeholder="새 제출 항목"> <button class="mini" onclick="addOnboItem()">항목 추가</button></div>':''}
+  </div>
+  ${isLead()?await onboOverview():''}`;
+}
+async function onboOverview(){
+  const {data:items}=await sb.from('onboarding_items').select('*').eq('active',true);
+  const {data:checks}=await sb.from('onboarding_checks').select('*');
+  const staff=PROFILES.filter(p=>p.active!==false);
+  const doneMap={};(checks||[]).forEach(c=>{if(c.status!=='미제출')doneMap[c.user_id+'|'+c.item_id]=1;});
+  const rows=staff.map(p=>{const miss=(items||[]).filter(i=>!doneMap[p.user_id+'|'+i.id]);return {name:p.name,miss};}).filter(r=>r.miss.length);
+  return `<div class="card"><h2>👀 미제출 현황 <span class="sub">(관리자)</span></h2>${rows.length?`<table><tr><th>직원</th><th>미제출</th></tr>
+    ${rows.map(r=>`<tr class="warn"><td>${esc(r.name)}</td><td>${r.miss.map(i=>esc(i.label)).join(', ')}</td></tr>`).join('')}</table>`:'<div class="empty">전원 제출 완료</div>'}
+    <div class="hint">미제출 페널티는 아직 미설정 — 현황만 집계됩니다.</div></div>`;
+}
+async function submitOnbo(itemId){await sb.from('onboarding_checks').upsert({user_id:ME.id,item_id:itemId,status:'제출',submitted_at:new Date().toISOString()},{onConflict:'user_id,item_id'});setStatus('saved');render();refreshBadges();}
+async function confirmOnbo(itemId){await sb.from('onboarding_checks').update({status:'확인',checked_by:ME.name,checked_at:new Date().toISOString()}).eq('item_id',itemId).eq('user_id',ME.id);setStatus('saved');render();}
+async function addOnboItem(){const l=$('#oiNew').value.trim();if(!l)return;await sb.from('onboarding_items').insert({label:l});setStatus('saved');render();}
+
+/* ── 원장 ── */
+function renderOwner(m){
+  m.innerHTML=`<div class="card"><h2>🔑 원장 전용</h2>
+    <div class="rowflex">
+      <div class="stat"><div class="sub">직원 명부</div><div>${PROFILES.length}명 · owner ${PROFILES.filter(p=>p.role==='owner').length}·chief ${PROFILES.filter(p=>p.role==='chief').length}·manager ${PROFILES.filter(p=>p.role==='manager').length}·staff ${PROFILES.filter(p=>p.role==='staff').length}</div></div>
+    </div>
+    <h3>직원 권한 관리 <span class="sub">(입퇴사·승진 시 여기서 변경)</span></h3>
+    <div class="tblwrap"><table><tr><th>이름</th><th>부서</th><th>입사</th><th>권한</th></tr>
+    ${PROFILES.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.dept||'')}</td><td>${p.hire_date||''}</td>
+      <td><select class="mini" onchange="setRole('${p.user_id}',this.value)">${['staff','manager','chief','owner'].map(r=>`<option ${p.role===r?'selected':''}>${r}</option>`).join('')}</select></td></tr>`).join('')}</table></div>
+  </div>
+  <div class="card"><h2>다음 마일스톤 <span class="sub">(설계 완료·구현 예정)</span></h2>
+    <div class="stub">M2 근무표·계약서 자동생성 · M3 급여 대시보드/명세서 발행·월말 평가·휴일근로 계산기 · M4 채용·입금피드·기공차트 통합<br>— 백엔드(표)는 이미 준비됨. 화면만 순차 추가.</div>
+  </div>`;
+}
+async function setRole(uid,role){await sb.from('profiles').update({role}).eq('user_id',uid);await loadProfiles();setStatus('saved');
+  if(uid===ME.id){ME.role=role;renderNav();}render();}
+
+/* ── 로그인 ── */
+let _inited=false;
+async function onAuthed(session){
+  $('#gate').style.display='none';$('#app').style.display='';
+  ME.id=session.user.id;ME.email=session.user.email;
+  if(_inited)return;_inited=true;
+  await loadProfiles();
+  let p=PROFILES.find(x=>x.user_id===ME.id);
+  if(!p){ // 프로필 없으면 자동 생성(staff)
+    await sb.from('profiles').insert({user_id:ME.id,name:ME.email.split('@')[0],role:'staff'}).then(()=>{});
+    await loadProfiles();p=PROFILES.find(x=>x.user_id===ME.id);
+  }
+  ME.name=p?p.name:ME.email.split('@')[0];ME.role=p?p.role:'staff';ME.stamp=p?p.stamp:null;
+  $('#meName').textContent=ME.name;$('#meRole').textContent=ME.role;
+  renderNav();await render();await refreshBadges();
+  // 결재선 표시(비동기)
+  document.addEventListener('click',()=>setTimeout(loadSteps,300));
+}
+async function doLogin(){
+  const msg=$('#lgMsg'),email=$('#lgEmail').value.trim(),pw=$('#lgPw').value;
+  if(!sb){msg.textContent='인터넷 연결이 필요합니다.';return;}
+  if(!email||!pw){msg.textContent='이메일과 비밀번호를 입력하세요.';return;}
+  msg.textContent='로그인 중…';
+  const {error}=await sb.auth.signInWithPassword({email,password:pw});
+  if(error)msg.textContent='이메일 또는 비밀번호가 올바르지 않습니다.';
+}
+async function boot(){
+  $('#lgBtn').addEventListener('click',doLogin);
+  $('#lgPw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+  $('#lgEmail').addEventListener('keydown',e=>{if(e.key==='Enter')$('#lgPw').focus();});
+  $('#logoutBtn').addEventListener('click',async()=>{try{await sb.auth.signOut();}catch(e){}location.reload();});
+  if(!sb){$('#gate').style.display='';$('#lgMsg').textContent='인터넷 연결 후 새로고침하세요.';return;}
+  sb.auth.onAuthStateChange((_e,s)=>{if(s)onAuthed(s);});
+  const {data:{session}}=await sb.auth.getSession();
+  if(session)onAuthed(session);else $('#gate').style.display='';
+}
+boot();
+setInterval(loadSteps,1500);
+</script>
+</body>
+</html>
