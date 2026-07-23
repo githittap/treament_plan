@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<!-- © 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지 -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>교정 케이스 보드 · 아산정플란트치과</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --bg:#0d1715; --card:#14201d; --panel:#182823; --ink:#e6f2ef; --gray:#8fa5a0; --line:#24332f;
+  --mint:#2fd9c4; --mint-dk:#0e2b27; --gold:#e3b341; --gold-bg:#2a2312; --red:#ff7b76; --red-bg:#2b1512;
+  --blue:#6fb2ff; --blue-bg:#13202e; --purple:#a98ef0; --purple-bg:#211a35;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;font-size:14px}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:13.5px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 9px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:rgba(47,217,196,.55)}
+textarea{resize:vertical;min-height:52px}
+input[type=date]{color-scheme:dark}
+
+/* ── 로그인 게이트 ── */
+.gate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100}
+.gate .box{width:min(360px,92vw);background:var(--card);border:1px solid var(--line);border-radius:16px;padding:28px 26px;text-align:center}
+.gate h1{font-size:19px;margin:6px 0 4px}
+.gate p{font-size:12.5px;color:var(--gray);margin-bottom:16px}
+.gate input{width:100%;margin-bottom:8px;font-size:15px;padding:10px}
+.gate .lg{width:100%;background:var(--mint);color:#062421;border:none;border-radius:9px;padding:11px;font-size:15px;font-weight:800}
+.gate .msg{font-size:12.5px;margin-top:10px;min-height:16px;color:var(--gray)}
+
+/* ── 헤더 ── */
+header{position:sticky;top:0;z-index:30;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+header .ttl{font-weight:800;font-size:16px;margin-right:4px}
+header .ttl small{color:var(--mint);font-weight:700}
+#q{width:150px}
+.chip{background:var(--card);border:1px solid var(--line);color:var(--gray);border-radius:16px;padding:5px 11px;font-size:12.5px;font-weight:700}
+.chip.on{background:var(--mint-dk);border-color:var(--mint);color:var(--mint)}
+.hbtn{background:var(--card);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:6px 11px;font-size:12.5px;font-weight:700}
+.hbtn:hover{border-color:var(--mint)}
+.hbtn.pri{background:var(--mint);color:#062421;border-color:var(--mint)}
+#saveTag{font-size:12px;color:var(--gray);margin-left:auto}
+#saveTag.err{color:var(--red)}
+
+/* ── 칸반 ── */
+#kanban{display:flex;gap:9px;overflow-x:auto;padding:12px 14px 40px;align-items:flex-start;min-height:calc(100vh - 60px)}
+.kcol{min-width:215px;width:215px;flex:0 0 auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px}
+.kcol h5{font-size:12.5px;color:var(--gray);margin:2px 4px 8px;display:flex;justify-content:space-between}
+.kcol h5 .cnt{color:var(--mint)}
+.kcol.money{border-color:#4a3c14}
+.kcol.ship{border-color:#28425e}
+.kc{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 9px;margin-bottom:8px;font-size:12px}
+.kc.late{border:1.5px solid var(--red)}
+.kc .nm{font-size:13.5px;font-weight:800}
+.kc .sub{color:var(--gray);font-size:11px}
+.kc .bd{margin:4px 0;display:flex;flex-wrap:wrap;gap:3px}
+.b{display:inline-block;border-radius:5px;padding:0 6px;font-size:10.5px;font-weight:700;line-height:1.7}
+.b.type{background:var(--mint-dk);color:var(--mint)}
+.b.trim{background:var(--panel);color:var(--gray);border:1px solid var(--line)}
+.b.early{background:var(--gold-bg);color:var(--gold)}
+.b.flag{background:var(--panel);color:var(--gray);border:1px solid var(--line)}
+.b.pay{background:var(--gold-bg);color:var(--gold)}
+.b.ok{background:var(--mint-dk);color:var(--mint)}
+.b.ship{background:var(--blue-bg);color:var(--blue)}
+.b.warn{background:var(--red-bg);color:var(--red)}
+.kc .line{margin:3px 0;color:var(--ink)}
+.kc .line.dim{color:var(--gray);font-size:11.5px}
+.kc a{color:var(--blue);text-decoration:none}
+.kc .mv{display:flex;gap:5px;margin-top:6px}
+.kc .mv button{flex:0 0 auto;background:var(--panel);border:1px solid var(--line);color:var(--gray);border-radius:7px;padding:3px 9px;font-size:12px}
+.kc .mv .open{flex:1;color:var(--ink)}
+.kc .mv button:hover{border-color:var(--mint);color:var(--mint)}
+
+/* ── 모달 공통 ── */
+.mask{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:4vh 10px}
+.mask.show{display:flex}
+.modal{background:var(--card);border:1px solid var(--line);border-radius:16px;width:min(760px,96vw);padding:18px 20px;margin-bottom:6vh}
+.modal h3{font-size:16px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.modal .x{margin-left:auto;background:none;border:none;color:var(--gray);font-size:20px}
+.tabs{display:flex;gap:6px;margin-bottom:12px}
+.tab{background:var(--panel);border:1px solid var(--line);color:var(--gray);border-radius:9px;padding:6px 13px;font-size:13px;font-weight:700}
+.tab.on{background:var(--mint-dk);border-color:var(--mint);color:var(--mint)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px 10px}
+.fld{display:flex;flex-direction:column;gap:3px}
+.fld label{font-size:11px;color:var(--gray);font-weight:700}
+.fld.w2{grid-column:span 2}
+.fld.w4{grid-column:1/-1}
+.sect{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+.sect h4{font-size:12.5px;color:var(--mint);margin-bottom:8px}
+.fbtns{display:flex;flex-wrap:wrap;gap:6px}
+.fbtn{background:var(--panel);border:1px solid var(--line);color:var(--gray);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700}
+.fbtn.on{background:var(--gold-bg);border-color:var(--gold);color:var(--gold)}
+.logs{max-height:220px;overflow-y:auto;font-size:12px;border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--bg)}
+.logs .lg1{padding:3px 0;border-bottom:1px dashed var(--line)}
+.logs .lg1:last-child{border:none}
+.logs .who{color:var(--gray);font-size:10.5px}
+.danger{background:var(--red-bg);border:1px solid #5c2420;color:var(--red);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700}
+.vtable{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0}
+.vtable th,.vtable td{border:1px solid var(--line);padding:5px 7px;text-align:left;vertical-align:top}
+.vtable th{background:var(--panel);color:var(--gray);font-size:11.5px}
+.vtable input,.vtable textarea{width:100%;font-size:12.5px;padding:4px 6px;min-height:0}
+.bar3y{height:10px;background:var(--bg);border:1px solid var(--line);border-radius:5px;overflow:hidden;margin:4px 0}
+.bar3y i{display:block;height:100%;background:var(--mint)}
+.bar3y.over i{background:var(--gold)}
+.listrow{display:flex;gap:8px;align-items:center;padding:7px 4px;border-bottom:1px dashed var(--line);font-size:13px}
+.listrow:last-child{border:none}
+.listrow .g{color:var(--gray);font-size:12px}
+.listrow button{background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:7px;padding:3px 9px;font-size:12px}
+.hint{font-size:11.5px;color:var(--gray);margin-top:6px}
+footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px;color:#4a5f5a;padding:4px;background:var(--bg);border-top:1px solid var(--line);z-index:20}
+@media(max-width:640px){ #q{width:110px} .kcol{min-width:190px;width:190px} .fld.w2{grid-column:span 1} }
+</style>
+</head>
+<body>
+
+<!-- 로그인 -->
+<div class="gate" id="gate" style="display:none">
+  <div class="box">
+    <div style="font-size:30px">🦷</div>
+    <h1>교정 케이스 보드</h1>
+    <p>기공차트와 같은 직원 계정으로 로그인하세요.<br>모든 기기가 같은 보드를 실시간 공유합니다.</p>
+    <input type="email" id="lgEmail" placeholder="이메일" autocomplete="username">
+    <input type="password" id="lgPw" placeholder="비밀번호" autocomplete="current-password">
+    <button class="lg" id="lgBtn">로그인</button>
+    <div class="msg" id="lgMsg"></div>
+  </div>
+</div>
+
+<!-- 앱 -->
+<div id="app" style="display:none">
+<header>
+  <span class="ttl">🦷 교정 보드 <small id="cntAll"></small></span>
+  <input id="q" placeholder="🔍 이름·차트번호">
+  <button class="chip" data-f="late">⚠ 지연</button>
+  <button class="chip" data-f="early">⚡ 조기논의</button>
+  <button class="chip" data-f="money">💰 대기</button>
+  <select id="fStaff" style="font-size:12.5px"><option value="">담당 전체</option></select>
+  <button class="hbtn pri" onclick="openNew()">➕ 새 케이스</button>
+  <button class="hbtn" onclick="openUpcoming()">🗓 다가오는 계획</button>
+  <button class="hbtn" onclick="openMgmt()">📂 진행 관리</button>
+  <button class="hbtn" onclick="openArch()">🗃 보관함</button>
+  <span id="saveTag">✓ 자동 저장</span>
+  <button class="hbtn" id="logoutBtn">로그아웃</button>
+</header>
+<div id="kanban"></div>
+</div>
+
+<!-- 상세 모달 -->
+<div class="mask" id="dMask"><div class="modal">
+  <h3>📋 <span id="dTitle"></span><button class="x" onclick="closeDetail()">✕</button></h3>
+  <div class="tabs">
+    <button class="tab on" id="tabInfo" onclick="switchTab('info')">정보·로그</button>
+    <button class="tab" id="tabVisit" onclick="switchTab('visit')">간이 진료기록부</button>
+  </div>
+
+  <div id="paneInfo">
+    <div class="grid" id="dGrid"></div>
+    <div class="sect"><h4>플래그</h4><div class="fbtns" id="dFlags"></div></div>
+    <div class="sect"><h4>활동 로그 <span style="color:var(--gray);font-weight:400">(자동 기록 + 수동 추가)</span></h4>
+      <div class="fbtns" style="margin-bottom:8px">
+        <button class="fbtn" onclick="addLog('call')">📞 통화 기록</button>
+        <button class="fbtn" onclick="addLog('pay')">💰 수납 메모</button>
+        <button class="fbtn" onclick="addLog('note')">📝 메모</button>
+      </div>
+      <div class="logs" id="dLogs">불러오는 중…</div>
+    </div>
+    <div class="sect" style="display:flex;justify-content:flex-end">
+      <button class="danger" onclick="softDelete()">🗑 이 케이스 숨기기(소프트 삭제)</button>
+    </div>
+  </div>
+
+  <div id="paneVisit" style="display:none">
+    <div id="v3y"></div>
+    <table class="vtable"><thead><tr><th style="width:92px">내원일</th><th>진행 내용</th><th>고려사항</th><th>다음 계획</th><th style="width:104px">예정일</th></tr></thead>
+    <tbody id="vRows"></tbody></table>
+    <div class="sect"><h4>➕ 내원 기록 추가</h4>
+      <div class="grid">
+        <div class="fld"><label>내원일</label><input type="date" id="nvDate"></div>
+        <div class="fld w2"><label>진행 내용 (예: 세트 5~8 전달)</label><input id="nvProg"></div>
+        <div class="fld"><label>다음 계획 예정일</label><input type="date" id="nvPlanDate"></div>
+        <div class="fld w2"><label>고려사항</label><input id="nvCons"></div>
+        <div class="fld w2"><label>다음 계획</label><input id="nvPlan"></div>
+      </div>
+      <button class="hbtn pri" style="margin-top:8px" onclick="addVisit()">기록 추가</button>
+      <div class="hint">지난 내원 기록은 다음날부터 잠깁니다(추가만 가능).</div>
+    </div>
+  </div>
+</div></div>
+
+<!-- 다가오는 계획 -->
+<div class="mask" id="uMask"><div class="modal">
+  <h3>🗓 다가오는 계획<button class="x" onclick="hide('uMask')">✕</button></h3>
+  <div id="uList">불러오는 중…</div>
+</div></div>
+
+<!-- 진행 관리 -->
+<div class="mask" id="mMask"><div class="modal">
+  <h3>📂 진행 관리 (장착 후 ~ 완료)<button class="x" onclick="hide('mMask')">✕</button></h3>
+  <div id="mList"></div>
+</div></div>
+
+<!-- 보관함 -->
+<div class="mask" id="aMask"><div class="modal">
+  <h3>🗃 보관함 (완료)<button class="x" onclick="hide('aMask')">✕</button></h3>
+  <div id="aList"></div>
+</div></div>
+
+<!-- 새 케이스 -->
+<div class="mask" id="nMask"><div class="modal" style="width:min(480px,96vw)">
+  <h3>➕ 새 케이스<button class="x" onclick="hide('nMask')">✕</button></h3>
+  <div class="grid">
+    <div class="fld w2"><label>환자명 *</label><input id="nName"></div>
+    <div class="fld"><label>차트번호</label><input id="nChart"></div>
+    <div class="fld"><label>유형</label><select id="nType"></select></div>
+    <div class="fld"><label>트림</label><select id="nTrim"></select></div>
+    <div class="fld"><label>담당 직원</label><input id="nStaff"></div>
+    <div class="fld"><label>초진일</label><input type="date" id="nStart"></div>
+  </div>
+  <button class="hbtn pri" style="margin-top:12px" onclick="createCase()">만들기</button>
+  <div class="msg" id="nMsg" style="font-size:12px;color:var(--red);margin-top:6px"></div>
+</div></div>
+
+<footer>© 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지</footer>
+
+<script>
+/* ═══════════ 설정 (원장님이 직접 수정하는 구역) ═══════════ */
+const STAGES = [
+  {key:'stage01', name:'1 초진'},
+  {key:'stage02', name:'2 자료 채득'},
+  {key:'stage03', name:'3 데이터 업로드'},
+  {key:'stage04', name:'4 진단비 대기 💰', money:true},
+  {key:'stage05', name:'5 진단 의뢰'},
+  {key:'stage06', name:'6 진단 상담'},
+  {key:'stage07', name:'7 50% 납부 대기 💰', money:true},
+  {key:'stage08', name:'8 처방 논의', warnDays:7},
+  {key:'stage09', name:'9 배송중 🚚', ship:true, warnDays:14},
+  {key:'stage10', name:'10 장착·전달'},
+  {key:'stage11', name:'11 진행 관리', mgmt:true}   /* 칸반엔 안 보이고 [진행 관리] 서랍에 */
+];
+const CASE_TYPES = ['Selecto','Full','기타'];       /* Selecto=얼라이너 개수당 산정 / Full=3년 공급·리파인먼트 무료 */
+const TRIMS = ['Scalloped','Straight'];             /* Scalloped=잇몸선까지(심미, 대부분) / Straight=+1.5mm(효과↑) */
+const SHIP_TO_APPT_DAYS = 21;                       /* 배송요청 → 예약목표 (트리거와 동일 값, 표시용) */
+/* ═══════════════════════════════════════════════════════ */
+
+const SB_URL = 'https://texevhsxttfoqkrucfzl.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRleGV2aHN4dHRmb3FrcnVjZnpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMTMyNTIsImV4cCI6MjA5ODc4OTI1Mn0.v6zejbNx4Z4otGNc8hQeQum4c_wdst1azUkLx6s_9CM';
+const sb = (typeof supabase!=='undefined') ? supabase.createClient(SB_URL, SB_KEY) : null;
+
+let ME='', cases=[], curId=null, filt={q:'',late:false,early:false,money:false,staff:''};
+
+/* ── 유틸 ── */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const today=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());};
+const md=s=>s?String(s).slice(5).replace('-','/'):'';
+const dday=s=>{if(!s)return null;return Math.round((new Date(s+'T00:00:00')-new Date(today()+'T00:00:00'))/864e5);};
+const ddayTxt=s=>{const n=dday(s);if(n==null)return'';return n===0?'D-day':(n>0?'D-'+n:'D+'+(-n));};
+const daysSince=iso=>iso?Math.floor((Date.now()-new Date(iso).getTime())/864e5):null;
+const F=(c,k)=>((c.flags||{})[k]);
+const stageOf=k=>STAGES.find(s=>s.key===k)||STAGES[0];
+const stageIdx=k=>Math.max(0,STAGES.findIndex(s=>s.key===k));
+function setStatus(k){const el=$('#saveTag');if(!el)return;el.classList.remove('err');
+  if(k==='saving')el.textContent='저장 중…';
+  else if(k==='saved'){el.textContent='✓ 저장됨';setTimeout(()=>el.textContent='✓ 자동 저장',1200);}
+  else if(k==='error'){el.textContent='⚠ 저장 안됨 · 인터넷 확인';el.classList.add('err');}
+  else el.textContent='✓ 자동 저장';}
+function hide(id){document.getElementById(id).classList.remove('show');}
+function show(id){document.getElementById(id).classList.add('show');}
+
+/* ── 지연 계산 ── */
+function delayDays(c){
+  const st=stageOf(c.stage_key);
+  if(!st.warnDays) return null;
+  const base = st.ship && c.ship_requested_at ? c.ship_requested_at+'T00:00:00' : (F(c,'stage_at')||c.created_at);
+  const d=daysSince(base);
+  return (d!=null && d>st.warnDays)? d : null;
+}
+
+/* ── 로드·렌더 ── */
+async function loadAll(){
+  try{
+    const {data,error}=await sb.from('ortho_cases').select('*').eq('deleted',false).order('created_at',{ascending:true});
+    if(error)throw error;
+    cases=data||[]; render(); fillStaff(); setStatus('idle');
+  }catch(e){console.error('load',e);setStatus('error');}
+}
+function fillStaff(){
+  const sel=$('#fStaff'),cur=sel.value;
+  const st=[...new Set(cases.map(c=>c.staff).filter(Boolean))].sort();
+  sel.innerHTML='<option value="">담당 전체</option>'+st.map(s=>`<option${s===cur?' selected':''}>${esc(s)}</option>`).join('');
+}
+function visible(c){
+  if(c.archived||stageOf(c.stage_key).mgmt)return false;
+  if(filt.q){const q=filt.q.toLowerCase();if(!(String(c.patient_name||'').toLowerCase().includes(q)||String(c.chart_no||'').toLowerCase().includes(q)))return false;}
+  if(filt.late&&!delayDays(c))return false;
+  if(filt.early&&!c.early_rx)return false;
+  if(filt.money&&!stageOf(c.stage_key).money)return false;
+  if(filt.staff&&c.staff!==filt.staff)return false;
+  return true;
+}
+function cardHTML(c){
+  const st=stageOf(c.stage_key), late=delayDays(c);
+  const b=[];
+  if(c.case_type)b.push(`<span class="b type">${esc(c.case_type)}</span>`);
+  if(F(c,'trim'))b.push(`<span class="b trim">${esc(F(c,'trim'))}</span>`);
+  if(c.early_rx)b.push(`<span class="b early">⚡조기논의</span>`);
+  if(F(c,'hold'))b.push(`<span class="b flag">⏸보류</span>`);
+  if(F(c,'stop'))b.push(`<span class="b flag">✖중단</span>`);
+  if(F(c,'remake'))b.push(`<span class="b flag">↻리메이크</span>`);
+  b.push(c.fee_dx_paid_at?`<span class="b ok">진단✓${md(c.fee_dx_paid_at)}</span>`:`<span class="b pay">진단비 대기</span>`);
+  b.push(c.fee_half_paid_at?`<span class="b ok">50%✓${md(c.fee_half_paid_at)}</span>`:`<span class="b pay">50% 전</span>`);
+  if(late)b.push(`<span class="b warn">⚠ ${late}일 경과</span>`);
+  let ship='';
+  if(c.ship_requested_at||c.tracking_no){
+    const tgt=c.appt_target_date?` · 🗓목표 ${md(c.appt_target_date)} (${ddayTxt(c.appt_target_date)})`:'';
+    const fx=c.tracking_no?` · <a href="https://www.fedex.com/fedextrack/?trknbr=${encodeURIComponent(c.tracking_no)}" target="_blank" rel="noopener">FedEx▸</a>`:'';
+    ship=`<div class="line"><span class="b ship">🚚${c.ship_requested_at?' 요청 '+md(c.ship_requested_at):''}</span>${tgt}${fx}</div>`;
+  }
+  const nx=c.next_action?`<div class="line dim">다음: ${esc(c.next_action)}${c.next_due?` (${ddayTxt(c.next_due)})`:''}</div>`:'';
+  return `<div class="kc${late?' late':''}">
+    <div class="nm">${esc(c.patient_name)} <span class="sub">${esc(c.chart_no||'')}</span></div>
+    <div class="bd">${b.join('')}</div>${ship}${nx}
+    <div class="line dim">${esc(c.staff||'담당 미정')}</div>
+    <div class="mv">
+      <button onclick="moveStage('${c.id}',-1)">◀</button>
+      <button class="open" onclick="openDetail('${c.id}')">상세</button>
+      <button onclick="moveStage('${c.id}',1)">▶</button>
+    </div></div>`;
+}
+function render(){
+  const kb=$('#kanban');
+  kb.innerHTML=STAGES.filter(s=>!s.mgmt).map(st=>{
+    const list=cases.filter(c=>c.stage_key===st.key&&visible(c))
+      .sort((a,b)=>(a.next_due||'9999')<(b.next_due||'9999')?-1:1);
+    return `<div class="kcol${st.money?' money':''}${st.ship?' ship':''}"><h5>${esc(st.name)}<span class="cnt">${list.length}</span></h5>${list.map(cardHTML).join('')}</div>`;
+  }).join('');
+  $('#cntAll').textContent='· 활성 '+cases.filter(c=>!c.archived&&!stageOf(c.stage_key).mgmt).length+'건';
+}
+
+/* ── 저장 ── */
+async function patchCase(id,patch,log){
+  try{
+    setStatus('saving');
+    const {data,error}=await sb.from('ortho_cases').update(patch).eq('id',id).select().single();
+    if(error)throw error;
+    const i=cases.findIndex(c=>c.id===id); if(i>=0)cases[i]=data;
+    if(log)await sb.from('ortho_events').insert({case_id:id,kind:log.kind,body:log.body,author:ME});
+    setStatus('saved'); render();
+    if(curId===id)renderDetail();
+    return data;
+  }catch(e){console.error('save',e);setStatus('error');}
+}
+const _t={};
+function queuePatch(id,field,val){clearTimeout(_t[id+field]);_t[id+field]=setTimeout(()=>patchCase(id,{[field]:val===''?null:val}),700);}
+
+/* ── 단계 이동 ── */
+async function moveStage(id,dir){
+  const c=cases.find(x=>x.id===id); if(!c)return;
+  const i=stageIdx(c.stage_key), j=i+dir;
+  if(j<0||j>=STAGES.length)return;
+  const from=STAGES[i].name, to=STAGES[j].name;
+  const flags=Object.assign({},c.flags||{},{stage_at:new Date().toISOString()});
+  await patchCase(id,{stage_key:STAGES[j].key,flags},{kind:'stage',body:`단계 이동: ${from} → ${to}`});
+}
+
+/* ── 상세 ── */
+function openDetail(id){curId=id;switchTab('info');show('dMask');renderDetail();loadLogs();}
+function closeDetail(){hide('dMask');curId=null;if(_reload){_reload=false;loadAll();}}
+function switchTab(t){
+  $('#tabInfo').classList.toggle('on',t==='info');$('#tabVisit').classList.toggle('on',t==='visit');
+  $('#paneInfo').style.display=t==='info'?'':'none';$('#paneVisit').style.display=t==='visit'?'':'none';
+  if(t==='visit')loadVisits();
+}
+const FIELDS=[
+  {k:'patient_name',l:'환자명',t:'text'},{k:'chart_no',l:'차트번호',t:'text'},
+  {k:'phone',l:'연락처',t:'text'},{k:'rrn',l:'주민등록번호',t:'text'},
+  {k:'case_type',l:'유형 (Selecto=개수당 / Full=3년 무료)',t:'sel',opts:CASE_TYPES,w:2},
+  {k:'__trim',l:'트림 (Scalloped=잇몸선·심미 / Straight=+1.5mm·효과↑)',t:'sel',opts:TRIMS,w:2},
+  {k:'diagnosis',l:'진단 내용',t:'ta',w:4},
+  {k:'start_date',l:'초진일',t:'date'},{k:'staff',l:'담당 직원',t:'text'},
+  {k:'fee_dx_amount',l:'진단비 청구액',t:'num'},{k:'fee_dx_paid_at',l:'진단비 입금일',t:'date'},
+  {k:'fee_half_amount',l:'50% 청구액',t:'num'},{k:'fee_half_paid_at',l:'50% 입금일',t:'date'},
+  {k:'depositor_name',l:'입금자명(다를 때)',t:'text'},
+  {k:'ship_requested_at',l:'배송요청일',t:'date'},{k:'appt_target_date',l:'예약목표일(자동 +'+SHIP_TO_APPT_DAYS+'일)',t:'ro'},
+  {k:'tracking_no',l:'Tracking No.',t:'text'},{k:'ship_status',l:'최근 배송상태',t:'text'},
+  {k:'next_action',l:'다음 액션',t:'text',w:2},{k:'next_due',l:'기한',t:'date'},
+  {k:'memo',l:'메모',t:'ta',w:4},
+];
+function renderDetail(){
+  const c=cases.find(x=>x.id===curId); if(!c)return;
+  $('#dTitle').textContent=`${c.patient_name} ${c.chart_no||''} · ${stageOf(c.stage_key).name}`;
+  $('#dGrid').innerHTML=FIELDS.map(f=>{
+    const w=f.w?` w${f.w}`:'';
+    let v=f.k==='__trim'?(F(c,'trim')||'Scalloped'):(c[f.k]==null?'':c[f.k]);
+    if(f.t==='ro'){const dd=c.appt_target_date?` <b style="color:var(--mint)">${ddayTxt(c.appt_target_date)}</b>`:'';
+      return `<div class="fld${w}"><label>${f.l}</label><div style="padding:6px 2px">${esc(v)||'—'}${dd}</div></div>`;}
+    if(f.t==='sel')return `<div class="fld${w}"><label>${f.l}</label><select data-k="${f.k}">${f.opts.map(o=>`<option${o===v?' selected':''}>${o}</option>`).join('')}${f.opts.includes(v)||!v?'':`<option selected>${esc(v)}</option>`}</select></div>`;
+    if(f.t==='ta')return `<div class="fld${w}"><label>${f.l}</label><textarea data-k="${f.k}">${esc(v)}</textarea></div>`;
+    const typ=f.t==='num'?'number':(f.t==='date'?'date':'text');
+    return `<div class="fld${w}"><label>${f.l}</label><input type="${typ}" data-k="${f.k}" value="${esc(v)}"></div>`;
+  }).join('');
+  $('#dGrid').querySelectorAll('[data-k]').forEach(el=>{
+    const k=el.dataset.k;
+    const save=imm=>{
+      let val=el.value;
+      if(k==='__trim'){const c2=cases.find(x=>x.id===curId);const flags=Object.assign({},c2.flags||{},{trim:val});
+        imm?patchCase(curId,{flags}):queuePatch(curId,'flags',flags);return;}
+      if(el.type==='number')val=val===''?null:Number(val);
+      imm?patchCase(curId,{[k]:val===''?null:val}):queuePatch(curId,k,val);
+    };
+    el.addEventListener('input',()=>{if(el.tagName!=='SELECT')save(false);});
+    el.addEventListener('change',()=>save(true));
+  });
+  const flg=[['early','⚡ 조기논의',()=>!!c.early_rx],['hold','⏸ 보류',()=>!!F(c,'hold')],['stop','✖ 중단',()=>!!F(c,'stop')],['remake','↻ 리메이크',()=>!!F(c,'remake')]];
+  $('#dFlags').innerHTML=flg.map(([k,l,on])=>`<button class="fbtn${on()?' on':''}" onclick="toggleFlag('${k}')">${l}</button>`).join('')
+    +(c.early_rx?`<input style="flex:1;min-width:160px" placeholder="조기논의 사유 (예: 다음주 납부 예정)" value="${esc(c.early_rx_note||'')}" onchange="patchCase(curId,{early_rx_note:this.value})">`:'');
+}
+async function toggleFlag(k){
+  const c=cases.find(x=>x.id===curId); if(!c)return;
+  if(k==='early'){const on=!c.early_rx;
+    await patchCase(curId,{early_rx:on},{kind:'note',body:on?'⚡조기논의 설정':'⚡조기논의 해제'});return;}
+  const flags=Object.assign({},c.flags||{}); flags[k]=!flags[k]; if(!flags[k])delete flags[k];
+  const nm={hold:'보류',stop:'중단',remake:'리메이크'}[k];
+  await patchCase(curId,{flags},{kind:'note',body:(flags[k]?nm+' 설정':nm+' 해제')});
+}
+async function loadLogs(){
+  const el=$('#dLogs'); el.textContent='불러오는 중…';
+  const {data,error}=await sb.from('ortho_events').select('*').eq('case_id',curId).order('created_at',{ascending:false}).limit(40);
+  if(error){el.textContent='로그 오류';return;}
+  const ic={call:'📞',pay:'💰',stage:'▸',note:'📝'};
+  el.innerHTML=(data&&data.length)?data.map(e=>{
+    const t=new Date(e.created_at),p=n=>String(n).padStart(2,'0');
+    return `<div class="lg1">${ic[e.kind]||''} ${esc(e.body||'')} <span class="who">· ${t.getMonth()+1}/${t.getDate()} ${p(t.getHours())}:${p(t.getMinutes())} · ${esc((e.author||'').split('@')[0])}</span></div>`;
+  }).join(''):'<span style="color:var(--gray)">기록 없음</span>';
+}
+async function addLog(kind){
+  const nm={call:'통화 내용',pay:'수납 메모',note:'메모'}[kind];
+  const body=prompt(nm+' 입력:'); if(!body)return;
+  await sb.from('ortho_events').insert({case_id:curId,kind,body,author:ME}); loadLogs();
+}
+async function softDelete(){
+  const c=cases.find(x=>x.id===curId); if(!c)return;
+  if(!confirm(`'${c.patient_name}' 케이스를 숨길까요? (데이터는 보존, 복구는 원장님께)`))return;
+  await patchCase(curId,{deleted:true}); closeDetail();
+}
+
+/* ── 간이 진료기록부 ── */
+async function loadVisits(){
+  const c=cases.find(x=>x.id===curId); if(!c)return;
+  /* 3년 트래커 */
+  let bar='';
+  if(c.start_date){
+    const mo=Math.floor(daysSince(c.start_date+'T00:00:00')/30.4);
+    const pct=Math.min(100,Math.round(mo/36*100));
+    bar=`<div style="font-size:12px;color:var(--gray)">치료 경과 <b style="color:var(--ink)">${mo}개월 / 36개월</b>${mo>30?' <span class="b warn">🔶 3년 마무리 점검</span>':''}</div>
+    <div class="bar3y${mo>30?' over':''}"><i style="width:${pct}%"></i></div>`;
+  } else bar='<div class="hint">초진일을 입력하면 3년 트래커가 표시됩니다.</div>';
+  $('#v3y').innerHTML=bar;
+  $('#nvDate').value=today();
+  const {data,error}=await sb.from('ortho_visits').select('*').eq('case_id',curId).order('visit_date',{ascending:false});
+  const tb=$('#vRows');
+  if(error){tb.innerHTML='<tr><td colspan="5">오류</td></tr>';return;}
+  tb.innerHTML=(data&&data.length)?data.map(v=>{
+    const editable=(v.created_at||'').slice(0,10)===new Date().toISOString().slice(0,10);
+    const cell=(k,val,typ)=>editable
+      ?`<td><input type="${typ||'text'}" value="${esc(val||'')}" onchange="patchVisit(${v.id},'${k}',this.value)"></td>`
+      :`<td>${esc(val||'')}</td>`;
+    return `<tr>${cell('visit_date',v.visit_date,'date')}${cell('progress',v.progress)}${cell('considerations',v.considerations)}${cell('plan_next',v.plan_next)}${cell('plan_next_date',v.plan_next_date,'date')}</tr>`;
+  }).join(''):'<tr><td colspan="5" style="color:var(--gray)">기록 없음 — 아래에서 추가</td></tr>';
+}
+async function patchVisit(id,k,val){
+  const {error}=await sb.from('ortho_visits').update({[k]:val===''?null:val}).eq('id',id);
+  if(error){setStatus('error');console.error(error);}else setStatus('saved');
+}
+async function addVisit(){
+  const row={case_id:curId,visit_date:$('#nvDate').value||today(),progress:$('#nvProg').value,considerations:$('#nvCons').value,plan_next:$('#nvPlan').value,plan_next_date:$('#nvPlanDate').value||null,author:ME};
+  if(!row.progress&&!row.plan_next){alert('진행 내용 또는 다음 계획을 입력하세요.');return;}
+  const {error}=await sb.from('ortho_visits').insert(row);
+  if(error){setStatus('error');return;}
+  ['nvProg','nvCons','nvPlan','nvPlanDate'].forEach(i=>$('#'+i).value='');
+  loadVisits(); setStatus('saved');
+}
+
+/* ── 다가오는 계획 / 진행 관리 / 보관함 ── */
+async function openUpcoming(){
+  show('uMask'); const el=$('#uList'); el.textContent='불러오는 중…';
+  const {data,error}=await sb.from('v_upcoming_plans').select('*').limit(60);
+  if(error){el.textContent='오류: '+error.message;return;}
+  el.innerHTML=(data&&data.length)?data.map(r=>`<div class="listrow">
+    <b style="min-width:78px">${esc(md(r.plan_next_date))} <span class="g">${ddayTxt(r.plan_next_date)}</span></b>
+    <span><b>${esc(r.patient_name)}</b> <span class="g">${esc(r.chart_no||'')}</span> — ${esc(r.plan_next||'')}</span>
+  </div>`).join(''):'<div class="hint">예정된 계획이 없습니다.</div>';
+}
+function drawerList(elId,list,btn){
+  $(elId).innerHTML=list.length?list.map(c=>{
+    let mo='';
+    if(c.start_date){const m=Math.floor(daysSince(c.start_date+'T00:00:00')/30.4);mo=`<span class="g">${m}/36개월${m>30?' 🔶':''}</span>`;}
+    return `<div class="listrow"><span style="flex:1"><b>${esc(c.patient_name)}</b> <span class="g">${esc(c.chart_no||'')} · ${esc(c.case_type||'')}</span></span>${mo}
+    <button onclick="openDetail('${c.id}')">상세</button>${btn(c)}</div>`;
+  }).join(''):'<div class="hint">없음</div>';
+}
+function openMgmt(){show('mMask');drawerList('#mList',cases.filter(c=>stageOf(c.stage_key).mgmt&&!c.archived),
+  c=>`<button onclick="archiveCase('${c.id}',true)">완료→보관</button>`);}
+function openArch(){show('aMask');drawerList('#aList',cases.filter(c=>c.archived),
+  c=>`<button onclick="archiveCase('${c.id}',false)">보관 해제</button>`);}
+async function archiveCase(id,on){await patchCase(id,{archived:on},{kind:'note',body:on?'완료 보관':'보관 해제'});openMgmt();openArch();
+  if(on)hide('aMask');else hide('mMask');}
+
+/* ── 새 케이스 ── */
+function openNew(){
+  $('#nType').innerHTML=CASE_TYPES.map(o=>`<option>${o}</option>`).join('');
+  $('#nTrim').innerHTML=TRIMS.map(o=>`<option>${o}</option>`).join('');
+  $('#nStart').value=today(); $('#nName').value='';$('#nChart').value='';$('#nStaff').value='';$('#nMsg').textContent='';
+  show('nMask');
+}
+async function createCase(){
+  const name=$('#nName').value.trim();
+  if(!name){$('#nMsg').textContent='환자명은 필수입니다.';return;}
+  const row={patient_name:name,chart_no:$('#nChart').value.trim()||null,case_type:$('#nType').value,
+    staff:$('#nStaff').value.trim()||null,start_date:$('#nStart').value||null,
+    stage_key:STAGES[0].key,flags:{trim:$('#nTrim').value,stage_at:new Date().toISOString()}};
+  const {data,error}=await sb.from('ortho_cases').insert(row).select().single();
+  if(error){$('#nMsg').textContent='생성 실패: '+error.message;return;}
+  await sb.from('ortho_events').insert({case_id:data.id,kind:'note',body:'케이스 생성',author:ME});
+  hide('nMask'); await loadAll(); openDetail(data.id);
+}
+
+/* ── 실시간 ── */
+let _reload=false;
+function subscribeRealtime(){
+  sb.channel('ortho-rt')
+    .on('postgres_changes',{event:'*',schema:'public',table:'ortho_cases'},()=>sched())
+    .on('postgres_changes',{event:'*',schema:'public',table:'ortho_events'},()=>{if(curId)loadLogs();})
+    .on('postgres_changes',{event:'*',schema:'public',table:'ortho_visits'},()=>{if(curId&&$('#paneVisit').style.display!=='none')loadVisits();})
+    .subscribe();
+}
+function sched(){ if(curId){_reload=true;return;} loadAll(); }
+window.addEventListener('focus',()=>{if(!curId)loadAll();});
+
+/* ── 필터 ── */
+$('#q').addEventListener('input',e=>{filt.q=e.target.value.trim();render();});
+document.querySelectorAll('.chip').forEach(ch=>ch.addEventListener('click',()=>{
+  ch.classList.toggle('on'); filt[ch.dataset.f]=ch.classList.contains('on'); render();}));
+$('#fStaff').addEventListener('change',e=>{filt.staff=e.target.value;render();});
+
+/* ── 로그인 ── */
+let _inited=false;
+async function onAuthed(session){
+  $('#gate').style.display='none'; $('#app').style.display='';
+  ME=(session&&session.user&&session.user.email)||'';
+  if(_inited)return; _inited=true;
+  await loadAll(); subscribeRealtime();
+}
+async function doLogin(){
+  const msg=$('#lgMsg'), email=$('#lgEmail').value.trim(), pw=$('#lgPw').value;
+  if(!sb){msg.textContent='인터넷 연결이 필요합니다.';return;}
+  if(!email||!pw){msg.textContent='이메일과 비밀번호를 입력하세요.';return;}
+  msg.textContent='로그인 중…';
+  const {error}=await sb.auth.signInWithPassword({email,password:pw});
+  if(error)msg.textContent='이메일 또는 비밀번호가 올바르지 않습니다.';
+}
+async function boot(){
+  $('#lgBtn').addEventListener('click',doLogin);
+  $('#lgPw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+  $('#lgEmail').addEventListener('keydown',e=>{if(e.key==='Enter')$('#lgPw').focus();});
+  $('#logoutBtn').addEventListener('click',async()=>{try{await sb.auth.signOut();}catch(e){}location.reload();});
+  if(!sb){$('#gate').style.display='';$('#lgMsg').textContent='인터넷 연결 후 새로고침하세요.';return;}
+  sb.auth.onAuthStateChange((_e,s)=>{if(s)onAuthed(s);});
+  const {data:{session}}=await sb.auth.getSession();
+  if(session)onAuthed(session); else $('#gate').style.display='';
+}
+boot();
+</script>
+</body>
+</html>
