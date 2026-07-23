@@ -250,7 +250,7 @@ create table if not exists public.applicants (
 
 create table if not exists public.ledger_files (
   id bigint generated always as identity primary key,
-  ledger_id bigint not null references public.ledger(id) on delete cascade,
+  ledger_id uuid not null references public.ledger(id) on delete cascade,
   file text not null,
   created_by text,
   created_at timestamptz default now()
