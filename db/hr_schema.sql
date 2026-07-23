@@ -256,6 +256,29 @@ create table if not exists public.ledger_files (
   created_at timestamptz default now()
 );
 
+-- 07-24 증축: 입사 제출물 체크리스트 (열린 형태 — 항목은 owner/chief가 자유 정의)
+create table if not exists public.onboarding_items (
+  id bigint generated always as identity primary key,
+  label text not null,
+  required boolean not null default true,
+  order_no int default 0,
+  active boolean not null default true,
+  created_at timestamptz default now()
+);
+
+create table if not exists public.onboarding_checks (
+  id bigint generated always as identity primary key,
+  user_id uuid not null,
+  item_id bigint not null references public.onboarding_items(id) on delete cascade,
+  status text not null default '미제출'
+    check (status in ('미제출', '제출', '확인')),
+  submitted_at timestamptz,
+  checked_by text,
+  checked_at timestamptz,
+  note text,
+  unique (user_id, item_id)
+);
+
 -- RLS 정책에서 공통으로 사용하는 현재 사용자 역할 조회 함수.
 -- profiles에 행이 없으면 staff로 취급한다.
 create or replace function public.my_role()

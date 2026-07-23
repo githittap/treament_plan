@@ -490,6 +490,64 @@ create policy ledger_files_delete_owner
 on public.ledger_files for delete to authenticated
 using (public.my_role() = 'owner');
 
+-- 07-24 증축: 입사 제출물 체크리스트
+alter table public.onboarding_items enable row level security;
+alter table public.onboarding_checks enable row level security;
+
+drop policy if exists onboarding_items_select_authenticated on public.onboarding_items;
+create policy onboarding_items_select_authenticated
+on public.onboarding_items for select to authenticated
+using (true);
+
+drop policy if exists onboarding_items_insert_approvers on public.onboarding_items;
+create policy onboarding_items_insert_approvers
+on public.onboarding_items for insert to authenticated
+with check (public.my_role() in ('chief', 'owner'));
+
+drop policy if exists onboarding_items_update_approvers on public.onboarding_items;
+create policy onboarding_items_update_approvers
+on public.onboarding_items for update to authenticated
+using (public.my_role() in ('chief', 'owner'))
+with check (public.my_role() in ('chief', 'owner'));
+
+drop policy if exists onboarding_items_delete_owner on public.onboarding_items;
+create policy onboarding_items_delete_owner
+on public.onboarding_items for delete to authenticated
+using (public.my_role() = 'owner');
+
+drop policy if exists onboarding_checks_select_scoped on public.onboarding_checks;
+create policy onboarding_checks_select_scoped
+on public.onboarding_checks for select to authenticated
+using (
+  user_id = auth.uid()
+  or public.my_role() in ('manager', 'chief', 'owner')
+);
+
+drop policy if exists onboarding_checks_insert_scoped on public.onboarding_checks;
+create policy onboarding_checks_insert_scoped
+on public.onboarding_checks for insert to authenticated
+with check (
+  user_id = auth.uid()
+  or public.my_role() in ('chief', 'owner')
+);
+
+drop policy if exists onboarding_checks_update_scoped on public.onboarding_checks;
+create policy onboarding_checks_update_scoped
+on public.onboarding_checks for update to authenticated
+using (
+  user_id = auth.uid()
+  or public.my_role() in ('chief', 'owner')
+)
+with check (
+  user_id = auth.uid()
+  or public.my_role() in ('chief', 'owner')
+);
+
+drop policy if exists onboarding_checks_delete_owner on public.onboarding_checks;
+create policy onboarding_checks_delete_owner
+on public.onboarding_checks for delete to authenticated
+using (public.my_role() = 'owner');
+
 -- Storage: hr-docs 비공개 버킷
 drop policy if exists hr_docs_select_authenticated on storage.objects;
 create policy hr_docs_select_authenticated

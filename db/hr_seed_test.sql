@@ -55,6 +55,18 @@ where not exists (
   where name = '샘플 근로계약서'
 );
 
+-- 07-24 증축: 입사 제출물 기본 항목 (표가 비어 있을 때만 — 원장 수정본은 안 덮음)
+insert into public.onboarding_items (label, required, order_no)
+select v.label, true, v.ord
+from (values
+  ('급여 계좌번호 제출', 1),
+  ('노션 가입', 2),
+  ('지문 등록', 3),
+  ('채용 신체검사서 제출 (잠복결핵 검사 포함)', 4),
+  ('보안·개인정보 서약서', 5)
+) as v(label, ord)
+where not exists (select 1 from public.onboarding_items);
+
 insert into public.notices (title, body, pinned, author)
 select
   '직원 허브 이용 안내',
