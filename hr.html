@@ -176,14 +176,24 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 <footer>© 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지</footer>
 
 <script>
-/* ═══════ 설정(원장 수정 구역) ═══════ */
-const LATE_CUT = '09:40';                 // 이 시각 초과 = 지각 (시업 10:00)
-const OT_UNIT = 10;                        // 연장 분 단위(버림)
+/* ═══════ 설정 ═══════
+   실제 값은 DB의 app_settings 표에서 읽어옵니다.
+   시간 규칙 변경 = Supabase SQL Editor에서 값만 고치면 됨(코드 수정 불필요).
+   설명서: 09_claude-output\04_AI·Claude운영\산출물\근태설정_사용설명서.html
+   아래는 표를 못 불러왔을 때의 안전 기본값. */
+let SETTINGS = {
+  late_cut:'09:40', ot_unit_min:'10',
+  jongeop_weekday_evening:'20:00', jongeop_weekday_day:'18:30',
+  jongeop_sat:'17:00', jongeop_sun:'14:00'
+};
+async function loadSettings(){
+  try{const {data}=await sb.from('app_settings').select('key,value');(data||[]).forEach(s=>{SETTINGS[s.key]=s.value;});}catch(e){}
+}
 function jongeop(dateStr, evening){        // 종업시각 (요일·야간조)
   const d = new Date(dateStr+'T00:00:00').getDay(); // 0일 6토
-  if(d===0) return '14:00';
-  if(d===6) return '17:00';
-  return evening ? '20:00' : '18:30';
+  if(d===0) return SETTINGS.jongeop_sun;
+  if(d===6) return SETTINGS.jongeop_sat;
+  return evening ? SETTINGS.jongeop_weekday_evening : SETTINGS.jongeop_weekday_day;
 }
 /* ════════════════════════════════════ */
 
@@ -406,8 +416,9 @@ window.mapToken=async(tok,uid)=>{if(!uid)return;const prof=PROFILES.find(p=>p.us
 function buildUnmappedAfter(){const um=[...new Set(xlRows.filter(r=>!r.user_id).map(r=>r.tok))];
   $('#xlUnmapped').innerHTML=um.length?`<div class="hint" style="color:var(--gold)">⚠ 미매핑: ${um.map(f=>`<b>${esc(f)}</b> <select class="mini" onchange="mapToken('${esc(f)}',this.value)"><option value="">이 직원으로</option>${PROFILES.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select>`).join(' &nbsp; ')}</div>`:'<div class="hint" style="color:var(--mint)">✓ 전원 매핑됨</div>';}
 function calcRow(r){
-  const late = r.ci!=null ? Math.max(0, r.ci - toMin(LATE_CUT)) : 0;
-  let ot=0; if(r.co!=null){const je=toMin(jongeop(r.ds,r.evening)); ot=Math.max(0, r.co-je); ot=Math.floor(ot/OT_UNIT)*OT_UNIT;}
+  const unit = parseInt(SETTINGS.ot_unit_min)||10;
+  const late = r.ci!=null ? Math.max(0, r.ci - toMin(SETTINGS.late_cut)) : 0;
+  let ot=0; if(r.co!=null){const je=toMin(jongeop(r.ds,r.evening)); ot=Math.max(0, r.co-je); ot=Math.floor(ot/unit)*unit;}
   return {late,ot};
 }
 function renderXlTable(){
@@ -626,6 +637,7 @@ async function onAuthed(session){
   $('#gate').style.display='none';$('#app').style.display='';
   ME.id=session.user.id;ME.email=session.user.email;
   if(_inited)return;_inited=true;
+  await loadSettings();
   await loadProfiles();
   let p=PROFILES.find(x=>x.user_id===ME.id);
   if(!p){ // 프로필 없으면 자동 생성(staff)
