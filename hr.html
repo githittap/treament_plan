@@ -168,7 +168,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
   <div id="xlSummary" class="sub"></div>
   <div id="xlUnmapped"></div>
   <div class="tblwrap" style="margin-top:8px"><table id="xlTable"></table></div>
-  <div class="hint">지각 컷 09:40(시업 10:00) · 연장 10분 단위 버림 · 야간조 체크 시 종업 20:00 기준. 저장하면 해당 월 attendance에 기록됩니다.</div>
+  <div class="hint">야간·조퇴는 <b>공표된 근무표</b>가 기준(야간=자동 체크). 지각 컷·연장 단위는 설정 표 값 적용. 저장하면 해당 월 attendance에 기록됩니다. (조퇴 공제는 급여 단계에서)</div>
   <button class="hbtn pri" style="margin-top:10px" id="xlSaveBtn" onclick="saveAttendance()">저장</button>
   <div class="msg" id="xlMsg"></div>
 </div></div>
@@ -211,6 +211,10 @@ const isMgr=()=>['manager','chief','owner'].includes(ME.role);
 const nameOf=uid=>{const p=PROFILES.find(x=>x.user_id===uid);return p?p.name:(uid||'').slice(0,6);};
 const toMin=t=>{if(!t)return null;const[h,m]=String(t).slice(0,5).split(':').map(Number);return h*60+m;};
 const minToT=m=>{const h=Math.floor(m/60),mm=m%60,p=n=>String(n).padStart(2,'0');return p(h)+':'+p(mm);};
+const dstr=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+function addDays(ds,n){const d=new Date(ds+'T00:00:00');d.setDate(d.getDate()+n);return dstr(d);}
+function mondayStr(ds){const d=new Date(ds+'T00:00:00');const g=d.getDay();d.setDate(d.getDate()+(g===0?-6:1-g));return dstr(d);}
+const SHIFTS={work:{l:'근무'},off:{l:'휴무'},evening:{l:'야간'},half_am:{l:'오전'},half_pm:{l:'오후'}};
 function setStatus(k){const el=$('#saveTag');if(!el)return;el.classList.remove('err');
   if(k==='saving')el.textContent='저장 중…';else if(k==='saved'){el.textContent='✓ 저장됨';setTimeout(()=>el.textContent='✓ 자동 저장',1200);}
   else if(k==='error'){el.textContent='⚠ 저장 안됨 · 인터넷 확인';el.classList.add('err');}else el.textContent='✓ 자동 저장';}
@@ -220,6 +224,7 @@ function show(id){$('#'+id).classList.add('show');}function hide(id){$('#'+id).c
 const TABS=[
   {key:'home',  label:'홈',        roles:['staff','manager','chief','owner']},
   {key:'att',   label:'출퇴근',    roles:['staff','manager','chief','owner']},
+  {key:'sched', label:'근무표',    roles:['staff','manager','chief','owner']},
   {key:'leave', label:'연차',      roles:['staff','manager','chief','owner']},
   {key:'appr',  label:'결재함',    roles:['staff','manager','chief','owner']},
   {key:'notice',label:'공지',      roles:['staff','manager','chief','owner']},
@@ -268,6 +273,7 @@ async function render(){
   try{
     if(TAB==='home')await renderHome(m);
     else if(TAB==='att')await renderAtt(m);
+    else if(TAB==='sched')await renderSched(m);
     else if(TAB==='leave')await renderLeave(m);
     else if(TAB==='appr')await renderAppr(m);
     else if(TAB==='notice')await renderNotice(m);
@@ -315,6 +321,10 @@ async function renderAtt(m){
       <div class="sub">이번 달 상태: <b class="${mrow&&mrow.status==='확정'?'':'b wait'}">${mrow?mrow.status:'미집계'}</b>
         ${ME.role==='owner'?`<button class="mini" style="margin-left:8px" onclick="closeMonth('${month}')">이번 달 확정</button>`:''}</div>
     </div>
+    <div class="card"><h2>🚫 근무표 대비 결근·미기록 <span class="sub">(${month})</span></h2>
+      <button class="mini" onclick="checkAbsent('${month}')">확인하기</button>
+      <div id="absentBox" style="margin-top:8px"><div class="sub">버튼을 누르면 "근무표=근무인데 지문 기록이 없는 날"을 찾아줍니다.</div></div>
+    </div>
     <div class="card"><h2>🙋 지문누락 소명 <span class="sub">(실장·원장 승인)</span></h2>
       ${(iss||[]).length?`<div class="tblwrap"><table><tr><th>직원</th><th>날짜</th><th>유형</th><th>사유</th><th>상태</th><th></th></tr>
       ${(iss||[]).map(i=>`<tr><td>${esc(nameOf(i.user_id))}</td><td>${md(i.work_date)}</td><td>${esc(i.type||'')}</td><td>${esc(i.reason||'')}</td>
@@ -352,6 +362,61 @@ async function closeMonth(month){
   if(!confirm(month+' 근태를 확정할까요? (이후 수정은 소명/정정으로)'))return;
   await sb.from('att_months').upsert({month,status:'확정',closed_by:ME.name,closed_at:new Date().toISOString()},{onConflict:'month'});setStatus('saved');render();
 }
+async function checkAbsent(month){
+  const el=$('#absentBox');el.innerHTML='확인 중…';
+  const {data:sc}=await sb.from('schedules').select('user_id,day,week_start,shift');
+  const {data:att}=await sb.from('attendance').select('user_id,work_date').gte('work_date',month+'-01').lte('work_date',month+'-31');
+  const has=new Set((att||[]).map(a=>a.user_id+'|'+a.work_date));
+  const miss=[];
+  (sc||[]).forEach(s=>{ if(s.shift==='off')return;
+    for(let i=0;i<7;i++){const ds=addDays(s.week_start,i);const d=new Date(ds+'T00:00:00');
+      if(d.getDay()===s.day && ds.slice(0,7)===month && ds<=today() && !has.has(s.user_id+'|'+ds))miss.push({u:s.user_id,ds,shift:s.shift});}});
+  el.innerHTML=miss.length?`<table><tr><th>직원</th><th>날짜</th><th>근무표</th></tr>${miss.sort((a,b)=>a.ds<b.ds?-1:1).map(x=>`<tr class="warn"><td>${esc(nameOf(x.u))}</td><td>${md(x.ds)}</td><td>${SHIFTS[x.shift]?SHIFTS[x.shift].l:esc(x.shift)}</td></tr>`).join('')}</table><div class="hint">근무표=근무인데 지문 기록 없음 = 결근/미기록. 소명받거나 수기 처리하세요.</div>`:'<div class="empty">근무표 대비 미기록 없음 ✓</div>';
+}
+
+/* ── 근무표(M2) ── */
+let SCHED_WEEK=null;
+async function renderSched(m){
+  if(!SCHED_WEEK)SCHED_WEEK=mondayStr(today());
+  const ws=SCHED_WEEK;
+  const {data:wk}=await sb.from('schedule_weeks').select('*').eq('week_start',ws).maybeSingle();
+  const {data:rows}=await sb.from('schedules').select('*').eq('week_start',ws);
+  const smap={};(rows||[]).forEach(r=>smap[r.user_id+'|'+r.day]=r.shift);
+  const staff=PROFILES.filter(p=>p.active!==false);
+  const published=wk&&wk.status==='공표';
+  const canEdit=!published||isLead();
+  const dow=['일','월','화','수','목','금','토'];
+  const cols=[];for(let i=0;i<7;i++){const ds=addDays(ws,i);cols.push({ds,dd:new Date(ds+'T00:00:00').getDay()});}
+  const optHtml=cur=>Object.keys(SHIFTS).map(k=>`<option value="${k}" ${cur===k?'selected':''}>${SHIFTS[k].l}</option>`).join('');
+  let grid=`<div class="tblwrap"><table><tr><th>직원</th>${cols.map(c=>`<th>${dow[c.dd]}<br><span class="sub">${md(c.ds)}</span></th>`).join('')}</tr>`;
+  grid+=staff.map(p=>`<tr><td>${esc(p.name)} ${p.role!=='staff'?'<span class="sub">'+esc(p.role)+'</span>':''}</td>${cols.map(c=>{const cur=smap[p.user_id+'|'+c.dd]||'';
+    return `<td>${canEdit?`<select class="mini" onchange="setShift('${p.user_id}',${c.dd},'${ws}',this.value)"><option value="">-</option>${optHtml(cur)}</select>`:`<span class="b ${cur==='off'?'no':(cur==='evening'?'mid':'ok')}">${cur?SHIFTS[cur].l:'-'}</span>`}</td>`;}).join('')}</tr>`).join('');
+  grid+='</table></div>';
+  m.innerHTML=`<div class="card"><h2>🗓 근무표 <span class="b ${published?'ok':'wait'}">${published?'공표됨':'초안'}</span></h2>
+    <div class="rowflex" style="align-items:center;margin-bottom:8px;gap:8px">
+      <button class="mini" onclick="navWeek(-7)">◀ 지난주</button>
+      <b>${md(ws)} ~ ${md(addDays(ws,6))}</b>
+      <button class="mini" onclick="navWeek(7)">다음주 ▶</button>
+      ${canEdit?`<button class="mini" onclick="copyPrevWeek('${ws}')">지난주 복사</button>`:''}
+      ${isLead()?`<button class="mini stamp" onclick="publishSched('${ws}')">공표(확정)</button>`:''}
+    </div>
+    ${staff.length?grid:'<div class="empty">직원이 아직 없습니다. 직원이 회원가입하면 여기 뜹니다.</div>'}
+    <div class="hint">근무=정상 · 휴무=off · <b>야간=종업 20:00</b> · 오전/오후=반일. 직원이 초안 작성 → 실장·원장이 <b>공표</b>. 공표된 근무표가 출퇴근 <b>야간·조퇴 판정</b>의 기준이 됩니다. 수정하면 다시 초안이 되어 재공표가 필요합니다.</div>
+  </div>`;
+}
+function navWeek(n){SCHED_WEEK=addDays(SCHED_WEEK||mondayStr(today()),n);render();}
+async function setShift(uid,day,ws,shift){
+  await sb.from('schedule_weeks').upsert({week_start:ws,status:'초안'},{onConflict:'week_start'});
+  if(shift)await sb.from('schedules').upsert({week_start:ws,user_id:uid,day,shift},{onConflict:'week_start,user_id,day'});
+  else await sb.from('schedules').delete().eq('week_start',ws).eq('user_id',uid).eq('day',day);
+  setStatus('saved');
+}
+async function publishSched(ws){await sb.from('schedule_weeks').upsert({week_start:ws,status:'공표',confirmed_by:ME.name,confirmed_at:new Date().toISOString()},{onConflict:'week_start'});setStatus('saved');render();}
+async function copyPrevWeek(ws){const prev=addDays(ws,-7);const {data}=await sb.from('schedules').select('user_id,day,shift').eq('week_start',prev);
+  if(!data||!data.length){alert('지난주 근무표가 없습니다.');return;}
+  await sb.from('schedule_weeks').upsert({week_start:ws,status:'초안'},{onConflict:'week_start'});
+  await sb.from('schedules').upsert(data.map(r=>({week_start:ws,user_id:r.user_id,day:r.day,shift:r.shift})),{onConflict:'week_start,user_id,day'});
+  setStatus('saved');render();}
 
 /* 엑셀 파싱 */
 function parseXls(ev){
@@ -373,7 +438,7 @@ function excelToDate(v){ // v = Date(cellDates) or serial number
   if(typeof v==='number'){const d=new Date(Date.UTC(1899,11,30)+v*864e5);return d;}
   return null;
 }
-function buildPreview(aoa){
+async function buildPreview(aoa){
   const hdr=aoa[0]||[];
   const cName=findCol(hdr,['성명','이름','사원명','직원']);
   const cId=findCol(hdr,['사번','USERID','USER ID','아이디']);
@@ -401,8 +466,17 @@ function buildPreview(aoa){
     g.times.sort((a,b)=>a-b);
     const ci=g.times.length?g.times[0]:null, co=g.times.length>1?g.times[g.times.length-1]:null;
     const prof=resolve(g.tok);
-    return {tok:g.tok, user_id:prof?prof.user_id:null, name:prof?prof.name:g.tok, ds:g.ds, ci, co, evening:false, single:g.times.length<2};
+    return {tok:g.tok, user_id:prof?prof.user_id:null, name:prof?prof.name:g.tok, ds:g.ds, ci, co, evening:false, sched:null, single:g.times.length<2};
   }).sort((a,b)=>a.ds<b.ds?-1:1);
+  // 근무표 연동: 야간·근무표 시프트 자동 반영
+  try{
+    const weeks=[...new Set(xlRows.map(r=>mondayStr(r.ds)))];
+    if(weeks.length){
+      const {data:sc}=await sb.from('schedules').select('user_id,day,shift,week_start').in('week_start',weeks);
+      const sidx={};(sc||[]).forEach(s=>{sidx[s.user_id+'|'+s.week_start+'|'+s.day]=s.shift;});
+      xlRows.forEach(r=>{if(r.user_id){const sh=sidx[r.user_id+'|'+mondayStr(r.ds)+'|'+new Date(r.ds+'T00:00:00').getDay()];r.sched=sh||null;if(sh==='evening')r.evening=true;}});
+    }
+  }catch(e){}
   const um=[...unmapped];
   $('#xlSummary').innerHTML=`총 <b>${xlRows.length}</b>행 · 직원 매핑 <b>${xlRows.filter(r=>r.user_id).length}</b> / 미매핑 <b style="color:var(--red)">${xlRows.filter(r=>!r.user_id).length}</b>`;
   $('#xlUnmapped').innerHTML=um.length?`<div class="hint" style="color:var(--gold)">⚠ 미매핑 (직원 명부에 없음): ${um.map(f=>`<b>${esc(f)}</b> <select class="mini" onchange="mapToken('${esc(f)}',this.value)"><option value="">이 직원으로</option>${PROFILES.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select>`).join(' &nbsp; ')}</div>`:'';
@@ -418,16 +492,21 @@ function buildUnmappedAfter(){const um=[...new Set(xlRows.filter(r=>!r.user_id).
 function calcRow(r){
   const unit = parseInt(SETTINGS.ot_unit_min)||10;
   const late = r.ci!=null ? Math.max(0, r.ci - toMin(SETTINGS.late_cut)) : 0;
-  let ot=0; if(r.co!=null){const je=toMin(jongeop(r.ds,r.evening)); ot=Math.max(0, r.co-je); ot=Math.floor(ot/unit)*unit;}
-  return {late,ot};
+  let ot=0, early=0;
+  if(r.co!=null){const je=toMin(jongeop(r.ds,r.evening));
+    if(r.co>=je){ ot=Math.floor((r.co-je)/unit)*unit; } else { early=je-r.co; } // 정시보다 일찍=조퇴
+  }
+  return {late,ot,early};
 }
 function renderXlTable(){
-  $('#xlTable').innerHTML=`<tr><th>날짜</th><th>직원</th><th>출근</th><th>퇴근</th><th>지각</th><th>연장</th><th>야간조</th><th>비고</th></tr>`+
-  xlRows.map((r,i)=>{const c=calcRow(r);const bad=!r.user_id||r.single;
-    return `<tr class="${bad?'warn':''}"><td>${md(r.ds)}</td><td>${esc(r.name)}</td><td>${r.ci!=null?minToT(r.ci):'-'}</td><td>${r.co!=null?minToT(r.co):'-'}</td>
-    <td>${c.late>0?'<span class="b no">'+c.late+'분</span>':'-'}</td><td>${c.ot>0?c.ot+'분':'-'}</td>
+  $('#xlTable').innerHTML=`<tr><th>날짜</th><th>직원</th><th>근무표</th><th>출근</th><th>퇴근</th><th>지각</th><th>조퇴</th><th>연장</th><th>야간</th><th>비고</th></tr>`+
+  xlRows.map((r,i)=>{const c=calcRow(r);const bad=!r.user_id||r.single||(r.sched==='off');
+    const schedTxt=r.sched?SHIFTS[r.sched].l:'<span class="sub">-</span>';
+    const bigo=[];if(!r.user_id)bigo.push('<span class="b no">미매핑</span>');if(r.single)bigo.push('<span class="b wait">단일인식(누락?)</span>');if(r.sched==='off')bigo.push('<span class="b no">휴무 출근</span>');
+    return `<tr class="${bad?'warn':''}"><td>${md(r.ds)}</td><td>${esc(r.name)}</td><td>${schedTxt}</td><td>${r.ci!=null?minToT(r.ci):'-'}</td><td>${r.co!=null?minToT(r.co):'-'}</td>
+    <td>${c.late>0?'<span class="b no">'+c.late+'분</span>':'-'}</td><td>${c.early>0?'<span class="b wait">'+c.early+'분</span>':'-'}</td><td>${c.ot>0?c.ot+'분':'-'}</td>
     <td><input type="checkbox" ${r.evening?'checked':''} onchange="xlRows[${i}].evening=this.checked;renderXlTable()"></td>
-    <td>${!r.user_id?'<span class="b no">미매핑</span>':(r.single?'<span class="b wait">단일 인식(누락?)</span>':'')}</td></tr>`;
+    <td>${bigo.join(' ')||'-'}</td></tr>`;
   }).join('');
 }
 async function saveAttendance(){
