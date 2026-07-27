@@ -97,10 +97,22 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
   <div class="box">
     <div style="font-size:30px">👥</div>
     <h1>직원 허브</h1>
-    <p>기공차트와 같은 직원 계정으로 로그인하세요.</p>
-    <input type="email" id="lgEmail" placeholder="이메일" autocomplete="username">
-    <input type="password" id="lgPw" placeholder="비밀번호" autocomplete="current-password">
-    <button class="lg" id="lgBtn">로그인</button>
+    <div id="loginView">
+      <p>기공차트와 같은 직원 계정으로 로그인하세요.</p>
+      <input type="email" id="lgEmail" placeholder="이메일" autocomplete="username">
+      <input type="password" id="lgPw" placeholder="비밀번호" autocomplete="current-password">
+      <button class="lg" id="lgBtn">로그인</button>
+      <div class="switch" style="margin-top:12px;font-size:13px;color:#889">계정이 없나요? <a href="#" id="toSignup" style="color:#156f72;font-weight:700;text-decoration:none">회원가입</a></div>
+    </div>
+    <div id="signupView" style="display:none">
+      <p>처음이신가요? 계정을 만드세요.<br><span style="font-size:12px;color:#889">가입 후 원장이 권한(실장·매니저 등)을 지정합니다.</span></p>
+      <input type="text" id="suName" placeholder="이름 (예: 홍길동)" autocomplete="name">
+      <input type="email" id="suEmail" placeholder="이메일" autocomplete="username">
+      <input type="password" id="suPw" placeholder="비밀번호 (6자 이상)" autocomplete="new-password">
+      <input type="password" id="suPw2" placeholder="비밀번호 확인" autocomplete="new-password">
+      <button class="lg" id="suBtn">회원가입</button>
+      <div class="switch" style="margin-top:12px;font-size:13px;color:#889">이미 계정이 있나요? <a href="#" id="toLogin" style="color:#156f72;font-weight:700;text-decoration:none">로그인</a></div>
+    </div>
     <div class="msg" id="lgMsg"></div>
   </div>
 </div>
@@ -719,8 +731,10 @@ async function onAuthed(session){
   await loadSettings();
   await loadProfiles();
   let p=PROFILES.find(x=>x.user_id===ME.id);
-  if(!p){ // 프로필 없으면 자동 생성(staff)
-    await sb.from('profiles').insert({user_id:ME.id,name:ME.email.split('@')[0],role:'staff'}).then(()=>{});
+  if(!p){ // 프로필 없으면 자동 생성(staff) — 이름은 회원가입 때 저장한 값 우선
+    const nm=(session.user.user_metadata&&session.user.user_metadata.full_name)||ME.email.split('@')[0];
+    const {error:insErr}=await sb.from('profiles').insert({user_id:ME.id,name:nm,role:'staff'});
+    if(insErr)console.warn('프로필 자동생성 실패(회원가입 정책 미적용 가능):',insErr.message);
     await loadProfiles();p=PROFILES.find(x=>x.user_id===ME.id);
   }
   ME.name=p?p.name:ME.email.split('@')[0];ME.role=p?p.role:'staff';ME.stamp=p?p.stamp:null;
@@ -737,10 +751,34 @@ async function doLogin(){
   const {error}=await sb.auth.signInWithPassword({email,password:pw});
   if(error)msg.textContent='이메일 또는 비밀번호가 올바르지 않습니다.';
 }
+function showAuth(mode){
+  $('#loginView').style.display=mode==='login'?'':'none';
+  $('#signupView').style.display=mode==='signup'?'':'none';
+  $('#lgMsg').textContent='';
+}
+async function doSignup(){
+  const msg=$('#lgMsg');
+  const name=$('#suName').value.trim(),email=$('#suEmail').value.trim();
+  const pw=$('#suPw').value,pw2=$('#suPw2').value;
+  if(!sb){msg.textContent='인터넷 연결이 필요합니다.';return;}
+  if(!name){msg.textContent='이름을 입력하세요.';return;}
+  if(!email){msg.textContent='이메일을 입력하세요.';return;}
+  if(pw.length<6){msg.textContent='비밀번호는 6자 이상이어야 합니다.';return;}
+  if(pw!==pw2){msg.textContent='비밀번호가 일치하지 않습니다.';return;}
+  msg.textContent='가입 중…';
+  const {data,error}=await sb.auth.signUp({email,password:pw,options:{data:{full_name:name}}});
+  if(error){msg.textContent='가입 실패: '+(error.message||'다시 시도하세요.');return;}
+  if(data.session)msg.textContent='가입 완료! 접속 중…'; // 이메일 인증 꺼짐 → 즉시 로그인(onAuthStateChange가 처리)
+  else{msg.textContent='가입 완료! 이메일로 온 인증 링크를 누른 뒤 로그인하세요.';showAuth('login');}
+}
 async function boot(){
   $('#lgBtn').addEventListener('click',doLogin);
   $('#lgPw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
   $('#lgEmail').addEventListener('keydown',e=>{if(e.key==='Enter')$('#lgPw').focus();});
+  $('#suBtn').addEventListener('click',doSignup);
+  $('#suPw2').addEventListener('keydown',e=>{if(e.key==='Enter')doSignup();});
+  $('#toSignup').addEventListener('click',e=>{e.preventDefault();showAuth('signup');});
+  $('#toLogin').addEventListener('click',e=>{e.preventDefault();showAuth('login');});
   $('#logoutBtn').addEventListener('click',async()=>{try{await sb.auth.signOut();}catch(e){}location.reload();});
   if(!sb){$('#gate').style.display='';$('#lgMsg').textContent='인터넷 연결 후 새로고침하세요.';return;}
   sb.auth.onAuthStateChange((_e,s)=>{if(s)onAuthed(s);});
