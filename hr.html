@@ -236,6 +236,7 @@ function show(id){$('#'+id).classList.add('show');}function hide(id){$('#'+id).c
 const TABS=[
   {key:'home',  label:'홈',        roles:['staff','manager','chief','owner']},
   {key:'att',   label:'출퇴근',    roles:['staff','manager','chief','owner']},
+  {key:'deposit',label:'입금',     roles:['staff','manager','chief','owner']},
   {key:'sched', label:'근무표',    roles:['staff','manager','chief','owner']},
   {key:'leave', label:'연차',      roles:['staff','manager','chief','owner']},
   {key:'appr',  label:'결재함',    roles:['staff','manager','chief','owner']},
@@ -243,6 +244,8 @@ const TABS=[
   {key:'onbo',  label:'입사서류',  roles:['staff','manager','chief','owner']},
   {key:'owner', label:'원장',      roles:['owner']},
 ];
+let DEP_RANGE='month';
+function setDepRange(r){DEP_RANGE=r;render();}
 let BADGE={};
 function renderNav(){
   $('#nav').innerHTML=TABS.filter(t=>t.roles.includes(ME.role)).map(t=>{
@@ -285,6 +288,7 @@ async function render(){
   try{
     if(TAB==='home')await renderHome(m);
     else if(TAB==='att')await renderAtt(m);
+    else if(TAB==='deposit')await renderDeposit(m);
     else if(TAB==='sched')await renderSched(m);
     else if(TAB==='leave')await renderLeave(m);
     else if(TAB==='appr')await renderAppr(m);
@@ -318,6 +322,35 @@ async function renderHome(m){
   // 읽음 처리
   for(const n of (notices||[])) sb.from('notice_reads').upsert({notice_id:n.id,user_id:ME.id},{onConflict:'notice_id,user_id'}).then(()=>{});
   refreshBadges();
+}
+
+/* ── 입금 ── */
+async function renderDeposit(m){
+  const tabAtEntry=TAB;
+  const nowKst=new Date(Date.now()+9*60*60*1000);
+  const y=nowKst.getUTCFullYear(),mo=nowKst.getUTCMonth(),d=nowKst.getUTCDate();
+  const kstIso=(yy,mm,dd)=>new Date(Date.UTC(yy,mm,dd)-9*60*60*1000).toISOString();
+  let fromIso,toIso=kstIso(y,mo,d+1);
+  if(DEP_RANGE==='today')fromIso=kstIso(y,mo,d);
+  else if(DEP_RANGE==='week')fromIso=kstIso(y,mo,d-7);
+  else fromIso=kstIso(y,mo,1),toIso=kstIso(y,mo+1,1);
+  const {data:rows}=await sb.from('deposits').select('id,bank_dt,amount,payer_raw,is_card,account_tail')
+    .gte('bank_dt',fromIso).lt('bank_dt',toIso).order('bank_dt',{ascending:false}).order('id',{ascending:false}).limit(300);
+  if(TAB!==tabAtEntry||TAB!=='deposit')return;
+  const dtf=new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
+  m.innerHTML=`
+  <div class="card"><h2>💰 입금</h2>
+    <div class="hint" style="color:var(--gold)">⚠ 미검증 자동 알림 · 회계 원장이 아니며 수기 대조용</div>
+    <div class="chips" style="margin:10px 0">
+      <button class="mini ${DEP_RANGE==='today'?'stamp':''}" onclick="setDepRange('today')">오늘</button>
+      <button class="mini ${DEP_RANGE==='week'?'stamp':''}" onclick="setDepRange('week')">7일</button>
+      <button class="mini ${DEP_RANGE==='month'?'stamp':''}" onclick="setDepRange('month')">이번달</button>
+    </div>
+    ${(rows||[]).length?`<div class="tblwrap"><table><tr><th>시각</th><th style="text-align:right">금액</th><th>입금자</th><th>계좌</th></tr>
+    ${(rows||[]).map(r=>`<tr><td>${dtf.format(new Date(r.bank_dt))}</td><td style="text-align:right">₩${Number(r.amount).toLocaleString('ko-KR')}</td>
+      <td>${r.is_card?'💳 카드결제(추정) <span class="sub">'+esc(r.payer_raw||'')+'</span>':esc(r.payer_raw||'')}</td><td>${esc(r.account_tail||'')}</td></tr>`).join('')}</table></div>`
+    :'<div class="empty">입금 내역이 없습니다 (자동 수집 대기)</div>'}
+  </div>`;
 }
 
 /* ── 출퇴근 ── */
