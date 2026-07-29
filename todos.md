@@ -1,11 +1,11 @@
 # todos — 내부 도구(T8/D) 작업 목록
 
-갱신 2026-07-28 · 상세 상황판: `Z:\09_claude-output\04_AI·Claude운영\산출물\치과내부도구_상황판.html`
+갱신 2026-07-30 · 상세 상황판: `Z:\09_claude-output\04_AI·Claude운영\산출물\치과내부도구_상황판.html`
 
-## 🎯 한 줄 비전 (2026-07-28 원장 확정)
+## 🎯 한 줄 비전 (2026-07-30 원장 확정)
 설치·외주 없이 브라우저로 굴리는 아산정플란트 내부 운영 세트 — 진료·기공·교정·인사 4축, 로그인·데이터는 Supabase 한 곳.
 
-## 🔵 진행 중 / 바로 다음 (우선순위 2026-07-28 원장 확정: 입금피드 → 교정 v1.2 → 급여 → 계정)
+## 🔵 진행 중 / 바로 다음 (우선순위 2026-07-30 원장 확정: 입금피드 → 교정 v1.2 → 급여 → 계정)
 - [~] **1) 입금 피드 P1** — **코드 완성·검증**(codex 위임+plan-review 반영): `db/deposits.sql`(재직자 SELECT·쓰기정책 없음) + Edge Function `deposit-webhook`(X-Webhook-Token 인증·앵커 정규식·입금만·잔액/전체계좌 폐기·연도 received_at·event_id 멱등, **파서 테스트 7/7·deno check OK**) + hr.html '입금' 탭(KST 기간필터·읽기전용·**node --check OK**). **남음(원장 배포)**: ①deposits.sql 실행 ②Edge Function 배포 `--no-verify-jwt` + 시크릿 `WEBHOOK_TOKEN`·`BIZ_ACCOUNT_MASKED='101209036***3'` ③원장폰 MacroDroid 설정 ④hr.html push. (P2 교정 진단비 매칭은 이후)
 - [ ] **2) 교정보드 v1.2**: 칸반↔표 뷰 토글 · CSV 내보내기 · 진단 필드 FDI 치식 픽커 · 자주쓰는 문구 버튼
 - [ ] **3) M3 급여·명세서**: 급여대장 가져오기 + 임금명세서 발행제(payslips) + 휴일근로 계산기 + 월말 평가(월매출·정량·정성·소외배지) + 조퇴 공제 계산
@@ -29,7 +29,7 @@
 - 사주 · 직원뽑기 · 뉴스 · 보철프로토콜_진단기 · 설명덱_제작기
 
 ## ✅ 최근 완료
-- **직원 셀프 회원가입(D2) 라이브** (2026-07-28): 로그인/가입 토글·doSignup(이름→user_metadata)·onAuthed 자동 staff + 정책 `profiles_insert_self`(Codex·교차검증 A~E) + 원장 실행(SQL·가입 켜기·이메일확인 OFF) + 배포 `25f8f22`
+- **직원 셀프 회원가입(D2) 라이브** (2026-07-30): 로그인/가입 토글·doSignup(이름→user_metadata)·onAuthed 자동 staff + 정책 `profiles_insert_self`(Codex·교차검증 A~E) + 원장 실행(SQL·가입 켜기·이메일확인 OFF) + 배포 `25f8f22`
 - 교정 케이스 보드(ortho.html) 배포·검증 5/5 · jung-plant.com 연결
 - 근태 hr.html: M1(로그인·role·지문엑셀 파서·연차·결재·공지·온보딩) + M2(근무표·출퇴근 연동·조퇴·결근확인)
 - 백엔드 SQL(Codex 작성·교차검증): ortho·hr(표24)·app_settings
