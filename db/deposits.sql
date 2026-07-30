@@ -1,6 +1,6 @@
 -- Run in the 기공차트 SQL Editor; do not change existing objects.
 
-create table public.deposits (
+create table if not exists public.deposits (
   id bigint generated always as identity primary key,
   event_id text not null unique,
   bank_dt timestamptz not null,
@@ -11,7 +11,7 @@ create table public.deposits (
   created_at timestamptz not null default now()
 );
 
-create index deposits_bank_dt_idx
+create index if not exists deposits_bank_dt_idx
 on public.deposits (bank_dt desc);
 
 alter table public.deposits enable row level security;
@@ -23,6 +23,7 @@ grant select, insert on table public.deposits to service_role;
 revoke all on sequence public.deposits_id_seq from anon, authenticated, service_role;
 grant usage, select on sequence public.deposits_id_seq to service_role;
 
+drop policy if exists deposits_select_active on public.deposits;
 create policy deposits_select_active
 on public.deposits
 for select
