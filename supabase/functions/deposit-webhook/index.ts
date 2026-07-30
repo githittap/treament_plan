@@ -164,19 +164,20 @@ export async function handleRequest(req: Request): Promise<Response> {
     typeof body !== "object" ||
     body === null ||
     !("msg" in body) ||
-    !("received_at" in body) ||
     !("event_id" in body) ||
     typeof body.msg !== "string" ||
-    typeof body.received_at !== "string" ||
     typeof body.event_id !== "string" ||
     body.msg.trim() === "" ||
-    body.received_at.trim() === "" ||
     body.event_id.trim() === ""
   ) {
     return jsonResponse({ error: "invalid-body" }, 400);
   }
 
-  const receivedAt = body.received_at.trim();
+  const receivedAt = "received_at" in body &&
+      typeof body.received_at === "string" &&
+      body.received_at.trim() !== ""
+    ? body.received_at.trim()
+    : new Date().toISOString();
   const eventId = body.event_id.trim();
   const parsed = parseBusanSms(body.msg, receivedAt);
 
