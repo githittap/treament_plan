@@ -104,3 +104,19 @@ Deno.test("resolves Dec 31 to the prior year near New Year", () => {
     assertEquals(result.record.bank_dt, "2026-12-31T14:59:00.000Z");
   }
 });
+
+Deno.test("parses a Busan Bank deposit with a newline after Web발신", () => {
+  const result = parseBusanSms(
+    "[Web발신]\n부산07/31 08:35 101209036***3 정용태 입금10,000 잔액115,561,706",
+    "2026-07-31T08:36:00+09:00",
+  );
+
+  assertEquals(result.kind, "ok");
+  if (result.kind !== "ok") return;
+
+  assertEquals(result.record.amount, 10_000);
+  assertEquals(result.record.payer_raw, "정용태");
+  assertEquals(result.record.is_card, false);
+  assertEquals(result.record.account_tail, "***3");
+  assertEquals(result.record.bank_dt, "2026-07-30T23:35:00.000Z");
+});

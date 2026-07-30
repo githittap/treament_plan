@@ -7,7 +7,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.110.9";
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const MAX_EVENT_AGE_MS = 3 * 24 * 60 * 60 * 1000;
 const BUSAN_SMS_PATTERN =
-  /^\s*\[Web발신\] 부산(?<month>\d{2})\/(?<day>\d{2}) (?<hour>\d{2}):(?<minute>\d{2}) (?<maskedAccount>\d+\*+\d+) (?<payer>\S+) (?<transaction>입금|출금)(?<amount>[0-9,]+) 잔액[0-9,]+\s*$/u;
+  /^\s*\[Web발신\]\s*부산(?<month>\d{2})\/(?<day>\d{2})\s+(?<hour>\d{2}):(?<minute>\d{2})\s+(?<maskedAccount>\d+\*+\d+)\s+(?<payer>\S+)\s+(?<transaction>입금|출금)\s*(?<amount>[0-9,]+)\s+잔액\s*[0-9,]+\s*$/u;
 const AMOUNT_PATTERN = /^\d{1,3}(,\d{3})*$/;
 const CARD_PAYER_PATTERN = /^[A-Z]{2}\d+$/;
 
