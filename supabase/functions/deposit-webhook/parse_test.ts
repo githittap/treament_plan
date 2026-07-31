@@ -1,4 +1,4 @@
-import { extractPayload, parseBusanSms } from "./index.ts";
+import { buildTelegramMessage, extractPayload, parseBusanSms } from "./index.ts";
 
 function assert(
   condition: unknown,
@@ -235,4 +235,35 @@ Deno.test("extractPayload still rejects an empty text body", async () => {
   });
   const payload = await extractPayload(req);
   assertEquals(payload.ok, false);
+});
+
+Deno.test("buildTelegramMessage formats a name deposit without balance or masked account", () => {
+  const record = {
+    bank_dt: "2026-07-31T10:32:00.000Z",
+    amount: 10_000,
+    payer_raw: "정용태",
+    is_card: false,
+    account_tail: "***3",
+    masked_account: "101209036***3",
+  };
+  const msg = buildTelegramMessage(record);
+  assert(msg.includes("10,000원"), "should show the formatted amount");
+  assert(msg.includes("정용태"), "should show the payer name");
+  assert(!msg.includes(record.masked_account), "must never include the masked account");
+  assert(!msg.includes("잔액"), "must never include a balance label");
+});
+
+Deno.test("buildTelegramMessage formats a card deposit as a card label, not the approval code as a name", () => {
+  const record = {
+    bank_dt: "2026-07-22T07:18:00.000Z",
+    amount: 1_098_093,
+    payer_raw: "NH17576386",
+    is_card: true,
+    account_tail: "***3",
+    masked_account: "101209036***3",
+  };
+  const msg = buildTelegramMessage(record);
+  assert(msg.includes("카드결제"), "should label it as a card payment");
+  assert(msg.includes("1,098,093원"), "should show the formatted amount");
+  assert(!msg.includes(record.masked_account), "must never include the masked account");
 });

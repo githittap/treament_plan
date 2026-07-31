@@ -198,6 +198,44 @@ export async function extractPayload(
   return { ok: true, msg: raw, eventId, receivedAt: null };
 }
 
+export function buildTelegramMessage(record: DepositRecord): string {
+  const kstTime = new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(record.bank_dt));
+
+  const amountText = record.amount.toLocaleString("ko-KR");
+
+  if (record.is_card) {
+    return `💳 카드결제(추정) ${amountText}원\n${kstTime}`;
+  }
+  return `💰 입금 ${amountText}원 - ${record.payer_raw}\n${kstTime}`;
+}
+
+async function notifyTelegram(record: DepositRecord): Promise<void> {
+  const botToken = Deno.env.get("TELEGRAM_BOT_TOKEN");
+  const chatId = Deno.env.get("TELEGRAM_CHAT_ID");
+  if (!botToken || !chatId) {
+    return;
+  }
+  try {
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: buildTelegramMessage(record),
+      }),
+    });
+  } catch {
+    // best-effort only: a Telegram outage must never fail the deposit webhook
+  }
+}
+
 export async function handleRequest(req: Request): Promise<Response> {
   if (req.method !== "POST") {
     return jsonResponse({ error: "method-not-allowed" }, 405);
@@ -254,6 +292,10 @@ export async function handleRequest(req: Request): Promise<Response> {
 
   if (error) {
     return jsonResponse({ error: "database" }, 500);
+  }
+
+  if (data.length > 0) {
+    await notifyTelegram(parsed.record);
   }
 
   return data.length > 0
