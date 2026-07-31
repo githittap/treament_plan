@@ -60,7 +60,8 @@ export function parseBusanSms(
   msg: string,
   receivedAtIso: string,
 ): ParseResult {
-  const match = BUSAN_SMS_PATTERN.exec(msg);
+  const normalized = msg.replace(/\s+/g, " ").trim();
+  const match = BUSAN_SMS_PATTERN.exec(normalized);
   if (!match?.groups) {
     return { kind: "error", reason: "format" };
   }
@@ -139,6 +140,52 @@ function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   });
 }
 
+export async function extractPayload(
+  req: Request,
+): Promise<
+  | { ok: true; msg: string; eventId: string; receivedAt: string | null }
+  | { ok: false }
+> {
+  const raw = await req.text();
+  const contentType = req.headers.get("Content-Type") ?? "";
+
+  if (contentType.includes("application/json")) {
+    try {
+      const body: unknown = JSON.parse(raw);
+      if (
+        typeof body === "object" &&
+        body !== null &&
+        "msg" in body &&
+        "event_id" in body &&
+        typeof body.msg === "string" &&
+        typeof body.event_id === "string" &&
+        body.msg.trim() !== "" &&
+        body.event_id.trim() !== ""
+      ) {
+        const receivedAt = "received_at" in body &&
+            typeof body.received_at === "string" &&
+            body.received_at.trim() !== ""
+          ? body.received_at.trim()
+          : null;
+        return {
+          ok: true,
+          msg: body.msg,
+          eventId: body.event_id.trim(),
+          receivedAt,
+        };
+      }
+    } catch {
+      // invalid JSON: fall through to raw-text handling below
+    }
+  }
+
+  const eventId = new URL(req.url).searchParams.get("event_id")?.trim() ?? "";
+  if (raw.trim() === "" || eventId === "") {
+    return { ok: false };
+  }
+  return { ok: true, msg: raw, eventId, receivedAt: null };
+}
+
 export async function handleRequest(req: Request): Promise<Response> {
   if (req.method !== "POST") {
     return jsonResponse({ error: "method-not-allowed" }, 405);
@@ -153,33 +200,14 @@ export async function handleRequest(req: Request): Promise<Response> {
     return jsonResponse({ error: "unauthorized" }, 401);
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
+  const payload = await extractPayload(req);
+  if (!payload.ok) {
     return jsonResponse({ error: "invalid-body" }, 400);
   }
 
-  if (
-    typeof body !== "object" ||
-    body === null ||
-    !("msg" in body) ||
-    !("event_id" in body) ||
-    typeof body.msg !== "string" ||
-    typeof body.event_id !== "string" ||
-    body.msg.trim() === "" ||
-    body.event_id.trim() === ""
-  ) {
-    return jsonResponse({ error: "invalid-body" }, 400);
-  }
-
-  const receivedAt = "received_at" in body &&
-      typeof body.received_at === "string" &&
-      body.received_at.trim() !== ""
-    ? body.received_at.trim()
-    : new Date().toISOString();
-  const eventId = body.event_id.trim();
-  const parsed = parseBusanSms(body.msg, receivedAt);
+  const receivedAt = payload.receivedAt ?? new Date().toISOString();
+  const eventId = payload.eventId;
+  const parsed = parseBusanSms(payload.msg, receivedAt);
 
   if (parsed.kind === "error") {
     return jsonResponse({ error: parsed.reason }, 422);

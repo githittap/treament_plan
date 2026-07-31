@@ -1,4 +1,4 @@
-import { parseBusanSms } from "./index.ts";
+import { extractPayload, parseBusanSms } from "./index.ts";
 
 function assert(
   condition: unknown,
@@ -119,4 +119,87 @@ Deno.test("parses a Busan Bank deposit with a newline after Web발신", () => {
   assertEquals(result.record.is_card, false);
   assertEquals(result.record.account_tail, "***3");
   assertEquals(result.record.bank_dt, "2026-07-30T23:35:00.000Z");
+});
+
+Deno.test("parses a Busan Bank deposit with newlines between fields", () => {
+  const result = parseBusanSms(
+    "[Web발신]\n부산07/31 08:35 101209036***3 정용태\n입금10,000 잔액115,561,706",
+    "2026-07-31T08:36:00+09:00",
+  );
+  assertEquals(result.kind, "ok");
+  if (result.kind !== "ok") return;
+  assertEquals(result.record.amount, 10_000);
+  assertEquals(result.record.payer_raw, "정용태");
+  assertEquals(result.record.is_card, false);
+  assertEquals(result.record.account_tail, "***3");
+  assertEquals(result.record.bank_dt, "2026-07-30T23:35:00.000Z");
+});
+
+Deno.test("extractPayload reads a text/plain SMS body with event_id from the query", async () => {
+  const req = new Request(
+    "https://x.functions.supabase.co/deposit-webhook?event_id=evt-123",
+    {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body:
+        "[Web발신]\n부산07/31 08:35 101209036***3 정용태 입금10,000 잔액115,561,706",
+    },
+  );
+  const payload = await extractPayload(req);
+  assert(payload.ok, "payload should be ok");
+  if (!payload.ok) return;
+  assertEquals(payload.eventId, "evt-123");
+  assertEquals(payload.receivedAt, null);
+  assert(payload.msg.includes("정용태"), "msg should contain the payer");
+});
+
+Deno.test("extractPayload still accepts the legacy JSON body", async () => {
+  const req = new Request(
+    "https://x.functions.supabase.co/deposit-webhook",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        msg:
+          "[Web발신] 부산07/22 07:18 101209036***3 홍길동 입금10,000 잔액3,456,789",
+        event_id: "evt-json-1",
+      }),
+    },
+  );
+  const payload = await extractPayload(req);
+  assert(payload.ok, "payload should be ok");
+  if (!payload.ok) return;
+  assertEquals(payload.eventId, "evt-json-1");
+  assertEquals(payload.receivedAt, null);
+});
+
+Deno.test("extractPayload falls back to raw text when a JSON content-type carries an invalid JSON body", async () => {
+  const req = new Request(
+    "https://x.functions.supabase.co/deposit-webhook?event_id=evt-raw-1",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body:
+        "[Web발신]\n부산07/31 08:35 101209036***3 정용태 입금10,000 잔액115,561,706",
+    },
+  );
+  const payload = await extractPayload(req);
+  assert(payload.ok, "should fall back to raw text");
+  if (!payload.ok) return;
+  assertEquals(payload.eventId, "evt-raw-1");
+  assert(payload.msg.includes("[Web발신]"), "msg should be the raw SMS");
+});
+
+Deno.test("extractPayload rejects a text body missing event_id", async () => {
+  const req = new Request(
+    "https://x.functions.supabase.co/deposit-webhook",
+    {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body:
+        "[Web발신]\n부산07/31 08:35 101209036***3 정용태 입금10,000 잔액115,561,706",
+    },
+  );
+  const payload = await extractPayload(req);
+  assertEquals(payload.ok, false);
 });
