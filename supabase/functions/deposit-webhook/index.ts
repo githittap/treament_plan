@@ -140,6 +140,14 @@ function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   });
 }
 
+async function sha256Hex(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 export async function extractPayload(
   req: Request,
 ): Promise<
@@ -179,10 +187,14 @@ export async function extractPayload(
     }
   }
 
-  const eventId = new URL(req.url).searchParams.get("event_id")?.trim() ?? "";
-  if (raw.trim() === "" || eventId === "") {
+  if (raw.trim() === "") {
     return { ok: false };
   }
+  const queryEventId = new URL(req.url).searchParams.get("event_id")?.trim() ??
+    "";
+  const eventId = queryEventId !== ""
+    ? queryEventId
+    : "sms:" + await sha256Hex(raw.replace(/\s+/g, " ").trim());
   return { ok: true, msg: raw, eventId, receivedAt: null };
 }
 

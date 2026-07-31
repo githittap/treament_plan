@@ -190,16 +190,49 @@ Deno.test("extractPayload falls back to raw text when a JSON content-type carrie
   assert(payload.msg.includes("[Web발신]"), "msg should be the raw SMS");
 });
 
-Deno.test("extractPayload rejects a text body missing event_id", async () => {
-  const req = new Request(
-    "https://x.functions.supabase.co/deposit-webhook",
-    {
+Deno.test("extractPayload derives a stable sms: event_id when the query has none", async () => {
+  const body =
+    "[Web발신]\n부산07/31 08:35 101209036***3 정용태 입금10,000 잔액115,561,706";
+  const make = () =>
+    new Request("https://x.functions.supabase.co/deposit-webhook", {
       method: "POST",
       headers: { "Content-Type": "text/plain" },
-      body:
-        "[Web발신]\n부산07/31 08:35 101209036***3 정용태 입금10,000 잔액115,561,706",
-    },
+      body,
+    });
+  const a = await extractPayload(make());
+  const b = await extractPayload(make());
+  assert(a.ok, "payload should be ok");
+  assert(b.ok, "payload should be ok");
+  if (!a.ok || !b.ok) return;
+  assert(a.eventId.startsWith("sms:"), "event_id should be hash-derived");
+  assertEquals(a.eventId, b.eventId);
+  assert(a.msg.includes("정용태"), "msg should be the raw SMS");
+});
+
+Deno.test("extractPayload gives different sms: event_ids for different SMS", async () => {
+  const mk = (body: string) =>
+    new Request("https://x.functions.supabase.co/deposit-webhook", {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body,
+    });
+  const a = await extractPayload(
+    mk("[Web발신]\n부산07/31 08:35 101209036***3 정용태 입금10,000 잔액115,561,706"),
   );
+  const b = await extractPayload(
+    mk("[Web발신]\n부산07/31 08:40 101209036***3 정용태 입금10,000 잔액115,571,706"),
+  );
+  assert(a.ok && b.ok, "both ok");
+  if (!a.ok || !b.ok) return;
+  assert(a.eventId !== b.eventId, "different SMS must hash differently");
+});
+
+Deno.test("extractPayload still rejects an empty text body", async () => {
+  const req = new Request("https://x.functions.supabase.co/deposit-webhook", {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: "   ",
+  });
   const payload = await extractPayload(req);
   assertEquals(payload.ok, false);
 });
