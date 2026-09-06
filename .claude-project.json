@@ -1,0 +1,19 @@
+{
+  "_설명": "이 폴더(및 하위)에서 세션이 열리면 훅이 이 설정으로 동작한다. 정본 규격: Z:\\09_claude-output\\★운영체계_표준_v1.md",
+  "name": "아산정플란트 내부 도구 (치료계획·hr·ortho·기공차트)",
+  "pending": {
+    "file": "todos.md",
+    "section_name": "아직 원장이 답하지 않은 것",
+    "rebuild_cmd": "",
+    "guide": "우리 프로젝트 CLAUDE.md"
+  },
+  "briefing": {
+    "recent_hours": 48,
+    "queue_section": "진행 중 / 바로 다음"
+  },
+  "handoff": {
+    "file": "todos.md",
+    "min_mb": 2.5,
+    "hint": "맨 위에 「🧭 이번 세션 인수인계」 블록 유지 (목적·결정·수정파일·실패한 방법·검증·남은 할일) + 「👉 새 세션 지시문」"
+  }
+}
