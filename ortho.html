@@ -71,6 +71,11 @@ header .ttl small{color:var(--mint);font-weight:700}
 .kc .mv button{flex:0 0 auto;background:var(--panel);border:1px solid var(--line);color:var(--gray);border-radius:7px;padding:3px 9px;font-size:12px}
 .kc .mv .open{flex:1;color:var(--ink)}
 .kc .mv button:hover{border-color:var(--mint);color:var(--mint)}
+#tableView{display:none;padding:12px 14px 40px;overflow-x:auto;min-height:calc(100vh - 60px)}
+.caseTable{width:100%;min-width:820px;border-collapse:collapse;background:var(--card);font-size:12.5px}
+.caseTable th,.caseTable td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:middle}
+.caseTable th{background:var(--panel);color:var(--gray);font-size:11.5px;white-space:nowrap}
+.caseTable tbody tr{cursor:pointer}.caseTable tbody tr:hover{background:var(--mint-dk)}
 
 /* ── 모달 공통 ── */
 .mask{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:4vh 10px}
@@ -84,6 +89,16 @@ header .ttl small{color:var(--mint);font-weight:700}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px 10px}
 .fld{display:flex;flex-direction:column;gap:3px}
 .fld label{font-size:11px;color:var(--gray);font-weight:700}
+.labelrow{display:flex;align-items:center;gap:6px}.labelrow label{flex:1}
+.mini{background:var(--panel);border:1px solid var(--line);color:var(--mint);border-radius:6px;padding:1px 7px;font-size:10.5px;font-weight:800}
+.quickrow{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
+.quickrow button{background:var(--panel);border:1px solid var(--line);color:var(--gray);border-radius:12px;padding:2px 7px;font-size:10.5px}
+.quickrow button:hover,.mini:hover{border-color:var(--mint);color:var(--mint)}
+.fdipanel{display:none;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:7px;margin-top:3px}
+.fdipanel.show{display:block}.fdihead{display:flex;align-items:center;color:var(--gray);font-size:10.5px;margin-bottom:5px}.fdihead button{margin-left:auto}
+.fdirow{display:grid;grid-template-columns:repeat(8,1fr) 6px repeat(8,1fr);gap:3px;margin:3px 0}
+.fdirow i{border-left:1px solid var(--line)}.fdirow button{background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:5px;padding:3px 1px;font-size:10.5px}
+.fdirow button:hover{border-color:var(--mint);color:var(--mint)}
 .fld.w2{grid-column:span 2}
 .fld.w4{grid-column:1/-1}
 .sect{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
@@ -136,6 +151,8 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
   <button class="chip" data-f="early">⚡ 조기논의</button>
   <button class="chip" data-f="money">💰 대기</button>
   <select id="fStaff" style="font-size:12.5px"><option value="">담당 전체</option></select>
+  <button class="hbtn" id="viewBtn" onclick="toggleView()">표</button>
+  <button class="hbtn" onclick="downloadCSV()">CSV</button>
   <button class="hbtn pri" onclick="openNew()">➕ 새 케이스</button>
   <button class="hbtn" onclick="openUpcoming()">🗓 다가오는 계획</button>
   <button class="hbtn" onclick="openMgmt()">📂 진행 관리</button>
@@ -144,6 +161,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
   <button class="hbtn" id="logoutBtn">로그아웃</button>
 </header>
 <div id="kanban"></div>
+<div id="tableView"></div>
 </div>
 
 <!-- 상세 모달 -->
@@ -248,6 +266,8 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const sb = (typeof supabase!=='undefined') ? supabase.createClient(SB_URL, SB_KEY) : null;
 
 let ME='', cases=[], curId=null, filt={q:'',late:false,early:false,money:false,staff:''};
+let viewMode='kanban';try{if(localStorage.getItem('ortho_view_mode')==='table')viewMode='table';}catch(e){} /* 저장소가 차단되거나 값이 없으면 익숙한 기본 칸반으로 시작 */
+let QUICK_PHRASES={}, fdiOpen=false, fdiCaret=null;
 
 /* ── 유틸 ── */
 const $=s=>document.querySelector(s);
@@ -299,6 +319,8 @@ function visible(c){
   if(filt.staff&&c.staff!==filt.staff)return false;
   return true;
 }
+const dueSort=(a,b)=>{const aa=a.next_due||'9999',bb=b.next_due||'9999';return aa===bb?0:(aa<bb?-1:1);};
+function sortedVisibleCases(){return cases.filter(visible).sort((a,b)=>stageIdx(a.stage_key)-stageIdx(b.stage_key)||dueSort(a,b));}
 function cardHTML(c){
   const st=stageOf(c.stage_key), late=delayDays(c);
   const b=[];
@@ -329,14 +351,61 @@ function cardHTML(c){
     </div></div>`;
 }
 function render(){
-  const kb=$('#kanban');
+  const kb=$('#kanban'),tv=$('#tableView');
+  kb.style.display=viewMode==='kanban'?'flex':'none';tv.style.display=viewMode==='table'?'block':'none';
+  $('#viewBtn').textContent=viewMode==='kanban'?'표':'칸반';
   kb.innerHTML=STAGES.filter(s=>!s.mgmt).map(st=>{
     const list=cases.filter(c=>c.stage_key===st.key&&visible(c))
-      .sort((a,b)=>(a.next_due||'9999')<(b.next_due||'9999')?-1:1);
+      .sort(dueSort);
     return `<div class="kcol${st.money?' money':''}${st.ship?' ship':''}"><h5>${esc(st.name)}<span class="cnt">${list.length}</span></h5>${list.map(cardHTML).join('')}</div>`;
   }).join('');
+  const rows=sortedVisibleCases();
+  tv.innerHTML=`<table class="caseTable"><thead><tr><th>환자명</th><th>차트번호</th><th>현재 단계</th><th>유형</th><th>담당</th><th>다음 액션</th><th>경과</th></tr></thead><tbody>${rows.map(c=>{
+    const late=delayDays(c),nx=esc(c.next_action||'—')+(c.next_due?` <span class="b trim">${ddayTxt(c.next_due)}</span>`:'');
+    return `<tr onclick="openDetail('${c.id}')"><td><b>${esc(c.patient_name)}</b></td><td>${esc(c.chart_no||'')}</td><td>${esc(stageOf(c.stage_key).name)}</td><td>${esc(c.case_type||'')}</td><td>${esc(c.staff||'담당 미정')}</td><td>${nx}</td><td>${late?`<span class="b warn">⚠ ${late}일 경과</span>`:'—'}</td></tr>`;
+  }).join('')}</tbody></table>`;
   $('#cntAll').textContent='· 활성 '+cases.filter(c=>!c.archived&&!stageOf(c.stage_key).mgmt).length+'건';
 }
+
+function toggleView(){viewMode=viewMode==='kanban'?'table':'kanban';try{localStorage.setItem('ortho_view_mode',viewMode);}catch(e){}render();}
+const csvCell=v=>{const s=String(v==null?'':v);return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
+function downloadCSV(){
+  const heads=['환자명','차트번호','유형','트림','담당','현재단계','초진일','진단비청구액','진단비입금일','50%청구액','50%입금일','다음액션','기한','배송요청일','예약목표일','TrackingNo','메모'];
+  const rows=sortedVisibleCases().map(c=>[c.patient_name,c.chart_no,c.case_type,F(c,'trim'),c.staff,stageOf(c.stage_key).name,c.start_date,c.fee_dx_amount,c.fee_dx_paid_at,c.fee_half_amount,c.fee_half_paid_at,c.next_action,c.next_due,c.ship_requested_at,c.appt_target_date,c.tracking_no,c.memo]);
+  const blob=new Blob(['\uFEFF'+[heads,...rows].map(r=>r.map(csvCell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='교정케이스_'+today()+'.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),0);
+}
+
+async function loadQuickPhrases(){
+  QUICK_PHRASES={};
+  try{
+    const {data,error}=await sb.from('app_settings').select('value').eq('key','ortho_quick_phrases').maybeSingle();
+    if(error||!data)return renderVisitQuickPhrases();
+    const parsed=JSON.parse(data.value);if(parsed&&typeof parsed==='object'&&!Array.isArray(parsed))QUICK_PHRASES=parsed;
+  }catch(e){}
+  renderVisitQuickPhrases();
+}
+function quickHTML(key){const list=Array.isArray(QUICK_PHRASES[key])?QUICK_PHRASES[key].filter(v=>typeof v==='string'&&v):[];
+  return list.map((v,i)=>`<button type="button" data-phrase-key="${key}" data-phrase-i="${i}">${esc(v)}</button>`).join('');}
+function appendPhrase(el,text){
+  const sep=el.value?(el.tagName==='TEXTAREA'?'\n':' · '):''; /* 여러 문장을 읽기 쉽게 textarea는 줄바꿈, 한 줄 입력은 가운데점을 사용 */
+  el.value+=sep+text;el.dispatchEvent(new Event('input',{bubbles:true}));el.focus();el.setSelectionRange(el.value.length,el.value.length);
+}
+function bindQuickButtons(root){root.querySelectorAll('[data-phrase-key]').forEach(btn=>btn.addEventListener('click',()=>{
+  const map={visit_progress:'#nvProg',visit_considerations:'#nvCons',visit_plan:'#nvPlan',next_action:'[data-k="next_action"]',diagnosis:'[data-k="diagnosis"]'};
+  const list=QUICK_PHRASES[btn.dataset.phraseKey]||[],el=$(map[btn.dataset.phraseKey]);if(el&&list[btn.dataset.phraseI]!=null)appendPhrase(el,list[btn.dataset.phraseI]);
+}));}
+function renderVisitQuickPhrases(){[['nvProg','visit_progress'],['nvCons','visit_considerations'],['nvPlan','visit_plan']].forEach(([id,key])=>{
+  const input=$('#'+id);let row=input.parentElement.querySelector('[data-quick]');if(!row){row=document.createElement('div');row.className='quickrow';row.dataset.quick=key;input.after(row);}
+  row.innerHTML=quickHTML(key);row.style.display=row.innerHTML?'flex':'none';
+});bindQuickButtons($('#paneVisit'));}
+
+const FDI_QUADS=[[18,17,16,15,14,13,12,11],[21,22,23,24,25,26,27,28],[48,47,46,45,44,43,42,41],[31,32,33,34,35,36,37,38]]; /* 환자를 마주 보는 실제 구강 방향으로 좌우 대칭 배치 */
+function fdiPanelHTML(){const row=(left,right,label)=>`<div class="fdirow" aria-label="${label}">${left.map(n=>`<button type="button" data-fdi="${n}">${n}</button>`).join('')}<i></i>${right.map(n=>`<button type="button" data-fdi="${n}">${n}</button>`).join('')}</div>`;
+  return `<div class="fdipanel${fdiOpen?' show':''}"><div class="fdihead">성인 FDI 치식 · 환자를 마주 보는 방향<button type="button" class="mini" data-fdi-close>닫기</button></div>${row(FDI_QUADS[0],FDI_QUADS[1],'상악')}${row(FDI_QUADS[2],FDI_QUADS[3],'하악')}</div>`;}
+function closeFDI(){fdiOpen=false;const panel=$('.fdipanel');if(panel)panel.classList.remove('show');}
+function insertFDI(n){const el=$('[data-k="diagnosis"]');if(!el)return;const pos=fdiCaret==null?el.value.length:fdiCaret,before=el.value.slice(0,pos),after=el.value.slice(pos);
+  const text=(before&&!/\s$/.test(before)?' ':'')+'#'+n+(after&&!/^\s/.test(after)?' ':'');el.setRangeText(text,pos,pos,'end');fdiCaret=pos+text.length;el.dispatchEvent(new Event('input',{bubbles:true}));el.focus();el.setSelectionRange(fdiCaret,fdiCaret);}
 
 /* ── 저장 ── */
 async function patchCase(id,patch,log){
@@ -366,7 +435,7 @@ async function moveStage(id,dir){
 
 /* ── 상세 ── */
 function openDetail(id){curId=id;switchTab('info');show('dMask');renderDetail();loadLogs();}
-function closeDetail(){hide('dMask');curId=null;if(_reload){_reload=false;loadAll();}}
+function closeDetail(){closeFDI();hide('dMask');curId=null;if(_reload){_reload=false;loadAll();}}
 function switchTab(t){
   $('#tabInfo').classList.toggle('on',t==='info');$('#tabVisit').classList.toggle('on',t==='visit');
   $('#paneInfo').style.display=t==='info'?'':'none';$('#paneVisit').style.display=t==='visit'?'':'none';
@@ -389,17 +458,26 @@ const FIELDS=[
 ];
 function renderDetail(){
   const c=cases.find(x=>x.id===curId); if(!c)return;
+  fdiCaret=null;
   $('#dTitle').textContent=`${c.patient_name} ${c.chart_no||''} · ${stageOf(c.stage_key).name}`;
   $('#dGrid').innerHTML=FIELDS.map(f=>{
     const w=f.w?` w${f.w}`:'';
     let v=f.k==='__trim'?(F(c,'trim')||'Scalloped'):(c[f.k]==null?'':c[f.k]);
+    const label=f.k==='diagnosis'?`<div class="labelrow"><label>${f.l}</label><button type="button" class="mini" data-fdi-toggle>FDI</button></div>`:`<label>${f.l}</label>`;
+    const quick=(f.k==='diagnosis'||f.k==='next_action')?`<div class="quickrow"${quickHTML(f.k)?'':` style="display:none"`}>${quickHTML(f.k)}</div>`:'';
     if(f.t==='ro'){const dd=c.appt_target_date?` <b style="color:var(--mint)">${ddayTxt(c.appt_target_date)}</b>`:'';
-      return `<div class="fld${w}"><label>${f.l}</label><div style="padding:6px 2px">${esc(v)||'—'}${dd}</div></div>`;}
-    if(f.t==='sel')return `<div class="fld${w}"><label>${f.l}</label><select data-k="${f.k}">${f.opts.map(o=>`<option${o===v?' selected':''}>${o}</option>`).join('')}${f.opts.includes(v)||!v?'':`<option selected>${esc(v)}</option>`}</select></div>`;
-    if(f.t==='ta')return `<div class="fld${w}"><label>${f.l}</label><textarea data-k="${f.k}">${esc(v)}</textarea></div>`;
+      return `<div class="fld${w}">${label}<div style="padding:6px 2px">${esc(v)||'—'}${dd}</div></div>`;}
+    if(f.t==='sel')return `<div class="fld${w}">${label}<select data-k="${f.k}">${f.opts.map(o=>`<option${o===v?' selected':''}>${o}</option>`).join('')}${f.opts.includes(v)||!v?'':`<option selected>${esc(v)}</option>`}</select></div>`;
+    if(f.t==='ta')return `<div class="fld${w}${f.k==='diagnosis'?' fdiBlock':''}">${label}<textarea data-k="${f.k}">${esc(v)}</textarea>${quick}${f.k==='diagnosis'?fdiPanelHTML():''}</div>`;
     const typ=f.t==='num'?'number':(f.t==='date'?'date':'text');
-    return `<div class="fld${w}"><label>${f.l}</label><input type="${typ}" data-k="${f.k}" value="${esc(v)}"></div>`;
+    return `<div class="fld${w}">${label}<input type="${typ}" data-k="${f.k}" value="${esc(v)}">${quick}</div>`;
   }).join('');
+  bindQuickButtons($('#dGrid'));
+  const diag=$('[data-k="diagnosis"]'),toggle=$('[data-fdi-toggle]');
+  if(toggle){toggle.addEventListener('pointerdown',()=>{if(document.activeElement===diag)fdiCaret=diag.selectionStart;});toggle.addEventListener('click',e=>{e.stopPropagation();fdiOpen=!fdiOpen;$('.fdipanel').classList.toggle('show',fdiOpen);});}
+  if(diag)['select','keyup','click'].forEach(ev=>diag.addEventListener(ev,()=>{fdiCaret=diag.selectionStart;}));
+  $('#dGrid').querySelectorAll('[data-fdi]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();insertFDI(btn.dataset.fdi);}));
+  const fdiClose=$('[data-fdi-close]');if(fdiClose)fdiClose.addEventListener('click',e=>{e.stopPropagation();closeFDI();});
   $('#dGrid').querySelectorAll('[data-k]').forEach(el=>{
     const k=el.dataset.k;
     const save=imm=>{
@@ -543,6 +621,7 @@ $('#q').addEventListener('input',e=>{filt.q=e.target.value.trim();render();});
 document.querySelectorAll('.chip').forEach(ch=>ch.addEventListener('click',()=>{
   ch.classList.toggle('on'); filt[ch.dataset.f]=ch.classList.contains('on'); render();}));
 $('#fStaff').addEventListener('change',e=>{filt.staff=e.target.value;render();});
+document.addEventListener('click',e=>{if(fdiOpen&&!e.target.closest('.fdiBlock'))closeFDI();});
 
 /* ── 로그인 ── */
 let _inited=false;
@@ -550,7 +629,7 @@ async function onAuthed(session){
   $('#gate').style.display='none'; $('#app').style.display='';
   ME=(session&&session.user&&session.user.email)||'';
   if(_inited)return; _inited=true;
-  await loadAll(); subscribeRealtime();
+  await Promise.all([loadAll(),loadQuickPhrases()]); subscribeRealtime();
 }
 async function doLogin(){
   const msg=$('#lgMsg'), email=$('#lgEmail').value.trim(), pw=$('#lgPw').value;
