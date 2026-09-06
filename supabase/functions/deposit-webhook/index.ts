@@ -223,14 +223,20 @@ async function notifyTelegram(record: DepositRecord): Promise<void> {
     return;
   }
   try {
-    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: buildTelegramMessage(record),
-      }),
-    });
+    const response = await fetch(
+      `https://api.telegram.org/bot${botToken}/sendMessage`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: buildTelegramMessage(record),
+        }),
+      },
+    );
+    if (!response.ok) {
+      console.error("telegram-send-failed", response.status);
+    }
   } catch {
     // best-effort only: a Telegram outage must never fail the deposit webhook
   }
