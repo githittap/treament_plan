@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>아산정플란트치과 · 진료 도구</title>
 <meta name="description" content="아산정플란트치과 도구 모음 — 치료계획 도구, 사주 정밀풀이, 직원 뽑기">
+<link rel="manifest" href="manifest-index.json">
+<meta name="theme-color" content="#156f72">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="정플란트도구">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <style>
   :root{
     --bg:#070c0e;
@@ -313,5 +320,6 @@
   <footer>© 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지</footer>
 
   <script src="shared.js"></script>
+<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}</script>
 </body>
 </html>

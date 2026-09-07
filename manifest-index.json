@@ -1,0 +1,16 @@
+{
+  "name": "아산정플란트 진료 도구",
+  "short_name": "정플란트도구",
+  "start_url": "index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#070c0e",
+  "theme_color": "#156f72",
+  "icons": [
+    {"src":"icons/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"icons/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any"},
+    {"src":"icons/icon-192-maskable.png","sizes":"192x192","type":"image/png","purpose":"maskable"},
+    {"src":"icons/icon-512-maskable.png","sizes":"512x512","type":"image/png","purpose":"maskable"}
+  ]
+}
