@@ -117,6 +117,16 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
   </div>
 </div>
 
+<div id="pendingGate" style="display:none;position:fixed;inset:0;background:var(--bg,#0d1715);align-items:center;justify-content:center;z-index:99">
+  <div style="max-width:360px;text-align:center;padding:24px">
+    <div style="font-size:30px">⏳</div>
+    <h1 style="font-size:19px;margin:6px 0 8px">승인 대기 중입니다</h1>
+    <p style="font-size:13px;color:var(--gray,#8fa5a0)">가입 확인 후 원장님이 승인하면 자동으로 사용할 수 있습니다. 승인되면 새로고침해 주세요.</p>
+    <button class="hbtn" style="margin-top:14px" onclick="location.reload()">새로고침</button>
+    <button class="hbtn" style="margin-top:8px" onclick="sb.auth.signOut().then(()=>location.reload())">로그아웃</button>
+  </div>
+</div>
+
 <div id="app" style="display:none">
 <header>
   <span class="ttl">👥 직원 허브</span>
@@ -213,7 +223,7 @@ const SB_URL = 'https://texevhsxttfoqkrucfzl.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRleGV2aHN4dHRmb3FrcnVjZnpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMTMyNTIsImV4cCI6MjA5ODc4OTI1Mn0.v6zejbNx4Z4otGNc8hQeQum4c_wdst1azUkLx6s_9CM';
 const sb = (typeof supabase!=='undefined') ? supabase.createClient(SB_URL, SB_KEY) : null;
 
-let ME={id:'',email:'',name:'',role:'staff'}, PROFILES=[], TAB='home', xlRows=[];
+let ME={id:'',email:'',name:'',role:'staff',approved:true}, PROFILES=[], TAB='home', xlRows=[];
 const $=s=>document.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const today=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());};
@@ -242,13 +252,14 @@ const TABS=[
   {key:'appr',  label:'결재함',    roles:['staff','manager','chief','owner']},
   {key:'notice',label:'공지',      roles:['staff','manager','chief','owner']},
   {key:'onbo',  label:'입사서류',  roles:['staff','manager','chief','owner']},
+  {key:'confid',label:'비밀 진료기록',roles:['staff','manager','chief','owner'],needsConfid:true},
   {key:'owner', label:'원장',      roles:['owner']},
 ];
 let DEP_RANGE='month';
 function setDepRange(r){DEP_RANGE=r;render();}
 let BADGE={};
 function renderNav(){
-  $('#nav').innerHTML=TABS.filter(t=>t.roles.includes(ME.role)).map(t=>{
+  $('#nav').innerHTML=TABS.filter(t=>t.roles.includes(ME.role)&&(!t.needsConfid||ME.confidAccess)).map(t=>{
     const c=BADGE[t.key]?`<span class="cnt">${BADGE[t.key]}</span>`:'';
     return `<button class="${t.key===TAB?'on':''}" onclick="go('${t.key}')">${t.label}${c}</button>`;
   }).join('');
@@ -294,7 +305,8 @@ async function render(){
     else if(TAB==='appr')await renderAppr(m);
     else if(TAB==='notice')await renderNotice(m);
     else if(TAB==='onbo')await renderOnbo(m);
-    else if(TAB==='owner')renderOwner(m);
+    else if(TAB==='confid')await renderConfid(m);
+    else if(TAB==='owner')await renderOwner(m);
   }catch(e){console.error(e);m.innerHTML='<div class="card"><div class="empty">오류: '+esc(e.message)+'</div></div>';}
 }
 
@@ -737,16 +749,61 @@ async function submitOnbo(itemId){await sb.from('onboarding_checks').upsert({use
 async function confirmOnbo(itemId){await sb.from('onboarding_checks').update({status:'확인',checked_by:ME.name,checked_at:new Date().toISOString()}).eq('item_id',itemId).eq('user_id',ME.id);setStatus('saved');render();}
 async function addOnboItem(){const l=$('#oiNew').value.trim();if(!l)return;await sb.from('onboarding_items').insert({label:l});setStatus('saved');render();}
 
+/* ── 비밀 진료기록 ── */
+async function renderConfid(m){
+  const {data,error}=await sb.from('confidential_records').select('*').order('created_at',{ascending:false});
+  if(error){m.innerHTML='<div class="empty">불러오기 오류</div>';return;}
+  m.innerHTML=`<div class="card"><h2>🔒 비밀 진료기록</h2>
+    <input id="cfQ" placeholder="환자명·차트번호 검색" style="margin-bottom:8px" oninput="filterConfid()">
+    <div id="cfList"></div></div>
+    <div class="card"><h3>➕ 기록 추가</h3>
+    <input id="cfName" placeholder="환자명 *"> <input id="cfChart" placeholder="차트번호(선택)">
+    <textarea id="cfBody" placeholder="내용" style="width:100%;min-height:80px;margin-top:6px"></textarea>
+    <button class="hbtn pri" style="margin-top:6px" onclick="submitConfidRecord()">저장</button>
+    <div id="cfMsg" class="sub" style="color:var(--red,#ff7b76)"></div></div>`;
+  window._cfRecords=data||[];
+  filterConfid();
+}
+function filterConfid(){
+  const q=($('#cfQ')?.value||'').trim().toLowerCase();
+  const list=(window._cfRecords||[]).filter(r=>!q||String(r.patient_name||'').toLowerCase().includes(q)||String(r.chart_no||'').toLowerCase().includes(q));
+  $('#cfList').innerHTML=list.length?list.map(r=>`<div style="padding:8px 0;border-bottom:1px dashed var(--line,#24332f)">
+    <b>${esc(r.patient_name)}</b> ${r.chart_no?`<span class="sub">${esc(r.chart_no)}</span>`:''} <span class="sub">${md(r.created_at)} · ${esc(r.author||'')}</span>
+    <div style="margin-top:4px;white-space:pre-wrap">${esc(r.body)}</div></div>`).join(''):'<div class="empty">기록 없음</div>';
+}
+async function submitConfidRecord(){
+  const patient_name=$('#cfName').value.trim(),body=$('#cfBody').value.trim();
+  if(!patient_name||!body){$('#cfMsg').textContent='환자명과 내용은 필수입니다.';return;}
+  const {error}=await sb.from('confidential_records').insert({patient_name,chart_no:$('#cfChart').value.trim()||null,body,author:ME.name});
+  if(error){$('#cfMsg').textContent='저장 실패: '+error.message;return;}
+  $('#cfName').value='';$('#cfChart').value='';$('#cfBody').value='';$('#cfMsg').textContent='';
+  renderConfid($('#main'));setStatus('saved');
+}
+
 /* ── 원장 ── */
-function renderOwner(m){
+async function renderOwner(m){
+  const pending=PROFILES.filter(p=>p.approved===false);
+  const {data:accessRows}=await sb.from('confidential_access').select('user_id');
+  const accessSet=new Set((accessRows||[]).map(r=>r.user_id));
   m.innerHTML=`<div class="card"><h2>🔑 원장 전용</h2>
     <div class="rowflex">
       <div class="stat"><div class="sub">직원 명부</div><div>${PROFILES.length}명 · owner ${PROFILES.filter(p=>p.role==='owner').length}·chief ${PROFILES.filter(p=>p.role==='chief').length}·manager ${PROFILES.filter(p=>p.role==='manager').length}·staff ${PROFILES.filter(p=>p.role==='staff').length}</div></div>
     </div>
+    ${pending.length?`<h3>🆕 가입 승인 대기 (${pending.length}명)</h3>
+    <div class="tblwrap"><table><tr><th>이름</th><th>부서</th><th>가입일</th><th></th></tr>
+    ${pending.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.dept||'')}</td><td>${p.created_at?md(p.created_at):''}</td>
+      <td><button class="mini stamp" onclick="approveProfile('${p.user_id}')">승인</button></td></tr>`).join('')}</table></div>`:''}
     <h3>직원 권한 관리 <span class="sub">(입퇴사·승진 시 여기서 변경)</span></h3>
     <div class="tblwrap"><table><tr><th>이름</th><th>부서</th><th>입사</th><th>권한</th></tr>
     ${PROFILES.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.dept||'')}</td><td>${p.hire_date||''}</td>
       <td><select class="mini" onchange="setRole('${p.user_id}',this.value)">${['staff','manager','chief','owner'].map(r=>`<option ${p.role===r?'selected':''}>${r}</option>`).join('')}</select></td></tr>`).join('')}</table></div>
+    <h3>🔒 비밀 진료기록 접근 명단</h3>
+    <div class="tblwrap"><table><tr><th>이름</th><th>권한</th><th>접근</th><th></th></tr>
+    ${PROFILES.filter(p=>p.approved!==false).map(p=>`<tr><td>${esc(p.name)}</td><td>${p.role}</td>
+      <td>${accessSet.has(p.user_id)?'✅':'—'}</td>
+      <td>${accessSet.has(p.user_id)
+        ?`<button class="mini rej" onclick="revokeConfid('${p.user_id}')">제거</button>`
+        :`<button class="mini" onclick="grantConfid('${p.user_id}')">추가</button>`}</td></tr>`).join('')}</table></div>
   </div>
   <div class="card"><h2>다음 마일스톤 <span class="sub">(설계 완료·구현 예정)</span></h2>
     <div class="stub">M2 근무표·계약서 자동생성 · M3 급여 대시보드/명세서 발행·월말 평가·휴일근로 계산기 · M4 채용·입금피드·기공차트 통합<br>— 백엔드(표)는 이미 준비됨. 화면만 순차 추가.</div>
@@ -754,6 +811,12 @@ function renderOwner(m){
 }
 async function setRole(uid,role){await sb.from('profiles').update({role}).eq('user_id',uid);await loadProfiles();setStatus('saved');
   if(uid===ME.id){ME.role=role;renderNav();}render();}
+async function approveProfile(uid){
+  await sb.from('profiles').update({approved:true}).eq('user_id',uid);
+  await loadProfiles();setStatus('saved');render();
+}
+async function grantConfid(uid){await sb.from('confidential_access').insert({user_id:uid});setStatus('saved');render();}
+async function revokeConfid(uid){await sb.from('confidential_access').delete().eq('user_id',uid);setStatus('saved');render();}
 
 /* ── 로그인 ── */
 let _inited=false;
@@ -771,6 +834,12 @@ async function onAuthed(session){
     await loadProfiles();p=PROFILES.find(x=>x.user_id===ME.id);
   }
   ME.name=p?p.name:ME.email.split('@')[0];ME.role=p?p.role:'staff';ME.stamp=p?p.stamp:null;
+  ME.approved=p?p.approved!==false:true; // 프로필 없으면(이론상 발생 안 함) 통과
+  if(!ME.approved){$('#app').style.display='none';$('#pendingGate').style.display='flex';return;}
+  try{
+    const {data:ca}=await sb.from('confidential_access').select('user_id').eq('user_id',ME.id).maybeSingle();
+    ME.confidAccess=!!ca||ME.role==='owner';
+  }catch(e){ME.confidAccess=false;} // 조회 실패 시 fail closed — 탭을 숨기는 쪽으로
   $('#meName').textContent=ME.name;$('#meRole').textContent=ME.role;
   renderNav();await render();await refreshBadges();
   // 결재선 표시(비동기)
