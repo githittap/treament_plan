@@ -150,12 +150,14 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
   <button class="chip" data-f="late">⚠ 지연</button>
   <button class="chip" data-f="early">⚡ 조기논의</button>
   <button class="chip" data-f="money">💰 대기</button>
+  <button class="chip" data-f="rescan">↻재스캔</button>
   <select id="fStaff" style="font-size:12.5px"><option value="">담당 전체</option></select>
   <button class="hbtn" id="viewBtn" onclick="toggleView()">표</button>
   <button class="hbtn" onclick="downloadCSV()">CSV</button>
   <button class="hbtn pri" onclick="openNew()">➕ 새 케이스</button>
   <button class="hbtn" onclick="openUpcoming()">🗓 다가오는 계획</button>
   <button class="hbtn" onclick="openMgmt()">📂 진행 관리</button>
+  <button class="hbtn" onclick="openRescanMgmt()">↻ 재스캔 관리</button>
   <button class="hbtn" onclick="openArch()">🗃 보관함</button>
   <span id="saveTag">✓ 자동 저장</span>
   <button class="hbtn" id="logoutBtn">로그아웃</button>
@@ -170,6 +172,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
   <div class="tabs">
     <button class="tab on" id="tabInfo" onclick="switchTab('info')">정보·로그</button>
     <button class="tab" id="tabVisit" onclick="switchTab('visit')">간이 진료기록부</button>
+    <button class="tab" id="tabRescan" onclick="switchTab('rescan')">재스캔</button>
   </div>
 
   <div id="paneInfo">
@@ -204,6 +207,15 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
       <div class="hint">지난 내원 기록은 다음날부터 잠깁니다(추가만 가능).</div>
     </div>
   </div>
+  <div id="paneRescan" style="display:none">
+    <div id="rDeadline"></div>
+    <table class="vtable"><thead><tr><th style="width:92px">재스캔일</th><th>사유</th><th style="width:76px">무상·유상</th><th style="width:90px">비용</th><th>메모</th></tr></thead>
+    <tbody id="rRows"></tbody></table>
+    <div class="sect"><h4>재스캔 기록 추가</h4><div class="grid">
+      <div class="fld"><label>재스캔일</label><input type="date" id="nrDate"></div><div class="fld w2"><label>사유</label><input id="nrReason"></div>
+      <div class="fld"><label>무상·유상</label><select id="nrFree"><option value="">선택 없음</option><option value="true">무상</option><option value="false">유상</option></select></div><div class="fld"><label>비용</label><input type="number" id="nrCost" min="0"></div><div class="fld w2"><label>메모</label><input id="nrNote"></div>
+    </div><button class="hbtn pri" style="margin-top:8px" onclick="addRescan()">기록 추가</button><div class="hint">오늘 작성한 기록만 수정할 수 있습니다.</div></div>
+  </div>
 </div></div>
 
 <!-- 다가오는 계획 -->
@@ -223,6 +235,9 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
   <h3>🗃 보관함 (완료)<button class="x" onclick="hide('aMask')">✕</button></h3>
   <div id="aList"></div>
 </div></div>
+
+<!-- 재스캔 관리 -->
+<div class="mask" id="rMask"><div class="modal"><h3>↻ 재스캔 관리<button class="x" onclick="hide('rMask')">✕</button></h3><div id="rList"></div></div></div>
 
 <!-- 새 케이스 -->
 <div class="mask" id="nMask"><div class="modal" style="width:min(480px,96vw)">
@@ -265,9 +280,10 @@ const SB_URL = 'https://texevhsxttfoqkrucfzl.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRleGV2aHN4dHRmb3FrcnVjZnpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMTMyNTIsImV4cCI6MjA5ODc4OTI1Mn0.v6zejbNx4Z4otGNc8hQeQum4c_wdst1azUkLx6s_9CM';
 const sb = (typeof supabase!=='undefined') ? supabase.createClient(SB_URL, SB_KEY) : null;
 
-let ME='', cases=[], curId=null, filt={q:'',late:false,early:false,money:false,staff:''};
+let ME='', cases=[], curId=null, filt={q:'',late:false,early:false,money:false,rescan:false,staff:''};
 let viewMode='kanban';try{if(localStorage.getItem('ortho_view_mode')==='table')viewMode='table';}catch(e){} /* 저장소가 차단되거나 값이 없으면 익숙한 기본 칸반으로 시작 */
 let QUICK_PHRASES={}, fdiOpen=false, fdiCaret=null;
+let RESCAN_MAP={};
 
 /* ── 유틸 ── */
 const $=s=>document.querySelector(s);
@@ -278,6 +294,9 @@ const dday=s=>{if(!s)return null;return Math.round((new Date(s+'T00:00:00')-new 
 const ddayTxt=s=>{const n=dday(s);if(n==null)return'';return n===0?'D-day':(n>0?'D-'+n:'D+'+(-n));};
 const daysSince=iso=>iso?Math.floor((Date.now()-new Date(iso).getTime())/864e5):null;
 const F=(c,k)=>((c.flags||{})[k]);
+const freeDeadline=c=>{const s=F(c,'plan_submitted_at');if(!s)return null;const d=new Date(s+'T00:00:00');d.setFullYear(d.getFullYear()+3);const p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());};
+const freeStatus=c=>{const end=freeDeadline(c),n=dday(end);return !end?'최초 계획 제출일 미입력':n<0?'무상기간 종료':'무상 마감 '+ddayTxt(end);};
+const rescanBadge=c=>{const r=RESCAN_MAP[c.id];return r&&r.count?`<span class="b${r.hasPaid?' warn':' flag'}">↻재스캔 ${r.count}회</span>`:'';};
 const stageOf=k=>STAGES.find(s=>s.key===k)||STAGES[0];
 const stageIdx=k=>Math.max(0,STAGES.findIndex(s=>s.key===k));
 function setStatus(k){const el=$('#saveTag');if(!el)return;el.classList.remove('err');
@@ -302,9 +321,10 @@ async function loadAll(){
   try{
     const {data,error}=await sb.from('ortho_cases').select('*').eq('deleted',false).order('created_at',{ascending:true});
     if(error)throw error;
-    cases=data||[]; render(); fillStaff(); setStatus('idle');
+    cases=data||[]; await loadRescanMap(); render(); fillStaff(); setStatus('idle');
   }catch(e){console.error('load',e);setStatus('error');}
 }
+async function loadRescanMap(){const {data,error}=await sb.from('ortho_rescans').select('case_id,is_free');if(error)throw error;RESCAN_MAP={};(data||[]).forEach(r=>{const v=RESCAN_MAP[r.case_id]||(RESCAN_MAP[r.case_id]={count:0,hasPaid:false});v.count++;if(r.is_free===false)v.hasPaid=true;});}
 function fillStaff(){
   const sel=$('#fStaff'),cur=sel.value;
   const st=[...new Set(cases.map(c=>c.staff).filter(Boolean))].sort();
@@ -316,6 +336,7 @@ function visible(c){
   if(filt.late&&!delayDays(c))return false;
   if(filt.early&&!c.early_rx)return false;
   if(filt.money&&!stageOf(c.stage_key).money)return false;
+  if(filt.rescan&&!(RESCAN_MAP[c.id]&&RESCAN_MAP[c.id].count))return false;
   if(filt.staff&&c.staff!==filt.staff)return false;
   return true;
 }
@@ -329,7 +350,7 @@ function cardHTML(c){
   if(c.early_rx)b.push(`<span class="b early">⚡조기논의</span>`);
   if(F(c,'hold'))b.push(`<span class="b flag">⏸보류</span>`);
   if(F(c,'stop'))b.push(`<span class="b flag">✖중단</span>`);
-  if(F(c,'remake'))b.push(`<span class="b flag">↻리메이크</span>`);
+  if(RESCAN_MAP[c.id])b.push(rescanBadge(c));
   b.push(c.fee_dx_paid_at?`<span class="b ok">진단✓${md(c.fee_dx_paid_at)}</span>`:`<span class="b pay">진단비 대기</span>`);
   b.push(c.fee_half_paid_at?`<span class="b ok">50%✓${md(c.fee_half_paid_at)}</span>`:`<span class="b pay">50% 전</span>`);
   if(late)b.push(`<span class="b warn">⚠ ${late}일 경과</span>`);
@@ -362,7 +383,7 @@ function render(){
   const rows=sortedVisibleCases();
   tv.innerHTML=`<table class="caseTable"><thead><tr><th>환자명</th><th>차트번호</th><th>현재 단계</th><th>유형</th><th>담당</th><th>다음 액션</th><th>경과</th></tr></thead><tbody>${rows.map(c=>{
     const late=delayDays(c),nx=esc(c.next_action||'—')+(c.next_due?` <span class="b trim">${ddayTxt(c.next_due)}</span>`:'');
-    return `<tr onclick="openDetail('${c.id}')"><td><b>${esc(c.patient_name)}</b></td><td>${esc(c.chart_no||'')}</td><td>${esc(stageOf(c.stage_key).name)}</td><td>${esc(c.case_type||'')}</td><td>${esc(c.staff||'담당 미정')}</td><td>${nx}</td><td>${late?`<span class="b warn">⚠ ${late}일 경과</span>`:'—'}</td></tr>`;
+    return `<tr onclick="openDetail('${c.id}')"><td><b>${esc(c.patient_name)}</b></td><td>${esc(c.chart_no||'')}</td><td>${esc(stageOf(c.stage_key).name)}</td><td>${esc(c.case_type||'')}</td><td>${esc(c.staff||'담당 미정')}</td><td>${nx}</td><td>${late?`<span class="b warn">⚠ ${late}일 경과</span>`:'—'} ${rescanBadge(c)}</td></tr>`;
   }).join('')}</tbody></table>`;
   $('#cntAll').textContent='· 활성 '+cases.filter(c=>!c.archived&&!stageOf(c.stage_key).mgmt).length+'건';
 }
@@ -434,18 +455,20 @@ async function moveStage(id,dir){
 }
 
 /* ── 상세 ── */
-function openDetail(id){curId=id;switchTab('info');show('dMask');renderDetail();loadLogs();}
+function openDetail(id){curId=id;resetRescanForm();switchTab('info');show('dMask');renderDetail();loadLogs();}
 function closeDetail(){closeFDI();hide('dMask');curId=null;if(_reload){_reload=false;loadAll();}}
 function switchTab(t){
-  $('#tabInfo').classList.toggle('on',t==='info');$('#tabVisit').classList.toggle('on',t==='visit');
-  $('#paneInfo').style.display=t==='info'?'':'none';$('#paneVisit').style.display=t==='visit'?'':'none';
+  $('#tabInfo').classList.toggle('on',t==='info');$('#tabVisit').classList.toggle('on',t==='visit');$('#tabRescan').classList.toggle('on',t==='rescan');
+  $('#paneInfo').style.display=t==='info'?'':'none';$('#paneVisit').style.display=t==='visit'?'':'none';$('#paneRescan').style.display=t==='rescan'?'':'none';
   if(t==='visit')loadVisits();
+  if(t==='rescan')loadRescans();
 }
 const FIELDS=[
   {k:'patient_name',l:'환자명',t:'text'},{k:'chart_no',l:'차트번호',t:'text'},
   {k:'phone',l:'연락처',t:'text'},{k:'rrn',l:'주민등록번호',t:'text'},
   {k:'case_type',l:'유형 (Selecto=개수당 / Full=3년 무료)',t:'sel',opts:CASE_TYPES,w:2},
   {k:'__trim',l:'트림 (Scalloped=잇몸선·심미 / Straight=+1.5mm·효과↑)',t:'sel',opts:TRIMS,w:2},
+  {k:'__plan_submitted_at',l:'최초 계획 제출일 (무상 재스캔 3년 기준)',t:'date',w:2},
   {k:'diagnosis',l:'진단 내용',t:'ta',w:4},
   {k:'start_date',l:'초진일',t:'date'},{k:'staff',l:'담당 직원',t:'text'},
   {k:'fee_dx_amount',l:'진단비 청구액',t:'num'},{k:'fee_dx_paid_at',l:'진단비 입금일',t:'date'},
@@ -462,7 +485,7 @@ function renderDetail(){
   $('#dTitle').textContent=`${c.patient_name} ${c.chart_no||''} · ${stageOf(c.stage_key).name}`;
   $('#dGrid').innerHTML=FIELDS.map(f=>{
     const w=f.w?` w${f.w}`:'';
-    let v=f.k==='__trim'?(F(c,'trim')||'Scalloped'):(c[f.k]==null?'':c[f.k]);
+    let v=f.k==='__trim'?(F(c,'trim')||'Scalloped'):f.k==='__plan_submitted_at'?(F(c,'plan_submitted_at')||''):(c[f.k]==null?'':c[f.k]);
     const label=f.k==='diagnosis'?`<div class="labelrow"><label>${f.l}</label><button type="button" class="mini" data-fdi-toggle>FDI</button></div>`:`<label>${f.l}</label>`;
     const quick=(f.k==='diagnosis'||f.k==='next_action')?`<div class="quickrow"${quickHTML(f.k)?'':` style="display:none"`}>${quickHTML(f.k)}</div>`:'';
     if(f.t==='ro'){const dd=c.appt_target_date?` <b style="color:var(--mint)">${ddayTxt(c.appt_target_date)}</b>`:'';
@@ -484,13 +507,14 @@ function renderDetail(){
       let val=el.value;
       if(k==='__trim'){const c2=cases.find(x=>x.id===curId);const flags=Object.assign({},c2.flags||{},{trim:val});
         imm?patchCase(curId,{flags}):queuePatch(curId,'flags',flags);return;}
+      if(k==='__plan_submitted_at'){const c2=cases.find(x=>x.id===curId);const flags=Object.assign({},c2.flags||{});if(val)flags.plan_submitted_at=val;else delete flags.plan_submitted_at;imm?patchCase(curId,{flags}):queuePatch(curId,'flags',flags);return;}
       if(el.type==='number')val=val===''?null:Number(val);
       imm?patchCase(curId,{[k]:val===''?null:val}):queuePatch(curId,k,val);
     };
     el.addEventListener('input',()=>{if(el.tagName!=='SELECT')save(false);});
     el.addEventListener('change',()=>save(true));
   });
-  const flg=[['early','⚡ 조기논의',()=>!!c.early_rx],['hold','⏸ 보류',()=>!!F(c,'hold')],['stop','✖ 중단',()=>!!F(c,'stop')],['remake','↻ 리메이크',()=>!!F(c,'remake')]];
+  const flg=[['early','⚡ 조기논의',()=>!!c.early_rx],['hold','⏸ 보류',()=>!!F(c,'hold')],['stop','✖ 중단',()=>!!F(c,'stop')]];
   $('#dFlags').innerHTML=flg.map(([k,l,on])=>`<button class="fbtn${on()?' on':''}" onclick="toggleFlag('${k}')">${l}</button>`).join('')
     +(c.early_rx?`<input style="flex:1;min-width:160px" placeholder="조기논의 사유 (예: 다음주 납부 예정)" value="${esc(c.early_rx_note||'')}" onchange="patchCase(curId,{early_rx_note:this.value})">`:'');
 }
@@ -499,7 +523,7 @@ async function toggleFlag(k){
   if(k==='early'){const on=!c.early_rx;
     await patchCase(curId,{early_rx:on},{kind:'note',body:on?'⚡조기논의 설정':'⚡조기논의 해제'});return;}
   const flags=Object.assign({},c.flags||{}); flags[k]=!flags[k]; if(!flags[k])delete flags[k];
-  const nm={hold:'보류',stop:'중단',remake:'리메이크'}[k];
+  const nm={hold:'보류',stop:'중단'}[k];
   await patchCase(curId,{flags},{kind:'note',body:(flags[k]?nm+' 설정':nm+' 해제')});
 }
 async function loadLogs(){
@@ -560,6 +584,31 @@ async function addVisit(){
   loadVisits(); setStatus('saved');
 }
 
+/* ── 재스캔 ── */
+function resetRescanForm(){['nrReason','nrCost','nrNote'].forEach(i=>$('#'+i).value='');$('#nrDate').value='';$('#nrFree').value='';}
+function rescanDefault(c,date){const end=freeDeadline(c);return !end?'':((date||today())<=end?'true':'false');}
+async function loadRescans(){
+  const c=cases.find(x=>x.id===curId);if(!c)return;
+  const end=freeDeadline(c),n=dday(end);
+  $('#rDeadline').innerHTML=end?`<div style="font-size:12px;color:var(--gray);margin-bottom:6px">${n<0?'<span class="b warn">무상기간 종료</span>':'<span class="b ok">'+freeStatus(c)+'</span>'} <span class="g">(마감 '+md(end)+')</span></div>`:'<div class="hint" style="margin-top:0">최초 계획 제출일을 입력하면 무상 마감이 계산됩니다.</div>';
+  if(!$('#nrDate').value){$('#nrDate').value=today();$('#nrFree').value=rescanDefault(c,$('#nrDate').value);}
+  const {data,error}=await sb.from('ortho_rescans').select('*').eq('case_id',curId).order('rescan_date',{ascending:false});
+  const tb=$('#rRows');if(error){tb.innerHTML='<tr><td colspan="5">오류</td></tr>';return;}
+  const free=v=>v===true?'무상':v===false?'유상':'미선택';
+  tb.innerHTML=(data&&data.length)?data.map(v=>{const editable=(v.created_at||'').slice(0,10)===new Date().toISOString().slice(0,10);
+    const cell=(k,val,typ)=>editable?`<td>${typ==='sel'?'<select onchange="patchRescan('+v.id+',\''+k+'\',this.value)"><option value="">선택 없음</option><option value="true"'+(val===true?' selected':'')+'>무상</option><option value="false"'+(val===false?' selected':'')+'>유상</option></select>':`<input type="${typ||'text'}" value="${esc(val==null?'':val)}" onchange="patchRescan(${v.id},'${k}',this.value)">`}</td>`:`<td>${k==='is_free'?free(val):k==='cost'&&val!=null?Number(val).toLocaleString():esc(val||'')}</td>`;
+    return `<tr>${cell('rescan_date',v.rescan_date,'date')}${cell('reason',v.reason)}${cell('is_free',v.is_free,'sel')}${cell('cost',v.cost,'number')}${cell('note',v.note)}</tr>`;
+  }).join(''):'<tr><td colspan="5" style="color:var(--gray)">기록 없음 — 아래에서 추가</td></tr>';
+}
+async function patchRescan(id,k,val){const patch={[k]:k==='is_free'?(val===''?null:val==='true'):k==='cost'?(val===''?null:Number(val)):val===''?null:val};const {error}=await sb.from('ortho_rescans').update(patch).eq('id',id);if(error){setStatus('error');console.error(error);}else{await loadRescanMap();render();loadRescans();setStatus('saved');}}
+async function addRescan(){
+  const c=cases.find(x=>x.id===curId);if(!c)return;const v=$('#nrFree').value;
+  const row={case_id:curId,rescan_date:$('#nrDate').value||today(),reason:$('#nrReason').value||null,is_free:v===''?null:v==='true',cost:$('#nrCost').value===''?null:Number($('#nrCost').value),note:$('#nrNote').value||null,author:ME};
+  const {error}=await sb.from('ortho_rescans').insert(row);if(error){setStatus('error');return;}
+  ['nrReason','nrCost','nrNote'].forEach(i=>$('#'+i).value='');await loadRescanMap();render();loadRescans();setStatus('saved');
+}
+$('#nrDate').addEventListener('change',()=>{const c=cases.find(x=>x.id===curId);if(c)$('#nrFree').value=rescanDefault(c,$('#nrDate').value);});
+
 /* ── 다가오는 계획 / 진행 관리 / 보관함 ── */
 async function openUpcoming(){
   show('uMask'); const el=$('#uList'); el.textContent='불러오는 중…';
@@ -582,6 +631,12 @@ function openMgmt(){show('mMask');drawerList('#mList',cases.filter(c=>stageOf(c.
   c=>`<button onclick="archiveCase('${c.id}',true)">완료→보관</button>`);}
 function openArch(){show('aMask');drawerList('#aList',cases.filter(c=>c.archived),
   c=>`<button onclick="archiveCase('${c.id}',false)">보관 해제</button>`);}
+function openRescanMgmt(){
+  show('rMask');const list=cases.filter(c=>RESCAN_MAP[c.id]&&RESCAN_MAP[c.id].count),el=$('#rList');
+  el.innerHTML=list.length?list.map(c=>{const r=RESCAN_MAP[c.id],n=dday(freeDeadline(c)),warn=n!=null&&n<=90;const sum=r.hasPaid?'유상 포함':'무상만';
+    return `<div class="listrow"><span style="flex:1"><b>${esc(c.patient_name)}</b> <span class="g">${esc(c.chart_no||'')} · ${esc(c.case_type||'')}</span></span><span class="b${warn?' warn':' flag'}">${freeStatus(c)}</span><span class="g">↻ ${r.count}회 · ${sum}</span><button onclick="openDetail('${c.id}');hide('rMask')">상세</button></div>`;
+  }).join(''):'<div class="hint">재스캔 이력이 없습니다.</div>';
+}
 async function archiveCase(id,on){await patchCase(id,{archived:on},{kind:'note',body:on?'완료 보관':'보관 해제'});openMgmt();openArch();
   if(on)hide('aMask');else hide('mMask');}
 
@@ -611,6 +666,7 @@ function subscribeRealtime(){
     .on('postgres_changes',{event:'*',schema:'public',table:'ortho_cases'},()=>sched())
     .on('postgres_changes',{event:'*',schema:'public',table:'ortho_events'},()=>{if(curId)loadLogs();})
     .on('postgres_changes',{event:'*',schema:'public',table:'ortho_visits'},()=>{if(curId&&$('#paneVisit').style.display!=='none')loadVisits();})
+    .on('postgres_changes',{event:'*',schema:'public',table:'ortho_rescans'},async()=>{try{await loadRescanMap();render();if(curId&&$('#paneRescan').style.display!=='none')loadRescans();}catch(e){console.error('rescans',e);}})
     .subscribe();
 }
 function sched(){ if(curId){_reload=true;return;} loadAll(); }
