@@ -9,9 +9,9 @@
 - **커밋 내역**: `fix(deposit-webhook)` 텔레그램 실패 로깅(이미 배포된 v12와 동기화) · `chore` deno.lock 추적 시작 · `docs` 운영 규약(.claude-project.json 연동) + todos.md 갱신. **push는 아직 안 함**(공개 repo라 별도 승인 대기).
 - **교정보드 v1.2 완료·배포**: codex exec로 4개 기능(칸반↔표 토글·CSV·FDI 픽커·문구버튼) 구현, Claude가 JS 구문·CSV 이스케이프·FDI 해부학적 배치·SQL 멱등성 검수 완료. `app_settings.ortho_quick_phrases` 시드 SQL 원장 승인 후 실행 완료. 코드 커밋 `2771c09`. **원장 할 일**: 운영 계정으로 표 전환·CSV·FDI·문구칩 실사용 확인만 남음(급하지 않음).
 - **세션 중 새로 들어온 요청 4건**:
-  1. **로그인 승인제** + 2. **항목별 개인 열람권한** + 3. **비밀 진료기록**(교정 한정 아닌 일반 진료기록, 환자명·차트번호 포함, 원장이 지정한 고정 명단만 열람) → 하나로 묶어 `superpowers:brainstorming`으로 설계 완료, 원장 승인받아 스펙 문서 커밋함: `docs/superpowers/specs/2026-09-06-access-control-design.md` (커밋 `5809afa`). **다음 단계**: `writing-plans` 스킬로 구현 계획 작성 → codex 위임.
+  1. **로그인 승인제** + 2·3. **비밀 진료기록** → **구현·배포 완료(2026-09-07, 커밋 `67d1387`)**. 스펙 `docs/superpowers/specs/2026-09-06-access-control-design.md`, 구현계획 `docs/superpowers/plans/2026-09-07-access-control-plan.md`. `profiles.approved`(기존 14명 전원 승인 백필)+`my_role()` pending 분기 + **ortho/기공 6개 데이터표 RLS를 `my_role()<>'pending'`으로 조임**(설계 전제였던 "using(true) 자동차단"이 거짓임을 실측으로 발견해 보강 — 미승인자가 교정보드·기공차트 직접 접근하던 구멍 차단). hr.html: 승인대기 게이트 + 원장탭 승인목록 + "비밀 진료기록" 탭(명단 밖이면 미렌더) + 접근명단 관리. `confidential_access`(고정명단)+`confidential_records`(환자명·차트번호 포함). SQL 실행·검증(pending 0·게이팅 완료) 완료. **원장 할 일**: 신규 테스트계정 가입→승인 플로우 + 비밀기록 탭 실사용 확인.
   4. **[교정, 별도 건] 재스캔(리스캔) 란 — 완료**(2026-09-07): 리메이크 플래그 완전 제거 → 재스캔으로 대체. `ortho_rescans` 표(RLS를 `ortho_visits`와 DB에서 직접 대조해 정책 문구까지 일치 확인) + 케이스 상세 "재스캔" 탭(계획제출일+3년 무상마감 카운트다운, 재스캔일 바꾸면 무상/유상 자동재계산, 당일만 수정) + 카드 배지·필터칩 + "재스캔 관리" 서랍(무상마감 90일 이내·종료 강조) + 실시간구독. 계획제출일은 `flags.plan_submitted_at`(스키마 변경 없음). SQL 실행 완료(표·realtime 등록 확인)·커밋 `4d37091`. **교정진단기(`ortho_integrated_chart`) 연동은 불가로 결론** — 로컬 JSON 저장/불러오기만 있고 공유 DB가 없어 상시 연동 접점 없음. 수동입력으로 확정, 연동은 백로그(B: JSON 다리 / C: Supabase 이전)로 이동.
-- **다음 순번**: 접근제어 개편 구현 계획(writing-plans) → M3 급여명세서.
+- **다음 순번**: (접근제어 완료) → 교정보드 v1.2/재스캔/접근제어 실사용 확인 → M3 급여명세서 or 계정채우기.
 
 👉 **새 세션 지시문**: `overview.md·todos.md 읽고 이어서 해줘. "🔵 진행 중 / 바로 다음" 1번부터. 컨텍스트 80% 넘으면 멈추고 todos.md에 적고 알려줘.` (compact 발생 시: 접근제어 스펙 문서가 이미 승인·커밋된 상태이므로 바로 `writing-plans`부터 이어갈 것. 재스캔 란은 아직 질문도 못 시작했으니 위 힌트로 처음부터 물어볼 것.)
 
