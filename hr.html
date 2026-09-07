@@ -89,6 +89,7 @@ tr.new td{background:var(--mint-dk)}
 .modal.wide{width:min(920px,97vw)}
 .modal h3{font-size:16px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
 .modal .x{margin-left:auto;background:none;border:none;color:var(--gray);font-size:20px}
+.appstamp{display:inline-block;border:2px solid #c0392b;color:#c0392b;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:800;line-height:1.2;text-align:center;transform:rotate(-8deg)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 10px}
 .fld{display:flex;flex-direction:column;gap:3px}.fld.w2{grid-column:span 2}.fld.w4{grid-column:1/-1}
 .fld label{font-size:11px;color:var(--gray);font-weight:700}
@@ -156,13 +157,20 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
     <div class="fld"><label>시작일</label><input type="date" id="lvFrom"></div>
     <div class="fld"><label>종료일</label><input type="date" id="lvTo"></div>
     <div class="fld w4"><label>사유(선택)</label><input id="lvReason"></div>
+    <div class="fld w4"><label>연락처(선택)</label><input id="lvContact" placeholder="연락처(선택)"></div>
     <div class="fld w4" id="lvSpecialWrap" style="display:none">
       <label style="color:var(--gold)">⚠ 그날 이미 휴가자가 있습니다. 특별사정이면 사유를 적고 신청하세요.</label>
       <input id="lvSpecial" placeholder="특별사정 사유">
     </div>
   </div>
   <button class="hbtn pri" style="margin-top:12px" onclick="submitLeave()">신청</button>
-  <div class="msg" id="lvMsg"></div>
+  <div class="msg" id="lvMsg" style="color:var(--red)"></div>
+</div></div>
+
+<!-- 휴가 신청서 -->
+<div class="mask" id="lvFormMask"><div class="modal wide">
+  <h3>📄 휴가 신청서<button class="hbtn mini" onclick="window.print()">🖨️ 인쇄</button><button class="x" onclick="hide('lvFormMask')">✕</button></h3>
+  <div id="lvFormBody"></div>
 </div></div>
 
 <!-- 결재 기안 -->
@@ -607,7 +615,7 @@ async function renderLeave(m){
       ${forme.length?`<div class="tblwrap"><table><tr><th>직원</th><th>유형</th><th>기간</th><th>일수</th><th>사유</th><th></th></tr>
       ${forme.map(r=>`<tr class="${r.special?'warn':''}"><td>${esc(nameOf(r.user_id))}</td><td>${esc(r.type)}${r.type_note?'('+esc(r.type_note)+')':''}</td>
         <td>${md(r.date_from)}~${md(r.date_to)}</td><td>${r.days}</td><td>${esc(r.reason||'')}${r.special?' <span class="b no">특별사정</span> '+esc(r.special_reason||''):''}</td>
-        <td><button class="mini stamp" onclick="leaveAct(${r.id},'ok')">${ME.role==='chief'?'실장 승인':'원장 승인'}</button> <button class="mini rej" onclick="leaveAct(${r.id},'rej')">반려</button></td></tr>`).join('')}</table></div>`:'<div class="empty">대기 없음</div>'}</div>`;
+        <td><button class="mini" onclick="openLeaveForm(${r.id})">📄 신청서</button> <button class="mini stamp" onclick="leaveAct(${r.id},'ok')">${ME.role==='chief'?'실장 승인':'원장 승인'}</button> <button class="mini rej" onclick="leaveAct(${r.id},'rej')">반려</button></td></tr>`).join('')}</table></div>`:'<div class="empty">대기 없음</div>'}</div>`;
   }
   let grantHtml=ME.role==='owner'?`<div class="card"><h2>➕ 연차 부여/조정 <span class="sub">(원장)</span></h2>
     <div class="rowflex"><select id="gvUser" class="mini">${PROFILES.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select>
@@ -621,32 +629,65 @@ async function renderLeave(m){
     <div class="rowflex"><div class="stat"><div class="sub">잔여</div><div class="big">${bal?bal.balance:0}<span style="font-size:14px"> 일</span></div></div></div>
     <button class="hbtn pri" style="margin-top:10px" onclick="openLeave()">연차 신청</button>
     <h3>내 신청 내역</h3>
-    ${(mine||[]).length?`<div class="tblwrap"><table><tr><th>유형</th><th>기간</th><th>일수</th><th>상태</th></tr>
+    ${(mine||[]).length?`<div class="tblwrap"><table><tr><th>유형</th><th>기간</th><th>일수</th><th>상태</th><th></th></tr>
     ${(mine||[]).map(r=>`<tr><td>${esc(r.type)}</td><td>${md(r.date_from)}~${md(r.date_to)}</td><td>${r.days}</td>
-      <td><span class="b ${r.status==='승인'?'ok':(r.status==='반려'?'no':'wait')}">${esc(r.status)}</span></td></tr>`).join('')}</table></div>`:'<div class="empty">신청 내역 없음</div>'}
+      <td><span class="b ${r.status==='승인'?'ok':(r.status==='반려'?'no':'wait')}">${esc(r.status)}</span></td><td><button class="mini" onclick="openLeaveForm(${r.id})">📄 신청서</button></td></tr>`).join('')}</table></div>`:'<div class="empty">신청 내역 없음</div>'}
   </div>${leadHtml}${grantHtml}`;
 }
 $('#lvType') && $('#lvType').addEventListener('change',e=>{$('#lvNoteWrap').style.display=e.target.value==='기타'?'':'none';});
-function openLeave(){$('#lvFrom').value=today();$('#lvTo').value=today();$('#lvReason').value='';$('#lvNote').value='';$('#lvSpecial').value='';$('#lvSpecialWrap').style.display='none';$('#lvMsg').textContent='';show('lvMask');checkClash();}
+function openLeave(){$('#lvFrom').value=today();$('#lvTo').value=today();$('#lvReason').value='';$('#lvNote').value='';$('#lvContact').value='';$('#lvSpecial').value='';$('#lvSpecialWrap').style.display='none';$('#lvMsg').textContent='';show('lvMask');checkClash();}
 ['lvFrom','lvTo'].forEach(id=>{const el=$('#'+id);if(el)el.addEventListener('change',checkClash);});
+async function leaveConflict(from,to){
+  const {data}=await sb.from('leave_requests').select('user_id,date_from,date_to').in('status',['승인','1차승인','대기']).neq('user_id',ME.id).lte('date_from',to).gte('date_to',from);
+  const byDate={};
+  for(const r of data||[]){
+    const start=r.date_from<from?from:r.date_from,end=r.date_to>to?to:r.date_to;
+    for(let d=start;d<=end;d=addDays(d,1)){if(!byDate[d])byDate[d]=new Set();byDate[d].add(r.user_id);}
+  }
+  return Math.max(0,...Object.values(byDate).map(users=>users.size));
+}
 async function checkClash(){
   const f=$('#lvFrom').value,t=$('#lvTo').value;if(!f||!t)return;
-  const {data}=await sb.from('leave_requests').select('user_id,date_from,date_to').eq('status','승인');
-  const clash=(data||[]).some(r=>!(t<r.date_from||f>r.date_to)&&r.user_id!==ME.id);
-  $('#lvSpecialWrap').style.display=clash?'':'none';
+  if(t<f){$('#lvSpecialWrap').style.display='none';return;}
+  const others=await leaveConflict(f,t);
+  $('#lvSpecialWrap').style.display=others===1?'':'none';
+  $('#lvMsg').textContent=others>=2?'그 날 이미 2명이 휴가입니다. 신청할 수 없습니다':'';
 }
 async function submitLeave(){
   const f=$('#lvFrom').value,t=$('#lvTo').value;if(!f||!t){$('#lvMsg').textContent='기간을 입력하세요.';return;}
   if(t<f){$('#lvMsg').textContent='종료일이 시작일보다 빠릅니다.';return;}
   const type=$('#lvType').value;
-  const clashVisible=$('#lvSpecialWrap').style.display!=='none';
-  const special=clashVisible&&$('#lvSpecial').value.trim()!=='';
-  if(clashVisible&&!special){$('#lvMsg').textContent='그날 이미 휴가자가 있습니다. 특별사정 사유를 적어야 신청됩니다.';return;}
+  const others=await leaveConflict(f,t);
+  if(others>=2){$('#lvMsg').textContent='그 날 이미 2명이 휴가입니다. 신청할 수 없습니다';return;}
+  const special=others===1&&$('#lvSpecial').value.trim()!=='';
+  if(others===1&&!special){$('#lvMsg').textContent='그날 이미 휴가자가 있습니다. 특별사정 사유를 적어야 신청됩니다.';return;}
   const days=type==='반차'?0.5:((new Date(t)-new Date(f))/864e5+1);
   const {error}=await sb.from('leave_requests').insert({user_id:ME.id,type,type_note:type==='기타'?$('#lvNote').value:null,
-    date_from:f,date_to:t,days,reason:$('#lvReason').value||null,special,special_reason:special?$('#lvSpecial').value:null});
+    date_from:f,date_to:t,days,reason:$('#lvReason').value||null,contact:$('#lvContact').value||null,special,special_reason:special?$('#lvSpecial').value:null});
   if(error){$('#lvMsg').textContent='실패: '+error.message;return;}
   hide('lvMask');setStatus('saved');render();refreshBadges();
+}
+function stampDate(s){
+  const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(s));
+  const get=type=>parts.find(p=>p.type===type).value;
+  return `${get('year')}.${get('month')}.${get('day')}`;
+}
+function appStamp(name,at,label='승인'){return `<span class="appstamp">${label}<br>${esc(name||'')}<br>${stampDate(at)}</span>`;}
+async function openLeaveForm(id){
+  const {data:r,error}=await sb.from('leave_requests').select('*').eq('id',id).single();
+  if(error||!r)return;
+  const {data:p}=await sb.from('profiles').select('name,dept').eq('user_id',r.user_id).maybeSingle();
+  const applicant=(p&&p.name)||nameOf(r.user_id),dept=(p&&p.dept)||'';
+  $('#lvFormBody').innerHTML=`<div style="background:#fff;color:#111;padding:30px;line-height:1.7;font-size:14px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start"><h1 style="margin:0;font-size:26px;text-align:center;flex:1">휴 가 신 청 서</h1><table style="border-collapse:collapse;margin-left:20px;text-align:center"><tr><th style="border:1px solid #111;padding:4px 12px">중간관리자</th><th style="border:1px solid #111;padding:4px 12px">대표원장</th></tr><tr><td style="border:1px solid #111;height:66px;padding:4px 12px">${r.chief_at?appStamp(r.chief_by,r.chief_at):''}</td><td style="border:1px solid #111;height:66px;padding:4px 12px">${r.owner_at?appStamp(r.owner_by,r.owner_at):''}</td></tr></table></div>
+    <table style="width:100%;border-collapse:collapse;margin-top:28px"><tr><th style="border:1px solid #111;padding:8px;width:18%">성명</th><td style="border:1px solid #111;padding:8px">${esc(applicant)}</td><th style="border:1px solid #111;padding:8px;width:18%">소속</th><td style="border:1px solid #111;padding:8px">${esc(dept)}</td></tr></table>
+    <p style="margin:28px 0 18px;text-align:center">아래와 같이 휴가를 실시하고자 하오니 승인하여 주시기 바랍니다.</p>
+    <table style="width:100%;border-collapse:collapse"><tr><th style="border:1px solid #111;padding:8px;width:18%">휴가종류</th><td style="border:1px solid #111;padding:8px">${esc(r.type)}${r.type_note?' ('+esc(r.type_note)+')':''}</td></tr><tr><th style="border:1px solid #111;padding:8px">기간</th><td style="border:1px solid #111;padding:8px">${esc(r.date_from)} ~ ${esc(r.date_to)} (총 ${esc(r.days)}일)</td></tr><tr><th style="border:1px solid #111;padding:8px">사유</th><td style="border:1px solid #111;padding:8px">${esc(r.reason||'')}</td></tr><tr><th style="border:1px solid #111;padding:8px">연락처</th><td style="border:1px solid #111;padding:8px">${esc(r.contact||'')}</td></tr><tr><th style="border:1px solid #111;padding:8px">기타</th><td style="border:1px solid #111;padding:8px">${r.special?'특별사정: '+esc(r.special_reason||''):''}</td></tr></table>
+    <div style="margin-top:28px;text-align:right">신청일: ${r.created_at?stampDate(r.created_at):''}</div>
+    <div style="margin-top:24px;text-align:right">위 신청인 ${esc(applicant)} ${r.created_at?appStamp(applicant,r.created_at,'신청'):''}</div>
+    <div style="margin-top:34px;text-align:center">아산정플란트치과의원 대표자 귀하</div>
+  </div>`;
+  show('lvFormMask');
 }
 async function leaveAct(id,act){
   const {data:r}=await sb.from('leave_requests').select('*').eq('id',id).single();
@@ -772,6 +813,7 @@ async function renderConfid(m){
     <div class="card"><h3>➕ 기록 추가</h3>
     <input id="cfName" placeholder="환자명 *"> <input id="cfChart" placeholder="차트번호(선택)">
     <textarea id="cfBody" placeholder="내용" style="width:100%;min-height:80px;margin-top:6px"></textarea>
+    ${ME.role==='owner'?'<label><input type="checkbox" id="cfOwnerOnly"> 원장 전용(다른 직원 안 보임)</label>':''}
     <button class="hbtn pri" style="margin-top:6px" onclick="submitConfidRecord()">저장</button>
     <div id="cfMsg" class="sub" style="color:var(--red,#ff7b76)"></div></div>`;
   window._cfRecords=data||[];
@@ -781,13 +823,13 @@ function filterConfid(){
   const q=($('#cfQ')?.value||'').trim().toLowerCase();
   const list=(window._cfRecords||[]).filter(r=>!q||String(r.patient_name||'').toLowerCase().includes(q)||String(r.chart_no||'').toLowerCase().includes(q));
   $('#cfList').innerHTML=list.length?list.map(r=>`<div style="padding:8px 0;border-bottom:1px dashed var(--line,#24332f)">
-    <b>${esc(r.patient_name)}</b> ${r.chart_no?`<span class="sub">${esc(r.chart_no)}</span>`:''} <span class="sub">${md(r.created_at)} · ${esc(r.author||'')}</span>
+    <b>${esc(r.patient_name)}</b> ${r.chart_no?`<span class="sub">${esc(r.chart_no)}</span>`:''} ${r.owner_only?'<span class="b no">🔒 원장전용</span>':''} <span class="sub">${md(r.created_at)} · ${esc(r.author||'')}</span>
     <div style="margin-top:4px;white-space:pre-wrap">${esc(r.body)}</div></div>`).join(''):'<div class="empty">기록 없음</div>';
 }
 async function submitConfidRecord(){
   const patient_name=$('#cfName').value.trim(),body=$('#cfBody').value.trim();
   if(!patient_name||!body){$('#cfMsg').textContent='환자명과 내용은 필수입니다.';return;}
-  const {error}=await sb.from('confidential_records').insert({patient_name,chart_no:$('#cfChart').value.trim()||null,body,author:ME.name});
+  const {error}=await sb.from('confidential_records').insert({patient_name,chart_no:$('#cfChart').value.trim()||null,body,author:ME.name,owner_only:(ME.role==='owner'&&$('#cfOwnerOnly')&&$('#cfOwnerOnly').checked)||false});
   if(error){$('#cfMsg').textContent='저장 실패: '+error.message;return;}
   $('#cfName').value='';$('#cfChart').value='';$('#cfBody').value='';$('#cfMsg').textContent='';
   renderConfid($('#main'));setStatus('saved');
