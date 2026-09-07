@@ -209,9 +209,11 @@ let SETTINGS = {
   jongeop_sat:'17:00', jongeop_sun:'14:00'
 };
 let TAB_ROLES={};
+let TAB_OVERRIDES={};
 async function loadSettings(){
   try{const {data}=await sb.from('app_settings').select('key,value');(data||[]).forEach(s=>{SETTINGS[s.key]=s.value;});}catch(e){}
   try{TAB_ROLES=JSON.parse(SETTINGS.hr_tab_roles||'{}')||{};}catch(e){TAB_ROLES={};}
+  try{TAB_OVERRIDES=JSON.parse(SETTINGS.hr_tab_overrides||'{}')||{};}catch(e){TAB_OVERRIDES={};}
 }
 function jongeop(dateStr, evening){        // 종업시각 (요일·야간조)
   const d = new Date(dateStr+'T00:00:00').getDay(); // 0일 6토
@@ -263,7 +265,7 @@ let BADGE={};
 function renderNav(){
   $('#nav').innerHTML=TABS.filter(t=>ME.role==='owner'
     ?t.roles.includes('owner')&&(!t.needsConfid||ME.confidAccess)
-    :t.key!=='owner'&&(TAB_ROLES[t.key]||t.roles).includes(ME.role)&&(!t.needsConfid||ME.confidAccess)).map(t=>{
+    :(()=>{const ov=(TAB_OVERRIDES[ME.id]||{})[t.key],base=(TAB_ROLES[t.key]||t.roles).includes(ME.role),shown=ov===true?true:ov===false?false:base;return t.key!=='owner'&&shown&&(!t.needsConfid||ME.confidAccess);})()).map(t=>{
     const c=BADGE[t.key]?`<span class="cnt">${BADGE[t.key]}</span>`:'';
     return `<button class="${t.key===TAB?'on':''}" onclick="go('${t.key}')">${t.label}${c}</button>`;
   }).join('');
@@ -811,10 +813,14 @@ async function renderOwner(m){
     <h3>🧭 탭 노출 설정 <span class="sub">(역할별 · 즉시 반영)</span></h3>
     <div class="tblwrap"><table><tr><th>탭</th>${['staff','manager','chief','owner'].map(r=>`<th>${r}</th>`).join('')}</tr>
     ${['att','deposit','sched','leave','appr','notice','onbo'].map(key=>{const t=TABS.find(x=>x.key===key),allowed=TAB_ROLES[key]||t.roles;return `<tr><td>${t.label}</td>${['staff','manager','chief','owner'].map(role=>`<td><input type="checkbox" ${allowed.includes(role)?'checked':''} ${role==='owner'?'disabled':''} onchange="toggleTabRole('${key}','${role}',this.checked)"></td>`).join('')}</tr>`;}).join('')}</table></div>
+    <h3>👤 사람별 탭 예외 <span class="sub">(역할 기본을 개인별로 덮어씀 · 즉시 반영)</span></h3>
+    <select id="ovUser" onchange="renderOverrideRows()"><option value="">직원을 선택하세요</option>${PROFILES.filter(p=>p.approved!==false&&p.role!=='owner').map(p=>`<option value="${p.user_id}">${esc(p.name)} (${p.role})</option>`).join('')}</select>
+    <div id="ovRows"></div>
   </div>
   <div class="card"><h2>다음 마일스톤 <span class="sub">(설계 완료·구현 예정)</span></h2>
     <div class="stub">M2 근무표·계약서 자동생성 · M3 급여 대시보드/명세서 발행·월말 평가·휴일근로 계산기 · M4 채용·입금피드·기공차트 통합<br>— 백엔드(표)는 이미 준비됨. 화면만 순차 추가.</div>
   </div>`;
+  renderOverrideRows();
 }
 async function setRole(uid,role){await sb.from('profiles').update({role}).eq('user_id',uid);await loadProfiles();setStatus('saved');
   if(uid===ME.id){ME.role=role;renderNav();}render();}
@@ -831,6 +837,21 @@ async function toggleTabRole(key,role,on){
   TAB_ROLES[key]=allowed;SETTINGS.hr_tab_roles=JSON.stringify(TAB_ROLES);
   const {error}=await sb.from('app_settings').upsert({key:'hr_tab_roles',value:SETTINGS.hr_tab_roles},{onConflict:'key'});
   if(error){setStatus('error');return;}setStatus('saved');renderNav();render();
+}
+function renderOverrideRows(){
+  const sel=$('#ovUser'),rows=$('#ovRows');if(!sel||!rows)return;
+  const uid=sel.value,keys=['att','deposit','sched','leave','appr','notice','onbo'];
+  if(!uid){rows.innerHTML='<div class="sub">승인된 직원을 선택하세요.</div>';return;}
+  const overrides=TAB_OVERRIDES[uid]||{};
+  rows.innerHTML=`<div class="tblwrap"><table><tr><th>탭</th><th>개인 예외</th></tr>${keys.map(key=>{const t=TABS.find(x=>x.key===key),v=overrides[key]===true?'show':overrides[key]===false?'hide':'';return `<tr><td>${t.label}</td><td><select class="mini" onchange="setTabOverride('${uid}','${key}',this.value)"><option value="" ${v===''?'selected':''}>기본(역할규칙)</option><option value="show" ${v==='show'?'selected':''}>보이기(강제)</option><option value="hide" ${v==='hide'?'selected':''}>숨기기(강제)</option></select></td></tr>`;}).join('')}</table></div>`;
+}
+async function setTabOverride(uid,key,val){
+  const m=TAB_OVERRIDES[uid]||{};
+  if(val==='show')m[key]=true;else if(val==='hide')m[key]=false;else delete m[key];
+  if(Object.keys(m).length)TAB_OVERRIDES[uid]=m;else delete TAB_OVERRIDES[uid];
+  SETTINGS.hr_tab_overrides=JSON.stringify(TAB_OVERRIDES);
+  const {error}=await sb.from('app_settings').upsert({key:'hr_tab_overrides',value:SETTINGS.hr_tab_overrides},{onConflict:'key'});
+  if(error){setStatus('error');return;}setStatus('saved');renderNav();renderOverrideRows();
 }
 
 /* ── 로그인 ── */
