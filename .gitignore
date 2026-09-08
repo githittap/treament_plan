@@ -1,2 +1,9 @@
 node_modules/
 .superpowers/
+
+# 원장이 읽는 HTML 보기판 — .md 저장 시 전역 md2view 훅이 자동 생성한다.
+# 원본 .md 가 이미 저장소에 있으므로 생성물은 커밋하지 않는다(공개 repo · 파일당 200KB+).
+_보기/
+
+# Office 임시 잠금 파일 (.md 를 워드로 열면 생긴다)
+~$*
