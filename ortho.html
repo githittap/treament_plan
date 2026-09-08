@@ -108,6 +108,9 @@ header .ttl small{color:var(--mint);font-weight:700}
 .fdirow button:hover{border-color:var(--mint);color:var(--mint)}
 .fld.w2{grid-column:span 2}
 .fld.w4{grid-column:1/-1}
+.detail-extra{grid-column:1/-1;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:7px 9px}
+.detail-extra summary{cursor:pointer;color:var(--gray);font-size:11.5px;font-weight:700}
+.detail-extra[open] summary{margin-bottom:8px}
 .sect{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
 .sect h4{font-size:12.5px;color:var(--mint);margin-bottom:8px}
 .fbtns{display:flex;flex-wrap:wrap;gap:6px}
@@ -486,11 +489,12 @@ const FIELDS=[
   {k:'next_action',l:'다음 액션',t:'text',w:2},{k:'next_due',l:'기한',t:'date'},
   {k:'memo',l:'메모',t:'ta',w:4},
 ];
+const TOGGLE_KEYS=new Set(['chart_no','rrn','case_type','__trim']);
 function renderDetail(){
   const c=cases.find(x=>x.id===curId); if(!c)return;
   fdiCaret=null;
   $('#dTitle').textContent=`${c.patient_name} ${c.chart_no||''} · ${stageOf(c.stage_key).name}`;
-  $('#dGrid').innerHTML=FIELDS.map(f=>{
+  const renderField=f=>{
     const w=f.w?` w${f.w}`:'';
     let v=f.k==='__trim'?(F(c,'trim')||'Scalloped'):f.k==='__plan_submitted_at'?(F(c,'plan_submitted_at')||''):(c[f.k]==null?'':c[f.k]);
     const label=f.k==='diagnosis'?`<div class="labelrow"><label>${f.l}</label><button type="button" class="mini" data-fdi-toggle>FDI</button></div>`:`<label>${f.l}</label>`;
@@ -501,7 +505,12 @@ function renderDetail(){
     if(f.t==='ta')return `<div class="fld${w}${f.k==='diagnosis'?' fdiBlock':''}">${label}<textarea data-k="${f.k}">${esc(v)}</textarea>${quick}${f.k==='diagnosis'?fdiPanelHTML():''}</div>`;
     const typ=f.t==='num'?'number':(f.t==='date'?'date':'text');
     return `<div class="fld${w}">${label}<input type="${typ}" data-k="${f.k}" value="${esc(v)}">${quick}</div>`;
-  }).join('');
+  };
+  const alwaysFields=FIELDS.filter(f=>!TOGGLE_KEYS.has(f.k));
+  const splitAt=alwaysFields.findIndex(f=>f.k==='patient_name')+1;
+  const toggleHtml=FIELDS.filter(f=>TOGGLE_KEYS.has(f.k)).map(renderField).join('');
+  const detailsHtml=`<details class="detail-extra"><summary>차트번호 / 주민등록번호 / 유형 / 트림 보기</summary><div class="grid">${toggleHtml}</div></details>`;
+  $('#dGrid').innerHTML=alwaysFields.slice(0,splitAt).map(renderField).join('')+detailsHtml+alwaysFields.slice(splitAt).map(renderField).join('');
   bindQuickButtons($('#dGrid'));
   const diag=$('[data-k="diagnosis"]'),toggle=$('[data-fdi-toggle]');
   if(toggle){toggle.addEventListener('pointerdown',()=>{if(document.activeElement===diag)fdiCaret=diag.selectionStart;});toggle.addEventListener('click',e=>{e.stopPropagation();fdiOpen=!fdiOpen;$('.fdipanel').classList.toggle('show',fdiOpen);});}
@@ -593,7 +602,7 @@ async function addVisit(){
 
 /* ── 재스캔 ── */
 function resetRescanForm(){['nrReason','nrCost','nrNote'].forEach(i=>$('#'+i).value='');$('#nrDate').value='';$('#nrFree').value='';}
-function rescanDefault(c,date){const end=freeDeadline(c);return !end?'':((date||today())<=end?'true':'false');}
+function rescanDefault(c,date){const end=freeDeadline(c);if(!end)return 'true';return (date||today())<=end?'true':'false';}
 async function loadRescans(){
   const c=cases.find(x=>x.id===curId);if(!c)return;
   const end=freeDeadline(c),n=dday(end);
@@ -603,14 +612,16 @@ async function loadRescans(){
   const tb=$('#rRows');if(error){tb.innerHTML='<tr><td colspan="5">오류</td></tr>';return;}
   const free=v=>v===true?'무상':v===false?'유상':'미선택';
   tb.innerHTML=(data&&data.length)?data.map(v=>{const editable=(v.created_at||'').slice(0,10)===new Date().toISOString().slice(0,10);
-    const cell=(k,val,typ)=>editable?`<td>${typ==='sel'?'<select onchange="patchRescan('+v.id+',\''+k+'\',this.value)"><option value="">선택 없음</option><option value="true"'+(val===true?' selected':'')+'>무상</option><option value="false"'+(val===false?' selected':'')+'>유상</option></select>':`<input type="${typ||'text'}" value="${esc(val==null?'':val)}" onchange="patchRescan(${v.id},'${k}',this.value)">`}</td>`:`<td>${k==='is_free'?free(val):k==='cost'&&val!=null?Number(val).toLocaleString():esc(val||'')}</td>`;
-    return `<tr>${cell('rescan_date',v.rescan_date,'date')}${cell('reason',v.reason)}${cell('is_free',v.is_free,'sel')}${cell('cost',v.cost,'number')}${cell('note',v.note)}</tr>`;
+    const cell=(k,val,typ,prefix='')=>editable?`<td>${prefix}${typ==='sel'?'<select onchange="patchRescan('+v.id+',\''+k+'\',this.value)"><option value="">선택 없음</option><option value="true"'+(val===true?' selected':'')+'>무상</option><option value="false"'+(val===false?' selected':'')+'>유상</option></select>':`<input type="${typ||'text'}" value="${esc(val==null?'':val)}" onchange="patchRescan(${v.id},'${k}',this.value)">`}</td>`:`<td>${prefix}${k==='is_free'?free(val):k==='cost'&&val!=null?Number(val).toLocaleString():esc(val||'')}</td>`;
+    const upcoming=v.rescan_date>today()?'<span class="b flag">예정</span> ':'';
+    return `<tr>${cell('rescan_date',v.rescan_date,'date',upcoming)}${cell('reason',v.reason)}${cell('is_free',v.is_free,'sel')}${cell('cost',v.cost,'number')}${cell('note',v.note)}</tr>`;
   }).join(''):'<tr><td colspan="5" style="color:var(--gray)">기록 없음 — 아래에서 추가</td></tr>';
 }
 async function patchRescan(id,k,val){const patch={[k]:k==='is_free'?(val===''?null:val==='true'):k==='cost'?(val===''?null:Number(val)):val===''?null:val};const {error}=await sb.from('ortho_rescans').update(patch).eq('id',id);if(error){setStatus('error');console.error(error);}else{await loadRescanMap();render();loadRescans();setStatus('saved');}}
 async function addRescan(){
-  const c=cases.find(x=>x.id===curId);if(!c)return;const v=$('#nrFree').value;
-  const row={case_id:curId,rescan_date:$('#nrDate').value||today(),reason:$('#nrReason').value||null,is_free:v===''?null:v==='true',cost:$('#nrCost').value===''?null:Number($('#nrCost').value),note:$('#nrNote').value||null,author:ME};
+  const c=cases.find(x=>x.id===curId);if(!c)return;const v=$('#nrFree').value,reason=$('#nrReason').value.trim();
+  const row={case_id:curId,rescan_date:$('#nrDate').value||today(),reason:reason||null,is_free:v===''?null:v==='true',cost:$('#nrCost').value===''?null:Number($('#nrCost').value),note:$('#nrNote').value||null,author:ME};
+  if(row.is_free===false&&!reason){alert('유상 재스캔 사유를 입력하세요.');return;}
   const {error}=await sb.from('ortho_rescans').insert(row);if(error){setStatus('error');return;}
   ['nrReason','nrCost','nrNote'].forEach(i=>$('#'+i).value='');await loadRescanMap();render();loadRescans();setStatus('saved');
 }
@@ -638,11 +649,20 @@ function openMgmt(){show('mMask');drawerList('#mList',cases.filter(c=>stageOf(c.
   c=>`<button onclick="archiveCase('${c.id}',true)">완료→보관</button>`);}
 function openArch(){show('aMask');drawerList('#aList',cases.filter(c=>c.archived),
   c=>`<button onclick="archiveCase('${c.id}',false)">보관 해제</button>`);}
-function openRescanMgmt(){
-  show('rMask');const list=cases.filter(c=>RESCAN_MAP[c.id]&&RESCAN_MAP[c.id].count),el=$('#rList');
-  el.innerHTML=list.length?list.map(c=>{const r=RESCAN_MAP[c.id],n=dday(freeDeadline(c)),warn=n!=null&&n<=90;const sum=r.hasPaid?'유상 포함':'무상만';
+async function openRescanMgmt(){
+  show('rMask');const el=$('#rList');el.textContent='불러오는 중…';
+  const list=cases.filter(c=>RESCAN_MAP[c.id]&&RESCAN_MAP[c.id].count);
+  const historyHtml=list.length?list.map(c=>{const r=RESCAN_MAP[c.id],n=dday(freeDeadline(c)),warn=n!=null&&n<=90;const sum=r.hasPaid?'유상 포함':'무상만';
     return `<div class="listrow"><span style="flex:1"><b>${esc(c.patient_name)}</b> <span class="g">${esc(c.chart_no||'')} · ${esc(c.case_type||'')}</span></span><span class="b${warn?' warn':' flag'}">${freeStatus(c)}</span><span class="g">↻ ${r.count}회 · ${sum}</span><button onclick="openDetail('${c.id}');hide('rMask')">상세</button></div>`;
   }).join(''):'<div class="hint">재스캔 이력이 없습니다.</div>';
+  const {data,error}=await sb.from('ortho_rescans').select('case_id,rescan_date,reason').gt('rescan_date',today()).order('rescan_date',{ascending:true});
+  const upcoming=(data||[]).map(r=>({r,c:cases.find(c=>c.id===r.case_id)})).filter(x=>x.c);
+  const upcomingHtml=error?`<div class="hint">예정 재스캔 오류: ${esc(error.message)}</div>`:upcoming.length?upcoming.map(({r,c})=>`<div class="listrow">
+    <b style="min-width:100px"><span class="b flag">예정</span> ${esc(r.rescan_date)}</b>
+    <span style="flex:1"><b>${esc(c.patient_name)}</b> <span class="g">${esc(c.chart_no||'')}</span>${r.reason?` — ${esc(r.reason)}`:''}</span>
+    <button onclick="openDetail('${c.id}');hide('rMask')">상세</button>
+  </div>`).join(''):'<div class="hint">예정된 재스캔이 없습니다.</div>';
+  el.innerHTML=`<div class="sect" style="margin-top:0;border-top:0;padding-top:0"><h4>예정된 재스캔</h4>${upcomingHtml}</div><div class="sect"><h4>재스캔 이력</h4>${historyHtml}</div>`;
 }
 async function archiveCase(id,on){await patchCase(id,{archived:on},{kind:'note',body:on?'완료 보관':'보관 해제'});openMgmt();openArch();
   if(on)hide('aMask');else hide('mMask');}
