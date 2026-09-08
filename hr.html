@@ -272,8 +272,10 @@ const TABS=[
   {key:'notice',label:'공지',      roles:['staff','manager','chief','owner']},
   {key:'onbo',  label:'입사서류',  roles:['staff','manager','chief','owner']},
   {key:'confid',label:'비밀 진료기록',roles:['staff','manager','chief','owner'],needsConfid:true},
+  {key:'pay',   label:'💰 급여',   roles:['owner']},
   {key:'owner', label:'원장',      roles:['owner']},
 ];
+let PAY_VIEW='ledger',PAY_MONTH='',PAY_ROWS=[],PAY_COLUMNS=[],PAY_MESSAGE='',PAY_WAGE_LATEST={};
 let DEP_RANGE='month';
 function setDepRange(r){DEP_RANGE=r;render();}
 let BADGE={};
@@ -327,6 +329,7 @@ async function render(){
     else if(TAB==='notice')await renderNotice(m);
     else if(TAB==='onbo')await renderOnbo(m);
     else if(TAB==='confid')await renderConfid(m);
+    else if(TAB==='pay')await renderPay(m);
     else if(TAB==='owner')await renderOwner(m);
   }catch(e){console.error(e);m.innerHTML='<div class="card"><div class="empty">오류: '+esc(e.message)+'</div></div>';}
 }
@@ -593,7 +596,7 @@ async function saveAttendance(){
   $('#xlMsg').textContent='저장 중…';setStatus('saving');
   const holi=new Set((await sb.from('holidays').select('date')).data?.map(h=>h.date)||[]);
   const payload=rows.map(r=>{const c=calcRow(r);return {user_id:r.user_id,work_date:r.ds,clock_in:r.ci!=null?minToT(r.ci)+':00':null,clock_out:r.co!=null?minToT(r.co)+':00':null,
-    source:'fp',late_min:c.late,overtime_min:c.ot,evening:r.evening,is_holiday:holi.has(r.ds)};});
+    source:'fp',late_min:c.late,early_min:c.early,overtime_min:c.ot,evening:r.evening,is_holiday:holi.has(r.ds)};});
   const {error}=await sb.from('attendance').upsert(payload,{onConflict:'user_id,work_date'});
   if(error){$('#xlMsg').textContent='실패: '+error.message;setStatus('error');return;}
   // 소명 자동 생성: 단일 인식(누락 의심)
@@ -833,6 +836,146 @@ async function submitConfidRecord(){
   if(error){$('#cfMsg').textContent='저장 실패: '+error.message;return;}
   $('#cfName').value='';$('#cfChart').value='';$('#cfBody').value='';$('#cfMsg').textContent='';
   renderConfid($('#main'));setStatus('saved');
+}
+
+/* ── 급여 ── */
+const PAY_ALIASES=[
+  ['포괄휴일연장수당','fixed_holiday_ot'],['소득세연말정산','income_tax_yearend'],['지방소득세연말정산','local_tax_yearend'],
+  ['포괄시간외근로수당','fixed_ot'],['포괄연차수당','fixed_annual'],['포괄휴일수당','fixed_holiday'],['미사용연차수당','unused_annual_pay'],
+  ['휴일연장수당','holiday_ot_pay'],['추가근무수당','extra_ot_pay'],['휴일근로수당','holiday_pay'],['장기요양보험','ltc_ins'],
+  ['입사지원금','signing_bonus'],['근태공제','attendance_deduct'],['지급액계','gross_total'],['공제액계','deduct_total'],['차인지급액','net_pay'],
+  ['기타공제','prepaid_deduct'],['보험료조정','ins_adjust'],['고용보험','employment_ins'],['건강보험','health_ins'],['국민연금','pension'],
+  ['공제가족','dependents'],['기타수당','etc_allow'],['조정수당','adjust_allow'],['유급연차','unused_annual_pay'],['지방소득세','local_tax'],
+  ['상여금','bonus'],['복지비','welfare'],['선지급','prepaid_deduct'],['기본급','base_pay'],['식대','meal_allow'],['소득세','income_tax'],
+  ['입사일','hire_date'],['직종','job_type'],['시급','hourly_wage'],['연번','seq'],['성명','name']
+].sort((a,b)=>b[0].length-a[0].length);
+const PAY_NON_AMOUNT_KEYS=new Set(['name','job_type','hire_date']);
+function normPayHeader(v){return String(v==null?'':v).replace(/\s/g,'');}
+function payHeaderKey(v){
+  const n=normPayHeader(v);if(!n)return null;
+  try{const saved=JSON.parse(SETTINGS.payroll_col_map||'{}');if(saved[n])return saved[n];}catch(e){}
+  const hit=PAY_ALIASES.find(a=>n===a[0]||n.includes(a[0]));return hit?hit[1]:null;
+}
+function payNumber(v){
+  if(typeof v==='number')return Number.isFinite(v)?v:null;
+  let s=String(v==null?'':v).trim();if(!s)return null;
+  const neg=/^\(.*\)$/.test(s);s=s.replace(/[\s,원₩]/g,'').replace(/^\((.*)\)$/,'$1');
+  if(!/^-?\d+(\.\d+)?$/.test(s))return null;
+  const n=Number(s);return Number.isFinite(n)?(neg?-Math.abs(n):n):null;
+}
+function payTop(){return `<div class="card"><h2>💰 급여 <span class="sub">(원장 전용)</span></h2>
+  <button class="mini ${PAY_VIEW==='ledger'?'stamp':''}" onclick="setPayView('ledger')">급여대장</button>
+  <button class="mini ${PAY_VIEW==='wage'?'stamp':''}" onclick="setPayView('wage')">시급설정</button></div>`;}
+function setPayView(v){PAY_VIEW=v;PAY_MESSAGE='';render();}
+async function renderPay(m){
+  if(ME.role!=='owner'){m.innerHTML='<div class="card"><div class="empty">원장만 사용할 수 있습니다.</div></div>';return;}
+  if(PAY_VIEW==='wage')await renderPayWages(m);else await renderPayLedger(m);
+}
+async function renderPayWages(m){
+  const {data,error}=await sb.from('wage_info').select('*').order('effective_from',{ascending:false});
+  if(error){setStatus('error');m.innerHTML=payTop()+`<div class="card"><div class="empty">시급 정보를 불러오지 못했습니다: ${esc(error.message)}</div></div>`;return;}
+  PAY_WAGE_LATEST={};(data||[]).forEach(r=>{if(!PAY_WAGE_LATEST[r.user_id])PAY_WAGE_LATEST[r.user_id]=r;});
+  const staff=PROFILES.filter(p=>p.active!==false);
+  m.innerHTML=payTop()+`<div class="card"><h2>시급설정</h2>
+    ${PAY_MESSAGE?`<div class="hint">${esc(PAY_MESSAGE)}</div>`:''}
+    <div class="tblwrap"><table><tr><th>직원</th><th>급여형태</th><th>기본급/시급</th><th>통상시간</th><th>고정상여</th><th>숙소지원</th><th>적용일</th><th>메모</th><th></th></tr>
+    ${staff.map(p=>{const w=PAY_WAGE_LATEST[p.user_id]||{};return `<tr><td>${esc(p.name)}</td>
+      <td><select class="mini" id="pw-type-${p.user_id}"><option value="monthly" ${w.wage_type!=='hourly'?'selected':''}>월급</option><option value="hourly" ${w.wage_type==='hourly'?'selected':''}>시급</option></select></td>
+      <td><input class="mini" id="pw-base-${p.user_id}" type="number" min="0" step="1" value="${w.base_wage==null?0:w.base_wage}"></td>
+      <td><input class="mini" id="pw-hours-${p.user_id}" type="number" min="0" step="0.01" value="${w.normal_hours==null?209:w.normal_hours}" style="width:80px"></td>
+      <td><input class="mini" id="pw-bonus-${p.user_id}" type="number" min="0" step="1" value="${w.fixed_bonus==null?0:w.fixed_bonus}"></td>
+      <td><input class="mini" id="pw-housing-${p.user_id}" type="number" min="0" step="1" value="${w.housing_support==null?0:w.housing_support}"></td>
+      <td><input class="mini" id="pw-from-${p.user_id}" type="date" value="${w.effective_from||today()}"></td>
+      <td><input class="mini" id="pw-memo-${p.user_id}" value="${esc(w.memo||'')}" style="width:130px"></td>
+      <td><button class="mini stamp" onclick="saveWageInfo('${p.user_id}')">저장</button></td></tr>`;}).join('')}</table></div>
+    <div class="hint">적용일을 새 날짜로 바꾸어 저장하면 기존 값을 덮지 않고 새 임금 이력이 만들어집니다.</div></div>`;
+}
+async function saveWageInfo(uid){
+  const prior=PAY_WAGE_LATEST[uid]||{},effective=$('#pw-from-'+uid).value;
+  if(!effective){PAY_MESSAGE='적용일을 입력하세요.';setStatus('error');render();return;}
+  const payload={user_id:uid,wage_type:$('#pw-type-'+uid).value,base_wage:payNumber($('#pw-base-'+uid).value)||0,
+    normal_hours:payNumber($('#pw-hours-'+uid).value)||0,fixed_bonus:payNumber($('#pw-bonus-'+uid).value)||0,
+    housing_support:payNumber($('#pw-housing-'+uid).value)||0,effective_from:effective,
+    housing_from:prior.housing_from||null,housing_to:prior.housing_to||null,memo:$('#pw-memo-'+uid).value||null,
+    updated_by:ME.name,updated_at:new Date().toISOString()};
+  setStatus('saving');const {error}=await sb.from('wage_info').upsert(payload,{onConflict:'user_id,effective_from'});
+  if(error){PAY_MESSAGE='저장 실패: '+error.message;setStatus('error');render();return;}
+  PAY_MESSAGE=nameOf(uid)+' 시급 정보를 저장했습니다.';setStatus('saved');render();
+}
+function setPayMonth(v){PAY_MONTH=v;}
+function setPayRowUser(i,uid){const p=PROFILES.find(x=>x.user_id===uid);PAY_ROWS[i].user_id=uid;PAY_ROWS[i].name=p?p.name:PAY_ROWS[i].name;render();}
+function setPayItem(i,j,v){const key=PAY_COLUMNS[j].key,n=payNumber(v);if(n==null)delete PAY_ROWS[i].items[key];else PAY_ROWS[i].items[key]=n;}
+function addPayRow(){
+  if(!PAY_COLUMNS.length)PAY_COLUMNS=[
+    {key:'base_pay',label:'기본급'},{key:'meal_allow',label:'식대'},{key:'gross_total',label:'지급액계'},
+    {key:'deduct_total',label:'공제액계'},{key:'net_pay',label:'차인지급액'}];
+  PAY_ROWS.push({user_id:'',name:'',items:{},manual:true});PAY_MESSAGE='수기 입력 행을 추가했습니다.';render();
+}
+function parsePayrollXls(ev){
+  const f=ev.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=async e=>{try{const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});const ws=wb.Sheets[wb.SheetNames[0]];
+    const aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true});await buildPayrollPreview(aoa);
+  }catch(err){PAY_MESSAGE='엑셀을 읽지 못했습니다: '+err.message;setStatus('error');render();}};
+  rd.readAsArrayBuffer(f);
+}
+async function buildPayrollPreview(aoa){
+  // 노무법인 양식은 헤더가 2행이다: 성명·연번·시급·차인지급액 등은 대분류행,
+  // 기본급·식대 등 지급/공제 항목명은 그 아래 항목행. 항목행을 기준으로 잡고,
+  // 항목행이 빈 열은 바로 윗행에서 끌어와 한 줄 헤더로 병합한다. (1행 헤더면 병합이 저절로 무효)
+  const itemRow=aoa.findIndex(row=>(row||[]).some(x=>normPayHeader(x).includes('기본급')));
+  if(itemRow<0){PAY_MESSAGE='기본급 열이 있는 헤더 행을 찾지 못했습니다.';setStatus('error');render();return;}
+  const above=itemRow>0?(aoa[itemRow-1]||[]):[],cur=aoa[itemRow]||[];
+  const width=Math.max(cur.length,above.length);
+  const labels=[];for(let c=0;c<width;c++){labels[c]=normPayHeader(cur[c])||normPayHeader(above[c]);}
+  const initial=labels.map((label,index)=>({index,label,key:payHeaderKey(label)}));
+  // 차인지급액(net_pay) 이후 열(비고·세후·상여·급여구성 세전내역 등)은 정식 대장이 아니라 보조·중복이므로 매핑에서 제외한다
+  const netCol=initial.find(c=>c.key==='net_pay'),payCut=netCol?netCol.index:Infinity;
+  const nameCol=initial.find(c=>c.key==='name');
+  if(!nameCol){PAY_MESSAGE='성명 열을 찾지 못했습니다.';setStatus('error');render();return;}
+  const raw=[];
+  for(let i=itemRow+1;i<aoa.length;i++){const row=aoa[i]||[],name=String(row[nameCol.index]==null?'':row[nameCol.index]).trim();
+    const stop=normPayHeader(name);if(!name||stop==='인원'||stop==='총합계')break;raw.push(row);}
+  const headerMap={},cols=[];
+  initial.forEach(c=>{if(!c.label||c.index>payCut)return;let key=c.key;
+    if(!key&&raw.some(row=>payNumber(row[c.index])!=null))key=c.label;
+    if(!key)return;headerMap[c.label]=key;
+    if(key!=='name'&&!PAY_NON_AMOUNT_KEYS.has(key)){const prior=cols.find(x=>x.key===key);
+      if(prior){prior.indexes.push(c.index);prior.label+=' + '+c.label;}else cols.push({indexes:[c.index],key,label:c.label});}});
+  PAY_COLUMNS=cols;PAY_ROWS=raw.map(row=>{const name=String(row[nameCol.index]==null?'':row[nameCol.index]).trim();
+    const matches=PROFILES.filter(p=>String(p.name||'').trim()===name),items=Object.create(null);
+    cols.forEach(c=>{const nums=c.indexes.map(index=>payNumber(row[index])).filter(n=>n!=null);if(nums.length)items[c.key]=nums.reduce((a,b)=>a+b,0);});
+    return {user_id:matches.length===1?matches[0].user_id:'',name,items,manual:false};});
+  SETTINGS.payroll_col_map=JSON.stringify(headerMap);
+  const {error}=await sb.from('app_settings').upsert({key:'payroll_col_map',value:SETTINGS.payroll_col_map},{onConflict:'key'});
+  PAY_MESSAGE=`엑셀 ${PAY_ROWS.length}행을 읽었습니다.`+(error?' 열 매핑 저장 실패: '+error.message:' 열 매핑도 저장했습니다.');
+  setStatus(error?'error':'saved');render();
+}
+async function renderPayLedger(m){
+  if(!PAY_MONTH)PAY_MONTH=today().slice(0,7);
+  const staff=PROFILES.filter(p=>p.active!==false);
+  const cols=PAY_COLUMNS;
+  m.innerHTML=payTop()+`<div class="card"><h2>급여대장</h2>
+    <div class="rowflex"><label>대상 월 <input class="mini" type="month" value="${PAY_MONTH}" onchange="setPayMonth(this.value)"></label>
+      <label class="mini stamp" style="cursor:pointer">엑셀 업로드<input type="file" accept=".xls,.xlsx" style="display:none" onchange="parsePayrollXls(event)"></label>
+      <button class="mini" onclick="addPayRow()">수기 행 추가</button>
+      <button class="mini stamp" onclick="savePayrollRows()">급여대장 저장</button></div>
+    ${PAY_MESSAGE?`<div class="hint" id="payMsg">${esc(PAY_MESSAGE)}</div>`:'<div class="hint" id="payMsg">노무법인 급여대장의 첫 시트를 올리거나 수기 행을 추가하세요.</div>'}
+    ${PAY_ROWS.length?`<div class="tblwrap"><table><tr><th>직원 매핑</th><th>원본 성명</th>${cols.map(c=>`<th>${esc(c.label)}</th>`).join('')}</tr>
+      ${PAY_ROWS.map((r,i)=>`<tr class="${r.user_id?'':'warn'}"><td><select class="mini" onchange="setPayRowUser(${i},this.value)"><option value="">${r.user_id?'선택':'미매핑'}</option>
+        ${staff.map(p=>`<option value="${p.user_id}" ${r.user_id===p.user_id?'selected':''}>${esc(p.name)}</option>`).join('')}</select></td><td>${esc(r.name||'수기')}</td>
+        ${cols.map((c,j)=>`<td><input class="mini" type="number" step="any" value="${r.items[c.key]==null?'':r.items[c.key]}" oninput="setPayItem(${i},${j},this.value)" style="width:100px"></td>`).join('')}</tr>`).join('')}</table></div>`:'<div class="empty">입력된 급여 행이 없습니다.</div>'}
+    <div class="hint">직원 이름이 정확히 한 명과 일치할 때만 자동 매핑합니다. 미매핑 행은 저장하지 않습니다.</div></div>`;
+}
+async function savePayrollRows(){
+  if(!PAY_MONTH){PAY_MESSAGE='대상 월을 선택하세요.';setStatus('error');render();return;}
+  const now=new Date().toISOString(),seen=new Set(),payload=[];let skipped=0;
+  PAY_ROWS.forEach(r=>{if(!r.user_id||seen.has(r.user_id)){skipped++;return;}seen.add(r.user_id);
+    payload.push({month:PAY_MONTH,user_id:r.user_id,items:{...r.items},net:r.items.net_pay==null?null:r.items.net_pay,imported_by:ME.name,imported_at:now});});
+  if(!payload.length){PAY_MESSAGE=`저장할 매핑 행이 없습니다. 건너뜀 ${skipped}건.`;setStatus('error');render();return;}
+  setStatus('saving');const {error}=await sb.from('payroll_rows').upsert(payload,{onConflict:'month,user_id'});
+  if(error){PAY_MESSAGE='급여대장 저장 실패: '+error.message;setStatus('error');render();return;}
+  PAY_MESSAGE=`급여대장 ${payload.length}건 저장 완료`+(skipped?` · 건너뜀 ${skipped}건`:'');setStatus('saved');render();
 }
 
 /* ── 원장 ── */
