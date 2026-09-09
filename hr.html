@@ -623,10 +623,40 @@ async function saveAttendance(){
 }
 
 /* ── 연차 ── */
+let LEAVE_ARCHIVE_MONTH=null;
+async function computeLeaveDays(uid,from,to,type){
+  if(type==='반차')return 0.5;
+  const dates=[];for(let d=from;d<=to;d=addDays(d,1))dates.push(d);
+  const holiSet=new Set((await sb.from('holidays').select('date')).data?.map(h=>h.date)||[]);
+  const weekStarts=[...new Set(dates.map(d=>mondayStr(d)))];
+  const {data:schRows}=await sb.from('schedules').select('week_start,day,shift').eq('user_id',uid).in('week_start',weekStarts);
+  const schMap={};(schRows||[]).forEach(r=>schMap[r.week_start+'|'+r.day]=r.shift);
+  let count=0;
+  for(const d of dates){
+    if(holiSet.has(d))continue;
+    const dow=new Date(d+'T00:00:00').getDay();
+    if(schMap[mondayStr(d)+'|'+dow]==='off')continue;
+    count++;
+  }
+  return count;
+}
+function monthsSince(hireDate){
+  if(!hireDate)return null;
+  const a=new Date(hireDate+'T00:00:00'),b=new Date(today()+'T00:00:00');
+  let m=(b.getFullYear()-a.getFullYear())*12+(b.getMonth()-a.getMonth());
+  if(b.getDate()<a.getDate())m--;
+  return Math.max(0,m);
+}
+function suggestGrantDays(hireDate){
+  const m=monthsSince(hireDate);
+  if(m==null)return null;
+  return m>=12?15:Math.min(11,m);
+}
 async function renderLeave(m){
   const {data:bal}=await sb.from('v_leave_balance').select('*').eq('user_id',ME.id).maybeSingle();
   const {data:mine}=await sb.from('leave_requests').select('*').eq('user_id',ME.id).order('created_at',{ascending:false}).limit(20);
   let leadHtml='';
+  let archiveHtml='';
   if(isLead()){
     const {data:pend}=await sb.from('leave_requests').select('*').in('status',['대기','1차승인']).order('date_from');
     const forme=(pend||[]).filter(r=>ME.role==='chief'?r.status==='대기':r.status==='대기'||r.status==='1차승인');
@@ -635,8 +665,16 @@ async function renderLeave(m){
       ${forme.map(r=>`<tr class="${r.special?'warn':''}"><td>${esc(nameOf(r.user_id))}</td><td>${esc(r.type)}${r.type_note?'('+esc(r.type_note)+')':''}</td>
         <td>${md(r.date_from)}~${md(r.date_to)}</td><td>${r.days}</td><td><span class="b ${r.status==='대기'?'wait':'ok'}">${esc(r.status)}</span></td><td>${esc(r.reason||'')}${r.special?' <span class="b no">특별사정</span> '+esc(r.special_reason||''):''}</td>
         <td><button class="mini" onclick="openLeaveForm(${r.id})">📄 신청서</button> <button class="mini stamp" onclick="leaveAct(${r.id},'ok')">${ME.role==='chief'?'실장 승인':(r.status==='대기'?'즉시승인(실장생략)':'원장 승인')}</button> <button class="mini rej" onclick="leaveAct(${r.id},'rej')">반려</button></td></tr>`).join('')}</table></div>`:'<div class="empty">대기 없음</div>'}</div>`;
+    if(!LEAVE_ARCHIVE_MONTH)LEAVE_ARCHIVE_MONTH=today().slice(0,7);
+    const {data:archive}=await sb.from('leave_requests').select('*').in('status',['승인','취소']).gte('date_from',LEAVE_ARCHIVE_MONTH+'-01').lte('date_from',LEAVE_ARCHIVE_MONTH+'-31').order('date_from',{ascending:false});
+    archiveHtml=`<div class="card"><h2>📚 승인 내역</h2>
+      <div class="rowflex"><label>대상 월 <input class="mini" type="month" value="${LEAVE_ARCHIVE_MONTH}" onchange="LEAVE_ARCHIVE_MONTH=this.value;render()"></label></div>
+      ${(archive||[]).length?`<div class="tblwrap"><table><tr><th>직원</th><th>기간</th><th>일수</th><th>상태</th><th>승인자·승인일</th><th>취소자·취소일</th><th>액션</th></tr>
+      ${(archive||[]).map(r=>`<tr><td>${esc(nameOf(r.user_id))}</td><td>${md(r.date_from)}~${md(r.date_to)}</td><td>${r.days}</td><td><span class="b ${r.status==='승인'?'ok':'no'}">${esc(r.status)}</span></td><td>${esc(r.owner_by||r.chief_by||'')}${r.owner_at||r.chief_at?' · '+stampDate(r.owner_at||r.chief_at):''}</td><td>${r.cancelled_by?esc(r.cancelled_by)+(r.cancelled_at?' · '+stampDate(r.cancelled_at):''):''}</td><td>${r.status==='승인'?`<button class="mini rej" onclick="cancelApprovedLeave(${r.id})">취소</button>`:''}</td></tr>`).join('')}</table></div>`:'<div class="empty">선택한 달의 승인·취소 내역 없음</div>'}</div>`;
   }
-  let grantHtml=ME.role==='owner'?`<div class="card"><h2>➕ 연차 부여/조정 <span class="sub">(원장)</span></h2>
+  let grantHtml=['manager','chief','owner'].includes(ME.role)?`<div class="card"><h2>➕ 연차 부여/조정 <span class="sub">(매니저·실장·원장)</span></h2>
+    <div class="tblwrap"><table><tr><th>이름</th><th>입사일</th><th>제안일수</th><th></th></tr>
+    ${PROFILES.filter(p=>p.active!==false).map(p=>{const suggested=suggestGrantDays(p.hire_date);return `<tr><td>${esc(p.name)}</td><td>${p.hire_date?esc(p.hire_date):'—'}</td><td>${suggested==null?'—':suggested}</td><td><button class="mini" ${suggested==null?'disabled':`onclick="$('#gvUser').value='${p.user_id}';$('#gvDays').value=${suggested};$('#gvKind').value='부여'"`}>이 값으로 채우기</button></td></tr>`;}).join('')}</table></div>
     <div class="rowflex"><select id="gvUser" class="mini">${PROFILES.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select>
     <select id="gvKind" class="mini"><option>부여</option><option>조정</option></select>
     <input id="gvDays" class="mini" type="number" step="0.5" placeholder="일수" style="width:80px">
@@ -651,7 +689,7 @@ async function renderLeave(m){
     ${(mine||[]).length?`<div class="tblwrap"><table><tr><th>유형</th><th>기간</th><th>일수</th><th>상태</th><th></th></tr>
     ${(mine||[]).map(r=>`<tr><td>${esc(r.type)}</td><td>${md(r.date_from)}~${md(r.date_to)}</td><td>${r.days}</td>
       <td><span class="b ${r.status==='승인'?'ok':(r.status==='반려'?'no':'wait')}">${esc(r.status)}</span></td><td><button class="mini" onclick="openLeaveForm(${r.id})">📄 신청서</button></td></tr>`).join('')}</table></div>`:'<div class="empty">신청 내역 없음</div>'}
-  </div>${leadHtml}${grantHtml}`;
+  </div>${leadHtml}${archiveHtml}${grantHtml}`;
 }
 $('#lvType') && $('#lvType').addEventListener('change',e=>{$('#lvNoteWrap').style.display=e.target.value==='기타'?'':'none';});
 function openLeave(){$('#lvFrom').value=today();$('#lvTo').value=today();$('#lvReason').value='';$('#lvNote').value='';$('#lvContact').value='';$('#lvSpecial').value='';$('#lvSpecialWrap').style.display='none';$('#lvMsg').textContent='';$('#lvOverlap').textContent='';show('lvMask');checkClash();}
@@ -683,7 +721,7 @@ async function submitLeave(){
   if(others>=2){$('#lvMsg').textContent='그 날 이미 2명이 휴가입니다. 신청할 수 없습니다';return;}
   const special=others===1&&$('#lvSpecial').value.trim()!=='';
   if(others===1&&!special){$('#lvMsg').textContent='그날 이미 휴가자가 있습니다. 특별사정 사유를 적어야 신청됩니다.';return;}
-  const days=type==='반차'?0.5:((new Date(t)-new Date(f))/864e5+1);
+  const days=await computeLeaveDays(ME.id,f,t,type);
   const {error}=await sb.from('leave_requests').insert({user_id:ME.id,type,type_note:type==='기타'?$('#lvNote').value:null,
     date_from:f,date_to:t,days,reason:$('#lvReason').value||null,contact:$('#lvContact').value||null,special,special_reason:special?$('#lvSpecial').value:null});
   if(error){$('#lvMsg').textContent='실패: '+error.message;return;}
@@ -727,6 +765,14 @@ async function leaveAct(id,act){
       if(!(ledger||[]).length){await sb.from('leave_ledger').insert({user_id:r.user_id,kind:'사용',days:r.days,ref:id,note:`${r.type} ${r.date_from}~${r.date_to}`});}
     }
   }
+  setStatus('saved');render();refreshBadges();
+}
+async function cancelApprovedLeave(id){
+  const {data:r}=await sb.from('leave_requests').select('*').eq('id',id).single();
+  if(!r||r.status!=='승인'){alert('취소할 수 없는 상태입니다.');return;}
+  if(!confirm(`${nameOf(r.user_id)}님의 ${md(r.date_from)}~${md(r.date_to)} 연차 승인을 취소합니다. 계속하시겠습니까?`))return;
+  await sb.from('leave_requests').update({status:'취소',cancelled_by:ME.name,cancelled_at:new Date().toISOString()}).eq('id',id);
+  await sb.from('leave_ledger').insert({user_id:r.user_id,kind:'조정',days:r.days,ref:id,note:`승인취소: ${r.type} ${r.date_from}~${r.date_to} 복구`});
   setStatus('saved');render();refreshBadges();
 }
 async function grantLeave(){
