@@ -143,6 +143,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
   <span class="me">
     <span id="saveTag">✓ 자동 저장</span>
     <span id="meName"></span><span class="rolechip" id="meRole"></span>
+    <a class="hbtn" href="ortho.html">🦷 교정보드</a>
     <button class="hbtn" id="logoutBtn">로그아웃</button>
   </span>
 </header>
@@ -308,7 +309,7 @@ async function refreshBadges(){
     const {data:st}=await sb.from('approval_steps').select('id,approver_role,status').eq('status','대기').eq('approver_role',ME.role);
     BADGE.appr=(st||[]).length||0;
     const {data:lv}=await sb.from('leave_requests').select('id,status');
-    BADGE.leave=(lv||[]).filter(r=>ME.role==='chief'?r.status==='대기':r.status==='1차승인').length||0;
+    BADGE.leave=(lv||[]).filter(r=>ME.role==='chief'?r.status==='대기':r.status==='대기'||r.status==='1차승인').length||0;
   }
   // 내 미제출 온보딩
   const {data:oi}=await sb.from('onboarding_items').select('id').eq('active',true);
@@ -628,12 +629,12 @@ async function renderLeave(m){
   let leadHtml='';
   if(isLead()){
     const {data:pend}=await sb.from('leave_requests').select('*').in('status',['대기','1차승인']).order('date_from');
-    const forme=(pend||[]).filter(r=>ME.role==='chief'?r.status==='대기':r.status==='1차승인');
+    const forme=(pend||[]).filter(r=>ME.role==='chief'?r.status==='대기':r.status==='대기'||r.status==='1차승인');
     leadHtml=`<div class="card"><h2>✅ 승인 대기 <span class="sub">(${ME.role==='chief'?'실장 1차':'원장 최종'})</span></h2>
-      ${forme.length?`<div class="tblwrap"><table><tr><th>직원</th><th>유형</th><th>기간</th><th>일수</th><th>사유</th><th></th></tr>
+      ${forme.length?`<div class="tblwrap"><table><tr><th>직원</th><th>유형</th><th>기간</th><th>일수</th><th>상태</th><th>사유</th><th></th></tr>
       ${forme.map(r=>`<tr class="${r.special?'warn':''}"><td>${esc(nameOf(r.user_id))}</td><td>${esc(r.type)}${r.type_note?'('+esc(r.type_note)+')':''}</td>
-        <td>${md(r.date_from)}~${md(r.date_to)}</td><td>${r.days}</td><td>${esc(r.reason||'')}${r.special?' <span class="b no">특별사정</span> '+esc(r.special_reason||''):''}</td>
-        <td><button class="mini" onclick="openLeaveForm(${r.id})">📄 신청서</button> <button class="mini stamp" onclick="leaveAct(${r.id},'ok')">${ME.role==='chief'?'실장 승인':'원장 승인'}</button> <button class="mini rej" onclick="leaveAct(${r.id},'rej')">반려</button></td></tr>`).join('')}</table></div>`:'<div class="empty">대기 없음</div>'}</div>`;
+        <td>${md(r.date_from)}~${md(r.date_to)}</td><td>${r.days}</td><td><span class="b ${r.status==='대기'?'wait':'ok'}">${esc(r.status)}</span></td><td>${esc(r.reason||'')}${r.special?' <span class="b no">특별사정</span> '+esc(r.special_reason||''):''}</td>
+        <td><button class="mini" onclick="openLeaveForm(${r.id})">📄 신청서</button> <button class="mini stamp" onclick="leaveAct(${r.id},'ok')">${ME.role==='chief'?'실장 승인':(r.status==='대기'?'즉시승인(실장생략)':'원장 승인')}</button> <button class="mini rej" onclick="leaveAct(${r.id},'rej')">반려</button></td></tr>`).join('')}</table></div>`:'<div class="empty">대기 없음</div>'}</div>`;
   }
   let grantHtml=ME.role==='owner'?`<div class="card"><h2>➕ 연차 부여/조정 <span class="sub">(원장)</span></h2>
     <div class="rowflex"><select id="gvUser" class="mini">${PROFILES.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select>
@@ -712,10 +713,20 @@ async function openLeaveForm(id){
 }
 async function leaveAct(id,act){
   const {data:r}=await sb.from('leave_requests').select('*').eq('id',id).single();
-  if(act==='rej'){await sb.from('leave_requests').update({status:'반려'}).eq('id',id);}
-  else if(ME.role==='chief'){await sb.from('leave_requests').update({status:'1차승인',chief_by:ME.name,chief_at:new Date().toISOString()}).eq('id',id);}
-  else if(ME.role==='owner'){await sb.from('leave_requests').update({status:'승인',owner_by:ME.name,owner_at:new Date().toISOString()}).eq('id',id);
-    await sb.from('leave_ledger').insert({user_id:r.user_id,kind:'사용',days:r.days,ref:id,note:`${r.type} ${r.date_from}~${r.date_to}`});}
+  if(!r){alert('신청을 찾을 수 없습니다.');return;}
+  if(act==='rej'){
+    if(!['대기','1차승인'].includes(r.status)){alert('이미 처리된 신청입니다. 새로고침 후 다시 확인해주세요.');return;}
+    await sb.from('leave_requests').update({status:'반려'}).eq('id',id);
+  }else if(act==='ok'){
+    const canAct=ME.role==='chief'?r.status==='대기':ME.role==='owner'&&(r.status==='대기'||r.status==='1차승인');
+    if(!canAct){alert('이미 처리된 신청입니다. 새로고침 후 다시 확인해주세요.');return;}
+    if(ME.role==='chief'){await sb.from('leave_requests').update({status:'1차승인',chief_by:ME.name,chief_at:new Date().toISOString()}).eq('id',id);}
+    else if(ME.role==='owner'){
+      await sb.from('leave_requests').update({status:'승인',owner_by:ME.name,owner_at:new Date().toISOString()}).eq('id',id);
+      const {data:ledger}=await sb.from('leave_ledger').select('id').eq('ref',id).limit(1);
+      if(!(ledger||[]).length){await sb.from('leave_ledger').insert({user_id:r.user_id,kind:'사용',days:r.days,ref:id,note:`${r.type} ${r.date_from}~${r.date_to}`});}
+    }
+  }
   setStatus('saved');render();refreshBadges();
 }
 async function grantLeave(){
