@@ -785,25 +785,36 @@ async function grantLeave(){
 async function renderAppr(m){
   const {data:mine}=await sb.from('approval_docs').select('*').eq('author',ME.id).order('created_at',{ascending:false}).limit(20);
   let inbox='';
+  let archive='';
   if(isLead()){
     const {data:steps}=await sb.from('approval_steps').select('*').eq('status','대기').eq('approver_role',ME.role);
     const ids=[...new Set((steps||[]).map(s=>s.doc_id))];
     let docs=[];
     if(ids.length){const {data:d}=await sb.from('approval_docs').select('*').in('id',ids).eq('status','진행');docs=d||[];}
     inbox=`<div class="card"><h2>📥 내 결재 대기</h2>${docs.length?docs.map(d=>docCard(d,true)).join(''):'<div class="empty">대기 없음</div>'}</div>`;
+    const {data:completed}=await sb.from('approval_docs').select('*').in('status',['완결','취소']).order('created_at',{ascending:false}).limit(50);
+    archive=`<div class="card"><h2>🗂 완결된 결재 문서</h2>${(completed||[]).length?(completed||[]).map(d=>`<div>${docCard(d,false)}${d.status==='완결'?`<div style="margin:-4px 0 10px"><button class="mini rej" onclick="cancelApprovalDoc(${d.id})">취소</button></div>`:''}</div>`).join(''):'<div class="empty">없음</div>'}</div>`;
   }
   m.innerHTML=`<div class="card"><h2>🖊 결재</h2><button class="hbtn pri" onclick="show('apMask');$('#apMsg').textContent='';">결재 올리기</button></div>
   ${inbox}
+  ${archive}
   <div class="card"><h2>📄 내가 올린 문서</h2>${(mine||[]).length?(mine||[]).map(d=>docCard(d,false)).join(''):'<div class="empty">없음</div>'}</div>`;
 }
 function docCard(d,actable){
-  const st=d.status==='완결'?'ok':(d.status==='반려'?'no':'wait');
+  const st=d.status==='완결'?'ok':(['반려','취소'].includes(d.status)?'no':'wait');
   return `<div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px">
     <b>[${esc(d.kind)}] ${esc(d.title)}</b> <span class="b ${st}">${esc(d.status)}</span> <span class="sub">${md(d.created_at)} · ${esc(nameOf(d.author))}</span>
     <div class="sub" style="margin:4px 0;white-space:pre-wrap">${esc(d.body||'')}</div>
     <div id="steps-${d.id}" class="sub">…</div>
     ${actable?`<div style="margin-top:6px"><button class="mini stamp" onclick="apprAct(${d.id},'ok')">🔴 도장(승인)</button> <button class="mini rej" onclick="apprAct(${d.id},'rej')">반려</button></div>`:''}
   </div>`;
+}
+async function cancelApprovalDoc(docId){
+  const {data:d}=await sb.from('approval_docs').select('*').eq('id',docId).single();
+  if(!d||d.status!=='완결'){alert('취소할 수 없는 상태입니다.');return;}
+  if(!confirm(`[${d.kind}] ${d.title} 문서의 완결 처리를 취소합니다. 계속하시겠습니까?`))return;
+  await sb.from('approval_docs').update({status:'취소',cancelled_by:ME.name,cancelled_at:new Date().toISOString()}).eq('id',docId);
+  setStatus('saved');render();refreshBadges();
 }
 async function loadSteps(){
   document.querySelectorAll('[id^="steps-"]').forEach(async el=>{
