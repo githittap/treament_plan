@@ -1021,9 +1021,10 @@ async function renderOwner(m){
     ${pending.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.dept||'')}</td><td>${p.created_at?md(p.created_at):''}</td>
       <td><button class="mini stamp" onclick="approveProfile('${p.user_id}')">승인</button></td></tr>`).join('')}</table></div>`:''}
     <h3>직원 권한 관리 <span class="sub">(입퇴사·승진 시 여기서 변경)</span></h3>
-    <div class="tblwrap"><table><tr><th>이름</th><th>부서</th><th>입사</th><th>권한</th></tr>
+    <div class="tblwrap"><table><tr><th>이름</th><th>부서</th><th>입사</th><th>권한</th><th>승인</th></tr>
     ${PROFILES.map(p=>{const depts=['진료실','데스크','기공팀','기타'],dept=p.dept||'';return `<tr><td>${esc(p.name)}</td><td><select class="mini" onchange="setDept('${p.user_id}',this.value)"><option value="" ${dept===''?'selected':''}>-</option>${depts.map(d=>`<option value="${d}" ${dept===d?'selected':''}>${d}</option>`).join('')}${dept&&!depts.includes(dept)?`<option value="${esc(dept)}" selected>${esc(dept)}</option>`:''}</select></td><td>${p.hire_date||''}</td>
-      <td><select class="mini" onchange="setRole('${p.user_id}',this.value)">${['staff','manager','chief','owner'].map(r=>`<option ${p.role===r?'selected':''}>${r}</option>`).join('')}</select></td></tr>`}).join('')}</table></div>
+      <td><select class="mini" onchange="setRole('${p.user_id}',this.value)">${['staff','manager','chief','owner'].map(r=>`<option ${p.role===r?'selected':''}>${r}</option>`).join('')}</select></td>
+      <td><span class="b ${p.approved!==false?'ok':'wait'}">${p.approved!==false?'승인됨':'대기'}</span>${p.approved!==false&&p.user_id!==ME.id?` <button class="mini rej" onclick="revokeApproval('${p.user_id}')">승인취소</button>`:''}</td></tr>`}).join('')}</table></div>
     <h3>🔒 비밀 진료기록 접근 명단</h3>
     <div class="tblwrap"><table><tr><th>이름</th><th>권한</th><th>접근</th><th></th></tr>
     ${PROFILES.filter(p=>p.approved!==false).map(p=>`<tr><td>${esc(p.name)}</td><td>${p.role}</td>
@@ -1048,6 +1049,13 @@ async function setRole(uid,role){await sb.from('profiles').update({role}).eq('us
 async function setDept(uid,dept){await sb.from('profiles').update({dept:dept||null}).eq('user_id',uid);await loadProfiles();setStatus('saved');render();}
 async function approveProfile(uid){
   await sb.from('profiles').update({approved:true}).eq('user_id',uid);
+  await loadProfiles();setStatus('saved');render();
+}
+async function revokeApproval(uid){
+  if(uid===ME.id)return;
+  const p=PROFILES.find(x=>x.user_id===uid);
+  if(!confirm(`${p?p.name:'이 직원'}의 승인을 취소합니다. 로그인은 되지만 업무 화면과 주요 데이터 접근이 막힙니다. 계속하시겠습니까?`))return;
+  await sb.from('profiles').update({approved:false}).eq('user_id',uid);
   await loadProfiles();setStatus('saved');render();
 }
 async function grantConfid(uid){await sb.from('confidential_access').insert({user_id:uid});setStatus('saved');render();}
