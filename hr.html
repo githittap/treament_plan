@@ -273,6 +273,7 @@ const TABS=[
   {key:'leave', label:'연차',      roles:['staff','manager','chief','owner']},
   {key:'appr',  label:'결재함',    roles:['staff','manager','chief','owner']},
   {key:'notice',label:'공지',      roles:['staff','manager','chief','owner']},
+  {key:'calendar',label:'📅 캘린더',roles:['staff','manager','chief','owner']},
   {key:'onbo',  label:'입사서류',  roles:['staff','manager','chief','owner']},
   {key:'confid',label:'비밀 진료기록',roles:['staff','manager','chief','owner'],needsConfid:true},
   {key:'pay',   label:'💰 급여',   roles:['owner']},
@@ -330,6 +331,7 @@ async function render(){
     else if(TAB==='leave')await renderLeave(m);
     else if(TAB==='appr')await renderAppr(m);
     else if(TAB==='notice')await renderNotice(m);
+    else if(TAB==='calendar')await renderCalendar(m);
     else if(TAB==='onbo')await renderOnbo(m);
     else if(TAB==='confid')await renderConfid(m);
     else if(TAB==='pay')await renderPay(m);
@@ -862,6 +864,43 @@ async function submitNotice(){
   hide('ntMask');$('#ntTitle').value='';$('#ntBody').value='';$('#ntUrl').value='';$('#ntPin').checked=false;setStatus('saved');render();
 }
 async function delNotice(id){if(!confirm('삭제할까요?'))return;await sb.from('notices').delete().eq('id',id);setStatus('saved');render();}
+
+/* ── 캘린더 ── */
+let CAL_MONTH=null;
+async function renderCalendar(m){
+  if(!CAL_MONTH)CAL_MONTH=today().slice(0,7);
+  const from=CAL_MONTH+'-01',to=CAL_MONTH+'-31';
+  const {data:holidays}=await sb.from('holidays').select('date,name').gte('date',from).lte('date',to);
+  const {data:events}=await sb.from('calendar_events').select('id,date,title,kind').gte('date',from).lte('date',to);
+  const {data:lv}=await sb.from('leave_requests').select('user_id,date_from,date_to').eq('status','승인').lte('date_from',to).gte('date_to',from);
+  const leaveByDate={};
+  for(const r of lv||[]){const start=r.date_from<from?from:r.date_from,end=r.date_to>to?to:r.date_to;
+    for(let ds=start;ds<=end;ds=addDays(ds,1)){if(!leaveByDate[ds])leaveByDate[ds]=[];const name=nameOf(r.user_id);if(!leaveByDate[ds].includes(name))leaveByDate[ds].push(name);}}
+  const byDate={};
+  const day=ds=>byDate[ds]||(byDate[ds]={holidays:[],events:[],leave:leaveByDate[ds]||[]});
+  for(const h of holidays||[])day(h.date).holidays.push(h);
+  for(const e of events||[])day(e.date).events.push(e);
+  for(const ds of Object.keys(leaveByDate))day(ds);
+  const dates=Object.keys(byDate).sort(),dow=['일','월','화','수','목','금','토'];
+  m.innerHTML=`<div class="card"><h2>📅 캘린더</h2>
+    <div class="rowflex"><label>대상 월 <input class="mini" type="month" value="${CAL_MONTH}" onchange="CAL_MONTH=this.value;render()"></label></div>
+    ${dates.length?`<div class="tblwrap"><table><tr><th>날짜</th><th>공휴일</th><th>이벤트</th><th>연차</th></tr>
+      ${dates.map(ds=>{const d=byDate[ds],weekday=dow[new Date(ds+'T00:00:00').getDay()];return `<tr><td>${md(ds)} (${weekday})</td>
+        <td>${d.holidays.map(h=>`<span class="b wait">${esc(h.name)}</span>`).join(' ')}</td>
+        <td>${d.events.map(e=>`<div><span class="b mid">${esc(e.kind)}</span> ${esc(e.title)}${isLead()?` <button class="mini rej" onclick="deleteCalendarEvent(${e.id})">삭제</button>`:''}</div>`).join('')}</td>
+        <td>${esc(d.leave.join(', '))}</td></tr>`;}).join('')}</table></div>`:'<div class="empty">표시할 일정이 없습니다.</div>'}
+    ${isLead()?`<div class="rowflex" style="margin-top:10px"><input class="mini" type="date" id="calDate" value="${today()}"><input class="mini" id="calTitle" placeholder="제목"><select class="mini" id="calKind"><option>이벤트</option><option>단축근무</option><option>면접</option></select><button class="mini" onclick="addCalendarEvent()">추가</button></div>`:''}
+  </div>`;
+}
+async function addCalendarEvent(){
+  const date=$('#calDate').value,title=$('#calTitle').value.trim(),kind=$('#calKind').value;if(!date||!title)return;
+  setStatus('saving');const {error}=await sb.from('calendar_events').insert({date,title,kind,created_by:ME.name});
+  if(error){setStatus('error');return;}setStatus('saved');render();
+}
+async function deleteCalendarEvent(id){
+  if(!confirm('삭제할까요?'))return;setStatus('saving');const {error}=await sb.from('calendar_events').delete().eq('id',id);
+  if(error){setStatus('error');return;}setStatus('saved');render();
+}
 
 /* ── 온보딩 ── */
 async function renderOnbo(m){
