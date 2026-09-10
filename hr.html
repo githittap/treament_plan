@@ -275,7 +275,7 @@ const TABS=[
   {key:'notice',label:'공지',      roles:['staff','manager','chief','owner']},
   {key:'calendar',label:'📅 캘린더',roles:['staff','manager','chief','owner']},
   {key:'onbo',  label:'입사서류',  roles:['staff','manager','chief','owner']},
-  {key:'confid',label:'비밀 진료기록',roles:['staff','manager','chief','owner'],needsConfid:true},
+  {key:'confid',label:'케이스노트',roles:['staff','manager','chief','owner'],needsConfid:true},
   {key:'pay',   label:'💰 급여',   roles:['owner']},
   {key:'owner', label:'원장',      roles:['owner']},
 ];
@@ -931,11 +931,11 @@ async function submitOnbo(itemId){await sb.from('onboarding_checks').upsert({use
 async function confirmOnbo(itemId){await sb.from('onboarding_checks').update({status:'확인',checked_by:ME.name,checked_at:new Date().toISOString()}).eq('item_id',itemId).eq('user_id',ME.id);setStatus('saved');render();}
 async function addOnboItem(){const l=$('#oiNew').value.trim();if(!l)return;await sb.from('onboarding_items').insert({label:l});setStatus('saved');render();}
 
-/* ── 비밀 진료기록 ── */
+/* ── 케이스노트 ── */
 async function renderConfid(m){
   const {data,error}=await sb.from('confidential_records').select('*').order('created_at',{ascending:false});
   if(error){m.innerHTML='<div class="empty">불러오기 오류</div>';return;}
-  m.innerHTML=`<div class="card"><h2>🔒 비밀 진료기록</h2>
+  m.innerHTML=`<div class="card"><h2>🔒 케이스노트</h2>
     <input id="cfQ" placeholder="환자명·차트번호 검색" style="margin-bottom:8px" oninput="filterConfid()">
     <div id="cfList"></div></div>
     <div class="card"><h3>➕ 기록 추가</h3>
@@ -1121,7 +1121,7 @@ async function renderOwner(m){
     ${PROFILES.map(p=>{const depts=['진료실','데스크','기공팀','기타'],dept=p.dept||'';return `<tr><td>${esc(p.name)}</td><td><select class="mini" onchange="setDept('${p.user_id}',this.value)"><option value="" ${dept===''?'selected':''}>-</option>${depts.map(d=>`<option value="${d}" ${dept===d?'selected':''}>${d}</option>`).join('')}${dept&&!depts.includes(dept)?`<option value="${esc(dept)}" selected>${esc(dept)}</option>`:''}</select></td><td>${p.hire_date||''}</td>
       <td><select class="mini" onchange="setRole('${p.user_id}',this.value)">${['staff','manager','chief','owner'].map(r=>`<option ${p.role===r?'selected':''}>${r}</option>`).join('')}</select></td>
       <td><span class="b ${p.approved!==false?'ok':'wait'}">${p.approved!==false?'승인됨':'대기'}</span>${p.approved!==false&&p.user_id!==ME.id?` <button class="mini rej" onclick="revokeApproval('${p.user_id}')">승인취소</button>`:''}</td></tr>`}).join('')}</table></div>
-    <h3>🔒 비밀 진료기록 접근 명단</h3>
+    <h3>🔒 케이스노트 접근 명단</h3>
     <div class="tblwrap"><table><tr><th>이름</th><th>권한</th><th>접근</th><th></th></tr>
     ${PROFILES.filter(p=>p.approved!==false).map(p=>`<tr><td>${esc(p.name)}</td><td>${p.role}</td>
       <td>${accessSet.has(p.user_id)?'✅':'—'}</td>
