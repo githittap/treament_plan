@@ -39,10 +39,12 @@
   - Supabase Edge Function `ai-billing-webhook` 배포(project texevhsxttfoqkrucfzl) — POST로 {token, platform, raw_text} 받아 금액 자동추출 → `ai_billing_events`(신규 표) insert. 토큰 인증은 DB `webhook_secrets` 테이블로 관리(대시보드/CLI 불필요).
   - 🔴 **v1의 추출 로직이 실제 문자와 달라 처음엔 틀렸음** — 원장이 보여준 실제 결제문자 3종(삼성카드 `USD 28.12`, KB국민카드 `10.76(USD)`, 둘 다 해외승인=달러) 확인 후 **v2로 즉시 재배포**: USD 두 형식 모두 정규식 지원 + 수신 즉시 실시간 환율로 KRW 환산(open.er-api, 실패시 고정폴백) + 기존 원(KRW) 직접표기 패턴도 하위호환 유지. **실제 문자 형식 3건(OPENAI/ANTHROPIC/MOONSHOT) 전부로 curl 재검증 완료**(USD28.12→₩37,766, USD10.76→₩14,451, USD100→₩134,303, 테스트데이터 삭제함). MacroDroid 쪽 설정(raw_text=SMS 원문 그대로)은 안 바뀜.
   - hr `💰 AI비용` 탭: "직접 입력"+"자동감지(문자)" 두 열로 표시, 총액에 자동 합산, 최근 20건 원문 로그 노출.
-  - **⏳ 원장이 해야 할 유일한 수동 단계(1회성)**: 기존 3개 MacroDroid 결제문자 매크로 각각에 **HTTP Request(POST) 액션 1개씩 추가**. 아래 참조:
-    - URL: `https://texevhsxttfoqkrucfzl.supabase.co/functions/v1/ai-billing-webhook`
-    - Method: POST, Content-Type: application/json
-    - Body(플랫폼별로 platform 값만 바꿔 3개 매크로에 각각): `{"token":"CNqF08Gd4U4FqrbWhXevQFX0jJF7H7Nz","platform":"Claude","raw_text":"[SMS 본문 변수]"}` — platform은 반드시 `Claude` / `Codex(OpenAI)` / `Kimi` / `기타` 중 하나 정확히 일치해야 표에 매칭됨. raw_text 자리에 MacroDroid의 "SMS 본문" 변수를 넣기만 하면 금액은 서버가 자동 추출.
+  - 🔴 **사고 발생·복구 완료(2026-09-14)**: 원장이 설정 중 **원본 "계좌연동"(입금) 매크로를 직접 편집·저장**해 deposit-webhook 연결이 끊겼었음. deposit-webhook 함수 자체는 안 건드려짐(v12 그대로) — 폰의 매크로 포인터만 잘못됨. 원장이 URL·헤더토큰을 deposit-webhook 원래값으로 복원 완료, **DB 증거로도 검증**(복원 직후 원장 본인 테스트입금 ₩10,000이 `deposits` id=215로 정상 기록됨 확인). 그 사고 구간에 놓친 실입금은 없어 보임(직전 입금 9/11과 시간 간격 자연스러움).
+  - 🔴 **v3로 방식 변경(2026-09-14)** — MacroDroid의 실제 패턴(기존 계좌연동과 동일)에 맞춰 **JSON body 방식을 폐기하고 헤더+쿼리파라미터 방식으로 전환**. `Body 내용`은 그대로 `{sms_message}`(원문 그대로, 변경 불필요)만 두면 됨. curl로 이 방식 재검증 완료(USD28.12→₩37,766). 현재 유효한 설정값:
+    - URL(쿼리파라미터로 플랫폼 구분): `https://texevhsxttfoqkrucfzl.supabase.co/functions/v1/ai-billing-webhook?platform=Claude` (Codex(OpenAI)/Kimi는 값만 교체)
+    - 헤더: `X-Webhook-Token: CNqF08Gd4U4FqrbWhXevQFX0jJF7H7Nz`
+    - Body 내용: `{sms_message}` (그대로, 손대지 않음)
+  - ⏳ **원장이 해야 할 것(진행 중)**: "계좌연동" **복제본**(원본 아님, 이미 복제·SMS트리거 완료함)에서 위 URL/헤더만 이 값으로 설정 — 3개(Claude/Codex(OpenAI)/Kimi) 전부.
   - **다음(선택, 더 완전한 자동화)**: 원장이 Moonshot 플랫폼(키미) API 키(sk-...)를 제공하면 잔액 API로 진짜 실시간 폴링도 추가 가능 — 로그인용 OAuth 토큰은 이미 있으나 결제 전용 키는 별도라 환경에 없음, 채팅에 붙이지 말고 파일로 전달받는 방식 권장.
 - ✅ **근로계약서 작성·발송 권한 확대 배포(2026-09-14)** — 실장(chief)·매니저(manager)도 계약 생성·발송 가능(원장 지시). 본인 계약이 있으면 서명 섹션도 함께 표시. RLS는 이미 09-14 이전에 manager 포함 확대 완료돼 있었음.
 - **D3 jung-plant.com 허브 정리** — 원장 "뒤로 미룸, **꼭 리마인드**". ⏸️ 급여 2단계 뒤. 🔔 리마인드 대상(잊지 말 것).
