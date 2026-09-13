@@ -36,7 +36,8 @@
   - 🔒 **전자서명 강화 도입 예정(모두싸인/스마일싸인 벤치마킹, 원장 "필요한 것 적극 도입")**: ①**감사추적**(서명 시 서명자 계정·시각·IP·기기 기록) ②**서명완료본 불변**(서명 후 merged_html 수정 잠금) ③**서명 PDF+해시 hr-docs 영구보존**(위변조 방지) — 다음 codex 작업. (상용은 건당·월정액 비용, 우리는 자체구축 무료지만 고액·분쟁소지 계약은 상용 감사추적인증서 병행 고려.)
   - **다음(선택)**: 연차신청서 서식 추가 · 결재함/입사서류에 완결계약서 표시 · 로컬 `db/*.sql` 부트스트랩을 원격 스키마에 맞춰 갱신(백로그).
 - ✅ **AI비용 자동연동(SMS웹훅) 배포·검증완료(2026-09-14, 원장 "자동연동 해야지" 요구 반영)** — Kimi/OpenAI/Codex 결제 API키가 환경에 없어(조사 완료·없음 확인) 직접 API연동은 불가했으나, 원장이 이미 받는 **결제 문자 알림(MacroDroid)** 을 이용해 완전자동화 구축:
-  - Supabase Edge Function `ai-billing-webhook` 배포(project texevhsxttfoqkrucfzl) — POST로 {token, platform, raw_text} 받아 raw_text에서 "12,345원" 패턴 금액 자동추출 → `ai_billing_events`(신규 표) insert. 토큰 인증은 DB `webhook_secrets` 테이블로 관리(대시보드/CLI 불필요). **curl로 end-to-end 검증 완료**(정상토큰 성공·오토큰 401, 테스트데이터 삭제함).
+  - Supabase Edge Function `ai-billing-webhook` 배포(project texevhsxttfoqkrucfzl) — POST로 {token, platform, raw_text} 받아 금액 자동추출 → `ai_billing_events`(신규 표) insert. 토큰 인증은 DB `webhook_secrets` 테이블로 관리(대시보드/CLI 불필요).
+  - 🔴 **v1의 추출 로직이 실제 문자와 달라 처음엔 틀렸음** — 원장이 보여준 실제 결제문자 3종(삼성카드 `USD 28.12`, KB국민카드 `10.76(USD)`, 둘 다 해외승인=달러) 확인 후 **v2로 즉시 재배포**: USD 두 형식 모두 정규식 지원 + 수신 즉시 실시간 환율로 KRW 환산(open.er-api, 실패시 고정폴백) + 기존 원(KRW) 직접표기 패턴도 하위호환 유지. **실제 문자 형식 3건(OPENAI/ANTHROPIC/MOONSHOT) 전부로 curl 재검증 완료**(USD28.12→₩37,766, USD10.76→₩14,451, USD100→₩134,303, 테스트데이터 삭제함). MacroDroid 쪽 설정(raw_text=SMS 원문 그대로)은 안 바뀜.
   - hr `💰 AI비용` 탭: "직접 입력"+"자동감지(문자)" 두 열로 표시, 총액에 자동 합산, 최근 20건 원문 로그 노출.
   - **⏳ 원장이 해야 할 유일한 수동 단계(1회성)**: 기존 3개 MacroDroid 결제문자 매크로 각각에 **HTTP Request(POST) 액션 1개씩 추가**. 아래 참조:
     - URL: `https://texevhsxttfoqkrucfzl.supabase.co/functions/v1/ai-billing-webhook`
