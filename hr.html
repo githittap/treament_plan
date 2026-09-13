@@ -85,6 +85,23 @@ tr.new td{background:var(--mint-dk)}
 .contract-doc{background:#fff;color:#111;border-radius:8px;padding:24px;overflow:auto;line-height:1.7}
 .contract-signature{display:block;width:100%;max-width:720px;height:180px;background:#fff;border:1px solid var(--line);border-radius:8px;touch-action:none}
 
+/* 월별 캘린더 그리드 */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:10px}
+.cal-dow{background:var(--panel);padding:6px 4px;font-size:11.5px;font-weight:700;color:var(--gray);text-align:center}
+.cal-dow.sun{color:var(--red)} .cal-dow.sat{color:var(--blue)}
+.cal-cell{background:var(--card);min-height:86px;padding:5px 6px}
+.cal-cell.out{background:var(--bg);opacity:.4}
+.cal-cell.today{box-shadow:inset 0 0 0 2px var(--mint)}
+.cal-cell .d{font-size:12.5px;font-weight:800;margin-bottom:3px;color:var(--ink)}
+.cal-cell .d.sun,.cal-cell .d.hol{color:var(--red)} .cal-cell .d.sat{color:var(--blue)}
+.cal-tag{display:flex;align-items:center;justify-content:space-between;gap:3px;font-size:10px;line-height:1.5;padding:1px 4px;border-radius:4px;margin-bottom:2px;overflow:hidden}
+.cal-tag span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cal-tag.hol{background:var(--red-bg);color:var(--red)}
+.cal-tag.ev{background:var(--purple-bg);color:var(--purple)}
+.cal-tag.lv{background:var(--gold-bg);color:var(--gold)}
+.cal-tag a{color:inherit;opacity:.6;flex-shrink:0}
+@media(max-width:640px){.cal-cell{min-height:56px;padding:3px 4px}.cal-cell .d{font-size:11px}.cal-tag{font-size:9px;padding:0 2px}}
+
 /* 모달 */
 .mask{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:5vh 10px}
 .mask.show{display:flex}
@@ -888,14 +905,34 @@ async function renderCalendar(m){
   for(const h of holidays||[])day(h.date).holidays.push(h);
   for(const e of events||[])day(e.date).events.push(e);
   for(const ds of Object.keys(leaveByDate))day(ds);
-  const dates=Object.keys(byDate).sort(),dow=['일','월','화','수','목','금','토'];
+  const dow=['일','월','화','수','목','금','토'];
+  const [cy,cm]=CAL_MONTH.split('-').map(Number);
+  const firstDow=new Date(cy,cm-1,1).getDay();
+  const daysInMonth=new Date(cy,cm,0).getDate();
+  const prevDaysInMonth=new Date(cy,cm-1,0).getDate();
+  const cells=[];
+  for(let i=firstDow-1;i>=0;i--)cells.push({d:prevDaysInMonth-i,out:true});
+  for(let d=1;d<=daysInMonth;d++)cells.push({d,out:false,ds:CAL_MONTH+'-'+String(d).padStart(2,'0')});
+  let nextD=1;while(cells.length%7!==0)cells.push({d:nextD++,out:true});
+  const todayStr=today();
+  const cellsHtml=cells.map((c,idx)=>{
+    if(c.out)return `<div class="cal-cell out"><div class="d">${c.d}</div></div>`;
+    const info=byDate[c.ds]||{holidays:[],events:[],leave:[]};
+    const dowIdx=idx%7;
+    const dCls=info.holidays.length?'hol':(dowIdx===0?'sun':(dowIdx===6?'sat':''));
+    const tags=[
+      ...info.holidays.map(h=>`<span class="cal-tag hol"><span title="${esc(h.name)}">${esc(h.name)}</span></span>`),
+      ...info.events.map(e=>`<span class="cal-tag ev"><span title="${esc(e.kind)} ${esc(e.title)}">${esc(e.title)}</span>${isLead()?`<a href="javascript:void(0)" onclick="deleteCalendarEvent(${e.id})">✕</a>`:''}</span>`),
+      info.leave.length?`<span class="cal-tag lv"><span title="연차: ${esc(info.leave.join(', '))}">🏖 ${esc(info.leave.join(', '))}</span></span>`:''
+    ].filter(Boolean).join('');
+    return `<div class="cal-cell${c.ds===todayStr?' today':''}"><div class="d ${dCls}">${c.d}</div>${tags}</div>`;
+  }).join('');
   m.innerHTML=`<div class="card"><h2>📅 캘린더</h2>
     <div class="rowflex"><label>대상 월 <input class="mini" type="month" value="${CAL_MONTH}" onchange="CAL_MONTH=this.value;render()"></label></div>
-    ${dates.length?`<div class="tblwrap"><table><tr><th>날짜</th><th>공휴일</th><th>이벤트</th><th>연차</th></tr>
-      ${dates.map(ds=>{const d=byDate[ds],weekday=dow[new Date(ds+'T00:00:00').getDay()];return `<tr><td>${md(ds)} (${weekday})</td>
-        <td>${d.holidays.map(h=>`<span class="b wait">${esc(h.name)}</span>`).join(' ')}</td>
-        <td>${d.events.map(e=>`<div><span class="b mid">${esc(e.kind)}</span> ${esc(e.title)}${isLead()?` <button class="mini rej" onclick="deleteCalendarEvent(${e.id})">삭제</button>`:''}</div>`).join('')}</td>
-        <td>${esc(d.leave.join(', '))}</td></tr>`;}).join('')}</table></div>`:'<div class="empty">표시할 일정이 없습니다.</div>'}
+    <div class="cal-grid">
+      ${dow.map((w,i)=>`<div class="cal-dow ${i===0?'sun':(i===6?'sat':'')}">${w}</div>`).join('')}
+      ${cellsHtml}
+    </div>
     ${isLead()?`<div class="rowflex" style="margin-top:10px"><input class="mini" type="date" id="calDate" value="${today()}"><input class="mini" id="calTitle" placeholder="제목"><select class="mini" id="calKind"><option>이벤트</option><option>단축근무</option><option>면접</option></select><button class="mini" onclick="addCalendarEvent()">추가</button></div>`:''}
   </div>`;
 }
