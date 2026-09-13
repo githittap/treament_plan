@@ -29,7 +29,10 @@
   - `hr-docs` 비공개 Storage 버킷 **이미 있음**(파일/서명 이미지 저장에 재사용).
   - `contracts` 표 **이미 있음**(0행, hr 미사용): `id·user_id·template_id·merged_html·fields·sign_slots(jsonb)·status·signed_at·created_by·created_at`. RLS: INSERT=owner만, SELECT=owner or (본인 & (서명완료아님 or 서명후5일내)), UPDATE=owner or (본인 & status='대기'). → **직원 서명 = status='대기'일 때 본인 행 UPDATE로 sign_slots 채움**(별도 RPC 불필요).
   - **빠진 것 = `doc_templates` 표**(contracts.template_id가 가리킴, 아직 없음). 다음 단계: ①doc_templates 생성(서식: 근로계약서 필드+sign_slots 정의) ②근로계약서 서식 시드(마주옥 계약서 제1~11조 구조·도장#156f72) ③hr UI(codex): 서식관리·계약생성/발송·직원 서명페이지.
-  - ⚠️ 계약서는 마주옥 예시 기준 **시급/포괄임금·주휴·연차·퇴직금·비밀유지·해고사유 8개** 포함. (내가 만든 contracts_foundation 마이그레이션은 기존 표와 충돌해 **미적용** — 기존 스키마로 진행.)
+  - ⚠️ 계약서는 마주옥 예시 기준 **시급/포괄임금·주휴·연차·퇴직금·비밀유지·해고사유 8개** 포함.
+  - ✅ **2026-09-13~14 v1 배포**(커밋 `5bc9deb`): `doc_templates` 표+FK 생성, `근로계약서(표준)` 서식 시드(id=1, 마주옥 제1~11조+개인정보동의, 필드16·프리셋5·병원직인 base64), hr에 **근로계약서 탭**(원장=서식선택·프리셋·직원선택·미리보기·발송[만료일]; 직원=내 계약서 확인·canvas 서명·저장). `contracts.due_at/sent_at` 추가, UPDATE RLS를 **대기→서명완료 허용**으로 보정(직원 서명 저장 가능하게).
+  - ⏳ **미검증(로그인 필요)**: 원장 생성→직원 실제 서명 end-to-end는 실계정 로그인 테스트 필요(MCP는 RLS 우회라 서버측 검증 불가). 다음 실사용 시 확인.
+  - **다음(선택)**: 연차신청서 서식 추가 · 결재함/입사서류에 완결계약서 표시 · 서명 PDF를 hr-docs에 영구보존 · 실장(chief)도 계약 생성 허용할지 · 로컬 `db/*.sql` 부트스트랩을 원격 스키마(doc_templates·due_at·서명RLS)에 맞춰 갱신(백로그).
 - **D3 jung-plant.com 허브 정리** — 원장 "뒤로 미룸, **꼭 리마인드**". ⏸️ 급여 2단계 뒤. 🔔 리마인드 대상(잊지 말 것).
 - **D4 도장·컬러 서식 자동생성** — 원장 "**결재함과 모든 서식 연동 원칙**, 복잡하면 순서대로: 근로계약서→연차신청서→기타". 개인도장/병원직인/#156f72. 참고자료: 근로계약서 예시 xlsx(마주옥/김민혁/정규민부원장), 보안서약서 양식 PDF, Notion "근로계약서 작성 양식".
 - **D5 비번재설정 이메일** — ✅ 원장이 **gmail SMTP를 Supabase에 연동 완료**(2026-09-12). 남은 것=코드(로그인 화면 "비밀번호 찾기"→resetPasswordForEmail→재설정 페이지)=codex 빌드.
