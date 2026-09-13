@@ -1192,26 +1192,34 @@ async function saveAicost(i){
 async function renderAicost(m){
   if(ME.role!=='owner'){m.innerHTML='<div class="card"><div class="empty">원장만 사용할 수 있습니다.</div></div>';return;}
   if(!AICOST_MONTH)AICOST_MONTH=today().slice(0,7);
-  const [{data:rows,error},{data:history,error:historyError}]=await Promise.all([
+  const [{data:rows,error},{data:history,error:historyError},{data:events,error:eventsError}]=await Promise.all([
     sb.from('ai_billing').select('*').eq('ym',AICOST_MONTH),
-    sb.from('ai_billing').select('ym,amount_krw').order('ym',{ascending:false})
+    sb.from('ai_billing').select('ym,amount_krw').order('ym',{ascending:false}),
+    sb.from('ai_billing_events').select('platform,amount_krw,source,note,raw_text,received_at').order('received_at',{ascending:false}).limit(300)
   ]);
-  if(error||historyError){setStatus('error');m.innerHTML=`<div class="card"><div class="empty">AI 비용을 불러오지 못했습니다: ${esc((error||historyError).message)}</div></div>`;return;}
+  if(error||historyError||eventsError){setStatus('error');m.innerHTML=`<div class="card"><div class="empty">AI 비용을 불러오지 못했습니다: ${esc((error||historyError||eventsError).message)}</div></div>`;return;}
   const byPlatform={};(rows||[]).forEach(r=>byPlatform[r.platform]=r);
-  const total=AICOST_PLATFORMS.reduce((sum,p)=>sum+Number((byPlatform[p]||{}).amount_krw||0),0);
+  // 자동감지(문자 웹훅 등) — 선택한 달의 이벤트만 플랫폼별 합산
+  const autoByPlatform={};(events||[]).forEach(e=>{if(String(e.received_at).slice(0,7)===AICOST_MONTH)autoByPlatform[e.platform]=(autoByPlatform[e.platform]||0)+Number(e.amount_krw||0);});
+  const total=AICOST_PLATFORMS.reduce((sum,p)=>sum+Number((byPlatform[p]||{}).amount_krw||0)+Number(autoByPlatform[p]||0),0);
   const totals={};(history||[]).forEach(r=>totals[r.ym]=(totals[r.ym]||0)+Number(r.amount_krw||0));
+  (events||[]).forEach(e=>{const ym=String(e.received_at).slice(0,7);totals[ym]=(totals[ym]||0)+Number(e.amount_krw||0);});
   const recent=Object.entries(totals).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,6),max=Math.max(1,...recent.map(x=>x[1]));
+  const recentEvents=(events||[]).slice(0,20);
   m.innerHTML=`<div class="card"><h2>💰 AI비용 <span class="sub">(원장 전용)</span></h2>
     <div class="fld" style="max-width:220px"><label>조회 월</label><input type="month" value="${esc(AICOST_MONTH)}" onchange="setAicostMonth(this.value)"></div>
-    <div style="font-size:13px;color:var(--gray);margin-top:16px">이번 달 실제 청구액(원장 입력)</div>
+    <div style="font-size:13px;color:var(--gray);margin-top:16px">이번 달 실제 청구액 (직접 입력 + 자동감지 문자 합계)</div>
     <div style="font-size:30px;font-weight:800;color:var(--mint);margin:4px 0 18px">₩${aicostMoney(total)}</div>
-    <div class="tblwrap"><table><tr><th>플랫폼</th><th>실제 청구액</th><th>메모</th><th></th></tr>
-    ${AICOST_PLATFORMS.map((p,i)=>{const r=byPlatform[p]||{};return `<tr><td>${esc(p)}</td>
-      <td><input class="mini" id="aiAmount-${i}" type="number" step="1" value="${Number(r.amount_krw)||0}" style="width:150px"> 원</td>
-      <td><input class="mini" id="aiNote-${i}" value="${esc(r.note||'')}" placeholder="선택 입력" style="min-width:220px"></td>
+    <div class="tblwrap"><table><tr><th>플랫폼</th><th>직접 입력</th><th>자동감지(문자)</th><th>메모</th><th></th></tr>
+    ${AICOST_PLATFORMS.map((p,i)=>{const r=byPlatform[p]||{},auto=Number(autoByPlatform[p]||0);return `<tr><td>${esc(p)}</td>
+      <td><input class="mini" id="aiAmount-${i}" type="number" step="1" value="${Number(r.amount_krw)||0}" style="width:130px"> 원</td>
+      <td>${auto?`<b style="color:var(--mint)">₩${aicostMoney(auto)}</b>`:'<span class="sub">-</span>'}</td>
+      <td><input class="mini" id="aiNote-${i}" value="${esc(r.note||'')}" placeholder="선택 입력" style="min-width:200px"></td>
       <td><button class="mini stamp" onclick="saveAicost(${i})">저장</button></td></tr>`;}).join('')}</table></div>
-    <div class="hint">정확한 사용량(정가 환산) 상세는 로컬 상황판 파일 참고. 이 화면은 원장이 실제 청구액을 직접 입력·보관하는 곳입니다.</div></div>
-  <div class="card"><h2>최근 6개월 실제 청구액</h2>${recent.length?recent.map(([ym,sum])=>`<div style="margin:10px 0"><div class="rowflex" style="justify-content:space-between"><span>${esc(ym)}</span><b>₩${aicostMoney(sum)}</b></div><div style="height:8px;background:var(--line);border-radius:4px;margin-top:5px"><div style="height:100%;width:${Math.round(sum/max*100)}%;background:var(--mint);border-radius:4px"></div></div></div>`).join(''):'<div class="empty">저장된 청구 내역이 없습니다.</div>'}</div>`;
+    <div class="hint">"직접 입력"은 원장이 넣는 값, "자동감지(문자)"는 결제 문자를 MacroDroid가 자동으로 전송해 쌓인 값(수정 불가·자동 집계). 합계가 위 총액에 함께 반영됩니다.</div></div>
+  <div class="card"><h2>최근 6개월 실제 청구액</h2>${recent.length?recent.map(([ym,sum])=>`<div style="margin:10px 0"><div class="rowflex" style="justify-content:space-between"><span>${esc(ym)}</span><b>₩${aicostMoney(sum)}</b></div><div style="height:8px;background:var(--line);border-radius:4px;margin-top:5px"><div style="height:100%;width:${Math.round(sum/max*100)}%;background:var(--mint);border-radius:4px"></div></div></div>`).join(''):'<div class="empty">저장된 청구 내역이 없습니다.</div>'}</div>
+  <div class="card"><h2>📩 자동감지 내역 <span class="sub">(최근 20건, 문자 웹훅)</span></h2>${recentEvents.length?`<div class="tblwrap"><table><tr><th>수신</th><th>플랫폼</th><th>금액</th><th>원문</th></tr>
+    ${recentEvents.map(e=>`<tr><td>${md(String(e.received_at).slice(0,10))} ${String(e.received_at).slice(11,16)}</td><td>${esc(e.platform)}</td><td>₩${aicostMoney(e.amount_krw)}</td><td class="sub" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.raw_text||'')}">${esc(e.raw_text||e.note||'')}</td></tr>`).join('')}</table></div>`:'<div class="empty">아직 자동감지된 결제 문자가 없습니다. MacroDroid 연동 후 결제 문자가 오면 여기 쌓입니다.</div>'}</div>`;
 }
 
 /* ── 급여 ── */
