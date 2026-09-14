@@ -60,6 +60,7 @@
 - **큐 순서(원장 1순위 근로계약서)**: ①근로계약서(D2+D4) ②D5 코드 ③직원 개인정보표(+원장전용섹션) ④AI 비용 상황판 ⑤캘린더/근무표 월뷰 ⑥D3 허브(보류·리마인드).
 
 ## 아직 원장이 답하지 않은 것
+- **Codex에 Supabase MCP 연결(2026-09-14, 원장 요청)** — Codex가 이미 `[mcp_servers.*]`(node_repl·serena 등) 구조 사용 중 확인, Supabase만 추가하면 됨. 절차 전달함: ①supabase.com 대시보드→Access Tokens→"Codex CLI"용 새 토큰 발급 ②`C:\Users\elusi\.codex\config.toml`에 `[mcp_servers.supabase]`(command=npx, args=-y @supabase/mcp-server-supabase@latest --project-ref=texevhsxttfoqkrucfzl) + `[mcp_servers.supabase.env]` SUPABASE_ACCESS_TOKEN 추가. **기존 Claude 쪽 키는 재사용 안 함**(평문 노출 위험, 신규 발급 권장). 원장이 진행했는지 확인 필요.
 - 🔴 **임은숙 "연차 신청했는데 안 보인다" — 원인 추정·조치 완료(2026-09-14)** — `leave_requests` 실측 결과 **신·구 계정 모두 신청 내역 0건**(RLS는 chief 본인 INSERT를 막지 않음, 정상 확인). 코드 확인 결과 `submitLeave()`의 **동시연차 제한 규칙**(그날 이미 2명↑ 휴가=차단, 1명+특별사유無=차단)이 **작은 텍스트로만 알림 후 저장 자체를 안 함** — 유력 원인으로 추정(insert 자체가 하드블록됨, DB에러 아님). 즉시 조치: 차단 메시지를 **빨간 굵은 글씨 "⚠ 신청되지 않았습니다"**로 변경 배포(재발방지). **원장 확인 필요**: 임은숙이 신청하려던 날짜에 이미 다른 직원 연차가 있었는지, 있다면 특별사유 적고 재신청 안내.
 - ✅ **캘린더에 휴무(off) 표시 배포(2026-09-14, 원장 "휴무도 보여야 편함")** — 캘린더 날짜칸에 승인연차(🏖)뿐 아니라 그날 근무표상 휴무(off)인 직원도 🛋로 함께 표시. `schedules.shift='off'` 실시간 반영.
 - ✅ **"계좌연동" MacroDroid 매크로 사고 — 복원 완료(2026-09-14, 원장 "기존의것은 교체했어" 확인)** — AI비용 웹훅 설정 중 실수로 원본 "계좌연동"(입금알림) 매크로가 ai-billing-webhook을 가리키게 됐던 사고. 원장이 deposit-webhook URL·기존 헤더토큰으로 복원 완료 확인함. (서버 측 deposit-webhook 함수 자체는 애초에 안 건드려졌었음.)
