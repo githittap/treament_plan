@@ -295,6 +295,7 @@ const TABS=[
   {key:'appr',  label:'결재함',    roles:['staff','manager','chief','owner']},
   {key:'notice',label:'공지',      roles:['staff','manager','chief','owner']},
   {key:'calendar',label:'📅 캘린더',roles:['staff','manager','chief','owner']},
+  {key:'leavestatus',label:'연차현황',roles:['staff','manager','chief','owner']},
   {key:'onbo',  label:'입사서류',  roles:['staff','manager','chief','owner']},
   {key:'confid',label:'케이스노트',roles:['staff','manager','chief','owner'],needsConfid:true},
   {key:'contract',label:'근로계약서',roles:['staff','manager','chief','owner']},
@@ -355,6 +356,7 @@ async function render(){
     else if(TAB==='appr')await renderAppr(m);
     else if(TAB==='notice')await renderNotice(m);
     else if(TAB==='calendar')await renderCalendar(m);
+    else if(TAB==='leavestatus')await renderLeaveStatus(m);
     else if(TAB==='onbo')await renderOnbo(m);
     else if(TAB==='confid')await renderConfid(m);
     else if(TAB==='contract')await renderContract(m);
@@ -941,6 +943,24 @@ async function renderCalendar(m){
       ${cellsHtml}
     </div>
     ${isLead()?`<div class="rowflex" style="margin-top:10px"><input class="mini" type="date" id="calDate" value="${today()}"><input class="mini" id="calTitle" placeholder="제목"><select class="mini" id="calKind"><option>이벤트</option><option>단축근무</option><option>면접</option></select><button class="mini" onclick="addCalendarEvent()">추가</button></div>`:''}
+  </div>`;
+}
+/* ── 연차현황 ── */
+let LVSTATUS_MONTH='';
+async function renderLeaveStatus(m){
+  if(!LVSTATUS_MONTH)LVSTATUS_MONTH=today().slice(0,7);
+  const from=LVSTATUS_MONTH+'-01',to=LVSTATUS_MONTH+'-31';
+  const {data,error}=await sb.from('leave_requests').select('*').lte('date_from',to).gte('date_to',from).order('date_from');
+  if(error){m.innerHTML=`<div class="card"><div class="empty">연차현황을 불러오지 못했습니다: ${esc(error.message)}</div></div>`;return;}
+  const rows=data||[];
+  m.innerHTML=`<div class="card"><h2>🏖 연차현황</h2>
+    <div class="rowflex"><label>대상 월 <input class="mini" type="month" value="${LVSTATUS_MONTH}" onchange="LVSTATUS_MONTH=this.value;render()"></label></div>
+    <div class="hint">${isLead()?'전 직원의 연차 신청·승인 내역입니다.':'승인된 연차는 전 직원, 대기·반려는 본인 것만 보입니다.'}</div>
+    ${rows.length?`<div class="tblwrap"><table><tr><th>이름</th><th>종류</th><th>기간</th><th>일수</th><th>상태</th><th>사유</th></tr>
+    ${rows.map(r=>`<tr><td>${esc(nameOf(r.user_id))}</td><td>${esc(r.type||'')}${r.type==='기타'&&r.type_note?' '+esc(r.type_note):''}</td>
+      <td>${md(r.date_from)}~${md(r.date_to)}</td><td>${r.days}</td>
+      <td><span class="b ${r.status==='승인'?'ok':(r.status==='반려'?'no':'wait')}">${esc(r.status)}</span></td>
+      <td>${esc(r.reason||'')}${r.special?' <span class="b no">특별사정</span> '+esc(r.special_reason||''):''}</td></tr>`).join('')}</table></div>`:'<div class="empty">이번 달 연차 내역이 없습니다.</div>'}
   </div>`;
 }
 async function addCalendarEvent(){
