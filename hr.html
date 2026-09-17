@@ -1006,8 +1006,11 @@ async function deleteCalendarEvent(id){
 
 /* ── 온보딩 ── */
 async function renderOnbo(m){
-  const {data:items}=await sb.from('onboarding_items').select('*').eq('active',true).order('order_no');
-  const {data:checks}=await sb.from('onboarding_checks').select('*').eq('user_id',ME.id);
+  const [{data:items},{data:checks},{data:docs,error:docsError}]=await Promise.all([
+    sb.from('onboarding_items').select('*').eq('active',true).order('order_no'),
+    sb.from('onboarding_checks').select('*').eq('user_id',ME.id),
+    isMgr()?sb.from('employee_documents').select('*').order('created_at',{ascending:false}):sb.from('employee_documents').select('*').eq('user_id',ME.id).order('created_at',{ascending:false})
+  ]);
   const cmap={};(checks||[]).forEach(c=>cmap[c.item_id]=c);
   m.innerHTML=`<div class="card"><h2>📋 내 입사 제출물</h2>
     <table><tr><th>항목</th><th>상태</th><th></th></tr>
@@ -1017,7 +1020,45 @@ async function renderOnbo(m){
       <td>${s==='미제출'?`<button class="mini" onclick="submitOnbo(${it.id})">제출함</button>`:(s==='제출'&&isLead()?`<button class="mini stamp" onclick="confirmOnbo(${it.id})">확인</button>`:'')}</td></tr>`;}).join('')}
     </table>${isLead()?'<div style="margin-top:8px"><input id="oiNew" class="mini" placeholder="새 제출 항목"> <button class="mini" onclick="addOnboItem()">항목 추가</button></div>':''}
   </div>
+  ${employeeDocumentsCard(docs||[],docsError)}
   ${isLead()?await onboOverview():''}`;
+}
+/* employee-documents:test-start */
+function validateEmployeeDocument(file){
+  if(!file)return '파일을 선택하세요.';
+  if(!['application/pdf','image/jpeg','image/png'].includes(file.type))return 'PDF, JPG, PNG 파일만 올릴 수 있습니다.';
+  if(file.size>10*1024*1024)return '파일은 10MB 이하만 올릴 수 있습니다.';
+  return '';
+}
+/* employee-documents:test-end */
+function employeeDocumentsCard(docs,error){
+  const lead=isMgr(),staff=PROFILES.filter(p=>p.active!==false&&p.approved!==false);
+  const rows=docs.map(d=>'<tr>'+(lead?'<td>'+esc(nameOf(d.user_id))+'</td>':'')+'<td>'+esc(d.document_type)+'</td><td>'+esc(d.original_name)+'</td><td>'+contractDate(d.created_at)+'</td><td><button class="mini" onclick="downloadEmployeeDocument('+d.id+')">열기</button></td></tr>').join('');
+  const list=error?'<div class="hint" style="color:var(--red)">서류함을 불러오지 못했습니다: '+esc(error.message)+'</div>':docs.length?'<div class="tblwrap"><table><tr>'+(lead?'<th>직원</th>':'')+'<th>종류</th><th>파일</th><th>올린 날</th><th></th></tr>'+rows+'</table></div>':'<div class="empty">올린 서류가 없습니다.</div>';
+  return `<div class="card"><h2>📎 직원 서류함 <span class="sub">(PDF·JPG·PNG, 최대 10MB)</span></h2>${list}
+    <div class="grid" style="margin-top:10px">
+      ${lead?`<div class="fld"><label>직원</label><select id="edUser">${staff.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select></div>`:''}
+      <div class="fld"><label>서류 종류</label><select id="edType"><option>잠복결핵 검사서</option><option>자격증</option><option>면허증</option><option>신분증 사본</option><option>기타</option></select></div>
+      <div class="fld"><label>파일</label><input type="file" id="edFile" accept="application/pdf,image/jpeg,image/png"></div>
+    </div><button class="hbtn pri" style="margin-top:10px" onclick="uploadEmployeeDocument()">서류 올리기</button><div class="msg" id="edMsg"></div>
+  </div>`;
+}
+async function uploadEmployeeDocument(){
+  const file=$('#edFile').files[0],msg=$('#edMsg'),problem=validateEmployeeDocument(file);if(problem){msg.textContent=problem;return;}
+  const userId=isMgr()?$('#edUser').value:ME.id,type=$('#edType').value,path=`${userId}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+  setStatus('saving');msg.textContent='업로드 중…';
+  const {error:storageError}=await sb.storage.from('hr-docs').upload(path,file,{contentType:file.type,upsert:false});
+  if(storageError){msg.textContent='파일 업로드 실패: '+storageError.message;setStatus('error');return;}
+  const {error}=await sb.from('employee_documents').insert({user_id:userId,document_type:type,original_name:file.name,storage_path:path,mime_type:file.type,size_bytes:file.size});
+  if(error){msg.textContent='서류 목록 저장 실패: '+error.message;setStatus('error');return;}
+  setStatus('saved');render();
+}
+async function downloadEmployeeDocument(id){
+  const {data:doc,error}=await sb.from('employee_documents').select('storage_path,original_name').eq('id',id).maybeSingle();
+  if(error||!doc){alert('서류를 찾지 못했습니다.');return;}
+  const {data,error:downloadError}=await sb.storage.from('hr-docs').download(doc.storage_path);
+  if(downloadError){alert('파일을 열지 못했습니다: '+downloadError.message);return;}
+  const url=URL.createObjectURL(data),win=window.open(url,'_blank','noopener');if(!win)location.href=url;setTimeout(()=>URL.revokeObjectURL(url),60000);
 }
 async function onboOverview(){
   const {data:items}=await sb.from('onboarding_items').select('*').eq('active',true);
