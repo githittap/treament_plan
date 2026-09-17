@@ -238,6 +238,19 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
   <div class="msg" id="xlMsg"></div>
 </div></div>
 
+<!-- 기존 계약 종료일 보완 -->
+<div class="mask" id="contractEndMask"><div class="modal">
+  <h3>📅 계약 종료일 설정<button class="x" onclick="hide('contractEndMask')">✕</button></h3>
+  <div class="grid">
+    <div class="fld w4"><label>직원</label><div id="contractEndEmployee"></div></div>
+    <div class="fld"><label>계약 종료일</label><input type="date" id="contractEndDate"></div>
+    <div class="fld"><label>계약 기간</label><label style="font-size:13px;color:var(--ink)"><input type="checkbox" id="contractEndNoEnd" onchange="toggleExistingContractNoEnd()"> 기간의 정함 없음</label></div>
+  </div>
+  <div class="hint">계약서 본문·서명·발송 기록은 바꾸지 않고, 만료 알림 기준인 종료일만 보완합니다.</div>
+  <button class="hbtn pri" style="margin-top:12px" onclick="saveContractEnd()">저장</button>
+  <div class="msg" id="contractEndMsg"></div>
+</div></div>
+
 <footer>© 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지</footer>
 
 <script>
@@ -1060,6 +1073,12 @@ function contractEndValue(row){
   if(typeof fields==='string'){try{fields=JSON.parse(fields);}catch(e){fields={};}}
   return String(fields&&fields['계약종료']!=null?fields['계약종료']:'').trim();
 }
+function contractEndFields(row,end,isNoEnd){
+  let fields=row&&row.fields;
+  if(typeof fields==='string'){try{fields=JSON.parse(fields);}catch(e){fields={};}}
+  if(!fields||typeof fields!=='object'||Array.isArray(fields))fields={};
+  return {...fields,'계약종료':isNoEnd?'기간의 정함 없음':String(end||'').trim()};
+}
 function contractExpiryInfo(row,baseDate){
   if(!row||row.status==='취소')return null;
   const end=contractEndValue(row);
@@ -1183,6 +1202,27 @@ function viewContract(id){
   box.innerHTML=`<h3>${esc(contractTitle(row))} <span class="b ${contractStatusClass(row.status)}">${esc(row.status)}</span></h3><div class="contract-doc">${row.merged_html||''}</div>`;
   box.scrollIntoView({behavior:'smooth',block:'start'});
 }
+let CONTRACT_END_ID=null;
+function toggleExistingContractNoEnd(){
+  const checked=!!($('#contractEndNoEnd')&&$('#contractEndNoEnd').checked),input=$('#contractEndDate');
+  if(input){input.disabled=checked;if(checked)input.value='';}
+}
+function openContractEnd(id){
+  const row=CONTRACT_ROWS.find(r=>Number(r.id)===Number(id));if(!row)return;
+  CONTRACT_END_ID=row.id;const end=contractEndValue(row),noEnd=end==='기간의 정함 없음';
+  $('#contractEndEmployee').textContent=nameOf(row.user_id);
+  $('#contractEndDate').value=/^\d{4}-\d{2}-\d{2}$/.test(end)?end:'';
+  $('#contractEndNoEnd').checked=noEnd;$('#contractEndMsg').textContent='';toggleExistingContractNoEnd();show('contractEndMask');
+}
+async function saveContractEnd(){
+  const row=CONTRACT_ROWS.find(r=>Number(r.id)===Number(CONTRACT_END_ID)),msg=$('#contractEndMsg');if(!row)return;
+  const noEnd=$('#contractEndNoEnd').checked,end=$('#contractEndDate').value;
+  if(!noEnd&&!/^\d{4}-\d{2}-\d{2}$/.test(end)){msg.textContent="계약 종료일을 입력하거나 '기간의 정함 없음'을 선택하세요.";return;}
+  setStatus('saving');msg.textContent='저장 중…';
+  const fields=contractEndFields(row,end,noEnd),{data,error}=await sb.from('contracts').update({fields}).eq('id',row.id).select('id,fields');
+  if(error||!(data||[]).length){msg.textContent='저장 실패: '+(error?error.message:'계약을 찾지 못했습니다.');setStatus('error');return;}
+  row.fields=data[0].fields;hide('contractEndMask');setStatus('saved');await refreshBadges();render();
+}
 async function cancelContract(id){
   const row=CONTRACT_ROWS.find(r=>Number(r.id)===Number(id));if(!row||row.status!=='대기'||!confirm('이 계약 발송을 취소할까요?'))return;
   setStatus('saving');const {data,error}=await sb.from('contracts').update({status:'취소'}).eq('id',id).eq('status','대기').select('id');
@@ -1215,7 +1255,7 @@ async function renderContractOwner(m){
   </div>
   ${contractAlertsCard(CONTRACT_ALERTS)}
   <div class="card"><h2>📚 계약 목록</h2>${CONTRACT_ROWS.length?`<div class="tblwrap"><table><tr><th>직원</th><th>서식</th><th>상태</th><th>계약종료</th><th>발송일</th><th>서명일</th><th>서명기한</th><th></th></tr>
-    ${CONTRACT_ROWS.map(r=>`<tr><td>${esc(nameOf(r.user_id))}</td><td>${esc(contractTitle(r))}</td><td><span class="b ${contractStatusClass(r.status)}">${esc(r.status)}</span></td><td>${esc(contractEndValue(r)||'관리자 확인 필요')}</td><td>${contractDate(r.sent_at)}</td><td>${contractDate(r.signed_at)}</td><td>${contractDate(r.due_at)}</td><td><button class="mini" onclick="viewContract(${r.id})">보기</button>${r.status==='대기'?` <button class="mini rej" onclick="cancelContract(${r.id})">취소</button>`:''}</td></tr>`).join('')}</table></div>`:'<div class="empty">계약이 없습니다.</div>'}</div>`;
+    ${CONTRACT_ROWS.map(r=>`<tr><td>${esc(nameOf(r.user_id))}</td><td>${esc(contractTitle(r))}</td><td><span class="b ${contractStatusClass(r.status)}">${esc(r.status)}</span></td><td>${esc(contractEndValue(r)||'관리자 확인 필요')}</td><td>${contractDate(r.sent_at)}</td><td>${contractDate(r.signed_at)}</td><td>${contractDate(r.due_at)}</td><td><button class="mini" onclick="viewContract(${r.id})">보기</button> <button class="mini" onclick="openContractEnd(${r.id})">종료일 설정</button>${r.status==='대기'?` <button class="mini rej" onclick="cancelContract(${r.id})">취소</button>`:''}</td></tr>`).join('')}</table></div>`:'<div class="empty">계약이 없습니다.</div>'}</div>`;
 }
 function contractExpired(row){return !!row.due_at&&new Date(row.due_at).getTime()<Date.now();}
 function initContractSignatures(){

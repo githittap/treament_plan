@@ -51,4 +51,17 @@ if (block) {
     assert.match(html, /id="contractNoEnd"/);
     assert.match(html, /계약 종료일을 입력하거나 '기간의 정함 없음'을 선택하세요\./);
   });
+
+  test('기존 계약의 종료일 보완은 다른 계약 필드를 보존한다', () => {
+    const row = { fields: { 계약시작: '2026-01-01', 직무: '치과위생사', 계약종료: '' } };
+    assert.deepEqual(
+      { ...context.contractEndFields(row, '2026-12-31', false) },
+      { 계약시작: '2026-01-01', 직무: '치과위생사', 계약종료: '2026-12-31' }
+    );
+    assert.deepEqual(
+      { ...context.contractEndFields(row, '', true) },
+      { 계약시작: '2026-01-01', 직무: '치과위생사', 계약종료: '기간의 정함 없음' }
+    );
+    assert.match(html, /function saveContractEnd\(/);
+  });
 }
