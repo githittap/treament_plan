@@ -1,5 +1,6 @@
 create table if not exists public.employee_contract_terms (
   user_id uuid primary key references public.profiles(user_id) on delete cascade,
+  start_date date,
   end_date date,
   is_indefinite boolean not null default false,
   updated_by text,
