@@ -89,6 +89,9 @@ tr.new td{background:var(--mint-dk)}
 .contract-alert.expired,.contract-alert.urgent{border-left-color:var(--red)}
 .contract-alert.review,.contract-alert.warning{border-left-color:var(--gold)}
 .contract-alert.upcoming{border-left-color:var(--blue)}
+.contract-day-check{display:flex;align-items:center;gap:4px;min-height:30px;padding:4px 3px;border:1px solid transparent;border-radius:6px;cursor:pointer;position:relative;z-index:1;font-size:12px;white-space:nowrap;color:var(--ink)!important}
+.contract-day-check:hover{background:var(--panel);border-color:var(--line)}
+.contract-day-check input[type=checkbox]{width:16px;height:16px;min-width:16px;margin:0;padding:0;cursor:pointer;accent-color:var(--mint)}
 
 /* 월별 캘린더 그리드 */
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:10px}
@@ -1191,7 +1194,7 @@ function contractScheduleRowEditor(row){
   const modeNote=r.day_mode==='rotating_5'?'토·일을 포함해 근무표에 따라 주 5일 근무':r.day_mode==='weekday_twice'?'상기 주 5일 중 평일 야간 주 2회(근무표에 따름)':'근무하는 요일을 선택하세요.';
   return `<div data-contract-schedule-row style="display:grid;grid-template-columns:repeat(7,minmax(34px,1fr)) 84px 92px 92px minmax(125px,1fr) minmax(110px,1fr) 30px;gap:5px;align-items:center;margin:5px 0">
     <div style="grid-column:1/-1;display:flex;align-items:center;gap:7px"><label style="font-size:12px;white-space:nowrap">근무일 <select data-schedule-day-mode onchange="syncContractScheduleDayMode(this)"><option value="fixed" ${r.day_mode==='fixed'?'selected':''}>고정 요일</option><option value="rotating_5" ${r.day_mode==='rotating_5'?'selected':''}>월~일 중 주 5일 교대(주말 가능)</option><option value="weekday_twice" ${r.day_mode==='weekday_twice'?'selected':''}>상기 주 5일 중 평일 야간 2회</option></select></label><span class="sub" data-schedule-day-mode-note>${modeNote}</span></div>
-    <div data-schedule-day-picks style="display:contents">${CONTRACT_WEEKDAYS.map(day=>`<label style="font-size:12px;white-space:nowrap"><input type="checkbox" data-schedule-days value="${day}" ${r.days.includes(day)?'checked':''}> ${day}</label>`).join('')}</div>
+    <div data-schedule-day-picks style="display:contents">${CONTRACT_WEEKDAYS.map(day=>`<label class="contract-day-check"><input type="checkbox" data-schedule-days value="${day}" ${r.days.includes(day)?'checked':''}><span>${day}</span></label>`).join('')}</div>
     <select data-schedule-kind><option value="주간" ${r.kind==='주간'?'selected':''}>주간</option><option value="야간" ${r.kind==='야간'?'selected':''}>야간</option><option value="별도" ${r.kind==='별도'?'selected':''}>별도</option></select>
     <input type="time" data-schedule-start value="${esc(r.start)}" aria-label="시업시간"><input type="time" data-schedule-end value="${esc(r.end)}" aria-label="종업시간">
     <input data-schedule-break value="${esc(r.break_time)}" placeholder="휴게 13:00 ~ 14:00"><input data-schedule-note value="${esc(r.note)}" placeholder="비고(선택)">

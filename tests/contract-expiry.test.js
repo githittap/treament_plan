@@ -18,6 +18,11 @@ test('요일별 근무시간표 입력 코드가 포함되어 있다', () => {
   assert.doesNotMatch(html, /data-schedule-days[^>]*disabled/);
 });
 
+test('요일은 체크박스뿐 아니라 표시 영역 전체를 클릭할 수 있다', () => {
+  assert.match(html, /class="contract-day-check"/);
+  assert.match(html, /\.contract-day-check input\[type=checkbox\]/);
+});
+
 if (scheduleBlock) {
   const scheduleContext = {};
   vm.createContext(scheduleContext);
