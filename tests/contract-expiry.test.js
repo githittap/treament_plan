@@ -23,7 +23,7 @@ if (scheduleBlock) {
 
   test('근무시간표는 월~일, 주간·야간·별도 구분을 보존한다', () => {
     const rows = scheduleContext.contractScheduleRows([{ days: ['월', '수', '일'], kind: '야간', start: '18:30', end: '20:30', break_time: '18:00 ~ 18:30', note: '야간진료' }]);
-    assert.deepEqual({ ...rows[0], days: [...rows[0].days] }, { days: ['월', '수', '일'], kind: '야간', start: '18:30', end: '20:30', break_time: '18:00 ~ 18:30', note: '야간진료' });
+    assert.deepEqual({ ...rows[0], days: [...rows[0].days] }, { days: ['월', '수', '일'], day_mode: 'fixed', kind: '야간', start: '18:30', end: '20:30', break_time: '18:00 ~ 18:30', note: '야간진료' });
     assert.equal(scheduleContext.validContractSchedule(rows), true);
     assert.equal(scheduleContext.validContractSchedule([{ days: [], start: '10:00', end: '18:00' }]), false);
   });
@@ -31,6 +31,12 @@ if (scheduleBlock) {
   test('깨진 이전 시간표 문자열은 원장 검토 대상으로 표시한다', () => {
     assert.equal(scheduleContext.contractScheduleNeedsReview('[object Object]'), true);
     assert.equal(scheduleContext.contractScheduleNeedsReview('[{"days":["월"]}]'), false);
+  });
+
+  test('주 5일 교대근무는 주말 가능 상태로 저장하고 요일 미선택도 허용한다', () => {
+    const rows = scheduleContext.contractScheduleRows([{ days: [], day_mode: 'rotating_5', kind: '주간', start: '10:00', end: '19:00' }]);
+    assert.equal(rows[0].day_mode, 'rotating_5');
+    assert.equal(scheduleContext.validContractSchedule(rows), true);
   });
 }
 
