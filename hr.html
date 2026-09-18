@@ -563,11 +563,11 @@ async function closeMonth(month){
 }
 async function checkAbsent(month){
   const el=$('#absentBox');el.innerHTML='확인 중…';
-  const {data:sc}=await sb.from('schedules').select('user_id,day,week_start,shift');
+  const {data:sc}=await sb.from('schedules').select('person_id,user_id,day,week_start,shift');
   const {data:att}=await sb.from('attendance').select('user_id,work_date').gte('work_date',month+'-01').lte('work_date',month+'-31');
   const has=new Set((att||[]).map(a=>a.user_id+'|'+a.work_date));
   const miss=[];
-  (sc||[]).forEach(s=>{ if(s.shift==='off')return;
+  (sc||[]).forEach(s=>{ if(!s.user_id||s.shift==='off')return;
     for(let i=0;i<7;i++){const ds=addDays(s.week_start,i);const d=new Date(ds+'T00:00:00');
       if(d.getDay()===s.day && ds.slice(0,7)===month && ds<=today() && !has.has(s.user_id+'|'+ds))miss.push({u:s.user_id,ds,shift:s.shift});}});
   el.innerHTML=miss.length?`<table><tr><th>직원</th><th>날짜</th><th>근무표</th></tr>${miss.sort((a,b)=>a.ds<b.ds?-1:1).map(x=>`<tr class="warn"><td>${esc(nameOf(x.u))}</td><td>${md(x.ds)}</td><td>${SHIFTS[x.shift]?SHIFTS[x.shift].l:esc(x.shift)}</td></tr>`).join('')}</table><div class="hint">근무표=근무인데 지문 기록 없음 = 결근/미기록. 소명받거나 수기 처리하세요.</div>`:'<div class="empty">근무표 대비 미기록 없음 ✓</div>';
@@ -579,16 +579,15 @@ async function renderSched(m){
   if(!SCHED_WEEK)SCHED_WEEK=mondayStr(today());
   const ws=SCHED_WEEK;
   const {data:wk}=await sb.from('schedule_weeks').select('*').eq('week_start',ws).maybeSingle();
-  const {data:rows}=await sb.from('schedules').select('*').eq('week_start',ws);
+  const {data:rows}=await sb.from('schedules').select('person_id,user_id,week_start,day,shift,note').eq('week_start',ws);
   const {data:lv}=await sb.from('leave_requests').select('user_id,date_from,date_to').eq('status','승인').lte('date_from',addDays(ws,6)).gte('date_to',ws);
-  const smap={};(rows||[]).forEach(r=>smap[r.user_id+'|'+r.day]=r.shift);
+  const smap={};(rows||[]).forEach(r=>smap[r.person_id+'|'+r.day]=r.shift);
   const leaveDays=new Set();
   for(const r of lv||[]){const start=r.date_from<ws?ws:r.date_from,end=r.date_to>addDays(ws,6)?addDays(ws,6):r.date_to;
     for(let ds=start;ds<=end;ds=addDays(ds,1))leaveDays.add(r.user_id+'|'+ds);}
-  const staff=PROFILES.filter(p=>p.active!==false);
-  const deptNames=['진료실','데스크','기공팀'];
-  const groups=[...deptNames.map(label=>({label,members:staff.filter(p=>p.dept===label)})),
-    {label:'미지정',members:staff.filter(p=>!deptNames.includes(p.dept))}];
+  const staff=schedulePeopleForWeek(SCHEDULE_PEOPLE,rows);
+  const deptNames=['Dr.','진료실','데스크','기공실','미지정'];
+  const groups=deptNames.map(label=>({label,members:staff.filter(p=>(deptNames.includes(p.department)?p.department:'미지정')===label)}));
   const published=wk&&wk.status==='공표';
   const canEdit=!published||isLead();
   const dow=['일','월','화','수','목','금','토'];
@@ -596,8 +595,8 @@ async function renderSched(m){
   const optHtml=cur=>Object.keys(SHIFTS).map(k=>`<option value="${k}" ${cur===k?'selected':''}>${SHIFTS[k].l}</option>`).join('');
   let grid=`<div class="tblwrap"><table><tr><th>직원</th>${cols.map(c=>`<th>${dow[c.dd]}<br><span class="sub">${md(c.ds)}</span></th>`).join('')}</tr>`;
   grid+=groups.filter(g=>g.members.length).map(g=>`<tr><td colspan="${1+cols.length}" style="font-weight:800;background:var(--panel);color:var(--gray)">${g.label}</td></tr>`+
-    g.members.map(p=>`<tr><td>${esc(p.name)} ${p.role!=='staff'?'<span class="sub">'+esc(p.role)+'</span>':''}</td>${cols.map(c=>{const cur=smap[p.user_id+'|'+c.dd]||'',onLeave=leaveDays.has(p.user_id+'|'+c.ds);
-      return `<td>${canEdit?`<select class="mini ${cur==='evening'?'shift-evening':''}" data-uid="${p.user_id}" data-day="${c.dd}" onchange="setShift('${p.user_id}',${c.dd},'${ws}',this.value);this.classList.toggle('shift-evening',this.value==='evening')"><option value="">-</option>${optHtml(cur)}</select>`:`<span class="b ${cur==='off'?'no':(cur==='evening'?'no':'ok')}">${cur?SHIFTS[cur].l:'-'}</span>`}${onLeave?'<span class="b ok" style="margin-left:4px">연차</span>':''}</td>`;}).join('')}</tr>`).join('')).join('');
+    g.members.map(p=>`<tr><td>${esc(schedulePersonLabel(p))}</td>${cols.map(c=>{const cur=smap[p.id+'|'+c.dd]||'',onLeave=p.profile_user_id&&leaveDays.has(p.profile_user_id+'|'+c.ds);
+      return `<td>${canEdit?`<select class="mini ${cur==='evening'?'shift-evening':''}" data-person-id="${p.id}" data-profile-user-id="${p.profile_user_id||''}" data-day="${c.dd}" onchange="setShift(this.dataset.personId,this.dataset.profileUserId||null,Number(this.dataset.day),'${ws}',this.value);this.classList.toggle('shift-evening',this.value==='evening')"><option value="">-</option>${optHtml(cur)}</select>`:`<span class="b ${cur==='off'?'no':(cur==='evening'?'no':'ok')}">${cur?SHIFTS[cur].l:'-'}</span>`}${onLeave?'<span class="b ok" style="margin-left:4px">연차</span>':''}</td>`;}).join('')}</tr>`).join('')).join('');
   grid+='</table></div>';
   m.innerHTML=`<div class="card"><h2>🗓 근무표 <span class="b ${published?'ok':'wait'}">${published?'공표됨':'초안'}</span></h2>
     <div class="rowflex" style="align-items:center;margin-bottom:8px;gap:8px">
@@ -607,27 +606,33 @@ async function renderSched(m){
       ${canEdit?`<button class="mini" onclick="copyPrevWeek('${ws}')">지난주 복사</button>`:''}
       ${isLead()?`<button class="mini stamp" onclick="publishSched('${ws}')">공표(확정)</button>`:''}
     </div>
-    ${staff.length?grid:'<div class="empty">직원이 아직 없습니다. 직원이 회원가입하면 여기 뜹니다.</div>'}
+    ${staff.length?grid:'<div class="empty">근무표에 포함된 인원이 아직 없습니다.</div>'}
     <div class="hint">근무=정상 · 휴무=off · <b>야간=종업 20:00</b> · 기타=기타 근무. 셀 값을 고른 뒤 그 셀에서 마우스 왼쪽 버튼을 누른 채 다른 셀 위로 끌면 같은 값을 한꺼번에 칠할 수 있습니다. 직원이 초안 작성 → 실장·원장이 <b>공표</b>. 공표된 근무표가 출퇴근 <b>야간·조퇴 판정</b>의 기준이 됩니다. 수정하면 다시 초안이 되어 재공표가 필요합니다.</div>
   </div>`;
   if(!window.__schedPaintBound){window.__schedPaintBound=true;
-    m.addEventListener('mousedown',e=>{const target=e.target.closest&&e.target.closest('select[data-uid][data-day]');if(!target||!m.contains(target))return;PAINT_VALUE=target.value;PAINTING=true;});
-    m.addEventListener('mouseenter',e=>{const target=e.target.closest&&e.target.closest('select[data-uid][data-day]');if(!target||!m.contains(target)||!PAINTING||e.buttons!==1)return;target.value=PAINT_VALUE;setShift(target.dataset.uid,Number(target.dataset.day),SCHED_WEEK,PAINT_VALUE);target.classList.toggle('shift-evening',PAINT_VALUE==='evening');},true);
+    m.addEventListener('mousedown',e=>{const target=e.target.closest&&e.target.closest('select[data-person-id][data-profile-user-id][data-day]');if(!target||!m.contains(target))return;PAINT_VALUE=target.value;PAINTING=true;});
+    m.addEventListener('mouseenter',e=>{const target=e.target.closest&&e.target.closest('select[data-person-id][data-profile-user-id][data-day]');if(!target||!m.contains(target)||!PAINTING||e.buttons!==1)return;target.value=PAINT_VALUE;setShift(target.dataset.personId,target.dataset.profileUserId||null,Number(target.dataset.day),SCHED_WEEK,PAINT_VALUE);target.classList.toggle('shift-evening',PAINT_VALUE==='evening');},true);
     document.addEventListener('mouseup',()=>{PAINTING=false;});
   }
 }
 function navWeek(n){SCHED_WEEK=addDays(SCHED_WEEK||mondayStr(today()),n);render();}
-async function setShift(uid,day,ws,shift){
-  await sb.from('schedule_weeks').upsert({week_start:ws,status:'초안'},{onConflict:'week_start'});
-  if(shift)await sb.from('schedules').upsert({week_start:ws,user_id:uid,day,shift},{onConflict:'week_start,user_id,day'});
-  else await sb.from('schedules').delete().eq('week_start',ws).eq('user_id',uid).eq('day',day);
+async function setShift(personId,profileUserId,day,ws,shift){
+  const {error:weekError}=await sb.from('schedule_weeks').upsert({week_start:ws,status:'초안'},{onConflict:'week_start'});
+  if(weekError){setStatus('error');return;}
+  const {error}=shift
+    ?await sb.from('schedules').upsert({week_start:ws,person_id:personId,user_id:profileUserId||null,day,shift},{onConflict:'week_start,person_id,day'})
+    :await sb.from('schedules').delete().eq('week_start',ws).eq('person_id',personId).eq('day',day);
+  if(error){setStatus('error');return;}
   setStatus('saved');
 }
-async function publishSched(ws){await sb.from('schedule_weeks').upsert({week_start:ws,status:'공표',confirmed_by:ME.name,confirmed_at:new Date().toISOString()},{onConflict:'week_start'});setStatus('saved');render();}
-async function copyPrevWeek(ws){const prev=addDays(ws,-7);const {data}=await sb.from('schedules').select('user_id,day,shift').eq('week_start',prev);
+async function publishSched(ws){const {error}=await sb.from('schedule_weeks').upsert({week_start:ws,status:'공표',confirmed_by:ME.name,confirmed_at:new Date().toISOString()},{onConflict:'week_start'});if(error){setStatus('error');return;}setStatus('saved');render();}
+async function copyPrevWeek(ws){const prev=addDays(ws,-7);const {data,error:readError}=await sb.from('schedules').select('person_id,user_id,day,shift,note').eq('week_start',prev);
+  if(readError){setStatus('error');return;}
   if(!data||!data.length){alert('지난주 근무표가 없습니다.');return;}
-  await sb.from('schedule_weeks').upsert({week_start:ws,status:'초안'},{onConflict:'week_start'});
-  await sb.from('schedules').upsert(data.map(r=>({week_start:ws,user_id:r.user_id,day:r.day,shift:r.shift})),{onConflict:'week_start,user_id,day'});
+  const {error:weekError}=await sb.from('schedule_weeks').upsert({week_start:ws,status:'초안'},{onConflict:'week_start'});
+  if(weekError){setStatus('error');return;}
+  const {error}=await sb.from('schedules').upsert(data.map(r=>({week_start:ws,person_id:r.person_id,user_id:r.user_id||null,day:r.day,shift:r.shift,note:r.note??null})),{onConflict:'week_start,person_id,day'});
+  if(error){setStatus('error');return;}
   setStatus('saved');render();}
 
 /* 엑셀 파싱 */

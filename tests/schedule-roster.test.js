@@ -7,6 +7,26 @@ const vm = require('node:vm');
 const html = fs.readFileSync(path.join(__dirname, '..', 'hr.html'), 'utf8');
 const block = html.match(/\/\* schedule-roster:test-start \*\/([\s\S]*?)\/\* schedule-roster:test-end \*\//);
 
+test('근무표는 person_id 명부와 person_id 저장 계약을 사용한다', () => {
+  const schedule = html.match(/\/\* ── 근무표\(M2\) ── \*\/([\s\S]*?)\/\* 엑셀 파싱 \*\//);
+  assert.ok(schedule, '근무표 코드 블록이 없습니다.');
+  const source = schedule[1];
+  assert.match(source, /select\('person_id,user_id,week_start,day,shift,note'\)/);
+  assert.match(source, /schedulePeopleForWeek\(SCHEDULE_PEOPLE,rows\)/);
+  assert.match(source, /smap\[r\.person_id\+'\|'\+r\.day\]/);
+  assert.match(source, /data-person-id=/);
+  assert.match(source, /data-profile-user-id=/);
+  assert.match(source, /async function setShift\(personId,profileUserId,day,ws,shift\)/);
+  assert.match(source, /onConflict:'week_start,person_id,day'/);
+});
+
+test('근무표 저장 실패는 성공 상태로 표시하지 않는다', () => {
+  const setShift = html.match(/async function setShift\([\s\S]*?async function publishSched/);
+  assert.ok(setShift, 'setShift 함수를 찾을 수 없습니다.');
+  assert.match(setShift[0], /if\(weekError\)\{setStatus\('error'\);return;\}/);
+  assert.match(setShift[0], /if\(error\)\{setStatus\('error'\);return;\}/);
+});
+
 test('통합 명부 순수 함수 코드 블록이 포함되어 있다', () => {
   assert.ok(block, '통합 명부 순수 함수 코드 블록이 없습니다.');
 });
