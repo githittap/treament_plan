@@ -75,7 +75,22 @@ end;
 $$;
 
 -- 기존 부분 인덱스는 Supabase upsert 충돌 대상으로 사용할 수 없으므로 전체 unique로 교체한다.
-drop index if exists public.schedules_week_person_day_unique;
+do $$
+begin
+  if exists (
+    select 1
+    from pg_catalog.pg_index i
+    join pg_catalog.pg_class c on c.oid = i.indexrelid
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'schedules_week_person_day_unique'
+      and i.indpred is not null
+  ) then
+    execute 'drop index public.schedules_week_person_day_unique';
+  end if;
+end;
+$$;
+
 create unique index if not exists schedules_week_person_day_unique
   on public.schedules (week_start, person_id, day);
 
@@ -310,6 +325,8 @@ language plpgsql
 security invoker
 set search_path = public, pg_temp
 as $$
+declare
+  v_copied_count integer;
 begin
   if p_source_week = p_target_week then
     raise exception 'source and target schedule weeks must differ';
@@ -334,6 +351,11 @@ begin
   select p_target_week, s.person_id, s.user_id, s.day, s.shift, s.note
   from public.schedules s
   where s.week_start = p_source_week;
+
+  get diagnostics v_copied_count = row_count;
+  if v_copied_count = 0 then
+    raise exception 'source schedule week has no rows';
+  end if;
 end;
 $$;
 

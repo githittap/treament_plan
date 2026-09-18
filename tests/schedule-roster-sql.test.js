@@ -64,7 +64,8 @@ test('profiles와 기존 일정을 명부 기준으로 백필하고 누락 시 �
 });
 
 test('명부 전환은 전체 unique, 호환 트리거, 승인 접근과 주차 복사 RPC를 제공한다', () => {
-  assert.match(migration, /drop index[\s\S]*schedules_week_person_day_unique/i);
+  assert.match(migration, /from pg_catalog\.pg_index[\s\S]*schedules_week_person_day_unique[\s\S]*indpred is not null/i);
+  assert.match(migration, /execute\s+'drop index public\.schedules_week_person_day_unique'/i);
   assert.match(migration, /create unique index if not exists schedules_week_person_day_unique\s+on public\.schedules\s*\(\s*week_start\s*,\s*person_id\s*,\s*day\s*\)\s*;/i);
 
   const normalizer = functionStatement('normalize_schedule_person');
@@ -98,6 +99,9 @@ test('명부 전환은 전체 unique, 호환 트리거, 승인 접근과 주차 
   assert.match(copyWeek, /insert into public\.schedule_weeks[\s\S]*status\s*\)\s*values\s*\(\s*p_target_week\s*,\s*'초안'\s*\)[\s\S]*on conflict/i);
   assert.match(copyWeek, /delete from public\.schedules[\s\S]*week_start\s*=\s*p_target_week/i);
   assert.match(copyWeek, /insert into public\.schedules[\s\S]*select[\s\S]*p_target_week[\s\S]*from public\.schedules/i);
+  assert.match(copyWeek, /declare\s+v_copied_count\s+integer/i);
+  assert.match(copyWeek, /get diagnostics\s+v_copied_count\s*=\s*row_count/i);
+  assert.match(copyWeek, /if v_copied_count\s*=\s*0 then[\s\S]*raise exception/i);
   assert.match(migration, /revoke all on function public\.copy_schedule_week\(date, date\) from public/i);
   assert.match(migration, /revoke all on function public\.copy_schedule_week\(date, date\) from anon/i);
   assert.match(migration, /grant execute on function public\.copy_schedule_week\(date, date\) to authenticated/i);
