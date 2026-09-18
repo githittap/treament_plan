@@ -49,6 +49,23 @@ test('명부 RLS와 권한은 authenticated 조회·manager/chief/owner 쓰기�
   assert.match(migration, /manager.*chief.*owner|chief.*owner.*manager/i);
 });
 
+test('근무표 RLS는 초안 편집만 열고 anon 권한과 공표 주차 직접 편집을 막는다', () => {
+  assert.match(migration, /revoke all privileges on table public\.schedules from anon/i);
+  assert.match(migration, /revoke all privileges on table public\.schedule_weeks from anon/i);
+  assert.match(migration, /revoke all privileges on table public\.schedules from authenticated/i);
+  assert.match(migration, /revoke all privileges on table public\.schedule_weeks from authenticated/i);
+  assert.match(migration, /grant select,\s*insert,\s*update,\s*delete on table public\.schedules to authenticated/i);
+  assert.match(migration, /grant select,\s*insert,\s*update on table public\.schedule_weeks to authenticated/i);
+  assert.doesNotMatch(migration, /grant[^;]*(truncate|references|trigger)[^;]*(schedules|schedule_weeks)/i);
+
+  assert.match(migration, /drop policy if exists schedule_weeks_update_approvers on public\.schedule_weeks/i);
+  assert.match(migration, /schedule_weeks_update_approvers[\s\S]*using\s*\(\s*status\s*=\s*'초안'\s+or\s+public\.my_role\(\)\s+in\s*\('chief',\s*'owner'\)\s*\)[\s\S]*with check\s*\(\s*status\s*=\s*'초안'\s+or\s+public\.my_role\(\)\s+in\s*\('chief',\s*'owner'\)\s*\)/i);
+
+  for (const operation of ['insert', 'update', 'delete']) {
+    assert.match(migration, new RegExp(`schedules_${operation}_authenticated[\\s\\S]*for ${operation} to authenticated[\\s\\S]*exists\\s*\\([\\s\\S]*from public\\.schedule_weeks sw[\\s\\S]*sw\\.week_start\\s*=\\s*schedules\\.week_start[\\s\\S]*sw\\.status\\s*=\\s*'초안'[\\s\\S]*public\\.my_role\\(\\)\\s+in\\s*\\('chief',\\s*'owner'\\)`, 'i'));
+  }
+});
+
 test('finalize는 null person_id를 먼저 거부하고 not null을 적용한다', () => {
   assert.match(finalize, /if exists\s*\(\s*select 1 from public\.schedules[^)]*person_id\s+is null/i);
   assert.match(finalize, /raise exception/i);

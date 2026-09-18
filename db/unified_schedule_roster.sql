@@ -109,4 +109,73 @@ on public.schedule_people for update to authenticated
 using (public.my_role() in ('manager', 'chief', 'owner'))
 with check (public.my_role() in ('manager', 'chief', 'owner'));
 
+-- 근무표는 인증 사용자에게 필요한 권한만 부여하고, 행 단위 초안 상태를 정책으로 확인한다.
+revoke all privileges on table public.schedules from anon;
+revoke all privileges on table public.schedule_weeks from anon;
+revoke all privileges on table public.schedules from authenticated;
+revoke all privileges on table public.schedule_weeks from authenticated;
+grant select, insert, update, delete on table public.schedules to authenticated;
+grant select, insert, update on table public.schedule_weeks to authenticated;
+
+drop policy if exists schedule_weeks_select_authenticated on public.schedule_weeks;
+create policy schedule_weeks_select_authenticated
+on public.schedule_weeks for select to authenticated
+using (true);
+
+drop policy if exists schedule_weeks_insert_authenticated on public.schedule_weeks;
+create policy schedule_weeks_insert_authenticated
+on public.schedule_weeks for insert to authenticated
+with check (true);
+
+drop policy if exists schedule_weeks_update_approvers on public.schedule_weeks;
+create policy schedule_weeks_update_approvers
+on public.schedule_weeks for update to authenticated
+using (status = '초안' or public.my_role() in ('chief', 'owner'))
+with check (status = '초안' or public.my_role() in ('chief', 'owner'));
+
+drop policy if exists schedules_select_authenticated on public.schedules;
+create policy schedules_select_authenticated
+on public.schedules for select to authenticated
+using (true);
+
+drop policy if exists schedules_insert_authenticated on public.schedules;
+create policy schedules_insert_authenticated
+on public.schedules for insert to authenticated
+with check (
+  exists (
+    select 1 from public.schedule_weeks sw
+    where sw.week_start = schedules.week_start
+      and (sw.status = '초안' or public.my_role() in ('chief', 'owner'))
+  )
+);
+
+drop policy if exists schedules_update_authenticated on public.schedules;
+create policy schedules_update_authenticated
+on public.schedules for update to authenticated
+using (
+  exists (
+    select 1 from public.schedule_weeks sw
+    where sw.week_start = schedules.week_start
+      and (sw.status = '초안' or public.my_role() in ('chief', 'owner'))
+  )
+)
+with check (
+  exists (
+    select 1 from public.schedule_weeks sw
+    where sw.week_start = schedules.week_start
+      and (sw.status = '초안' or public.my_role() in ('chief', 'owner'))
+  )
+);
+
+drop policy if exists schedules_delete_authenticated on public.schedules;
+create policy schedules_delete_authenticated
+on public.schedules for delete to authenticated
+using (
+  exists (
+    select 1 from public.schedule_weeks sw
+    where sw.week_start = schedules.week_start
+      and (sw.status = '초안' or public.my_role() in ('chief', 'owner'))
+  )
+);
+
 commit;
