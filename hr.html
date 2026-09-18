@@ -97,19 +97,31 @@ tr.new td{background:var(--mint-dk)}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:10px}
 .cal-dow{background:var(--panel);padding:6px 4px;font-size:11.5px;font-weight:700;color:var(--gray);text-align:center}
 .cal-dow.sun{color:var(--red)} .cal-dow.sat{color:var(--blue)}
-.cal-cell{background:var(--card);min-height:86px;padding:5px 6px}
+.cal-cell{background:var(--card);min-width:0;min-height:86px;padding:5px 6px;overflow:hidden}
 .cal-cell.out{background:var(--bg);opacity:.4}
 .cal-cell.today{box-shadow:inset 0 0 0 2px var(--mint)}
+.cal-cell[role=button]{cursor:pointer}
+.cal-cell:focus-visible{outline:2px solid var(--mint);outline-offset:-2px}
 .cal-cell .d{font-size:12.5px;font-weight:800;margin-bottom:3px;color:var(--ink)}
 .cal-cell .d.sun,.cal-cell .d.hol{color:var(--red)} .cal-cell .d.sat{color:var(--blue)}
-.cal-tag{display:flex;align-items:center;justify-content:space-between;gap:3px;font-size:10px;line-height:1.5;padding:1px 4px;border-radius:4px;margin-bottom:2px;overflow:hidden}
+.cal-tag{display:flex;align-items:flex-start;justify-content:space-between;gap:3px;font-size:10px;line-height:1.5;padding:1px 4px;border-radius:4px;margin-bottom:2px;overflow:hidden}
 .cal-tag span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cal-tag.cal-roster{display:block}
+.cal-tag .cal-summary{font-weight:800;margin-right:4px;overflow:visible;text-overflow:clip;white-space:nowrap}
+.cal-tag .cal-names{overflow:visible;text-overflow:clip;white-space:normal;overflow-wrap:anywhere}
 .cal-tag.hol{background:var(--red-bg);color:var(--red)}
 .cal-tag.ev{background:var(--purple-bg);color:var(--purple)}
+.cal-tag.dept{background:var(--mint-dk);color:var(--mint)}
+.cal-tag.evening{background:var(--purple-bg);color:var(--purple)}
 .cal-tag.lv{background:var(--gold-bg);color:var(--gold)}
 .cal-tag.off{background:var(--panel);color:var(--gray)}
+.cal-tag.etc{background:var(--blue-bg);color:var(--blue)}
+.cal-tag.status{border:1px solid var(--line);background:transparent;color:var(--gray)}
+.cal-tag.status.draft{border-color:var(--gold);color:var(--gold)}
+.cal-tag.status.published{border-color:var(--mint);color:var(--mint)}
 .cal-tag a{color:inherit;opacity:.6;flex-shrink:0}
-@media(max-width:640px){.cal-cell{min-height:56px;padding:3px 4px}.cal-cell .d{font-size:11px}.cal-tag{font-size:9px;padding:0 2px}}
+.cal-error{margin:7px 0;padding:7px 9px;border:1px solid var(--red);border-radius:7px;background:var(--red-bg);color:var(--red);font-size:12px}
+@media(max-width:640px){.cal-cell{min-height:56px;padding:3px 4px}.cal-cell .d{font-size:11px}.cal-tag{font-size:9px;padding:0 2px}.cal-cell:not(.expanded) .cal-names{display:none}.cal-cell.expanded .cal-names{display:inline}}
 
 /* 모달 */
 .mask{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:5vh 10px}
@@ -335,6 +347,17 @@ function scheduleCalendarIndex(rows,people,weeks){
     const sort=(a,b)=>(Number(a.person.sort_order)||0)-(Number(b.person.sort_order)||0)||String(a.person.name||'').localeCompare(String(b.person.name||''),'ko');
     Object.keys(day.departments).forEach(key=>{day.departments[key]=day.departments[key].sort(sort).map(x=>x.label);});
     ['evening','off','etc'].forEach(key=>{day[key]=day[key].sort(sort).map(x=>x.label);});
+  });
+  return index;
+}
+function calendarLeaveIndex(rows,people,from,to,nameForUser){
+  const personByUser=new Map((people||[]).filter(p=>p.profile_user_id).map(p=>[p.profile_user_id,p])),index={};
+  const nextDay=ds=>{const p=String(ds).split('-').map(Number),d=new Date(p[0],p[1]-1,p[2]);d.setDate(d.getDate()+1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+  (rows||[]).forEach(row=>{
+    const person=personByUser.get(row.user_id);
+    if(person&&person.included_in_schedule===false)return;
+    const label=person?schedulePersonLabel(person):nameForUser(row.user_id),start=row.date_from<from?from:row.date_from,end=row.date_to>to?to:row.date_to;
+    for(let ds=start;ds<=end;ds=nextDay(ds)){if(!index[ds])index[ds]=[];if(!index[ds].includes(label))index[ds].push(label);}
   });
   return index;
 }
@@ -1048,29 +1071,48 @@ async function delNotice(id){if(!confirm('삭제할까요?'))return;await sb.fro
 
 /* ── 캘린더 ── */
 let CAL_MONTH=null;
+function calendarRosterTag(label,names,kind){
+  if(!names.length)return '';
+  const detail=names.join(', ');
+  return `<span class="cal-tag ${kind} cal-roster"><span class="cal-summary">${esc(label)} ${names.length}명</span><span class="cal-names" title="${esc(label)}: ${esc(detail)}">${esc(detail)}</span></span>`;
+}
+function toggleCalendarDay(cell,event){
+  if(event&&event.type==='keydown'){
+    if(!(event.key==='Enter'||event.key===' '))return;
+    event.preventDefault();
+  }
+  if(event&&event.target&&event.target.closest&&event.target.closest('a,button,input,select'))return;
+  const expanded=cell.classList.toggle('expanded');
+  cell.setAttribute('aria-expanded',String(expanded));
+}
 async function renderCalendar(m){
   if(!CAL_MONTH)CAL_MONTH=today().slice(0,7);
-  const from=CAL_MONTH+'-01',to=CAL_MONTH+'-31';
-  const {data:holidays}=await sb.from('holidays').select('date,name').gte('date',from).lte('date',to);
-  const {data:events}=await sb.from('calendar_events').select('id,date,title,kind').gte('date',from).lte('date',to);
-  const {data:lv}=await sb.from('leave_requests').select('user_id,date_from,date_to').eq('status','승인').lte('date_from',to).gte('date_to',from);
-  const leaveByDate={};
-  for(const r of lv||[]){const start=r.date_from<from?from:r.date_from,end=r.date_to>to?to:r.date_to;
-    for(let ds=start;ds<=end;ds=addDays(ds,1)){if(!leaveByDate[ds])leaveByDate[ds]=[];const name=nameOf(r.user_id);if(!leaveByDate[ds].includes(name))leaveByDate[ds].push(name);}}
-  const {data:sch}=await sb.from('schedules').select('user_id,week_start,day,shift').eq('shift','off').gte('week_start',addDays(from,-6)).lte('week_start',to);
-  const offByDate={};
-  for(const r of sch||[]){const ds=addDays(r.week_start,r.day);if(ds<from||ds>to)continue;
-    if(!offByDate[ds])offByDate[ds]=[];const name=nameOf(r.user_id);if(!offByDate[ds].includes(name))offByDate[ds].push(name);}
+  const [cy,cm]=CAL_MONTH.split('-').map(Number),daysInMonth=new Date(cy,cm,0).getDate();
+  const from=CAL_MONTH+'-01',to=CAL_MONTH+'-'+String(daysInMonth).padStart(2,'0');
+  const weekFrom=mondayStr(from),weekTo=mondayStr(to);
+  const [
+    {data:holidays,error:holidaysError},
+    {data:events,error:eventsError},
+    {data:lv,error:leaveError},
+    {data:schedules,error:schedulesError},
+    {data:weeks,error:weeksError}
+  ]=await Promise.all([
+    sb.from('holidays').select('date,name').gte('date',from).lte('date',to),
+    sb.from('calendar_events').select('id,date,title,kind').gte('date',from).lte('date',to),
+    sb.from('leave_requests').select('user_id,date_from,date_to').eq('status','승인').lte('date_from',to).gte('date_to',from),
+    sb.from('schedules').select('person_id,user_id,week_start,day,shift,note').gte('week_start',weekFrom).lte('week_start',weekTo),
+    sb.from('schedule_weeks').select('week_start,status').gte('week_start',weekFrom).lte('week_start',weekTo)
+  ]);
+  const loadError=holidaysError||eventsError||leaveError||schedulesError||weeksError;
+  const leaveByDate=calendarLeaveIndex(lv||[],SCHEDULE_PEOPLE,from,to,nameOf);
+  const scheduleByDate=scheduleCalendarIndex(schedules||[],SCHEDULE_PEOPLE,weeks||[]);
+  const weekByStart=new Map((weeks||[]).map(w=>[w.week_start,w]));
   const byDate={};
-  const day=ds=>byDate[ds]||(byDate[ds]={holidays:[],events:[],leave:leaveByDate[ds]||[],off:offByDate[ds]||[]});
+  const day=ds=>byDate[ds]||(byDate[ds]={holidays:[],events:[]});
   for(const h of holidays||[])day(h.date).holidays.push(h);
   for(const e of events||[])day(e.date).events.push(e);
-  for(const ds of Object.keys(leaveByDate))day(ds);
-  for(const ds of Object.keys(offByDate))day(ds);
   const dow=['일','월','화','수','목','금','토'];
-  const [cy,cm]=CAL_MONTH.split('-').map(Number);
   const firstDow=new Date(cy,cm-1,1).getDay();
-  const daysInMonth=new Date(cy,cm,0).getDate();
   const prevDaysInMonth=new Date(cy,cm-1,0).getDate();
   const cells=[];
   for(let i=firstDow-1;i>=0;i--)cells.push({d:prevDaysInMonth-i,out:true});
@@ -1079,18 +1121,29 @@ async function renderCalendar(m){
   const todayStr=today();
   const cellsHtml=cells.map((c,idx)=>{
     if(c.out)return `<div class="cal-cell out"><div class="d">${c.d}</div></div>`;
-    const info=byDate[c.ds]||{holidays:[],events:[],leave:[],off:[]};
+    const info=byDate[c.ds]||{holidays:[],events:[]};
+    const roster=scheduleByDate[c.ds]||{departments:{'Dr.':[],'진료실':[],'데스크':[],'기공실':[],'미지정':[]},evening:[],off:[],etc:[]};
+    const week=weekByStart.get(mondayStr(c.ds)),weekStatus=roster.weekStatus||(week&&week.status==='공표'?'published':week&&week.status==='초안'?'draft':null);
     const dowIdx=idx%7;
     const dCls=info.holidays.length?'hol':(dowIdx===0?'sun':(dowIdx===6?'sat':''));
     const tags=[
       ...info.holidays.map(h=>`<span class="cal-tag hol"><span title="${esc(h.name)}">${esc(h.name)}</span></span>`),
-      ...info.events.map(e=>`<span class="cal-tag ev"><span title="${esc(e.kind)} ${esc(e.title)}">${esc(e.title)}</span>${isLead()?`<a href="javascript:void(0)" onclick="deleteCalendarEvent(${e.id})">✕</a>`:''}</span>`),
-      info.leave.length?`<span class="cal-tag lv"><span title="연차: ${esc(info.leave.join(', '))}">🏖 ${esc(info.leave.join(', '))}</span></span>`:'',
-      info.off.length?`<span class="cal-tag off"><span title="휴무: ${esc(info.off.join(', '))}">🛋 ${esc(info.off.join(', '))}</span></span>`:''
+      ...info.events.map(e=>`<span class="cal-tag ev"><span title="${esc(e.kind)} ${esc(e.title)}">${esc(e.title)}</span>${isLead()?`<a href="javascript:void(0)" onclick="event.stopPropagation();deleteCalendarEvent(${e.id})">✕</a>`:''}</span>`),
+      calendarRosterTag('Dr.',roster.departments['Dr.'],'dept dr'),
+      calendarRosterTag('진료실',roster.departments['진료실'],'dept room'),
+      calendarRosterTag('데스크',roster.departments['데스크'],'dept desk'),
+      calendarRosterTag('기공실',roster.departments['기공실'],'dept lab'),
+      calendarRosterTag('미지정',roster.departments['미지정'],'dept unassigned'),
+      calendarRosterTag('야간',roster.evening,'evening'),
+      calendarRosterTag('연차',leaveByDate[c.ds]||[],'lv'),
+      calendarRosterTag('OFF',roster.off,'off'),
+      calendarRosterTag('기타',roster.etc,'etc'),
+      weekStatus?`<span class="cal-tag status ${weekStatus}"><span>${weekStatus==='published'?'확정':'작성 중'}</span></span>`:''
     ].filter(Boolean).join('');
-    return `<div class="cal-cell${c.ds===todayStr?' today':''}"><div class="d ${dCls}">${c.d}</div>${tags}</div>`;
+    return `<div class="cal-cell${c.ds===todayStr?' today':''}" tabindex="0" role="button" aria-expanded="false" onclick="toggleCalendarDay(this,event)" onkeydown="toggleCalendarDay(this,event)"><div class="d ${dCls}">${c.d}</div>${tags}</div>`;
   }).join('');
   m.innerHTML=`<div class="card"><h2>📅 캘린더</h2>
+    ${loadError?'<div class="cal-error">근무표를 불러오지 못했습니다</div>':''}
     <div class="rowflex"><label>대상 월 <input class="mini" type="month" value="${CAL_MONTH}" onchange="CAL_MONTH=this.value;render()"></label></div>
     <div class="cal-grid">
       ${dow.map((w,i)=>`<div class="cal-dow ${i===0?'sun':(i===6?'sat':'')}">${w}</div>`).join('')}

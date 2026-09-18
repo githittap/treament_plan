@@ -7,6 +7,7 @@ const vm = require('node:vm');
 const html = fs.readFileSync(path.join(__dirname, '..', 'hr.html'), 'utf8');
 const block = html.match(/\/\* schedule-roster:test-start \*\/([\s\S]*?)\/\* schedule-roster:test-end \*\//);
 const adminBlock = html.match(/\/\* schedule-roster-admin:test-start \*\/([\s\S]*?)\/\* schedule-roster-admin:test-end \*\//);
+const calendarBlock = html.match(/\/\* ── 캘린더 ── \*\/([\s\S]*?)\/\* ── 연차현황 ── \*\//);
 
 test('근무표는 person_id 명부와 person_id 저장 계약을 사용한다', () => {
   const schedule = html.match(/\/\* ── 근무표\(M2\) ── \*\/([\s\S]*?)\/\* 엑셀 파싱 \*\//);
@@ -35,7 +36,7 @@ test('통합 명부 순수 함수 코드 블록이 포함되어 있다', () => {
 if (block) {
   const context = {};
   vm.createContext(context);
-  vm.runInContext(`${block[1]};this.schedulePersonLabel=schedulePersonLabel;this.schedulePeopleForWeek=schedulePeopleForWeek;this.scheduleDate=scheduleDate;this.scheduleCalendarIndex=scheduleCalendarIndex;`, context);
+  vm.runInContext(`${block[1]};this.schedulePersonLabel=schedulePersonLabel;this.schedulePeopleForWeek=schedulePeopleForWeek;this.scheduleDate=scheduleDate;this.scheduleCalendarIndex=scheduleCalendarIndex;this.calendarLeaveIndex=typeof calendarLeaveIndex==='function'?calendarLeaveIndex:null;`, context);
 
   test('의사 부서는 표시 이름에만 Dr. 접두사를 붙인다', () => {
     assert.equal(context.schedulePersonLabel({ name: '홍길동', department: 'Dr.' }), 'Dr. 홍길동');
@@ -109,7 +110,76 @@ if (block) {
     assert.deepEqual(JSON.parse(JSON.stringify(index['2026-09-20'].departments['미지정'])), ['무소속']);
     assert.equal(index['2026-09-20'].weekStatus, 'draft');
   });
+
+  test('연차 인덱스는 제외 명부를 숨기고 연결되지 않은 프로필 이름은 보존한다', () => {
+    assert.equal(typeof context.calendarLeaveIndex, 'function');
+    const index = context.calendarLeaveIndex(
+      [
+        { user_id: 'included-user', date_from: '2026-09-14', date_to: '2026-09-14' },
+        { user_id: 'excluded-user', date_from: '2026-09-14', date_to: '2026-09-15' },
+        { user_id: 'unlinked-user', date_from: '2026-09-15', date_to: '2026-09-15' }
+      ],
+      [
+        { id: 'included', profile_user_id: 'included-user', name: '포함의사', department: 'Dr.', included_in_schedule: true },
+        { id: 'excluded', profile_user_id: 'excluded-user', name: '제외직원', department: '진료실', included_in_schedule: false }
+      ],
+      '2026-09-01',
+      '2026-09-30',
+      userId => userId === 'unlinked-user' ? '연결없음' : userId
+    );
+    assert.deepEqual(JSON.parse(JSON.stringify(index)), {
+      '2026-09-14': ['Dr. 포함의사'],
+      '2026-09-15': ['연결없음']
+    });
+  });
 }
+
+test('월간 캘린더는 월 경계 주차의 전체 근무와 주차 상태를 조회한다', () => {
+  assert.ok(calendarBlock, '캘린더 코드 블록이 없습니다.');
+  const source = calendarBlock[1];
+  assert.match(source, /const weekFrom=mondayStr\(from\),weekTo=mondayStr\(to\)/);
+  assert.match(source, /from\('schedules'\)\.select\('person_id,user_id,week_start,day,shift,note'\)\.gte\('week_start',weekFrom\)\.lte\('week_start',weekTo\)/);
+  assert.match(source, /from\('schedule_weeks'\)\.select\('week_start,status'\)\.gte\('week_start',weekFrom\)\.lte\('week_start',weekTo\)/);
+  assert.doesNotMatch(source, /from\('schedules'\)[\s\S]*?\.eq\('shift','off'\)/);
+  assert.match(source, /scheduleCalendarIndex\(schedules\|\|\[\],SCHEDULE_PEOPLE,weeks\|\|\[\]\)/);
+});
+
+test('월간 캘린더는 모든 조회 오류를 눈에 보이는 하나의 오류 문구로 표시한다', () => {
+  const source = calendarBlock[1];
+  for (const name of ['holidaysError', 'eventsError', 'leaveError', 'schedulesError', 'weeksError']) {
+    assert.match(source, new RegExp(name));
+  }
+  assert.match(source, /근무표를 불러오지 못했습니다/);
+});
+
+test('캘린더 렌더 순서는 공휴일과 이벤트, 부서, 야간, 연차, OFF, 기타, 주차 상태다', () => {
+  const source = calendarBlock[1];
+  const markers = [
+    'cal-tag hol', 'cal-tag ev',
+    "calendarRosterTag('Dr.'", "calendarRosterTag('진료실'", "calendarRosterTag('데스크'", "calendarRosterTag('기공실'", "calendarRosterTag('미지정'",
+    "calendarRosterTag('야간'", "calendarRosterTag('연차'", "calendarRosterTag('OFF'", "calendarRosterTag('기타'", 'cal-tag status'
+  ];
+  let previous = -1;
+  for (const marker of markers) {
+    const current = source.indexOf(marker);
+    assert.ok(current > previous, `${marker} 렌더 순서가 잘못되었습니다.`);
+    previous = current;
+  }
+  assert.doesNotMatch(source, /치과\s*휴무/);
+  assert.match(source, /weekByStart\.get\(mondayStr\(c\.ds\)\)/);
+});
+
+test('캘린더 날짜 셀은 모바일·키보드 펼침과 삭제 링크 전파 차단을 제공한다', () => {
+  const source = calendarBlock[1];
+  assert.match(source, /function toggleCalendarDay\(cell,event\)/);
+  assert.match(source, /event\.key==='Enter'\|\|event\.key===' '/);
+  assert.match(source, /tabindex="0" role="button" aria-expanded="false"/);
+  assert.match(source, /onclick="toggleCalendarDay\(this,event\)"/);
+  assert.match(source, /onkeydown="toggleCalendarDay\(this,event\)"/);
+  assert.match(source, /event\.stopPropagation\(\);deleteCalendarEvent/);
+  assert.match(html, /@media\(max-width:640px\)[\s\S]*?\.cal-cell:not\(\.expanded\) \.cal-names\{display:none\}/);
+  assert.match(html, /\.cal-cell:focus-visible/);
+});
 
 test('명부 관리 UI는 manager, chief, owner에게만 근무표 안에서 노출된다', () => {
   const ownerTab = html.match(/\{key:'owner',[^\n]+/);
