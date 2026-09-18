@@ -38,6 +38,10 @@ test('기존 일정에 person_id를 추가하고 user_id를 nullable로 전환�
   assert.match(migration, /unique\s*index[\s\S]*week_start[\s\S]*person_id[\s\S]*day/i);
 });
 
+test('일정 명부 외래키 조회용 person_id 선두 인덱스를 선언한다', () => {
+  assert.match(migration, /create index if not exists schedules_person_id_idx\s+on public\.schedules\s*\(\s*person_id\s*\)/i);
+});
+
 test('profiles와 기존 일정을 명부 기준으로 백필하고 누락 시 중단한다', () => {
   assert.match(migration, /insert into public\.schedule_people[\s\S]*from public\.profiles/i);
   assert.match(migration, /on conflict\s*\(profile_user_id\)\s*do update/i);

@@ -88,6 +88,9 @@ create unique index if not exists schedules_week_person_day_unique
   on public.schedules (week_start, person_id, day)
   where person_id is not null;
 
+create index if not exists schedules_person_id_idx
+  on public.schedules (person_id);
+
 alter table public.schedule_people enable row level security;
 revoke all privileges on table public.schedule_people from anon;
 revoke all privileges on table public.schedule_people from authenticated;
