@@ -18,6 +18,12 @@ function privilegeStatement(action, table, role) {
   return match[0];
 }
 
+function functionStatement(name) {
+  const match = migration.match(new RegExp(`create or replace function public\\.${name}\\b[\\s\\S]*?\\$\\$;`, 'i'));
+  assert.ok(match, `${name} 함수가 있어야 한다`);
+  return match[0];
+}
+
 test('통합 명부 테이블의 핵심 스키마를 선언한다', () => {
   assert.match(migration, /create table if not exists public\.schedule_people/i);
   assert.match(migration, /id\s+uuid[^\n]*primary key/i);
@@ -35,7 +41,7 @@ test('기존 일정에 person_id를 추가하고 user_id를 nullable로 전환�
   assert.match(migration, /alter table public\.schedules[\s\S]*add column if not exists person_id\s+uuid/i);
   assert.match(migration, /foreign key\s*\(person_id\)\s*references public\.schedule_people\s*\(id\)/i);
   assert.match(migration, /alter column user_id drop not null/i);
-  assert.match(migration, /unique\s*index[\s\S]*week_start[\s\S]*person_id[\s\S]*day/i);
+  assert.match(migration, /create unique index if not exists schedules_week_person_day_unique\s+on public\.schedules\s*\(\s*week_start\s*,\s*person_id\s*,\s*day\s*\)\s*;/i);
 });
 
 test('일정 명부 외래키 조회용 person_id 선두 인덱스를 선언한다', () => {
@@ -44,7 +50,9 @@ test('일정 명부 외래키 조회용 person_id 선두 인덱스를 선언한�
 
 test('profiles와 기존 일정을 명부 기준으로 백필하고 누락 시 중단한다', () => {
   assert.match(migration, /insert into public\.schedule_people[\s\S]*from public\.profiles/i);
-  assert.match(migration, /on conflict\s*\(profile_user_id\)\s*do update/i);
+  assert.match(migration, /on conflict\s*\(profile_user_id\)\s*do nothing/i);
+  assert.doesNotMatch(migration, /on conflict\s*\(profile_user_id\)\s*do update/i);
+  assert.doesNotMatch(migration, /update public\.schedule_people[\s\S]*where name in \('abc', '테스트', '공용1'\)/i);
   assert.match(migration, /update public\.schedules[\s\S]*set person_id/i);
   assert.match(migration, /raise exception[\s\S]*backfill|raise exception[\s\S]*person_id/i);
   assert.match(migration, /abc/);
@@ -53,6 +61,54 @@ test('profiles와 기존 일정을 명부 기준으로 백필하고 누락 시 �
   assert.match(migration, /정용태/);
   assert.match(migration, /정도경/);
   assert.match(migration, /정규민/);
+});
+
+test('명부 전환은 전체 unique, 호환 트리거, 승인 접근과 주차 복사 RPC를 제공한다', () => {
+  assert.match(migration, /drop index[\s\S]*schedules_week_person_day_unique/i);
+  assert.match(migration, /create unique index if not exists schedules_week_person_day_unique\s+on public\.schedules\s*\(\s*week_start\s*,\s*person_id\s*,\s*day\s*\)\s*;/i);
+
+  const normalizer = functionStatement('normalize_schedule_person');
+  assert.match(normalizer, /if new\.person_id is null/i);
+  assert.match(normalizer, /profile_user_id\s*=\s*new\.user_id/i);
+  assert.match(normalizer, /where (?:sp\.)?id\s*=\s*new\.person_id/i);
+  assert.match(normalizer, /raise exception/i);
+  assert.match(migration, /drop trigger if exists schedules_normalize_person_before_write on public\.schedules/i);
+  assert.match(migration, /create trigger schedules_normalize_person_before_write\s+before insert or update on public\.schedules/i);
+
+  for (const name of [
+    'schedule_people_select_authenticated',
+    'schedule_people_write_leads_insert',
+    'schedule_people_write_leads_update',
+    'schedule_weeks_select_authenticated',
+    'schedule_weeks_insert_authenticated',
+    'schedule_weeks_update_approvers',
+    'schedules_select_authenticated',
+    'schedules_insert_authenticated',
+    'schedules_update_authenticated',
+    'schedules_delete_authenticated',
+  ]) {
+    assert.match(policyStatement(name), /from public\.profiles[\s\S]*approved\s*=\s*true/i);
+  }
+
+  const copyWeek = functionStatement('copy_schedule_week');
+  assert.match(copyWeek, /security invoker/i);
+  assert.doesNotMatch(copyWeek, /security definer/i);
+  assert.match(copyWeek, /p_source_week\s*=\s*p_target_week/i);
+  assert.match(copyWeek, /from public\.profiles[\s\S]*approved\s*=\s*true/i);
+  assert.match(copyWeek, /insert into public\.schedule_weeks[\s\S]*status\s*\)\s*values\s*\(\s*p_target_week\s*,\s*'초안'\s*\)[\s\S]*on conflict/i);
+  assert.match(copyWeek, /delete from public\.schedules[\s\S]*week_start\s*=\s*p_target_week/i);
+  assert.match(copyWeek, /insert into public\.schedules[\s\S]*select[\s\S]*p_target_week[\s\S]*from public\.schedules/i);
+  assert.match(migration, /revoke all on function public\.copy_schedule_week\(date, date\) from public/i);
+  assert.match(migration, /revoke all on function public\.copy_schedule_week\(date, date\) from anon/i);
+  assert.match(migration, /grant execute on function public\.copy_schedule_week\(date, date\) to authenticated/i);
+
+  const timestampTrigger = functionStatement('set_schedule_people_updated_at');
+  assert.match(timestampTrigger, /new\.updated_at\s*:=\s*now\(\)/i);
+  assert.match(migration, /drop trigger if exists schedule_people_set_updated_at on public\.schedule_people/i);
+  assert.match(migration, /create trigger schedule_people_set_updated_at\s+before update on public\.schedule_people/i);
+
+  assert.match(finalize, /update public\.schedules[\s\S]*set person_id/i);
+  assert.match(finalize, /raise exception[\s\S]*person_id/i);
 });
 
 test('명부 RLS와 권한은 authenticated 조회·manager/chief/owner 쓰기만 허용한다', () => {
@@ -77,12 +133,12 @@ test('근무표 RLS는 초안 편집만 열고 anon 권한과 공표 주차 직�
   assert.match(migration, /drop policy if exists schedule_weeks_update_approvers on public\.schedule_weeks/i);
   const weekInsert = policyStatement('schedule_weeks_insert_authenticated');
   assert.match(weekInsert, /on public\.schedule_weeks for insert to authenticated/i);
-  assert.match(weekInsert, /with check\s*\(\s*status\s*=\s*'초안'\s+or\s+public\.my_role\(\)\s+in\s*\('chief',\s*'owner'\)\s*\)/i);
+  assert.match(weekInsert, /status\s*=\s*'초안'\s+or\s+public\.my_role\(\)\s+in\s*\('chief',\s*'owner'\)/i);
 
   const weekUpdate = policyStatement('schedule_weeks_update_approvers');
   assert.match(weekUpdate, /on public\.schedule_weeks for update to authenticated/i);
-  assert.match(weekUpdate, /using\s*\(\s*status\s*=\s*'초안'\s+or\s+public\.my_role\(\)\s+in\s*\('chief',\s*'owner'\)\s*\)/i);
-  assert.match(weekUpdate, /with check\s*\(\s*status\s*=\s*'초안'\s+or\s+public\.my_role\(\)\s+in\s*\('chief',\s*'owner'\)\s*\)/i);
+  assert.match(weekUpdate, /using\s*\([\s\S]*status\s*=\s*'초안'\s+or\s+public\.my_role\(\)\s+in\s*\('chief',\s*'owner'\)/i);
+  assert.match(weekUpdate, /with check\s*\([\s\S]*status\s*=\s*'초안'\s+or\s+public\.my_role\(\)\s+in\s*\('chief',\s*'owner'\)/i);
 
   for (const operation of ['insert', 'update', 'delete']) {
     const policy = policyStatement(`schedules_${operation}_authenticated`);
