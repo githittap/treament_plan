@@ -8,6 +8,8 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'hr.html'), 'utf8');
 const block = html.match(/\/\* schedule-roster:test-start \*\/([\s\S]*?)\/\* schedule-roster:test-end \*\//);
 const adminBlock = html.match(/\/\* schedule-roster-admin:test-start \*\/([\s\S]*?)\/\* schedule-roster-admin:test-end \*\//);
 const calendarBlock = html.match(/\/\* ── 캘린더 ── \*\/([\s\S]*?)\/\* ── 연차현황 ── \*\//);
+const loadSchedulePeopleSource = html.match(/async function loadSchedulePeople\(\)\{[\s\S]*?\n\}/);
+const authBlock = html.match(/let _inited=false[^;]*;[\s\S]*?async function doLogin/);
 
 test('근무표는 person_id 명부와 person_id 저장 계약을 사용한다', () => {
   const schedule = html.match(/\/\* ── 근무표\(M2\) ── \*\/([\s\S]*?)\/\* 엑셀 파싱 \*\//);
@@ -133,6 +135,24 @@ if (block) {
     });
   });
 
+  test('연차 인덱스는 동명이인을 person_id로 구분해 모두 표시한다', () => {
+    const index = context.calendarLeaveIndex(
+      [
+        { user_id: 'same-user-1', date_from: '2026-09-14', date_to: '2026-09-14' },
+        { user_id: 'same-user-2', date_from: '2026-09-14', date_to: '2026-09-14' },
+        { user_id: 'same-user-1', date_from: '2026-09-14', date_to: '2026-09-14' }
+      ],
+      [
+        { id: 'person-1', profile_user_id: 'same-user-1', name: '김동일', department: '진료실', included_in_schedule: true },
+        { id: 'person-2', profile_user_id: 'same-user-2', name: '김동일', department: '진료실', included_in_schedule: true }
+      ],
+      '2026-09-01',
+      '2026-09-30',
+      value => value
+    );
+    assert.deepEqual(JSON.parse(JSON.stringify(index['2026-09-14'])), ['김동일', '김동일']);
+  });
+
   test('승인 연차 당일의 work와 evening만 근무 집계에서 제외하고 연차·OFF·기타는 보존한다', () => {
     assert.equal(typeof context.scheduleRowsWithoutApprovedLeave, 'function');
     const people = [
@@ -160,6 +180,183 @@ if (block) {
     assert.deepEqual(JSON.parse(JSON.stringify(scheduleIndex['2026-09-16'].etc)), ['Dr. 연차의사']);
   });
 }
+
+function authHarness({ rosterResults = [{ data: [], error: null }], settingsResults = [null], settingsGate = null } = {}) {
+  assert.ok(loadSchedulePeopleSource, 'loadSchedulePeople 함수를 찾을 수 없습니다.');
+  assert.ok(authBlock, 'onAuthed 코드 블록을 찾을 수 없습니다.');
+  const calls = { settings: 0, profiles: 0, roster: 0, nav: 0, render: 0, badges: 0, listeners: 0, status: [] };
+  const elements = {
+    gate: { style: {} }, app: { style: {} }, pendingGate: { style: {} },
+    meName: { textContent: '' }, meRole: { textContent: '' }, main: { innerHTML: '', insertAdjacentHTML() {} }
+  };
+  const rosterQueue = rosterResults.slice();
+  const settingsQueue = settingsResults.slice();
+  const context = {
+    ME: { id: '', email: '', name: '', role: 'staff', approved: true },
+    PROFILES: [], SCHEDULE_PEOPLE: [], SCHEDULE_PEOPLE_ERROR: '',
+    $: selector => elements[selector.replace('#', '')] || null,
+    esc: value => String(value),
+    setStatus: value => calls.status.push(value),
+    loadSettings: async () => { calls.settings++; if (settingsGate) await settingsGate; const error = settingsQueue.shift(); if (error) throw error; },
+    loadProfiles: async () => { calls.profiles++; context.PROFILES = [{ user_id: 'user-1', name: '홍길동', role: 'staff', approved: true }]; },
+    renderNav: () => { calls.nav++; },
+    render: async () => { calls.render++; },
+    refreshBadges: async () => { calls.badges++; },
+    loadSteps: () => {},
+    setTimeout: () => 0,
+    document: { addEventListener: () => { calls.listeners++; } },
+    console: { warn() {}, error() {} },
+    sb: {
+      from(table) {
+        if (table === 'schedule_people') {
+          const result = rosterQueue.length ? rosterQueue.shift() : { data: [], error: null };
+          const builder = {
+            select() { return builder; }, order() { return builder; },
+            then(resolve) { calls.roster++; return Promise.resolve(resolve(result)); }
+          };
+          return builder;
+        }
+        if (table === 'confidential_access') {
+          return { select() { return this; }, eq() { return this; }, maybeSingle: async () => ({ data: null, error: null }) };
+        }
+        if (table === 'profiles') return { insert: async () => ({ error: null }) };
+        throw new Error(`예상하지 않은 테이블: ${table}`);
+      }
+    }
+  };
+  vm.createContext(context);
+  const authSource = authBlock[0].replace(/\nasync function doLogin[\s\S]*$/, '');
+  vm.runInContext(`${loadSchedulePeopleSource[0]};${authSource};this.onAuthed=onAuthed;this.getInited=()=>_inited;this.getInitPromise=()=>_initPromise;this.getRosterError=()=>SCHEDULE_PEOPLE_ERROR;`, context);
+  const session = { user: { id: 'user-1', email: 'user@example.com', user_metadata: { full_name: '홍길동' } } };
+  return { context, calls, elements, session };
+}
+
+test('명부 로딩 실패 후에도 이름·nav·렌더에 도달하고 onAuthed 재호출로 회복한다', async () => {
+  const { context, calls, elements, session } = authHarness({
+    rosterResults: [{ data: null, error: { message: 'roster denied' } }, { data: [{ id: 'person-1' }], error: null }]
+  });
+  await context.onAuthed(session);
+  assert.equal(elements.meName.textContent, '홍길동');
+  assert.equal(calls.nav, 1);
+  assert.equal(calls.render, 1);
+  assert.match(context.getRosterError(), /근무명부|roster denied/);
+  assert.equal(context.getInited(), false);
+
+  await context.onAuthed(session);
+  assert.equal(calls.roster, 2);
+  assert.equal(calls.nav, 2);
+  assert.equal(calls.render, 2);
+  assert.equal(context.getRosterError(), '');
+  assert.equal(context.getInited(), true);
+  assert.equal(calls.listeners, 1);
+});
+
+test('치명적 초기화 실패는 플래그를 복구해 다음 onAuthed가 재시도한다', async () => {
+  const { context, calls, session } = authHarness({ settingsResults: [new Error('settings down'), null] });
+  await context.onAuthed(session);
+  assert.equal(context.getInited(), false);
+  assert.equal(calls.render, 0);
+  await context.onAuthed(session);
+  assert.equal(calls.settings, 2);
+  assert.equal(calls.render, 1);
+  assert.equal(context.getInited(), true);
+});
+
+test('동시 onAuthed 호출은 하나의 초기화 Promise를 공유한다', async () => {
+  let releaseSettings;
+  const settingsGate = new Promise(resolve => { releaseSettings = resolve; });
+  const { context, calls, session } = authHarness({ settingsGate });
+  const first = context.onAuthed(session);
+  const second = context.onAuthed(session);
+  let secondDone = false;
+  second.then(() => { secondDone = true; });
+  await Promise.resolve();
+  assert.equal(secondDone, false, '중복 호출이 진행 중인 초기화를 기다리지 않았습니다.');
+  releaseSettings();
+  await Promise.all([first, second]);
+  assert.equal(calls.settings, 1);
+  assert.equal(calls.profiles, 1);
+  assert.equal(calls.render, 1);
+  assert.equal(calls.listeners, 1);
+});
+
+function scheduleRenderHarness() {
+  const source = html.match(/async function renderSched\([\s\S]*?\n\}/);
+  assert.ok(source, 'renderSched 함수를 찾을 수 없습니다.');
+  const m = { innerHTML: '', addEventListener() {}, contains: () => true };
+  const context = {
+    SCHED_WEEK: '2026-09-14', SCHEDULE_PEOPLE: [{ id: 'person-1', name: '김직원', department: '진료실', active: true, included_in_schedule: true }],
+    SCHEDULE_PEOPLE_ERROR: '', SHIFTS: { work: { l: '근무' }, off: { l: 'off' }, evening: { l: '야간' }, etc: { l: '기타' } },
+    today: () => '2026-09-14', mondayStr: value => value, addDays: value => value, md: value => value,
+    schedulePeopleForWeek: (people) => people, schedulePersonLabel: person => person.name, esc: value => String(value),
+    isLead: () => false, isMgr: () => false, scheduleRosterAdminCard: () => '', window: {},
+    document: { addEventListener() {} },
+    sb: {
+      from(table) {
+        const result = table === 'schedules' ? { data: null, error: { message: 'schedule denied' } } : { data: table === 'schedule_weeks' ? { status: '초안' } : [], error: null };
+        const builder = {
+          select() { return builder; }, eq() { return builder; }, lte() { return builder; }, gte() { return builder; },
+          maybeSingle: async () => result,
+          then(resolve) { return Promise.resolve(resolve(result)); }
+        };
+        return builder;
+      }
+    }
+  };
+  vm.createContext(context);
+  vm.runInContext(`${source[0]};this.renderSched=renderSched;`, context);
+  return { context, m };
+}
+
+test('근무표 schedules 조회 오류는 보이는 오류를 남기고 편집 셀을 만들지 않는다', async () => {
+  const { context, m } = scheduleRenderHarness();
+  await context.renderSched(m);
+  assert.match(m.innerHTML, /근무표를 불러오지 못했습니다|schedule denied/);
+  assert.doesNotMatch(m.innerHTML, /data-person-id|<select/);
+});
+
+function copyPrevWeekHarness(rpcError = null) {
+  const source = html.match(/async function copyPrevWeek\([\s\S]*?\n\}/);
+  assert.ok(source, 'copyPrevWeek 함수를 찾을 수 없습니다.');
+  const calls = { rpc: [], scheduleWrites: [], render: 0, status: [], alerts: [] };
+  const context = {
+    addDays: () => '2026-09-07', setStatus: value => calls.status.push(value), render: () => { calls.render++; }, alert: value => calls.alerts.push(value),
+    sb: {
+      from(table) {
+        if (table === 'schedules') {
+          const builder = {
+            select() { return builder; }, eq: async () => ({ data: [{ person_id: 'person-1', day: 1, shift: 'work' }], error: null }),
+            upsert(payload) { calls.scheduleWrites.push(['upsert', payload]); return Promise.resolve({ error: null }); },
+            delete() { calls.scheduleWrites.push(['delete']); return builder; }
+          };
+          return builder;
+        }
+        return { upsert: async payload => ({ error: null, payload }) };
+      },
+      rpc: async (name, args) => { calls.rpc.push([name, args]); return { error: rpcError }; }
+    }
+  };
+  vm.createContext(context);
+  vm.runInContext(`${source[0]};this.copyPrevWeek=copyPrevWeek;`, context);
+  return { context, calls };
+}
+
+test('지난주 복사는 copy_schedule_week RPC로 대상 주차를 교체하고 schedules를 직접 쓰지 않는다', async () => {
+  const { context, calls } = copyPrevWeekHarness();
+  await context.copyPrevWeek('2026-09-14');
+  assert.deepEqual(JSON.parse(JSON.stringify(calls.rpc)), [['copy_schedule_week', { p_source_week: '2026-09-07', p_target_week: '2026-09-14' }]]);
+  assert.deepEqual(calls.scheduleWrites, []);
+  assert.equal(calls.render, 1);
+  assert.equal(calls.status.at(-1), 'saved');
+});
+
+test('지난주 복사 RPC 오류는 사용자에게 표시하고 성공 렌더를 막는다', async () => {
+  const { context, calls } = copyPrevWeekHarness({ message: 'rpc denied' });
+  await context.copyPrevWeek('2026-09-14');
+  assert.equal(calls.status.at(-1), 'error');
+  assert.match(calls.alerts.at(-1), /복사 실패.*rpc denied/);
+  assert.equal(calls.render, 0);
+});
 
 test('월간 캘린더는 월 경계 주차의 전체 근무와 주차 상태를 조회한다', () => {
   assert.ok(calendarBlock, '캘린더 코드 블록이 없습니다.');
