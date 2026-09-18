@@ -1230,23 +1230,25 @@ function mergeContractHtml(template,values){
     return Object.prototype.hasOwnProperty.call(fields,key)?esc(fields[key]):all;
   });
 }
-function contractFieldInputs(template,employee){
-  return contractArray(template&&template.fields).map((f,i)=>{
+const CONTRACT_DETAIL_KEYS=new Set(['근무장소','수행업무','포괄내역','주휴일']);
+function contractFieldInputs(template,employee,details=false){
+  return contractArray(template&&template.fields).filter(f=>String(f.key||'')!=='성명'&&CONTRACT_DETAIL_KEYS.has(String(f.key||''))===details).map((f,i)=>{
     const key=String(f.key||''),type=['text','date','select','work_schedule'].includes(f.type)?f.type:'text';
     const value=CONTRACT_EDIT_FIELDS&&Object.prototype.hasOwnProperty.call(CONTRACT_EDIT_FIELDS,key)?CONTRACT_EDIT_FIELDS[key]:(key==='성명'?(employee?employee.name:''):(f.default==null?'':f.default));
     const control=type==='work_schedule'?contractScheduleInputs(key,value):type==='select'
       ?`<select data-contract-key="${esc(key)}">${contractArray(f.options).map(o=>`<option value="${esc(o)}" ${String(o)===String(value)?'selected':''}>${esc(o)}</option>`).join('')}</select>`
-      :`<input type="${type}" data-contract-key="${esc(key)}" value="${esc(value)}">`;
+      :`<input type="${type}" data-contract-key="${esc(key)}" value="${esc(value)}" ${key==='계약종료'?'onchange="syncContractEnd()"':''}>`;
     return `<div class="fld" data-contract-field-index="${i}"><label>${esc(f.label||key)}</label>${control}</div>`;
   }).join('');
 }
 function contractFormValues(){
-  const values={};document.querySelectorAll('[data-contract-key]').forEach(el=>values[el.dataset.contractKey]=el.value);document.querySelectorAll('[data-work-schedule-key]').forEach(box=>values[box.dataset.workScheduleKey]=readContractSchedule(box));return values;
+  const values={성명:nameOf($('#contractEmployee')?$('#contractEmployee').value:CONTRACT_EMPLOYEE_ID)};document.querySelectorAll('[data-contract-key]').forEach(el=>values[el.dataset.contractKey]=el.value);document.querySelectorAll('[data-work-schedule-key]').forEach(box=>values[box.dataset.workScheduleKey]=readContractSchedule(box));return values;
 }
 function toggleContractNoEnd(){
   const checked=!!($('#contractNoEnd')&&$('#contractNoEnd').checked),end=document.querySelector('[data-contract-key="계약종료"]');
   if(end){end.disabled=checked;if(checked)end.value='';}
 }
+function syncContractEnd(){const end=document.querySelector('[data-contract-key="계약종료"]'),noEnd=$('#contractNoEnd');if(!end||!noEnd)return;if(end.value){noEnd.checked=false;noEnd.disabled=true;}else noEnd.disabled=false;}
 function selectContractTemplate(id){CONTRACT_TEMPLATE_ID=Number(id);render();}
 function selectContractEmployee(uid){
   CONTRACT_EMPLOYEE_ID=uid;const p=PROFILES.find(x=>x.user_id===uid);
@@ -1345,11 +1347,10 @@ async function renderContractOwner(m){
     ${template?`<div class="grid">
       <div class="fld"><label>서식</label><select id="contractTemplate" onchange="selectContractTemplate(this.value)">${CONTRACT_TEMPLATES.map(t=>`<option value="${t.id}" ${Number(t.id)===Number(CONTRACT_TEMPLATE_ID)?'selected':''}>${esc(t.name||t.title||('서식 '+t.id))}</option>`).join('')}</select></div>
       <div class="fld"><label>직원</label><select id="contractEmployee" onchange="selectContractEmployee(this.value)">${staff.map(p=>`<option value="${p.user_id}" ${p.user_id===CONTRACT_EMPLOYEE_ID?'selected':''}>${esc(p.name)}${p.dept?' · '+esc(p.dept):''}</option>`).join('')}</select></div>
-      <div class="fld"><label>프리셋</label><select id="contractPreset" onchange="applyContractPreset(this.value)"><option value="">선택 안 함</option>${presets.map(k=>`<option value="${esc(k)}">${esc(k)}</option>`).join('')}</select></div>
-      <div class="fld"><label>서명 만료일</label><input type="date" id="contractDue" value="${addDays(today(),7)}"></div>
-      ${contractFieldInputs(template,employee)}
+      <div class="fld"><label>역할(부서)</label><select id="contractPreset" onchange="applyContractPreset(this.value)"><option value="">선택 안 함</option>${presets.map(k=>`<option value="${esc(k)}">${esc(k)}</option>`).join('')}</select></div>
+      ${contractFieldInputs(template,employee,false)}
       <div class="fld"><label>계약 기간</label><label style="font-size:13px;color:var(--ink)"><input type="checkbox" id="contractNoEnd" onchange="toggleContractNoEnd()"> 기간의 정함 없음</label></div>
-    </div><div class="rowflex" style="margin-top:12px"><button class="hbtn" onclick="previewContract()">미리보기</button><button class="hbtn pri" onclick="sendContract()">${ME.role==='owner'?'최종 발송':'원장 발송 요청'}</button></div>
+    </div><details style="margin-top:12px"><summary style="cursor:pointer;font-weight:700">상세 조건 (특별한 경우만 수정)</summary><div class="grid" style="margin-top:10px"><div class="fld"><label>서명 만료일</label><input type="date" id="contractDue" value="${addDays(today(),7)}"></div>${contractFieldInputs(template,employee,true)}</div></details><div class="rowflex" style="margin-top:12px"><button class="hbtn" onclick="previewContract()">미리보기</button><button class="hbtn pri" onclick="sendContract()">${ME.role==='owner'?'최종 발송':'원장 발송 요청'}</button></div>
     <div class="msg" id="contractMsg"></div>
     <div id="contractPreview" style="margin-top:12px"><div class="empty">미리보기 또는 계약 보기를 선택하세요.</div></div>`:'<div class="empty">활성 근로계약서 서식이 없습니다.</div>'}
   </div>
