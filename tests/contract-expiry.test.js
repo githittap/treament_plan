@@ -38,6 +38,12 @@ if (scheduleBlock) {
     assert.equal(rows[0].day_mode, 'rotating_5');
     assert.equal(scheduleContext.validContractSchedule(rows), true);
   });
+
+  test('평일 중 주 2회 야간근무도 고정 요일 없이 허용한다', () => {
+    const rows = scheduleContext.contractScheduleRows([{ days: ['월', '화', '수', '목', '금'], day_mode: 'weekday_twice', kind: '야간', start: '10:00', end: '20:00' }]);
+    assert.equal(rows[0].day_mode, 'weekday_twice');
+    assert.equal(scheduleContext.validContractSchedule(rows), true);
+  });
 }
 
 if (block) {
