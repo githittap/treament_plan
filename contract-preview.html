@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>근로계약서 작성 미리보기</title>
+<style>
+  :root{--navy:#123c42;--teal:#156f72;--line:#cad9d7;--paper:#fff;--bg:#eef5f4;--ink:#172321;--muted:#647572}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Pretendard,"Noto Sans KR",sans-serif}.top{background:var(--navy);color:#fff;padding:18px max(22px,calc((100vw - 1440px)/2));display:flex;justify-content:space-between;gap:16px;align-items:center}.top h1{font-size:20px;margin:0}.top span{color:#bfe5df;font-size:13px}.wrap{max-width:1440px;margin:22px auto;padding:0 22px;display:grid;grid-template-columns:460px minmax(0,1fr);gap:20px}.panel,.paper{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 24px #234b4714}.panel{padding:20px}.panel h2{font-size:17px;margin:0 0 14px;color:var(--navy)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.field{display:flex;flex-direction:column;gap:4px}.field.full{grid-column:1/-1}label{font-size:12px;font-weight:700;color:#506462}input,select,textarea,button{font:inherit}input,select,textarea{border:1px solid var(--line);border-radius:8px;padding:9px;background:#fff;color:var(--ink);width:100%}textarea{min-height:72px;resize:vertical}input:disabled{background:#edf1f0;color:#87908f}.hint{font-size:12px;color:var(--muted);margin:4px 0 0}.schedule{margin-top:18px;border-top:1px solid var(--line);padding-top:14px}.schedule h3{font-size:15px;margin:0 0 4px}.schedule-row{border:1px solid var(--line);border-radius:9px;margin:8px 0;padding:9px;background:#fbfdfd}.days{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.days label{font-weight:500;border:1px solid var(--line);padding:3px 5px;border-radius:5px;color:#273835}.days input{width:auto}.time-grid{display:grid;grid-template-columns:86px 1fr 1fr;gap:7px}.time-grid .wide{grid-column:2/-1}.small{font-size:12px}.add{border:1px solid var(--teal);background:#fff;color:var(--teal);padding:7px 10px;border-radius:7px;cursor:pointer}.remove{border:0;background:none;color:#af3c31;cursor:pointer;font-size:12px;padding:0}.details{margin-top:17px;border-top:1px solid var(--line);padding-top:12px}.details summary{cursor:pointer;font-weight:700;color:var(--navy)}.details .grid{margin-top:11px}.actions{display:flex;gap:8px;margin-top:16px}.primary{background:var(--teal);color:#fff;border:0;border-radius:8px;padding:10px 13px;cursor:pointer}.paper{padding:44px 52px;min-height:900px}.paper h1{text-align:center;letter-spacing:9px;color:var(--navy);font-size:28px;margin:0 0 26px}.paper h3{border-bottom:2px solid var(--teal);color:var(--teal);padding-bottom:3px;margin:22px 0 8px;font-size:16px}.paper p{margin:0}.contract-table{border-collapse:collapse;width:100%;margin:8px 0;font-size:13px}.contract-table th,.contract-table td{border:1px solid #96aaa7;padding:6px;text-align:left}.contract-table th{background:#eef6f5}.notice{background:#f4faf9;border-left:4px solid var(--teal);padding:8px 10px;margin:10px 0;font-size:13px}.sign{display:flex;justify-content:space-between;margin-top:45px;border-top:1px solid #aaa;padding-top:16px}.value{font-weight:700;color:#102b2e}@media(max-width:1000px){.wrap{grid-template-columns:1fr}.paper{padding:28px 22px}}@media print{.top,.panel{display:none}.wrap{display:block;margin:0;padding:0}.paper{border:0;box-shadow:none;border-radius:0}}
+</style>
+<body>
+<header class="top"><h1>📝 근로계약서 작성 미리보기</h1><span>운영 직원허브·DB에 저장되지 않는 별도 화면</span></header>
+<main class="wrap">
+  <section class="panel">
+    <h2>기본 정보</h2>
+    <div class="grid">
+      <div class="field full"><label>직원</label><select id="employee"><option value="">직원 선택</option><option>임은숙</option><option>김수란</option><option>이소연</option><option>신규 직원</option></select></div>
+      <div class="field"><label>주민등록번호</label><input id="resident" placeholder="000000-0000000"></div>
+      <div class="field"><label>역할(부서)</label><select id="role"><option value="">역할 선택</option><option>통역사</option><option>진료실</option><option>리셉션</option><option>상담실장</option><option>마케터</option><option>부원장</option><option>기공소</option></select></div>
+      <div class="field"><label>계약 시작일</label><input id="start" type="date"></div>
+      <div class="field"><label>계약 종료일</label><input id="end" type="date"></div>
+      <div class="field full"><label><input id="indefinite" type="checkbox" style="width:auto"> 기간의 정함 없음</label><div class="hint">종료일을 입력하면 자동으로 해제되어 수정할 수 없습니다.</div></div>
+      <div class="field"><label>월 급여 (세전) <b style="color:#bd372c">*</b></label><input id="gross" inputmode="numeric" placeholder="예: 3,000,000"></div>
+      <div class="field"><label>예상 실수령액 (세후·참고)</label><input id="net" inputmode="numeric" placeholder="예: 2,650,000"></div>
+    </div>
+    <div class="schedule"><h3>요일별 근무시간표</h3><div class="hint">요일을 복수 선택하고 주간·야간·별도 시간대를 추가하세요.</div><div id="scheduleRows"></div><button class="add" id="addSchedule" type="button">+ 시간대 추가</button></div>
+    <details class="details"><summary>상세 조건 (특별한 경우만 수정)</summary><div class="grid"><div class="field"><label>서명 만료일</label><input id="due" type="date"></div><div class="field"><label>근무장소</label><input id="place" value="사업장 內"></div><div class="field full"><label>수행업무</label><textarea id="duty" placeholder="역할을 선택하면 자동 입력됩니다."></textarea></div><div class="field"><label>포괄 구성</label><input id="package" value="기본급 6H, 주휴 1.2H, 휴일 0.5H"></div><div class="field"><label>주휴일</label><input id="weeklyRest" value="일요일"></div></div></details>
+    <div class="actions"><button class="primary" id="refresh" type="button">계약서 미리보기 갱신</button><button class="add" type="button" onclick="window.print()">인쇄 / PDF 저장</button></div>
+  </section>
+  <article class="paper" id="preview"><h1>근 로 계 약 서</h1><div class="notice">왼쪽 정보를 입력하면 계약서 미리보기가 표시됩니다.</div></article>
+</main>
+<script>
+/* contract-preview:test-start */
+const ROLE_DUTIES={
+  '통역사':'외국환자 응대, 통역, 진료보조, 기타 전반적 치과 업무 보조 및 홍보',
+  '진료실':'진료보조, 기공물관리, 재료/환자관리, 전반적인 치과 업무 보조 및 사업주 지도하 홍보',
+  '리셉션':'리셉션 업무, 응대, 청구, 수납, 리콜, 기타 전반적 치과 업무 전반(사업주 지도, 감독하)',
+  '상담실장':'상담, 전화업무(전화상담, 해피콜), 예약, 보험청구, 수입지출 통계, 수납 및 사업주 감독하 진료보조 및 직원교육, 기타 치과 업무 전반 및 홍보',
+  '마케터':'기획, 광고심의, 디자인, 매체별 최적화 세팅 및 광고 집행, 내부 사이니지 변경, 카피라이팅, 오프라인, 대외 계약체결 등 치과 업무 보조 전반(사업주 지도하)',
+  '부원장':'진료(부원장) 및 관련 제반 업무',
+  '기공소':'기공소 / 보철 제작 관련 제반 업무'
+};
+function indefiniteContractState(endDate){return endDate?{checked:false,disabled:true}:{checked:false,disabled:false};}
+/* contract-preview:test-end */
+const DAYS=['월','화','수','목','금','토','일'];
+const $=id=>document.getElementById(id);
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function scheduleRow(data={days:['월','화','수','목','금'],kind:'주간',start:'10:00',end:'19:00',breakTime:'13:00 ~ 14:00',note:''}){const el=document.createElement('div');el.className='schedule-row';el.innerHTML=`<div class="days">${DAYS.map(day=>`<label><input type="checkbox" value="${day}" ${data.days.includes(day)?'checked':''}>${day}</label>`).join('')}<button class="remove" type="button">삭제</button></div><div class="time-grid"><select class="kind"><option ${data.kind==='주간'?'selected':''}>주간</option><option ${data.kind==='야간'?'selected':''}>야간</option><option ${data.kind==='별도'?'selected':''}>별도</option></select><input class="startTime" type="time" value="${data.start}"><input class="endTime" type="time" value="${data.end}"><input class="breakTime wide" value="${esc(data.breakTime)}" placeholder="휴게시간"><input class="note wide" value="${esc(data.note)}" placeholder="비고 (선택)"></div>`;el.querySelector('.remove').onclick=()=>el.remove();return el;}
+function renderScheduleRows(){return [...document.querySelectorAll('.schedule-row')].map(row=>({days:[...row.querySelectorAll('.days input:checked')].map(input=>input.value),kind:row.querySelector('.kind').value,start:row.querySelector('.startTime').value,end:row.querySelector('.endTime').value,breakTime:row.querySelector('.breakTime').value,note:row.querySelector('.note').value}));}
+function value(id,fallback='-'){return $(id).value.trim()||fallback;}
+function contractDate(id){const raw=$(id).value;if(!raw)return '-';const [y,m,d]=raw.split('-');return `${y}년 ${Number(m)}월 ${Number(d)}일`;}
+function renderContractPreview(){const employee=value('employee'),role=value('role'),end=$('indefinite').checked?'기간의 정함 없음':contractDate('end'),rows=renderScheduleRows();const schedule=rows.filter(r=>r.days.length&&r.start&&r.end).map(r=>`<tr><td>${esc(r.days.join(' · '))}</td><td>${esc(r.kind)}</td><td>${esc(r.start)} ~ ${esc(r.end)}</td><td>${esc(r.breakTime||'-')}</td><td>${esc(r.note||'-')}</td></tr>`).join('')||'<tr><td colspan="5">근무시간을 입력하세요.</td></tr>';$('preview').innerHTML=`<h1>근 로 계 약 서</h1><h3>제1조 (계약 당사자)</h3><p>병원명 <span class="value">아산정플란트치과의원</span> · 대표자 <span class="value">정용태</span><br>직원 성명 <span class="value">${esc(employee)}</span> · 주민등록번호 <span class="value">${esc(value('resident'))}</span></p><h3>제2조 (계약기간)</h3><p>근로계약기간은 <span class="value">${contractDate('start')}</span>부터 <span class="value">${esc(end)}</span>까지로 한다.</p><h3>제3조 (장소·업무)</h3><p>직원의 근무장소는 <span class="value">${esc(value('place'))}</span>로 하고, 수행업무는 <span class="value">${esc(value('duty'))}</span>로 한다.</p><h3>제4조 (근로시간·휴게)</h3><p>직원의 근로시간 및 휴게시간은 다음과 같다.</p><table class="contract-table"><thead><tr><th>근무일</th><th>구분</th><th>시업~종업</th><th>휴게시간</th><th>비고</th></tr></thead><tbody>${schedule}</tbody></table><p>■ 공휴일 근무 포함 / 구체적인 요일 및 시간은 스케줄표에 따른다.</p><h3>제5조 (임금)</h3><p>월 급여(세전) <span class="value">${esc(value('gross'))}</span>원<br>예상 실수령액(세후·참고) <span class="value">${esc(value('net'))}</span>원 — 세후 예상액은 공제에 따라 달라질 수 있다.<br>□ 상기 금액에는 <span class="value">${esc(value('package'))}</span>이 포괄되어 있다.</p><h3>제6조 (휴일)</h3><p>주휴일은 <span class="value">${esc(value('weeklyRest'))}</span>로 한다.</p><h3>제7조 (연차휴가)</h3><p>연차휴가는 근로기준법에 따라 지급하고, 연차수당을 급여에 포괄하여 선지급한다. 재직기간 동안 자유로이 사용하고, 퇴사 시 또는 연차정산 시 선지급분을 포함하여 정산한다.</p><h3>제8조 (퇴사)</h3><p>사직하고자 하는 경우 사직 희망일로부터 3주 전 사직서를 제출하고 인수인계를 철저히 한다. 이를 위반하여 병원에 손해가 발생한 경우 직원은 법적 조치에 이의를 제기하지 아니한다.</p><h3>제9조 (비밀유지)</h3><p>직원은 병원의 서면승인 없이 고용기간 중 또는 그 이후에도 병원의 비밀정보·환자정보·고용정책 및 기타 정보를 타인에게 공개하거나 이용할 수 없다.</p><h3>제10조 (계약해지)</h3><p>다음 각 호 발생 시 의원은 본 계약을 해지할 수 있다. 정당한 사유 없는 업무지시 불복, 고의·과실에 의한 손해, 불성실 근무·근무질서 문란, 무단결근, 직장 내 성희롱·괴롭힘, 의료관계법령 위반 또는 자격 상실, 기타 이에 준하는 사유.</p><h3>제11조 (기타)</h3><p>퇴사 시 병원에서 받은 물품은 원상복귀 후 반납하며, 미반납 시 마지막 월급에서 10만원 공제에 동의한다.<br>중도퇴사 시 임금 등은 퇴사일 이후 돌아오는 익월 임금지급일에 지급하는 것에 동의한다.</p><div class="sign"><div>병원<br><b>아산정플란트치과의원</b><br>대표 정용태 (인)</div><div>직원<br><b>${esc(employee)}</b> (인)</div></div>`;}
+function syncIndefinite(){const state=indefiniteContractState($('end').value);$('indefinite').checked=state.checked;$('indefinite').disabled=state.disabled;}
+$('role').addEventListener('change',()=>{$('duty').value=ROLE_DUTIES[$('role').value]||'';renderContractPreview();});
+$('end').addEventListener('input',()=>{syncIndefinite();renderContractPreview();});
+$('addSchedule').onclick=()=>$('scheduleRows').append(scheduleRow({days:[],kind:'별도',start:'',end:'',breakTime:'',note:''}));
+$('refresh').onclick=renderContractPreview;
+['employee','resident','start','gross','net','due','place','duty','package','weeklyRest','indefinite'].forEach(id=>$(id).addEventListener('input',renderContractPreview));
+$('scheduleRows').append(scheduleRow());syncIndefinite();renderContractPreview();
+</script>
+</body>
+</html>
