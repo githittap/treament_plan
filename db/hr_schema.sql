@@ -157,7 +157,8 @@ create table if not exists public.contracts (
   fields jsonb default '{}'::jsonb,
   sign_slots jsonb default '{}'::jsonb,
   status text not null default '대기'
-    check (status in ('대기', '서명완료')),
+    constraint contracts_status_check
+    check (status in ('발송요청', '대기', '서명완료', '취소')),
   signed_at timestamptz,
   created_by text,
   created_at timestamptz default now()
