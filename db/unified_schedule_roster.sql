@@ -125,7 +125,7 @@ using (true);
 drop policy if exists schedule_weeks_insert_authenticated on public.schedule_weeks;
 create policy schedule_weeks_insert_authenticated
 on public.schedule_weeks for insert to authenticated
-with check (true);
+with check (status = '초안' or public.my_role() in ('chief', 'owner'));
 
 drop policy if exists schedule_weeks_update_approvers on public.schedule_weeks;
 create policy schedule_weeks_update_approvers
