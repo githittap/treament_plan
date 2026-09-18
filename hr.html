@@ -1113,7 +1113,7 @@ async function submitConfidRecord(){
 }
 
 /* ── 근로계약서 ── */
-let CONTRACT_TEMPLATES=[],CONTRACT_ROWS=[],CONTRACT_TEMPLATE_ID=1,CONTRACT_EMPLOYEE_ID='';
+let CONTRACT_TEMPLATES=[],CONTRACT_ROWS=[],CONTRACT_TEMPLATE_ID=1,CONTRACT_EMPLOYEE_ID='',CONTRACT_EDIT_ID=null,CONTRACT_EDIT_FIELDS=null;
 /* contract-expiry:test-start */
 function contractEndValue(row){
   let fields=row&&row.fields;
@@ -1173,6 +1173,46 @@ function contractObject(v){
   if(typeof v==='string'){try{const parsed=JSON.parse(v);return parsed&&typeof parsed==='object'&&!Array.isArray(parsed)?parsed:{};}catch(e){}}
   return {};
 }
+/* contract-schedule:test-start */
+const CONTRACT_WEEKDAYS=['월','화','수','목','금','토','일'];
+function contractScheduleRows(value){
+  let rows=value;
+  if(typeof rows==='string'){try{rows=JSON.parse(rows);}catch(e){rows=null;}}
+  if(!Array.isArray(rows))rows=[{days:['월','화','수','목','금'],kind:'주간',start:'10:00',end:'19:00',break_time:'13:00 ~ 14:00',note:''}];
+  return rows.map(row=>({
+    days:CONTRACT_WEEKDAYS.filter(day=>Array.isArray(row&&row.days)&&row.days.includes(day)),
+    kind:['주간','야간','별도'].includes(row&&row.kind)?row.kind:'별도',
+    start:String(row&&row.start||''),end:String(row&&row.end||''),break_time:String(row&&row.break_time||''),note:String(row&&row.note||'')
+  }));
+}
+function contractScheduleRowEditor(row){
+  const r=contractScheduleRows([row])[0];
+  return `<div data-contract-schedule-row style="display:grid;grid-template-columns:repeat(7,minmax(34px,1fr)) 84px 92px 92px minmax(125px,1fr) minmax(110px,1fr) 30px;gap:5px;align-items:center;margin:5px 0">
+    ${CONTRACT_WEEKDAYS.map(day=>`<label style="font-size:12px;white-space:nowrap"><input type="checkbox" data-schedule-days value="${day}" ${r.days.includes(day)?'checked':''}> ${day}</label>`).join('')}
+    <select data-schedule-kind><option value="주간" ${r.kind==='주간'?'selected':''}>주간</option><option value="야간" ${r.kind==='야간'?'selected':''}>야간</option><option value="별도" ${r.kind==='별도'?'selected':''}>별도</option></select>
+    <input type="time" data-schedule-start value="${esc(r.start)}" aria-label="시업시간"><input type="time" data-schedule-end value="${esc(r.end)}" aria-label="종업시간">
+    <input data-schedule-break value="${esc(r.break_time)}" placeholder="휴게 13:00 ~ 14:00"><input data-schedule-note value="${esc(r.note)}" placeholder="비고(선택)">
+    <button type="button" class="mini rej" onclick="this.closest('[data-contract-schedule-row]').remove()" aria-label="근무시간 행 삭제">×</button></div>`;
+}
+function contractScheduleInputs(key,value){
+  return `<div data-work-schedule-key="${esc(key)}"><div class="sub" style="margin-bottom:4px">요일을 복수 선택하고 주간·야간·별도 시간을 각각 추가하세요.</div><div data-contract-schedule-list>${contractScheduleRows(value).map(contractScheduleRowEditor).join('')}</div><button type="button" class="mini" style="margin-top:5px" onclick="addContractScheduleRow('${esc(key)}')">+ 시간대 추가</button></div>`;
+}
+function addContractScheduleRow(key){
+  const list=document.querySelector(`[data-work-schedule-key="${CSS.escape(key)}"] [data-contract-schedule-list]`);if(list)list.insertAdjacentHTML('beforeend',contractScheduleRowEditor({days:[],kind:'별도',start:'',end:'',break_time:'',note:''}));
+}
+function readContractSchedule(box){
+  return Array.from(box.querySelectorAll('[data-contract-schedule-row]')).map(row=>({
+    days:Array.from(row.querySelectorAll('[data-schedule-days]:checked')).map(el=>el.value),kind:row.querySelector('[data-schedule-kind]').value,
+    start:row.querySelector('[data-schedule-start]').value,end:row.querySelector('[data-schedule-end]').value,
+    break_time:row.querySelector('[data-schedule-break]').value.trim(),note:row.querySelector('[data-schedule-note]').value.trim()
+  }));
+}
+function validContractSchedule(rows){return rows.length>0&&rows.every(r=>r.days.length>0&&/^\d{2}:\d{2}$/.test(r.start)&&/^\d{2}:\d{2}$/.test(r.end));}
+/* contract-schedule:test-end */
+function contractScheduleHtml(value){
+  const rows=contractScheduleRows(value);
+  return `<table style="width:100%;border-collapse:collapse;margin:7px 0;font-size:13px"><thead><tr>${['근무일','구분','시업~종업','휴게시간','비고'].map(h=>`<th style="border:1px solid #aaa;padding:4px;background:#f4f7f7">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr><td style="border:1px solid #aaa;padding:4px">${esc(r.days.join(' · '))}</td><td style="border:1px solid #aaa;padding:4px">${esc(r.kind)}</td><td style="border:1px solid #aaa;padding:4px">${esc(r.start)} ~ ${esc(r.end)}</td><td style="border:1px solid #aaa;padding:4px">${esc(r.break_time||'-')}</td><td style="border:1px solid #aaa;padding:4px">${esc(r.note||'-')}</td></tr>`).join('')}</tbody></table>`;
+}
 function contractTemplate(){return CONTRACT_TEMPLATES.find(t=>Number(t.id)===Number(CONTRACT_TEMPLATE_ID))||CONTRACT_TEMPLATES[0]||null;}
 function contractLongDate(ds=today()){
   const [y,m,d]=String(ds).slice(0,10).split('-').map(Number);return `${y}년 ${m}월 ${d}일`;
@@ -1185,21 +1225,23 @@ function mergeContractHtml(template,values){
     const key=String(raw).trim();
     if(key==='도장_원장')return seal;
     if(key==='계약일자')return esc(contractLongDate());
+    if(key==='근무시간표')return contractScheduleHtml(fields[key]);
+    if(key==='공휴일근무문구')return fields['공휴일근무']==='포함'?'■ 설·추석 등 공휴일 근무 포함<br>':'';
     return Object.prototype.hasOwnProperty.call(fields,key)?esc(fields[key]):all;
   });
 }
 function contractFieldInputs(template,employee){
   return contractArray(template&&template.fields).map((f,i)=>{
-    const key=String(f.key||''),type=['text','date','select'].includes(f.type)?f.type:'text';
-    const value=key==='성명'?(employee?employee.name:''):(f.default==null?'':f.default);
-    const control=type==='select'
+    const key=String(f.key||''),type=['text','date','select','work_schedule'].includes(f.type)?f.type:'text';
+    const value=CONTRACT_EDIT_FIELDS&&Object.prototype.hasOwnProperty.call(CONTRACT_EDIT_FIELDS,key)?CONTRACT_EDIT_FIELDS[key]:(key==='성명'?(employee?employee.name:''):(f.default==null?'':f.default));
+    const control=type==='work_schedule'?contractScheduleInputs(key,value):type==='select'
       ?`<select data-contract-key="${esc(key)}">${contractArray(f.options).map(o=>`<option value="${esc(o)}" ${String(o)===String(value)?'selected':''}>${esc(o)}</option>`).join('')}</select>`
       :`<input type="${type}" data-contract-key="${esc(key)}" value="${esc(value)}">`;
     return `<div class="fld" data-contract-field-index="${i}"><label>${esc(f.label||key)}</label>${control}</div>`;
   }).join('');
 }
 function contractFormValues(){
-  const values={};document.querySelectorAll('[data-contract-key]').forEach(el=>values[el.dataset.contractKey]=el.value);return values;
+  const values={};document.querySelectorAll('[data-contract-key]').forEach(el=>values[el.dataset.contractKey]=el.value);document.querySelectorAll('[data-work-schedule-key]').forEach(box=>values[box.dataset.workScheduleKey]=readContractSchedule(box));return values;
 }
 function toggleContractNoEnd(){
   const checked=!!($('#contractNoEnd')&&$('#contractNoEnd').checked),end=document.querySelector('[data-contract-key="계약종료"]');
@@ -1232,11 +1274,13 @@ async function sendContract(){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(String(d.fields['계약종료']||''))&&d.fields['계약종료']!=='기간의 정함 없음'){
     if(msg)msg.textContent="계약 종료일을 입력하거나 '기간의 정함 없음'을 선택하세요.";return;
   }
+  if(d.fields['근무시간표']&&!validContractSchedule(d.fields['근무시간표'])){if(msg)msg.textContent='근무시간표에서 요일·시업·종업시간을 모두 입력하세요.';return;}
   const dueDate=new Date(d.due+'T23:59:59+09:00');
   if(Number.isNaN(dueDate.getTime())){if(msg)msg.textContent='서명 만료일을 확인하세요.';return;}
-  const finalSend=ME.role==='owner';setStatus('saving');if(msg)msg.textContent=finalSend?'발송 중…':'원장 발송 요청 중…';
+  const finalSend=ME.role==='owner',merged=mergeContractHtml(d.template,d.fields);setStatus('saving');if(msg)msg.textContent=CONTRACT_EDIT_ID?'수정 후 최종 발송 중…':(finalSend?'발송 중…':'원장 발송 요청 중…');
+  if(CONTRACT_EDIT_ID){const {error}=await sb.from('contracts').update({template_id:d.template.id,merged_html:merged,fields:d.fields,status:'대기',sent_at:new Date().toISOString(),due_at:dueDate.toISOString(),reviewed_by:ME.name,reviewed_at:new Date().toISOString()}).eq('id',CONTRACT_EDIT_ID).eq('status','발송요청');if(error){if(msg)msg.textContent='수정 발송 실패: '+error.message;setStatus('error');return;}CONTRACT_EDIT_ID=null;CONTRACT_EDIT_FIELDS=null;setStatus('saved');render();return;}
   const {error}=await sb.from('contracts').insert({user_id:d.employeeId,template_id:d.template.id,
-    merged_html:mergeContractHtml(d.template,d.fields),fields:d.fields,sign_slots:contractArray(d.template.sign_slots),status:finalSend?'대기':'발송요청',
+    merged_html:merged,fields:d.fields,request_merged_html:finalSend?null:merged,request_fields:finalSend?null:d.fields,sign_slots:contractArray(d.template.sign_slots),status:finalSend?'대기':'발송요청',
     created_by:ME.name,sent_at:finalSend?new Date().toISOString():null,due_at:dueDate.toISOString()});
   if(error){if(msg)msg.textContent='발송 실패: '+error.message;setStatus('error');return;}
   if(msg)msg.textContent=finalSend?'발송했습니다.':'원장에게 최종 발송을 요청했습니다.';setStatus('saved');render();

@@ -6,10 +6,28 @@ const vm = require('node:vm');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'hr.html'), 'utf8');
 const block = html.match(/\/\* contract-expiry:test-start \*\/([\s\S]*?)\/\* contract-expiry:test-end \*\//);
+const scheduleBlock = html.match(/\/\* contract-schedule:test-start \*\/([\s\S]*?)\/\* contract-schedule:test-end \*\//);
 
 test('계약 종료 알림 계산 코드가 포함되어 있다', () => {
   assert.ok(block, '계약 종료 알림 계산 코드 블록이 없습니다.');
 });
+
+test('요일별 근무시간표 입력 코드가 포함되어 있다', () => {
+  assert.ok(scheduleBlock, '근무시간표 계산 코드 블록이 없습니다.');
+});
+
+if (scheduleBlock) {
+  const scheduleContext = {};
+  vm.createContext(scheduleContext);
+  vm.runInContext(`${scheduleBlock[1]};this.contractScheduleRows=contractScheduleRows;this.validContractSchedule=validContractSchedule;`, scheduleContext);
+
+  test('근무시간표는 월~일, 주간·야간·별도 구분을 보존한다', () => {
+    const rows = scheduleContext.contractScheduleRows([{ days: ['월', '수', '일'], kind: '야간', start: '18:30', end: '20:30', break_time: '18:00 ~ 18:30', note: '야간진료' }]);
+    assert.deepEqual({ ...rows[0], days: [...rows[0].days] }, { days: ['월', '수', '일'], kind: '야간', start: '18:30', end: '20:30', break_time: '18:00 ~ 18:30', note: '야간진료' });
+    assert.equal(scheduleContext.validContractSchedule(rows), true);
+    assert.equal(scheduleContext.validContractSchedule([{ days: [], start: '10:00', end: '18:00' }]), false);
+  });
+}
 
 if (block) {
   const context = {};
