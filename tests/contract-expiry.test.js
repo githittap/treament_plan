@@ -14,6 +14,7 @@ test('계약 종료 알림 계산 코드가 포함되어 있다', () => {
 
 test('요일별 근무시간표 입력 코드가 포함되어 있다', () => {
   assert.ok(scheduleBlock, '근무시간표 계산 코드 블록이 없습니다.');
+  assert.match(html, /상기 주 5일 중 평일 야간 2회/);
 });
 
 if (scheduleBlock) {
