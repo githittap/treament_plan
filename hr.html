@@ -1234,12 +1234,20 @@ async function sendContract(){
   }
   const dueDate=new Date(d.due+'T23:59:59+09:00');
   if(Number.isNaN(dueDate.getTime())){if(msg)msg.textContent='서명 만료일을 확인하세요.';return;}
-  setStatus('saving');if(msg)msg.textContent='발송 중…';
+  const finalSend=ME.role==='owner';setStatus('saving');if(msg)msg.textContent=finalSend?'발송 중…':'원장 발송 요청 중…';
   const {error}=await sb.from('contracts').insert({user_id:d.employeeId,template_id:d.template.id,
-    merged_html:mergeContractHtml(d.template,d.fields),fields:d.fields,sign_slots:contractArray(d.template.sign_slots),status:'대기',
-    created_by:ME.name,sent_at:new Date().toISOString(),due_at:dueDate.toISOString()});
+    merged_html:mergeContractHtml(d.template,d.fields),fields:d.fields,sign_slots:contractArray(d.template.sign_slots),status:finalSend?'대기':'발송요청',
+    created_by:ME.name,sent_at:finalSend?new Date().toISOString():null,due_at:dueDate.toISOString()});
   if(error){if(msg)msg.textContent='발송 실패: '+error.message;setStatus('error');return;}
-  if(msg)msg.textContent='발송했습니다.';setStatus('saved');render();
+  if(msg)msg.textContent=finalSend?'발송했습니다.':'원장에게 최종 발송을 요청했습니다.';setStatus('saved');render();
+}
+async function approveContractSend(id){
+  const row=CONTRACT_ROWS.find(r=>Number(r.id)===Number(id));if(!row||ME.role!=='owner'||row.status!=='발송요청')return;
+  setStatus('saving');const archivePath=`${row.user_id}/contracts/contract-${row.id}.html`,file=new Blob([row.merged_html||''],{type:'text/html;charset=utf-8'});
+  const {error:uploadError}=await sb.storage.from('hr-docs').upload(archivePath,file,{contentType:'text/html;charset=utf-8',upsert:false});
+  if(uploadError){alert('최종본 보관 실패: '+uploadError.message);setStatus('error');return;}
+  const {error}=await sb.from('contracts').update({status:'대기',sent_at:new Date().toISOString(),archive_path:archivePath}).eq('id',row.id).eq('status','발송요청');
+  if(error){alert('발송 실패: '+error.message);setStatus('error');return;}setStatus('saved');render();
 }
 function contractTitle(row){
   const t=CONTRACT_TEMPLATES.find(x=>Number(x.id)===Number(row.template_id));return t?(t.title||t.name||'근로계약서'):'근로계약서';
@@ -1297,10 +1305,11 @@ async function renderContractOwner(m){
       <div class="fld"><label>서명 만료일</label><input type="date" id="contractDue" value="${addDays(today(),7)}"></div>
       ${contractFieldInputs(template,employee)}
       <div class="fld"><label>계약 기간</label><label style="font-size:13px;color:var(--ink)"><input type="checkbox" id="contractNoEnd" onchange="toggleContractNoEnd()"> 기간의 정함 없음</label></div>
-    </div><div class="rowflex" style="margin-top:12px"><button class="hbtn" onclick="previewContract()">미리보기</button><button class="hbtn pri" onclick="sendContract()">발송</button></div>
+    </div><div class="rowflex" style="margin-top:12px"><button class="hbtn" onclick="previewContract()">미리보기</button><button class="hbtn pri" onclick="sendContract()">${ME.role==='owner'?'최종 발송':'원장 발송 요청'}</button></div>
     <div class="msg" id="contractMsg"></div>
     <div id="contractPreview" style="margin-top:12px"><div class="empty">미리보기 또는 계약 보기를 선택하세요.</div></div>`:'<div class="empty">활성 근로계약서 서식이 없습니다.</div>'}
   </div>
+  ${ME.role==='owner'?`<div class="card"><h2>🖋 원장 최종 발송 대기</h2>${CONTRACT_ROWS.filter(r=>r.status==='발송요청').length?`<div class="tblwrap"><table><tr><th>직원</th><th>작성자</th><th>서명기한</th><th></th></tr>${CONTRACT_ROWS.filter(r=>r.status==='발송요청').map(r=>`<tr><td>${esc(nameOf(r.user_id))}</td><td>${esc(r.created_by||'')}</td><td>${contractDate(r.due_at)}</td><td><button class="mini" onclick="viewContract(${r.id})">미리보기</button> <button class="mini stamp" onclick="approveContractSend(${r.id})">확인 후 최종 발송</button></td></tr>`).join('')}</table></div>`:'<div class="empty">최종 발송 요청이 없습니다.</div>'}</div>`:''}
   ${employmentTermsCard()}
   ${contractAlertsCard(CONTRACT_ALERTS)}
   <div class="card"><h2>📚 계약 목록</h2>${CONTRACT_ROWS.length?`<div class="tblwrap"><table><tr><th>직원</th><th>서식</th><th>상태</th><th>계약종료</th><th>발송일</th><th>서명일</th><th>서명기한</th><th></th></tr>
