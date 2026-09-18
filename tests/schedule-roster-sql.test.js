@@ -99,6 +99,9 @@ test('명부 전환은 전체 unique, 호환 트리거, 승인 접근과 주차 
   assert.match(copyWeek, /insert into public\.schedule_weeks[\s\S]*status\s*\)\s*values\s*\(\s*p_target_week\s*,\s*'초안'\s*\)[\s\S]*on conflict/i);
   assert.match(copyWeek, /delete from public\.schedules[\s\S]*week_start\s*=\s*p_target_week/i);
   assert.match(copyWeek, /insert into public\.schedules[\s\S]*select[\s\S]*p_target_week[\s\S]*from public\.schedules/i);
+  assert.match(copyWeek, /join public\.schedule_people sp on sp\.id\s*=\s*s\.person_id/i);
+  assert.match(copyWeek, /sp\.active\s*=\s*true/i);
+  assert.match(copyWeek, /sp\.included_in_schedule\s*=\s*true/i);
   assert.match(copyWeek, /declare\s+v_copied_count\s+integer/i);
   assert.match(copyWeek, /get diagnostics\s+v_copied_count\s*=\s*row_count/i);
   assert.match(copyWeek, /if v_copied_count\s*=\s*0 then[\s\S]*raise exception/i);

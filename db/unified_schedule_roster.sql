@@ -350,7 +350,10 @@ begin
   insert into public.schedules (week_start, person_id, user_id, day, shift, note)
   select p_target_week, s.person_id, s.user_id, s.day, s.shift, s.note
   from public.schedules s
-  where s.week_start = p_source_week;
+  join public.schedule_people sp on sp.id = s.person_id
+  where s.week_start = p_source_week
+    and sp.active = true
+    and sp.included_in_schedule = true;
 
   get diagnostics v_copied_count = row_count;
   if v_copied_count = 0 then
