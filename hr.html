@@ -608,13 +608,76 @@ async function renderSched(m){
     </div>
     ${staff.length?grid:'<div class="empty">근무표에 포함된 인원이 아직 없습니다.</div>'}
     <div class="hint">근무=정상 · 휴무=off · <b>야간=종업 20:00</b> · 기타=기타 근무. 셀 값을 고른 뒤 그 셀에서 마우스 왼쪽 버튼을 누른 채 다른 셀 위로 끌면 같은 값을 한꺼번에 칠할 수 있습니다. 직원이 초안 작성 → 실장·원장이 <b>공표</b>. 공표된 근무표가 출퇴근 <b>야간·조퇴 판정</b>의 기준이 됩니다. 수정하면 다시 초안이 되어 재공표가 필요합니다.</div>
-  </div>`;
+  </div>${isMgr()?scheduleRosterAdminCard():''}`;
   if(!window.__schedPaintBound){window.__schedPaintBound=true;
     m.addEventListener('mousedown',e=>{const target=e.target.closest&&e.target.closest('select[data-person-id][data-profile-user-id][data-day]');if(!target||!m.contains(target))return;PAINT_VALUE=target.value;PAINTING=true;});
     m.addEventListener('mouseenter',e=>{const target=e.target.closest&&e.target.closest('select[data-person-id][data-profile-user-id][data-day]');if(!target||!m.contains(target)||!PAINTING||e.buttons!==1)return;target.value=PAINT_VALUE;setShift(target.dataset.personId,target.dataset.profileUserId||null,Number(target.dataset.day),SCHED_WEEK,PAINT_VALUE);target.classList.toggle('shift-evening',PAINT_VALUE==='evening');},true);
     document.addEventListener('mouseup',()=>{PAINTING=false;});
   }
 }
+/* schedule-roster-admin:test-start */
+const SCHEDULE_DEPARTMENTS=['Dr.','진료실','데스크','기공실','미지정'];
+function scheduleRosterAdminCard(){
+  const departmentOptions=current=>SCHEDULE_DEPARTMENTS.map(department=>`<option value="${department}" ${current===department?'selected':''}>${department}</option>`).join('');
+  const rows=SCHEDULE_PEOPLE.map(person=>{
+    const department=SCHEDULE_DEPARTMENTS.includes(person.department)?person.department:'미지정';
+    const source=person.profile_user_id?'로그인 계정':'비로그인 명부';
+    return `<tr><td>${esc(person.name)}</td><td><span class="b ${person.profile_user_id?'ok':'wait'}">${source}</span></td>
+      <td><select class="mini" onchange="setSchedulePersonDepartment('${person.id}',this.value)">${departmentOptions(department)}</select></td>
+      <td><label><input type="checkbox" ${person.included_in_schedule!==false?'checked':''} onchange="setSchedulePersonIncluded('${person.id}',this.checked)"> 포함</label></td>
+      <td><span class="b ${person.active===true?'ok':'no'}">${person.active===true?'재직':'비활성'}</span> <button class="mini ${person.active===true?'rej':'stamp'}" onclick="setSchedulePersonActive('${person.id}',${person.active===true?'false':'true'})">${person.active===true?'비활성화':'재활성화'}</button></td></tr>`;
+  }).join('');
+  return `<details class="card"><summary style="cursor:pointer;font-weight:800">👥 근무명부 관리</summary>
+    <div class="hint">로그인 계정과 비로그인 명부를 함께 관리합니다. 근무표·집계 포함 여부는 계정 로그인·승인과 별개입니다.</div>
+    <div class="rowflex" style="margin:10px 0"><input class="mini" id="rosterName" placeholder="이름"><select class="mini" id="rosterDepartment"><option value="">근무부서 선택</option>${departmentOptions('')}</select><button class="mini stamp" onclick="saveSchedulePerson()">비로그인 근무자 추가</button></div>
+    <div class="msg" id="rosterMsg"></div>
+    ${rows?`<div class="tblwrap"><table><tr><th>이름</th><th>구분</th><th>근무부서</th><th>근무표·집계 포함</th><th>재직 상태</th></tr>${rows}</table></div>`:'<div class="empty">등록된 근무명부가 없습니다.</div>'}
+  </details>`;
+}
+function showScheduleRosterError(message){
+  const el=$('#rosterMsg');
+  if(el)el.textContent=message;else alert(message);
+}
+function canMutateScheduleRoster(){
+  if(isMgr())return true;
+  setStatus('error');showScheduleRosterError('근무명부 관리 권한이 없습니다.');return false;
+}
+async function finishScheduleRosterMutation(result,label){
+  if(result&&result.error){setStatus('error');showScheduleRosterError(`${label} 실패: ${result.error.message}`);return false;}
+  try{await loadSchedulePeople();}
+  catch(error){setStatus('error');showScheduleRosterError(`근무명부 새로고침 실패: ${error.message}`);return false;}
+  setStatus('saved');await render();return true;
+}
+async function saveSchedulePerson(){
+  if(!canMutateScheduleRoster())return;
+  const nameEl=$('#rosterName'),departmentEl=$('#rosterDepartment');
+  const name=nameEl?nameEl.value.trim():'',department=departmentEl?departmentEl.value:'';
+  if(!name||!SCHEDULE_DEPARTMENTS.includes(department)){setStatus('error');showScheduleRosterError('이름과 근무부서를 모두 입력하세요.');return;}
+  setStatus('saving');
+  const result=await sb.from('schedule_people').insert({profile_user_id:null,name,department,included_in_schedule:true,active:true});
+  await finishScheduleRosterMutation(result,'근무자 추가');
+}
+async function setSchedulePersonDepartment(id,department){
+  if(!canMutateScheduleRoster())return;
+  if(!SCHEDULE_DEPARTMENTS.includes(department)){setStatus('error');showScheduleRosterError('올바른 근무부서를 선택하세요.');return;}
+  setStatus('saving');
+  const result=await sb.from('schedule_people').update({department}).eq('id',id);
+  await finishScheduleRosterMutation(result,'근무부서 저장');
+}
+async function setSchedulePersonIncluded(id,included_in_schedule){
+  if(!canMutateScheduleRoster())return;
+  setStatus('saving');
+  const result=await sb.from('schedule_people').update({included_in_schedule}).eq('id',id);
+  await finishScheduleRosterMutation(result,'근무표·집계 포함 저장');
+}
+async function setSchedulePersonActive(id,active){
+  if(!canMutateScheduleRoster())return;
+  if(!active&&!confirm('이 근무자를 비활성화할까요? 기존 근무 기록은 삭제되지 않으며 같은 행에서 재활성화할 수 있습니다.'))return;
+  setStatus('saving');
+  const result=await sb.from('schedule_people').update({active}).eq('id',id);
+  await finishScheduleRosterMutation(result,active?'재활성화':'비활성화');
+}
+/* schedule-roster-admin:test-end */
 function navWeek(n){SCHED_WEEK=addDays(SCHED_WEEK||mondayStr(today()),n);render();}
 async function setShift(personId,profileUserId,day,ws,shift){
   const {error:weekError}=await sb.from('schedule_weeks').upsert({week_start:ws,status:'초안'},{onConflict:'week_start'});
@@ -1702,8 +1765,12 @@ async function renderOwner(m){
     ${pending.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.dept||'')}</td><td>${p.created_at?md(p.created_at):''}</td>
       <td><button class="mini stamp" onclick="approveProfile('${p.user_id}')">승인</button></td></tr>`).join('')}</table></div>`:''}
     <h3>직원 권한 관리 <span class="sub">(입퇴사·승진 시 여기서 변경)</span></h3>
-    <div class="tblwrap"><table><tr><th>이름</th><th>부서</th><th>입사</th><th>권한</th><th>승인</th></tr>
-    ${PROFILES.map(p=>{const depts=['진료실','데스크','기공팀','기타'],dept=p.dept||'';return `<tr><td>${esc(p.name)}</td><td><select class="mini" onchange="setDept('${p.user_id}',this.value)"><option value="" ${dept===''?'selected':''}>-</option>${depts.map(d=>`<option value="${d}" ${dept===d?'selected':''}>${d}</option>`).join('')}${dept&&!depts.includes(dept)?`<option value="${esc(dept)}" selected>${esc(dept)}</option>`:''}</select></td><td>${p.hire_date||''}</td>
+    <div class="msg" id="rosterMsg"></div>
+    <div class="tblwrap"><table><tr><th>이름</th><th>부서</th><th>근무부서</th><th>근무표·집계 포함</th><th>재직 상태</th><th>입사</th><th>권한</th><th>승인</th></tr>
+    ${PROFILES.map(p=>{const depts=['진료실','데스크','기공팀','기타'],dept=p.dept||'',roster=SCHEDULE_PEOPLE.find(x=>x.profile_user_id===p.user_id),rosterDept=roster&&(SCHEDULE_DEPARTMENTS.includes(roster.department)?roster.department:'미지정');return `<tr><td>${esc(p.name)}</td><td><select class="mini" onchange="setDept('${p.user_id}',this.value)"><option value="" ${dept===''?'selected':''}>-</option>${depts.map(d=>`<option value="${d}" ${dept===d?'selected':''}>${d}</option>`).join('')}${dept&&!depts.includes(dept)?`<option value="${esc(dept)}" selected>${esc(dept)}</option>`:''}</select></td>
+      <td>${roster?`<select class="mini" onchange="setSchedulePersonDepartment('${roster.id}',this.value)">${SCHEDULE_DEPARTMENTS.map(d=>`<option value="${d}" ${rosterDept===d?'selected':''}>${d}</option>`).join('')}</select>`:'<span class="sub">미연결</span>'}</td>
+      <td>${roster?`<input type="checkbox" ${roster.included_in_schedule!==false?'checked':''} onchange="setSchedulePersonIncluded('${roster.id}',this.checked)">`:'—'}</td>
+      <td>${roster?`<span class="b ${roster.active===true?'ok':'no'}">${roster.active===true?'재직':'비활성'}</span> <button class="mini ${roster.active===true?'rej':'stamp'}" onclick="setSchedulePersonActive('${roster.id}',${roster.active===true?'false':'true'})">${roster.active===true?'비활성화':'재활성화'}</button>`:'—'}</td><td>${p.hire_date||''}</td>
       <td><select class="mini" onchange="setRole('${p.user_id}',this.value)">${['staff','manager','chief','owner'].map(r=>`<option ${p.role===r?'selected':''}>${r}</option>`).join('')}</select></td>
       <td><span class="b ${p.approved!==false?'ok':'wait'}">${p.approved!==false?'승인됨':'대기'}</span>${p.approved!==false&&p.user_id!==ME.id?` <button class="mini rej" onclick="revokeApproval('${p.user_id}')">승인취소</button>`:''}</td></tr>`}).join('')}</table></div>
     <h3>🔒 케이스노트 접근 명단</h3>
@@ -1729,8 +1796,19 @@ async function setRole(uid,role){await sb.from('profiles').update({role}).eq('us
   if(uid===ME.id){ME.role=role;renderNav();}render();}
 async function setDept(uid,dept){await sb.from('profiles').update({dept:dept||null}).eq('user_id',uid);await loadProfiles();setStatus('saved');render();}
 async function approveProfile(uid){
-  await sb.from('profiles').update({approved:true}).eq('user_id',uid);
-  await loadProfiles();setStatus('saved');render();
+  if(!isMgr()){setStatus('error');showScheduleRosterError('가입 승인 권한이 없습니다.');return;}
+  const p=PROFILES.find(x=>x.user_id===uid);
+  if(!p){setStatus('error');showScheduleRosterError('승인할 프로필을 찾지 못했습니다.');return;}
+  setStatus('saving');
+  const {error:profileError}=await sb.from('profiles').update({approved:true}).eq('user_id',uid);
+  if(profileError){setStatus('error');showScheduleRosterError('가입 승인 실패: '+profileError.message);return;}
+  if(!SCHEDULE_PEOPLE.some(person=>person.profile_user_id===uid)){
+    const {error:rosterError}=await sb.from('schedule_people').upsert({profile_user_id:uid,name:p.name,department:'미지정',included_in_schedule:true,active:true},{onConflict:'profile_user_id',ignoreDuplicates:true});
+    if(rosterError){setStatus('error');showScheduleRosterError('연결 근무명부 저장 실패: '+rosterError.message);return;}
+  }
+  try{await Promise.all([loadProfiles(),loadSchedulePeople()]);}
+  catch(error){setStatus('error');showScheduleRosterError('승인 정보 새로고침 실패: '+error.message);return;}
+  setStatus('saved');render();
 }
 async function revokeApproval(uid){
   if(uid===ME.id)return;
