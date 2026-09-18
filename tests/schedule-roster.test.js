@@ -280,7 +280,7 @@ test('동시 onAuthed 호출은 하나의 초기화 Promise를 공유한다', as
   assert.equal(calls.listeners, 1);
 });
 
-function scheduleRenderHarness() {
+function scheduleRenderHarness({ weekError = null, scheduleError = { message: 'schedule denied' }, leaveError = null } = {}) {
   const source = html.match(/async function renderSched\([\s\S]*?\n\}/);
   assert.ok(source, 'renderSched 함수를 찾을 수 없습니다.');
   const m = { innerHTML: '', addEventListener() {}, contains: () => true };
@@ -288,12 +288,16 @@ function scheduleRenderHarness() {
     SCHED_WEEK: '2026-09-14', SCHEDULE_PEOPLE: [{ id: 'person-1', name: '김직원', department: '진료실', active: true, included_in_schedule: true }],
     SCHEDULE_PEOPLE_ERROR: '', SHIFTS: { work: { l: '근무' }, off: { l: 'off' }, evening: { l: '야간' }, etc: { l: '기타' } },
     today: () => '2026-09-14', mondayStr: value => value, addDays: value => value, md: value => value,
-    schedulePeopleForWeek: (people) => people, schedulePersonLabel: person => person.name, esc: value => String(value),
+    schedulePeopleForWeek: (people) => people, schedulePersonLabel: person => person.name, esc: value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
     isLead: () => false, isMgr: () => false, scheduleRosterAdminCard: () => '', window: {},
     document: { addEventListener() {} },
     sb: {
       from(table) {
-        const result = table === 'schedules' ? { data: null, error: { message: 'schedule denied' } } : { data: table === 'schedule_weeks' ? { status: '초안' } : [], error: null };
+        const result = table === 'schedule_weeks'
+          ? { data: { status: '초안' }, error: weekError }
+          : table === 'schedules'
+            ? { data: scheduleError ? null : [], error: scheduleError }
+            : { data: leaveError ? null : [], error: leaveError };
         const builder = {
           select() { return builder; }, eq() { return builder; }, lte() { return builder; }, gte() { return builder; },
           maybeSingle: async () => result,
@@ -313,6 +317,22 @@ test('근무표 schedules 조회 오류는 보이는 오류를 남기고 편집 
   await context.renderSched(m);
   assert.match(m.innerHTML, /근무표를 불러오지 못했습니다|schedule denied/);
   assert.doesNotMatch(m.innerHTML, /data-person-id|<select/);
+});
+
+test('근무표 주차 조회 오류는 대상과 escape된 메시지만 표시하고 편집을 차단한다', async () => {
+  const { context, m } = scheduleRenderHarness({ weekError: { message: '<week denied>' }, scheduleError: null });
+  await context.renderSched(m);
+  assert.match(m.innerHTML, /주차/);
+  assert.match(m.innerHTML, /&lt;week denied&gt;/);
+  assert.doesNotMatch(m.innerHTML, /<week denied>|data-person-id|<select|지난주 복사/);
+});
+
+test('근무표 연차 조회 오류는 대상과 escape된 메시지만 표시하고 편집을 차단한다', async () => {
+  const { context, m } = scheduleRenderHarness({ scheduleError: null, leaveError: { message: '<leave denied>' } });
+  await context.renderSched(m);
+  assert.match(m.innerHTML, /연차/);
+  assert.match(m.innerHTML, /&lt;leave denied&gt;/);
+  assert.doesNotMatch(m.innerHTML, /<leave denied>|data-person-id|<select|지난주 복사/);
 });
 
 function copyPrevWeekHarness(rpcError = null) {
