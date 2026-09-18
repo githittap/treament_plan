@@ -255,3 +255,87 @@ test('owner 직원 권한 표는 연결 명부 상태를 보여 주고 승인 �
   assert.match(approve[0], /onConflict:'profile_user_id',ignoreDuplicates:true/);
   assert.match(approve[0], /if\(rosterError\).*setStatus\('error'\)/s);
 });
+
+function approvalHarness({ existingRoster = false, rosterError = null, profileError = null } = {}) {
+  const approve = html.match(/async function approveProfile\([\s\S]*?async function revokeApproval/);
+  assert.ok(approve, 'approveProfile 함수를 찾을 수 없습니다.');
+  const source = approve[0].replace(/async function revokeApproval[\s\S]*/, '');
+  const profileErrors=Array.isArray(profileError)?profileError.slice():[profileError];
+  const calls = { order: [], rosterPayloads: [], profilePayloads: [], status: [], errors: [], loadProfiles: 0, loadRoster: 0, render: 0 };
+  const context = {
+    ME: { role: 'owner' },
+    PROFILES: [{ user_id: 'user-1', name: '승인 대상' }],
+    SCHEDULE_PEOPLE: existingRoster ? [{ id: 'person-1', profile_user_id: 'user-1', department: '데스크', included_in_schedule: false, active: false }] : [],
+    isMgr: () => true,
+    setStatus: value => calls.status.push(value),
+    showScheduleRosterError: message => calls.errors.push(message),
+    loadProfiles: async () => { calls.loadProfiles++; },
+    loadSchedulePeople: async () => { calls.loadRoster++; },
+    render: () => { calls.render++; },
+    sb: {
+      from(table) {
+        if (table === 'schedule_people') {
+          return {
+            upsert: async (payload, options) => {
+              calls.order.push('roster');
+              calls.rosterPayloads.push({ payload, options });
+              return { error: rosterError };
+            }
+          };
+        }
+        if (table === 'profiles') {
+          return {
+            update(payload) {
+              return {
+                eq: async (column, value) => {
+                  calls.order.push('profile');
+                  calls.profilePayloads.push({ payload, column, value });
+                  return { error: profileErrors.length?profileErrors.shift():null };
+                }
+              };
+            }
+          };
+        }
+        throw new Error(`예상하지 않은 테이블: ${table}`);
+      }
+    }
+  };
+  vm.createContext(context);
+  vm.runInContext(`${source};this.approveProfile=approveProfile;`, context);
+  return { context, calls };
+}
+
+test('연결 명부가 없으면 명부 저장 성공 후에만 프로필을 승인한다', async () => {
+  const { context, calls } = approvalHarness();
+  await context.approveProfile('user-1');
+  assert.deepEqual(calls.order, ['roster', 'profile']);
+  assert.deepEqual(JSON.parse(JSON.stringify(calls.profilePayloads)), [{ payload: { approved: true }, column: 'user_id', value: 'user-1' }]);
+  assert.equal(calls.status.at(-1), 'saved');
+});
+
+test('연결 명부 저장 실패는 approved=true 갱신을 차단한다', async () => {
+  const { context, calls } = approvalHarness({ rosterError: { message: 'roster denied' } });
+  await context.approveProfile('user-1');
+  assert.deepEqual(calls.order, ['roster']);
+  assert.equal(calls.profilePayloads.length, 0);
+  assert.equal(calls.status.at(-1), 'error');
+  assert.match(calls.errors.at(-1), /roster denied/);
+});
+
+test('연결 명부가 이미 있으면 설정을 보존하고 upsert 없이 프로필만 승인한다', async () => {
+  const { context, calls } = approvalHarness({ existingRoster: true });
+  await context.approveProfile('user-1');
+  assert.deepEqual(calls.order, ['profile']);
+  assert.equal(calls.rosterPayloads.length, 0);
+  assert.equal(calls.status.at(-1), 'saved');
+});
+
+test('명부 생성 뒤 프로필 승인이 실패해도 재시도할 수 있다', async () => {
+  const { context, calls } = approvalHarness({ profileError: [{ message: 'profile denied' }, null] });
+  await context.approveProfile('user-1');
+  assert.deepEqual(calls.order, ['roster', 'profile']);
+  assert.equal(calls.status.at(-1), 'error');
+  await context.approveProfile('user-1');
+  assert.deepEqual(calls.order, ['roster', 'profile', 'roster', 'profile']);
+  assert.equal(calls.status.at(-1), 'saved');
+});
