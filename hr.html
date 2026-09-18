@@ -1208,6 +1208,10 @@ function readContractSchedule(box){
   }));
 }
 function validContractSchedule(rows){return rows.length>0&&rows.every(r=>r.days.length>0&&/^\d{2}:\d{2}$/.test(r.start)&&/^\d{2}:\d{2}$/.test(r.end));}
+function contractScheduleNeedsReview(value){
+  if(typeof value!=='string')return false;
+  try{return !Array.isArray(JSON.parse(value));}catch(e){return true;}
+}
 /* contract-schedule:test-end */
 function contractScheduleHtml(value){
   const rows=contractScheduleRows(value);
@@ -1295,12 +1299,22 @@ async function approveContractSend(id){
   const {error}=await sb.from('contracts').update({status:'대기',sent_at:new Date().toISOString(),archive_path:archivePath}).eq('id',row.id).eq('status','발송요청');
   if(error){alert('발송 실패: '+error.message);setStatus('error');return;}setStatus('saved');render();
 }
+function editContractRequest(id){
+  const row=CONTRACT_ROWS.find(r=>Number(r.id)===Number(id));
+  if(!row||ME.role!=='owner'||row.status!=='발송요청')return;
+  const fields=contractObject(row.request_fields||row.fields);
+  CONTRACT_EDIT_ID=row.id;CONTRACT_EDIT_FIELDS=fields;CONTRACT_EMPLOYEE_ID=row.user_id;CONTRACT_TEMPLATE_ID=Number(row.template_id);
+  render();
+}
 function contractTitle(row){
   const t=CONTRACT_TEMPLATES.find(x=>Number(x.id)===Number(row.template_id));return t?(t.title||t.name||'근로계약서'):'근로계약서';
 }
 function viewContract(id){
   const row=CONTRACT_ROWS.find(r=>Number(r.id)===Number(id)),box=$('#contractPreview');if(!row||!box)return;
-  box.innerHTML=`<h3>${esc(contractTitle(row))} <span class="b ${contractStatusClass(row.status)}">${esc(row.status)}</span></h3><div class="contract-doc">${row.merged_html||''}</div>`;
+  const fields=contractObject(row.request_fields||row.fields),needsScheduleReview=contractScheduleNeedsReview(fields['근무시간표']);
+  const warning=needsScheduleReview?`<div class="hint" style="margin:8px 0;color:var(--bad)">이전 브라우저에서 저장된 요청이라 근무시간표 값을 다시 확인해야 합니다.${ME.role==='owner'&&row.status==='발송요청'?' 아래 ‘수정 후 최종 발송’으로 시간표를 입력하세요.':' 원장 최종 검토 후 시간표를 입력해야 합니다.'}</div>`:'';
+  const body=needsScheduleReview?String(row.merged_html||'').replace('[object Object]','<strong>근무시간표 확인 필요</strong>'):(row.merged_html||'');
+  box.innerHTML=`<h3>${esc(contractTitle(row))} <span class="b ${contractStatusClass(row.status)}">${esc(row.status)}</span></h3>${warning}<div class="contract-doc">${body}</div>`;
   box.scrollIntoView({behavior:'smooth',block:'start'});
 }
 let CONTRACT_END_ID=null;
@@ -1354,7 +1368,7 @@ async function renderContractOwner(m){
     <div class="msg" id="contractMsg"></div>
     <div id="contractPreview" style="margin-top:12px"><div class="empty">미리보기 또는 계약 보기를 선택하세요.</div></div>`:'<div class="empty">활성 근로계약서 서식이 없습니다.</div>'}
   </div>
-  ${ME.role==='owner'?`<div class="card"><h2>🖋 원장 최종 발송 대기</h2>${CONTRACT_ROWS.filter(r=>r.status==='발송요청').length?`<div class="tblwrap"><table><tr><th>직원</th><th>작성자</th><th>서명기한</th><th></th></tr>${CONTRACT_ROWS.filter(r=>r.status==='발송요청').map(r=>`<tr><td>${esc(nameOf(r.user_id))}</td><td>${esc(r.created_by||'')}</td><td>${contractDate(r.due_at)}</td><td><button class="mini" onclick="viewContract(${r.id})">미리보기</button> <button class="mini stamp" onclick="approveContractSend(${r.id})">확인 후 최종 발송</button></td></tr>`).join('')}</table></div>`:'<div class="empty">최종 발송 요청이 없습니다.</div>'}</div>`:''}
+  ${ME.role==='owner'?`<div class="card"><h2>🖋 원장 최종 발송 대기</h2>${CONTRACT_ROWS.filter(r=>r.status==='발송요청').length?`<div class="tblwrap"><table><tr><th>직원</th><th>작성자</th><th>서명기한</th><th></th></tr>${CONTRACT_ROWS.filter(r=>r.status==='발송요청').map(r=>`<tr><td>${esc(nameOf(r.user_id))}</td><td>${esc(r.created_by||'')}</td><td>${contractDate(r.due_at)}</td><td><button class="mini" onclick="viewContract(${r.id})">미리보기</button> <button class="mini" onclick="editContractRequest(${r.id})">수정</button> <button class="mini stamp" onclick="approveContractSend(${r.id})">확인 후 최종 발송</button></td></tr>`).join('')}</table></div>`:'<div class="empty">최종 발송 요청이 없습니다.</div>'}</div>`:''}
   ${employmentTermsCard()}
   ${contractAlertsCard(CONTRACT_ALERTS)}
   <div class="card"><h2>📚 계약 목록</h2>${CONTRACT_ROWS.length?`<div class="tblwrap"><table><tr><th>직원</th><th>서식</th><th>상태</th><th>계약종료</th><th>발송일</th><th>서명일</th><th>서명기한</th><th></th></tr>

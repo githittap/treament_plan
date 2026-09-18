@@ -19,13 +19,18 @@ test('요일별 근무시간표 입력 코드가 포함되어 있다', () => {
 if (scheduleBlock) {
   const scheduleContext = {};
   vm.createContext(scheduleContext);
-  vm.runInContext(`${scheduleBlock[1]};this.contractScheduleRows=contractScheduleRows;this.validContractSchedule=validContractSchedule;`, scheduleContext);
+  vm.runInContext(`${scheduleBlock[1]};this.contractScheduleRows=contractScheduleRows;this.validContractSchedule=validContractSchedule;this.contractScheduleNeedsReview=contractScheduleNeedsReview;`, scheduleContext);
 
   test('근무시간표는 월~일, 주간·야간·별도 구분을 보존한다', () => {
     const rows = scheduleContext.contractScheduleRows([{ days: ['월', '수', '일'], kind: '야간', start: '18:30', end: '20:30', break_time: '18:00 ~ 18:30', note: '야간진료' }]);
     assert.deepEqual({ ...rows[0], days: [...rows[0].days] }, { days: ['월', '수', '일'], kind: '야간', start: '18:30', end: '20:30', break_time: '18:00 ~ 18:30', note: '야간진료' });
     assert.equal(scheduleContext.validContractSchedule(rows), true);
     assert.equal(scheduleContext.validContractSchedule([{ days: [], start: '10:00', end: '18:00' }]), false);
+  });
+
+  test('깨진 이전 시간표 문자열은 원장 검토 대상으로 표시한다', () => {
+    assert.equal(scheduleContext.contractScheduleNeedsReview('[object Object]'), true);
+    assert.equal(scheduleContext.contractScheduleNeedsReview('[{"days":["월"]}]'), false);
   });
 }
 
