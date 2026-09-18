@@ -361,6 +361,13 @@ function calendarLeaveIndex(rows,people,from,to,nameForUser){
   });
   return index;
 }
+function scheduleRowsWithoutApprovedLeave(rows,leaveRows){
+  return (rows||[]).filter(row=>{
+    if((row.shift!=='work'&&row.shift!=='evening')||!row.user_id)return true;
+    const date=scheduleDate(row.week_start,row.day);
+    return !(leaveRows||[]).some(leave=>leave.user_id===row.user_id&&leave.date_from<=date&&leave.date_to>=date);
+  });
+}
 /* schedule-roster:test-end */
 function mondayStr(ds){const d=new Date(ds+'T00:00:00');const g=d.getDay();d.setDate(d.getDate()+(g===0?-6:1-g));return dstr(d);}
 const SHIFTS={work:{l:'근무'},off:{l:'off'},evening:{l:'야간'},etc:{l:'기타'}};
@@ -1077,11 +1084,11 @@ function calendarRosterTag(label,names,kind){
   return `<span class="cal-tag ${kind} cal-roster"><span class="cal-summary">${esc(label)} ${names.length}명</span><span class="cal-names" title="${esc(label)}: ${esc(detail)}">${esc(detail)}</span></span>`;
 }
 function toggleCalendarDay(cell,event){
+  if(event&&event.target&&event.target.closest&&event.target.closest('a,button,input,select'))return;
   if(event&&event.type==='keydown'){
     if(!(event.key==='Enter'||event.key===' '))return;
     event.preventDefault();
   }
-  if(event&&event.target&&event.target.closest&&event.target.closest('a,button,input,select'))return;
   const expanded=cell.classList.toggle('expanded');
   cell.setAttribute('aria-expanded',String(expanded));
 }
@@ -1105,7 +1112,7 @@ async function renderCalendar(m){
   ]);
   const loadError=holidaysError||eventsError||leaveError||schedulesError||weeksError;
   const leaveByDate=calendarLeaveIndex(lv||[],SCHEDULE_PEOPLE,from,to,nameOf);
-  const scheduleByDate=scheduleCalendarIndex(schedules||[],SCHEDULE_PEOPLE,weeks||[]);
+  const scheduleByDate=scheduleCalendarIndex(scheduleRowsWithoutApprovedLeave(schedules||[],lv||[]),SCHEDULE_PEOPLE,weeks||[]);
   const weekByStart=new Map((weeks||[]).map(w=>[w.week_start,w]));
   const byDate={};
   const day=ds=>byDate[ds]||(byDate[ds]={holidays:[],events:[]});

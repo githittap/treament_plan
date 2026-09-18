@@ -36,7 +36,7 @@ test('통합 명부 순수 함수 코드 블록이 포함되어 있다', () => {
 if (block) {
   const context = {};
   vm.createContext(context);
-  vm.runInContext(`${block[1]};this.schedulePersonLabel=schedulePersonLabel;this.schedulePeopleForWeek=schedulePeopleForWeek;this.scheduleDate=scheduleDate;this.scheduleCalendarIndex=scheduleCalendarIndex;this.calendarLeaveIndex=typeof calendarLeaveIndex==='function'?calendarLeaveIndex:null;`, context);
+  vm.runInContext(`${block[1]};this.schedulePersonLabel=schedulePersonLabel;this.schedulePeopleForWeek=schedulePeopleForWeek;this.scheduleDate=scheduleDate;this.scheduleCalendarIndex=scheduleCalendarIndex;this.calendarLeaveIndex=typeof calendarLeaveIndex==='function'?calendarLeaveIndex:null;this.scheduleRowsWithoutApprovedLeave=typeof scheduleRowsWithoutApprovedLeave==='function'?scheduleRowsWithoutApprovedLeave:null;`, context);
 
   test('의사 부서는 표시 이름에만 Dr. 접두사를 붙인다', () => {
     assert.equal(context.schedulePersonLabel({ name: '홍길동', department: 'Dr.' }), 'Dr. 홍길동');
@@ -132,6 +132,33 @@ if (block) {
       '2026-09-15': ['연결없음']
     });
   });
+
+  test('승인 연차 당일의 work와 evening만 근무 집계에서 제외하고 연차·OFF·기타는 보존한다', () => {
+    assert.equal(typeof context.scheduleRowsWithoutApprovedLeave, 'function');
+    const people = [
+      { id: 'leave-person', profile_user_id: 'leave-user', name: '연차의사', department: 'Dr.', sort_order: 1, included_in_schedule: true },
+      { id: 'worker', profile_user_id: 'worker-user', name: '근무직원', department: '진료실', sort_order: 1, included_in_schedule: true }
+    ];
+    const schedules = [
+      { person_id: 'leave-person', user_id: 'leave-user', week_start: '2026-09-14', day: 1, shift: 'work' },
+      { person_id: 'leave-person', user_id: 'leave-user', week_start: '2026-09-14', day: 1, shift: 'evening' },
+      { person_id: 'worker', user_id: 'worker-user', week_start: '2026-09-14', day: 1, shift: 'work' },
+      { person_id: 'leave-person', user_id: 'leave-user', week_start: '2026-09-14', day: 2, shift: 'off' },
+      { person_id: 'leave-person', user_id: 'leave-user', week_start: '2026-09-14', day: 3, shift: 'etc' }
+    ];
+    const leave = [{ user_id: 'leave-user', date_from: '2026-09-14', date_to: '2026-09-14' }];
+    const filtered = context.scheduleRowsWithoutApprovedLeave(schedules, leave);
+    assert.deepEqual([...filtered].map(row => row.shift), ['work', 'off', 'etc']);
+
+    const scheduleIndex = context.scheduleCalendarIndex(filtered, people, []);
+    const leaveIndex = context.calendarLeaveIndex(leave, people, '2026-09-01', '2026-09-30', value => value);
+    assert.deepEqual(JSON.parse(JSON.stringify(scheduleIndex['2026-09-14'].departments['Dr.'])), []);
+    assert.deepEqual(JSON.parse(JSON.stringify(scheduleIndex['2026-09-14'].departments['진료실'])), ['근무직원']);
+    assert.deepEqual(JSON.parse(JSON.stringify(scheduleIndex['2026-09-14'].evening)), []);
+    assert.deepEqual(JSON.parse(JSON.stringify(leaveIndex['2026-09-14'])), ['Dr. 연차의사']);
+    assert.deepEqual(JSON.parse(JSON.stringify(scheduleIndex['2026-09-15'].off)), ['Dr. 연차의사']);
+    assert.deepEqual(JSON.parse(JSON.stringify(scheduleIndex['2026-09-16'].etc)), ['Dr. 연차의사']);
+  });
 }
 
 test('월간 캘린더는 월 경계 주차의 전체 근무와 주차 상태를 조회한다', () => {
@@ -141,7 +168,7 @@ test('월간 캘린더는 월 경계 주차의 전체 근무와 주차 상태를
   assert.match(source, /from\('schedules'\)\.select\('person_id,user_id,week_start,day,shift,note'\)\.gte\('week_start',weekFrom\)\.lte\('week_start',weekTo\)/);
   assert.match(source, /from\('schedule_weeks'\)\.select\('week_start,status'\)\.gte\('week_start',weekFrom\)\.lte\('week_start',weekTo\)/);
   assert.doesNotMatch(source, /from\('schedules'\)[\s\S]*?\.eq\('shift','off'\)/);
-  assert.match(source, /scheduleCalendarIndex\(schedules\|\|\[\],SCHEDULE_PEOPLE,weeks\|\|\[\]\)/);
+  assert.match(source, /scheduleCalendarIndex\(scheduleRowsWithoutApprovedLeave\(schedules\|\|\[\],lv\|\|\[\]\),SCHEDULE_PEOPLE,weeks\|\|\[\]\)/);
 });
 
 test('월간 캘린더는 모든 조회 오류를 눈에 보이는 하나의 오류 문구로 표시한다', () => {
@@ -179,6 +206,46 @@ test('캘린더 날짜 셀은 모바일·키보드 펼침과 삭제 링크 전�
   assert.match(source, /event\.stopPropagation\(\);deleteCalendarEvent/);
   assert.match(html, /@media\(max-width:640px\)[\s\S]*?\.cal-cell:not\(\.expanded\) \.cal-names\{display:none\}/);
   assert.match(html, /\.cal-cell:focus-visible/);
+});
+
+function calendarToggleHarness() {
+  const context = {};
+  vm.createContext(context);
+  vm.runInContext(`${calendarBlock[1]};this.toggleCalendarDay=toggleCalendarDay;`, context);
+  const calls = { toggle: 0, preventDefault: 0, attributes: [] };
+  const cell = {
+    classList: { toggle: () => { calls.toggle++; return true; } },
+    setAttribute: (name, value) => calls.attributes.push([name, value])
+  };
+  return { context, calls, cell };
+}
+
+test('중첩 삭제 링크의 Enter는 기본 동작을 막거나 날짜 셀을 펼치지 않는다', () => {
+  const { context, calls, cell } = calendarToggleHarness();
+  context.toggleCalendarDay(cell, {
+    type: 'keydown',
+    key: 'Enter',
+    target: { closest: selector => selector === 'a,button,input,select' ? {} : null },
+    preventDefault: () => { calls.preventDefault++; }
+  });
+  assert.equal(calls.preventDefault, 0);
+  assert.equal(calls.toggle, 0);
+  assert.deepEqual(calls.attributes, []);
+});
+
+test('날짜 셀의 Enter와 Space는 기본 동작을 막고 펼침 상태를 갱신한다', () => {
+  for (const key of ['Enter', ' ']) {
+    const { context, calls, cell } = calendarToggleHarness();
+    context.toggleCalendarDay(cell, {
+      type: 'keydown',
+      key,
+      target: { closest: () => null },
+      preventDefault: () => { calls.preventDefault++; }
+    });
+    assert.equal(calls.preventDefault, 1, `${JSON.stringify(key)} preventDefault 누락`);
+    assert.equal(calls.toggle, 1, `${JSON.stringify(key)} 펼침 누락`);
+    assert.deepEqual(calls.attributes, [['aria-expanded', 'true']]);
+  }
 });
 
 test('명부 관리 UI는 manager, chief, owner에게만 근무표 안에서 노출된다', () => {
