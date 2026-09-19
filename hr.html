@@ -386,7 +386,7 @@ const TABS=[
   {key:'appr',  label:'결재함',    roles:['staff','manager','chief','owner']},
   {key:'notice',label:'공지',      roles:['staff','manager','chief','owner']},
   {key:'calendar',label:'📅 캘린더',roles:['staff','manager','chief','owner']},
-  {key:'leavestatus',label:'연차현황',roles:['staff','manager','chief','owner']},
+  {key:'leavestatus',label:'연차캘린더',roles:['staff','manager','chief','owner']},
   {key:'onbo',  label:'입사서류',  roles:['staff','manager','chief','owner']},
   {key:'confid',label:'케이스노트',roles:['staff','manager','chief','owner'],needsConfid:true},
   {key:'contract',label:'근로계약서',roles:['staff','manager','chief','owner']},
@@ -1165,23 +1165,46 @@ async function renderCalendar(m){
   </div>`;
 }
 /* ── 연차현황 ── */
-let LVSTATUS_MONTH='';
+/* leave-calendar:test-start */
+function compareLeaveRowsByCreatedAtThenId(a,b){
+  const aAt=a.created_at==null?'':String(a.created_at),bAt=b.created_at==null?'':String(b.created_at);
+  if(aAt!==bAt){if(!aAt)return 1;if(!bAt)return -1;return aAt<bAt?-1:1;}
+  return Number(a.id)-Number(b.id);
+}
+function buildLeaveCalendarIndex(rows,monthFrom,monthTo){
+  const byDate={};
+  const next=ds=>{const p=String(ds).split('-').map(Number),d=new Date(p[0],p[1]-1,p[2]);d.setDate(d.getDate()+1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+  (rows||[]).forEach(row=>{
+    const start=row.date_from<monthFrom?monthFrom:row.date_from,end=row.date_to>monthTo?monthTo:row.date_to;
+    for(let date=start;date<=end;date=next(date)){(byDate[date]||(byDate[date]=[])).push(row);}
+  });
+  Object.keys(byDate).forEach(date=>{byDate[date].sort(compareLeaveRowsByCreatedAtThenId);byDate[date]=byDate[date].map((row,index)=>({row,rank:index+1,date}));});
+  return byDate;
+}
+function leaveCalendarLabel(item,role){
+  const circled=['','①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩','⑪','⑫','⑬','⑭','⑮','⑯','⑰','⑱','⑲','⑳'];
+  const rank=circled[item.rank]||String(item.rank)+'.',row=item.row,name=row.user_name||row.name||'';
+  if(role!=='owner')return rank+' '+name;
+  return rank+' '+name+' · '+(row.type||'')+' · 신청 '+(row.created_at||'미상')+' · 승인 '+(row.owner_at||'미상');
+}
+/* leave-calendar:test-end */
+/* leave-calendar:render-start */
+let LVSTATUS_MONTH='',LVSTATUS_VIEW='calendar';
 async function renderLeaveStatus(m){
   if(!LVSTATUS_MONTH)LVSTATUS_MONTH=today().slice(0,7);
   const from=LVSTATUS_MONTH+'-01',to=LVSTATUS_MONTH+'-31';
-  const {data,error}=await sb.from('leave_requests').select('*').lte('date_from',to).gte('date_to',from).order('date_from');
-  if(error){m.innerHTML=`<div class="card"><div class="empty">연차현황을 불러오지 못했습니다: ${esc(error.message)}</div></div>`;return;}
-  const rows=data||[];
-  m.innerHTML=`<div class="card"><h2>🏖 연차현황</h2>
-    <div class="rowflex"><label>대상 월 <input class="mini" type="month" value="${LVSTATUS_MONTH}" onchange="LVSTATUS_MONTH=this.value;render()"></label></div>
-    <div class="hint">${isLead()?'전 직원의 연차 신청·승인 내역입니다.':'승인된 연차는 전 직원, 대기·반려는 본인 것만 보입니다.'}</div>
-    ${rows.length?`<div class="tblwrap"><table><tr><th>이름</th><th>종류</th><th>기간</th><th>일수</th><th>상태</th><th>사유</th></tr>
-    ${rows.map(r=>`<tr><td>${esc(nameOf(r.user_id))}</td><td>${esc(r.type||'')}${r.type==='기타'&&r.type_note?' '+esc(r.type_note):''}</td>
-      <td>${md(r.date_from)}~${md(r.date_to)}</td><td>${r.days}</td>
-      <td><span class="b ${r.status==='승인'?'ok':(r.status==='반려'?'no':'wait')}">${esc(r.status)}</span></td>
-      <td>${esc(r.reason||'')}${r.special?' <span class="b no">특별사정</span> '+esc(r.special_reason||''):''}</td></tr>`).join('')}</table></div>`:'<div class="empty">이번 달 연차 내역이 없습니다.</div>'}
-  </div>`;
+  const {data,error}=await sb.from('leave_requests').select('id,user_id,type,type_note,date_from,date_to,days,status,owner_at,created_at').eq('status','승인').lte('date_from',to).gte('date_to',from).order('date_from');
+  if(error){m.innerHTML=`<div class="card"><h2>🏖 연차캘린더</h2><div class="cal-error">연차 정보를 불러오지 못했습니다: ${esc(error.message||'알 수 없는 오류')}</div></div>`;return;}
+  const rows=(data||[]).map(row=>({...row,user_name:nameOf(row.user_id)})),index=buildLeaveCalendarIndex(rows,from,to),owner=ME.role==='owner';
+  const first=new Date(from+'T00:00:00'),days=new Date(first.getFullYear(),first.getMonth()+1,0).getDate(),leading=first.getDay(),dow=['일','월','화','수','목','금','토'];
+  const cells=[];for(let i=0;i<leading;i++)cells.push('<div class="cal-cell out"></div>');
+  for(let day=1;day<=days;day++){const date=LVSTATUS_MONTH+'-'+String(day).padStart(2,'0'),items=index[date]||[];cells.push(`<div class="cal-cell"><div class="d">${day}</div>${items.map(item=>`<div class="cal-tag lv"><span>${esc(leaveCalendarLabel(item,ME.role))}</span></div>`).join('')}</div>`);}
+  const listRows=[...rows].sort((a,b)=>a.date_from.localeCompare(b.date_from)||compareLeaveRowsByCreatedAtThenId(a,b));
+  const table=rows.length?`<div class="tblwrap"><table><tr><th>이름</th>${owner?'<th>종류</th>':''}<th>기간</th><th>일수</th>${owner?'<th>신청 시각</th><th>승인 시각</th>':''}</tr>${listRows.map(row=>`<tr><td>${esc(row.user_name)}</td>${owner?`<td>${esc(row.type||'')}${row.type_note?' '+esc(row.type_note):''}</td>`:''}<td>${md(row.date_from)}~${md(row.date_to)}</td><td>${row.days}</td>${owner?`<td>${esc(row.created_at||'')}</td><td>${esc(row.owner_at||'')}</td>`:''}</tr>`).join('')}</table></div>`:'<div class="empty">선택한 달의 승인 연차가 없습니다.</div>';
+  const calendar=`<div class="cal-grid">${dow.map((label,index)=>`<div class="cal-dow ${index===0?'sun':index===6?'sat':''}">${label}</div>`).join('')}${cells.join('')}</div>`;
+  m.innerHTML=`<div class="card"><h2>🏖 연차캘린더</h2><div class="rowflex"><label>대상 월 <input class="mini" type="month" value="${LVSTATUS_MONTH}" onchange="LVSTATUS_MONTH=this.value;render()"></label><button class="mini ${LVSTATUS_VIEW==='calendar'?'stamp':''}" onclick="LVSTATUS_VIEW='calendar';render()">달력 보기</button><button class="mini ${LVSTATUS_VIEW==='list'?'stamp':''}" onclick="LVSTATUS_VIEW='list';render()">목록 보기</button></div><div class="hint">승인된 연차만 표시합니다.</div>${LVSTATUS_VIEW==='calendar'?calendar:table}</div>`;
 }
+/* leave-calendar:render-end */
 async function addCalendarEvent(){
   const date=$('#calDate').value,title=$('#calTitle').value.trim(),kind=$('#calKind').value;if(!date||!title)return;
   setStatus('saving');const {error}=await sb.from('calendar_events').insert({date,title,kind,created_by:ME.name});
