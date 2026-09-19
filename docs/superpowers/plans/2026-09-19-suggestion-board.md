@@ -4,7 +4,7 @@
 
 **Goal:** 직원 허브에 월간 건의함, 좋아요, owner 평가·수상 공개, 안전한 Supabase RLS를 추가한다.
 
-**Architecture:** 새 Supabase 테이블 4개와 민감 필드를 제외한 수상 공개 view를 전용 SQL 정본에 둔다. hr.html은 suggestions 탭과 renderSuggestions를 추가하고, 집계·좋아요 상태·표시용 함수는 테스트 경계 안에서 검증한다. SQL 정책 테스트는 파일의 정책·grant·제약을 정적으로 확인하고, live DDL 후 읽기 쿼리와 security advisor로 확인한다.
+**Architecture:** 새 Supabase 업무 테이블 4개와 공개 ID·순위 보조 테이블, 민감 필드를 제외한 security-invoker 수상 공개 view를 전용 SQL 정본에 둔다. hr.html은 suggestions 탭과 renderSuggestions를 추가하고, 집계·좋아요 상태·표시용 함수는 테스트 경계 안에서 검증한다. SQL 정책 테스트는 파일의 정책·grant·제약을 정적으로 확인하고, live DDL 후 읽기 쿼리와 security advisor로 확인한다.
 
 **Tech Stack:** 단일 HTML, Supabase JS, PostgreSQL 17, Node node:test, Node vm.
 

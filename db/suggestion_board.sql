@@ -56,10 +56,18 @@ create unique index if not exists suggestion_reviews_campaign_award_rank_uq
   on public.suggestion_reviews (campaign_id, award_rank)
   where award_rank is not null;
 
+create table if not exists public.suggestion_awards_public_rows (
+  campaign_id bigint not null references public.suggestion_campaigns(id) on delete cascade,
+  suggestion_id bigint not null references public.suggestions(id) on delete cascade,
+  award_rank smallint not null check (award_rank between 1 and 3),
+  primary key (campaign_id, suggestion_id)
+);
+
 alter table public.suggestion_campaigns enable row level security;
 alter table public.suggestions enable row level security;
 alter table public.suggestion_likes enable row level security;
 alter table public.suggestion_reviews enable row level security;
+alter table public.suggestion_awards_public_rows enable row level security;
 
 revoke all on table public.suggestion_campaigns from anon;
 revoke all on table public.suggestions from anon;
@@ -69,10 +77,12 @@ revoke all on table public.suggestion_campaigns from public;
 revoke all on table public.suggestions from public;
 revoke all on table public.suggestion_likes from public;
 revoke all on table public.suggestion_reviews from public;
+revoke all on table public.suggestion_awards_public_rows from public;
 revoke all on table public.suggestion_campaigns from authenticated;
 revoke all on table public.suggestions from authenticated;
 revoke all on table public.suggestion_likes from authenticated;
 revoke all on table public.suggestion_reviews from authenticated;
+revoke all on table public.suggestion_awards_public_rows from authenticated;
 
 grant select on table public.suggestion_campaigns to authenticated;
 grant insert, update on table public.suggestion_campaigns to authenticated;
@@ -81,6 +91,7 @@ grant insert, delete on table public.suggestions to authenticated;
 grant update (title, body, updated_at) on table public.suggestions to authenticated;
 grant select, insert, delete on table public.suggestion_likes to authenticated;
 grant select, insert, update, delete on table public.suggestion_reviews to authenticated;
+grant select on table public.suggestion_awards_public_rows to authenticated;
 grant usage, select on sequence public.suggestion_campaigns_id_seq to authenticated;
 grant usage, select on sequence public.suggestions_id_seq to authenticated;
 grant usage, select on sequence public.suggestion_reviews_id_seq to authenticated;
@@ -206,25 +217,57 @@ create policy suggestion_reviews_delete_owner
 on public.suggestion_reviews for delete to authenticated
 using ((select public.my_role()) = 'owner');
 
-create or replace view public.suggestion_awards_public
-with (security_invoker = false) as
+drop policy if exists suggestion_awards_public_rows_select_authenticated on public.suggestion_awards_public_rows;
+create policy suggestion_awards_public_rows_select_authenticated
+on public.suggestion_awards_public_rows for select to authenticated
+using (true);
+
+create or replace function public.sync_suggestion_award_public_rows()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if tg_op <> 'INSERT' then
+    delete from public.suggestion_awards_public_rows
+    where campaign_id = old.campaign_id and suggestion_id = old.suggestion_id;
+  end if;
+  if tg_op <> 'DELETE' and new.award_rank is not null then
+    insert into public.suggestion_awards_public_rows (campaign_id, suggestion_id, award_rank)
+    values (new.campaign_id, new.suggestion_id, new.award_rank)
+    on conflict (campaign_id, suggestion_id) do update set award_rank = excluded.award_rank;
+  end if;
+  return coalesce(new, old);
+end;
+$$;
+
+revoke all on function public.sync_suggestion_award_public_rows() from public, anon, authenticated;
+drop trigger if exists suggestion_reviews_sync_public_awards on public.suggestion_reviews;
+create trigger suggestion_reviews_sync_public_awards
+after insert or update or delete on public.suggestion_reviews
+for each row execute function public.sync_suggestion_award_public_rows();
+
+drop view if exists public.suggestion_awards_public;
+create view public.suggestion_awards_public
+with (security_invoker = true) as
 select
-  r.campaign_id,
-  r.suggestion_id,
-  r.award_rank,
+  p.campaign_id,
+  p.suggestion_id,
+  p.award_rank,
   s.title,
   s.user_id,
   c.ends_at,
-  case r.award_rank
+  case p.award_rank
     when 1 then c.prize_1
     when 2 then c.prize_2
     when 3 then c.prize_3
   end as prize_amount
-from public.suggestion_reviews r
-join public.suggestion_campaigns c on c.id = r.campaign_id
-join public.suggestions s on s.id = r.suggestion_id and s.campaign_id = r.campaign_id
+from public.suggestion_awards_public_rows p
+join public.suggestion_campaigns c on c.id = p.campaign_id
+join public.suggestions s on s.id = p.suggestion_id and s.campaign_id = p.campaign_id
 where c.ends_at < current_date
-  and r.award_rank is not null;
+  and p.award_rank is not null;
 
 revoke all on table public.suggestion_awards_public from anon;
 revoke all on table public.suggestion_awards_public from public;

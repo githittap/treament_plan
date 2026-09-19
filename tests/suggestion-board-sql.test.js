@@ -32,8 +32,10 @@ test('기간·auth.uid·UPDATE USING/WITH CHECK·자기 글 좋아요 금지를 
 
 test('캠페인별 수상 순위 중복을 막고 공개 view에서 민감 필드를 제외한다', () => {
   assert.match(sql, /unique index[\s\S]+campaign_award_rank[\s\S]+where[\s\S]+award_rank is not null/i);
-  const view = sql.match(/create or replace view public\.suggestion_awards_public[\s\S]+?;\s*$/i);
+  assert.match(sql, /create table if not exists public\.suggestion_awards_public_rows/i);
+  const view = sql.match(/create(?: or replace)? view public\.suggestion_awards_public[\s\S]+?;\s*$/i);
   assert.ok(view, '수상 공개 view가 없습니다.');
+  assert.match(view[0], /security_invoker\s*=\s*true/i);
   assert.doesNotMatch(view[0], /originality_score|review_note|reviewer_id/i);
 });
 

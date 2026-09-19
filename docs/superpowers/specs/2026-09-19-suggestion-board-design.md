@@ -45,7 +45,7 @@ id bigint identity primary key, campaign_id, suggestion_id, originality_score in
 
 ### 종료 후 공개 view
 
-suggestion_awards_public view는 종료일이 지난 캠페인의 award_rank가 있는 행만 반환한다. 반환 컬럼은 campaign_id, suggestion_id, award_rank, title, user_id, ends_at, prize_amount로 제한한다. 점수·메모·reviewer_id는 view에 포함하지 않는다. 원본 suggestion_reviews는 owner만 직접 조회한다.
+suggestion_awards_public security-invoker view는 종료일이 지난 캠페인의 award_rank가 있는 행만 반환한다. 반환 컬럼은 campaign_id, suggestion_id, award_rank, title, user_id, ends_at, prize_amount로 제한한다. 점수·메모·reviewer_id는 view에 포함하지 않는다. view가 private review 행을 직접 읽지 않도록 공개 ID·순위만 담은 suggestion_awards_public_rows 보조 테이블을 두고, 원본 suggestion_reviews는 owner만 직접 조회한다.
 
 ## 4. RLS·권한
 
