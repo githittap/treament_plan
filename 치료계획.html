@@ -3434,12 +3434,21 @@ function implantRecorderLineOf(r, addPeriodFn, measureOut){
   if(r.memoEtc) line += ` ${r.memoEtc}`;
   return line.trim();
 }
+function implantRecorderCommit(records, draft, editingIndex){
+  const next = records.slice();
+  if(editingIndex===null) next.push(draft); else next[editingIndex]=draft;
+  return next;
+}
+function implantRecorderStepForSegment(segment){
+  return {date:1, type:2, teeth:3, period:4, measure:5}[segment];
+}
 /* implant-recorder:test-end */
 const ImplantRecorder = (function(){
   const modal = document.getElementById('implantModal');
   const body  = document.getElementById('irBody');
   let records = [];
   let draft = null;
+  let editingIndex = null;
   let step = 1;
   let showMoreMonths = false;
   let advance = null;  // 현재 단계의 진행 동작 (다음/추가)
@@ -3491,7 +3500,7 @@ const ImplantRecorder = (function(){
   }
   function newDraft(){ return {date:todayStr(), type:null, teeth:[], months:null, memoMeasure:null, memoForce:null, memoEtc:''}; }
   function goStep(n){ step = n; render(); }
-  function open(){ draft = newDraft(); step = 1; showMoreMonths = false; modal.style.display='flex'; document.addEventListener('keydown', onKey); render(); }
+  function open(){ draft = newDraft(); editingIndex = null; step = 1; showMoreMonths = false; modal.style.display='flex'; document.addEventListener('keydown', onKey); render(); }
   function close(){ modal.style.display='none'; document.removeEventListener('keydown', onKey); }
   function render(){
     if(step===1) return renderDate();
@@ -3606,7 +3615,7 @@ const ImplantRecorder = (function(){
     document.getElementById('irNext').onclick = advance;
   }
   function renderMemo(){
-    const measures = ['IST + SCAN','ISQ + SCAN','ISQ만 측정','경과관찰','2nd op'];
+    const measures = ['ISQ + SCAN','ISQ만 측정','경과관찰','2nd op','IST + SCAN'];
     const forces = ['0N','5N','10N','20N','30N이상'];
     const mBtns = measures.map(v=>`<button class="ir-btn${draft.memoMeasure===v?' sel':''}" data-meas="${v}">${v}</button>`).join('');
     const fBtns = forces.map(v=>`<button class="ir-btn${draft.memoForce===v?' sel':''}" data-force="${v}">${v}</button>`).join('');
@@ -3622,7 +3631,7 @@ const ImplantRecorder = (function(){
       </div>
       <div style="display:flex;justify-content:space-between;">
         <button class="ir-btn" id="irBack">◀ 이전</button>
-        <button class="ir-primary" id="irAdd">기록 추가 ✔</button>
+        <button class="ir-primary" id="irAdd">${editingIndex===null?'기록 추가 ✔':'수정 완료 ✔'}</button>
       </div>`;
     body.querySelectorAll('[data-meas]').forEach(b=>{
       b.onclick = ()=>{ draft.memoMeasure = (draft.memoMeasure===b.dataset.meas?null:b.dataset.meas); render(); };
@@ -3639,7 +3648,8 @@ const ImplantRecorder = (function(){
     document.getElementById('irAdd').onclick = add;
   }
   function commitDraft(){
-    records.push(draft);
+    editingIndex===null ? records.push(draft) : records[editingIndex]=draft;
+    editingIndex = null;
     draft = newDraft();
     step = 1; showMoreMonths = false;
     renderList();
@@ -3649,9 +3659,31 @@ const ImplantRecorder = (function(){
     return implantRecorderLineOf(r, addPeriod, MEASURE_OUT);
   }
   function buildText(){ return records.map(lineOf).join('\n'); }
+  function editPart(label, stepNo, index){
+    return `<button type="button" class="ir-edit-part" data-edit-index="${index}" data-edit-step="${stepNo}" style="background:none;border:0;padding:0;color:inherit;font:inherit;cursor:pointer;text-align:left;">${label}</button>`;
+  }
+  function recordHtml(r, index){
+    let html = editPart(r.date, 1, index);
+    const teeth = r.teeth.join(' ');
+    if(r.type || teeth){
+      html += ' (';
+      if(r.type) html += editPart(r.type, 2, index);
+      if(teeth) html += `${r.type?' ':''}${editPart('#'+teeth, 3, index)}`;
+      html += ')';
+    }
+    if(r.months!=null){
+      const period = addPeriod(r.date, r.months);
+      if(period) html += ` > ${editPart(period, 4, index)}`;
+    }
+    const meas = r.memoMeasure ? MEASURE_OUT[r.memoMeasure] : '';
+    if(meas) html += ` ${editPart(meas, 5, index)}`;
+    if(r.memoForce) html += ` ${editPart('('+r.memoForce+')', 5, index)}`;
+    if(r.memoEtc) html += ` ${editPart(r.memoEtc, 5, index)}`;
+    return html;
+  }
   function renderList(){
     const items = records.length
-      ? records.map((r,i)=>`<div class="ir-row-item"><span style="flex:1;">${lineOf(r)}</span><button class="ir-del" data-i="${i}">🗑</button></div>`).join('')
+      ? records.map((r,i)=>`<div class="ir-row-item"><span style="flex:1;">${recordHtml(r,i)}</span><button class="ir-del" data-i="${i}">🗑</button></div>`).join('')
       : '<div style="color:#999;text-align:center;padding:16px;">아직 기록이 없습니다.</div>';
     body.innerHTML = `
       <div class="ir-section">
@@ -3673,7 +3705,17 @@ const ImplantRecorder = (function(){
     body.querySelectorAll('[data-i]').forEach(b=>{
       b.onclick = ()=>{ records.splice(Number(b.dataset.i),1); renderList(); };
     });
-    document.getElementById('irAddNew').onclick = ()=>{ draft = newDraft(); step = 1; showMoreMonths = false; render(); };
+    body.querySelectorAll('[data-edit-index]').forEach(b=>{
+      b.onclick = ()=>{
+        const index = Number(b.dataset.editIndex);
+        draft = JSON.parse(JSON.stringify(records[index]));
+        editingIndex = index;
+        step = Number(b.dataset.editStep);
+        showMoreMonths = step===4 && ![2.5,3,4,6].includes(draft.months);
+        render();
+      };
+    });
+    document.getElementById('irAddNew').onclick = ()=>{ draft = newDraft(); editingIndex = null; step = 1; showMoreMonths = false; render(); };
     document.getElementById('irCopy').onclick = doCopy;
   }
   return { open, close };
