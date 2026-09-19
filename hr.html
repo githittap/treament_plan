@@ -509,6 +509,7 @@ async function renderHome(m){
     ${undone.length?`<div class="hint" style="color:var(--gold)">⚠ 미제출: ${undone.map(i=>esc(i.label)).join(', ')} — [입사서류] 탭에서 제출하세요.</div>`:''}
   </div>
   ${isMgr()?contractAlertsCard(CONTRACT_ALERTS):''}
+  <div class="card" style="padding:12px 14px"><div class="rowflex" style="justify-content:space-between;align-items:center;gap:10px"><div><h2 style="margin-bottom:3px">📚 업무자료</h2><div class="hint">직원 업무에 필요한 공개 자료를 한곳에서 확인합니다.</div></div><button class="mini" onclick="go('workdocs')">업무자료 열기</button></div></div>
   <div class="card"><h2>📢 최근 공지</h2>${(notices||[]).length?(notices||[]).map(n=>
     `<div style="padding:6px 0;border-bottom:1px dashed var(--line)">${n.pinned?'📌 ':''}<b>${esc(n.title)}</b> <span class="sub">${md(n.created_at)}</span>
      ${n.notion_url?` · <a href="${esc(n.notion_url)}" target="_blank" rel="noopener">전문 보기 ↗</a>`:''}
