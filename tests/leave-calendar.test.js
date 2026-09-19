@@ -12,7 +12,7 @@ function loadLeaveContext() {
   assert.ok(leaveBlock, '연차캘린더 테스트 경계가 없습니다.');
   const context = {};
   vm.createContext(context);
-  vm.runInContext(`${leaveBlock[1]};this.buildLeaveCalendarIndex=buildLeaveCalendarIndex;this.leaveCalendarLabel=leaveCalendarLabel;this.compareLeaveRowsByCreatedAtThenId=compareLeaveRowsByCreatedAtThenId;`, context);
+  vm.runInContext(`${leaveBlock[1]};this.buildLeaveCalendarIndex=buildLeaveCalendarIndex;this.leaveCalendarLabel=leaveCalendarLabel;this.compareLeaveRowsByCreatedAtThenId=compareLeaveRowsByCreatedAtThenId;this.leaveCalendarMonthEnd=leaveCalendarMonthEnd;this.formatLeaveTimestamp=formatLeaveTimestamp;`, context);
   return context;
 }
 
@@ -64,6 +64,18 @@ test('동률 created_at은 id 오름차순으로 정렬하고 null 시각은 마
   assert.deepEqual(JSON.parse(JSON.stringify(index['2026-09-05'].map(item => item.row.id))), [2, 3, 8]);
 });
 
+test('선택 월의 실제 말일을 윤년과 평년 기준으로 계산한다', () => {
+  const context = loadLeaveContext();
+  assert.equal(context.leaveCalendarMonthEnd('2024-02'), '2024-02-29');
+  assert.equal(context.leaveCalendarMonthEnd('2026-02'), '2026-02-28');
+  assert.equal(context.leaveCalendarMonthEnd('2026-09'), '2026-09-30');
+});
+
+test('owner 시각은 Asia/Seoul 기준 한국 시간으로 포맷한다', () => {
+  const context = loadLeaveContext();
+  assert.equal(context.formatLeaveTimestamp('2026-09-01T09:00:00Z'), '2026.09.01 18:00');
+});
+
 test('비원장 라벨은 순번과 이름만, 원장 라벨은 승인 상세를 포함한다', () => {
   const context = loadLeaveContext();
   const item = { rank: 1, row: row(1, '2026-09-05', '2026-09-05', '2026-09-01T09:00:00Z', { user_name: '홍길동' }) };
@@ -90,6 +102,12 @@ test('조회 실패는 빈 상태가 아니라 오류를 표시한다', () => {
   assert.ok(leaveRender, 'renderLeaveStatus 함수를 찾을 수 없습니다.');
   assert.match(leaveRender[1], /연차 정보를 불러오지 못했습니다/);
   assert.doesNotMatch(leaveRender[1], /error\)\{[\s\S]*?rows=\[\]/);
+});
+
+test('승인 연차 0건은 달력에서도 정상 빈 상태 문구를 표시한다', () => {
+  assert.ok(leaveRender, 'renderLeaveStatus 함수를 찾을 수 없습니다.');
+  assert.match(leaveRender[1], /calendarView=rows\.length\?calendar/);
+  assert.match(leaveRender[1], /선택한 달의 승인 연차가 없습니다\./);
 });
 
 test('비원장 목록에는 종류와 정확한 시각을 렌더링하지 않는다', () => {

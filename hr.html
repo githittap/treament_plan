@@ -1171,6 +1171,16 @@ function compareLeaveRowsByCreatedAtThenId(a,b){
   if(aAt!==bAt){if(!aAt)return 1;if(!bAt)return -1;return aAt<bAt?-1:1;}
   return Number(a.id)-Number(b.id);
 }
+function leaveCalendarMonthEnd(month){
+  const p=String(month).split('-').map(Number),d=new Date(p[0],p[1],0);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function formatLeaveTimestamp(value){
+  if(!value)return '';
+  const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(new Date(value));
+  const get=type=>parts.find(part=>part.type===type)?.value||'';
+  return `${get('year')}.${get('month')}.${get('day')} ${get('hour')}:${get('minute')}`;
+}
 function buildLeaveCalendarIndex(rows,monthFrom,monthTo){
   const byDate={};
   const next=ds=>{const p=String(ds).split('-').map(Number),d=new Date(p[0],p[1]-1,p[2]);d.setDate(d.getDate()+1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
@@ -1185,14 +1195,14 @@ function leaveCalendarLabel(item,role){
   const circled=['','①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩','⑪','⑫','⑬','⑭','⑮','⑯','⑰','⑱','⑲','⑳'];
   const rank=circled[item.rank]||String(item.rank)+'.',row=item.row,name=row.user_name||row.name||'';
   if(role!=='owner')return rank+' '+name;
-  return rank+' '+name+' · '+(row.type||'')+' · 신청 '+(row.created_at||'미상')+' · 승인 '+(row.owner_at||'미상');
+  return rank+' '+name+' · '+(row.type||'')+' · 신청 '+(formatLeaveTimestamp(row.created_at)||'미상')+' · 승인 '+(formatLeaveTimestamp(row.owner_at)||'미상');
 }
 /* leave-calendar:test-end */
 /* leave-calendar:render-start */
 let LVSTATUS_MONTH='',LVSTATUS_VIEW='calendar';
 async function renderLeaveStatus(m){
   if(!LVSTATUS_MONTH)LVSTATUS_MONTH=today().slice(0,7);
-  const from=LVSTATUS_MONTH+'-01',to=LVSTATUS_MONTH+'-31';
+  const from=LVSTATUS_MONTH+'-01',to=leaveCalendarMonthEnd(LVSTATUS_MONTH);
   const {data,error}=await sb.from('leave_requests').select('id,user_id,type,type_note,date_from,date_to,days,status,owner_at,created_at').eq('status','승인').lte('date_from',to).gte('date_to',from).order('date_from');
   if(error){m.innerHTML=`<div class="card"><h2>🏖 연차캘린더</h2><div class="cal-error">연차 정보를 불러오지 못했습니다: ${esc(error.message||'알 수 없는 오류')}</div></div>`;return;}
   const rows=(data||[]).map(row=>({...row,user_name:nameOf(row.user_id)})),index=buildLeaveCalendarIndex(rows,from,to),owner=ME.role==='owner';
@@ -1201,8 +1211,8 @@ async function renderLeaveStatus(m){
   for(let day=1;day<=days;day++){const date=LVSTATUS_MONTH+'-'+String(day).padStart(2,'0'),items=index[date]||[];cells.push(`<div class="cal-cell"><div class="d">${day}</div>${items.map(item=>`<div class="cal-tag lv"><span>${esc(leaveCalendarLabel(item,ME.role))}</span></div>`).join('')}</div>`);}
   const listRows=[...rows].sort((a,b)=>a.date_from.localeCompare(b.date_from)||compareLeaveRowsByCreatedAtThenId(a,b));
   const table=rows.length?`<div class="tblwrap"><table><tr><th>이름</th>${owner?'<th>종류</th>':''}<th>기간</th><th>일수</th>${owner?'<th>신청 시각</th><th>승인 시각</th>':''}</tr>${listRows.map(row=>`<tr><td>${esc(row.user_name)}</td>${owner?`<td>${esc(row.type||'')}${row.type_note?' '+esc(row.type_note):''}</td>`:''}<td>${md(row.date_from)}~${md(row.date_to)}</td><td>${row.days}</td>${owner?`<td>${esc(row.created_at||'')}</td><td>${esc(row.owner_at||'')}</td>`:''}</tr>`).join('')}</table></div>`:'<div class="empty">선택한 달의 승인 연차가 없습니다.</div>';
-  const calendar=`<div class="cal-grid">${dow.map((label,index)=>`<div class="cal-dow ${index===0?'sun':index===6?'sat':''}">${label}</div>`).join('')}${cells.join('')}</div>`;
-  m.innerHTML=`<div class="card"><h2>🏖 연차캘린더</h2><div class="rowflex"><label>대상 월 <input class="mini" type="month" value="${LVSTATUS_MONTH}" onchange="LVSTATUS_MONTH=this.value;render()"></label><button class="mini ${LVSTATUS_VIEW==='calendar'?'stamp':''}" onclick="LVSTATUS_VIEW='calendar';render()">달력 보기</button><button class="mini ${LVSTATUS_VIEW==='list'?'stamp':''}" onclick="LVSTATUS_VIEW='list';render()">목록 보기</button></div><div class="hint">승인된 연차만 표시합니다.</div>${LVSTATUS_VIEW==='calendar'?calendar:table}</div>`;
+  const calendar=`<div class="cal-grid">${dow.map((label,index)=>`<div class="cal-dow ${index===0?'sun':index===6?'sat':''}">${label}</div>`).join('')}${cells.join('')}</div>`,calendarView=rows.length?calendar:'<div class="empty">선택한 달의 승인 연차가 없습니다.</div>';
+  m.innerHTML=`<div class="card"><h2>🏖 연차캘린더</h2><div class="rowflex"><label>대상 월 <input class="mini" type="month" value="${LVSTATUS_MONTH}" onchange="LVSTATUS_MONTH=this.value;render()"></label><button class="mini ${LVSTATUS_VIEW==='calendar'?'stamp':''}" onclick="LVSTATUS_VIEW='calendar';render()">달력 보기</button><button class="mini ${LVSTATUS_VIEW==='list'?'stamp':''}" onclick="LVSTATUS_VIEW='list';render()">목록 보기</button></div><div class="hint">승인된 연차만 표시합니다.</div>${LVSTATUS_VIEW==='calendar'?calendarView:table}</div>`;
 }
 /* leave-calendar:render-end */
 async function addCalendarEvent(){

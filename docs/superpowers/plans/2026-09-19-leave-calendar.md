@@ -239,4 +239,3 @@ git commit -m "연차캘린더 달력과 목록 구현"
 - [ ] 자동테스트 RED를 구현 전에 확인했다.
 - [ ] 전체 테스트, 인라인 script 구문검사, `git diff --check`를 실행했다.
 - [ ] DB·SQL·RLS·Edge Function·다른 제품 코드·배포·push를 변경하지 않았다.
-
