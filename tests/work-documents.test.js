@@ -41,4 +41,7 @@ test('검색 빈 상태와 카드 확장 가능 목록 계약이 있다', () => 
   assert.match(render[1], /자료가 없습니다|검색 결과가 없습니다/);
   assert.match(render[1], /workDocuments/);
   assert.match(render[1], /업무자료/);
+  assert.match(render[1], /id="workDocResults"/);
+  assert.match(render[1], /oninput="WORK_DOC_QUERY=this\.value;renderWorkDocumentResults\(\)"/);
+  assert.doesNotMatch(render[1], /oninput="[^"]*renderWorkDocuments\(/);
 });

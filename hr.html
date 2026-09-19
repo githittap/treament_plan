@@ -1097,9 +1097,13 @@ function filterWorkDocuments(items,query){const q=String(query||'').trim().toLoc
 /* work-documents:test-end */
 /* work-documents:render-start */
 let WORK_DOC_QUERY='';
+function workDocumentCards(items){
+  const filtered=filterWorkDocuments(items,WORK_DOC_QUERY);
+  return filtered.length?filtered.map(item=>`<article class="workdoc-card"><div class="workdoc-icon">${item.icon}</div><div class="sub">${esc(item.category)}</div><h3>${esc(item.title)}</h3><p>${esc(item.description)}</p><a class="mini" href="${esc(item.url)}" target="_blank" rel="noopener">열기 ↗</a></article>`).join(''):'<div class="empty">검색 결과가 없습니다.</div>';
+}
+function renderWorkDocumentResults(){const results=document.querySelector('#workDocResults');if(results)results.innerHTML=workDocumentCards(workDocuments);}
 function renderWorkDocuments(m){
-  const filtered=filterWorkDocuments(workDocuments,WORK_DOC_QUERY);
-  m.innerHTML=`<div class="card"><h2>📚 업무자료</h2><p class="hint">직원 업무에 필요한 공개 자료를 한곳에서 확인합니다.</p><input id="workDocSearch" style="width:100%;margin-top:10px" type="search" placeholder="자료 검색" value="${esc(WORK_DOC_QUERY)}" oninput="WORK_DOC_QUERY=this.value;renderWorkDocuments(document.querySelector('#main'))"><div class="workdocs-grid">${filtered.length?filtered.map(item=>`<article class="workdoc-card"><div class="workdoc-icon">${item.icon}</div><div class="sub">${esc(item.category)}</div><h3>${esc(item.title)}</h3><p>${esc(item.description)}</p><a class="mini" href="${esc(item.url)}" target="_blank" rel="noopener">열기 ↗</a></article>`).join(''):'<div class="empty">검색 결과가 없습니다.</div>'}</div></div>`;
+  m.innerHTML=`<div class="card"><h2>📚 업무자료</h2><p class="hint">직원 업무에 필요한 공개 자료를 한곳에서 확인합니다.</p><input id="workDocSearch" style="width:100%;margin-top:10px" type="search" placeholder="자료 검색" value="${esc(WORK_DOC_QUERY)}" oninput="WORK_DOC_QUERY=this.value;renderWorkDocumentResults()"><div id="workDocResults" class="workdocs-grid">${workDocumentCards(workDocuments)}</div></div>`;
 }
 /* work-documents:render-end */
 /* ── 캘린더 ── */
