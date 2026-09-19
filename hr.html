@@ -59,6 +59,9 @@ main{padding:16px 16px 70px;max-width:1080px;margin:0 auto}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:14px}
 .card h2{font-size:16px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
 .card h3{font-size:13.5px;color:var(--mint);margin:12px 0 6px}
+.workdocs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-top:12px}
+.workdoc-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:7px}
+.workdoc-card .workdoc-icon{font-size:24px}.workdoc-card h3{margin:0}.workdoc-card p{color:var(--gray);font-size:12.5px;flex:1}
 .big{font-size:30px;font-weight:800;color:var(--mint)}
 .sub{font-size:12px;color:var(--gray)}
 .rowflex{display:flex;flex-wrap:wrap;gap:10px}
@@ -385,6 +388,7 @@ const TABS=[
   {key:'leave', label:'연차',      roles:['staff','manager','chief','owner']},
   {key:'appr',  label:'결재함',    roles:['staff','manager','chief','owner']},
   {key:'notice',label:'공지',      roles:['staff','manager','chief','owner']},
+  {key:'workdocs',label:'📚 업무자료',roles:['staff','manager','chief','owner']},
   {key:'calendar',label:'📅 캘린더',roles:['staff','manager','chief','owner']},
   {key:'suggestions',label:'💡 건의함',roles:['staff','manager','chief','owner']},
   {key:'onbo',  label:'입사서류',  roles:['staff','manager','chief','owner']},
@@ -467,6 +471,7 @@ async function render(){
     else if(TAB==='leave')await renderLeave(m);
     else if(TAB==='appr')await renderAppr(m);
     else if(TAB==='notice')await renderNotice(m);
+    else if(TAB==='workdocs')renderWorkDocuments(m);
     else if(TAB==='calendar')await renderCalendar(m);
     else if(TAB==='leavestatus'){CAL_VIEW='leave';TAB='calendar';await renderCalendar(m);}
     else if(TAB==='suggestions')await renderSuggestions(m);
@@ -1082,6 +1087,21 @@ async function submitNotice(){
 }
 async function delNotice(id){if(!confirm('삭제할까요?'))return;await sb.from('notices').delete().eq('id',id);setStatus('saved');render();}
 
+/* ── 업무자료 ── */
+/* work-documents:test-start */
+const workDocuments=[
+  {icon:'📘',category:'매뉴얼',title:'업무 매뉴얼',description:'직원 허브와 진료실 업무 안내를 확인합니다.',url:'https://app.notion.com/p/1f7ba489f082806e9761e748524994bc?source=copy_link'},
+  {icon:'🛒',category:'구매',title:'필요물품 요청·구매현황',description:'필요물품 요청과 구매 진행현황을 확인합니다.',url:'https://app.notion.com/p/163ba489f082805c9db2e2949b98a2d2?source=copy_link'}
+];
+function filterWorkDocuments(items,query){const q=String(query||'').trim().toLocaleLowerCase();return (items||[]).filter(item=>!q||[item.title,item.description,item.category].some(value=>String(value||'').toLocaleLowerCase().includes(q)));}
+/* work-documents:test-end */
+/* work-documents:render-start */
+let WORK_DOC_QUERY='';
+function renderWorkDocuments(m){
+  const filtered=filterWorkDocuments(workDocuments,WORK_DOC_QUERY);
+  m.innerHTML=`<div class="card"><h2>📚 업무자료</h2><p class="hint">직원 업무에 필요한 공개 자료를 한곳에서 확인합니다.</p><input id="workDocSearch" style="width:100%;margin-top:10px" type="search" placeholder="자료 검색" value="${esc(WORK_DOC_QUERY)}" oninput="WORK_DOC_QUERY=this.value;renderWorkDocuments(document.querySelector('#main'))"><div class="workdocs-grid">${filtered.length?filtered.map(item=>`<article class="workdoc-card"><div class="workdoc-icon">${item.icon}</div><div class="sub">${esc(item.category)}</div><h3>${esc(item.title)}</h3><p>${esc(item.description)}</p><a class="mini" href="${esc(item.url)}" target="_blank" rel="noopener">열기 ↗</a></article>`).join(''):'<div class="empty">검색 결과가 없습니다.</div>'}</div></div>`;
+}
+/* work-documents:render-end */
 /* ── 캘린더 ── */
 let CAL_MONTH=null,CAL_VIEW='work';
 function setCalendarView(view){CAL_VIEW=view;render();}
