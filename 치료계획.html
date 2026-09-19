@@ -3411,6 +3411,30 @@ document.addEventListener('copy', e=>{
 });
 
 // ===== 임플란트 기록 생성기 (독립 모듈) =====
+/* implant-recorder:test-start */
+function implantRecorderLineOf(r, addPeriodFn, measureOut){
+  const isq = r.months!=null ? addPeriodFn(r.date, r.months) : '';
+  const teeth = r.teeth.join(' ');
+  let line = r.date;
+  if(r.type || teeth){
+    const inner = [r.type, teeth ? ('#'+teeth) : ''].filter(Boolean).join(' ');
+    line += ` (${inner})`;
+  }
+  if(isq) line += ` > ${isq}`;
+  const defaultMeasureOut = {
+    'ISQ + SCAN':'ISQ & SCAN.',
+    'IST + SCAN':'IST & SCAN.',
+    'ISQ만 측정':'ISQ.',
+    '경과관찰':'경과관찰.',
+    '2nd op':'2nd op.'
+  };
+  const meas = r.memoMeasure ? (measureOut || defaultMeasureOut)[r.memoMeasure] : '';
+  if(meas) line += ` ${meas}`;
+  if(r.memoForce) line += ` (${r.memoForce})`;
+  if(r.memoEtc) line += ` ${r.memoEtc}`;
+  return line.trim();
+}
+/* implant-recorder:test-end */
 const ImplantRecorder = (function(){
   const modal = document.getElementById('implantModal');
   const body  = document.getElementById('irBody');
@@ -3429,7 +3453,8 @@ const ImplantRecorder = (function(){
     if(e.key===' ' && !inEtc){ e.preventDefault(); if(advance) advance(); }  // 그 외엔 Space=다음
   }
   const IMPLANT_TYPES = ['EV','ST','DT','BD','EV mini','ST mini','BD nc'];
-  const IMPLANT_ACTIONS = ['발치'];
+  const IMPLANT_ACTIONS = ['발치','GBR','상악동거상'];
+  const IMPLANT_INSTALLS = ['베이스5.5','베이스4.5'];
   const FDI_ROWS = [
     [18,17,16,15,14,13,12,11, 21,22,23,24,25,26,27,28],
     [48,47,46,45,44,43,42,41, 31,32,33,34,35,36,37,38]
@@ -3494,12 +3519,16 @@ const ImplantRecorder = (function(){
       `<button class="ir-btn${draft.type===t?' sel':''}" data-t="${t}">${t}</button>`).join('');
     const actBtns = IMPLANT_ACTIONS.map(t=>
       `<button class="ir-btn${draft.type===t?' sel':''}" data-t="${t}">${t}</button>`).join('');
+    const installBtns = IMPLANT_INSTALLS.map(t=>
+      `<button class="ir-btn${draft.type===t?' sel':''}" data-t="${t}">${t}</button>`).join('');
     body.innerHTML = `
       <div class="ir-section">
         <h4>2 / 5 · 임플란트 종류</h4>
         <div>${btns}</div>
         <div style="font-size:12px;color:#666;margin:10px 0 4px;">행위</div>
         <div>${actBtns}</div>
+        <div style="font-size:12px;color:#666;margin:10px 0 4px;">장착</div>
+        <div>${installBtns}</div>
       </div>
       <div style="display:flex;justify-content:space-between;">
         <button class="ir-btn" id="irBack">◀ 이전</button>
@@ -3577,7 +3606,7 @@ const ImplantRecorder = (function(){
     document.getElementById('irNext').onclick = advance;
   }
   function renderMemo(){
-    const measures = ['ISQ + SCAN','ISQ만 측정','경과관찰','2nd op'];
+    const measures = ['IST + SCAN','ISQ + SCAN','ISQ만 측정','경과관찰','2nd op'];
     const forces = ['0N','5N','10N','20N','30N이상'];
     const mBtns = measures.map(v=>`<button class="ir-btn${draft.memoMeasure===v?' sel':''}" data-meas="${v}">${v}</button>`).join('');
     const fBtns = forces.map(v=>`<button class="ir-btn${draft.memoForce===v?' sel':''}" data-force="${v}">${v}</button>`).join('');
@@ -3615,21 +3644,9 @@ const ImplantRecorder = (function(){
     step = 1; showMoreMonths = false;
     renderList();
   }
-  const MEASURE_OUT = { 'ISQ + SCAN':'ISQ & SCAN.', 'ISQ만 측정':'ISQ.', '경과관찰':'경과관찰.', '2nd op':'2nd op.' };
+  const MEASURE_OUT = { 'IST + SCAN':'IST & SCAN.', 'ISQ + SCAN':'ISQ & SCAN.', 'ISQ만 측정':'ISQ.', '경과관찰':'경과관찰.', '2nd op':'2nd op.' };
   function lineOf(r){
-    const isq = r.months!=null ? addPeriod(r.date, r.months) : '';
-    const teeth = r.teeth.join(' ');
-    let line = r.date;
-    if(r.type || teeth){
-      const inner = [r.type, teeth ? ('#'+teeth) : ''].filter(Boolean).join(' ');
-      line += ` (${inner})`;
-    }
-    if(isq) line += ` > ${isq}`;
-    const meas = r.memoMeasure ? MEASURE_OUT[r.memoMeasure] : '';
-    if(meas) line += ` ${meas}`;
-    if(r.memoForce) line += ` (${r.memoForce})`;
-    if(r.memoEtc) line += ` ${r.memoEtc}`;
-    return line.trim();
+    return implantRecorderLineOf(r, addPeriod, MEASURE_OUT);
   }
   function buildText(){ return records.map(lineOf).join('\n'); }
   function renderList(){
