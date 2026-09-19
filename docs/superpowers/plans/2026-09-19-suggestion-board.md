@@ -170,7 +170,7 @@ TABS에 key suggestions, label 💡 건의함, roles staff/manager/chief/owner�
 
 - [ ] Step 3: renderSuggestions를 구현한다.
 
-현재 캠페인·게시글·좋아요·owner 평가를 조회한다. 정상 0건과 조회 오류를 서로 다른 상태로 표시한다. 진행 중 본인 글만 작성·수정·삭제하고, owner는 부적절한 글 삭제와 캠페인·평가 수정을 제공한다. 좋아요는 자기 글 금지와 toggle을 적용하며 성공 응답 후에만 화면을 갱신한다. 종료 후에는 suggestion_awards_public만 사용해 순위·게시자·제목·상금을 표시한다.
+현재 캠페인·게시글·현재 캠페인에 속한 좋아요·owner 평가를 조회한다. 정상 0건과 조회 오류를 서로 다른 상태로 표시한다. 진행 중 새 글 작성과 게시글별 본인 수정·삭제를 제공하고, owner는 부적절한 글 삭제와 캠페인·평가 수정을 제공한다. 좋아요는 자기 글 금지와 toggle을 적용하며 성공 응답 후에만 화면을 갱신한다. 종료 후에는 owner도 suggestion_awards_public을 별도로 조회해 순위·게시자·제목·상금을 표시하고, private review는 평가 폼에만 사용한다.
 
 - [ ] Step 4: 테스트를 GREEN으로 만든다.
 
@@ -257,7 +257,7 @@ Expected: push/deploy 없이 커밋 완료.
 
 - [ ] 모든 승인 UX와 권한 규칙이 테스트에 연결됐다.
 - [ ] likes는 자동 순위를 만들지 않는다.
-- [ ] owner 평가 원본과 종료 후 공개 view가 분리됐다.
+- [x] owner 평가 원본과 종료 후 공개 view가 분리됐다.
 - [ ] 정상 빈 상태와 오류가 분리됐다.
 - [ ] live DDL 검증과 security advisor 비교가 완료됐다.
 - [ ] 기존 데이터 변경·삭제, 노션, 지급, push/deploy가 없다.

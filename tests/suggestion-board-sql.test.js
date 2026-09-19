@@ -50,6 +50,11 @@ test('공개 보조 행은 종료 캠페인에서만 authenticated가 읽는다'
   assert.match(sql, /suggestions_delete_self_or_owner[\s\S]+ends_at >= current_date[\s\S]+or[\s\S]+my_role\(\)[\s\S]+owner/i);
 });
 
+test('좋아요 테이블은 suggestion_id와 user_id만으로 현재 게시글 범위를 필터링한다', () => {
+  assert.match(sql, /create table if not exists public\.suggestion_likes[\s\S]+suggestion_id bigint[\s\S]+user_id uuid/i);
+  assert.doesNotMatch(sql.match(/create table if not exists public\.suggestion_likes[\s\S]+?\);/i)[0], /campaign_id/i);
+});
+
 test('초기 캠페인은 테이블이 비어 있을 때만 삽입한다', () => {
   assert.match(sql, /insert into public\.suggestion_campaigns[\s\S]+where not exists[\s\S]+suggestion_campaigns/i);
 });

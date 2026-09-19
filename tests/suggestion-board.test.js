@@ -78,4 +78,8 @@ test('조회 오류·정상 빈 상태·owner 평가·지급 기능 없음 계�
   assert.match(render[1], /suggestion_awards_public/);
   assert.match(render[1], /게시글 \$\{summary\.totalPosts\}개/);
   assert.match(render[1], /SUGGESTION_EDIT_ID/);
+  assert.doesNotMatch(render[1], /select\('suggestion_id,user_id,campaign_id'\)/);
+  assert.match(render[1], /suggestion_awards_public/);
+  assert.match(render[1], /publicAwards|awardRows/);
+  assert.match(render[1], /participatingPeople|posts.*likes/);
 });
