@@ -1177,7 +1177,7 @@ function leaveCalendarMonthEnd(month){
 }
 function formatLeaveTimestamp(value){
   if(!value)return '';
-  const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(new Date(value));
+  const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false,hourCycle:'h23'}).formatToParts(new Date(value));
   const get=type=>parts.find(part=>part.type===type)?.value||'';
   return `${get('year')}.${get('month')}.${get('day')} ${get('hour')}:${get('minute')}`;
 }
@@ -1210,7 +1210,7 @@ async function renderLeaveStatus(m){
   const cells=[];for(let i=0;i<leading;i++)cells.push('<div class="cal-cell out"></div>');
   for(let day=1;day<=days;day++){const date=LVSTATUS_MONTH+'-'+String(day).padStart(2,'0'),items=index[date]||[];cells.push(`<div class="cal-cell"><div class="d">${day}</div>${items.map(item=>`<div class="cal-tag lv"><span>${esc(leaveCalendarLabel(item,ME.role))}</span></div>`).join('')}</div>`);}
   const listRows=[...rows].sort((a,b)=>a.date_from.localeCompare(b.date_from)||compareLeaveRowsByCreatedAtThenId(a,b));
-  const table=rows.length?`<div class="tblwrap"><table><tr><th>이름</th>${owner?'<th>종류</th>':''}<th>기간</th><th>일수</th>${owner?'<th>신청 시각</th><th>승인 시각</th>':''}</tr>${listRows.map(row=>`<tr><td>${esc(row.user_name)}</td>${owner?`<td>${esc(row.type||'')}${row.type_note?' '+esc(row.type_note):''}</td>`:''}<td>${md(row.date_from)}~${md(row.date_to)}</td><td>${row.days}</td>${owner?`<td>${esc(row.created_at||'')}</td><td>${esc(row.owner_at||'')}</td>`:''}</tr>`).join('')}</table></div>`:'<div class="empty">선택한 달의 승인 연차가 없습니다.</div>';
+  const table=rows.length?`<div class="tblwrap"><table><tr><th>이름</th>${owner?'<th>종류</th>':''}<th>기간</th><th>일수</th>${owner?'<th>신청 시각</th><th>승인 시각</th>':''}</tr>${listRows.map(row=>`<tr><td>${esc(row.user_name)}</td>${owner?`<td>${esc(row.type||'')}${row.type_note?' '+esc(row.type_note):''}</td>`:''}<td>${md(row.date_from)}~${md(row.date_to)}</td><td>${row.days}</td>${owner?`<td>${esc(formatLeaveTimestamp(row.created_at)||'미상')}</td><td>${esc(formatLeaveTimestamp(row.owner_at)||'미상')}</td>`:''}</tr>`).join('')}</table></div>`:'<div class="empty">선택한 달의 승인 연차가 없습니다.</div>';
   const calendar=`<div class="cal-grid">${dow.map((label,index)=>`<div class="cal-dow ${index===0?'sun':index===6?'sat':''}">${label}</div>`).join('')}${cells.join('')}</div>`,calendarView=rows.length?calendar:'<div class="empty">선택한 달의 승인 연차가 없습니다.</div>';
   m.innerHTML=`<div class="card"><h2>🏖 연차캘린더</h2><div class="rowflex"><label>대상 월 <input class="mini" type="month" value="${LVSTATUS_MONTH}" onchange="LVSTATUS_MONTH=this.value;render()"></label><button class="mini ${LVSTATUS_VIEW==='calendar'?'stamp':''}" onclick="LVSTATUS_VIEW='calendar';render()">달력 보기</button><button class="mini ${LVSTATUS_VIEW==='list'?'stamp':''}" onclick="LVSTATUS_VIEW='list';render()">목록 보기</button></div><div class="hint">승인된 연차만 표시합니다.</div>${LVSTATUS_VIEW==='calendar'?calendarView:table}</div>`;
 }

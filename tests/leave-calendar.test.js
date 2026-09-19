@@ -116,3 +116,10 @@ test('비원장 목록에는 종류와 정확한 시각을 렌더링하지 않�
   assert.match(leaveRender[1], /created_at/);
   assert.match(leaveRender[1], /owner_at/);
 });
+
+test('owner 목록 시각도 한국시간 포맷과 미상 fallback을 사용한다', () => {
+  assert.ok(leaveRender, 'renderLeaveStatus 함수를 찾을 수 없습니다.');
+  assert.match(leaveRender[1], /formatLeaveTimestamp\(row\.created_at\)\|\|'미상'/);
+  assert.match(leaveRender[1], /formatLeaveTimestamp\(row\.owner_at\)\|\|'미상'/);
+  assert.match(leaveBlock[1], /hourCycle:'h23'/);
+});
