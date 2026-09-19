@@ -6,14 +6,14 @@
 
 ## 1. 목표
 
-직원 허브에 💡 건의함 탭을 추가한다. 하나의 월간 캠페인 동안 모든 직원이 아이디어를 한 건 게시하고 서로 열람하며 좋아요를 누를 수 있게 한다. 게시글 수와 받은 좋아요 수는 자동 집계하되 좋아요를 자동 순위로 사용하지 않는다. 원장만 독창성 점수·평가 메모·최종 순위를 관리하고, 캠페인 종료 후 전 직원에게 확정된 1·2·3등과 상금을 공개한다.
+직원 허브에 💡 건의함 탭을 추가한다. 하나의 월간 캠페인 동안 모든 직원이 여러 아이디어를 게시하고 서로 열람하며 좋아요를 누를 수 있게 한다. 게시글 수와 받은 좋아요 수는 자동 집계하되 좋아요를 자동 순위로 사용하지 않는다. 원장만 독창성 점수·평가 메모·최종 순위를 관리하고, 캠페인 종료 후 전 직원에게 확정된 1·2·3등과 상금을 공개한다.
 
 상금은 1등 50,000원, 2등 30,000원, 3등 10,000원이다. 지급 기능은 구현하지 않고 안내만 표시한다.
 
 ## 2. 확정 UX·업무 규칙
 
 - staff, manager, chief, owner 모두 탭 열람·작성 가능하며 게시자 이름은 공개한다.
-- 캠페인당 직원 한 명은 게시글 하나만 작성한다.
+- 캠페인당 직원은 여러 게시글을 작성할 수 있다.
 - 직원당 게시글 하나에 좋아요 1회만 가능하고 다시 누르면 취소한다.
 - 자기 글에는 좋아요를 추가할 수 없다.
 - 게시글 수·받은 좋아요 수는 자동 집계한다. 좋아요는 참고자료이며 자동 순위 결정에 사용하지 않는다.
@@ -33,7 +33,7 @@ id bigint identity primary key, title text, starts_at date, ends_at date, prize_
 
 ### suggestions
 
-id bigint identity primary key, campaign_id bigint references campaigns on delete cascade, user_id uuid references profiles, title/body text, created_at/updated_at timestamptz를 둔다. (campaign_id, user_id) unique로 캠페인당 1인 1글을 DB에서 보장한다.
+id bigint identity primary key, campaign_id bigint references campaigns on delete cascade, user_id uuid references profiles, title/body text, created_at/updated_at timestamptz를 둔다. 캠페인당 사용자별 게시글 수 제한은 두지 않는다.
 
 ### suggestion_likes
 
@@ -52,7 +52,7 @@ suggestion_awards_public security-invoker view는 종료일이 지난 캠페인�
 Supabase Data API의 grant와 RLS를 함께 적용한다. 네 테이블 모두 RLS를 활성화하고 anon grant·anon policy는 만들지 않는다.
 
 - 캠페인: authenticated select, owner insert/update. update는 USING과 WITH CHECK 모두 owner role이다. delete는 제공하지 않는다.
-- 게시글: authenticated select. insert는 user_id=auth.uid()이고 현재 날짜가 캠페인 기간 안일 때만 허용한다. 작성자 update/delete는 진행 중 자기 글만, owner delete는 전 기간 허용한다. authenticated update grant는 title, body 컬럼으로 제한하여 작성자가 campaign_id·user_id·집계 필드를 바꾸지 못하게 한다. update에는 USING과 WITH CHECK를 모두 둔다.
+- 게시글: authenticated select. insert는 user_id=auth.uid()이고 현재 날짜가 캠페인 기간 안일 때만 허용한다. 작성자 update/delete는 진행 중 자기 글별로, owner delete는 전 기간 허용한다. authenticated update grant는 title, body 컬럼으로 제한하여 작성자가 campaign_id·user_id·집계 필드를 바꾸지 못하게 한다. update에는 USING과 WITH CHECK를 모두 둔다.
 - 좋아요: authenticated select. insert는 user_id=auth.uid(), 캠페인 진행 중, 게시글 작성자와 현재 사용자가 다를 때만 허용한다. delete는 자기 행이며 캠페인 진행 중일 때만 허용한다.
 - 평가: suggestion_reviews select/insert/update/delete는 owner만 허용한다. 종료 후 전 직원은 제한 view로만 수상 정보를 읽는다.
 - service_role·secret 키는 프런트 코드에 넣지 않는다.
@@ -80,7 +80,7 @@ owner에게는 캠페인 기간·상금 수정 폼과 각 글의 점수·평가 
 자동테스트는 다음을 검증한다.
 
 - 탭 라벨·라우터 키, 캠페인 날짜·상금 표시
-- 캠페인당 1인 1글, 작성자 진행 중 수정·삭제, 종료 후 차단
+- 캠페인당 여러 글, 게시글별 작성자 진행 중 수정·삭제, 종료 후 작성자 차단
 - 좋아요 toggle, 자기 글 좋아요 금지, 중복 좋아요 방지
 - 게시글 수·받은 좋아요 수·사람별 집계
 - owner만 점수·메모·순위 관리

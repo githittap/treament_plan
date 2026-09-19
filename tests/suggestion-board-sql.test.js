@@ -17,6 +17,12 @@ test('네 테이블과 RLS를 정의한다', () => {
   }
 });
 
+test('캠페인당 여러 게시글을 허용하고 review와 공개 행의 캠페인-게시글 연결을 강제한다', () => {
+  assert.doesNotMatch(sql, /unique \(campaign_id, user_id\)/i);
+  assert.match(sql, /unique \(campaign_id, id\)/i);
+  assert.match(sql, /foreign key \(campaign_id, suggestion_id\)[\s\S]+references public\.suggestions\(campaign_id, id\)/i);
+});
+
 test('authenticated 최소 grant와 anon 차단을 명시한다', () => {
   assert.match(sql, /grant[\s\S]+to authenticated/i);
   assert.match(sql, /revoke all[\s\S]+from anon/i);
@@ -37,6 +43,11 @@ test('캠페인별 수상 순위 중복을 막고 공개 view에서 민감 필�
   assert.ok(view, '수상 공개 view가 없습니다.');
   assert.match(view[0], /security_invoker\s*=\s*true/i);
   assert.doesNotMatch(view[0], /originality_score|review_note|reviewer_id/i);
+});
+
+test('공개 보조 행은 종료 캠페인에서만 authenticated가 읽는다', () => {
+  assert.match(sql, /suggestion_awards_public_rows_select_authenticated[\s\S]+ends_at < current_date/i);
+  assert.match(sql, /suggestions_delete_self_or_owner[\s\S]+ends_at >= current_date[\s\S]+or[\s\S]+my_role\(\)[\s\S]+owner/i);
 });
 
 test('초기 캠페인은 테이블이 비어 있을 때만 삽입한다', () => {

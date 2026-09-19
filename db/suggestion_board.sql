@@ -23,7 +23,7 @@ create table if not exists public.suggestions (
   body text not null check (length(btrim(body)) between 1 and 5000),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (campaign_id, user_id)
+  unique (campaign_id, id)
 );
 
 create table if not exists public.suggestion_likes (
@@ -36,7 +36,7 @@ create table if not exists public.suggestion_likes (
 create table if not exists public.suggestion_reviews (
   id bigint generated always as identity primary key,
   campaign_id bigint not null references public.suggestion_campaigns(id) on delete cascade,
-  suggestion_id bigint not null references public.suggestions(id) on delete cascade,
+  suggestion_id bigint not null,
   originality_score smallint check (originality_score between 1 and 5),
   review_note text,
   award_rank smallint check (award_rank between 1 and 3),
@@ -57,11 +57,26 @@ create unique index if not exists suggestion_reviews_campaign_award_rank_uq
   where award_rank is not null;
 
 create table if not exists public.suggestion_awards_public_rows (
-  campaign_id bigint not null references public.suggestion_campaigns(id) on delete cascade,
-  suggestion_id bigint not null references public.suggestions(id) on delete cascade,
+  campaign_id bigint not null,
+  suggestion_id bigint not null,
   award_rank smallint not null check (award_rank between 1 and 3),
   primary key (campaign_id, suggestion_id)
 );
+
+alter table public.suggestions drop constraint if exists suggestions_campaign_id_user_id_key;
+create unique index if not exists suggestions_campaign_id_id_uq
+  on public.suggestions (campaign_id, id);
+alter table public.suggestion_reviews drop constraint if exists suggestion_reviews_suggestion_id_fkey;
+alter table public.suggestion_reviews drop constraint if exists suggestion_reviews_campaign_suggestion_fkey;
+alter table public.suggestion_reviews
+  add constraint suggestion_reviews_campaign_suggestion_fkey
+  foreign key (campaign_id, suggestion_id) references public.suggestions(campaign_id, id) on delete cascade;
+alter table public.suggestion_awards_public_rows drop constraint if exists suggestion_awards_public_rows_campaign_id_fkey;
+alter table public.suggestion_awards_public_rows drop constraint if exists suggestion_awards_public_rows_suggestion_id_fkey;
+alter table public.suggestion_awards_public_rows drop constraint if exists suggestion_awards_public_rows_campaign_suggestion_fkey;
+alter table public.suggestion_awards_public_rows
+  add constraint suggestion_awards_public_rows_campaign_suggestion_fkey
+  foreign key (campaign_id, suggestion_id) references public.suggestions(campaign_id, id) on delete cascade;
 
 alter table public.suggestion_campaigns enable row level security;
 alter table public.suggestions enable row level security;
@@ -158,7 +173,15 @@ with check (
 drop policy if exists suggestions_delete_self_or_owner on public.suggestions;
 create policy suggestions_delete_self_or_owner
 on public.suggestions for delete to authenticated
-using (user_id = (select auth.uid()) or (select public.my_role()) = 'owner');
+using (
+  (user_id = (select auth.uid()) and exists (
+    select 1 from public.suggestion_campaigns c
+    where c.id = campaign_id
+      and c.starts_at <= current_date
+      and c.ends_at >= current_date
+  ))
+  or (select public.my_role()) = 'owner'
+);
 
 drop policy if exists suggestion_likes_select_authenticated on public.suggestion_likes;
 create policy suggestion_likes_select_authenticated
@@ -220,7 +243,10 @@ using ((select public.my_role()) = 'owner');
 drop policy if exists suggestion_awards_public_rows_select_authenticated on public.suggestion_awards_public_rows;
 create policy suggestion_awards_public_rows_select_authenticated
 on public.suggestion_awards_public_rows for select to authenticated
-using (true);
+using (exists (
+  select 1 from public.suggestion_campaigns c
+  where c.id = campaign_id and c.ends_at < current_date
+));
 
 create or replace function public.sync_suggestion_award_public_rows()
 returns trigger
