@@ -86,8 +86,11 @@ test('비원장 라벨은 순번과 이름만, 원장 라벨은 승인 상세를
   assert.match(context.leaveCalendarLabel(item, 'owner'), /연차/);
 });
 
-test('상단 탭은 연차캘린더 라벨과 leavestatus 키를 유지한다', () => {
-  assert.match(html, /\{key:'leavestatus',label:'연차캘린더'/);
+test('연차캘린더는 별도 상단 탭 없이 캘린더 내부 전환으로 제공한다', () => {
+  assert.doesNotMatch(html, /\{key:'leavestatus',label:'연차캘린더'/);
+  assert.match(html, /근무 캘린더/);
+  assert.match(html, /연차 캘린더/);
+  assert.match(html, /k==='leavestatus'/);
 });
 
 test('연차 전용 조회는 승인 상태와 양방향 월 겹침 조건을 사용한다', () => {
