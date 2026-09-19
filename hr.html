@@ -62,6 +62,8 @@ main{padding:16px 16px 70px;max-width:1080px;margin:0 auto}
 .workdocs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-top:12px}
 .workdoc-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:7px}
 .workdoc-card .workdoc-icon{font-size:24px}.workdoc-card h3{margin:0}.workdoc-card p{color:var(--gray);font-size:12.5px;flex:1}
+.guide-shell{max-width:900px}.guide-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:1px solid var(--line);padding-bottom:12px}.guide-breadcrumb{font-size:11px;color:var(--gray);letter-spacing:.02em;margin-bottom:5px}.guide-lead{color:var(--gray);margin:4px 0 0;font-size:13px}.guide-flow{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:14px 0}.guide-flow span{padding:8px 6px;border:1px solid var(--line);border-radius:8px;background:var(--panel);font-size:11px;text-align:center;color:var(--gray)}.guide-flow b{display:block;color:var(--mint);font-size:13px;margin-bottom:2px}.guide-sections{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.guide-section{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px}.guide-section h3{margin:0 0 6px;color:var(--ink);font-size:13px}.guide-section p{margin:0;color:var(--gray);font-size:12.5px;line-height:1.55}.guide-section ul{margin:6px 0 0;padding-left:18px;color:var(--gray);font-size:12px;line-height:1.6}.guide-mock{margin-top:14px;border:1px solid rgba(47,217,196,.35);border-radius:10px;background:#081214;padding:10px}.guide-mock-nav{display:flex;gap:5px;flex-wrap:wrap}.guide-mock-nav span{font-size:10px;padding:4px 7px;border-radius:5px;color:var(--gray);background:rgba(255,255,255,.05)}.guide-mock-nav .active{color:#062421;background:var(--mint);font-weight:800}.guide-mock-row{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:9px;padding:8px;border:1px solid var(--line);border-radius:7px;font-size:11px}.guide-pill{color:var(--mint);font-size:10px}.guide-caption{margin:7px 0 0;color:var(--gray);font-size:11px}.guide-caption b{color:var(--mint)}.guide-close{white-space:nowrap}.guide-shell button:focus-visible,.guide-shell a:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
+@media(max-width:640px){.guide-flow{grid-template-columns:repeat(2,1fr)}.guide-sections{grid-template-columns:1fr}.guide-head{align-items:stretch;flex-direction:column}.guide-close{align-self:flex-start}}
 .big{font-size:30px;font-weight:800;color:var(--mint)}
 .sub{font-size:12px;color:var(--gray)}
 .rowflex{display:flex;flex-wrap:wrap;gap:10px}
@@ -1099,13 +1101,35 @@ function filterWorkDocuments(items,query){const q=String(query||'').trim().toLoc
 /* work-documents:test-end */
 /* work-documents:render-start */
 let WORK_DOC_QUERY='';
+let WORK_DOC_GUIDE_OPEN=false;
 function workDocumentCards(items){
   const filtered=filterWorkDocuments(items,WORK_DOC_QUERY);
   return filtered.length?filtered.map(item=>`<article class="workdoc-card"><div class="workdoc-icon">${item.icon}</div><div class="sub">${esc(item.category)}</div><h3>${esc(item.title)}</h3><p>${esc(item.description)}</p><a class="mini" href="${esc(item.url)}" target="_blank" rel="noopener">열기 ↗</a></article>`).join(''):'<div class="empty">검색 결과가 없습니다.</div>';
 }
 function renderWorkDocumentResults(){const results=document.querySelector('#workDocResults');if(results)results.innerHTML=workDocumentCards(workDocuments);}
+/* work-documents-guide:test-start */
+function workDocumentsGuideHtml(){return `<div class="guide-shell">
+  <div class="guide-head"><div><div class="guide-breadcrumb">업무자료 | 직원 허브 사용 설명서</div><h2>직원 허브 사용 설명서</h2><p class="guide-lead">매일 필요한 메뉴를 짧게 따라가 보세요. 보이는 메뉴만 사용하면 됩니다.</p></div><button type="button" class="mini guide-close" onclick="closeWorkDocumentsGuide()">← 업무자료로 돌아가기</button></div>
+  <div class="guide-flow" aria-label="직원 허브 기본 동선"><span><b>01</b>홈</span><span><b>02</b>근무표·연차</span><span><b>03</b>결재·공지</span><span><b>04</b>자료·서류</span></div>
+  <div class="guide-mock" aria-label="직원 화면 미니 예시"><div class="guide-mock-nav"><span class="active">홈</span><span>근무표</span><span>연차</span><span>결재</span><span>공지</span></div><div class="guide-mock-row"><b>오늘 확인할 일</b><span class="guide-pill">공지 2 · 미제출 1</span></div><p class="guide-caption"><b>①</b> 위쪽 메뉴에서 원하는 화면을 고르고, 카드 안의 버튼을 누르면 해당 작업으로 이동합니다.</p></div>
+  <div class="guide-sections">
+    <section class="guide-section"><h3>🏠 홈에서 할 일 확인</h3><p>홈에서 오늘 확인할 공지, 남은 연차, 미제출 서류를 먼저 봅니다.</p></section>
+    <section class="guide-section"><h3>🗓 근무표 확인</h3><p>근무표에서 내 근무일과 시간을 확인합니다. 날짜를 누르면 자세한 내용이 보입니다.</p></section>
+    <section class="guide-section"><h3>🌿 연차 신청·확인</h3><ul><li>연차 화면에서 종류와 날짜를 입력해 신청합니다.</li><li>승인된 연차는 캘린더 안의 연차 보기에서 확인합니다.</li><li>공휴일 표시는 병원 휴무 의미가 아닐 수 있습니다.</li></ul></section>
+    <section class="guide-section"><h3>🖊 결재 문서 올리기·상태 확인</h3><p>결재에서 제목과 내용을 입력해 문서를 올립니다. 내가 올린 문서의 진행·완결·반려 상태를 확인할 수 있습니다.</p></section>
+    <section class="guide-section"><h3>📢 공지 확인</h3><p>공지에서 병원 안내와 새 소식을 확인합니다. 제목과 본문을 읽고 필요한 경우 전문 링크를 엽니다.</p></section>
+    <section class="guide-section"><h3>📚 업무자료 보기</h3><p>업무자료에서 매뉴얼과 필요물품 요청·구매현황을 검색해 엽니다. 이 설명서도 업무자료 안에서 다시 열 수 있습니다.</p></section>
+    <section class="guide-section"><h3>💡 건의함 사용</h3><p>건의함에서 글을 쓰고 다른 글에 좋아요를 누릅니다. 월간 시상은 캠페인 종료 후 공개되는 안내를 확인합니다.</p></section>
+    <section class="guide-section"><h3>📎 입사서류 제출·계약서 열람</h3><p>입사서류에서 필요한 서류를 제출합니다. 직원 서류함에서는 올린 서류와 체결된 근로계약서를 열람할 수 있습니다.</p></section>
+  </div>
+  <div class="hint" style="margin-top:12px">ℹ️ 본인에게 보이지 않는 메뉴는 권한 차이입니다. 필요한 메뉴가 보이지 않으면 관리자에게 문의하세요.</div>
+</div>`;}
+/* work-documents-guide:test-end */
+function showWorkDocumentsGuide(){WORK_DOC_GUIDE_OPEN=true;render();}
+function closeWorkDocumentsGuide(){WORK_DOC_GUIDE_OPEN=false;render();}
 function renderWorkDocuments(m){
-  m.innerHTML=`<div class="card"><h2>📚 업무자료</h2><p class="hint">직원 업무에 필요한 공개 자료를 한곳에서 확인합니다.</p><input id="workDocSearch" style="width:100%;margin-top:10px" type="search" placeholder="자료 검색" value="${esc(WORK_DOC_QUERY)}" oninput="WORK_DOC_QUERY=this.value;renderWorkDocumentResults()"><div id="workDocResults" class="workdocs-grid">${workDocumentCards(workDocuments)}</div></div>`;
+  if(WORK_DOC_GUIDE_OPEN){m.innerHTML=`<div class="card">${workDocumentsGuideHtml()}</div>`;return;}
+  m.innerHTML=`<div class="card"><h2>📚 업무자료</h2><p class="hint">직원 업무에 필요한 공개 자료를 한곳에서 확인합니다.</p><div class="workdocs-grid"><article class="workdoc-card"><div class="workdoc-icon">🧭</div><div class="sub">직원용 안내</div><h3>직원 허브 사용 설명서</h3><p>홈·근무표·연차·결재·서류함을 처음 사용하는 방법을 확인합니다.</p><button type="button" class="mini" onclick="showWorkDocumentsGuide()">업무자료 설명서 열기</button></article></div><input id="workDocSearch" style="width:100%;margin-top:10px" type="search" placeholder="자료 검색" value="${esc(WORK_DOC_QUERY)}" oninput="WORK_DOC_QUERY=this.value;renderWorkDocumentResults()"><div id="workDocResults" class="workdocs-grid">${workDocumentCards(workDocuments)}</div></div>`;
 }
 /* work-documents:render-end */
 /* ── 캘린더 ── */
