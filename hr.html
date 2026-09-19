@@ -156,7 +156,20 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
       <input type="email" id="lgEmail" placeholder="이메일" autocomplete="username">
       <input type="password" id="lgPw" placeholder="비밀번호" autocomplete="current-password">
       <button class="lg" id="lgBtn">로그인</button>
+      <button type="button" class="switch" id="lgResetBtn" style="margin-top:10px;background:none;border:0;color:#156f72;font-weight:700">비밀번호 찾기</button>
       <div class="switch" style="margin-top:12px;font-size:13px;color:#889">계정이 없나요? <a href="#" id="toSignup" style="color:#156f72;font-weight:700;text-decoration:none">회원가입</a></div>
+    </div>
+    <div id="resetView" style="display:none">
+      <p>가입한 이메일을 입력하면 비밀번호 재설정 링크를 보내드립니다.</p>
+      <input type="email" id="resetEmail" placeholder="가입 이메일" autocomplete="email">
+      <button class="lg" id="resetSendBtn">재설정 메일 보내기</button>
+      <div class="switch" style="margin-top:12px;font-size:13px;color:#889"><a href="#" id="resetToLogin" style="color:#156f72;font-weight:700;text-decoration:none">로그인으로 돌아가기</a></div>
+    </div>
+    <div id="recoveryView" style="display:none">
+      <p>새 비밀번호를 입력하세요.</p>
+      <input type="password" id="resetPw" placeholder="새 비밀번호 (6자 이상)" autocomplete="new-password">
+      <input type="password" id="resetPw2" placeholder="새 비밀번호 확인" autocomplete="new-password">
+      <button class="lg" id="resetPwBtn">비밀번호 변경</button>
     </div>
     <div id="signupView" style="display:none">
       <p>처음이신가요? 계정을 만드세요.<br><span style="font-size:12px;color:#889">가입 후 원장이 권한(실장·매니저 등)을 지정합니다.</span></p>
@@ -2097,7 +2110,15 @@ async function setTabOverride(uid,key,val){
 }
 
 /* ── 로그인 ── */
-let _inited=false,_initPromise=null,_stepsClickBound=false;
+/* password-reset:test-start */
+function validatePasswordReset(newPassword,confirmPassword){
+  if(!newPassword)return '비밀번호를 입력하세요.';
+  if(newPassword.length<6)return '비밀번호는 6자 이상이어야 합니다.';
+  if(newPassword!==confirmPassword)return '비밀번호가 일치하지 않습니다.';
+  return '';
+}
+/* password-reset:test-end */
+let _inited=false,_initPromise=null,_stepsClickBound=false,recoveryInProgress=false,passwordRecoveryMode=typeof location!=='undefined'&&location.hash.includes('type=recovery');
 async function onAuthed(session){
   $('#gate').style.display='none';$('#app').style.display='';
   ME.id=session.user.id;ME.email=session.user.email;
@@ -2147,9 +2168,37 @@ async function doLogin(){
   if(error)msg.textContent='이메일 또는 비밀번호가 올바르지 않습니다.';
 }
 function showAuth(mode){
+  if(mode==='login'){$('#gate').style.display='';$('#app').style.display='none';$('#pendingGate').style.display='none';}
   $('#loginView').style.display=mode==='login'?'':'none';
   $('#signupView').style.display=mode==='signup'?'':'none';
+  $('#resetView').style.display='none';$('#recoveryView').style.display='none';
   $('#lgMsg').textContent='';
+}
+function showResetView(){
+  $('#loginView').style.display='none';$('#signupView').style.display='none';$('#resetView').style.display='';$('#recoveryView').style.display='none';$('#lgMsg').textContent='';$('#resetEmail').focus();
+}
+function showRecoveryView(){
+  passwordRecoveryMode=true;
+  $('#gate').style.display='';$('#app').style.display='none';$('#pendingGate').style.display='none';
+  $('#loginView').style.display='none';$('#signupView').style.display='none';$('#resetView').style.display='none';$('#recoveryView').style.display='';$('#lgMsg').textContent='';$('#resetPw').focus();
+}
+async function sendPasswordReset(){
+  const msg=$('#lgMsg'),email=$('#resetEmail').value.trim();
+  if(!sb){msg.textContent='인터넷 연결이 필요합니다.';return;}
+  if(!email){msg.textContent='가입 이메일을 입력하세요.';return;}
+  msg.textContent='재설정 메일을 보내는 중…';
+  const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:'https://jung-plant.com/hr.html'});
+  if(error){msg.textContent='재설정 메일을 보내지 못했습니다. 이메일 주소를 확인하세요.';return;}
+  msg.textContent='재설정 링크를 이메일로 보냈습니다. 메일의 링크를 열어 새 비밀번호를 설정하세요.';
+}
+async function updateRecoveredPassword(){
+  const msg=$('#lgMsg'),newPassword=$('#resetPw').value,confirmPassword=$('#resetPw2').value,problem=validatePasswordReset(newPassword,confirmPassword);
+  if(problem){msg.textContent=problem;return;}
+  msg.textContent='비밀번호를 변경하는 중…';recoveryInProgress=true;
+  const {error}=await sb.auth.updateUser({password:newPassword});
+  $('#resetPw').value='';$('#resetPw2').value='';
+  if(error){recoveryInProgress=false;msg.textContent='비밀번호를 변경하지 못했습니다. 재설정 링크를 다시 요청하세요.';return;}
+  await sb.auth.signOut();recoveryInProgress=false;passwordRecoveryMode=false;history.replaceState(null,'',location.pathname+location.search);showAuth('login');$('#lgMsg').textContent='비밀번호가 변경되었습니다. 새 비밀번호로 로그인하세요.';
 }
 async function doSignup(){
   const msg=$('#lgMsg');
@@ -2171,14 +2220,18 @@ async function boot(){
   $('#lgPw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
   $('#lgEmail').addEventListener('keydown',e=>{if(e.key==='Enter')$('#lgPw').focus();});
   $('#suBtn').addEventListener('click',doSignup);
+  $('#lgResetBtn').addEventListener('click',showResetView);
+  $('#resetSendBtn').addEventListener('click',sendPasswordReset);
+  $('#resetPwBtn').addEventListener('click',updateRecoveredPassword);
+  $('#resetToLogin').addEventListener('click',e=>{e.preventDefault();showAuth('login');});
   $('#suPw2').addEventListener('keydown',e=>{if(e.key==='Enter')doSignup();});
   $('#toSignup').addEventListener('click',e=>{e.preventDefault();showAuth('signup');});
   $('#toLogin').addEventListener('click',e=>{e.preventDefault();showAuth('login');});
   $('#logoutBtn').addEventListener('click',async()=>{try{await sb.auth.signOut();}catch(e){}location.reload();});
   if(!sb){$('#gate').style.display='';$('#lgMsg').textContent='인터넷 연결 후 새로고침하세요.';return;}
-  sb.auth.onAuthStateChange((_e,s)=>{if(s)onAuthed(s);});
+  sb.auth.onAuthStateChange((event,s)=>{if(event==='PASSWORD_RECOVERY'){showRecoveryView();return;}if(s&&!recoveryInProgress&&!passwordRecoveryMode)onAuthed(s);});
   const {data:{session}}=await sb.auth.getSession();
-  if(session)onAuthed(session);else $('#gate').style.display='';
+  if(session&&!passwordRecoveryMode)onAuthed(session);else if(!passwordRecoveryMode)$('#gate').style.display='';
 }
 boot();
 setInterval(loadSteps,1500);
