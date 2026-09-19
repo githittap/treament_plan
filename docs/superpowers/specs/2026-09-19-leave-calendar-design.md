@@ -6,7 +6,7 @@
 
 ## 1. 목표
 
-기존 상단 `연차현황` 탭을 승인된 연차만 보여 주는 전용 화면으로 확장한다. 한 화면 안에서 `달력 보기`와 `목록 보기`를 전환할 수 있게 하며, 달력에서는 같은 날짜의 승인 연차를 신청 시각 순서로 표시한다. 목록 보기에서는 기존 연차현황 표의 확인 목적을 유지한다.
+기존 상단 `연차현황` 탭의 사용자 표시 라벨을 `연차캘린더`로 바꾸고, 승인된 연차만 보여 주는 전용 화면으로 확장한다. 내부 식별자 `key: 'leavestatus'`는 유지한다. 한 화면 안에서 `달력 보기`와 `목록 보기`를 전환할 수 있게 하며, 달력에서는 같은 날짜의 승인 연차를 신청 시각 순서로 표시한다. 목록 보기에서는 기존 연차현황 표의 확인 목적을 유지한다.
 
 이번 설계의 범위는 화면·조회·표시 규칙과 테스트 설계다. 구현은 이 설계서에 대한 최종 확인 뒤에 별도로 진행한다.
 
@@ -14,13 +14,13 @@
 
 현재 `hr.html`에는 다음 구조가 있다.
 
-- `TABS`에 `key: 'leavestatus'`, `label: '연차현황'` 탭이 있고 네 역할(`staff`, `manager`, `chief`, `owner`)에 노출된다.
+- `TABS`에 `key: 'leavestatus'`, `label: '연차현황'` 탭이 있고 네 역할(`staff`, `manager`, `chief`, `owner`)에 노출된다. 구현 시 `key`는 유지하고 사용자 표시 라벨만 `연차캘린더`로 바꾼다.
 - 라우터는 `TAB === 'leavestatus'`일 때 `renderLeaveStatus(m)`을 호출한다.
 - `renderLeaveStatus()`는 `leave_requests`에서 선택 월과 겹치는 행을 조회하고, 현재는 상태 제한 없이 기존 표에 이름·종류·기간·일수·상태·사유를 출력한다.
 - `leave_requests`에는 `id`, `user_id`, `type`, `date_from`, `date_to`, `days`, `status`, `owner_at`, `created_at`이 이미 있다.
 - 기존 근무표는 이미 `status = '승인'` 조건과 `date_from <= 범위 종료`, `date_to >= 범위 시작` 방식으로 승인 연차를 조회한다.
 
-구현 시 변경할 정본 파일은 `treament_plan/hr.html` 하나다. DB 스키마, RLS 정책, Edge Function, 다른 HTML·SQL·테스트 파일은 이 기능의 구현 단계에서도 변경하지 않는다. 이 설계 단계에서는 이 설계서만 생성·수정한다.
+구현 시 제품 코드 변경 파일은 `treament_plan/hr.html` 하나로 제한한다. 자동테스트는 기존 테스트 파일을 수정하거나 `tests/leave-calendar.test.js`를 새로 추가하는 것을 허용한다. DB 스키마·SQL, RLS 정책, Edge Function, 다른 제품 코드 파일은 변경하지 않는다. 이 설계 단계에서는 이 설계서만 생성·수정한다.
 
 ## 3. 승인된 A안의 확정 규칙
 
@@ -177,7 +177,7 @@ function buildLeaveCalendarIndex(rows, monthFrom, monthTo) {
 
 ## 7. 테스트 설계
 
-구현 단계에서 기존 프로젝트의 테스트 방식과 `hr.html` 내 테스트 훅을 먼저 확인한 뒤 다음 시나리오를 모두 검증한다. 이 설계 단계에서는 테스트 파일이나 코드에 손대지 않는다.
+구현 단계에서 기존 프로젝트의 테스트 방식과 `hr.html` 내 테스트 훅을 먼저 확인한 뒤 다음 시나리오를 모두 검증한다. 자동테스트는 기존 테스트 파일을 수정하거나 `tests/leave-calendar.test.js`를 추가할 수 있으며, 이 설계 단계에서는 테스트 파일이나 제품 코드에 손대지 않는다.
 
 ### 7.1 역할별 노출
 
@@ -225,7 +225,7 @@ function buildLeaveCalendarIndex(rows, monthFrom, monthTo) {
 
 구현 후 최소한 다음을 확인한다.
 
-- `hr.html` 외 파일에 변경이 없는지 `git status --short`로 확인한다.
+- 허용된 변경 범위가 제품 코드 `hr.html`과 연차캘린더 자동테스트 파일뿐인지 `git status --short`로 확인한다.
 - `status = '승인'` 필터가 연차 전용 조회에 존재하는지 확인한다.
 - 비원장 렌더링 경로에 `created_at`, `owner_at`, `type`이 출력되지 않는지 확인한다.
 - 조회 오류 분기가 빈 배열로 폴백하지 않는지 확인한다.
@@ -248,7 +248,7 @@ function buildLeaveCalendarIndex(rows, monthFrom, monthTo) {
 - 원장에게만 세 owner 전용 필드가 보인다.
 - 목록 보기가 기존 기간·일수 확인 기능을 보존한다.
 - 조회 실패가 오류로 표시되고 빈 달력으로 위장되지 않는다.
-- 구현 단계에서 DB·RLS·배포 변경이 없다.
+- 구현 단계에서 DB·SQL·RLS·배포 변경이 없고, 제품 코드 변경은 `hr.html`, 자동테스트 변경은 기존 테스트 파일 또는 `tests/leave-calendar.test.js`로 제한된다.
 
 ## 9. 범위 밖
 
