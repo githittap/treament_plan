@@ -149,7 +149,13 @@ with check (true);
 drop policy if exists leave_requests_insert_self on public.leave_requests;
 create policy leave_requests_insert_self
 on public.leave_requests for insert to authenticated
-with check (user_id = auth.uid());
+with check (
+  exists (select 1 from public.profiles p where p.user_id = auth.uid() and p.active and p.approved)
+  and user_id = auth.uid()
+  and status = '대기'
+  and chief_by is null and chief_at is null
+  and owner_by is null and owner_at is null
+);
 
 drop policy if exists leave_requests_select_scoped on public.leave_requests;
 create policy leave_requests_select_scoped
@@ -161,10 +167,17 @@ using (
 );
 
 drop policy if exists leave_requests_update_approvers on public.leave_requests;
-create policy leave_requests_update_approvers
+drop policy if exists leave_requests_update_scoped on public.leave_requests;
+create policy leave_requests_update_scoped
 on public.leave_requests for update to authenticated
-using (public.my_role() in ('chief', 'owner'))
-with check (public.my_role() in ('chief', 'owner'));
+using (
+  exists (select 1 from public.profiles p where p.user_id = auth.uid() and p.active and p.approved)
+  and user_id = auth.uid() and status = '대기'
+)
+with check (
+  exists (select 1 from public.profiles p where p.user_id = auth.uid() and p.active and p.approved)
+  and user_id = auth.uid() and status = '취소'
+);
 
 -- leave_ledger
 drop policy if exists leave_ledger_select_scoped on public.leave_ledger;
@@ -178,18 +191,30 @@ using (
 drop policy if exists leave_ledger_insert_owner on public.leave_ledger;
 create policy leave_ledger_insert_owner
 on public.leave_ledger for insert to authenticated
-with check (public.my_role() = 'owner');
+with check (
+  exists (select 1 from public.profiles p where p.user_id = auth.uid() and p.active and p.approved)
+  and public.my_role() = 'owner'
+);
 
 drop policy if exists leave_ledger_update_owner on public.leave_ledger;
 create policy leave_ledger_update_owner
 on public.leave_ledger for update to authenticated
-using (public.my_role() = 'owner')
-with check (public.my_role() = 'owner');
+using (
+  exists (select 1 from public.profiles p where p.user_id = auth.uid() and p.active and p.approved)
+  and public.my_role() = 'owner'
+)
+with check (
+  exists (select 1 from public.profiles p where p.user_id = auth.uid() and p.active and p.approved)
+  and public.my_role() = 'owner'
+);
 
 drop policy if exists leave_ledger_delete_owner on public.leave_ledger;
 create policy leave_ledger_delete_owner
 on public.leave_ledger for delete to authenticated
-using (public.my_role() = 'owner');
+using (
+  exists (select 1 from public.profiles p where p.user_id = auth.uid() and p.active and p.approved)
+  and public.my_role() = 'owner'
+);
 
 -- holidays
 drop policy if exists holidays_select_authenticated on public.holidays;
