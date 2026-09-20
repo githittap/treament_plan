@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 const sqlPath = path.join(root, 'db', 'consultation_journal_draft.sql');
+const rollbackPath = path.join(root, 'db', 'consultation_journal_rollback.sql');
 const htmlPath = path.join(root, 'hr.html');
 const sql = fs.existsSync(sqlPath) ? fs.readFileSync(sqlPath, 'utf8') : '';
 const html = fs.readFileSync(htmlPath, 'utf8');
@@ -47,6 +48,16 @@ test('UUID를 식별자로 쓰고 sequence 권한 없이 감사 필드 변조를
   for (const immutable of ['new\.id is distinct from old\.id', 'new\.author_id is distinct from old\.author_id', 'new\.created_at is distinct from old\.created_at']) {
     assert.match(sql, new RegExp(immutable, 'i'));
   }
+});
+
+test('운영 적용 전용 롤백은 상담일지 신규 객체만 역순으로 제거한다', () => {
+  assert.ok(fs.existsSync(rollbackPath), '상담일지 롤백 SQL이 없습니다.');
+  const rollback = fs.readFileSync(rollbackPath, 'utf8');
+  assert.match(rollback, /begin;/i);
+  assert.match(rollback, /drop table if exists public\.consultation_journals/i);
+  assert.match(rollback, /drop function if exists public\.set_consultation_journals_updated_at\(\)/i);
+  assert.match(rollback, /commit;/i);
+  assert.doesNotMatch(rollback, /delete from|truncate/i);
 });
 
 test('원본 헤더의 비용과 두 개의 메모 열을 분리해 최소 필드로 검증한다', () => {

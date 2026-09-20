@@ -1,4 +1,4 @@
--- 상담일지 기능 초안: 운영 DB에는 별도 검증 후 적용한다.
+-- 상담일지 운영 적용 SQL: `consultation_journal_rollback.sql`을 함께 확인한 뒤 SQL Editor에서 1회 실행한다.
 create table if not exists public.consultation_journals (
   id uuid primary key default gen_random_uuid(),
   patient_name text not null check (char_length(trim(patient_name)) between 1 and 80),

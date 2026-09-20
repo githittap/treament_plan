@@ -40,6 +40,12 @@
 - 계정 생성: 직원 **셀프 회원가입**(hr 로그인 화면) → `profiles` 자동 staff → owner가 원장 탭에서 권한 지정. 정책 `profiles_insert_self`(자기 행·staff만) + `profiles_insert_owner`(owner는 임의). 가입 이름은 Auth user_metadata(full_name).
 - 입금 피드(P1): 사업계좌 입금 SMS → **원장 개인폰 MacroDroid**(발동: SMS 내용 포함 `101209036`) → Edge Function `deposit-webhook`(`--no-verify-jwt`, 시크릿 `WEBHOOK_TOKEN`·`BIZ_ACCOUNT_MASKED=101209036***3`) → `deposits` 표(재직자 SELECT·쓰기 service_role만; **잔액·전체계좌 미저장**) → hr '입금' 탭 + (직원 업무폰) **텔레그램 그룹 알림**. 직원 업무폰엔 설치 X(웹 열람·텔레그램 가입만). `db/deposits.sql`은 멱등판.
 
+## 상담일지 운영 적용 준비 (2026-09-21)
+- 대상: `hr.html`과 `db/consultation_journal_draft.sql`. 실장(`manager`)·원장(`owner`)만 신규 상담일지를 조회·입력·수정하며 anon·staff·chief는 RLS로 거부한다.
+- 사전 RLS 실행시험: 총괄이 프로젝트 `texevhsxttfoqkrucfzl`에서 `BEGIN`/`ROLLBACK`으로 8/8 PASS 확인. manager 입력·수정, owner 조회 허용; staff/chief 조회 차단, staff 입력·anon 조회 거부, `created_at` 변조 거부. 트랜잭션 ROLLBACK으로 운영 스키마·데이터 변경 없음.
+- 적용 전 체크: `db/consultation_journal_draft.sql`과 `db/consultation_journal_rollback.sql`을 함께 검토하고, `hr.html`의 커밋이 배포 대상 브랜치에 포함됐는지 확인한다. 저장소 검색상 `consultation_journals`·`set_consultation_journals_updated_at`의 중복 정의는 없다.
+- 롤백: 신규 테이블과 갱신 트리거 함수만 제거한다. 적용 뒤 기록이 생성됐다면 이 롤백을 실행하지 말고 데이터 보존 판단을 먼저 받는다.
+
 ## 핵심 규칙·컨벤션
 - **모든 코드(프론트·백엔드·SQL)는 Codex에 위임 작성**(2026-07-30 원장 강조: "코딩 직접 말고 항상 codex delegate"). Claude는 계약(스키마·호출목록) 작성 + 결과 **검수·검증·통합**만, 코드 파일 직접 편집 X. **SQL은 Codex 교차검증 통과 후에만 실행 안내**(FK 타입 사고 재발 방지 — 기존 DB 참조 시 타입 실측). 이 환경에선 codex를 **PowerShell로 codex.exe 직접 구동**(Bash 훅 고장; prompt는 stdin 파이프 + `$OutputEncoding=UTF8`).
 - **자주 바뀔 값은 하드코딩 금지 → `app_settings` 표로**(원장이 SQL 한 줄로 수정). 설명서=`09_claude-output\04_AI·Claude운영\산출물\근태설정_사용설명서.html`.
