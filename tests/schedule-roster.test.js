@@ -602,16 +602,23 @@ test('월간 캘린더는 모든 조회 오류를 눈에 보이는 하나의 오
   assert.match(source, /캘린더 정보를 불러오지 못했습니다/);
 });
 
+test('4차 캘린더는 기존 DB 부서를 표시군으로만 묶고 날짜 상세를 제공한다', () => {
+  const source = calendarBlock[1];
+  for (const marker of ["calendarRosterTag('진료·상담'", "calendarRosterTag('소독·행정'", "calendarRosterTag('기공'", 'renderCalendarDayPanel', 'scheduleCalendarIndex']) assert.match(source, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(html, /label:'서류제출'/);
+});
+
 test('캘린더 렌더 순서는 공휴일과 이벤트, 부서, 야간, 연차, OFF, 기타, 주차 상태다', () => {
   const source = calendarBlock[1];
+  const tagSource = source.slice(source.indexOf('const tags=['));
   const markers = [
     'cal-tag hol', 'cal-tag ev',
-    "calendarRosterTag('Dr.'", "calendarRosterTag('진료실'", "calendarRosterTag('데스크'", "calendarRosterTag('기공실'", "calendarRosterTag('상담'", "calendarRosterTag('행정'", "calendarRosterTag('미지정'",
+    "calendarRosterTag('Dr.'", "calendarRosterTag('진료·상담'", "calendarRosterTag('데스크'", "calendarRosterTag('소독·행정'", "calendarRosterTag('기공'", "calendarRosterTag('미지정'",
     "calendarRosterTag('야간'", "calendarRosterTag('연차'", "calendarRosterTag('OFF'", "calendarRosterTag('기타'", 'cal-tag status'
   ];
   let previous = -1;
   for (const marker of markers) {
-    const current = source.indexOf(marker);
+    const current = tagSource.indexOf(marker);
     assert.ok(current > previous, `${marker} 렌더 순서가 잘못되었습니다.`);
     previous = current;
   }
@@ -629,13 +636,14 @@ test('캘린더는 전체·근무·연차 3단 전환과 상담·행정 직무�
   assert.match(source, /CAL_VIEW==='all'\?calendarRosterTag\('연차'/);
 });
 
-test('캘린더 날짜 셀은 모바일·키보드 펼침과 삭제 링크 전파 차단을 제공한다', () => {
+test('캘린더 날짜 셀은 선택 날짜 패널·키보드·삭제 링크 전파 차단을 제공한다', () => {
   const source = calendarBlock[1];
   assert.match(source, /function toggleCalendarDay\(cell,event\)/);
   assert.match(source, /event\.key==='Enter'\|\|event\.key===' '/);
-  assert.match(source, /tabindex="0" role="button" aria-expanded="false"/);
-  assert.match(source, /onclick="toggleCalendarDay\(this,event\)"/);
-  assert.match(source, /onkeydown="toggleCalendarDay\(this,event\)"/);
+  assert.match(source, /tabindex="0" role="button" aria-expanded="\$\{c\.ds===CAL_SELECTED_DATE\}"/);
+  assert.match(source, /onclick="selectCalendarDay\('\$\{c\.ds\}',event\)"/);
+  assert.match(source, /onkeydown="if\(event\.key==='Enter'\|\|event\.key===' '\)/);
+  assert.match(source, /calendar-day-panel/);
   assert.match(source, /event\.stopPropagation\(\);deleteCalendarEvent/);
   assert.match(html, /@media\(max-width:640px\)[\s\S]*?\.cal-cell:not\(\.expanded\) \.cal-names\{display:none\}/);
   assert.match(html, /\.cal-cell:focus-visible/);

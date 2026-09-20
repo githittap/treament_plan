@@ -116,11 +116,17 @@ tr.new td{background:var(--mint-dk)}
 
 /* 월별 캘린더 그리드 */
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:10px}
+.calendar-layout{display:grid;grid-template-columns:minmax(190px,240px) minmax(0,1fr);gap:10px;align-items:start}
+.calendar-layout .cal-grid{margin-top:0}
+.calendar-day-panel{position:sticky;top:58px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;min-width:0}
+.calendar-day-panel h3{margin:2px 0 9px;color:var(--ink)}
+.calendar-day-panel .cal-tag{margin-bottom:4px}
 .cal-dow{background:var(--panel);padding:6px 4px;font-size:11.5px;font-weight:700;color:var(--gray);text-align:center}
 .cal-dow.sun{color:var(--red)} .cal-dow.sat{color:var(--blue)}
 .cal-cell{background:var(--card);min-width:0;min-height:86px;padding:5px 6px;overflow:hidden}
 .cal-cell.out{background:var(--bg);opacity:.4}
 .cal-cell.today{box-shadow:inset 0 0 0 2px var(--mint)}
+.cal-cell.selected{box-shadow:inset 0 0 0 2px var(--blue)}
 .cal-cell[role=button]{cursor:pointer}
 .cal-cell:focus-visible{outline:2px solid var(--mint);outline-offset:-2px}
 .cal-cell .d{font-size:12.5px;font-weight:800;margin-bottom:3px;color:var(--ink)}
@@ -136,13 +142,13 @@ tr.new td{background:var(--mint-dk)}
 .cal-tag.evening{background:var(--purple-bg);color:var(--purple)}
 .cal-tag.lv{background:var(--gold-bg);color:var(--gold)}
 .cal-tag.off{background:var(--panel);color:var(--gray)}
-.cal-tag.etc{background:var(--blue-bg);color:var(--blue)}
+.cal-tag.etc,.cal-tag.unassigned{background:var(--panel);color:var(--gray)}
 .cal-tag.status{border:1px solid var(--line);background:transparent;color:var(--gray)}
 .cal-tag.status.draft{border-color:var(--gold);color:var(--gold)}
 .cal-tag.status.published{border-color:var(--mint);color:var(--mint)}
 .cal-tag a{color:inherit;opacity:.6;flex-shrink:0}
 .cal-error{margin:7px 0;padding:7px 9px;border:1px solid var(--red);border-radius:7px;background:var(--red-bg);color:var(--red);font-size:12px}
-@media(max-width:640px){.cal-cell{min-height:56px;padding:3px 4px}.cal-cell .d{font-size:11px}.cal-tag{font-size:9px;padding:0 2px}.cal-cell:not(.expanded) .cal-names{display:none}.cal-cell.expanded .cal-names{display:inline}}
+@media(max-width:640px){.calendar-layout{grid-template-columns:1fr}.calendar-day-panel{position:static;order:2}.cal-cell{min-height:56px;padding:3px 4px}.cal-cell .d{font-size:11px}.cal-tag{font-size:9px;padding:0 2px}.cal-cell:not(.expanded) .cal-names{display:none}.cal-cell.expanded .cal-names{display:inline}}
 
 /* 모달 */
 .mask{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:5vh 10px}
@@ -427,7 +433,7 @@ const TABS=[
   {key:'workdocs',label:'📚 업무자료',roles:['staff','manager','chief','owner']},
   {key:'calendar',label:'📅 캘린더',roles:['staff','manager','chief','owner']},
   {key:'suggestions',label:'💡 건의함',roles:['staff','manager','chief','owner']},
-  {key:'onbo',  label:'입사서류',  roles:['staff','manager','chief','owner']},
+  {key:'onbo',  label:'서류제출',  roles:['staff','manager','chief','owner']},
   {key:'confid',label:'케이스노트',roles:['staff','manager','chief','owner'],needsConfid:true},
   {key:'contract',label:'근로계약서',roles:['staff','manager','chief','owner']},
   {key:'pay',   label:'💰 급여',   roles:['owner']},
@@ -1258,12 +1264,35 @@ function renderWorkDocuments(m){
 }
 /* work-documents:render-end */
 /* ── 캘린더 ── */
-let CAL_MONTH=null,CAL_VIEW='all';
+let CAL_MONTH=null,CAL_VIEW='all',CAL_SELECTED_DATE=null;
 function setCalendarView(view){CAL_VIEW=view;render();}
+function calendarDepartmentGroups(roster){
+  const departments=roster&&roster.departments||{};
+  return [
+    ['Dr.',departments['Dr.']||[],'dept dr'],
+    ['진료·상담',[...(departments['진료실']||[]),...(departments['상담']||[])],'dept room'],
+    ['데스크',departments['데스크']||[],'dept desk'],
+    ['소독·행정',departments['행정']||[],'dept admin'],
+    ['기공',departments['기공실']||[],'dept lab'],
+    ['미지정',departments['미지정']||[],'unassigned']
+  ];
+}
 function calendarRosterTag(label,names,kind){
   if(!names.length)return '';
   const detail=names.join(', ');
   return `<span class="cal-tag ${kind} cal-roster"><span class="cal-summary">${esc(label)} ${names.length}명</span><span class="cal-names" title="${esc(label)}: ${esc(detail)}">${esc(detail)}</span></span>`;
+}
+function renderCalendarDayPanel(date,roster,leaveNames){
+  const groups=calendarDepartmentGroups(roster),tags=groups.map(([label,names,kind])=>calendarRosterTag(label,names,kind)).filter(Boolean);
+  if((roster&&roster.evening||[]).length)tags.push(calendarRosterTag('야간',roster.evening,'evening'));
+  if((leaveNames||[]).length)tags.push(calendarRosterTag('연차',leaveNames,'lv'));
+  if((roster&&roster.off||[]).length)tags.push(calendarRosterTag('OFF',roster.off,'off'));
+  if((roster&&roster.etc||[]).length)tags.push(calendarRosterTag('기타',roster.etc,'etc'));
+  return `<aside class="calendar-day-panel"><div class="sub">선택 날짜</div><h3>${esc(date||'날짜를 선택하세요')}</h3>${tags.length?tags.join(''):'<div class="empty">등록된 근무·연차가 없습니다.</div>'}</aside>`;
+}
+function selectCalendarDay(date,event){
+  if(event&&event.target&&event.target.closest&&event.target.closest('a,button,input,select'))return;
+  CAL_SELECTED_DATE=date;render();
 }
 function toggleCalendarDay(cell,event){
   if(event&&event.target&&event.target.closest&&event.target.closest('a,button,input,select'))return;
@@ -1321,27 +1350,28 @@ async function renderCalendar(m){
       ...info.holidays.map(h=>`<span class="cal-tag hol"><span title="${esc(h.name)}">${esc(h.name)}</span></span>`),
       ...info.events.map(e=>`<span class="cal-tag ev"><span title="${esc(e.kind)} ${esc(e.title)}">${esc(e.title)}</span>${isLead()?`<a href="javascript:void(0)" onclick="event.stopPropagation();deleteCalendarEvent(${e.id})">✕</a>`:''}</span>`),
       calendarRosterTag('Dr.',roster.departments['Dr.'],'dept dr'),
-      calendarRosterTag('진료실',roster.departments['진료실'],'dept room'),
+      calendarRosterTag('진료·상담',[...roster.departments['진료실'],...roster.departments['상담']],'dept room'),
       calendarRosterTag('데스크',roster.departments['데스크'],'dept desk'),
-      calendarRosterTag('기공실',roster.departments['기공실'],'dept lab'),
-      calendarRosterTag('상담',roster.departments['상담'],'dept consult'),
-      calendarRosterTag('행정',roster.departments['행정'],'dept admin'),
-      calendarRosterTag('미지정',roster.departments['미지정'],'dept unassigned'),
+      calendarRosterTag('소독·행정',roster.departments['행정'],'dept admin'),
+      calendarRosterTag('기공',roster.departments['기공실'],'dept lab'),
+      calendarRosterTag('미지정',roster.departments['미지정'],'unassigned'),
       calendarRosterTag('야간',roster.evening,'evening'),
       CAL_VIEW==='all'?calendarRosterTag('연차',leaveByDate[c.ds]||[],'lv'):'',
       calendarRosterTag('OFF',roster.off,'off'),
       calendarRosterTag('기타',roster.etc,'etc'),
       weekStatus?`<span class="cal-tag status ${weekStatus}"><span>${weekStatus==='published'?'확정':'작성 중'}</span></span>`:''
     ].filter(Boolean).join('');
-    return `<div class="cal-cell${c.ds===todayStr?' today':''}" tabindex="0" role="button" aria-expanded="false" onclick="toggleCalendarDay(this,event)" onkeydown="toggleCalendarDay(this,event)"><div class="d ${dCls}">${c.d}</div>${tags}</div>`;
+    return `<div class="cal-cell${c.ds===todayStr?' today':''}${c.ds===CAL_SELECTED_DATE?' selected':''}" tabindex="0" role="button" aria-expanded="${c.ds===CAL_SELECTED_DATE}" onclick="selectCalendarDay('${c.ds}',event)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectCalendarDay('${c.ds}',event)}"><div class="d ${dCls}">${c.d}</div>${tags}</div>`;
   }).join('');
+  if(!CAL_SELECTED_DATE||!CAL_SELECTED_DATE.startsWith(CAL_MONTH+'-'))CAL_SELECTED_DATE=from;
+  const selectedRoster=scheduleByDate[CAL_SELECTED_DATE]||{departments:{'Dr.':[],'진료실':[],'데스크':[],'기공실':[],'상담':[],'행정':[],'미지정':[]},evening:[],off:[],etc:[]};
   m.innerHTML=`<div class="card"><h2>📅 캘린더</h2>
     <div class="rowflex"><button class="mini ${CAL_VIEW==='all'?'stamp':''}" onclick="setCalendarView('all')">전체</button><button class="mini ${CAL_VIEW==='work'?'stamp':''}" onclick="setCalendarView('work')">근무</button><button class="mini ${CAL_VIEW==='leave'?'stamp':''}" onclick="setCalendarView('leave')">연차</button></div>
     <div class="rowflex"><label>대상 월 <input class="mini" type="month" value="${CAL_MONTH}" onchange="CAL_MONTH=this.value;render()"></label></div>
-    <div class="cal-grid">
+    <div class="calendar-layout">${renderCalendarDayPanel(CAL_SELECTED_DATE,selectedRoster,leaveByDate[CAL_SELECTED_DATE]||[])}<div class="cal-grid">
       ${dow.map((w,i)=>`<div class="cal-dow ${i===0?'sun':(i===6?'sat':'')}">${w}</div>`).join('')}
       ${cellsHtml}
-    </div>
+    </div></div>
     ${isLead()?`<div class="rowflex" style="margin-top:10px"><input class="mini" type="date" id="calDate" value="${today()}"><input class="mini" id="calTitle" placeholder="제목"><select class="mini" id="calKind"><option>이벤트</option><option>단축근무</option><option>면접</option></select><button class="mini" onclick="addCalendarEvent()">추가</button></div>`:''}
   </div>`;
 }
