@@ -1,6 +1,6 @@
 # todos — 내부 도구(T8/D) 작업 목록
 
-## 🟡 Task 3 연차 신청 증빙·월차 자동발생 DB 운영 적용·프런트 배포 대기 (2026-09-20)
+## ✅ Task 3 연차 신청 증빙·월차 자동발생 운영 적용·프런트 배포 완료 (2026-09-20)
 - 변경: `hr.html` 입사서류의 직원 서류함 안에 별도 `연차 신청 증빙` 하위 카드를 추가했다. 일반 `employee_documents`·`hr-docs`와 분리한 `leave_application_documents`·`leave-docs`를 사용하며, 관리자는 조회만 하고 업로드는 본인 신청 건에만 허용한다.
 - 운영 migration: `leave_application_documents_monthly_accrual_release_20260920` 적용 후, 기존 default privilege를 명시적으로 회수한 `leave_application_documents_monthly_accrual_security_fix_20260920`를 적용했다. SQL SHA256은 각각 `D56EC2D8B2402B933CB49140EE08E36C6D2170B54A611519279889C742D4FF18`, `CD4D02903CE907FB762F543CC7BADAAC700D4EEC6DE63095282039819D7364DA`.
 - DB 경계: `leave_accrual_runs`의 `unique(user_id,due_date)`로 발생 후보를 구조적으로 식별한다. 1년 미만 1~11회 후보만 owner에게 미리보기로 제공하고, 개근 근태 확인 연결 전 `apply_monthly_leave_accruals`는 SECURITY INVOKER로 실제 ledger 기록을 항상 차단한다. 수동 ledger·잔액은 수정하지 않는다.
@@ -8,7 +8,7 @@
 - 검증: 직접 순차 Node 정적/회귀 20개 파일, PGlite SQL 2개, 인라인 파싱, `git diff --check`를 재실행한다. `node --test` 병렬 실행은 Windows 샌드박스 `spawn EPERM`으로 미사용.
 - 운영 전후 스냅샷: 적용 전 `profiles=21`, active·approved=20, hire_date=13, `leave_requests=27`, `leave_ledger=30행/115.5일`, `employee_documents=0`, `hr-docs` private/객체 1개였다. 적용 후 새 두 테이블은 RLS 활성화·0행, `leave-docs` private/객체 0개이며 기존 `hr-docs`와 기존 연차 데이터는 그대로다.
 - 운영 검증: `authenticated`는 증빙 SELECT/INSERT/DELETE 및 월차 후보 SELECT만 보유하고, anon 함수 실행은 모두 거부된다. 롤백 트랜잭션으로 owner 미리보기 허용·비owner 거부·apply 항상 차단을 확인했다. Supabase security advisor는 적용 전후 동일 경고만 남아 Task 3 신규 경고는 없다.
-- 배포 대기: DB migration은 적용했으나, 커밋 `699a686`의 GitHub `main` 직접 push는 현재 세션의 외부 전송 권한이 없어 미완료다. push 뒤 `https://jung-plant.com/hr.html`의 로딩·정적 마커만 확인하며, 실제 직원 로그인·업로드·알림은 하지 않는다.
+- 배포 확인: 최종 교정 커밋 `b400e0b`을 `origin/main`에 반영했다. `https://jung-plant.com/hr.html?release=b400e0b`은 HTTP 200이며, 연차 증빙 업로드 표식과 로그인 기본 화면이 정상 로딩된다. 실제 직원 로그인·업로드·알림은 하지 않았다.
 - 롤백: 프런트는 보완 커밋 이전으로 되돌리고, DB는 새 테이블·RLS·함수·Storage 정책을 역순 해제한다. 이미 생성된 ledger는 삭제하지 않고 owner 조정 이력으로 복구한다. 현재는 실제 ledger·직원 문서 행을 만들지 않았다.
 
 ## ✅ ZIP 근무표 직무표 단계배포 완료 (2026-09-20)
