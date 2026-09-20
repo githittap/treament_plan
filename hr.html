@@ -519,6 +519,7 @@ async function render(){
     else if(TAB==='suggestions')await renderSuggestions(m);
     else if(TAB==='onbo')await renderOnbo(m);
     else if(TAB==='confid')await renderConfid(m);
+    else if(TAB==='consult')await renderConsultationJournal(m);
     else if(TAB==='contract')await renderContract(m);
     else if(TAB==='pay')await renderPay(m);
     else if(TAB==='aicost')await renderAicost(m);
@@ -551,6 +552,7 @@ async function renderHome(m){
     ${undone.length?`<div class="hint" style="color:var(--gold)">⚠ 미제출: ${undone.map(i=>esc(i.label)).join(', ')} — [서류제출] 탭에서 제출하세요.</div>`:''}
   </div>
   ${isMgr()?contractAlertsCard(CONTRACT_ALERTS):''}
+  ${canManageConsultation()?'<div class="card" style="padding:12px 14px"><div class="rowflex" style="justify-content:space-between;align-items:center;gap:10px"><div><h2 style="margin-bottom:3px">🗂 상담일지</h2><div class="hint">실장·원장만 상담 기록을 입력·조회·수정합니다.</div></div><button class="mini" onclick="go(\'consult\')">상담일지 열기</button></div></div>':''}
   <div class="card" style="padding:12px 14px"><div class="rowflex" style="justify-content:space-between;align-items:center;gap:10px"><div><h2 style="margin-bottom:3px">📚 업무자료</h2><div class="hint">직원 업무에 필요한 공개 자료를 한곳에서 확인합니다.</div></div><button class="mini" onclick="go('workdocs')">업무자료 열기</button></div></div>
   <div class="card"><h2>📢 최근 공지</h2>${(notices||[]).length?(notices||[]).map(n=>
     `<div style="padding:6px 0;border-bottom:1px dashed var(--line)">${n.pinned?'📌 ':''}<b>${esc(n.title)}</b> <span class="sub">${md(n.created_at)}</span>
@@ -1693,6 +1695,39 @@ async function submitConfidRecord(){
   if(error){$('#cfMsg').textContent='저장 실패: '+error.message;return;}
   $('#cfName').value='';$('#cfChart').value='';$('#cfBody').value='';$('#cfMsg').textContent='';
   renderConfid($('#main'));setStatus('saved');
+}
+
+/* ── 상담일지: 원본 엑셀의 허용 시트 범주만 새 기록에 사용한다. ── */
+const CONSULTATION_SHEETS=['교정','확정','미확정 및 부분확정','홈페이지','카카오,네이버예약,당근','원본'];
+const CONSULTATION_STATUSES=['대기','미확정','부분확정','확정','종결'];
+let CONSULTATION_ROWS=[],CONSULTATION_EDIT_ID=null;
+function canManageConsultation(){return ME.role==='manager'||ME.role==='owner';}
+function consultationPhone(value){const text=String(value||'').trim();return text.length<5?'':text.slice(0,3)+'-•••-'+text.slice(-4);}
+function consultationOptions(values,selected){return values.map(value=>`<option value="${esc(value)}" ${value===selected?'selected':''}>${esc(value)}</option>`).join('');}
+function consultationDraftFromForm(){return {
+  patient_name:$('#cjName').value.trim(),contact_phone:$('#cjPhone').value.trim()||null,source_sheet:$('#cjSheet').value,
+  consulted_on:$('#cjDate').value,status:$('#cjStatus').value,consultation_note:$('#cjNote').value.trim(),next_action:$('#cjNext').value.trim()||null
+};}
+function consultationResetForm(){CONSULTATION_EDIT_ID=null;$('#cjFormTitle').textContent='➕ 새 상담 기록';$('#cjSave').textContent='저장';$('#cjName').value='';$('#cjPhone').value='';$('#cjSheet').value=CONSULTATION_SHEETS[0];$('#cjDate').value=today();$('#cjStatus').value='대기';$('#cjNote').value='';$('#cjNext').value='';$('#cjMsg').textContent='';}
+function consultationEdit(id){const row=CONSULTATION_ROWS.find(item=>item.id===id);if(!row)return;CONSULTATION_EDIT_ID=id;$('#cjFormTitle').textContent='✏️ 상담 기록 수정';$('#cjSave').textContent='수정 저장';$('#cjName').value=row.patient_name||'';$('#cjPhone').value=row.contact_phone||'';$('#cjSheet').value=row.source_sheet||CONSULTATION_SHEETS[0];$('#cjDate').value=row.consulted_on||today();$('#cjStatus').value=row.status||'대기';$('#cjNote').value=row.consultation_note||'';$('#cjNext').value=row.next_action||'';$('#cjMsg').textContent='';window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});}
+function filterConsultationRows(){const query=($('#cjQuery')?.value||'').trim().toLowerCase(),sheet=$('#cjFilterSheet')?.value||'',status=$('#cjFilterStatus')?.value||'';const rows=CONSULTATION_ROWS.filter(row=>(!sheet||row.source_sheet===sheet)&&(!status||row.status===status)&&(!query||String(row.patient_name||'').toLowerCase().includes(query)||String(row.contact_phone||'').includes(query)||String(row.next_action||'').toLowerCase().includes(query)));$('#cjList').innerHTML=rows.length?`<div class="tblwrap"><table><tr><th>상담일</th><th>환자</th><th>연락처</th><th>구분</th><th>상태</th><th>다음 조치</th><th></th></tr>${rows.map(row=>`<tr><td>${esc(row.consulted_on||'')}</td><td>${esc(row.patient_name||'')}</td><td>${esc(consultationPhone(row.contact_phone))||'-'}</td><td>${esc(row.source_sheet||'')}</td><td><span class="b ${row.status==='확정'?'ok':row.status==='종결'?'wait':'no'}">${esc(row.status||'')}</span></td><td>${esc(row.next_action||'-')}</td><td><button class="mini" onclick="consultationEdit(${Number(row.id)})">수정</button></td></tr>`).join('')}</table></div>`:'<div class="empty">조건에 맞는 상담 기록이 없습니다.</div>';}
+async function renderConsultationJournal(m){
+  if(!canManageConsultation()){m.innerHTML='<div class="card"><div class="empty">상담일지 접근 권한이 없습니다.</div></div>';return;}
+  const {data,error}=await sb.from('consultation_journals').select('id,patient_name,contact_phone,source_sheet,consulted_on,status,consultation_note,next_action,created_at,updated_at').order('consulted_on',{ascending:false}).order('id',{ascending:false}).limit(200);
+  if(error){m.innerHTML='<div class="card"><div class="cal-error">상담일지 불러오기 실패: '+esc(error.message||'알 수 없는 오류')+'</div></div>';setStatus('error');return;}
+  CONSULTATION_ROWS=data||[];
+  m.innerHTML=`<div class="card"><div class="rowflex" style="justify-content:space-between;align-items:center"><div><h2>🗂 상담일지</h2><div class="hint">실장·원장 전용입니다. 원본 엑셀 행은 가져오지 않으며, 새 기록만 저장합니다.</div></div><button class="mini" onclick="go('home')">홈으로</button></div><div class="rowflex" style="margin-top:10px"><input id="cjQuery" placeholder="환자명·연락처·다음 조치 검색" oninput="filterConsultationRows()"><select id="cjFilterSheet" onchange="filterConsultationRows()"><option value="">전체 상담 구분</option>${consultationOptions(CONSULTATION_SHEETS,'')}</select><select id="cjFilterStatus" onchange="filterConsultationRows()"><option value="">전체 상태</option>${consultationOptions(CONSULTATION_STATUSES,'')}</select></div><div id="cjList" style="margin-top:10px"></div></div><div class="card"><h3 id="cjFormTitle">➕ 새 상담 기록</h3><div class="grid"><div class="fld"><label>환자명 *</label><input id="cjName" maxlength="80"></div><div class="fld"><label>연락처</label><input id="cjPhone" inputmode="tel" maxlength="30"></div><div class="fld"><label>상담 구분 *</label><select id="cjSheet">${consultationOptions(CONSULTATION_SHEETS,CONSULTATION_SHEETS[0])}</select></div><div class="fld"><label>상담일 *</label><input id="cjDate" type="date" value="${today()}"></div><div class="fld"><label>상태 *</label><select id="cjStatus">${consultationOptions(CONSULTATION_STATUSES,'대기')}</select></div></div><div class="fld" style="margin-top:8px"><label>상담 내용 *</label><textarea id="cjNote" maxlength="4000"></textarea></div><div class="fld" style="margin-top:8px"><label>다음 조치</label><textarea id="cjNext" maxlength="1000"></textarea></div><div class="rowflex" style="margin-top:10px"><button class="hbtn pri" id="cjSave" onclick="saveConsultationJournal()">저장</button><button class="hbtn" onclick="consultationResetForm()">새로 입력</button></div><div class="msg" id="cjMsg"></div></div>`;
+  filterConsultationRows();
+}
+async function saveConsultationJournal(){
+  const msg=$('#cjMsg'),row=consultationDraftFromForm();
+  if(!row.patient_name||!row.consulted_on||!row.consultation_note){msg.textContent='환자명, 상담일, 상담 내용은 필수입니다.';return;}
+  if(!CONSULTATION_SHEETS.includes(row.source_sheet)||!CONSULTATION_STATUSES.includes(row.status)){msg.textContent='허용되지 않은 상담 구분 또는 상태입니다.';return;}
+  setStatus('saving');msg.textContent='저장 중…';
+  const request=CONSULTATION_EDIT_ID===null?sb.from('consultation_journals').insert(row):sb.from('consultation_journals').update(row).eq('id',CONSULTATION_EDIT_ID);
+  const {error}=await request;
+  if(error){msg.textContent=(CONSULTATION_EDIT_ID===null?'상담일지 저장 실패: ':'상담일지 수정 실패: ')+(error.message||'알 수 없는 오류');setStatus('error');return;}
+  setStatus('saved');consultationResetForm();await renderConsultationJournal($('#main'));
 }
 
 /* ── 근로계약서 ── */
