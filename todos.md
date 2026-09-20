@@ -15,6 +15,13 @@
 - 시안 승인 뒤 순서: 서류제출 통합(연차증빙·계정/Notion·퇴사/휴직/재직증명) → 근무표/계약/연차 → 캘린더 → 생체 원본과 분리된 개인 출퇴근 월간 기록 → 기능별 시험·RLS/Storage·모바일/데스크톱·단계 배포.
 - 기존 데이터 삭제·대량이관·실제 직원 시험발송은 제외한다.
 
+## 🟠 후속 시안 — `직원허브 3차.zip` 피드백 반영·결정 대기 (2026-09-21)
+- 원본 보존: `C:\Users\elusi\Downloads\직원허브 3차.zip`, 281,206 bytes, 6개 항목(Markdown 1·PNG 5), SHA256 `953610DDB7BBCD69007677756279EDAC34936EBC1F7056642F1F93643DCE1175`.
+- 시안: `C:\Users\elusi\.codex\visualizations\2026\09\20\01a0bf28-ff51-7ff2-9621-d8d2a1dc9589\직원허브_2차_시안.html`, SHA256 `3AF2668BFEE9D0F130700B2C04256FDFD0C6E5F879D114CA80844BDC211D14CF`. 운영 코드·DB에는 적용하지 않았다.
+- 분류: 기존 화면·가명·무저장·PNG/PDF는 유지, 휴직 신청 제거·생체 의미 안내는 2차 수정, 지문 체크→매니저 승인대기·직무별 숫자 기본/상세 명단·색상·야간 전원·모바일 알림 방향은 3차 신규 피드백으로 반영했다.
+- 판단 필요: 보안서약서 원본 PDF와 자동서명 범위, 매니저 승인권한, 알림 수신 대상, 보관기간. 이 결정 전 운영 구현은 시작하지 않는다.
+- 검증: Terra medium 보완 뒤 Sol high 읽기 전용 재검증 PASS. 기본 숫자/상세 명단 토글, 직무 6색, 9월 23일 야간 3명 일치, 모바일 1~30일 접근, 인라인 html2canvas PNG·PDF 인쇄, HTML/JS 파싱을 확인했다.
+
 ## ✅ Task 3 연차 신청 증빙·월차 자동발생 운영 적용·프런트 배포 완료 (2026-09-20)
 - 변경: `hr.html` 입사서류의 직원 서류함 안에 별도 `연차 신청 증빙` 하위 카드를 추가했다. 일반 `employee_documents`·`hr-docs`와 분리한 `leave_application_documents`·`leave-docs`를 사용하며, 관리자는 조회만 하고 업로드는 본인 신청 건에만 허용한다.
 - 운영 migration: `leave_application_documents_monthly_accrual_release_20260920` 적용 후, 기존 default privilege를 명시적으로 회수한 `leave_application_documents_monthly_accrual_security_fix_20260920`를 적용했다. SQL SHA256은 각각 `D56EC2D8B2402B933CB49140EE08E36C6D2170B54A611519279889C742D4FF18`, `CD4D02903CE907FB762F543CC7BADAAC700D4EEC6DE63095282039819D7364DA`.
