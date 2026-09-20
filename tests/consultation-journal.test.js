@@ -6,6 +6,7 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const sqlPath = path.join(root, 'db', 'consultation_journal_draft.sql');
 const rollbackPath = path.join(root, 'db', 'consultation_journal_rollback.sql');
+const hardeningPath = path.join(root, 'db', 'consultation_journal_advisor_hardening.sql');
 const htmlPath = path.join(root, 'hr.html');
 const sql = fs.existsSync(sqlPath) ? fs.readFileSync(sqlPath, 'utf8') : '';
 const html = fs.readFileSync(htmlPath, 'utf8');
@@ -37,7 +38,7 @@ test('상담일지는 anon과 일반 직원에게 닫고 manager·owner만 조�
   for (const action of ['select', 'insert', 'update']) {
     const policy = sql.match(new RegExp(`create policy consultation_journals_${action}[\\s\\S]*?;`, 'i'));
     assert.ok(policy, `${action} RLS 정책이 있어야 합니다.`);
-    assert.match(policy[0], /my_role\(\)\s+in\s*\('manager',\s*'owner'\)/i);
+    assert.match(policy[0], /\(select public\.my_role\(\)\)\s+in\s*\('manager',\s*'owner'\)/i);
   }
   assert.doesNotMatch(sql, /create policy consultation_journals_delete/i);
 });
@@ -47,6 +48,25 @@ test('UUID를 식별자로 쓰고 sequence 권한 없이 감사 필드 변조를
   assert.doesNotMatch(sql, /generated always as identity|consultation_journals_id_seq|on sequence/i);
   for (const immutable of ['new\.id is distinct from old\.id', 'new\.author_id is distinct from old\.author_id', 'new\.created_at is distinct from old\.created_at']) {
     assert.match(sql, new RegExp(immutable, 'i'));
+  }
+});
+
+test('Advisor 보완은 고정 search_path, author FK 인덱스, RLS initPlan을 유지한다', () => {
+  for (const source of [sql, fs.existsSync(hardeningPath) ? fs.readFileSync(hardeningPath, 'utf8') : '']) {
+    assert.match(source, /set search_path = public, pg_temp/i);
+    assert.match(source, /create index if not exists consultation_journals_author_id_idx\s+on public\.consultation_journals \(author_id\)/i);
+    assert.match(source, /\(select public\.my_role\(\)\)\s+in\s*\('manager',\s*'owner'\)/i);
+    assert.match(source, /author_id\s*=\s*\(select auth\.uid\(\)\)/i);
+  }
+});
+
+test('운영 추가 migration은 기존 상담일지 객체만 보완한다', () => {
+  assert.ok(fs.existsSync(hardeningPath), 'Advisor 보완 migration SQL이 없습니다.');
+  const hardening = fs.readFileSync(hardeningPath, 'utf8');
+  assert.doesNotMatch(hardening, /create table|drop table|delete from|truncate/i);
+  assert.match(hardening, /create or replace function public\.set_consultation_journals_updated_at/i);
+  for (const policy of ['consultation_journals_select', 'consultation_journals_insert', 'consultation_journals_update']) {
+    assert.match(hardening, new RegExp(`drop policy if exists ${policy}`, 'i'));
   }
 });
 

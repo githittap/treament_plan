@@ -45,6 +45,7 @@
 - 사전 RLS 실행시험: 총괄이 프로젝트 `texevhsxttfoqkrucfzl`에서 `BEGIN`/`ROLLBACK`으로 8/8 PASS 확인. manager 입력·수정, owner 조회 허용; staff/chief 조회 차단, staff 입력·anon 조회 거부, `created_at` 변조 거부. 트랜잭션 ROLLBACK으로 운영 스키마·데이터 변경 없음.
 - 적용 전 체크: `db/consultation_journal_draft.sql`과 `db/consultation_journal_rollback.sql`을 함께 검토하고, `hr.html`의 커밋이 배포 대상 브랜치에 포함됐는지 확인한다. 저장소 검색상 `consultation_journals`·`set_consultation_journals_updated_at`의 중복 정의는 없다.
 - 롤백: 신규 테이블과 갱신 트리거 함수만 제거한다. 적용 뒤 기록이 생성됐다면 이 롤백을 실행하지 말고 데이터 보존 판단을 먼저 받는다.
+- 적용 후 보완: 운영 적용된 실제 객체의 RLS 재시험도 8/8 PASS(실제 기록 0건, 시험 입력은 ROLLBACK)했다. `db/consultation_journal_advisor_hardening.sql`은 Advisor의 고정 `search_path`, `author_id` FK 인덱스, 정책 initPlan 보완만 추가한다.
 
 ## 핵심 규칙·컨벤션
 - **모든 코드(프론트·백엔드·SQL)는 Codex에 위임 작성**(2026-07-30 원장 강조: "코딩 직접 말고 항상 codex delegate"). Claude는 계약(스키마·호출목록) 작성 + 결과 **검수·검증·통합**만, 코드 파일 직접 편집 X. **SQL은 Codex 교차검증 통과 후에만 실행 안내**(FK 타입 사고 재발 방지 — 기존 DB 참조 시 타입 실측). 이 환경에선 codex를 **PowerShell로 codex.exe 직접 구동**(Bash 훅 고장; prompt는 stdin 파이프 + `$OutputEncoding=UTF8`).
