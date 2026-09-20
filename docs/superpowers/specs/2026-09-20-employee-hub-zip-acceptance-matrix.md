@@ -11,6 +11,16 @@
 | ZIP-05 | 승인 연차 선택 차단, 반차 표시 | 구현·런타임 검증 완료 | 날짜별 다일 연차 차단 시험 |
 | ZIP-06 | 야간은 전체 직원 선택, 원래 직무 색 유지 | 구현·런타임 검증 완료 | 야간 이중표시·해제→work 시험 |
 | ZIP-07 | 모든 승인 직원 초안 편집, chief/owner 공표 | 구현·회귀 검증 완료 | 역할·공표 시험 |
-| ZIP-08 | 기존 `schedules` 키·명부·행수 보존 | 운영 확인 대기 | DB read-only 집계 및 회귀시험 |
+| ZIP-08 | 기존 `schedules` 키·명부·행수 보존 | 운영 사전·사후 동일 확인 | 사전·사후 집계 및 회귀시험 |
 
 Task 0 증거: `tests/schedule-zip-acceptance.test.js`는 기존 개인별 select UI에서 실패한 뒤 새 구조에서 통과했다. Task 1 런타임 증거는 `tests/schedule-roster.test.js`의 합성 하니스와 `tests/fixtures/schedule-role-synthetic.html`이다. 운영 배포·실데이터 화면 검증은 총괄 승인 전까지 보류한다.
+
+## 단계배포 기록
+
+- 배포 커밋: `050bd980b7e2892e5becd37de068720bf3cfad22` (2026-09-20 18:32 KST)
+- migration: `unified_schedule_department_compatibility_20260920`
+- migration SHA256: `C60118680E255863EA120C1A67C794D2BB090F51AF46E7132439EF94A40740DA`
+- 사전·사후 집계: `schedule_people=21`, `schedules=281`, `schedule_weeks=10`, `holidays=9`, `leave_requests=27`; 부서별 `Dr.=3`, `미지정=18`
+- 롤백: 기존 5개 허용값만 남기는 `schedule_people_department_check` 재생성 SQL을 보존함.
+- 공개 검증: `https://jung-plant.com/hr.html?v=050bd98` HTTP 200, 새 직무표 마커 확인, 정규화 SHA256 로컬과 일치.
+- 미검증 경계: 실제 로그인·저장·역할별 운영 동작, 실제 직원 데이터 조작·알림은 수행하지 않음.

@@ -1,10 +1,13 @@
 # todos — 내부 도구(T8/D) 작업 목록
 
-## 🔎 ZIP 정합화 Task 0·1 진행 중 (2026-09-20)
-- 기준선: `origin/main` `0fa25926d2ef0959d25cba5bb2d3910b7f76cddf`; 운영 DB·프런트·GitHub 추가 배포는 보류.
-- Task 0: `docs/superpowers/specs/2026-09-20-employee-hub-zip-acceptance-matrix.md`와 `tests/schedule-zip-acceptance.test.js` 추가. 현재 개인별 select 근무표에서 수용시험이 실패해야 함.
-- Task 1 목표: 월간 직무 행·날짜 셀 체크박스, 일요일 우측, 승인 연차 차단, 야간 전체 직원 선택, 기존 schedules 키·행수 보존.
-- 보호: 원본 ZIP/XLSX·환자정보 비노출, 운영 DB·배포·push 금지, 기존 283건과 명부 보존.
+## ✅ ZIP 근무표 직무표 단계배포 완료 (2026-09-20)
+- 배포 커밋: `050bd980b7e2892e5becd37de068720bf3cfad22` — `origin/main` fast-forward. 배포 확인 시각: 2026-09-20 18:32 KST.
+- 운영 migration: `unified_schedule_department_compatibility_20260920`; SQL SHA256 `C60118680E255863EA120C1A67C794D2BB090F51AF46E7132439EF94A40740DA`.
+- 사전·사후 집계 동일: `schedule_people=21`, `schedules=281`, `schedule_weeks=10`, `holidays=9`, `leave_requests=27`; 부서별 `Dr.=3`, `미지정=18`.
+- constraint는 기존 `Dr./진료실/데스크/기공실/미지정`에서 `상담/행정`만 추가 허용. 행 수정·삭제 없음.
+- 롤백 SQL: `alter table public.schedule_people drop constraint if exists schedule_people_department_check; alter table public.schedule_people add constraint schedule_people_department_check check (department in ('Dr.', '진료실', '데스크', '기공실', '미지정'));`
+- 검증: 전체 18개 JS 테스트 파일 142/142, 근무표 관련 73/73, `git diff --check`, 공개 `hr.html` HTTP 200·정적 마커·정규화 SHA 일치.
+- 보호: 원본 ZIP/XLSX·환자정보 비노출, 실제 직원 데이터 조작·알림 발송·로그인/저장/역할별 운영 검증은 하지 않음.
 
 ## ✅ 출퇴근 수기정정·승인 경로 운영 적용 (2026-09-20)
 - **운영 migration 적용 완료**: Supabase `texevhsxttfoqkrucfzl`, migration `attendance_issue_resolution_release`. 적용 전 SQL SHA256 `039A4679134CB4042835D4CF58F9DF89750EEEC4DFF26AFB5260DFA087BC4E2F`; 기존 migration 목록에 없음을 확인한 뒤 적용.
