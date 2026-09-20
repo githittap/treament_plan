@@ -599,14 +599,14 @@ test('월간 캘린더는 모든 조회 오류를 눈에 보이는 하나의 오
   for (const name of ['holidaysError', 'eventsError', 'leaveError', 'schedulesError', 'weeksError']) {
     assert.match(source, new RegExp(name));
   }
-  assert.match(source, /근무표를 불러오지 못했습니다/);
+  assert.match(source, /캘린더 정보를 불러오지 못했습니다/);
 });
 
 test('캘린더 렌더 순서는 공휴일과 이벤트, 부서, 야간, 연차, OFF, 기타, 주차 상태다', () => {
   const source = calendarBlock[1];
   const markers = [
     'cal-tag hol', 'cal-tag ev',
-    "calendarRosterTag('Dr.'", "calendarRosterTag('진료실'", "calendarRosterTag('데스크'", "calendarRosterTag('기공실'", "calendarRosterTag('미지정'",
+    "calendarRosterTag('Dr.'", "calendarRosterTag('진료실'", "calendarRosterTag('데스크'", "calendarRosterTag('기공실'", "calendarRosterTag('상담'", "calendarRosterTag('행정'", "calendarRosterTag('미지정'",
     "calendarRosterTag('야간'", "calendarRosterTag('연차'", "calendarRosterTag('OFF'", "calendarRosterTag('기타'", 'cal-tag status'
   ];
   let previous = -1;
@@ -617,6 +617,16 @@ test('캘린더 렌더 순서는 공휴일과 이벤트, 부서, 야간, 연차,
   }
   assert.doesNotMatch(source, /치과\s*휴무/);
   assert.match(source, /weekByStart\.get\(mondayStr\(c\.ds\)\)/);
+});
+
+test('캘린더는 전체·근무·연차 3단 전환과 상담·행정 직무를 유지한다', () => {
+  const source = calendarBlock[1];
+  assert.match(source, /CAL_VIEW==='all'/);
+  assert.match(source, />전체</);
+  assert.match(source, />근무</);
+  assert.match(source, />연차</);
+  assert.match(source, /CAL_VIEW==='work'/);
+  assert.match(source, /CAL_VIEW==='all'\?calendarRosterTag\('연차'/);
 });
 
 test('캘린더 날짜 셀은 모바일·키보드 펼침과 삭제 링크 전파 차단을 제공한다', () => {

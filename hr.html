@@ -369,7 +369,7 @@ function scheduleCalendarIndex(rows,people,weeks){
     const date=scheduleDate(row.week_start,row.day);
     if(!index[date]){
       const week=weekByStart.get(row.week_start),status=week&&week.status;
-      index[date]={departments:{'Dr.':[],'진료실':[],'데스크':[],'기공실':[],'미지정':[]},evening:[],off:[],etc:[],weekStatus:status==='공표'?'published':status==='초안'?'draft':null};
+      index[date]={departments:{'Dr.':[],'진료실':[],'데스크':[],'기공실':[],'상담':[],'행정':[],'미지정':[]},evening:[],off:[],etc:[],weekStatus:status==='공표'?'published':status==='초안'?'draft':null};
       seen[date]=new Set();
     }
     if(seen[date].has(person.id))return;
@@ -1257,7 +1257,7 @@ function renderWorkDocuments(m){
 }
 /* work-documents:render-end */
 /* ── 캘린더 ── */
-let CAL_MONTH=null,CAL_VIEW='work';
+let CAL_MONTH=null,CAL_VIEW='all';
 function setCalendarView(view){CAL_VIEW=view;render();}
 function calendarRosterTag(label,names,kind){
   if(!names.length)return '';
@@ -1293,6 +1293,7 @@ async function renderCalendar(m){
     sb.from('schedule_weeks').select('week_start,status').gte('week_start',weekFrom).lte('week_start',weekTo)
   ]);
   const loadError=holidaysError||eventsError||leaveError||schedulesError||weeksError;
+  if(loadError){m.innerHTML='<div class="card"><h2>📅 캘린더</h2><div class="cal-error">캘린더 정보를 불러오지 못했습니다. 잠시 후 다시 시도하세요.</div><button class="mini stamp" onclick="render()">다시 시도</button></div>';return;}
   const leaveByDate=calendarLeaveIndex(lv||[],SCHEDULE_PEOPLE,from,to,nameOf);
   const scheduleByDate=scheduleCalendarIndex(scheduleRowsWithoutApprovedLeave(schedules||[],lv||[]),SCHEDULE_PEOPLE,weeks||[]);
   const weekByStart=new Map((weeks||[]).map(w=>[w.week_start,w]));
@@ -1311,7 +1312,7 @@ async function renderCalendar(m){
   const cellsHtml=cells.map((c,idx)=>{
     if(c.out)return `<div class="cal-cell out"><div class="d">${c.d}</div></div>`;
     const info=byDate[c.ds]||{holidays:[],events:[]};
-    const roster=scheduleByDate[c.ds]||{departments:{'Dr.':[],'진료실':[],'데스크':[],'기공실':[],'미지정':[]},evening:[],off:[],etc:[]};
+    const roster=scheduleByDate[c.ds]||{departments:{'Dr.':[],'진료실':[],'데스크':[],'기공실':[],'상담':[],'행정':[],'미지정':[]},evening:[],off:[],etc:[]};
     const week=weekByStart.get(mondayStr(c.ds)),weekStatus=roster.weekStatus||(week&&week.status==='공표'?'published':week&&week.status==='초안'?'draft':null);
     const dowIdx=idx%7;
     const dCls=info.holidays.length?'hol':(dowIdx===0?'sun':(dowIdx===6?'sat':''));
@@ -1322,9 +1323,11 @@ async function renderCalendar(m){
       calendarRosterTag('진료실',roster.departments['진료실'],'dept room'),
       calendarRosterTag('데스크',roster.departments['데스크'],'dept desk'),
       calendarRosterTag('기공실',roster.departments['기공실'],'dept lab'),
+      calendarRosterTag('상담',roster.departments['상담'],'dept consult'),
+      calendarRosterTag('행정',roster.departments['행정'],'dept admin'),
       calendarRosterTag('미지정',roster.departments['미지정'],'dept unassigned'),
       calendarRosterTag('야간',roster.evening,'evening'),
-      calendarRosterTag('연차',leaveByDate[c.ds]||[],'lv'),
+      CAL_VIEW==='all'?calendarRosterTag('연차',leaveByDate[c.ds]||[],'lv'):'',
       calendarRosterTag('OFF',roster.off,'off'),
       calendarRosterTag('기타',roster.etc,'etc'),
       weekStatus?`<span class="cal-tag status ${weekStatus}"><span>${weekStatus==='published'?'확정':'작성 중'}</span></span>`:''
@@ -1332,8 +1335,7 @@ async function renderCalendar(m){
     return `<div class="cal-cell${c.ds===todayStr?' today':''}" tabindex="0" role="button" aria-expanded="false" onclick="toggleCalendarDay(this,event)" onkeydown="toggleCalendarDay(this,event)"><div class="d ${dCls}">${c.d}</div>${tags}</div>`;
   }).join('');
   m.innerHTML=`<div class="card"><h2>📅 캘린더</h2>
-    <div class="rowflex"><button class="mini ${CAL_VIEW==='work'?'stamp':''}" onclick="setCalendarView('work')">근무 캘린더</button><button class="mini ${CAL_VIEW==='leave'?'stamp':''}" onclick="setCalendarView('leave')">연차 캘린더</button></div>
-    ${loadError?'<div class="cal-error">근무표를 불러오지 못했습니다</div>':''}
+    <div class="rowflex"><button class="mini ${CAL_VIEW==='all'?'stamp':''}" onclick="setCalendarView('all')">전체</button><button class="mini ${CAL_VIEW==='work'?'stamp':''}" onclick="setCalendarView('work')">근무</button><button class="mini ${CAL_VIEW==='leave'?'stamp':''}" onclick="setCalendarView('leave')">연차</button></div>
     <div class="rowflex"><label>대상 월 <input class="mini" type="month" value="${CAL_MONTH}" onchange="CAL_MONTH=this.value;render()"></label></div>
     <div class="cal-grid">
       ${dow.map((w,i)=>`<div class="cal-dow ${i===0?'sun':(i===6?'sat':'')}">${w}</div>`).join('')}
@@ -1459,7 +1461,7 @@ async function renderLeaveStatus(m,embedded){
   else if(!LVSTATUS_MONTH)LVSTATUS_MONTH=today().slice(0,7);
   const from=LVSTATUS_MONTH+'-01',to=leaveCalendarMonthEnd(LVSTATUS_MONTH);
   const {data,error}=await sb.from('leave_requests').select('id,user_id,type,type_note,date_from,date_to,days,status,owner_at,chief_at,created_at').eq('status','승인').lte('date_from',to).gte('date_to',from).order('date_from');
-  if(error){m.innerHTML=`<div class="card"><h2>🏖 연차캘린더</h2><div class="cal-error">연차 정보를 불러오지 못했습니다: ${esc(error.message||'알 수 없는 오류')}</div></div>`;return;}
+  if(error){m.innerHTML=`<div class="card"><h2>🏖 연차캘린더</h2><div class="cal-error">연차 정보를 불러오지 못했습니다: ${esc(error.message||'알 수 없는 오류')}</div><button class="mini stamp" onclick="render()">다시 시도</button></div>`;return;}
   const rows=(data||[]).map(row=>({...row,user_name:nameOf(row.user_id)})),index=buildLeaveCalendarIndex(rows,from,to),owner=ME.role==='owner';
   const first=new Date(from+'T00:00:00'),days=new Date(first.getFullYear(),first.getMonth()+1,0).getDate(),leading=first.getDay(),dow=['일','월','화','수','목','금','토'];
   const cells=[];for(let i=0;i<leading;i++)cells.push('<div class="cal-cell out"></div>');

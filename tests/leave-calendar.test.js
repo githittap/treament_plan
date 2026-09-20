@@ -90,7 +90,9 @@ test('연차캘린더는 별도 상단 탭 없이 캘린더 내부 전환으로 
   assert.doesNotMatch(html, /\{key:'leavestatus',label:'연차캘린더'/);
   assert.match(html, /근무 캘린더/);
   assert.match(html, /연차 캘린더/);
+  assert.match(html, /전체/);
   assert.match(html, /k==='leavestatus'/);
+  assert.ok(fs.existsSync(path.join(__dirname, 'fixtures', 'calendar-integrated-synthetic.html')), '개인정보 없는 통합 캘린더 fixture가 없습니다.');
 });
 
 test('연차 전용 조회는 승인 상태와 양방향 월 겹침 조건을 사용한다', () => {
