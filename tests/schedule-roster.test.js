@@ -369,7 +369,7 @@ test('근무표 연차 조회 오류는 대상과 escape된 메시지만 표시�
 });
 
 function scheduleMonthRenderHarness({ role = 'staff', leaveRows = [] } = {}) {
-  const source = html.match(/async function renderScheduleMonth\([\s\S]*?\n\}\nasync function applyScheduleShift/);
+  const source = html.match(/async function renderScheduleMonth\([\s\S]*?\r?\n\}\r?\nasync function applyScheduleShift/);
   assert.ok(source, 'renderScheduleMonth 함수를 찾을 수 없습니다.');
   const helpers = [html.match(/function scheduleMonthWeeks[\s\S]*?\n\}/)?.[0], html.match(/function scheduleShiftOptions[\s\S]*?\n\}/)?.[0], html.match(/function syncScheduleCellValues[\s\S]*?\n\}/)?.[0], html.match(/function scheduleRolePeople[\s\S]*?\n\}/)?.[0], html.match(/function scheduleRoleColor[\s\S]*?\n\}/)?.[0], html.match(/function scheduleRoleCell[\s\S]*?\n\}/)?.[0], html.match(/async function toggleScheduleRoleMember[\s\S]*?\n\}/)?.[0]].filter(Boolean).join('\n');
   const m = { innerHTML: '' };
