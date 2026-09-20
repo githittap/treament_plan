@@ -24,3 +24,12 @@ Task 0 증거: `tests/schedule-zip-acceptance.test.js`는 기존 개인별 selec
 - 롤백: 기존 5개 허용값만 남기는 `schedule_people_department_check` 재생성 SQL을 보존함.
 - 공개 검증: `https://jung-plant.com/hr.html?v=050bd98` HTTP 200, 새 직무표 마커 확인, 정규화 SHA256 로컬과 일치.
 - 미검증 경계: 실제 로그인·저장·역할별 운영 동작, 실제 직원 데이터 조작·알림은 수행하지 않음.
+
+### Task 2 통합 캘린더 단계배포 기록 (2026-09-20)
+
+- 배포 커밋: `49780b33325d5150876c9032d3eb52e73419a6e6`; 이후 기록 커밋: `52a9a1b`.
+- 시험: 관련 62/62, 전체 18개 파일 143/143, `git diff --check` 통과.
+- 라이브 확인: `https://jung-plant.com/hr.html?v=49780b3` 로그인 화면 정상 로드.
+- 미검증 경계: 인증 후 역할별 실제 화면·실제 직원 입력/승인은 자격증명과 실데이터 없이 미검증.
+- DB 영향: Task 2 migration 및 운영 DB 행 변경 없음.
+- 롤백: 프론트 직전 정본 `23a84f0e5be81561d2e297e16a322ca7d77f8433`으로 재배포; DB 롤백 없음.
