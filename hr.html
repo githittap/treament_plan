@@ -16,7 +16,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
-@media print{ @page{size:A4;margin:10mm} body.leave-printing> *{display:none!important} body.leave-printing>#lvFormMask{display:block!important;position:static!important;background:#fff!important;padding:0!important} body.leave-printing #lvFormMask,body.leave-printing #lvFormMask *{visibility:visible!important} body.leave-printing #lvFormMask .modal{width:100%!important;max-width:none!important;max-height:none!important;overflow:visible!important;box-shadow:none!important;border:0!important;padding:0!important} body.leave-printing #lvFormMask h3{display:none!important} body.leave-printing #lvFormBody>div{padding:8mm!important;font-size:12px!important;line-height:1.45!important} body.leave-printing #lvFormBody table{font-size:12px!important} }
+@media print{ @page{size:A4;margin:10mm} body.leave-printing> *{display:none!important} body.leave-printing>#lvFormMask{display:block!important;position:static!important;background:#fff!important;padding:0!important} body.leave-printing #lvFormMask,body.leave-printing #lvFormMask *{visibility:visible!important} body.leave-printing #lvFormMask .modal{width:100%!important;max-width:none!important;max-height:none!important;overflow:visible!important;box-shadow:none!important;border:0!important;padding:0!important} body.leave-printing #lvFormMask h3{display:none!important} body.leave-printing #lvFormBody>div{padding:8mm!important;font-size:12px!important;line-height:1.45!important} body.leave-printing #lvFormBody table{font-size:12px!important} body.calendar-printing> *{display:none!important} body.calendar-printing>#app,body.calendar-printing>#app main{display:block!important} body.calendar-printing header,body.calendar-printing footer,body.calendar-printing .calendar-actions{display:none!important} body.calendar-printing main{max-width:none!important;padding:0!important} body.calendar-printing #calendarCard{border:0!important;padding:0!important} body.calendar-printing .calendar-layout{grid-template-columns:210px minmax(0,1fr)!important} body.calendar-printing .calendar-day-panel{position:static!important} }
 :root{
   --bg:#0d1715; --card:#14201d; --panel:#182823; --ink:#e6f2ef; --gray:#8fa5a0; --line:#24332f;
   --mint:#2fd9c4; --mint-dk:#0e2b27; --gold:#e3b341; --gold-bg:#2a2312; --red:#ff7b76; --red-bg:#2b1512;
@@ -548,7 +548,7 @@ async function renderHome(m){
       <div class="stat"><div class="sub">안 읽은 공지</div><div class="big">${BADGE.notice||0}</div></div>
       <div class="stat"><div class="sub">미제출 서류</div><div class="big" style="color:${undone.length?'var(--gold)':'var(--mint)'}">${undone.length}</div></div>
     </div>
-    ${undone.length?`<div class="hint" style="color:var(--gold)">⚠ 미제출: ${undone.map(i=>esc(i.label)).join(', ')} — [입사서류] 탭에서 제출하세요.</div>`:''}
+    ${undone.length?`<div class="hint" style="color:var(--gold)">⚠ 미제출: ${undone.map(i=>esc(i.label)).join(', ')} — [서류제출] 탭에서 제출하세요.</div>`:''}
   </div>
   ${isMgr()?contractAlertsCard(CONTRACT_ALERTS):''}
   <div class="card" style="padding:12px 14px"><div class="rowflex" style="justify-content:space-between;align-items:center;gap:10px"><div><h2 style="margin-bottom:3px">📚 업무자료</h2><div class="hint">직원 업무에 필요한 공개 자료를 한곳에서 확인합니다.</div></div><button class="mini" onclick="go('workdocs')">업무자료 열기</button></div></div>
@@ -1251,7 +1251,7 @@ function workDocumentsGuideHtml(){return `<div class="guide-shell">
     <section class="guide-section"><h3>📢 공지 확인</h3><p>공지에서 병원 안내와 새 소식을 확인합니다. 제목과 본문을 읽고 필요한 경우 전문 링크를 엽니다.</p></section>
     <section class="guide-section"><h3>📚 업무자료 보기</h3><p>업무자료에서 매뉴얼과 필요물품 요청·구매현황을 검색해 엽니다. 이 설명서도 업무자료 안에서 다시 열 수 있습니다.</p></section>
     <section class="guide-section"><h3>💡 건의함 사용</h3><p>건의함에서 글을 쓰고 다른 글에 좋아요를 누릅니다. 월간 시상은 캠페인 종료 후 공개되는 안내를 확인합니다.</p></section>
-    <section class="guide-section"><h3>📎 입사서류 제출·계약서 열람</h3><p>입사서류에서 필요한 서류를 제출합니다. 직원 서류함에서는 올린 서류와 체결된 근로계약서를 열람할 수 있습니다.</p></section>
+    <section class="guide-section"><h3>📎 서류제출·계약서 열람</h3><p>서류제출에서 필요한 서류를 제출합니다. 직원 서류함에서는 올린 서류와 체결된 근로계약서를 열람할 수 있습니다.</p></section>
   </div>
   <div class="hint" style="margin-top:12px">ℹ️ 본인에게 보이지 않는 메뉴는 권한 차이입니다. 필요한 메뉴가 보이지 않으면 관리자에게 문의하세요.</div>
 </div>`;}
@@ -1293,6 +1293,22 @@ function renderCalendarDayPanel(date,roster,leaveNames){
 function selectCalendarDay(date,event){
   if(event&&event.target&&event.target.closest&&event.target.closest('a,button,input,select'))return;
   CAL_SELECTED_DATE=date;render();
+}
+async function saveCalendarPng(){
+  const card=$('#calendarCard');if(!card)return;
+  const clone=card.cloneNode(true);clone.querySelectorAll('.calendar-actions').forEach(node=>node.remove());
+  const width=Math.max(card.scrollWidth,760),height=Math.max(card.scrollHeight,500),style=document.querySelector('style')?.textContent||'';
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml"><style>${style}</style>${clone.outerHTML}</div></foreignObject></svg>`;
+  const url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml;charset=utf-8'}));
+  try{
+    const image=await new Promise((resolve,reject)=>{const value=new Image();value.onload=()=>resolve(value);value.onerror=reject;value.src=url;});
+    const canvas=document.createElement('canvas');canvas.width=width*2;canvas.height=height*2;const ctx=canvas.getContext('2d');ctx.scale(2,2);ctx.drawImage(image,0,0);
+    const link=document.createElement('a');link.href=canvas.toDataURL('image/png');link.download=`근무_캘린더_${CAL_MONTH}.png`;link.click();
+  }catch(error){alert('PNG 저장을 준비하지 못했습니다. 브라우저에서 다시 시도하세요.');}
+  finally{URL.revokeObjectURL(url);}
+}
+function printCalendar(){
+  document.body.classList.add('calendar-printing');const done=()=>{document.body.classList.remove('calendar-printing');window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);window.print();
 }
 function toggleCalendarDay(cell,event){
   if(event&&event.target&&event.target.closest&&event.target.closest('a,button,input,select'))return;
@@ -1339,6 +1355,7 @@ async function renderCalendar(m){
   for(let d=1;d<=daysInMonth;d++)cells.push({d,out:false,ds:CAL_MONTH+'-'+String(d).padStart(2,'0')});
   let nextD=1;while(cells.length%7!==0)cells.push({d:nextD++,out:true});
   const todayStr=today();
+  if(!CAL_SELECTED_DATE||!CAL_SELECTED_DATE.startsWith(CAL_MONTH+'-'))CAL_SELECTED_DATE=from;
   const cellsHtml=cells.map((c,idx)=>{
     if(c.out)return `<div class="cal-cell out"><div class="d">${c.d}</div></div>`;
     const info=byDate[c.ds]||{holidays:[],events:[]};
@@ -1363,11 +1380,10 @@ async function renderCalendar(m){
     ].filter(Boolean).join('');
     return `<div class="cal-cell${c.ds===todayStr?' today':''}${c.ds===CAL_SELECTED_DATE?' selected':''}" tabindex="0" role="button" aria-expanded="${c.ds===CAL_SELECTED_DATE}" onclick="selectCalendarDay('${c.ds}',event)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectCalendarDay('${c.ds}',event)}"><div class="d ${dCls}">${c.d}</div>${tags}</div>`;
   }).join('');
-  if(!CAL_SELECTED_DATE||!CAL_SELECTED_DATE.startsWith(CAL_MONTH+'-'))CAL_SELECTED_DATE=from;
   const selectedRoster=scheduleByDate[CAL_SELECTED_DATE]||{departments:{'Dr.':[],'진료실':[],'데스크':[],'기공실':[],'상담':[],'행정':[],'미지정':[]},evening:[],off:[],etc:[]};
-  m.innerHTML=`<div class="card"><h2>📅 캘린더</h2>
+  m.innerHTML=`<div class="card" id="calendarCard"><h2>📅 캘린더</h2>
     <div class="rowflex"><button class="mini ${CAL_VIEW==='all'?'stamp':''}" onclick="setCalendarView('all')">전체</button><button class="mini ${CAL_VIEW==='work'?'stamp':''}" onclick="setCalendarView('work')">근무</button><button class="mini ${CAL_VIEW==='leave'?'stamp':''}" onclick="setCalendarView('leave')">연차</button></div>
-    <div class="rowflex"><label>대상 월 <input class="mini" type="month" value="${CAL_MONTH}" onchange="CAL_MONTH=this.value;render()"></label></div>
+    <div class="rowflex calendar-actions"><label>대상 월 <input class="mini" type="month" value="${CAL_MONTH}" onchange="CAL_MONTH=this.value;render()"></label><button class="mini" onclick="saveCalendarPng()">PNG로 저장</button><button class="mini" onclick="printCalendar()">PDF로 저장</button></div>
     <div class="calendar-layout">${renderCalendarDayPanel(CAL_SELECTED_DATE,selectedRoster,leaveByDate[CAL_SELECTED_DATE]||[])}<div class="cal-grid">
       ${dow.map((w,i)=>`<div class="cal-dow ${i===0?'sun':(i===6?'sat':'')}">${w}</div>`).join('')}
       ${cellsHtml}

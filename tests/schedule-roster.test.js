@@ -608,6 +608,19 @@ test('4차 캘린더는 기존 DB 부서를 표시군으로만 묶고 날짜 상
   assert.match(html, /label:'서류제출'/);
 });
 
+test('4차 캘린더는 오프라인 PNG·전용 PDF 인쇄와 첫 선택 날짜 일치를 제공한다', () => {
+  const source = calendarBlock[1];
+  assert.match(source, /async function saveCalendarPng\(\)/);
+  assert.match(source, /function printCalendar\(\)/);
+  assert.match(source, /id="calendarCard"/);
+  assert.match(source, /PNG로 저장/);
+  assert.match(source, /PDF로 저장/);
+  assert.ok(source.indexOf("if(!CAL_SELECTED_DATE||!CAL_SELECTED_DATE.startsWith(CAL_MONTH+'-'))CAL_SELECTED_DATE=from;") < source.indexOf('const cellsHtml='), '선택 날짜는 셀 HTML보다 먼저 확정해야 합니다.');
+  assert.match(html, /body\.calendar-printing/);
+  assert.match(html, /\.calendar-actions\{display:none!important\}/);
+  assert.doesNotMatch(html, /\[입사서류\] 탭|입사서류에서/);
+});
+
 test('캘린더 렌더 순서는 공휴일과 이벤트, 부서, 야간, 연차, OFF, 기타, 주차 상태다', () => {
   const source = calendarBlock[1];
   const tagSource = source.slice(source.indexOf('const tags=['));
