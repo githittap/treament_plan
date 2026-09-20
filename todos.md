@@ -6,6 +6,8 @@
 - **권한 경계 확인**: 신규 직접 쓰기 권한은 부여하지 않고 authenticated SELECT와 RPC 실행 경로만 사용. `attendance_issues` 직접 INSERT/UPDATE 권한은 제거된 상태 확인.
 - **로컬 검증**: 정적 릴리스 테스트 4/4 통과. `node --test`는 Windows 샌드박스 `spawn EPERM`으로 실행기만 실패했으며, 테스트 파일 직접 실행은 통과. PGlite 테스트는 `PGLITE_PACKAGE_ROOT` 미설정 환경에서는 자동 종료되므로 이전 별도 통과 결과와 구분함.
 - **남음**: 검토된 파일만 commit/push 후 `https://jung-plant.com/hr.html` 실제 정본 도달·익명 화면 확인. 로그인·실제 직원 입력은 자격증명/실데이터 없이 미검증.
+- **배포 완료**: commit `89d1b0b731d31666f1e01c449f181c3219c67215`를 `origin/main`에 fast-forward push. `https://jung-plant.com/hr.html?release=89d1b0b` HTTP 200, 핵심 `submit_manual_attendance`·`submit_attendance_issue`·`record_auto_attendance_issue`·`fetchAttendancePages` 표식 확인. 원격 정본 SHA256 `B70040E3F50E75CA37BE9003005950699851091F7AE30BE69ECACDDE7BAAD86F`는 로컬 정본 LF 정규화 해시와 일치.
+- **남은 검증**: 브라우저 자동 접근은 기존 탭 응답 지연으로 완료하지 못했으며, 로그인 후 직원·실장·원장 화면과 실제 입력/승인은 자격증명 및 실데이터 없이 미검증. 기존 탭 사용자는 새로고침 필요.
 
 갱신 2026-09-09 · 상세 상황판: `Z:\09_claude-output\04_AI·Claude운영\산출물\치과내부도구_상황판.html`
 
