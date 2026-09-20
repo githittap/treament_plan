@@ -19,7 +19,7 @@ using (public.my_role() in ('chief','owner') and exists (select 1 from public.pr
 
 create or replace function public.preview_monthly_leave_accruals(p_as_of date)
 returns table(user_id uuid,user_name text,hire_date date,months_completed integer,due_date date,days numeric,already_recorded boolean)
-language plpgsql security definer set search_path=public as $$
+language plpgsql security invoker set search_path=public as $$
 begin
   if auth.uid() is null or coalesce(public.my_role(),'')<>'owner' or not exists(select 1 from public.profiles x where x.user_id=auth.uid() and x.active=true and x.approved=true) then
     raise exception 'owner execution required';
