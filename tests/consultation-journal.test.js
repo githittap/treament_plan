@@ -9,6 +9,14 @@ const htmlPath = path.join(root, 'hr.html');
 const sql = fs.existsSync(sqlPath) ? fs.readFileSync(sqlPath, 'utf8') : '';
 const html = fs.readFileSync(htmlPath, 'utf8');
 
+function loadConsultationHelpers() {
+  const match = html.match(/\/\* consultation-journal:test-start \*\/([\s\S]*?)\/\* consultation-journal:test-end \*\//);
+  assert.ok(match, '상담일지 테스트용 순수 함수 블록이 있어야 합니다.');
+  const context = {};
+  require('node:vm').runInNewContext(`${match[1]}\nthis.helpers={consultationCanAccess,consultationMaskPhone,consultationSafeSearch,consultationPageRange,consultationRequestError};`, context);
+  return context.helpers;
+}
+
 test('상담일지 SQL은 최소 필드, 감사시각, 허용 상담 구분만 선언한다', () => {
   assert.ok(fs.existsSync(sqlPath), '상담일지 SQL 초안이 없습니다.');
   assert.match(sql, /create table if not exists public\.consultation_journals/i);
@@ -33,14 +41,51 @@ test('상담일지는 anon과 일반 직원에게 닫고 manager·owner만 조�
   assert.doesNotMatch(sql, /create policy consultation_journals_delete/i);
 });
 
+test('UUID를 식별자로 쓰고 sequence 권한 없이 감사 필드 변조를 트리거로 거부한다', () => {
+  assert.match(sql, /id\s+uuid\s+primary key\s+default gen_random_uuid\(\)/i);
+  assert.doesNotMatch(sql, /generated always as identity|consultation_journals_id_seq|on sequence/i);
+  for (const immutable of ['new\.id is distinct from old\.id', 'new\.author_id is distinct from old\.author_id', 'new\.created_at is distinct from old\.created_at']) {
+    assert.match(sql, new RegExp(immutable, 'i'));
+  }
+});
+
+test('원본 헤더의 비용과 결정사유를 최소 필드로 검증한다', () => {
+  assert.match(sql, /quoted_amount numeric\(14,2\)[\s\S]*check \(quoted_amount is null or quoted_amount >= 0\)/i);
+  assert.match(sql, /decision_reason text check \(decision_reason is null or char_length\(trim\(decision_reason\)\) <= 1000\)/i);
+  assert.match(html, /id="cjAmount"[\s\S]*min="0"[\s\S]*step="0\.01"/i);
+  assert.match(html, /id="cjReason"[\s\S]*maxlength="1000"/i);
+});
+
+test('익명 하네스는 권한·짧은 연락처 마스킹·검색 정화·페이지 범위·오류 표기를 검증한다', () => {
+  const helpers = loadConsultationHelpers();
+  assert.equal(helpers.consultationCanAccess('anon'), false);
+  assert.equal(helpers.consultationCanAccess('staff'), false);
+  assert.equal(helpers.consultationCanAccess('manager'), true);
+  assert.equal(helpers.consultationMaskPhone('12345'), '12•45');
+  assert.equal(helpers.consultationMaskPhone('1234567'), '12•••67');
+  assert.equal(helpers.consultationMaskPhone('1234'), '');
+  assert.equal(helpers.consultationSafeSearch("<img src=x onerror=alert(1)> 홍길동%"), 'img srcx onerroralert1 홍길동');
+  const page = helpers.consultationPageRange(2, 20);
+  assert.equal(page.from, 40);
+  assert.equal(page.to, 59);
+  assert.equal(helpers.consultationRequestError('create', { message: 'denied' }), '상담일지 저장 실패: denied');
+  assert.equal(helpers.consultationRequestError('update', { message: 'denied' }), '상담일지 수정 실패: denied');
+  assert.equal(helpers.consultationRequestError('list', { message: 'denied' }), '상담일지 불러오기 실패: denied');
+});
+
 test('직원허브는 별도 상단 탭 없이 실장·원장 전용 상담 화면과 오류 경로를 제공한다', () => {
   assert.doesNotMatch(html, /\{key:'consult'/);
   assert.match(html, /상담일지 열기/);
   assert.match(html, /else if\(TAB==='consult'\)await renderConsultationJournal\(m\)/);
-  assert.match(html, /function canManageConsultation\(\)\{return ME\.role==='manager'\|\|ME\.role==='owner';\}/);
+  assert.match(html, /function canManageConsultation\(\)\{return consultationCanAccess\(ME\.role\);\}/);
   assert.match(html, /상담일지 접근 권한이 없습니다/);
   assert.match(html, /상담일지 불러오기 실패:/);
   assert.match(html, /상담일지 저장 실패:/);
   assert.match(html, /상담일지 수정 실패:/);
   assert.match(html, /const CONSULTATION_SHEETS=\['교정','확정','미확정 및 부분확정','홈페이지','카카오,네이버예약,당근','원본'\]/);
+  assert.match(html, /\.range\(CONSULTATION_PAGE\*CONSULTATION_PAGE_SIZE,\(CONSULTATION_PAGE\+1\)\*CONSULTATION_PAGE_SIZE-1\)/);
+  assert.match(html, /data-consultation-id=/);
+  const feature = html.match(/\/\* ── 상담일지:[\s\S]*?\/\* ── 근로계약서/)[0];
+  assert.doesNotMatch(feature, /Number\(row\.id\)|limit\(200\)|consultation_note,next_action,created_at,updated_at\)\.order/);
+  assert.match(html, /esc\(row\.patient_name\|\|'\'\)/);
 });
