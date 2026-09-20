@@ -99,7 +99,8 @@ test('직원허브는 별도 상단 탭 없이 실장·원장 전용 상담 화�
   assert.match(html, /상담일지 저장 실패:/);
   assert.match(html, /상담일지 수정 실패:/);
   assert.match(html, /const CONSULTATION_SHEETS=\['교정','확정','미확정 및 부분확정','홈페이지','카카오,네이버예약,당근','원본'\]/);
-  assert.match(html, /\.range\(CONSULTATION_PAGE\*CONSULTATION_PAGE_SIZE,\(CONSULTATION_PAGE\+1\)\*CONSULTATION_PAGE_SIZE-1\)/);
+  assert.match(html, /const queryPlan=consultationServerQueryPlan\(CONSULTATION_FILTERS,CONSULTATION_PAGE_SIZE\)/);
+  assert.match(html, /\.range\(queryPlan\.from,queryPlan\.to\)/);
   assert.match(html, /data-consultation-id=/);
   const feature = html.match(/\/\* ── 상담일지:[\s\S]*?\/\* ── 근로계약서/)[0];
   assert.doesNotMatch(feature, /Number\(row\.id\)|limit\(200\)|consultation_note,next_action,created_at,updated_at\)\.order/);
