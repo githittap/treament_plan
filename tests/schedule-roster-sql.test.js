@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const migration = fs.readFileSync(path.join(__dirname, '..', 'db', 'unified_schedule_roster.sql'), 'utf8');
 const finalize = fs.readFileSync(path.join(__dirname, '..', 'db', 'unified_schedule_roster_finalize.sql'), 'utf8');
+const departmentCompatibility = fs.readFileSync(path.join(__dirname, '..', 'db', 'unified_schedule_department_compatibility.sql'), 'utf8');
 
 function policyStatement(name) {
   const match = migration.match(new RegExp(`create policy ${name}\\b[\\s\\S]*?;`, 'i'));
@@ -35,6 +36,13 @@ test('통합 명부 테이블의 핵심 스키마를 선언한다', () => {
   assert.match(migration, /sort_order\s+integer\s+not null/i);
   assert.match(migration, /created_at\s+timestamptz/i);
   assert.match(migration, /updated_at\s+timestamptz/i);
+});
+
+test('ZIP 직무 부서는 기존 값을 보존한 채 상담·행정을 최소 추가 허용한다', () => {
+  assert.match(departmentCompatibility, /drop constraint if exists schedule_people_department_check/i);
+  assert.match(departmentCompatibility, /add constraint schedule_people_department_check/i);
+  assert.match(departmentCompatibility, /기공실[\s\S]*미지정[\s\S]*상담[\s\S]*행정/);
+  assert.doesNotMatch(departmentCompatibility, /delete from|truncate|drop table|update public\.schedule_people/i);
 });
 
 test('기존 일정에 person_id를 추가하고 user_id를 nullable로 전환한다', () => {

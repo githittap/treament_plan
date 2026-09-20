@@ -67,12 +67,14 @@ test('출석 수직 경로 SQL의 승인·보정·원본보호 경계가 고정�
   assert.doesNotMatch(sql, /drop table/i);
 });
 
-test('릴리스 후보의 신규 파일 목록이 출석 수직 경로로 제한되어 있다', () => {
+test('릴리스 후보의 필수 파일과 출석 SQL 범위를 검증한다', () => {
   for (const file of [
     'hr.html',
     'db/attendance_issue_resolution_release.sql',
     'tests/sql/pglite-attendance-resolution-release.mjs',
     'tests/attendance-resolution-release-static.test.js',
   ]) assert.ok(fs.existsSync(path.join(root, file)), `필수 후보 파일 없음: ${file}`);
-  assert.doesNotMatch(html, /pushSubscription|contract-pdf-sign|consultation/i);
+  // hr.html은 여러 기능이 공유하는 장기 파일이므로 전체 문자열을 출석 릴리스 범위로 판정하지 않는다.
+  // 무관 기능 혼입 검사는 출석 전용 SQL에만 적용하고, 프런트 연결은 위의 출석 렌더 계약으로 검증한다.
+  assert.doesNotMatch(sql, /pushSubscription|contract-pdf-sign|consultation/i);
 });

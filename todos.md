@@ -1,5 +1,11 @@
 # todos — 내부 도구(T8/D) 작업 목록
 
+## 🔎 ZIP 정합화 Task 0·1 진행 중 (2026-09-20)
+- 기준선: `origin/main` `0fa25926d2ef0959d25cba5bb2d3910b7f76cddf`; 운영 DB·프런트·GitHub 추가 배포는 보류.
+- Task 0: `docs/superpowers/specs/2026-09-20-employee-hub-zip-acceptance-matrix.md`와 `tests/schedule-zip-acceptance.test.js` 추가. 현재 개인별 select 근무표에서 수용시험이 실패해야 함.
+- Task 1 목표: 월간 직무 행·날짜 셀 체크박스, 일요일 우측, 승인 연차 차단, 야간 전체 직원 선택, 기존 schedules 키·행수 보존.
+- 보호: 원본 ZIP/XLSX·환자정보 비노출, 운영 DB·배포·push 금지, 기존 283건과 명부 보존.
+
 ## ✅ 출퇴근 수기정정·승인 경로 운영 적용 (2026-09-20)
 - **운영 migration 적용 완료**: Supabase `texevhsxttfoqkrucfzl`, migration `attendance_issue_resolution_release`. 적용 전 SQL SHA256 `039A4679134CB4042835D4CF58F9DF89750EEEC4DFF26AFB5260DFA087BC4E2F`; 기존 migration 목록에 없음을 확인한 뒤 적용.
 - **운영 사후검증 완료**: `attendance`, `attendance_issues`, 신규 4개 테이블 모두 RLS 활성화. 승인·수기정정·자동누락 RPC 7개와 `guard_attendance_issue_insert` 트리거 존재 확인. 출퇴근 관련 6개 테이블 행 수는 모두 0건으로 기존 데이터 보존 확인.
