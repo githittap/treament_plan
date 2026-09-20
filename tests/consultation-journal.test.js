@@ -13,7 +13,7 @@ function loadConsultationHelpers() {
   const match = html.match(/\/\* consultation-journal:test-start \*\/([\s\S]*?)\/\* consultation-journal:test-end \*\//);
   assert.ok(match, '상담일지 테스트용 순수 함수 블록이 있어야 합니다.');
   const context = {};
-  require('node:vm').runInNewContext(`${match[1]}\nthis.helpers={consultationCanAccess,consultationMaskPhone,consultationSafeSearch,consultationPageRange,consultationRequestError};`, context);
+  require('node:vm').runInNewContext(`${match[1]}\nthis.helpers={consultationCanAccess,consultationMaskPhone,consultationSafeSearch,consultationPageRange,consultationRequestError,consultationApplyFilterState,consultationServerQueryPlan};`, context);
   return context.helpers;
 }
 
@@ -49,11 +49,14 @@ test('UUID를 식별자로 쓰고 sequence 권한 없이 감사 필드 변조를
   }
 });
 
-test('원본 헤더의 비용과 결정사유를 최소 필드로 검증한다', () => {
+test('원본 헤더의 비용과 두 개의 메모 열을 분리해 최소 필드로 검증한다', () => {
   assert.match(sql, /quoted_amount numeric\(14,2\)[\s\S]*check \(quoted_amount is null or quoted_amount >= 0\)/i);
-  assert.match(sql, /decision_reason text check \(decision_reason is null or char_length\(trim\(decision_reason\)\) <= 1000\)/i);
+  assert.match(sql, /instruction_note text check \(instruction_note is null or char_length\(trim\(instruction_note\)\) <= 1000\)/i);
+  assert.match(sql, /special_note text check \(special_note is null or char_length\(trim\(special_note\)\) <= 1000\)/i);
+  assert.doesNotMatch(sql, /decision_reason/i);
   assert.match(html, /id="cjAmount"[\s\S]*min="0"[\s\S]*step="0\.01"/i);
-  assert.match(html, /id="cjReason"[\s\S]*maxlength="1000"/i);
+  assert.match(html, /<label>지시\/혹은 기타사항<\/label><textarea id="cjInstruction" maxlength="1000"><\/textarea>/i);
+  assert.match(html, /<label>특이사항<\/label><textarea id="cjSpecial" maxlength="1000"><\/textarea>/i);
 });
 
 test('익명 하네스는 권한·짧은 연락처 마스킹·검색 정화·페이지 범위·오류 표기를 검증한다', () => {
@@ -71,6 +74,19 @@ test('익명 하네스는 권한·짧은 연락처 마스킹·검색 정화·페
   assert.equal(helpers.consultationRequestError('create', { message: 'denied' }), '상담일지 저장 실패: denied');
   assert.equal(helpers.consultationRequestError('update', { message: 'denied' }), '상담일지 수정 실패: denied');
   assert.equal(helpers.consultationRequestError('list', { message: 'denied' }), '상담일지 불러오기 실패: denied');
+});
+
+test('server_search_filter_survives_render: 버튼 입력은 렌더 전 상태에 저장되고 서버 쿼리 계획까지 보존된다', () => {
+  const helpers = loadConsultationHelpers();
+  const state = helpers.consultationApplyFilterState({ query: '', sheet: '', status: '', page: 3 }, { query: ' 홍길동% ', sheet: '홈페이지', status: '미확정' });
+  assert.equal(state.query, '홍길동');
+  assert.equal(state.sheet, '홈페이지');
+  assert.equal(state.status, '미확정');
+  assert.equal(state.page, 0);
+  const plan = helpers.consultationServerQueryPlan(state, 20);
+  assert.deepEqual(JSON.parse(JSON.stringify(plan)), { query: '홍길동', sheet: '홈페이지', status: '미확정', from: 0, to: 19 });
+  assert.match(html, /function consultationApplyFilters\(\)\{CONSULTATION_FILTERS=consultationApplyFilterState\(CONSULTATION_FILTERS/);
+  assert.match(html, /const currentQuery=CONSULTATION_FILTERS\.query,currentSheet=CONSULTATION_FILTERS\.sheet,currentStatus=CONSULTATION_FILTERS\.status/);
 });
 
 test('직원허브는 별도 상단 탭 없이 실장·원장 전용 상담 화면과 오류 경로를 제공한다', () => {

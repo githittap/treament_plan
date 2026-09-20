@@ -9,7 +9,8 @@ create table if not exists public.consultation_journals (
   consultation_note text not null check (char_length(trim(consultation_note)) between 1 and 4000),
   next_action text,
   quoted_amount numeric(14,2) check (quoted_amount is null or quoted_amount >= 0),
-  decision_reason text check (decision_reason is null or char_length(trim(decision_reason)) <= 1000),
+  instruction_note text check (instruction_note is null or char_length(trim(instruction_note)) <= 1000),
+  special_note text check (special_note is null or char_length(trim(special_note)) <= 1000),
   author_id uuid not null default auth.uid() references auth.users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
