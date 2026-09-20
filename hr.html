@@ -342,6 +342,8 @@ function scheduleDate(weekStart,day){
   d.setDate(d.getDate()+(day===0?6:day-1));
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
+function scheduleWeekForDate(ds){return mondayStr(ds);}
+function scheduleDayForDate(ds){return new Date(ds+'T00:00:00').getDay();}
 function scheduleCalendarIndex(rows,people,weeks){
   const personById=new Map((people||[]).map(p=>[p.id,p]));
   const weekByStart=new Map((weeks||[]).map(w=>[w.week_start,w]));
@@ -370,14 +372,14 @@ function scheduleCalendarIndex(rows,people,weeks){
   });
   return index;
 }
-function calendarLeaveIndex(rows,people,from,to,nameForUser){
+function calendarLeaveIndex(rows,people,from,to,nameForUser,includeDetails=false){
   const personByUser=new Map((people||[]).filter(p=>p.profile_user_id).map(p=>[p.profile_user_id,p])),index={},seen={};
   const nextDay=ds=>{const p=String(ds).split('-').map(Number),d=new Date(p[0],p[1]-1,p[2]);d.setDate(d.getDate()+1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
   (rows||[]).forEach(row=>{
     const person=personByUser.get(row.user_id);
     if(person&&person.included_in_schedule===false)return;
     const key=person?person.id:row.user_id,label=person?schedulePersonLabel(person):nameForUser(row.user_id),start=row.date_from<from?from:row.date_from,end=row.date_to>to?to:row.date_to;
-    for(let ds=start;ds<=end;ds=nextDay(ds)){if(!index[ds]){index[ds]=[];seen[ds]=new Set();}if(!seen[ds].has(key)){seen[ds].add(key);index[ds].push(label);}}
+    for(let ds=start;ds<=end;ds=nextDay(ds)){if(!index[ds]){index[ds]=[];seen[ds]=new Set();}if(!seen[ds].has(key)){seen[ds].add(key);index[ds].push(includeDetails?{label,type:row.type||'연차',type_note:row.type_note||null}:label);}}
   });
   return index;
 }
@@ -385,9 +387,10 @@ function scheduleRowsWithoutApprovedLeave(rows,leaveRows){
   return (rows||[]).filter(row=>{
     if((row.shift!=='work'&&row.shift!=='evening')||!row.user_id)return true;
     const date=scheduleDate(row.week_start,row.day);
-    return !(leaveRows||[]).some(leave=>leave.user_id===row.user_id&&leave.date_from<=date&&leave.date_to>=date);
+    return !(leaveRows||[]).some(leave=>leave.type!=='반차'&&leave.user_id===row.user_id&&leave.date_from<=date&&leave.date_to>=date);
   });
 }
+function leaveDisplayText(type,note){const label=type==='반차'?'반차':type==='기타'?'기타':'연차';return note?label+' · '+note:label;}
 /* schedule-roster:test-end */
 function mondayStr(ds){const d=new Date(ds+'T00:00:00');const g=d.getDay();d.setDate(d.getDate()+(g===0?-6:1-g));return dstr(d);}
 const SHIFTS={work:{l:'근무'},off:{l:'off'},evening:{l:'야간'},etc:{l:'기타'}};
@@ -661,8 +664,38 @@ async function checkAbsent(month){
 }
 
 /* ── 근무표(M2) ── */
-let SCHED_WEEK=null,PAINT_VALUE=null,PAINTING=false;
+let SCHED_WEEK=null,SCHED_MONTH=null,SCHED_VIEW='week',PAINT_VALUE=null,PAINTING=false,SCHEDULE_STATUS_OVERRIDES={},SCHEDULE_WRITE_SEQ={},SCHEDULE_WRITE_TAIL={},SCHEDULE_CELL_VALUES={};
+function scheduleMonthWeeks(month){
+  const first=month+'-01',last=month+'-'+String(new Date(Number(month.slice(0,4)),Number(month.slice(5,7)),0).getDate()).padStart(2,'0');
+  const weeks=[];for(let ws=mondayStr(first);ws<=mondayStr(last);ws=addDays(ws,7))weeks.push(ws);
+  return {first,last,weeks};
+}
+function scheduleShiftOptions(cur){return Object.keys(SHIFTS).map(k=>`<option value="${k}" ${cur===k?'selected':''}>${SHIFTS[k].l}</option>`).join('');}
+function syncScheduleCellValues(rows,weekStarts){const server=new Map((rows||[]).map(r=>[r.person_id+'|'+r.week_start+'|'+r.day,r.shift||'']));for(const key of Object.keys(SCHEDULE_CELL_VALUES)){const parts=key.split('|'),ws=parts[1];if(weekStarts.includes(ws)&&!SCHEDULE_WRITE_TAIL[key])SCHEDULE_CELL_VALUES[key]=server.get(key)||'';}}
+async function renderScheduleMonth(m){
+  if(!SCHED_MONTH)SCHED_MONTH=today().slice(0,7);
+  const range=scheduleMonthWeeks(SCHED_MONTH),{first,last,weeks}=range;
+  const [{data:rows,error:scheduleError},{data:weekRows,error:weekError},{data:lv,error:leaveError}]=await Promise.all([
+    sb.from('schedules').select('person_id,user_id,week_start,day,shift,note').in('week_start',weeks),
+    sb.from('schedule_weeks').select('week_start,status').in('week_start',weeks),
+    sb.from('leave_requests').select('user_id,type,type_note,date_from,date_to').eq('status','승인').lte('date_from',last).gte('date_to',first)
+  ]);
+  const loadError=scheduleError||weekError||leaveError;
+  if(loadError){m.innerHTML=`<div class="card"><h2>🗓 근무표</h2><div class="cal-error">월간 근무표를 불러오지 못했습니다: ${esc(loadError.message||'알 수 없는 오류')}</div></div>`;return;}
+  const rowMap=new Map((rows||[]).map(r=>[r.person_id+'|'+scheduleDate(r.week_start,r.day),r.shift]));
+  const leaveSet=new Map();for(const r of lv||[]){const start=r.date_from<first?first:r.date_from,end=r.date_to>last?last:r.date_to;for(let ds=start;ds<=end;ds=addDays(ds,1))leaveSet.set(r.user_id+'|'+ds,leaveDisplayText(r.type,r.type_note));}
+  syncScheduleCellValues(rows,weeks);
+  for(const w of weekRows||[])if(!Object.keys(SCHEDULE_WRITE_TAIL).some(key=>key.includes('|'+w.week_start+'|')))delete SCHEDULE_STATUS_OVERRIDES[w.week_start];
+  const staff=schedulePeopleForWeek(SCHEDULE_PEOPLE,rows||[]),weekStatusByStart=new Map((weekRows||[]).map(w=>[w.week_start,w.status])),publishedWeeks=new Set([...weekStatusByStart].filter(([,status])=>status==='공표').map(([week])=>week));
+  const days=Number(last.slice(-2)),dates=Array.from({length:days},(_,i)=>{const ds=SCHED_MONTH+'-'+String(i+1).padStart(2,'0');return {ds,dd:new Date(ds+'T00:00:00').getDay()};});
+  const groups=['Dr.','진료실','데스크','기공실','미지정'].map(label=>({label,members:staff.filter(p=>(['Dr.','진료실','데스크','기공실'].includes(p.department)?p.department:'미지정')===label)})).filter(g=>g.members.length);
+  const grid=`<div class="tblwrap"><table><tr><th style="min-width:105px">직원</th>${dates.map(c=>`<th>${c.ds.slice(-2)}<br><span class="sub">${['일','월','화','수','목','금','토'][c.dd]}</span></th>`).join('')}</tr>`+groups.map(g=>`<tr><td colspan="${days+1}" style="font-weight:800;background:var(--panel);color:var(--gray)">${g.label}</td></tr>`+g.members.map(p=>`<tr><td>${esc(schedulePersonLabel(p))}</td>${dates.map(c=>{const cur=rowMap.get(p.id+'|'+c.ds)||'',onLeave=p.profile_user_id&&leaveSet.get(p.profile_user_id+'|'+c.ds),cellCanEdit=isLead()||weekStatusByStart.get(scheduleWeekForDate(c.ds))!=='공표';return `<td>${cellCanEdit?`<select class="mini ${cur==='evening'?'shift-evening':''}" data-prev-value="${esc(cur)}" onchange="applyScheduleShift(this,'${p.id}','${p.profile_user_id||''}',${scheduleDayForDate(c.ds)},'${scheduleWeekForDate(c.ds)}',this.value);this.classList.toggle('shift-evening',this.value==='evening')"><option value="">-</option>${scheduleShiftOptions(cur)}</select>`:`<span class="b ${cur==='off'?'no':(cur==='evening'?'no':'ok')}">${cur?SHIFTS[cur].l:'-'}</span>`}${onLeave?`<span class="b ok">${esc(onLeave)}</span>`:''}</td>`;}).join('')}</tr>`).join('')).join('')+'</table></div>';
+  m.innerHTML=`<div class="card"><h2>🗓 근무표 <span class="b ${publishedWeeks.size===weeks.length?'ok':'wait'}">${publishedWeeks.size===weeks.length?'공표됨':'월간 초안 포함'}</span></h2><div class="rowflex" style="align-items:center;margin-bottom:8px;gap:8px"><button class="mini ${SCHED_VIEW==='week'?'stamp':''}" onclick="SCHED_VIEW='week';render()">주간 편집</button><button class="mini ${SCHED_VIEW==='month'?'stamp':''}" onclick="SCHED_VIEW='month';render()">월간 편집</button><label>대상 월 <input class="mini" type="month" value="${SCHED_MONTH}" onchange="SCHED_MONTH=this.value;render()"></label></div>${staff.length?grid:'<div class="empty">근무표에 포함된 인원이 아직 없습니다.</div>'}<div class="hint">월간 편집도 기존 주차별 근무표에 저장됩니다. 공표된 주차는 원장·실장만 수정할 수 있습니다.</div></div>${isMgr()?scheduleRosterAdminCard():''}`;
+}
+async function applyScheduleShift(el,personId,profileUserId,day,ws,shift){const previous=el&&el.dataset?el.dataset.prevValue||'':'';const key=personId+'|'+ws+'|'+day;if(!Object.hasOwn(SCHEDULE_CELL_VALUES,key))SCHEDULE_CELL_VALUES[key]=previous;const seq=(SCHEDULE_WRITE_SEQ[key]||0)+1;SCHEDULE_WRITE_SEQ[key]=seq;const previousTail=SCHEDULE_WRITE_TAIL[key]||Promise.resolve();const operation=previousTail.catch(()=>{}).then(()=>setShift(personId,profileUserId,day,ws,shift)).catch(()=>{if(SCHEDULE_WRITE_SEQ[key]===seq)setStatus('error');return false;});const queued=operation.finally(()=>{if(SCHEDULE_WRITE_TAIL[key]===queued)delete SCHEDULE_WRITE_TAIL[key];});SCHEDULE_WRITE_TAIL[key]=queued;const ok=await operation;const latest=SCHEDULE_WRITE_SEQ[key]===seq;if(ok)SCHEDULE_CELL_VALUES[key]=shift;if(!latest)return null;if(!ok&&el){el.value=SCHEDULE_CELL_VALUES[key]??previous;}else if(ok&&el?.dataset)el.dataset.prevValue=shift;return ok;}
+function setShiftByDate(personId,profileUserId,ds,shift){return applyScheduleShift(null,personId,profileUserId,scheduleDayForDate(ds),scheduleWeekForDate(ds),shift);}
 async function renderSched(m){
+  if(SCHED_VIEW==='month'){await renderScheduleMonth(m);return;}
   if(!SCHED_WEEK)SCHED_WEEK=mondayStr(today());
   const ws=SCHED_WEEK;
   const {data:wk,error:weekError}=await sb.from('schedule_weeks').select('*').eq('week_start',ws).maybeSingle();
@@ -678,7 +711,7 @@ async function renderSched(m){
   const staff=schedulePeopleForWeek(SCHEDULE_PEOPLE,rows);
   const deptNames=['Dr.','진료실','데스크','기공실','미지정'];
   const groups=deptNames.map(label=>({label,members:staff.filter(p=>(deptNames.includes(p.department)?p.department:'미지정')===label)}));
-  const published=wk&&wk.status==='공표';
+  const published=wk&&(SCHEDULE_STATUS_OVERRIDES[ws]||wk.status)==='공표';
   const canEdit=!published||isLead();
   const dow=['일','월','화','수','목','금','토'];
   const cols=[];for(let i=0;i<7;i++){const ds=addDays(ws,i);cols.push({ds,dd:new Date(ds+'T00:00:00').getDay()});}
@@ -686,11 +719,11 @@ async function renderSched(m){
   let grid=`<div class="tblwrap"><table><tr><th>직원</th>${cols.map(c=>`<th>${dow[c.dd]}<br><span class="sub">${md(c.ds)}</span></th>`).join('')}</tr>`;
   grid+=groups.filter(g=>g.members.length).map(g=>`<tr><td colspan="${1+cols.length}" style="font-weight:800;background:var(--panel);color:var(--gray)">${g.label}</td></tr>`+
     g.members.map(p=>`<tr><td>${esc(schedulePersonLabel(p))}</td>${cols.map(c=>{const cur=smap[p.id+'|'+c.dd]||'',onLeave=p.profile_user_id&&leaveDays.has(p.profile_user_id+'|'+c.ds);
-      return `<td>${canEdit?`<select class="mini ${cur==='evening'?'shift-evening':''}" data-person-id="${p.id}" data-profile-user-id="${p.profile_user_id||''}" data-day="${c.dd}" onchange="setShift(this.dataset.personId,this.dataset.profileUserId||null,Number(this.dataset.day),'${ws}',this.value);this.classList.toggle('shift-evening',this.value==='evening')"><option value="">-</option>${optHtml(cur)}</select>`:`<span class="b ${cur==='off'?'no':(cur==='evening'?'no':'ok')}">${cur?SHIFTS[cur].l:'-'}</span>`}${onLeave?'<span class="b ok" style="margin-left:4px">연차</span>':''}</td>`;}).join('')}</tr>`).join('')).join('');
+      return `<td>${canEdit?`<select class="mini ${cur==='evening'?'shift-evening':''}" data-person-id="${p.id}" data-profile-user-id="${p.profile_user_id||''}" data-day="${c.dd}" data-prev-value="${esc(cur)}" onchange="applyScheduleShift(this,this.dataset.personId,this.dataset.profileUserId||null,Number(this.dataset.day),'${ws}',this.value);this.classList.toggle('shift-evening',this.value==='evening')"><option value="">-</option>${optHtml(cur)}</select>`:`<span class="b ${cur==='off'?'no':(cur==='evening'?'no':'ok')}">${cur?SHIFTS[cur].l:'-'}</span>`}${onLeave?'<span class="b ok" style="margin-left:4px">연차</span>':''}</td>`;}).join('')}</tr>`).join('')).join('');
   grid+='</table></div>';
   m.innerHTML=`<div class="card"><h2>🗓 근무표 <span class="b ${published?'ok':'wait'}">${published?'공표됨':'초안'}</span></h2>
     <div class="rowflex" style="align-items:center;margin-bottom:8px;gap:8px">
-      <button class="mini" onclick="navWeek(-7)">◀ 지난주</button>
+      <button class="mini ${SCHED_VIEW==='week'?'stamp':''}" onclick="SCHED_VIEW='week';render()">주간 편집</button><button class="mini ${SCHED_VIEW==='month'?'stamp':''}" onclick="SCHED_VIEW='month';SCHED_MONTH='${ws.slice(0,7)}';render()">월간 편집</button><button class="mini" onclick="navWeek(-7)">◀ 지난주</button>
       <b>${md(ws)} ~ ${md(addDays(ws,6))}</b>
       <button class="mini" onclick="navWeek(7)">다음주 ▶</button>
       ${canEdit?`<button class="mini" onclick="copyPrevWeek('${ws}')">지난주 복사</button>`:''}
@@ -701,7 +734,7 @@ async function renderSched(m){
   </div>${isMgr()?scheduleRosterAdminCard():''}`;
   if(!window.__schedPaintBound){window.__schedPaintBound=true;
     m.addEventListener('mousedown',e=>{const target=e.target.closest&&e.target.closest('select[data-person-id][data-profile-user-id][data-day]');if(!target||!m.contains(target))return;PAINT_VALUE=target.value;PAINTING=true;});
-    m.addEventListener('mouseenter',e=>{const target=e.target.closest&&e.target.closest('select[data-person-id][data-profile-user-id][data-day]');if(!target||!m.contains(target)||!PAINTING||e.buttons!==1)return;target.value=PAINT_VALUE;setShift(target.dataset.personId,target.dataset.profileUserId||null,Number(target.dataset.day),SCHED_WEEK,PAINT_VALUE);target.classList.toggle('shift-evening',PAINT_VALUE==='evening');},true);
+    m.addEventListener('mouseenter',e=>{const target=e.target.closest&&e.target.closest('select[data-person-id][data-profile-user-id][data-day]');if(!target||!m.contains(target)||!PAINTING||e.buttons!==1)return;target.value=PAINT_VALUE;applyScheduleShift(target,target.dataset.personId,target.dataset.profileUserId||null,Number(target.dataset.day),SCHED_WEEK,PAINT_VALUE).then(()=>target.classList.toggle('shift-evening',target.value==='evening'));},true);
     document.addEventListener('mouseup',()=>{PAINTING=false;});
   }
 }
@@ -770,15 +803,11 @@ async function setSchedulePersonActive(id,active){
 /* schedule-roster-admin:test-end */
 function navWeek(n){SCHED_WEEK=addDays(SCHED_WEEK||mondayStr(today()),n);render();}
 async function setShift(personId,profileUserId,day,ws,shift){
-  const {error:weekError}=await sb.from('schedule_weeks').upsert({week_start:ws,status:'초안'},{onConflict:'week_start'});
-  if(weekError){setStatus('error');return;}
-  const {error}=shift
-    ?await sb.from('schedules').upsert({week_start:ws,person_id:personId,user_id:profileUserId||null,day,shift},{onConflict:'week_start,person_id,day'})
-    :await sb.from('schedules').delete().eq('week_start',ws).eq('person_id',personId).eq('day',day);
-  if(error){setStatus('error');return;}
-  setStatus('saved');
+  const result=await sb.rpc('set_schedule_cell',{p_week_start:ws,p_person_id:personId,p_user_id:profileUserId||null,p_day:day,p_shift:shift||null});
+  if(result?.error){setStatus('error');return false;}
+  SCHEDULE_STATUS_OVERRIDES[ws]='초안';setStatus('saved');return true;
 }
-async function publishSched(ws){const {error}=await sb.from('schedule_weeks').upsert({week_start:ws,status:'공표',confirmed_by:ME.name,confirmed_at:new Date().toISOString()},{onConflict:'week_start'});if(error){setStatus('error');return;}setStatus('saved');render();}
+async function publishSched(ws){const {error}=await sb.from('schedule_weeks').upsert({week_start:ws,status:'공표',confirmed_by:ME.name,confirmed_at:new Date().toISOString()},{onConflict:'week_start'});if(error){setStatus('error');return;}delete SCHEDULE_STATUS_OVERRIDES[ws];setStatus('saved');render();}
 async function copyPrevWeek(ws){const prev=addDays(ws,-7);const {data,error:readError}=await sb.from('schedules').select('person_id,user_id,day,shift,note').eq('week_start',prev);
   if(readError){setStatus('error');return;}
   if(!data||!data.length){alert('지난주 근무표가 없습니다.');return;}

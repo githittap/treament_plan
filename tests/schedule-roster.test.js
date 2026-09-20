@@ -20,15 +20,38 @@ test('근무표는 person_id 명부와 person_id 저장 계약을 사용한다',
   assert.match(source, /smap\[r\.person_id\+'\|'\+r\.day\]/);
   assert.match(source, /data-person-id=/);
   assert.match(source, /data-profile-user-id=/);
-  assert.match(source, /async function setShift\(personId,profileUserId,day,ws,shift\)/);
-  assert.match(source, /onConflict:'week_start,person_id,day'/);
+  assert.match(source, /async function setShift\(personId,profileUserId,day,ws,shift(?:,writeKey=null,writeSeq=null)?\)/);
+  assert.match(source, /sb\.rpc\('set_schedule_cell'/);
+  assert.doesNotMatch(source, /from\('schedules'\)\.upsert/);
 });
 
 test('근무표 저장 실패는 성공 상태로 표시하지 않는다', () => {
   const setShift = html.match(/async function setShift\([\s\S]*?async function publishSched/);
   assert.ok(setShift, 'setShift 함수를 찾을 수 없습니다.');
-  assert.match(setShift[0], /if\(weekError\)\{setStatus\('error'\);return;\}/);
-  assert.match(setShift[0], /if\(error\)\{setStatus\('error'\);return;\}/);
+  assert.match(setShift[0], /sb\.rpc\('set_schedule_cell'/);
+  assert.match(setShift[0], /if\(result\?\.error\)\{setStatus\('error'\);return false;\}/);
+  assert.doesNotMatch(setShift[0], /from\('schedule_weeks'\)\.upsert/);
+});
+
+test('근무표 원자 저장 RPC 초안은 공표주·역할·키 검증과 롤백 계약을 담는다', () => {
+  const sql=fs.readFileSync(path.join(__dirname,'..','db','unified_schedule_transaction_draft.sql'),'utf8');
+  assert.match(sql,/create or replace function public\.set_schedule_cell/);
+  assert.match(sql,/status='공표'/);
+  assert.match(sql,/public\.my_role\(\).*chief.*owner/s);
+  assert.match(sql,/person_id/);
+  assert.match(sql,/p_day.*0.*6/s);
+  assert.match(sql,/extract\(isodow from p_week_start\).*<> 1/);
+  assert.match(sql,/on conflict \(week_start\) do nothing/);
+  assert.match(sql,/raise exception/);
+  assert.match(sql,/grant execute on function public\.set_schedule_cell/);
+});
+
+test('근무표 월뷰는 날짜를 기존 주차·요일 키로 되돌린다', () => {
+  const schedule = html.match(/\/\* ── 근무표\(M2\) ── \*\/([\s\S]*?)\/\* 엑셀 파싱 \*\//);
+  assert.ok(schedule, '근무표 코드 블록이 없습니다.');
+  assert.match(schedule[1], /SCHED_VIEW/);
+  assert.match(schedule[1], /renderScheduleMonth/);
+  assert.match(schedule[1], /setShiftByDate/);
 });
 
 test('통합 명부 순수 함수 코드 블록이 포함되어 있다', () => {
@@ -179,6 +202,14 @@ if (block) {
     assert.deepEqual(JSON.parse(JSON.stringify(scheduleIndex['2026-09-15'].off)), ['Dr. 연차의사']);
     assert.deepEqual(JSON.parse(JSON.stringify(scheduleIndex['2026-09-16'].etc)), ['Dr. 연차의사']);
   });
+
+  test('반차는 상세 표시에서 반차로 구분하고 근무표 자체를 통째로 숨기지 않는다', () => {
+    const people=[{id:'half',profile_user_id:'half-user',name:'반차직원',department:'진료실',included_in_schedule:true}];
+    const detail=context.calendarLeaveIndex([{user_id:'half-user',type:'반차',type_note:null,date_from:'2026-09-14',date_to:'2026-09-14'}],people,'2026-09-01','2026-09-30',v=>v,true);
+    assert.deepEqual(JSON.parse(JSON.stringify(detail['2026-09-14'])),[{label:'반차직원',type:'반차',type_note:null}]);
+    const kept=context.scheduleRowsWithoutApprovedLeave([{person_id:'half',user_id:'half-user',week_start:'2026-09-14',day:1,shift:'work'}],[{user_id:'half-user',type:'반차',date_from:'2026-09-14',date_to:'2026-09-14'}]);
+    assert.equal(kept.length,1);
+  });
 }
 
 function authHarness({ rosterResults = [{ data: [], error: null }], settingsResults = [null], settingsGate = null } = {}) {
@@ -187,6 +218,7 @@ function authHarness({ rosterResults = [{ data: [], error: null }], settingsResu
   const calls = { settings: 0, profiles: 0, roster: 0, nav: 0, render: 0, badges: 0, listeners: 0, status: [] };
   const elements = {
     gate: { style: {} }, app: { style: {} }, pendingGate: { style: {} },
+
     meName: { textContent: '' }, meRole: { textContent: '' }, main: { innerHTML: '', insertAdjacentHTML() {} }
   };
   const rosterQueue = rosterResults.slice();
@@ -270,7 +302,7 @@ test('동시 onAuthed 호출은 하나의 초기화 Promise를 공유한다', as
   const second = context.onAuthed(session);
   let secondDone = false;
   second.then(() => { secondDone = true; });
-  await Promise.resolve();
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal(secondDone, false, '중복 호출이 진행 중인 초기화를 기다리지 않았습니다.');
   releaseSettings();
   await Promise.all([first, second]);
@@ -283,9 +315,10 @@ test('동시 onAuthed 호출은 하나의 초기화 Promise를 공유한다', as
 function scheduleRenderHarness({ weekError = null, scheduleError = { message: 'schedule denied' }, leaveError = null } = {}) {
   const source = html.match(/async function renderSched\([\s\S]*?\n\}/);
   assert.ok(source, 'renderSched 함수를 찾을 수 없습니다.');
+  const syncHelper = html.match(/function syncScheduleCellValues[\s\S]*?\n\}/)?.[0] || '';
   const m = { innerHTML: '', addEventListener() {}, contains: () => true };
   const context = {
-    SCHED_WEEK: '2026-09-14', SCHEDULE_PEOPLE: [{ id: 'person-1', name: '김직원', department: '진료실', active: true, included_in_schedule: true }],
+    SCHED_WEEK: '2026-09-14', SCHED_VIEW: 'week', SCHEDULE_STATUS_OVERRIDES: {}, SCHEDULE_WRITE_TAIL: {}, SCHEDULE_CELL_VALUES: {}, SCHEDULE_PEOPLE: [{ id: 'person-1', name: '김직원', department: '진료실', active: true, included_in_schedule: true }],
     SCHEDULE_PEOPLE_ERROR: '', SHIFTS: { work: { l: '근무' }, off: { l: 'off' }, evening: { l: '야간' }, etc: { l: '기타' } },
     today: () => '2026-09-14', mondayStr: value => value, addDays: value => value, md: value => value,
     schedulePeopleForWeek: (people) => people, schedulePersonLabel: person => person.name, esc: value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
@@ -308,7 +341,7 @@ function scheduleRenderHarness({ weekError = null, scheduleError = { message: 's
     }
   };
   vm.createContext(context);
-  vm.runInContext(`${source[0]};this.renderSched=renderSched;`, context);
+  vm.runInContext(`${syncHelper}\n${source[0]};this.renderSched=renderSched;`, context);
   return { context, m };
 }
 
@@ -333,6 +366,143 @@ test('근무표 연차 조회 오류는 대상과 escape된 메시지만 표시�
   assert.match(m.innerHTML, /연차/);
   assert.match(m.innerHTML, /&lt;leave denied&gt;/);
   assert.doesNotMatch(m.innerHTML, /<leave denied>|data-person-id|<select|지난주 복사/);
+});
+
+function scheduleMonthRenderHarness({ role = 'staff' } = {}) {
+  const source = html.match(/async function renderScheduleMonth\([\s\S]*?\n\}\nasync function applyScheduleShift/);
+  assert.ok(source, 'renderScheduleMonth 함수를 찾을 수 없습니다.');
+  const helpers = [html.match(/function scheduleMonthWeeks[\s\S]*?\n\}/)?.[0], html.match(/function scheduleShiftOptions[\s\S]*?\n\}/)?.[0], html.match(/function syncScheduleCellValues[\s\S]*?\n\}/)?.[0]].filter(Boolean).join('\n');
+  const m = { innerHTML: '' };
+  const rows = [{ person_id: 'person-1', user_id: 'user-1', week_start: '2028-01-31', day: 2, shift: 'work' }, { person_id: 'guest-1', user_id: null, week_start: '2028-02-21', day: 4, shift: 'evening' }];
+  const weekRows = [{ week_start: '2028-01-31', status: '초안' }, { week_start: '2028-02-07', status: '공표' }, { week_start: '2028-02-14', status: '초안' }, { week_start: '2028-02-21', status: '공표' }, { week_start: '2028-02-28', status: '초안' }];
+  const context = {
+    SCHED_MONTH: '2028-02', SCHED_VIEW: 'month', SCHEDULE_STATUS_OVERRIDES: {}, SCHEDULE_WRITE_SEQ: {}, SCHEDULE_WRITE_TAIL: {}, SCHEDULE_CELL_VALUES: {}, SCHEDULE_PEOPLE: [{ id: 'person-1', profile_user_id: 'user-1', name: '직원', department: '진료실', active: true, included_in_schedule: true }, { id: 'guest-1', profile_user_id: null, name: 'Dr 비로그인', department: 'Dr.', active: true, included_in_schedule: true }],
+    SHIFTS: { work: { l: '근무' }, off: { l: 'off' }, evening: { l: '야간' }, etc: { l: '기타' } },
+    today: () => '2028-02-15', mondayStr: value => { const d = new Date(value+'T00:00:00'); const g=d.getDay(); d.setDate(d.getDate()+(g===0?-6:1-g)); return d.toISOString().slice(0,10); },
+    addDays: (value,n) => { const d=new Date(value+'T00:00:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); },
+    scheduleDate: (value,day) => { const d=new Date(value+'T00:00:00'); d.setDate(d.getDate()+(day===0?6:day-1)); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }, scheduleDayForDate: value => new Date(value+'T00:00:00').getDay(),
+    schedulePeopleForWeek: (people) => people, schedulePersonLabel: p => p.department==='Dr.'?'Dr. '+p.name:p.name, scheduleWeekForDate: value => { const d=new Date(value+'T00:00:00'); const g=d.getDay(); d.setDate(d.getDate()+(g===0?-6:1-g)); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }, scheduleShiftOptions: cur => Object.keys(context.SHIFTS).map(k=>`<option value="${k}" ${cur===k?'selected':''}>${context.SHIFTS[k].l}</option>`).join(''),
+    esc: value => String(value ?? ''), isLead: () => role !== 'staff', isMgr: () => role !== 'staff', scheduleRosterAdminCard: () => '',
+    serverRows: rows,
+    sb: { from(table) { const result = table==='schedules'?{data:rows,error:null}:table==='schedule_weeks'?{data:weekRows,error:null}:{data:[],error:null}; const builder={select(){return builder;},in(){return builder;},eq(){return builder;},lte(){return builder;},gte(){return builder;},then(resolve){return Promise.resolve(resolve(result));}}; return builder; } }
+  };
+  vm.createContext(context);
+  vm.runInContext(`${helpers}\n${source[0].replace(/\nasync function applyScheduleShift$/, '')};this.renderScheduleMonth=renderScheduleMonth;this.syncScheduleCellValues=syncScheduleCellValues;`, context);
+  return { context, m };
+}
+
+test('월간 렌더는 윤년 월경계·비로그인 Dr 저장키와 혼합 공표 주차별 편집을 실제 출력한다', async () => {
+  const { context, m } = scheduleMonthRenderHarness();
+  context.SCHEDULE_CELL_VALUES['person-1|2028-01-31|2'] = 'off';
+  context.SCHEDULE_STATUS_OVERRIDES['2028-02-07'] = '초안';
+  await context.renderScheduleMonth(m);
+  assert.match(m.innerHTML, /2028-02/);
+  assert.match(m.innerHTML, /applyScheduleShift\(this,'guest-1','',2,'2028-02-28'/);
+  assert.equal((m.innerHTML.match(/<select /g)||[]).length, 30);
+  assert.equal(Object.hasOwn(context.SCHEDULE_STATUS_OVERRIDES, '2028-02-07'), false);
+  context.syncScheduleCellValues(context.serverRows, ['2028-01-31']);
+  assert.equal(context.SCHEDULE_CELL_VALUES['person-1|2028-01-31|2'], 'work');
+  const owner = scheduleMonthRenderHarness({ role: 'owner' });
+  await owner.context.renderScheduleMonth(owner.m);
+  assert.equal((owner.m.innerHTML.match(/<select /g)||[]).length, 58);
+});
+
+test('공표 성공은 초안 override를 지우고 서버 재조회 렌더를 호출한다', async () => {
+  const source = html.match(/async function publishSched\([\s\S]*?\n\}/);
+  assert.ok(source, 'publishSched 함수를 찾을 수 없습니다.');
+  const calls = { render: 0, status: [] }, context = {
+    ME: { name: '합성원장' }, SCHEDULE_STATUS_OVERRIDES: { '2028-02-07': '초안' },
+    setStatus: value => calls.status.push(value), render: () => { calls.render++; },
+    sb: { from() { const builder = { upsert: async () => ({ error: null }) }; return builder; } }
+  };
+  vm.createContext(context);
+  vm.runInContext(`${source[0]};this.publishSched=publishSched;`, context);
+  await context.publishSched('2028-02-07');
+  assert.equal(Object.hasOwn(context.SCHEDULE_STATUS_OVERRIDES, '2028-02-07'), false);
+  assert.equal(calls.render, 1);
+  assert.deepEqual(calls.status, ['saved']);
+});
+
+test('근무표 셀 저장 실패는 이전 선택값을 복원하고 성공 시에만 새 값을 기억한다', async () => {
+  const source = html.match(/async function applyScheduleShift\([\s\S]*?\n\}/);
+  assert.ok(source, 'applyScheduleShift 함수를 찾을 수 없습니다.');
+  const calls = [], context = {
+    SCHEDULE_WRITE_SEQ: {}, SCHEDULE_STATUS_OVERRIDES: {}, SCHEDULE_WRITE_TAIL: {}, SCHEDULE_CELL_VALUES: {},
+    setShift: async (...args) => { calls.push(args); return context.nextResult; }
+  };
+  vm.createContext(context);
+  vm.runInContext(`${source[0]};this.applyScheduleShift=applyScheduleShift;`, context);
+  const element = { value: 'off', dataset: { prevValue: 'work' }, classList: { toggle() {} } };
+  context.nextResult = false;
+  assert.equal(await context.applyScheduleShift(element, 'person-1', null, 2, '2028-02-07', 'off'), false);
+  assert.equal(element.value, 'work');
+  context.nextResult = true;
+  element.value = 'evening';
+  assert.equal(await context.applyScheduleShift(element, 'person-1', null, 2, '2028-02-07', 'evening'), true);
+
+  assert.equal(element.dataset.prevValue, 'evening');
+  assert.equal(calls.length, 2);
+});
+
+test('근무표 셀의 늦게 도착한 이전 응답은 최신 선택을 되돌리지 않는다', async () => {
+  const source = html.match(/async function applyScheduleShift\([\s\S]*?\n\}/);
+  assert.ok(source, 'applyScheduleShift 함수를 찾을 수 없습니다.');
+  const pending = [], context = {
+    SCHEDULE_WRITE_SEQ: {}, SCHEDULE_WRITE_TAIL: {}, SCHEDULE_CELL_VALUES: {},
+    setShift: (...args) => new Promise(resolve => pending.push({ args, resolve }))
+  };
+  vm.createContext(context);
+  vm.runInContext(`${source[0]};this.applyScheduleShift=applyScheduleShift;`, context);
+  const first = { value: 'off', dataset: { prevValue: 'work' }, classList: { toggle() {} } };
+  const second = { value: 'evening', dataset: { prevValue: 'off' }, classList: { toggle() {} } };
+  const p1 = context.applyScheduleShift(first, 'person-1', null, 2, '2028-02-07', 'off');
+  const p2 = context.applyScheduleShift(second, 'person-1', null, 2, '2028-02-07', 'evening');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(pending.length, 1, '같은 셀 요청은 이전 RPC가 끝날 때까지 직렬화되어야 합니다.');
+  pending[0].resolve(true);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(pending.length, 2);
+  pending[1].resolve(true);
+  assert.equal(await p1, null);
+  assert.equal(await p2, true);
+  assert.equal(first.value, 'off');
+  assert.equal(first.dataset.prevValue, 'work');
+  assert.equal(second.dataset.prevValue, 'evening');
+});
+
+test('근무표 셀 RPC 예외는 최신 셀을 이전 값으로 복원하고 오류 상태를 남긴다', async () => {
+  const source = html.match(/async function applyScheduleShift\([\s\S]*?\n\}/);
+  const statuses = [], context = { SCHEDULE_WRITE_SEQ: {}, SCHEDULE_WRITE_TAIL: {}, SCHEDULE_CELL_VALUES: {}, setStatus: value => statuses.push(value), setShift: async () => { throw new Error('network'); } };
+  vm.createContext(context);
+  vm.runInContext(`${source[0]};this.applyScheduleShift=applyScheduleShift;`, context);
+  const element = { value: 'off', dataset: { prevValue: 'work' }, classList: { toggle() {} } };
+  assert.equal(await context.applyScheduleShift(element, 'person-1', null, 2, '2028-02-07', 'off'), false);
+  assert.equal(element.value, 'work');
+  assert.deepEqual(statuses, ['error']);
+});
+
+test('같은 셀의 성공·실패 조합은 최종 DB값과 화면값을 일치시킨다', async () => {
+  const source = html.match(/async function applyScheduleShift\([\s\S]*?\n\}/);
+  assert.ok(source, 'applyScheduleShift 함수를 찾을 수 없습니다.');
+  async function scenario(outcomes) {
+    let dbValue = 'work', call = 0;
+    const context = {
+      SCHEDULE_WRITE_SEQ: {}, SCHEDULE_WRITE_TAIL: {}, SCHEDULE_CELL_VALUES: {},
+      setShift: async (...args) => { const ok = outcomes[call++]; if (ok) dbValue = args[4]; return ok; }
+    };
+    vm.createContext(context);
+    vm.runInContext(`${source[0]};this.applyScheduleShift=applyScheduleShift;`, context);
+    const element = { value: 'work', dataset: { prevValue: 'work' }, classList: { toggle() {} } };
+    const first = context.applyScheduleShift(element, 'person-1', null, 2, '2028-02-07', 'off');
+    element.value = 'evening';
+    const second = context.applyScheduleShift(element, 'person-1', null, 2, '2028-02-07', 'evening');
+    const results = await Promise.all([first, second]);
+    return { dbValue, screenValue: element.value, confirmed: context.SCHEDULE_CELL_VALUES['person-1|2028-02-07|2'], results };
+  }
+  assert.deepEqual(await scenario([true, false]), { dbValue: 'off', screenValue: 'off', confirmed: 'off', results: [null, false] });
+  assert.deepEqual(await scenario([false, true]), { dbValue: 'evening', screenValue: 'evening', confirmed: 'evening', results: [null, true] });
+  assert.deepEqual(await scenario([false, false]), { dbValue: 'work', screenValue: 'work', confirmed: 'work', results: [null, false] });
+  assert.match(html, /function setShiftByDate\([^\n]+return applyScheduleShift\(/);
 });
 
 function copyPrevWeekHarness(rpcError = null) {
@@ -490,6 +660,7 @@ test('명부 관리 카드는 필수 라벨, 정확한 부서 선택지와 계�
   assert.match(adminBlock[1], /이름/);
   assert.match(adminBlock[1], /근무부서/);
   assert.match(adminBlock[1], /근무표·집계 포함/);
+
   assert.match(adminBlock[1], /재직 상태/);
   assert.match(adminBlock[1], /로그인 계정/);
   assert.match(adminBlock[1], /비로그인 명부/);
@@ -693,3 +864,4 @@ test('명부 생성 뒤 프로필 승인이 실패해도 재시도할 수 있다
   assert.deepEqual(calls.order, ['roster', 'profile', 'roster', 'profile']);
   assert.equal(calls.status.at(-1), 'saved');
 });
+
