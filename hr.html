@@ -1484,6 +1484,15 @@ async function deleteCalendarEvent(id){
 }
 
 /* ── 온보딩 ── */
+/* onboarding-evidence:test-start */
+function onboardingEvidenceComplete(kind,profile,documents){
+  const p=profile||{},docs=documents||[];
+  if(kind==='계좌')return !!(String(p.bank_name||'').trim()&&String(p.account_number||'').trim());
+  if(kind==='Notion')return !!(String(p.notion_id||'').trim()&&p.notion_app_installed&&p.notion_workspace_logged_in);
+  const typeMap={'잠복결핵':'잠복결핵 검사서','자격증':'자격증','보안서약':'보안서약서'};
+  return !typeMap[kind]||docs.some(d=>d.document_type===typeMap[kind]);
+}
+/* onboarding-evidence:test-end */
 async function renderOnbo(m){
   const contractQuery=(isMgr()?sb.from('contracts').select('id,user_id,template_id,fields,merged_html,signed_at,status'):sb.from('contracts').select('id,user_id,template_id,fields,merged_html,signed_at,status').eq('user_id',ME.id)).eq('status','서명완료');
   const [{data:items},{data:checks},{data:docs,error:docsError},{data:contracts,error:contractsError},{data:leaveDocs,error:leaveDocsError},{data:leaveRequests}]=await Promise.all([
