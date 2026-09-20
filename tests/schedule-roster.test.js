@@ -864,4 +864,3 @@ test('명부 생성 뒤 프로필 승인이 실패해도 재시도할 수 있다
   assert.deepEqual(calls.order, ['roster', 'profile', 'roster', 'profile']);
   assert.equal(calls.status.at(-1), 'saved');
 });
-

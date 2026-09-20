@@ -1,4 +1,4 @@
--- 로컬 검토용 초안: 운영 DB에 직접 적용하지 않는다.
+-- 운영 적용 완료 기록용 SQL: unified_schedule_cell_transaction 마이그레이션으로 적용됨.
 -- schedule_weeks 상태와 schedules 행을 한 RPC 문장 안에서 처리해 부분 저장을 막는다.
 
 create or replace function public.set_schedule_cell(
@@ -59,4 +59,3 @@ $$;
 
 revoke all on function public.set_schedule_cell(date,uuid,uuid,int,text) from public,anon,authenticated;
 grant execute on function public.set_schedule_cell(date,uuid,uuid,int,text) to authenticated;
-
