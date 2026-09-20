@@ -1,5 +1,12 @@
 # todos — 내부 도구(T8/D) 작업 목록
 
+## ✅ 출퇴근 수기정정·승인 경로 운영 적용 (2026-09-20)
+- **운영 migration 적용 완료**: Supabase `texevhsxttfoqkrucfzl`, migration `attendance_issue_resolution_release`. 적용 전 SQL SHA256 `039A4679134CB4042835D4CF58F9DF89750EEEC4DFF26AFB5260DFA087BC4E2F`; 기존 migration 목록에 없음을 확인한 뒤 적용.
+- **운영 사후검증 완료**: `attendance`, `attendance_issues`, 신규 4개 테이블 모두 RLS 활성화. 승인·수기정정·자동누락 RPC 7개와 `guard_attendance_issue_insert` 트리거 존재 확인. 출퇴근 관련 6개 테이블 행 수는 모두 0건으로 기존 데이터 보존 확인.
+- **권한 경계 확인**: 신규 직접 쓰기 권한은 부여하지 않고 authenticated SELECT와 RPC 실행 경로만 사용. `attendance_issues` 직접 INSERT/UPDATE 권한은 제거된 상태 확인.
+- **로컬 검증**: 정적 릴리스 테스트 4/4 통과. `node --test`는 Windows 샌드박스 `spawn EPERM`으로 실행기만 실패했으며, 테스트 파일 직접 실행은 통과. PGlite 테스트는 `PGLITE_PACKAGE_ROOT` 미설정 환경에서는 자동 종료되므로 이전 별도 통과 결과와 구분함.
+- **남음**: 검토된 파일만 commit/push 후 `https://jung-plant.com/hr.html` 실제 정본 도달·익명 화면 확인. 로그인·실제 직원 입력은 자격증명/실데이터 없이 미검증.
+
 갱신 2026-09-09 · 상세 상황판: `Z:\09_claude-output\04_AI·Claude운영\산출물\치과내부도구_상황판.html`
 
 ## ✅ 연차 1단계 운영 호환성 정상화·배포검증 중 (2026-09-20)
@@ -163,3 +170,13 @@ M3급여1단계(db/payroll.sql+💰급여탭, 8월 급여대장 실검증, 급�
 
 ## 원장 결정 대기 (요약, 오래된 항목)
 `AGENTS.md`·`docs/superpowers` 삭제 7건 커밋 여부(현재 복원됨) · 리스킨 레퍼런스 · 온보딩 페널티 세부 · 대체공휴일 확인 · 내부평가 항목
+## 🟢 출석 수직 경로 릴리스 후보 — 부모 리뷰 대기
+
+- **상태(2026-09-20)**: `b53efbe`에서 분리한 임시 worktree/브랜치 `codex/attendance-resolution-release`에서 구현·검증 완료. 아직 push/deploy하지 않음.
+- **범위**: 직원 수기 출퇴근 제출 → 실장 승인 → 원장 확정 → 지문 인식 오류 보정 레코드 생성 → 직원/관리자 화면 반영. PDF·Push·온보딩·상담 기능은 포함하지 않음.
+- **변경 파일**: `hr.html`, `db/attendance_issue_resolution_release.sql`, `tests/sql/pglite-attendance-resolution-release.mjs`, `tests/attendance-resolution-release-static.test.js`.
+- **DB 전제**: 기존 `profiles`, `attendance`, `attendance_issues`, `my_role()` 및 `chief/owner` 역할. 신규 테이블 4개와 RLS·최소 grant·승인 RPC를 먼저 적용해야 함. 직접 테이블 쓰기는 차단.
+- **검증**: 실제 UI 요청 payload 모양의 PGlite 호출로 제출→승인→조회 PASS. 날짜 누락 거부, 재제출 시 구버전 승인 거부, advisory lock 순서, 원본 지문 행 보존, 보정 멱등성/상이한 보정 거부, attendance issue 직접 UPDATE·확정행 재승인 차단, 세 label의 `type='정정'` 저장과 서버 INSERT guard까지 확인. 기존 지문 업로드의 manager/chief/owner 자동누락 RPC, 기존 확정 행 보존, 중복 멱등 처리, 일부 실패 표시 경로도 확인. 관리자 조회는 수기 50건의 user/date 키 대응 출석을 페이지 조회·정확 키 필터링하고 현재월 보정도 페이지 조회한다. 비활성 사용자 revisions 조회는 차단한다. 전체 Node 테스트 `127 pass / 0 fail`; `git diff --check` PASS.
+- **롤백**: 프론트 변경과 RPC/policy 정의를 이전 버전으로 되돌리되, 신규 테이블·기록은 삭제하지 않는다. 운영 적용 전 백업·점검창·복구 경로를 별도 확인한다.
+- **해시(2026-09-20 기존 importer 호환 보강 후)**: `hr.html`=`88505010CEF9DB05EA2DF528AAE919E536825C6D1AA7E10BDA40340AEDCB2DA8`, `db/attendance_issue_resolution_release.sql`=`039A4679134CB4042835D4CF58F9DF89750EEEC4DFF26AFB5260DFA087BC4E2F`, `tests/sql/pglite-attendance-resolution-release.mjs`=`E98CC9AE5E7399A5ED9464FEE01D8FF7C91CE3020B711DB37979856B74EC4D28`, `tests/attendance-resolution-release-static.test.js`=`AF4A0885E686C88ACC2136EF595F4467DEB4D32D4D883030C5343E1A3A641D01`.
+- **기록 정정**: 아래의 과거 “전체 기능/VAPID 대기” 메모는 당시 상태 기록이며, 현재 원장의 **검증된 수직 기능부터 점진 배포** 결정으로 대체되었다. 과거 기록 자체는 삭제하지 않는다.
