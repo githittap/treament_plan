@@ -1,5 +1,14 @@
 # todos — 내부 도구(T8/D) 작업 목록
 
+## 🟡 Task 3 연차 신청 증빙·월차 자동발생 로컬 구현 후보 (2026-09-20)
+- 변경: `hr.html` 직원 서류함 안에 `일반 직원서류 / 연차 신청 증빙` 하위 보기를 추가했다. 연차 증빙도 기존 본인·manager·chief·owner 접근 경계를 그대로 사용한다.
+- DB 초안: `db/leave_application_documents_draft.sql`은 문서 분류 열과 기존 역할 정책을 명시한다. `db/monthly_leave_accrual_draft.sql`은 owner 실행 경계에서 입사일 한 달 경과분을 1일씩 ledger에 추가하며, `(직원, 발생일)` 메모·advisory lock으로 재실행 중복을 막고 기존 잔액 설정 행은 갱신하지 않는다.
+- 이채원 경계: 입사일 `2026-09-18`은 `2026-10-17`까지 0일, `2026-10-18`부터 첫 1일 부여 대상으로 시험했다.
+- 검증: 직접 순차 실행한 Node 정적/회귀 20개 파일 통과, 인라인 스크립트 파싱 통과, `git diff --check` 통과. `node --test` 병렬 실행은 Windows 샌드박스 `spawn EPERM`으로 미사용.
+- 미검증: PGlite 런타임이 worktree·전역 npm·캐시에 없어 SQL 동작 시험 2개는 `PGLITE_SKIP`만 확인했다. 운영 DB migration·RLS·Storage 적용, 실제 역할별 화면/저장, 운영 데이터 변경·배포는 하지 않았다.
+- 운영 사전 스냅샷 필요: `employee_documents`의 분류별 행 수·기존 null/일반 문서 수·Storage `hr-docs` 경로 수·`profiles.hire_date` 분포·`leave_ledger`의 월차 자동발생 메모 수·직원별 잔액 집계.
+- 롤백: 프런트는 이 커밋 이전 정본으로 되돌리고, DB는 새 `document_category` 열·인덱스·제약과 월차 함수 권한만 역순 제거한다. 이미 발생한 ledger 행은 삭제하지 않고 owner가 별도 조정 이력으로 복구한다.
+
 ## ✅ ZIP 근무표 직무표 단계배포 완료 (2026-09-20)
 - 배포 커밋: `050bd980b7e2892e5becd37de068720bf3cfad22` — `origin/main` fast-forward. 배포 확인 시각: 2026-09-20 18:32 KST.
 - 운영 migration: `unified_schedule_department_compatibility_20260920`; SQL SHA256 `C60118680E255863EA120C1A67C794D2BB090F51AF46E7132439EF94A40740DA`.
