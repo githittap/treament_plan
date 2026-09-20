@@ -1,5 +1,12 @@
 # todos — 내부 도구(T8/D) 작업 목록
 
+## 🟡 Task 4 직원서류·입사 체크리스트·개인서명 로컬 릴리스 후보 (2026-09-20)
+- 변경: `hr.html` 입사서류 첫 화면에 공통 체크리스트를 추가했다. 계좌는 은행명+계좌번호, Notion은 ID+앱 설치+워크스페이스 로그인, 잠복결핵·자격증·보안서약은 파일 존재 기준으로 완료를 표시한다. chief·manager는 완료 여부만 점검하고 계좌 원문은 보지 않는다.
+- 문서함: 체결 근로계약서·일반 직원서류를 기존 한 목록에서 날짜순으로 보며, 일반 업로드는 PDF/JPG/PNG/DOC/DOCX/HWP 및 10MB·0바이트 제한을 화면·DB Storage metadata 양쪽에서 검사한다. 실행·압축 파일은 허용하지 않는다.
+- 신규 로컬 DB 초안: `db/onboarding_evidence_requirements_draft.sql`(개인 증빙 + 완료 상태 RPC), `db/employee_signature_vault_draft.sql`(비공개 `employee-signatures` 버킷, 개인서명·문서별 확인 사용·감사기록), 기존 `db/employee_documents_onboarding_hardening_draft.sql`(MIME/크기·권한 보강). 운영 DB·Storage 적용은 하지 않았다.
+- 검증: 관련 JS 9개 시험, PGlite 역할/RLS·Storage 2개, 전체 루트 JS 회귀(직접 순차 실행), 인라인 JS 파싱, `git diff --check` 통과. Windows 샌드박스에서는 `node --test`가 `spawn EPERM`이므로 개별 파일 실행으로 검증했다.
+- 남음/배포 관문: 실제 운영 migration 적용 전 총괄이 SQL 순서·기존 `hr-docs` 객체·권한을 다시 점검해야 한다. 실제 직원 개인정보·서명·파일 업로드, 운영 DB/Storage 적용, push·배포는 이 worktree에서 수행하지 않았다.
+
 ## ✅ Task 3 연차 신청 증빙·월차 자동발생 운영 적용·프런트 배포 완료 (2026-09-20)
 - 변경: `hr.html` 입사서류의 직원 서류함 안에 별도 `연차 신청 증빙` 하위 카드를 추가했다. 일반 `employee_documents`·`hr-docs`와 분리한 `leave_application_documents`·`leave-docs`를 사용하며, 관리자는 조회만 하고 업로드는 본인 신청 건에만 허용한다.
 - 운영 migration: `leave_application_documents_monthly_accrual_release_20260920` 적용 후, 기존 default privilege를 명시적으로 회수한 `leave_application_documents_monthly_accrual_security_fix_20260920`를 적용했다. SQL SHA256은 각각 `D56EC2D8B2402B933CB49140EE08E36C6D2170B54A611519279889C742D4FF18`, `CD4D02903CE907FB762F543CC7BADAAC700D4EEC6DE63095282039819D7364DA`.

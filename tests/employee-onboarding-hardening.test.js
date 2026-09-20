@@ -19,3 +19,11 @@ test('입사 증빙 완료 기준은 공통 함수로 고정한다', () => {
   assert.equal(done('자격증', {}, []), false);
   assert.equal(done('보안서약', {}, [{ document_type: '보안서약서' }]), true);
 });
+
+test('입사서류 첫 화면은 공통 체크리스트와 관리자 점검을 함께 제공한다', () => {
+  assert.match(html, /공통 입사 체크리스트/);
+  assert.match(html, /onboardingEvidenceComplete\(/);
+  assert.match(html, /isMgr\(\)\?await onboOverview\(\):''/);
+  assert.match(html, /계좌번호는 은행명과 계좌번호가 모두 있어야 완료/);
+  assert.match(html, /Notion은 ID, 앱 설치, 워크스페이스 로그인 확인이 모두 있어야 완료/);
+});

@@ -7,6 +7,8 @@ alter table public.employee_documents add constraint employee_documents_mime_typ
 ));
 alter table public.employee_documents drop constraint if exists employee_documents_size_bytes_check;
 alter table public.employee_documents add constraint employee_documents_size_bytes_check check (size_bytes > 0 and size_bytes <= 10485760);
+grant select,insert,update,delete on public.employee_documents to authenticated;
+grant usage,select on all sequences in schema public to authenticated;
 
 -- 기존 INSERT 정책의 경로 권한을 보존하면서 metadata 검사만 결합한다.
 alter policy hr_docs_insert_scoped on storage.objects
