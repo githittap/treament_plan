@@ -19,6 +19,12 @@ if (block) {
     assert.match(context.validateEmployeeDocument({ type: 'image/gif', size: 1 }), /PDF/);
     assert.match(context.validateEmployeeDocument({ type: 'image/png', size: 10 * 1024 * 1024 + 1 }), /10MB/);
   });
+  test('입사 서류는 문서 형식을 허용하되 실행·압축 파일은 거부한다', () => {
+    assert.equal(context.validateEmployeeDocument({ type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', size: 1 }), '');
+    assert.equal(context.validateEmployeeDocument({ type: 'application/x-hwp', size: 1 }), '');
+    assert.match(context.validateEmployeeDocument({ type: 'application/zip', size: 1 }), /PDF/);
+    assert.match(context.validateEmployeeDocument({ type: 'application/x-msdownload', size: 1 }), /PDF/);
+  });
   test('화면에 업로드·열람 함수가 있다', () => {
     assert.match(html, /function uploadEmployeeDocument\(/);
     assert.match(html, /function downloadEmployeeDocument\(/);
