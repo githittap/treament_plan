@@ -19,11 +19,14 @@ using (public.my_role() in ('chief','owner') and exists (select 1 from public.pr
 
 create or replace function public.preview_monthly_leave_accruals(p_as_of date)
 returns table(user_id uuid,user_name text,hire_date date,months_completed integer,due_date date,days numeric,already_recorded boolean)
-language sql security invoker set search_path=public as $$
-  with eligible as (
+language plpgsql security definer set search_path=public as $$
+begin
+  if auth.uid() is null or coalesce(public.my_role(),'')<>'owner' or not exists(select 1 from public.profiles x where x.user_id=auth.uid() and x.active=true and x.approved=true) then
+    raise exception 'owner execution required';
+  end if;
+  return query with eligible as (
     select p.user_id,p.name,p.hire_date,
-      greatest(0,((extract(year from age(p_as_of,p.hire_date))*12)+extract(month from age(p_as_of,p.hire_date)))::integer
-        - case when extract(day from p_as_of)<extract(day from p.hire_date) then 1 else 0 end) as months_elapsed
+      greatest(0,((extract(year from age(p_as_of,p.hire_date))*12)+extract(month from age(p_as_of,p.hire_date)))::integer) as months_elapsed
     from public.profiles p
     where p.active=true and p.approved=true and p.hire_date is not null and p_as_of>=p.hire_date
   ), candidates as (
@@ -37,12 +40,13 @@ language sql security invoker set search_path=public as $$
     exists(select 1 from public.leave_accrual_runs r where r.user_id=c.user_id and r.due_date=(c.hire_date + (c.months_completed||' months')::interval)::date)
   from candidates c
   where c.months_completed between 1 and 11;
+end;
 $$;
 
 -- 근태 개근 확인이 연결되기 전에는 owner도 실제 ledger·run을 만들 수 없다.
 create or replace function public.apply_monthly_leave_accruals(p_as_of date)
 returns table(user_id uuid,granted_days numeric,created_runs integer)
-language plpgsql security definer set search_path=public as $$
+language plpgsql security invoker set search_path=public as $$
 declare caller_role text;
 begin
   caller_role:=coalesce(public.my_role(),'');

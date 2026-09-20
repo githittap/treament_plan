@@ -21,9 +21,14 @@ const owner='33333333-3333-3333-3333-333333333333',staff='11111111-1111-1111-111
 try {
   await db.exec(prelude + draft);
   await query(`insert into public.profiles values ('${owner}','합성원장',null,'owner',true,true),('${staff}','합성직원','2026-09-18','staff',true,true),('${manager}','합성관리자',null,'manager',true,true)`);
-  await query('set role authenticated'); await query(`select set_config('app.test_uid','${owner}',false)`);
+  await query('set role authenticated'); await query(`select set_config('app.test_uid','${staff}',false)`);
+  let previewDenied=''; try { await query("select * from public.preview_monthly_leave_accruals('2026-10-18')"); } catch(error) { previewDenied=String(error); } assert.match(previewDenied,/owner execution required/);
+  await query(`select set_config('app.test_uid','${manager}',false)`); previewDenied=''; try { await query("select * from public.preview_monthly_leave_accruals('2026-10-18')"); } catch(error) { previewDenied=String(error); } assert.match(previewDenied,/owner execution required/);
+  await query(`select set_config('app.test_uid','${owner}',false)`);
   let preview = await query("select * from public.preview_monthly_leave_accruals('2026-10-17')"); assert.equal(preview.length,0);
   preview = await query("select * from public.preview_monthly_leave_accruals('2026-10-18')"); assert.equal(preview.length,1); assert.equal(preview[0].user_id,staff); assert.equal(preview[0].months_completed,1); assert.equal(new Date(preview[0].due_date).toISOString().slice(0,10),'2026-10-18');
+  preview = await query("select * from public.preview_monthly_leave_accruals('2026-11-17')"); assert.equal(preview.length,1); assert.equal(preview[0].months_completed,1);
+  preview = await query("select * from public.preview_monthly_leave_accruals('2026-11-18')"); assert.equal(preview.length,2); assert.equal(Math.max(...preview.map(row=>row.months_completed)),2);
   let blocked=''; try { await query("select * from public.apply_monthly_leave_accruals('2026-10-18')"); } catch(error) { blocked=String(error); } assert.match(blocked,/attendance confirmation required/); assert.equal((await query(`select count(*)::int n from public.leave_ledger where user_id='${staff}'`))[0].n,0);
   preview = await query("select * from public.preview_monthly_leave_accruals('2027-09-18')"); assert.equal(preview.length,11); assert.equal(Math.max(...preview.map(row=>row.months_completed)),11); assert.equal(preview.some(row=>new Date(row.due_date).toISOString().slice(0,10)==='2027-09-18'),false);
   await query(`select set_config('app.test_uid','${manager}',false)`); let denied=''; try { await query("select * from public.apply_monthly_leave_accruals('2026-12-18')"); } catch(error) { denied=String(error); } assert.match(denied,/owner execution required/);

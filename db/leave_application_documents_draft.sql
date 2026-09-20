@@ -5,7 +5,7 @@ create table if not exists public.leave_application_documents (
   user_id uuid not null references public.profiles(user_id),
   document_type text not null default '연차 신청서',
   original_name text not null,
-  storage_path text not null,
+  storage_path text not null unique,
   mime_type text not null,
   size_bytes bigint not null,
   created_at timestamptz not null default now(),
@@ -24,7 +24,8 @@ drop policy if exists leave_application_documents_delete_owner on public.leave_a
 create policy leave_application_documents_delete_owner on public.leave_application_documents for delete to authenticated
 using (public.my_role()='owner');
 
--- 적용 전 leave-docs 버킷이 1개이고 public=false인지 읽기 전용으로 확인한다.
+-- 운영 전 기존 버킷의 id/public/파일 수를 스냅샷한다. 없을 때만 private 버킷을 만든다.
+insert into storage.buckets (id,name,public) values ('leave-docs','leave-docs',false) on conflict do nothing;
 drop policy if exists leave_docs_select_scoped on storage.objects;
 create policy leave_docs_select_scoped on storage.objects for select to authenticated
 using (bucket_id='leave-docs' and exists (select 1 from public.profiles p where p.user_id=auth.uid() and p.active=true and p.approved=true) and (public.my_role() in ('manager','chief','owner') or (storage.foldername(name))[1]=auth.uid()::text));
