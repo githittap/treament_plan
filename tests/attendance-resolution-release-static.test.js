@@ -49,7 +49,7 @@ test('수기 출퇴근은 원본처럼 자유형 시각을 받아 DB 시각으�
   const context = {};
   vm.createContext(context);
   vm.runInContext(`${html.slice(start, end)}\nthis.normalizeManualClockTime=normalizeManualClockTime;`, context);
-  for (const [raw, expected] of [['09:20','09:20'],['9:05','09:05'],['0905','09:05'],['오후 8:42','20:42'],['off',null],['',null]]) {
+  for (const [raw, expected] of [['09:20','09:20'],['9:05','09:05'],['0905','09:05'],['오전 12:30','00:30'],['오후 12:30','12:30'],['오후 8:42','20:42'],['off',null],['',null]]) {
     assert.equal(context.normalizeManualClockTime(raw), expected, raw);
   }
   assert.equal(context.normalizeManualClockTime('25:00'), null);
