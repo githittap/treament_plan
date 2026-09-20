@@ -1534,6 +1534,7 @@ function contractPreviewHtml(row){return String(row&&row.merged_html||'');}
 /* employee-documents:test-start */
 function validateEmployeeDocument(file){
   if(!file)return '파일을 선택하세요.';
+  if(file.size<=0)return '0바이트 파일은 올릴 수 없습니다.';
   if(!['application/pdf','image/jpeg','image/png','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/x-hwp','application/vnd.hancom.hwp'].includes(file.type))return 'PDF, JPG, PNG, DOC, DOCX, HWP 파일만 올릴 수 있습니다.';
   if(file.size>10*1024*1024)return '파일은 10MB 이하만 올릴 수 있습니다.';
   return '';
@@ -1550,7 +1551,7 @@ function employeeDocumentsCard(docs,error,contractRows,contractError){
     <div class="grid" style="margin-top:10px">
       ${lead?`<div class="fld"><label>직원</label><select id="edUser">${staff.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select></div>`:''}
       <div class="fld"><label>서류 종류</label><select id="edType"><option>잠복결핵 검사서</option><option>자격증</option><option>면허증</option><option>신분증 사본</option><option>기타</option></select></div>
-      <div class="fld"><label>파일</label><input type="file" id="edFile" accept="application/pdf,image/jpeg,image/png,.doc,.docx,.hwp,.hwpx"></div>
+      <div class="fld"><label>파일</label><input type="file" id="edFile" accept="application/pdf,image/jpeg,image/png,.doc,.docx,.hwp"></div>
     </div><button class="hbtn pri" style="margin-top:10px" onclick="uploadEmployeeDocument()">서류 올리기</button><div class="msg" id="edMsg"></div>
   </div>`;
 }
@@ -1565,7 +1566,7 @@ async function uploadEmployeeDocument(){
   const {error:storageError}=await sb.storage.from('hr-docs').upload(path,file,{contentType:file.type,upsert:false});
   if(storageError){msg.textContent='파일 업로드 실패: '+storageError.message;setStatus('error');return;}
   const {error}=await sb.from('employee_documents').insert({user_id:userId,document_type:type,original_name:file.name,storage_path:path,mime_type:file.type,size_bytes:file.size});
-  if(error){msg.textContent='서류 목록 저장 실패: '+error.message;setStatus('error');return;}
+  if(error){await sb.storage.from('hr-docs').remove([path]);msg.textContent='서류 목록 저장 실패: '+error.message;setStatus('error');return;}
   setStatus('saved');render();
 }
 let LEAVE_APPLICATION_DOCUMENT_SAVING=false;

@@ -17,6 +17,7 @@ if (block) {
     assert.equal(context.validateEmployeeDocument({ type: 'application/pdf', size: 10 * 1024 * 1024 }), '');
     assert.equal(context.validateEmployeeDocument({ type: 'image/jpeg', size: 1 }), '');
     assert.match(context.validateEmployeeDocument({ type: 'image/gif', size: 1 }), /PDF/);
+    assert.match(context.validateEmployeeDocument({ type: 'application/pdf', size: 0 }), /0바이트/);
     assert.match(context.validateEmployeeDocument({ type: 'image/png', size: 10 * 1024 * 1024 + 1 }), /10MB/);
   });
   test('입사 서류는 문서 형식을 허용하되 실행·압축 파일은 거부한다', () => {
@@ -28,5 +29,7 @@ if (block) {
   test('화면에 업로드·열람 함수가 있다', () => {
     assert.match(html, /function uploadEmployeeDocument\(/);
     assert.match(html, /function downloadEmployeeDocument\(/);
+    assert.match(html, /await sb\.storage\.from\('hr-docs'\)\.remove\(\[path\]\)/);
+    assert.doesNotMatch(html.match(/id="edFile"[^>]+/)[0], /\.hwpx/);
   });
 }
