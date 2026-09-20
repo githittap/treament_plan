@@ -26,4 +26,6 @@ test('입사서류 첫 화면은 공통 체크리스트와 관리자 점검을 �
   assert.match(html, /isMgr\(\)\?await onboOverview\(\):''/);
   assert.match(html, /계좌번호는 은행명과 계좌번호가 모두 있어야 완료/);
   assert.match(html, /Notion은 ID, 앱 설치, 워크스페이스 로그인 확인이 모두 있어야 완료/);
+  assert.match(html, /from\('onboarding_evidence_completion'\)\.select\('\*'\)/);
+  assert.doesNotMatch(html, /rpc\('onboarding_evidence_completion'\)/);
 });

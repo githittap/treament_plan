@@ -16,17 +16,23 @@ create or replace function auth.uid() returns uuid language sql stable as $$ sel
 create or replace function storage.foldername(value text) returns text[] language sql immutable as $$ select string_to_array(value,'/') $$;
 create table public.profiles(user_id uuid primary key,role text,active boolean default true,approved boolean default true);
 create or replace function public.my_role() returns text language sql stable security definer set search_path=public as $$ select coalesce((select role from public.profiles where user_id=auth.uid()),'staff') $$;
-create table storage.buckets(id text primary key,name text unique,public boolean not null default false);
-create table storage.objects(id bigint generated always as identity primary key,bucket_id text,name text,owner_id uuid);
+create table storage.buckets(id text primary key,name text unique,public boolean not null default false,file_size_limit bigint,allowed_mime_types text[]);
+create table storage.objects(id bigint generated always as identity primary key,bucket_id text,name text,metadata jsonb default '{}'::jsonb,owner_id uuid);
 alter table storage.objects enable row level security;
-grant usage on schema auth,storage to authenticated; grant execute on function auth.uid(),public.my_role() to authenticated; grant select,insert on public.profiles to authenticated; grant select,insert on storage.objects to authenticated;
+grant usage on schema auth,storage to authenticated; grant execute on function auth.uid(),public.my_role() to authenticated; grant select,insert on public.profiles to authenticated; grant select,insert,delete on storage.objects to authenticated;
 `;
 try {
   await db.exec(prelude + draft); await query(`insert into public.profiles values ('${staff}','staff',true,true),('${manager}','manager',true,true),('${chief}','chief',true,true)`); await db.exec('set role authenticated'); await query(`select set_config('app.test_uid','${staff}',false)`);
   await query(`insert into public.employee_signature_vault(user_id,storage_path,mime_type,size_bytes) values ('${staff}','${staff}/signature.png','image/png',100)`);
+  await query(`insert into storage.objects(bucket_id,name,metadata,owner_id) values ('employee-signatures','${staff}/signature.png','{"mimetype":"image/png","size":100}','${staff}')`);
   await query(`select set_config('app.test_uid','${manager}',false)`); assert.equal((await query(`select * from public.employee_signature_vault`)).length,0);
   await query(`select set_config('app.test_uid','${staff}',false)`); let unsignedCopy=''; try { await query(`insert into public.employee_signature_uses(signature_id,document_kind,confirmed_at) values (1,'근로계약서',null)`); } catch (error) { unsignedCopy=String(error); } assert.match(unsignedCopy,/row-level security|permission denied/);
   await query(`insert into public.employee_signature_uses(signature_id,document_kind,confirmed_at) values (1,'근로계약서',now())`); assert.equal((await query('select count(*)::int n from public.employee_signature_audit'))[0].n,1);
+  await query(`delete from storage.objects where name='${staff}/signature.png'`); assert.equal((await query(`select count(*)::int n from storage.objects where name='${staff}/signature.png'`))[0].n,1);
   await query(`select set_config('app.test_uid','${chief}',false)`); assert.equal((await query(`select * from public.employee_signature_vault`)).length,0);
+  await db.exec('reset role');
+  assert.equal((await query(`select has_table_privilege('authenticated','public.employee_signature_uses','delete') allowed`))[0].allowed,false);
+  assert.equal((await query(`select has_table_privilege('authenticated','public.employee_signature_audit','insert') allowed`))[0].allowed,false);
+  assert.equal((await query(`select has_function_privilege('authenticated','employee_private.audit_employee_signature_use()','execute') allowed`))[0].allowed,false);
   console.log('PGLITE_EMPLOYEE_SIGNATURE_PASS: 비공개 서명 보관, 명시확인 복사, 감사기록');
 } finally { await db.close(); }

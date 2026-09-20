@@ -1603,7 +1603,7 @@ async function downloadEmployeeDocument(id){
   const url=URL.createObjectURL(data),win=window.open(url,'_blank','noopener');if(!win)location.href=url;setTimeout(()=>URL.revokeObjectURL(url),60000);
 }
 async function onboOverview(){
-  const [{data:items},{data:checks},{data:completion}]=await Promise.all([sb.from('onboarding_items').select('*').eq('active',true),sb.from('onboarding_checks').select('*'),sb.rpc('onboarding_evidence_completion')]);
+  const [{data:items},{data:checks},{data:completion}]=await Promise.all([sb.from('onboarding_items').select('*').eq('active',true),sb.from('onboarding_checks').select('*'),sb.from('onboarding_evidence_completion').select('*')]);
   const staff=PROFILES.filter(p=>p.active!==false);
   const doneMap={};(checks||[]).forEach(c=>{if(c.status!=='미제출')doneMap[c.user_id+'|'+c.item_id]=1;});
   const completeMap={};(completion||[]).forEach(c=>completeMap[c.user_id]=c);
