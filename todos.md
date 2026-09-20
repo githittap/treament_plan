@@ -1,13 +1,12 @@
 # todos — 내부 도구(T8/D) 작업 목록
 
-## 🟡 Task 3 연차 신청 증빙·월차 자동발생 로컬 구현 후보 (2026-09-20)
-- 변경: `hr.html` 직원 서류함 안에 `일반 직원서류 / 연차 신청 증빙` 하위 보기를 추가했다. 연차 증빙도 기존 본인·manager·chief·owner 접근 경계를 그대로 사용한다.
-- DB 초안: `db/leave_application_documents_draft.sql`은 문서 분류 열과 기존 역할 정책을 명시한다. `db/monthly_leave_accrual_draft.sql`은 owner 실행 경계에서 입사일 한 달 경과분을 1일씩 ledger에 추가하며, `(직원, 발생일)` 메모·advisory lock으로 재실행 중복을 막고 기존 잔액 설정 행은 갱신하지 않는다.
-- 이채원 경계: 입사일 `2026-09-18`은 `2026-10-17`까지 0일, `2026-10-18`부터 첫 1일 부여 대상으로 시험했다.
-- 검증: 직접 순차 실행한 Node 정적/회귀 20개 파일 통과, 인라인 스크립트 파싱 통과, `git diff --check` 통과. `node --test` 병렬 실행은 Windows 샌드박스 `spawn EPERM`으로 미사용.
-- 미검증: PGlite 런타임이 worktree·전역 npm·캐시에 없어 SQL 동작 시험 2개는 `PGLITE_SKIP`만 확인했다. 운영 DB migration·RLS·Storage 적용, 실제 역할별 화면/저장, 운영 데이터 변경·배포는 하지 않았다.
-- 운영 사전 스냅샷 필요: `employee_documents`의 분류별 행 수·기존 null/일반 문서 수·Storage `hr-docs` 경로 수·`profiles.hire_date` 분포·`leave_ledger`의 월차 자동발생 메모 수·직원별 잔액 집계.
-- 롤백: 프런트는 이 커밋 이전 정본으로 되돌리고, DB는 새 `document_category` 열·인덱스·제약과 월차 함수 권한만 역순 제거한다. 이미 발생한 ledger 행은 삭제하지 않고 owner가 별도 조정 이력으로 복구한다.
+## 🟡 Task 3 연차 신청 증빙·월차 자동발생 로컬 구현 후보 (2026-09-20, 보완)
+- 변경: `hr.html` 입사서류의 직원 서류함 안에 별도 `연차 신청 증빙` 하위 카드를 추가했다. 일반 `employee_documents`·`hr-docs`와 분리한 `leave_application_documents`·`leave-docs`를 사용하며, 관리자는 조회만 하고 업로드는 본인 신청 건에만 허용한다.
+- DB 초안: `leave_accrual_runs`의 `unique(user_id,due_date)`로 발생 후보를 구조적으로 식별한다. 1년 미만 1~11회 후보만 미리보기로 만들고, 개근 근태 확인 연결 전 `apply_monthly_leave_accruals`는 실제 ledger 기록을 항상 차단한다. 수동 ledger·잔액은 수정하지 않는다.
+- 이채원 경계: 입사일 `2026-09-18`은 `2026-10-17`까지 후보 0건, `2026-10-18`에 1회 후보이며 12회 자동 지급은 없다.
+- 검증: 직접 순차 Node 정적/회귀 20개 파일, PGlite SQL 2개, 인라인 파싱, `git diff --check`를 재실행한다. `node --test` 병렬 실행은 Windows 샌드박스 `spawn EPERM`으로 미사용.
+- 운영 사전 스냅샷 필요: `leave_application_documents`·`leave_accrual_runs` 존재 여부, `leave-docs` 버킷 단일·비공개 상태와 경로 수, `profiles.hire_date` 분포, `leave_ledger`·직원별 잔액 집계, 기존 연차 신청별 문서 수.
+- 롤백: 프런트는 보완 커밋 이전으로 되돌리고, 아직 적용하지 않은 DB 초안은 실행하지 않는다. 운영 적용 뒤에는 새 테이블·RLS·함수·Storage 정책만 역순 해제하며 이미 생성된 ledger는 삭제하지 않고 owner 조정 이력으로 복구한다.
 
 ## ✅ ZIP 근무표 직무표 단계배포 완료 (2026-09-20)
 - 배포 커밋: `050bd980b7e2892e5becd37de068720bf3cfad22` — `origin/main` fast-forward. 배포 확인 시각: 2026-09-20 18:32 KST.
