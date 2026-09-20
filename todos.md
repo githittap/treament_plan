@@ -191,3 +191,10 @@ M3급여1단계(db/payroll.sql+💰급여탭, 8월 급여대장 실검증, 급�
 - **롤백**: 프론트 변경과 RPC/policy 정의를 이전 버전으로 되돌리되, 신규 테이블·기록은 삭제하지 않는다. 운영 적용 전 백업·점검창·복구 경로를 별도 확인한다.
 - **해시(2026-09-20 기존 importer 호환 보강 후)**: `hr.html`=`88505010CEF9DB05EA2DF528AAE919E536825C6D1AA7E10BDA40340AEDCB2DA8`, `db/attendance_issue_resolution_release.sql`=`039A4679134CB4042835D4CF58F9DF89750EEEC4DFF26AFB5260DFA087BC4E2F`, `tests/sql/pglite-attendance-resolution-release.mjs`=`E98CC9AE5E7399A5ED9464FEE01D8FF7C91CE3020B711DB37979856B74EC4D28`, `tests/attendance-resolution-release-static.test.js`=`AF4A0885E686C88ACC2136EF595F4467DEB4D32D4D883030C5343E1A3A641D01`.
 - **기록 정정**: 아래의 과거 “전체 기능/VAPID 대기” 메모는 당시 상태 기록이며, 현재 원장의 **검증된 수직 기능부터 점진 배포** 결정으로 대체되었다. 과거 기록 자체는 삭제하지 않는다.
+# ✅ Task 2 통합 캘린더 단계배포 최종 기록 (2026-09-20)
+- 배포 커밋: `49780b33325d5150876c9032d3eb52e73419a6e6` — `origin/main` fast-forward 완료.
+- 시험: 관련 62/62, 전체 18개 파일 143/143 통과. `git diff --check` 통과.
+- 라이브 확인: `https://jung-plant.com/hr.html?v=49780b3` 로그인 화면 정상 로드 확인.
+- 미검증 경계: 인증 후 역할별 실제 화면·실제 직원 입력/승인은 자격증명과 실데이터 없이 미검증.
+- DB 영향: Task 2에서는 migration·운영 DB 행 변경 없음.
+- 롤백 기준: 프론트는 직전 정본 `23a84f0e5be81561d2e297e16a322ca7d77f8433`으로 재배포하며, Task 2의 DB 변경이 없으므로 DB 롤백은 없음.
