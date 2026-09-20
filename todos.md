@@ -1,11 +1,14 @@
 # todos — 내부 도구(T8/D) 작업 목록
 
-## 🟡 Task 4 직원서류·입사 체크리스트·개인서명 로컬 릴리스 후보 (2026-09-20)
+## ✅ Task 4 직원서류·입사 체크리스트·개인서명 단계배포 완료 (2026-09-21)
 - 변경: `hr.html` 입사서류 첫 화면에 공통 체크리스트를 추가했다. 계좌는 은행명+계좌번호, Notion은 ID+앱 설치+워크스페이스 로그인, 잠복결핵·자격증·보안서약은 파일 존재 기준으로 완료를 표시한다. chief·manager는 완료 여부만 점검하고 계좌 원문은 보지 않는다.
 - 문서함: 체결 근로계약서·일반 직원서류를 기존 한 목록에서 날짜순으로 보며, 일반 업로드는 PDF/JPG/PNG/DOC/DOCX/HWP 및 10MB·0바이트 제한을 화면·DB Storage metadata 양쪽에서 검사한다. 실행·압축 파일은 허용하지 않는다.
-- 신규 로컬 DB 초안: `db/onboarding_evidence_requirements_draft.sql`(개인 증빙 + 완료 상태 RPC), `db/employee_signature_vault_draft.sql`(비공개 `employee-signatures` 버킷, 개인서명·문서별 확인 사용·감사기록), 기존 `db/employee_documents_onboarding_hardening_draft.sql`(MIME/크기·권한 보강). 운영 DB·Storage 적용은 하지 않았다.
-- 검증: 관련 JS 9개 시험, PGlite 역할/RLS·Storage 2개, 전체 루트 JS 회귀(직접 순차 실행), 인라인 JS 파싱, `git diff --check` 통과. Windows 샌드박스에서는 `node --test`가 `spawn EPERM`이므로 개별 파일 실행으로 검증했다.
-- 남음/배포 관문: 실제 운영 migration 적용 전 총괄이 SQL 순서·기존 `hr-docs` 객체·권한을 다시 점검해야 한다. 실제 직원 개인정보·서명·파일 업로드, 운영 DB/Storage 적용, push·배포는 이 worktree에서 수행하지 않았다.
+- 운영 migration: `employee_onboarding_signature_hardening_20260921` 적용. SQL SHA256 `ADF6729B687F298C317A5DF22D4C9A381CCCA98AB6E60C047FFE84C4419A3B14`.
+- 보안 경계: 완료 여부는 민감 원문과 분리된 RLS 표로 제공하고, 내부 트리거 함수는 비노출 `employee_private` 스키마·빈 search path·직접 실행권한 없음으로 고정했다. `employee_documents`와 신규 표의 anon 권한을 회수했다. 개인서명은 PNG 1MB 비공개 버킷이며, 감사기록은 직원이 수정·삭제할 수 없고 등록된 원본 객체도 일반 사용자가 지울 수 없다.
+- 검증: PGlite 역할/RLS·Storage 2개, 전체 루트 JS 21개 파일, 인라인 JS 2개 파싱, `git diff --check` 통과. Supabase security advisor는 적용 전후 동일 경고만 남아 Task 4 신규 경고가 없다.
+- 보존 확인: 적용 전후 `employee_documents=0`, `hr-docs` private/객체 1개 유지. 신규 증빙·서명 5개 표는 모두 RLS 활성화·0행이며 `employee-signatures` private/객체 0개다. 실제 직원 개인정보·서명·파일 업로드는 하지 않았다.
+- 프런트 배포: `7e3b40c7f0927340c54c878a4957fdbf15956d0a`까지 `origin/main` fast-forward. `https://jung-plant.com/hr.html?release=7e3b40c-2` HTTP 200, 공통 체크리스트·개인서명·완료상태 표식을 확인했다.
+- 롤백: 프런트는 배포 직전 `8e56a1bd5e0aec26cbac0e5421e1e29c9799b6f6`으로 되돌린다. DB는 Storage 정책·신규 버킷·트리거·내부 함수·신규 표를 역순 해제하고 `employee_documents` 제약·권한·`hr_docs_insert_scoped` 정책을 이전 정의로 복원한다. 기존 `hr-docs` 객체는 삭제하지 않는다.
 
 ## ⏳ 후속 대기열 — `허브관련 2차.zip` (2026-09-20)
 - Task 4와 `hr.html`·직원서류·권한·SQL 범위가 겹치므로 이 커밋의 총괄 검토 전에는 코드 수정 없이 원본 보존·요구 재대조와 화면 시안까지만 한다.
