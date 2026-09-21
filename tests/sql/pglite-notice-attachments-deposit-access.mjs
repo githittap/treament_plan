@@ -74,8 +74,13 @@ try {
   const privilegesBefore = await snapshotPrivileges();
   const bucketBefore = (await query("select id,name,public,file_size_limit,allowed_mime_types from storage.buckets where id='notice-attachments'"))[0];
   await db.exec(draft);
+  assert.equal((await query(`select count(*)::int n from information_schema.role_table_grants where table_schema='public' and table_name='notice_attachments_migration_snapshot' and grantee in ('PUBLIC','anon','authenticated')`))[0].n,0);
   assert.deepEqual((await query("select id, public from storage.buckets where id='notice-attachments'"))[0], { id: 'notice-attachments', public: false });
   assert.deepEqual((await query("select public,file_size_limit,allowed_mime_types from storage.buckets where id='notice-attachments'"))[0], { public: false, file_size_limit: 10485760, allowed_mime_types: ['application/pdf','image/jpeg','image/png','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/x-hwp','application/haansofthwp'] });
+  await db.exec('set role anon');
+  await denied(`select * from public.notice_attachments_migration_snapshot`);
+  await denied(`update public.notice_attachments_migration_snapshot set bucket_existed=false where bucket_id='notice-attachments'`);
+  await db.exec('reset role');
   await query(`insert into public.profiles values
     ('${staff}','직원','staff','진료',true,true),('${desk}','데스크','staff','데스크',true,true),
     ('${chief}','실장','chief','진료',true,true),('${owner}','원장','owner','원장',true,true),
@@ -84,13 +89,20 @@ try {
   await db.exec('set role authenticated');
 
   await as(staff);
-  await query(`insert into public.notices(title, author, author_id, attachments) values ('공지','위조 문자열','${staff}','[]'::jsonb)`);
+  await denied(`select * from public.notice_attachments_migration_snapshot`);
+  await denied(`update public.notice_attachments_migration_snapshot set bucket_existed=false where bucket_id='notice-attachments'`);
+  const insertStartedAt = new Date();
+  await query(`insert into public.notices(title, author, author_id, attachments, created_at, updated_at) values ('공지','위조 문자열','${staff}','[]'::jsonb,'2000-01-01','2000-01-01')`);
   assert.equal((await query("select author from public.notices where title='공지'"))[0].author, '직원');
+  const storedTimes = (await query("select created_at,updated_at from public.notices where title='공지'"))[0];
+  assert.ok(new Date(storedTimes.created_at) >= insertStartedAt);
+  assert.ok(new Date(storedTimes.updated_at) >= insertStartedAt);
   await denied(`insert into public.notices(title, author, author_id) values ('위조','직원','${chief}')`);
   await query(`update public.notices set author_id='${chief}' where title='공지'`);
   await query(`update public.notices set author='위조' where title='공지'`);
   await query(`update public.notices set created_at=now()+interval '1 day' where title='공지'`);
-  assert.deepEqual((await query(`select author_id='${staff}' id_ok,author='직원' author_ok,created_at<now()+interval '1 minute' created_ok from public.notices where title='공지'`))[0], { id_ok: true, author_ok: true, created_ok: true });
+  await query(`update public.notices set updated_at='2000-01-01' where title='공지'`);
+  assert.deepEqual((await query(`select author_id='${staff}' id_ok,author='직원' author_ok,created_at<now()+interval '1 minute' created_ok,updated_at>='${insertStartedAt.toISOString()}'::timestamptz updated_ok from public.notices where title='공지'`))[0], { id_ok: true, author_ok: true, created_ok: true, updated_ok: true });
   await query(`insert into storage.objects(bucket_id,name,owner_id,metadata) values ('notice-attachments','${staff}/tmp/a.pdf','${staff}','{"mimetype":"application/pdf","size":100}'::jsonb)`);
   assert.equal((await query("select count(*)::int n from storage.objects where bucket_id='notice-attachments'"))[0].n,1);
   await query(`delete from storage.objects where bucket_id='notice-attachments' and name='${staff}/tmp/a.pdf'`);

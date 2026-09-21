@@ -19,6 +19,12 @@ assert.match(sql, /drop policy if exists notices_insert_approvers on public\.not
   '기존 permissive 공지 INSERT 정책을 제거해야 한다');
 assert.match(sql, /create or replace function public\.guard_notice_immutable_fields/i,
   '공지 작성자·작성시각 불변 트리거가 필요하다');
+assert.match(sql, /new\.created_at\s*:=\s*now\(\).*new\.updated_at\s*:=\s*now\(\)/is,
+  '공지 INSERT 시각은 클라이언트 값 대신 서버 시각으로 고정해야 한다');
+assert.match(sql, /revoke all on table public\.notice_attachments_migration_snapshot from public, anon, authenticated/i,
+  '롤백 기준값 표는 일반 세션의 ACL 접근을 차단해야 한다');
+assert.match(sql, /alter table public\.notice_attachments_migration_snapshot enable row level security/i,
+  '롤백 기준값 표는 RLS 방어를 명시해야 한다');
 assert.match(sql, /file_size_limits*=s*10485760/i,
   '비공개 버킷은 서버에서 10MB 제한을 강제해야 한다');
 assert.match(sql, /allowed_mime_types/i,
