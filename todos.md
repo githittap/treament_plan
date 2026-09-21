@@ -1,7 +1,7 @@
 # todos — 내부 도구(T8/D) 작업 목록
 
 ## 🟡 Task 7 모바일 Push 로컬 기반 완료 — 운영 연결 대기 (2026-09-21)
-- `hr.html` 업무자료 내부의 준비 상태·내 구독 해제, `sw.js` push/notificationclick, 본인 active/approved RLS 초안을 로컬로 추가했다. `tests/push-notifications.test.js`의 Node VM 시험은 악성 URL·긴/비문자 payload, 동일 origin focus, 현재 endpoint 한 행 삭제, 구독 없음·DB 실패 메시지를 확인한다. `tests/sql/pglite-push-subscriptions.mjs`는 marker/객체 충돌, 재apply snapshot, rows/marker mismatch/dependency rollback, RLS, endpoint·JSON·timestamp를 검증하며 PGlite package root가 있는 환경에서 실행한다.
+- `hr.html` 업무자료 내부의 준비 상태·내 구독 해제, `sw.js` push/notificationclick, 본인 active/approved RLS 초안을 로컬로 추가했다. RLS 정책의 profile 상태 확인은 전체 `profiles` SELECT 대신 고정 `search_path`의 `security definer` helper를 호출하고, helper 실행은 authenticated에만 부여한다. `tests/push-notifications.test.js`의 Node VM 시험은 악성 URL·긴/비문자 payload, 동일 origin focus, 현재 endpoint 한 행 삭제, 구독 없음·DB 실패 메시지를 확인한다. `tests/sql/pglite-push-subscriptions.mjs`는 marker/객체 충돌, 재apply snapshot, rows/marker mismatch/dependency rollback, RLS, endpoint·JSON·timestamp를 검증한다.
 - VAPID·서버 발송·실제 기기 권한/구독·직원 발송·운영 migration은 미수행이며 별도 비용·자격증명·실기기 검증 후 진행한다.
 
 ## ✅ Task 6 공지 첨부·예치금 권한 분리 — Sol High 최종 PASS, 운영 적용 대기 (2026-09-21)
