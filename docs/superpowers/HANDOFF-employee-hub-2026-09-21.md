@@ -2,7 +2,7 @@
 
 - 갱신: 2026-09-21 Task 6 로컬 검증
 - 기능 배포 기준 커밋: `0f3226b` (직접 push 완료)
-- 이 인수인계의 최신 정본은 기록 커밋을 포함한 `origin/main` HEAD를 따른다. 현재 로컬 기록 커밋은 아직 `origin/main`에 포함하지 않는다.
+- 배포 정본은 `origin/main`=`4865f89`이고, 현재 로컬 HEAD는 Task 6 기능·시험·문서 커밋을 포함한다. 이 로컬 커밋들은 아직 push·배포하지 않는다.
 - 구현 worktree: `Z:\코딩 프로젝트(클로드 작업)\치료계획 코딩\treament_plan\.worktrees\calendar-ui-release`
 - 구현 브랜치: `codex/calendar-ui-release`
 - 기준 UI: `hr.html`; Task 6 SQL: `db/notice_attachments_deposit_access_draft.sql`; Task 6 합성시험: `tests/sql/pglite-notice-attachments-deposit-access.mjs`
@@ -54,7 +54,7 @@
 
 ## 보호·금지사항
 
-- `todos.md` 및 원본 ZIP·엑셀·실제 상담/환자/직원 행은 이 인수인계 작업에서 수정·복사·기록하지 않는다.
+- 원본 ZIP·엑셀·실제 상담/환자/직원 행은 이 인수인계 작업에서 수정·복사·기록하지 않는다.
 - 자격증명, 토큰, API 키, 실사용자 식별값을 저장소·문서·테스트 출력에 넣지 않는다.
 - 운영 DB의 schema/data, Storage, 인증 계정, 알림 서비스는 최초 ZIP의 승인 범위 안에서는 단계별 재승인 없이 변경할 수 있다. 단, 원본 삭제, 대량 이관/수정, 보안 완화, 새 비용, 자격증명 입력, 실제 직원 메일·push·알림, 외부 공개는 별도 승인을 받는다.
 - 부모 작업트리 `Z:\코딩 프로젝트(클로드 작업)\치료계획 코딩\treament_plan`은 사용자 작업이 섞여 있으므로 이 인수인계의 편집 대상이 아니다. 그 트리에만 있는 기존 구현계획 `docs/superpowers/plans/2026-09-20-employee-hub-zip-reconciliation.md`은 역사 원문으로 보존하고, 현재 배포 상태는 이 문서와 수용추적표를 우선한다.
