@@ -1,5 +1,12 @@
 # 직원허브 확정 결정
 
+## 최신 결정 — Sol High 4차 FAIL 보완 (2026-09-22)
+
+| 시각 | 결정 | 근거와 경계 |
+|---|---|---|
+| 2026-09-22 | 원본 rollback의 기존 데이터 보호 4건을 영구 회귀로 복원한다. | 4차 FAIL의 대상은 빈 DB, existing profile 없음, 유효 row, endpoint same-name CHECK(true)이며 targeted JSON CHECK 4종은 유지한다. 원본 `rollbackError(db)`의 정확 오류와 행/객체 보존을 검증하고 preflight 삭제 변형은 금지한다. |
+| 2026-09-22 | Task7/Task8 production은 독립 재검증 PASS 전 계속 미적용이다. | 이번 보완은 테스트·기록만이며 운영 DB, push, 배포를 수행하지 않는다. |
+
 ## 최신 결정 — Task6/7/8 운영 순서 (2026-09-22)
 
 | 시각 | 결정 | 근거와 경계 |

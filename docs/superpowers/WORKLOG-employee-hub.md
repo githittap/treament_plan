@@ -1,5 +1,11 @@
 # 직원허브 구현 기록
 
+## 2026-09-22 — Sol High 4차 FAIL 기존 데이터 보호 회귀 복원
+
+- Sol High 4차는 Important 1 FAIL: `4dec81f` targeted same-name JSON CHECK 4종은 PASS였지만, 기존 데이터 보호 회귀 4건이 삭제됐다. SQL 변경은 없다.
+- `pglite-push-subscriptions.mjs`에 원본 rollback으로 빈 DB 실제 `regprocedure` 오류·객체 없음, fresh(false) profile 오류·객체 보존, 유효 row 1건 오류·행/객체 보존, endpoint same-name CHECK(true)의 exact catalog mismatch 오류·객체 보존을 고정했다. preflight 삭제 변형은 사용하지 않는다.
+- 로컬 PGlite Task7/Task8/push 및 diff check 뒤에도 production apply/push/deploy는 수행하지 않는다.
+
 ## 2026-09-22 — Sol High 3차 FAIL 보존 및 4차 재검증 대기
 
 - Sol High 3차 재검증은 HEAD `771ccf5`에서 Important 1·Minor 1로 FAIL했다. 운영 SQL 새 결함은 없었으나 tests/sql `onlyJsonProbe`와 `checkBehaviorRollback`이 원본 rollback preflight를 제거해 정확한 목표 증거가 부족했고 기록이 과장됐다. 이전 FAIL 이력과 함께 보존한다.

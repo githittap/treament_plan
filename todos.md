@@ -2,6 +2,7 @@
 
 ## 최신 미완료 — Task6~8 운영 순서 (2026-09-22)
 
+- [x] Sol High 4차 재검증은 Important 1 FAIL: targeted same-name JSON CHECK 4종은 PASS였으나 빈 DB·existing profile 없음·유효 row·endpoint CHECK(true)의 기존 데이터/객체 보존 회귀 4건이 삭제됐다. 원본 rollback 경로의 정확 오류와 보존 시험을 복원했으며, 독립 재검증 PASS 전 Task7/Task8 production은 미적용이다.
 - [x] Task6 production migration `employee_hub_notice_attachments_deposit_access_20260921` 적용. `notices=1`·`deposits=264` 보존, private `notice-attachments` 10MB/6 MIME/objects=0 확인. Storage API 실제 업로드는 자격증명 부재로 미검증.
 - [x] Task7 첫 production apply는 fixed canonical mismatch로 transaction rollback됐으며 운영 변화 없음.
 - [x] Sol High 첫 독립 검증은 HEAD `39604f8`에서 Important 6건 FAIL. Task7 rollback `proconfig`·dotted endpoint·policy/JSON drift와 Task8 `applied_at` default/self-spoof·기록 과장을 보완 대상으로 고정.

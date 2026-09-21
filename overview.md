@@ -2,6 +2,7 @@
 
 ## 최신 실행 정본 (2026-09-22)
 
+- Sol High 4차 재검증은 핵심 targeted same-name JSON CHECK 4종은 PASS였지만, 빈 DB·기존 profile 없음·유효 row·endpoint CHECK(true)에서 원본 rollback이 기존 객체를 보존하는 영구 회귀 4건이 삭제되어 Important 1로 FAIL했다. 이 보완은 원본 `rollbackError(db)`와 fresh fixture로 정확 오류·행/객체 보존을 다시 고정하며, Task7/Task8 production은 계속 미적용이다.
 - Task6 production 완료: migration `employee_hub_notice_attachments_deposit_access_20260921`을 적용했다. 기존 `notices=1`, `deposits=264`는 보존했고, private `notice-attachments` 버킷은 10MB·6 MIME 제한으로 생성됐으며 객체 수는 0이다. Storage API 실제 업로드는 자격증명이 없어 미검증이다.
 - Task7 첫 production apply는 고정 canonical 불일치로 transaction rollback됐다. 운영 스키마·데이터 변화는 없다.
 - Sol High 첫 독립 검증은 HEAD `39604f8`에서 Important 6건으로 FAIL했다. Task7 원본 rollback `proconfig`, dotted endpoint, policy drift, JSON CHECK drift와 Task8 `applied_at` default/self-spoof, 기록 과장이 대상이다.
