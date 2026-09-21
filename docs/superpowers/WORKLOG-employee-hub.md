@@ -1,5 +1,11 @@
 # 직원허브 구현 기록
 
+## 2026-09-22 — Task9 메뉴 도움말 기록 반영
+
+- 기존 `hr.html` workdocs 탭 안의 직원 허브 사용 설명서·열기/닫기·메뉴별 안내·권한 차이를 확인했다. 새 상단탭이나 민감정보는 추가하지 않았다.
+- `tests/work-documents.test.js` 4/4, work-documents-guide 2/2, home-work-docs 1/1 PASS다. 통합 `node --test`의 spawn EPERM은 코드 실패가 아니다.
+- 다음은 Task10 역할별 단계배포·최종인수, 이어서 Task11 설명서다. `직원허브 5차.zip`은 미열람이고 `상담문의 등 일원화`는 별도 후속이다.
+
 ## 2026-09-22 — Task7·Task8 운영 migration 적용·검증
 
 - Task7 `employee_hub_push_subscriptions_v6_20260922`를 PG17.6에 적용했다. rows=0, RLS, policy 4개, trigger 1개, constraints 5개, canonical=`4f7a3ffc459b04e0a3c87ea8dfda8c28`, 관련 advisor 0건을 확인했다.

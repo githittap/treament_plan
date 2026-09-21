@@ -4,7 +4,8 @@
 
 - Task7 운영 migration `employee_hub_push_subscriptions_v6_20260922` 성공: PG17.6에서 rows=0, RLS, policy 4개, trigger 1개, constraints 5개, canonical=`4f7a3ffc459b04e0a3c87ea8dfda8c28` 및 관련 advisor 0건을 확인했다. 실제 직원 Push·실기기·VAPID는 미수행이다.
 - Task8 운영 migration `employee_hub_attendance_owner_chief_gate_20260922` 성공: marker 1건, FORCE RLS·역할 SELECT 없음, function `prosrc`=`08d9fa62fcc82616dd9f7cb3f8ebafac`, chief gate=true·old bypass=false, `attendance_manual_entries=8`·history=9 보존 및 Task7 canonical 유지를 확인했다. private marker의 no-policy INFO는 의도된 deny-all이다.
-- 다음 순서: Task9 메뉴 도움말 → Task10 단계배포·최종인수 → Task11 보고서·설명서. `직원허브 5차.zip`은 미열람이며 `상담문의 등 일원화`는 별도 후속이다. 실제 직원 Push는 계속 금지한다.
+- Task9 메뉴 도움말 완료: 기존 `hr.html` workdocs 탭 안의 직원 허브 사용 설명서·열기/닫기·메뉴별 안내·권한 차이를 확인했고 새 상단탭·민감정보는 없다. 정적 시험은 work-documents 4/4, guide 2/2, home-work-docs 1/1 PASS다. 통합 `node --test`의 spawn EPERM은 코드 실패가 아니다.
+- 다음 순서: Task10 역할별 단계배포·최종인수 → Task11 설명서. `직원허브 5차.zip`은 미열람이며 `상담문의 등 일원화`는 별도 후속이다. 실제 직원 Push는 계속 금지한다.
 - Sol High 6차 결과는 기능·전체 JS/PGlite 시험 PASS였으나, 기록에 `e607ff6`의 오류 8건 exact equality 보완이 빠져 Minor 1 FAIL했다. production은 미적용이며 다음은 Sol High 7차 최종 문서 대조 대기다.
 - Sol High 5차 독립검증은 기능·독립 시험은 PASS였으나 기록 미동기와 targeted JSON 4종/복원 4건 오류의 exact assertion 부재로 Minor 2 FAIL했다. `95c296d` 복원 이력은 유지하고, 실제 PGlite `Error.message`를 접두·접미까지 동등 비교로 고정했다. Task7/Task8 production은 미적용이며 Sol High 6차 재검증 대기다.
 - Sol High 4차 재검증은 핵심 targeted same-name JSON CHECK 4종은 PASS였지만, 빈 DB·기존 profile 없음·유효 row·endpoint CHECK(true)에서 원본 rollback이 기존 객체를 보존하는 영구 회귀 4건이 삭제되어 Important 1로 FAIL했다. 이 보완은 원본 `rollbackError(db)`와 fresh fixture로 정확 오류·행/객체 보존을 다시 고정하며, Task7/Task8 production은 계속 미적용이다.

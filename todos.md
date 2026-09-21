@@ -4,7 +4,8 @@
 
 - [x] Task7 migration `employee_hub_push_subscriptions_v6_20260922` 적용·검증: PG17.6, rows=0, RLS, policy 4개, trigger 1개, constraints 5개, canonical=`4f7a3ffc459b04e0a3c87ea8dfda8c28`, 관련 advisor 0건.
 - [x] Task8 migration `employee_hub_attendance_owner_chief_gate_20260922` 적용·검증: marker 1건, FORCE RLS·역할 SELECT 없음, `prosrc=08d9fa62fcc82616dd9f7cb3f8ebafac`, chief gate=true·old bypass=false, 수기근태 `entries=8`·history=9 보존, Task7 canonical 유지. private marker no-policy INFO는 의도된 deny-all.
-- [ ] 다음: Task9 메뉴 도움말 → Task10 단계배포·최종인수 → Task11 보고서·설명서.
+- [x] Task9 메뉴 도움말: 기존 `hr.html` workdocs 탭의 사용 설명서·열기/닫기·메뉴별 안내·권한 차이를 확인했다. 새 상단탭·민감정보 없음, work-documents 4/4·guide 2/2·home-work-docs 1/1 PASS. 통합 `node --test` spawn EPERM은 코드 실패가 아니다.
+- [ ] 다음: Task10 역할별 단계배포·최종인수 → Task11 설명서.
 - [ ] 실제 직원 Push·실기기·VAPID는 미수행이며 계속 금지한다. `직원허브 5차.zip`은 미열람, `상담문의 등 일원화`는 별도 후속이다.
 
 ## 과거 미완료 — Task6~8 운영 순서 (2026-09-22)
