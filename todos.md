@@ -4,9 +4,10 @@
 
 - [x] Task6 production migration `employee_hub_notice_attachments_deposit_access_20260921` 적용. `notices=1`·`deposits=264` 보존, private `notice-attachments` 10MB/6 MIME/objects=0 확인. Storage API 실제 업로드는 자격증명 부재로 미검증.
 - [x] Task7 첫 production apply는 fixed canonical mismatch로 transaction rollback됐으며 운영 변화 없음.
-- [x] Task7 v5 로컬 완결: `6941111` → `448bcc2` → `72c4749` → `1b2e36b`; exact catalog/behavior/fail-closed PGlite와 push static PASS.
-- [x] Task8 로컬 보완: `373e829`; Task7 v5 상수·identity·private allowlist, marker exact shape·negative matrix 보강 및 Task8/Task7 PGlite PASS.
-- [ ] Sol High 독립 검증 PASS 후 Task7 운영 apply/verify를 수행한다.
+- [x] Sol High 첫 독립 검증은 HEAD `39604f8`에서 Important 6건 FAIL. Task7 rollback `proconfig`·dotted endpoint·policy/JSON drift와 Task8 `applied_at` default/self-spoof·기록 과장을 보완 대상으로 고정.
+- [x] Task7 v6 `fa61fb2`: fingerprint/manifest/hash/MD5 갱신, 원본 apply→rollback·dotted endpoint·policy exact·JSON behavior gate 보강, 상위 재실행 PASS.
+- [x] Task8 `77d0f11`·`33d8491`·`2ad9341`: v6 동기화·default 의미 gate·new `prosrc` MD5·marker+identity 동시 self-spoof 음성시험 추가, 상위 재실행 Task7/Task8/push PASS.
+- [ ] 같은 Sol High 재검증 PASS 후에만 Task7 운영 apply/verify를 수행한다. 현재 Task7/Task8 production 미적용.
 - [ ] Task7 운영 검증 뒤 Task8 운영 apply/verify를 수행하고, 그 다음 승인된 단계배포·실사이트 확인을 한다.
 - [ ] 실제 직원 메일·Push·생체입력, 자격증명 입력, 원본 삭제, 대량 이관, 보안 완화, 새 비용은 수행하지 않는다. `직원허브 5차.zip`은 최초 승인 범위 완료 후에만 읽고, `상담문의 등 일원화.zip`은 직원허브 전체 후속으로 남긴다.
 

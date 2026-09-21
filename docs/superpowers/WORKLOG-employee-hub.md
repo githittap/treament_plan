@@ -1,5 +1,12 @@
 # 직원허브 구현 기록
 
+## 2026-09-22 — Sol High 첫 FAIL 보존 및 v6 로컬 보완
+
+- Sol High 첫 독립 검증은 HEAD `39604f8`에서 Important 6건 FAIL했다. Task7은 원본 rollback `proconfig`, dotted endpoint, policy drift, JSON CHECK drift이고 Task8은 `applied_at` default/self-spoof 및 기록 과장이다. 이 FAIL 이력은 삭제하지 않는다.
+- Task7 보완 `fa61fb2`: v6 fingerprint `task7-push-v6-catalog`, manifest `push-v6-catalog-20260922`, SHA256 `b0cd63d9427445de8f2a03113dddd7bc6251cc9667a8655d160cf59512f0d3ff`, semantic MD5 `e4f10430874631e3ca0a9ed1423384d1`, snapshot MD5 `8774aede303f69fccd80680d8e283c4b`을 고정했다. 원본 apply→rollback, dotted endpoint, policy exact gate, JSON behavior gate를 추가했고 상위 재실행은 PASS다.
+- Task8 보완 `77d0f11`·`33d8491`·`2ad9341`: Task7 v6 동기화, `now/current_timestamp` default 의미 gate, 독립 new `prosrc` MD5 `08d9fa62fcc82616dd9f7cb3f8ebafac`, marker+identity 동시 self-spoof 음성시험을 추가했다. 상위 재실행 Task7/Task8/push는 PASS다.
+- 최종 판정은 Sol High 재검증 대기다. 로컬 회귀 PASS를 독립 검증 PASS나 production 완료로 바꾸지 않는다. 같은 Sol 재검증 PASS 후에만 Task7 운영 apply/verify, Task8 운영 apply/verify 및 승인된 단계배포·실사이트 확인으로 진행한다. production은 미적용이다.
+
 ## 2026-09-22 — Task6 production 완료 및 Task7/8 운영 전 최신화
 
 - Task6 production migration `employee_hub_notice_attachments_deposit_access_20260921`을 적용했다. 적용 전 보존 기준 `notices=1`, `deposits=264`는 유지됐다. private `notice-attachments` 버킷은 10MB·6 MIME 제한이며 objects=0이다. Storage API 실제 업로드는 자격증명이 없어 실행·검증하지 않았다.

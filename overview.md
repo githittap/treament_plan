@@ -4,9 +4,10 @@
 
 - Task6 production 완료: migration `employee_hub_notice_attachments_deposit_access_20260921`을 적용했다. 기존 `notices=1`, `deposits=264`는 보존했고, private `notice-attachments` 버킷은 10MB·6 MIME 제한으로 생성됐으며 객체 수는 0이다. Storage API 실제 업로드는 자격증명이 없어 미검증이다.
 - Task7 첫 production apply는 고정 canonical 불일치로 transaction rollback됐다. 운영 스키마·데이터 변화는 없다.
-- Task7 v5 로컬 완결 커밋은 `6941111`, `448bcc2`, `72c4749`, `1b2e36b`다. 현재 fingerprint=`task7-push-v5-catalog`, manifest=`push-v5-catalog-20260922`, SHA256=`ae2606f243d91400b15624dbc9113ae3e6187ed03b7eef6d213d37f56799b53e`, MD5=`8179b7fed8536fe0516a0b29109f1728`이며 PGlite exact catalog/behavior/fail-closed와 push static 검증을 통과했다. 운영에는 아직 적용하지 않았다.
-- Task8 로컬 보완 커밋은 `373e829`다. Task7 v5 상수·identity·private allowlist, marker exact shape 및 negative matrix를 보강했고 Task8/Task7 PGlite가 PASS했다. 운영에는 아직 적용하지 않았다.
-- 다음 순서: Sol High 독립 검증 PASS → Task7 운영 apply/verify → Task8 운영 apply/verify → 승인된 단계배포·실사이트 확인. 실제 직원 메일·Push·생체입력, 자격증명 입력, 원본 삭제, 대량 이관, 보안 완화, 새 비용은 금지한다. `직원허브 5차.zip`은 최초 승인 범위 완료 뒤에만 읽으며 `상담문의 등 일원화.zip`은 직원허브 전체 후속이다.
+- Sol High 첫 독립 검증은 HEAD `39604f8`에서 Important 6건으로 FAIL했다. Task7 원본 rollback `proconfig`, dotted endpoint, policy drift, JSON CHECK drift와 Task8 `applied_at` default/self-spoof, 기록 과장이 대상이다.
+- Task7 v6 보완 `fa61fb2`: fingerprint=`task7-push-v6-catalog`, manifest=`push-v6-catalog-20260922`, SHA256=`b0cd63d9427445de8f2a03113dddd7bc6251cc9667a8655d160cf59512f0d3ff`, semantic MD5=`e4f10430874631e3ca0a9ed1423384d1`, snapshot MD5=`8774aede303f69fccd80680d8e283c4b`로 갱신했다. 원본 apply→rollback, dotted endpoint, policy exact·JSON behavior gate를 추가했고 상위 재실행은 PASS다.
+- Task8 보완 `77d0f11`, `33d8491`, `2ad9341`: v6 동기화, `now/current_timestamp` default 의미 gate, 독립 new `prosrc` MD5=`08d9fa62fcc82616dd9f7cb3f8ebafac`, marker+identity 동시 self-spoof 음성시험을 추가했다. 상위 재실행 Task7/Task8/push는 PASS다.
+- 최종 상태는 **Sol High 재검증 대기**이며 Task7/Task8 production 미적용이다. 다음은 같은 Sol 재검증 PASS 후에만 Task7 운영 apply/verify → Task8 운영 apply/verify → 승인된 단계배포·실사이트 확인이다. 실제 직원 메일·Push·생체입력, 자격증명 입력, 원본 삭제, 대량 이관, 보안 완화, 새 비용은 금지한다. `직원허브 5차.zip`은 최초 승인 범위 완료 뒤에만 읽으며 `상담문의 등 일원화.zip`은 직원허브 전체 후속이다.
 
 ## 재부팅 정본 (2026-09-21)
 
