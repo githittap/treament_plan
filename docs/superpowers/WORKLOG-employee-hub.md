@@ -1,5 +1,10 @@
 # 직원허브 구현 기록
 
+## 2026-09-22 — Sol High 8차 문서 대조 Minor 2 보존
+
+- Sol High 8차 문서 대조는 Minor 2 FAIL로 기록하며, production apply, push, deploy는 계속 미수행이다.
+- 다음 순서는 Sol High 9차 PASS → Supabase PG17 읽기 전용 preflight → Task7 apply/verify → Task8 apply/verify다.
+
 ## 2026-09-22 — Sol High 7차 Minor 1 stale 문서 보완
 
 - Sol High 7차 코드 안전성은 PASS였으나 overview/todos의 6차 대기 두 줄이 stale이라 Minor 1 FAIL했다. 코드·시험·SQL은 변경하지 않는다.

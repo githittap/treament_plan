@@ -16,7 +16,7 @@
 - [x] `a521d1b`: dot escape 1개·FCM/Mozilla dotted 허용시험, JSON drift 4종의 독립 fresh fixture/목표 probe와 rollback reject·객체 보존을 보강. 상위 재실행 Task7/Task8/push PASS.
 - [x] Sol High 3차 재검증은 HEAD `771ccf5`에서 Important 1·Minor 1 FAIL. 운영 SQL 새 결함은 없고 tests/sql 원본 rollback preflight 제거·정확 목표 증거 부족·기록 과장을 보완 대상으로 고정.
 - [x] `4dec81f`: preflight 삭제 변형 제거, same-name targeted CHECK 4종의 원본 `rollbackError(db)`·정확 오류·private schema/public table 보존을 보강. 상위 Task7/Task8/push PASS.
-- [x] Sol High 4차 재검증은 Important 1 FAIL로 종료됐고 `95c296d`가 기존 데이터 보호 회귀를 복원했다. 현재 Task7/Task8 production 미적용이며, 운영 apply 조건은 위 Sol High 6차 PASS로 대체한다.
+- [x] Sol High 4차 재검증은 Important 1 FAIL로 종료됐고 `95c296d`가 기존 데이터 보호 회귀를 복원했다. 현재 Task7/Task8 production 미적용이며, 운영 apply 조건은 Sol High 9차 최종 문서 대조 PASS 후 Supabase PG17 읽기 전용 preflight 통과로 대체한다.
 - [ ] Task7 운영 검증 뒤 Task8 운영 apply/verify를 수행하고, 그 다음 승인된 단계배포·실사이트 확인을 한다.
 - [ ] 실제 직원 메일·Push·생체입력, 자격증명 입력, 원본 삭제, 대량 이관, 보안 완화, 새 비용은 수행하지 않는다. `직원허브 5차.zip`은 최초 승인 범위 완료 후에만 읽고, `상담문의 등 일원화.zip`은 직원허브 전체 후속으로 남긴다.
 
