@@ -31,8 +31,10 @@ assert.match(html, /noticeAttachmentLinks\(/,
   '공지 렌더는 첨부 목록을 별도로 표시해야 한다');
 assert.match(html, /downloadNoticeAttachment\(/,
   '첨부 열람은 private Storage download 경로를 사용해야 한다');
-assert.match(html, /removeUploadedNoticeAttachments\(/,
+assert.match(html, /cleanupNoticeUploads\(/,
   '공지 저장 실패·부분 업로드는 이번 요청의 임시 객체만 정리해야 한다');
+assert.match(sql, /notice_attachments_delete_own_tmp/i,
+  '업로더 본인의 임시 첨부만 삭제하는 Storage DELETE 정책이 필요하다');
 assert.match(sql, /deposits_select_desk_lead/,
   '예치금 조회 RLS가 공지 작성 RLS와 분리되어야 한다');
 assert.match(sql, /p\.dept='데스크'.*p\.role in \('chief','owner'\)/s,

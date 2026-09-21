@@ -1,6 +1,8 @@
 -- Task 6: 공지 첨부와 예치금 조회를 분리한다. 기존 공지·입금 행은 변경하지 않는다.
 -- 운영 적용 전 정책·버킷 설정·notices 행·notice-attachments 객체 수를 스냅샷하고 백업·롤백 경로와 역할별 시험을 확인한다.
 -- 실제 첨부가 생긴 뒤에는 파괴적 롤백을 실행하지 말고 데이터 보존 판단을 먼저 받는다.
+create table if not exists public.notice_attachments_migration_snapshot (bucket_id text primary key,bucket_existed boolean not null,public boolean,file_size_limit bigint,allowed_mime_types text[]);
+insert into public.notice_attachments_migration_snapshot(bucket_id,bucket_existed,public,file_size_limit,allowed_mime_types) select 'notice-attachments',b.id is not null,b.public,b.file_size_limit,b.allowed_mime_types from (select 1) x left join storage.buckets b on b.id='notice-attachments' on conflict (bucket_id) do nothing;
 insert into storage.buckets (id,name,public,file_size_limit,allowed_mime_types) values ('notice-attachments','notice-attachments',false,10485760,array['application/pdf','image/jpeg','image/png','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/x-hwp','application/haansofthwp']) on conflict (id) do update set public=false,file_size_limit=10485760,allowed_mime_types=excluded.allowed_mime_types;
 alter table public.notices add column if not exists author_id uuid references public.profiles(user_id);
 alter table public.notices add column if not exists attachments jsonb not null default '[]'::jsonb;
@@ -19,6 +21,8 @@ drop policy if exists notice_attachments_select_authenticated on storage.objects
 create policy notice_attachments_select_authenticated on storage.objects for select to authenticated using (bucket_id='notice-attachments' and exists (select 1 from public.profiles p where p.user_id=auth.uid() and p.active and p.approved));
 drop policy if exists notice_attachments_insert_authenticated on storage.objects;
 create policy notice_attachments_insert_authenticated on storage.objects for insert to authenticated with check (bucket_id='notice-attachments' and exists (select 1 from public.profiles p where p.user_id=auth.uid() and p.active and p.approved) and (storage.foldername(name))[1]=auth.uid()::text and (storage.foldername(name))[2]='tmp' and array_length(storage.foldername(name),1)=3 and coalesce(metadata->>'mimetype','')=any(array['application/pdf','image/jpeg','image/png','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/x-hwp','application/haansofthwp']) and coalesce((metadata->>'size')::bigint,10485761)<=10485760);
+drop policy if exists notice_attachments_delete_own_tmp on storage.objects;
+create policy notice_attachments_delete_own_tmp on storage.objects for delete to authenticated using (bucket_id='notice-attachments' and exists (select 1 from public.profiles p where p.user_id=auth.uid() and p.active and p.approved) and (storage.foldername(name))[1]=auth.uid()::text and (storage.foldername(name))[2]='tmp' and array_length(storage.foldername(name),1)=3);
 alter table public.deposits enable row level security;
 drop policy if exists deposits_select_active on public.deposits;
 drop policy if exists deposits_select_desk_lead on public.deposits;
