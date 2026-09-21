@@ -1,0 +1,10 @@
+const assert=require('node:assert/strict'),fs=require('node:fs');
+const html=fs.readFileSync('hr.html','utf8'),sw=fs.readFileSync('sw.js','utf8'),sql=fs.readFileSync('db/push_subscriptions_draft.sql','utf8');
+assert.match(html,/pushNotificationCard\(/,'기존 화면 안에 Push 상태 카드가 있어야 한다');
+assert.match(html,/push_subscriptions/,'구독 해제는 본인 구독 행만 대상으로 해야 한다');
+assert.match(html,/PUSH_VAPID_PUBLIC_KEY/,'VAPID 키 없이 실제 구독을 시작하지 않아야 한다');
+assert.match(sw,/addEventListener\('push'/,'서비스워커는 push 수신을 처리해야 한다');
+assert.match(sw,/addEventListener\('notificationclick'/,'서비스워커는 notificationclick을 안전하게 처리해야 한다');
+assert.match(sql,/create table if not exists public\.push_subscriptions/i,'구독 테이블 초안이 필요하다');
+assert.match(sql,/auth\.uid\(\)/i,'RLS는 본인 구독으로 한정해야 한다');
+console.log('PUSH_NOTIFICATIONS_STATIC_PASS');
