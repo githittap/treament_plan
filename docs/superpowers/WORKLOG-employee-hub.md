@@ -1,5 +1,11 @@
 # 직원허브 구현 기록
 
+## 2026-09-22 — Task7·Task8 운영 migration 적용·검증
+
+- Task7 `employee_hub_push_subscriptions_v6_20260922`를 PG17.6에 적용했다. rows=0, RLS, policy 4개, trigger 1개, constraints 5개, canonical=`4f7a3ffc459b04e0a3c87ea8dfda8c28`, 관련 advisor 0건을 확인했다.
+- Task8 `employee_hub_attendance_owner_chief_gate_20260922`를 적용했다. marker=1, FORCE RLS·역할 SELECT 없음, `prosrc=08d9fa62fcc82616dd9f7cb3f8ebafac`, chief gate=true·old bypass=false, `attendance_manual_entries=8`·history=9 보존 및 Task7 canonical 유지를 확인했다. private marker no-policy INFO는 의도된 deny-all이다.
+- 다음은 Task9 메뉴 도움말 → Task10 단계배포·최종인수 → Task11 보고서·설명서다. 실제 직원 Push·실기기·VAPID, `직원허브 5차.zip` 열람, `상담문의 등 일원화` 작업은 이번 범위에 없다.
+
 ## 2026-09-22 — Sol High 8차 문서 대조 Minor 2 보존
 
 - Sol High 8차 문서 대조는 Minor 2 FAIL로 기록하며, production apply, push, deploy는 계속 미수행이다.

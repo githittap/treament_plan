@@ -1,5 +1,12 @@
 # 직원허브 확정 결정
 
+## 최신 결정 — Task7·Task8 운영 완료 후속 순서 (2026-09-22)
+
+| 시각 | 결정 | 근거와 경계 |
+|---|---|---|
+| 2026-09-22 | Task7·Task8 운영 migration을 완료 상태로 기록한다. | Task7 `employee_hub_push_subscriptions_v6_20260922`: PG17.6, rows=0, RLS, policy 4개, trigger 1개, constraints 5개, canonical `4f7a3ffc459b04e0a3c87ea8dfda8c28`, advisor 0건. Task8 `employee_hub_attendance_owner_chief_gate_20260922`: marker 1건, FORCE RLS·역할 SELECT 없음, `prosrc=08d9fa62fcc82616dd9f7cb3f8ebafac`, chief gate=true·old bypass=false, entries=8·history=9 보존, Task7 canonical 유지. private marker no-policy INFO는 deny-all 의도다. |
+| 2026-09-22 | 다음 작업은 Task9 → Task10 → Task11 순서로 한다. | Task9 메뉴 도움말 → Task10 단계배포·최종인수 → Task11 보고서·설명서. 실제 직원 Push·실기기·VAPID는 미수행·금지, `직원허브 5차.zip`은 미열람, `상담문의 등 일원화`는 별도 후속이다. |
+
 ## 최신 결정 — Sol High 7차 Minor 1 stale 문서 보완 (2026-09-22)
 
 | 시각 | 결정 | 근거와 경계 |

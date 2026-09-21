@@ -1,9 +1,16 @@
 # todos — 내부 도구(T8/D) 작업 목록
 
-## 최신 미완료 — Task6~8 운영 순서 (2026-09-22)
+## 최신 상태 — Task7·Task8 운영 완료 (2026-09-22)
+
+- [x] Task7 migration `employee_hub_push_subscriptions_v6_20260922` 적용·검증: PG17.6, rows=0, RLS, policy 4개, trigger 1개, constraints 5개, canonical=`4f7a3ffc459b04e0a3c87ea8dfda8c28`, 관련 advisor 0건.
+- [x] Task8 migration `employee_hub_attendance_owner_chief_gate_20260922` 적용·검증: marker 1건, FORCE RLS·역할 SELECT 없음, `prosrc=08d9fa62fcc82616dd9f7cb3f8ebafac`, chief gate=true·old bypass=false, 수기근태 `entries=8`·history=9 보존, Task7 canonical 유지. private marker no-policy INFO는 의도된 deny-all.
+- [ ] 다음: Task9 메뉴 도움말 → Task10 단계배포·최종인수 → Task11 보고서·설명서.
+- [ ] 실제 직원 Push·실기기·VAPID는 미수행이며 계속 금지한다. `직원허브 5차.zip`은 미열람, `상담문의 등 일원화`는 별도 후속이다.
+
+## 과거 미완료 — Task6~8 운영 순서 (2026-09-22)
 
 - [x] `e607ff6`은 targeted JSON 4종/복원 4건 오류를 전체 문자열 exact equality로 고정했고 전체 JS/PGlite가 PASS했다. Sol High 6차는 이 커밋의 기록 미기재로 Minor 1 FAIL했으며 production은 미적용이다.
-- [ ] 최종 독립 대조 PASS 후 Supabase PG17 읽기 전용 preflight → Task7 apply/verify → Task8 apply/verify. 현재 Task7/Task8 production 미적용.
+- [x] 최종 독립 대조·PG17 읽기 전용 preflight 뒤 Task7 apply/verify → Task8 apply/verify를 완료했다. 상세 운영 증거와 현 상태는 위 최신 상태를 따른다.
 - [x] Sol High 5차 독립검증은 기능·독립 시험 PASS이나 기록 미동기와 targeted JSON 4종/복원 4건의 exact assertion 부재로 Minor 2 FAIL. `95c296d`의 4차 복원은 보존하고 PGlite `Error.message` 전체 동등 비교로 보완했다.
 - [x] Sol High 7차는 코드 안전성 PASS이나 overview/todos의 6차 대기 두 줄 stale로 Minor 1 FAIL했다. 이 기록 수정 후 8차 최종 문서 대조 대기이며 production은 미적용이다.
 - [x] Sol High 4차 재검증은 Important 1 FAIL: targeted same-name JSON CHECK 4종은 PASS였으나 빈 DB·existing profile 없음·유효 row·endpoint CHECK(true)의 기존 데이터/객체 보존 회귀 4건이 삭제됐다. 원본 rollback 경로의 정확 오류와 보존 시험을 복원했으며, 독립 재검증 PASS 전 Task7/Task8 production은 미적용이다.
@@ -17,7 +24,7 @@
 - [x] Sol High 3차 재검증은 HEAD `771ccf5`에서 Important 1·Minor 1 FAIL. 운영 SQL 새 결함은 없고 tests/sql 원본 rollback preflight 제거·정확 목표 증거 부족·기록 과장을 보완 대상으로 고정.
 - [x] `4dec81f`: preflight 삭제 변형 제거, same-name targeted CHECK 4종의 원본 `rollbackError(db)`·정확 오류·private schema/public table 보존을 보강. 상위 Task7/Task8/push PASS.
 - [x] Sol High 4차 재검증은 Important 1 FAIL로 종료됐고 `95c296d`가 기존 데이터 보호 회귀를 복원했다. 현재 Task7/Task8 production 미적용이며, 운영 apply 조건은 '최종 독립 대조 PASS 후 Supabase PG17 읽기 전용 preflight → Task7 apply/verify → Task8 apply/verify'로 통일한다.
-- [ ] Task7 운영 검증 뒤 Task8 운영 apply/verify를 수행하고, 그 다음 승인된 단계배포·실사이트 확인을 한다.
+- [x] Task7 운영 검증 뒤 Task8 운영 apply/verify를 완료했다. 단계배포·최종인수는 위 Task10 후속으로 분리한다.
 - [ ] 실제 직원 메일·Push·생체입력, 자격증명 입력, 원본 삭제, 대량 이관, 보안 완화, 새 비용은 수행하지 않는다. `직원허브 5차.zip`은 최초 승인 범위 완료 후에만 읽고, `상담문의 등 일원화.zip`은 직원허브 전체 후속으로 남긴다.
 
 ## 재부팅 정본 (2026-09-21)

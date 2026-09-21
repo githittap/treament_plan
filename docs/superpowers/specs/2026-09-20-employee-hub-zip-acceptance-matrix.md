@@ -1,5 +1,9 @@
 # 직원허브 ZIP 근무표 수용 추적표
 
+## 최신 승계 표식 — Task7·Task8 운영 완료 (2026-09-22)
+
+Task7 `employee_hub_push_subscriptions_v6_20260922`와 Task8 `employee_hub_attendance_owner_chief_gate_20260922`의 운영 적용·검증을 완료했다. Task7은 PG17.6 rows=0, RLS, policy 4개, trigger 1개, constraints 5개, canonical=`4f7a3ffc459b04e0a3c87ea8dfda8c28`, advisor 0건이다. Task8은 marker=1, FORCE RLS·역할 SELECT 없음, `prosrc=08d9fa62fcc82616dd9f7cb3f8ebafac`, chief gate=true·old bypass=false, entries=8·history=9 보존 및 Task7 canonical 유지다. 실제 직원 Push·실기기·VAPID는 미수행·금지이며 `직원허브 5차.zip`은 미열람이다. 다음은 Task9 메뉴 도움말 → Task10 단계배포·최종인수 → Task11 보고서·설명서다.
+
 ## Task 6 최신 수용 게이트 — Sol High FAIL (2026-09-21)
 
 Task 6은 **로컬 구현 있으나 최종 Sol High FAIL·배포 차단**이다. 기존 수용·배포 이력은 보존하며 이 게이트를 최신 상태로 적용한다.
