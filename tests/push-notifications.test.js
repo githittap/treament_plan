@@ -4,6 +4,7 @@ assert.match(html,/pushNotificationCard\(/,'기존 화면 안에 Push 상태 카
 assert.match(html,/push_subscriptions/,'구독 해제는 본인 구독 행만 대상으로 해야 한다');
 assert.match(html,/PUSH_VAPID_PUBLIC_KEY/,'VAPID 키 없이 실제 구독을 시작하지 않아야 한다');
 assert.match(html,/pushManager\.getSubscription\(\).*unsubscribe\(\)/s,'해제는 브라우저 구독부터 안전하게 처리해야 한다');
+assert.match(html,/\.eq\('endpoint',subscription\.endpoint\)/,'해제는 현재 브라우저 endpoint 한 건만 삭제해야 한다');
 assert.match(sw,/addEventListener\('push'/,'서비스워커는 push 수신을 처리해야 한다');
 assert.match(sw,/addEventListener\('notificationclick'/,'서비스워커는 notificationclick을 안전하게 처리해야 한다');
 assert.match(sw,/new URL\(/,'외부·비정상 URL은 origin/path 검증해야 한다');
@@ -11,7 +12,9 @@ assert.match(sw,/slice\(0,200\)/,'알림 문자열 길이는 제한해야 한다
 assert.match(sql,/create table if not exists public\.push_subscriptions/i,'구독 테이블 초안이 필요하다');
 assert.match(sql,/auth\.uid\(\)/i,'RLS는 본인 구독으로 한정해야 한다');
 assert.match(sql,/unique\(user_id,endpoint\)/i,'사용자별 여러 기기를 허용하되 같은 endpoint 중복은 막아야 한다');
+assert.match(sql,/endpoint text not null unique/i,'endpoint는 전역 단일 소유여야 한다');
 assert.match(sql,/subscription->>'endpoint'=endpoint/i,'구독 JSON endpoint는 열 값과 일치해야 한다');
 assert.match(sql,/begin;[\s\S]*commit;/i,'초안은 단일 트랜잭션이어야 한다');
+assert.match(sql,/migration object collision; preserve state and stop/i,'기존 동명 객체는 fail-closed 해야 한다');
 assert.match(rollback,/push subscriptions exist; preserve data and stop rollback/i,'rollback은 구독 행이 있으면 fail-closed 해야 한다');
 console.log('PUSH_NOTIFICATIONS_STATIC_PASS');
