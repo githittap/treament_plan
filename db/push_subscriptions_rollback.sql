@@ -1,0 +1,10 @@
+begin;
+do $$ begin if exists (select 1 from public.push_subscriptions) then raise exception 'push subscriptions exist; preserve data and stop rollback'; end if; end $$;
+drop trigger if exists guard_push_subscription_timestamps on public.push_subscriptions;
+drop function if exists public.guard_push_subscription_timestamps();
+drop policy if exists push_subscriptions_select_own on public.push_subscriptions;
+drop policy if exists push_subscriptions_insert_own on public.push_subscriptions;
+drop policy if exists push_subscriptions_update_own on public.push_subscriptions;
+drop policy if exists push_subscriptions_delete_own on public.push_subscriptions;
+drop table if exists public.push_subscriptions;
+commit;
