@@ -1,5 +1,11 @@
 # 직원허브 구현 기록
 
+## 2026-09-22 — Sol High 6차 Minor 1 기록 동기화
+
+- `e607ff6`은 targeted JSON 4종·`95c296d` 복원 4건의 PGlite 오류를 전체 문자열 exact equality로 고정했다. 전체 JS·PGlite 시험은 PASS했다.
+- Sol High 6차는 기능·전체 시험 PASS이나 이 보완 커밋의 기록 누락으로 Minor 1 FAIL했다. 코드·시험·SQL 변경 없이 기록만 동기화한다.
+- production apply, push, deploy는 수행하지 않았고 Sol High 7차 최종 문서 대조 대기다.
+
 ## 2026-09-22 — Sol High 5차 Minor 2 exact assertion 보완
 
 - Sol High 5차 독립검증은 기능·독립 시험 PASS, 기록 미동기와 partial match로 Minor 2 FAIL했다. 4차 FAIL 및 `95c296d`의 기존 데이터 보호 회귀 복원 이력은 삭제하지 않는다.

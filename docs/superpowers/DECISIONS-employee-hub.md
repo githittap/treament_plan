@@ -1,5 +1,12 @@
 # 직원허브 확정 결정
 
+## 최신 결정 — Sol High 6차 Minor 1 기록 동기화 (2026-09-22)
+
+| 시각 | 결정 | 근거와 경계 |
+|---|---|---|
+| 2026-09-22 | `e607ff6`의 exact equality·전체 시험 PASS를 기록 정본에 반영한다. | 6차는 기능·전체 시험 PASS였으나 이 커밋의 기록 미기재로 Minor 1 FAIL했다. 이번 변경은 기록-only다. |
+| 2026-09-22 | Task7/Task8 production은 Sol High 7차 최종 문서 대조 PASS 전 미적용이다. | 운영 DB/apply, push, deploy는 이번 범위 밖이다. |
+
 ## 최신 결정 — Sol High 5차 Minor 2 보완 (2026-09-22)
 
 | 시각 | 결정 | 근거와 경계 |

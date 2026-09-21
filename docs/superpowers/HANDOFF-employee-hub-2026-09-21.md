@@ -1,5 +1,11 @@
 # 직원허브 현재 인수인계
 
+## 최신 인계 — Sol High 6차 Minor 1 기록 보완, 7차 최종 문서 대조 대기 (2026-09-22)
+
+- `e607ff6`은 PGlite `Error.message`의 오류 8건을 exact equality로 고정했고 전체 JS/PGlite 시험은 PASS했다.
+- Sol High 6차는 기능·전체 시험 PASS였으나 해당 커밋이 기록에 반영되지 않아 Minor 1 FAIL했다. 이번 기록-only 보완은 그 누락만 해소하며 코드·시험·SQL은 수정하지 않는다.
+- Task7/Task8 production은 미적용이고, 다음은 Sol High 7차 최종 문서 대조다.
+
 ## 최신 인계 — Sol High 5차 Minor 2 보완, 6차 재검증 대기 (2026-09-22)
 
 - Sol High 5차 독립검증은 기능·독립 시험은 PASS였으나 기록 미동기와 targeted JSON 4종 및 `95c296d` 복원 4건의 오류가 부분 match여서 Minor 2 FAIL했다.

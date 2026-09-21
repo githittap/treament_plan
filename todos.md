@@ -2,6 +2,8 @@
 
 ## 최신 미완료 — Task6~8 운영 순서 (2026-09-22)
 
+- [x] `e607ff6`은 targeted JSON 4종/복원 4건 오류를 전체 문자열 exact equality로 고정했고 전체 JS/PGlite가 PASS했다. Sol High 6차는 이 커밋의 기록 미기재로 Minor 1 FAIL했으며 production은 미적용이다.
+- [ ] Sol High 7차 최종 문서 대조 PASS 후에만 Task7 운영 apply/verify를 수행한다. 현재 Task7/Task8 production 미적용.
 - [x] Sol High 5차 독립검증은 기능·독립 시험 PASS이나 기록 미동기와 targeted JSON 4종/복원 4건의 exact assertion 부재로 Minor 2 FAIL. `95c296d`의 4차 복원은 보존하고 PGlite `Error.message` 전체 동등 비교로 보완했다.
 - [ ] Sol High 6차 재검증 PASS 후에만 Task7 운영 apply/verify를 수행한다. 현재 Task7/Task8 production 미적용.
 - [x] Sol High 4차 재검증은 Important 1 FAIL: targeted same-name JSON CHECK 4종은 PASS였으나 빈 DB·existing profile 없음·유효 row·endpoint CHECK(true)의 기존 데이터/객체 보존 회귀 4건이 삭제됐다. 원본 rollback 경로의 정확 오류와 보존 시험을 복원했으며, 독립 재검증 PASS 전 Task7/Task8 production은 미적용이다.
