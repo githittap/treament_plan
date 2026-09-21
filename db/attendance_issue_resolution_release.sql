@@ -180,7 +180,7 @@ begin
   select name into actor_name from public.profiles where user_id=auth.uid();
   if p_action='reject' and role_name in ('chief','owner') and r.status in ('대기','실장승인') then update public.attendance_manual_entries set status='반려',chief_by=case when role_name='chief' then actor_name else chief_by end,chief_at=case when role_name='chief' then now() else chief_at end,owner_by=case when role_name='owner' then actor_name else owner_by end,owner_at=case when role_name='owner' then now() else owner_at end where id=p_id;
   elsif p_action='approve' and role_name='chief' and r.status='대기' then update public.attendance_manual_entries set status='실장승인',chief_by=actor_name,chief_at=now() where id=p_id;
-  elsif p_action='approve' and role_name='owner' and r.status in ('대기','실장승인') then
+  elsif p_action='approve' and role_name='owner' and r.status='실장승인' then
     select id into v_issue_id from public.attendance_issues where user_id=r.user_id and work_date=r.work_date and rule_label='지문인식오류' and status='원장확정' order by id desc limit 1;
     if exists(select 1 from public.attendance where user_id=r.user_id and work_date=r.work_date and source='fp') then
       if v_issue_id is null then raise exception 'fingerprint evidence requires approved recognition-error issue'; end if;
