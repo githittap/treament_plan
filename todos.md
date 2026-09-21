@@ -1,5 +1,12 @@
 # todos — 내부 도구(T8/D) 작업 목록
 
+## 최신 상태 — Task10 배포·공개 smoke 완료 (2026-09-22)
+
+- [x] Task10 기능 배포: `eeac4f2d9827f01764be66f8616717b732623fd0`를 `main`에 반영했고 GitHub Pages run `35640892992` build/deploy success를 확인했다.
+- [x] 공개 smoke: `jung-plant.com/hr.html?v=eeac4f2` HTTP 200(498479 bytes), GitHub Pages 501015 bytes, 양쪽 `push_subscriptions`·`WORK_DOC_GUIDE_OPEN`·`consultation_journals` 표식 확인. CDP reload 오류/실패/Log error·warn은 0건이며 form 권고 verbose 5건만 확인됐다.
+- [ ] 실제 4역할 로그인·저장/재조회, 실제 데이터·메일·Push·생체정보 시험은 자격증명 없이 미검증으로 남긴다.
+- [ ] 다음: Task11 설명서. 프론트 롤백 기준 `4865f89`; DB 롤백은 별도 증거 게이트를 따른다.
+
 ## 최신 상태 — Task7·Task8 운영 완료 (2026-09-22)
 
 - [x] Task7 migration `employee_hub_push_subscriptions_v6_20260922` 적용·검증: PG17.6, rows=0, RLS, policy 4개, trigger 1개, constraints 5개, canonical=`4f7a3ffc459b04e0a3c87ea8dfda8c28`, 관련 advisor 0건.

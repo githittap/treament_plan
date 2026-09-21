@@ -1,5 +1,9 @@
 # 직원허브 ZIP 근무표 수용 추적표
 
+## 최신 승계 표식 — Task10 배포·공개 smoke 완료 (2026-09-22)
+
+Task10은 `main`=`eeac4f2d9827f01764be66f8616717b732623fd0` 배포와 GitHub Pages run `35640892992` build/deploy success로 완료했다. `jung-plant.com/hr.html?v=eeac4f2` HTTP 200(498479 bytes), GitHub Pages 501015 bytes에서 `push_subscriptions`·`WORK_DOC_GUIDE_OPEN`·`consultation_journals` 표식을 확인했고, 로그인 UI의 CDP reload Runtime.exception·Network.loadingFailed·Log error/warn은 0건이었다(form 권고 verbose 5건만). 직접 JS 24/24·PGlite 9/9·인라인 구문·`git diff --check`도 PASS다. 실제 4역할 로그인·저장/재조회와 실제 데이터·메일·Push·생체정보는 시험 계정/자격증명 없이 미검증이며, 프론트 롤백 기준은 `4865f89`, DB 롤백은 별도 증거 게이트다. 다음은 Task11 설명서다.
+
 ## 최신 승계 표식 — Task7·Task8 운영 완료 (2026-09-22)
 
 Task7 `employee_hub_push_subscriptions_v6_20260922`와 Task8 `employee_hub_attendance_owner_chief_gate_20260922`의 운영 적용·검증을 완료했다. Task7은 PG17.6 rows=0, RLS, policy 4개, trigger 1개, constraints 5개, canonical=`4f7a3ffc459b04e0a3c87ea8dfda8c28`, advisor 0건이다. Task8은 marker=1, FORCE RLS·역할 SELECT 없음, `prosrc=08d9fa62fcc82616dd9f7cb3f8ebafac`, chief gate=true·old bypass=false, entries=8·history=9 보존 및 Task7 canonical 유지다. Task9는 기존 `hr.html` workdocs 탭의 사용 설명서·열기/닫기·메뉴별 안내·권한 차이를 확인해 완료했으며 work-documents 4/4, guide 2/2, home-work-docs 1/1 PASS다. 새 상단탭·민감정보는 없고 통합 `node --test` spawn EPERM은 코드 실패가 아니다. 실제 직원 Push·실기기·VAPID는 미수행·금지이며 `직원허브 5차.zip`은 미열람이다. 다음은 Task10 역할별 단계배포·최종인수 → Task11 설명서다.

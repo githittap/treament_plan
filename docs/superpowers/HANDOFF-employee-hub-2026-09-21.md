@@ -1,5 +1,11 @@
 # 직원허브 현재 인수인계
 
+## 최신 인계 — Task10 배포·공개 smoke 완료 (2026-09-22)
+
+- 배포 정본: `main`=`eeac4f2d9827f01764be66f8616717b732623fd0`; GitHub Pages run `35640892992` build/deploy success. `jung-plant.com/hr.html?v=eeac4f2` HTTP 200(498479 bytes), GitHub Pages 501015 bytes이며 두 공개본에서 `push_subscriptions`·`WORK_DOC_GUIDE_OPEN`·`consultation_journals` 표식을 확인했다.
+- 앱 내 로그인 UI를 열어 CDP reload를 확인했고 Runtime.exception·Network.loadingFailed·Log error/warn은 0건, 비밀번호 입력칸 form 권고 verbose 5건만 있었다. 직접 JS 24/24·PGlite 9/9·인라인 구문·`git diff --check`도 PASS다.
+- 실제 4역할 로그인·저장/재조회와 실제 데이터·메일·Push·생체정보는 자격증명/시험 계정 없이 미검증이다. 다음은 Task11 설명서이며, 프론트 롤백은 `4865f89`; DB 롤백은 기존 별도 증거 게이트를 유지한다.
+
 ## 최신 인계 — Task7·Task8 운영 적용·검증 완료 (2026-09-22)
 
 - Task7 `employee_hub_push_subscriptions_v6_20260922` 성공: PG17.6, rows=0, RLS, policy 4개, trigger 1개, constraints 5개, canonical=`4f7a3ffc459b04e0a3c87ea8dfda8c28`, 관련 advisor 0건.

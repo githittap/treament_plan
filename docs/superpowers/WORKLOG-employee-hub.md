@@ -1,5 +1,11 @@
 # 직원허브 구현 기록
 
+## 2026-09-22 — Task10 배포·공개 smoke
+
+- `eeac4f2d9827f01764be66f8616717b732623fd0`를 `main`에 반영했다. GitHub Pages run `35640892992` build/deploy success, `jung-plant.com/hr.html?v=eeac4f2` HTTP 200(498479 bytes), GitHub Pages 501015 bytes를 확인했다.
+- 두 공개본의 `push_subscriptions`·`WORK_DOC_GUIDE_OPEN`·`consultation_journals` 표식, 앱 내 로그인 UI, CDP reload Runtime.exception·Network.loadingFailed·Log error/warn 0건을 확인했다. 비밀번호 입력칸 form 권고 verbose 5건은 기능 오류가 아니다.
+- 직접 JS 24/24·PGlite 9/9·인라인 구문·`git diff --check` PASS. 실제 4역할 로그인·저장/재조회, 실제 데이터·메일·Push·생체정보는 미검증이며, 프론트 롤백 기준은 `4865f89`, DB 롤백은 별도 증거 게이트다.
+
 ## 2026-09-22 — Task9 메뉴 도움말 기록 반영
 
 - 기존 `hr.html` workdocs 탭 안의 직원 허브 사용 설명서·열기/닫기·메뉴별 안내·권한 차이를 확인했다. 새 상단탭이나 민감정보는 추가하지 않았다.
