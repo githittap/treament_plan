@@ -1,5 +1,12 @@
 # 직원허브 구현 기록
 
+## 2026-09-21 — 운영 릴리스 사전 스냅샷
+
+- 대상 Supabase: `texevhsxttfoqkrucfzl` ACTIVE_HEALTHY. 적용 전 migration에는 Task6/7/8 marker가 없다.
+- 보존 기준: notices=1, deposits=264, notice-attachments bucket/object=0, private schema·push_subscriptions 없음, attendance=0/manual entries=5/revisions=5/resolutions=0.
+- Task8 함수는 MD5 `f1277c2f9d91a3e434e237e19a6800b9`, postgres owner, SECURITY DEFINER, `search_path=public`, postgres/service_role/authenticated EXECUTE다.
+- rollback 순서: Task8 → Task7 → Task6. Task6는 Storage 객체가 하나라도 생기면 rollback STOP 후 보존 판단한다. 실제 Storage upload/download, 직원 알림·Push, 자격증명 입력은 범위 밖이다.
+
 ## 2026-09-21 — Task 8 Sol FAIL 보완 로컬 PASS
 
 - Task7 marker의 fingerprint/manifest·고정 canonical MD5·저장 canonical/identity를 apply와 rollback에서 비교한다. Task8 marker로 인해 추가되는 정확한 table/pkey 두 이름만 Task7 canonical schema.contents 비교에서 제외하며 identity는 그대로 대조한다.
