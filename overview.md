@@ -47,6 +47,14 @@
 - 롤백: 신규 테이블과 갱신 트리거 함수만 제거한다. 적용 뒤 기록이 생성됐다면 이 롤백을 실행하지 말고 데이터 보존 판단을 먼저 받는다.
 - 적용 후 보완: 운영 적용된 실제 객체의 RLS 재시험도 8/8 PASS(실제 기록 0건, 시험 입력은 ROLLBACK)했다. `db/consultation_journal_advisor_hardening.sql`은 Advisor의 고정 `search_path`, `author_id` FK 인덱스, 정책 initPlan 보완만 추가한다.
 
+## 직원허브 현재 배포·인수인계 (2026-09-21 09:38 KST)
+
+- 현재 배포 정본: `origin/main`의 `0f3226b` (직접 push 완료). 구현 기준 worktree는 `treament_plan/.worktrees/calendar-ui-release`, 브랜치는 `codex/calendar-ui-release`이다.
+- 상담일지 기본 migration `add_consultation_journals`은 운영 DB에 적용됐고, 실제 객체 대상으로 RLS 8/8 PASS·Sol 검토 PASS를 확인했다. 시험 입력은 ROLLBACK했고 운영 상담 기록은 0건이었다.
+- `db/consultation_journal_advisor_hardening.sql`은 `0f3226b`에 포함된 후속 보완 SQL이다. 운영 DB 적용 여부는 이 저장소만으로 확정하지 않으며, SQL Editor 적용·재시험은 별도 운영 승인 게이트다.
+- 실제 로그인 후 manager/owner/staff/chief의 조회·입력·수정, 브라우저 저장·재조회 및 운영 데이터 처리는 아직 수행하지 않았다. 자격증명·실제 환자 행·토큰은 이 저장소와 인수인계 문서에 기록하지 않는다.
+- 범위별 현재 상태와 다음 순서는 [직원허브 인수인계](docs/superpowers/HANDOFF-employee-hub-2026-09-21.md)를 정본으로 한다. 기존 ZIP 근무표 수용 이력은 아래 수용추적표에 보존한다.
+
 ## 핵심 규칙·컨벤션
 - **모든 코드(프론트·백엔드·SQL)는 Codex에 위임 작성**(2026-07-30 원장 강조: "코딩 직접 말고 항상 codex delegate"). Claude는 계약(스키마·호출목록) 작성 + 결과 **검수·검증·통합**만, 코드 파일 직접 편집 X. **SQL은 Codex 교차검증 통과 후에만 실행 안내**(FK 타입 사고 재발 방지 — 기존 DB 참조 시 타입 실측). 이 환경에선 codex를 **PowerShell로 codex.exe 직접 구동**(Bash 훅 고장; prompt는 stdin 파이프 + `$OutputEncoding=UTF8`).
 - **자주 바뀔 값은 하드코딩 금지 → `app_settings` 표로**(원장이 SQL 한 줄로 수정). 설명서=`09_claude-output\04_AI·Claude운영\산출물\근태설정_사용설명서.html`.
