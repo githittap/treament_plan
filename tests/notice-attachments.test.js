@@ -15,6 +15,24 @@ assert.match(html, /canViewDeposit\(ME\)/,
   '예치금 화면은 공지 작성권과 별도 권한 검사를 사용해야 한다');
 assert.match(sql, /notices_insert_authenticated/,
   '승인 직원의 공지 작성 RLS가 필요하다');
+assert.match(sql, /drop policy if exists notices_insert_approvers on public\.notices/i,
+  '기존 permissive 공지 INSERT 정책을 제거해야 한다');
+assert.match(sql, /create or replace function public\.guard_notice_immutable_fields/i,
+  '공지 작성자·작성시각 불변 트리거가 필요하다');
+assert.match(sql, /file_size_limits*=s*10485760/i,
+  '비공개 버킷은 서버에서 10MB 제한을 강제해야 한다');
+assert.match(sql, /allowed_mime_types/i,
+  '비공개 버킷은 서버 허용 MIME 목록을 설정해야 한다');
+assert.match(sql, /metadata->>'mimetype'/i,
+  'Storage INSERT 정책은 서버 metadata MIME을 검증해야 한다');
+assert.match(sql, /metadata->>'size'/i,
+  'Storage INSERT 정책은 서버 metadata 크기를 검증해야 한다');
+assert.match(html, /noticeAttachmentLinks\(/,
+  '공지 렌더는 첨부 목록을 별도로 표시해야 한다');
+assert.match(html, /downloadNoticeAttachment\(/,
+  '첨부 열람은 private Storage download 경로를 사용해야 한다');
+assert.match(html, /removeUploadedNoticeAttachments\(/,
+  '공지 저장 실패·부분 업로드는 이번 요청의 임시 객체만 정리해야 한다');
 assert.match(sql, /deposits_select_desk_lead/,
   '예치금 조회 RLS가 공지 작성 RLS와 분리되어야 한다');
 assert.match(sql, /p\.dept='데스크'.*p\.role in \('chief','owner'\)/s,

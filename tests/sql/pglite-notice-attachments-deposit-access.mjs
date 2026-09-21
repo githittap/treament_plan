@@ -19,11 +19,11 @@ const prelude = `
 create role anon; create role authenticated; create schema auth; create schema storage;
 create or replace function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('app.test_uid',true),'')::uuid $$;
 create or replace function storage.foldername(value text) returns text[] language sql immutable as $$ select string_to_array(value,'/') $$;
-create table public.profiles(user_id uuid primary key, role text, dept text, active boolean default true, approved boolean default true);
-create table public.notices(id bigint generated always as identity primary key, title text, body text, author text);
+create table public.profiles(user_id uuid primary key, name text, role text, dept text, active boolean default true, approved boolean default true);
+create table public.notices(id bigint generated always as identity primary key, title text, body text, author text, created_at timestamptz default now());
 create table public.deposits(id bigint generated always as identity primary key, amount numeric not null);
-create table storage.buckets(id text primary key, name text unique, public boolean not null default false);
-create table storage.objects(id bigint generated always as identity primary key, bucket_id text, name text, owner_id uuid);
+create table storage.buckets(id text primary key, name text unique, public boolean not null default false, file_size_limit bigint, allowed_mime_types text[]);
+create table storage.objects(id bigint generated always as identity primary key, bucket_id text, name text, owner_id uuid, metadata jsonb default '{}'::jsonb);
 alter table public.notices enable row level security;
 alter table public.deposits enable row level security;
 alter table storage.objects enable row level security;
@@ -33,6 +33,10 @@ grant select on public.profiles to authenticated;
 grant select, insert on public.notices to authenticated;
 grant select on public.deposits to authenticated;
 grant select, insert on storage.objects to authenticated;
+grant update on public.notices to authenticated;
+create policy notices_insert_approvers on public.notices for insert to authenticated with check (true);
+create policy notices_update_approvers on public.notices for update to authenticated using (true) with check (true);
+create policy notices_select_authenticated on public.notices for select to authenticated using (true);
 `;
 
 async function as(uid) {
@@ -41,30 +45,41 @@ async function as(uid) {
 async function denied(sql) {
   let error = '';
   try { await query(sql); } catch (caught) { error = String(caught); }
-  assert.match(error, /row-level security|permission denied/);
+  assert.match(error, /row-level security|permission denied|notice author must match|immutable/);
 }
 
 try {
   await db.exec(prelude + draft);
   assert.deepEqual((await query("select id, public from storage.buckets where id='notice-attachments'"))[0], { id: 'notice-attachments', public: false });
+  assert.deepEqual((await query("select public,file_size_limit,allowed_mime_types from storage.buckets where id='notice-attachments'"))[0], { public: false, file_size_limit: 10485760, allowed_mime_types: ['application/pdf','image/jpeg','image/png','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/x-hwp','application/haansofthwp'] });
   await query(`insert into public.profiles values
-    ('${staff}','staff','진료',true,true),('${desk}','staff','데스크',true,true),
-    ('${chief}','chief','진료',true,true),('${owner}','owner','원장',true,true),
-    ('${inactive}','staff','데스크',false,true)`);
+    ('${staff}','직원','staff','진료',true,true),('${desk}','데스크','staff','데스크',true,true),
+    ('${chief}','실장','chief','진료',true,true),('${owner}','원장','owner','원장',true,true),
+    ('${inactive}','비활성','staff','데스크',false,true)`);
   await query('insert into public.deposits(amount) values (100)');
   await db.exec('set role authenticated');
 
   await as(staff);
-  await query(`insert into public.notices(title, author, author_id, attachments) values ('공지','직원','${staff}','[]'::jsonb)`);
+  await query(`insert into public.notices(title, author, author_id, attachments) values ('공지','위조 문자열','${staff}','[]'::jsonb)`);
+  assert.equal((await query("select author from public.notices where title='공지'"))[0].author, '직원');
   await denied(`insert into public.notices(title, author, author_id) values ('위조','직원','${chief}')`);
-  await query(`insert into storage.objects(bucket_id,name,owner_id) values ('notice-attachments','${staff}/tmp/a.pdf','${staff}')`);
-  await denied(`insert into storage.objects(bucket_id,name,owner_id) values ('notice-attachments','${chief}/tmp/b.pdf','${staff}')`);
+  await query(`update public.notices set author_id='${chief}' where title='공지'`);
+  await query(`update public.notices set author='위조' where title='공지'`);
+  await query(`update public.notices set created_at=now()+interval '1 day' where title='공지'`);
+  assert.deepEqual((await query(`select author_id='${staff}' id_ok,author='직원' author_ok,created_at<now()+interval '1 minute' created_ok from public.notices where title='공지'`))[0], { id_ok: true, author_ok: true, created_ok: true });
+  await query(`insert into storage.objects(bucket_id,name,owner_id,metadata) values ('notice-attachments','${staff}/tmp/a.pdf','${staff}','{"mimetype":"application/pdf","size":100}'::jsonb)`);
+  assert.equal((await query("select count(*)::int n from storage.objects where bucket_id='notice-attachments'"))[0].n,1);
+  await denied(`insert into storage.objects(bucket_id,name,owner_id,metadata) values ('notice-attachments','${staff}/final/a.pdf','${staff}','{"mimetype":"application/pdf","size":100}'::jsonb)`);
+  await denied(`insert into storage.objects(bucket_id,name,owner_id,metadata) values ('notice-attachments','${staff}/tmp/a.exe','${staff}','{"mimetype":"application/x-msdownload","size":100}'::jsonb)`);
+  await denied(`insert into storage.objects(bucket_id,name,owner_id,metadata) values ('notice-attachments','${staff}/tmp/large.pdf','${staff}','{"mimetype":"application/pdf","size":10485761}'::jsonb)`);
+  await denied(`insert into storage.objects(bucket_id,name,owner_id,metadata) values ('notice-attachments','${chief}/tmp/b.pdf','${staff}','{"mimetype":"application/pdf","size":100}'::jsonb)`);
   assert.equal((await query('select count(*)::int n from public.deposits'))[0].n, 0);
 
   await as(desk); assert.equal((await query('select count(*)::int n from public.deposits'))[0].n, 1);
-  await as(chief); assert.equal((await query('select count(*)::int n from public.deposits'))[0].n, 1);
-  await as(owner); assert.equal((await query('select count(*)::int n from public.deposits'))[0].n, 1);
+  await as(chief); await query(`insert into public.notices(title,author,author_id) values ('실장 공지','위조','${chief}')`); await query("update public.notices set body='수정' where title='공지'"); await denied(`update public.notices set author='위조' where title='공지'`); assert.equal((await query('select count(*)::int n from public.deposits'))[0].n, 1);
+  await as(owner); await query(`insert into public.notices(title,author,author_id) values ('원장 공지','위조','${owner}')`); assert.equal((await query('select count(*)::int n from public.deposits'))[0].n, 1);
   await as(inactive); assert.equal((await query('select count(*)::int n from public.deposits'))[0].n, 0);
+  assert.equal((await query("select count(*)::int n from storage.objects where bucket_id='notice-attachments'"))[0].n,0);
   await denied(`insert into storage.objects(bucket_id,name,owner_id) values ('notice-attachments','${inactive}/tmp/c.pdf','${inactive}')`);
   console.log('PGLITE_NOTICE_ATTACHMENTS_DEPOSIT_ACCESS_PASS: 승인 직원 공지·개인 경로 첨부, 예치금 데스크·lead 분리');
 } finally {

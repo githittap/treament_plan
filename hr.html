@@ -276,7 +276,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
     <div class="fld w4"><label>제목</label><input id="ntTitle"></div>
     <div class="fld w4"><label>내용(짧게)</label><textarea id="ntBody"></textarea></div>
     <div class="fld w4"><label>긴 글은 노션 링크(선택)</label><input id="ntUrl" placeholder="https://notion.so/..."></div>
-    <div class="fld w4"><label>업무파일 첨부</label><input id="ntFiles" type="file" multiple accept="image/*,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/x-hwp,application/haansofthwp"><div class="hint">이미지, PDF, DOCX, HWP만 가능하며 압축·실행 파일은 거부됩니다.</div></div>
+    <div class="fld w4"><label>업무파일 첨부</label><input id="ntFiles" type="file" multiple accept="image/jpeg,image/png,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/x-hwp,application/haansofthwp"><div class="hint">JPG, PNG, PDF, DOCX, HWP만 가능하며 압축·실행 파일은 거부됩니다.</div></div>
     <div class="fld"><label><input type="checkbox" id="ntPin"> 상단 고정</label></div>
   </div>
   <button class="hbtn pri" style="margin-top:10px" onclick="submitNotice()">게시</button>
@@ -349,9 +349,9 @@ const md=s=>s?String(s).slice(5).replace('-','/'):'';
 const isLead=()=>['chief','owner'].includes(ME.role);
 const isMgr=()=>['manager','chief','owner'].includes(ME.role);
 const canViewDeposit=me=>me?.role==='owner'||me?.role==='chief'||me?.department==='데스크';
-const NOTICE_ATTACHMENT_ALLOWED_TYPES=new Set(['application/pdf','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/x-hwp','application/haansofthwp']);
+const NOTICE_ATTACHMENT_ALLOWED_TYPES=new Set(['application/pdf','image/jpeg','image/png','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/x-hwp','application/haansofthwp']);
 const NOTICE_ATTACHMENT_MAX_BYTES=10*1024*1024;
-function isAllowedNoticeAttachment(file){return !!file&&file.size>0&&file.size<=NOTICE_ATTACHMENT_MAX_BYTES&&(file.type.startsWith('image/')||NOTICE_ATTACHMENT_ALLOWED_TYPES.has(file.type));}
+function isAllowedNoticeAttachment(file){return !!file&&file.size>0&&file.size<=NOTICE_ATTACHMENT_MAX_BYTES&&NOTICE_ATTACHMENT_ALLOWED_TYPES.has(file.type);}
 const isLeaveDocsLead=()=>['manager','chief','owner'].includes(ME.role);
 const nameOf=uid=>{const p=PROFILES.find(x=>x.user_id===uid);return p?p.name:(uid||'').slice(0,6);};
 const toMin=t=>{if(!t)return null;const[h,m]=String(t).slice(0,5).split(':').map(Number);return h*60+m;};
@@ -1218,17 +1218,20 @@ async function renderNotice(m){
     ${(list||[]).length?(list||[]).map(n=>`<div style="padding:8px 0;border-bottom:1px dashed var(--line)">
       ${n.pinned?'📌 ':''}<b>${esc(n.title)}</b> <span class="sub">${md(n.created_at)} · ${esc(n.author||'')}</span>
       ${n.notion_url?` · <a href="${esc(n.notion_url)}" target="_blank" rel="noopener">전문 ↗</a>`:''}
-      <div class="sub" style="white-space:pre-wrap">${esc(n.body||'')}</div>
+      <div class="sub" style="white-space:pre-wrap">${esc(n.body||'')}</div>${noticeAttachmentLinks(n)}
       ${isLead()?`<button class="mini rej" style="margin-top:4px" onclick="delNotice(${n.id})">삭제</button>`:''}</div>`).join(''):'<div class="empty">공지 없음</div>'}
   </div>`;
   for(const n of (list||[])) sb.from('notice_reads').upsert({notice_id:n.id,user_id:ME.id},{onConflict:'notice_id,user_id'}).then(()=>{});
   refreshBadges();
 }
+function noticeAttachmentLinks(notice){const attachments=Array.isArray(notice.attachments)?notice.attachments:[];if(!attachments.length)return '<div class="sub">첨부 없음</div>';return `<div class="sub">첨부: ${attachments.map(a=>`<button class="mini" data-notice-attachment-path="${esc(a.path||'')}" data-notice-attachment-name="${esc(a.name||'첨부파일')}" onclick="downloadNoticeAttachment(this.dataset.noticeAttachmentPath,this.dataset.noticeAttachmentName)">${esc(a.name||'첨부파일')}</button>`).join(' ')}</div>`;}
+async function downloadNoticeAttachment(path,name){if(!path)return;const {data,error}=await sb.storage.from('notice-attachments').download(path);if(error){alert('첨부 열기 실패: '+error.message);return;}const url=URL.createObjectURL(data);const win=window.open(url,'_blank','noopener');if(!win)alert('팝업 차단으로 첨부를 열지 못했습니다.');setTimeout(()=>URL.revokeObjectURL(url),60000);}
+async function removeUploadedNoticeAttachments(paths){if(paths.length)await sb.storage.from('notice-attachments').remove(paths);}
 async function submitNotice(){
   const title=$('#ntTitle').value.trim();if(!title){$('#ntMsg').textContent='제목을 입력하세요.';return;}
   const files=[...($('#ntFiles').files||[])];if(files.some(f=>!isAllowedNoticeAttachment(f))){$('#ntMsg').textContent='허용되지 않은 파일 형식 또는 10MB 초과 파일이 있습니다.';return;}
-  const attachments=[];for(const file of files){const path=`${ME.id}/tmp/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;const {error}=await sb.storage.from('notice-attachments').upload(path,file,{contentType:file.type,upsert:false});if(error){$('#ntMsg').textContent='첨부 실패: '+error.message;return;}attachments.push({path,name:file.name,type:file.type,size:file.size});}
-  const {error}=await sb.from('notices').insert({title,body:$('#ntBody').value,notion_url:$('#ntUrl').value||null,pinned:$('#ntPin').checked,author:ME.name,author_id:ME.id,attachments});if(error){$('#ntMsg').textContent='공지 저장 실패: '+error.message;return;}
+  const attachments=[],uploaded=[];for(const file of files){const path=`${ME.id}/tmp/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;const {error}=await sb.storage.from('notice-attachments').upload(path,file,{contentType:file.type,upsert:false});if(error){await removeUploadedNoticeAttachments(uploaded);$('#ntMsg').textContent='첨부 실패: '+error.message;return;}uploaded.push(path);attachments.push({path,name:file.name,type:file.type,size:file.size});}
+  const {error}=await sb.from('notices').insert({title,body:$('#ntBody').value,notion_url:$('#ntUrl').value||null,pinned:$('#ntPin').checked,author_id:ME.id,attachments});if(error){await removeUploadedNoticeAttachments(uploaded);$('#ntMsg').textContent='공지 저장 실패: '+error.message;return;}
   hide('ntMask');$('#ntTitle').value='';$('#ntBody').value='';$('#ntUrl').value='';$('#ntFiles').value='';$('#ntPin').checked=false;setStatus('saved');render();
 }
 async function delNotice(id){if(!confirm('삭제할까요?'))return;await sb.from('notices').delete().eq('id',id);setStatus('saved');render();}
