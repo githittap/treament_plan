@@ -1,5 +1,11 @@
 # 직원허브 구현 기록
 
+## 2026-09-22 — Sol High 3차 FAIL 보존 및 4차 재검증 대기
+
+- Sol High 3차 재검증은 HEAD `771ccf5`에서 Important 1·Minor 1로 FAIL했다. 운영 SQL 새 결함은 없었으나 tests/sql `onlyJsonProbe`와 `checkBehaviorRollback`이 원본 rollback preflight를 제거해 정확한 목표 증거가 부족했고 기록이 과장됐다. 이전 FAIL 이력과 함께 보존한다.
+- `4dec81f`는 테스트만 수정했다. preflight 삭제 변형을 제거하고 same-name targeted CHECK 4종에서 원본 `rollbackError(db)`, 각 정확 오류, private schema/public table 보존을 확인한다. 상위 Task7/Task8/push 재실행 PASS다.
+- 최종 판정은 Sol High 4차 재검증 대기다. 로컬 회귀 PASS를 독립 재검증 PASS나 production 완료로 바꾸지 않는다. Task7/Task8 production은 미적용이다.
+
 ## 2026-09-22 — Sol High 2차 FAIL 보존 및 3차 재검증 대기
 
 - Sol High 2차 재검증은 HEAD `c38964a`에서 Important 2·Minor 1로 FAIL했다. endpoint regex의 실제 backslash 2개가 dotted FCM을 거부했고 JSON drift probes는 endpoint check에서 먼저 실패해 위양성이었으며 기록 상세도 모순됐다. Task7 원본 rollback/policy drift와 Task8 default/self-spoof는 PASS였다. 첫 FAIL과 이 2차 FAIL은 모두 삭제하지 않는다.

@@ -1,5 +1,11 @@
 # 직원허브 현재 인수인계
 
+## 최신 인계 — Sol High 3차 FAIL 보존, 4차 재검증 대기 (2026-09-22)
+
+- Sol High 3차 재검증은 HEAD `771ccf5`에서 Important 1·Minor 1 FAIL했다. 운영 SQL 새 결함은 없고 tests/sql `onlyJsonProbe`/`checkBehaviorRollback`이 원본 rollback preflight를 제거해 정확한 목표 증거가 부족했으며 기록도 과장됐다. 기존 FAIL 이력과 함께 보존한다.
+- `4dec81f`는 테스트만 수정했다. preflight 삭제 변형 제거, same-name targeted CHECK 4종의 원본 `rollbackError(db)`·각 정확 오류·private schema/public table 보존을 추가했다. 상위 Task7/Task8/push 재실행 PASS다.
+- 현재는 Sol High 4차 재검증 대기이며 Task7/Task8 production 미적용이다. 로컬 회귀 PASS와 독립 재검증 PASS를 구분한다.
+
 ## 최신 인계 — Sol High 2차 FAIL 보존, 3차 재검증 대기 (2026-09-22)
 
 - Sol High 2차 재검증은 HEAD `c38964a`에서 Important 2·Minor 1 FAIL했다. endpoint regex의 backslash 2개가 dotted FCM을 거부했고 JSON drift probes는 endpoint check에서 먼저 실패한 위양성이며 기록 상세도 모순됐다. Task7 원본 rollback/policy drift 및 Task8 default/self-spoof는 PASS였다. 첫·둘째 FAIL 이력은 아래 기록과 함께 보존한다.

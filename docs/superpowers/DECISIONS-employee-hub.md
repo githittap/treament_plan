@@ -9,7 +9,9 @@
 | 2026-09-22 | Task7 v6·Task8 보완의 상위 재실행 PASS는 최종 독립 검증 PASS가 아니다. | Task7 `fa61fb2`는 v6 fingerprint/manifest/hash/MD5 및 rollback·endpoint·policy/JSON gate를 보강했다. Task8 `77d0f11`·`33d8491`·`2ad9341`은 default 의미·new `prosrc` MD5·동시 self-spoof 음성시험을 보강했다. |
 | 2026-09-22 | Sol High 2차 FAIL 이력을 보존한다. | HEAD `c38964a`에서 Important 2·Minor 1 FAIL: endpoint backslash 2개, JSON probes 위양성, 기록 상세 모순. Task7 원본 rollback/policy 및 Task8 default/self-spoof는 PASS였다. |
 | 2026-09-22 | `a521d1b`의 로컬 회귀 PASS는 3차 독립 재검증 PASS가 아니다. | dot escape 1개·dotted FCM/Mozilla 허용·JSON drift 4종 독립 fixture/목표 probe·rollback reject 및 객체 보존을 보강했고 상위 재실행 Task7/Task8/push는 PASS다. |
-| 2026-09-22 | Sol High 3차 재검증 PASS 전 Task7/Task8 production 적용을 금지한다. | 같은 Sol 재검증 PASS 후에만 Task7 apply/verify → Task8 apply/verify → 승인된 단계배포·실사이트 확인으로 진행한다. 실제 직원 메일·Push·생체입력, 자격증명, 원본 삭제, 대량 이관, 보안 완화, 새 비용도 금지한다. |
+| 2026-09-22 | Sol High 3차 FAIL 이력을 보존한다. | HEAD `771ccf5`에서 Important 1·Minor 1 FAIL: 운영 SQL 새 결함 없음, tests/sql 원본 rollback preflight 제거로 정확 목표 증거 부족, 기록 과장. |
+| 2026-09-22 | `4dec81f`의 상위 재실행 PASS는 4차 독립 재검증 PASS가 아니다. | 테스트만 수정해 same-name targeted CHECK 4종의 원본 rollback·정확 오류·private schema/public table 보존을 고정했다. |
+| 2026-09-22 | Sol High 4차 재검증 PASS 전 Task7/Task8 production 적용을 금지한다. | 같은 Sol 재검증 PASS 후에만 Task7 apply/verify → Task8 apply/verify → 승인된 단계배포·실사이트 확인으로 진행한다. 실제 직원 메일·Push·생체입력, 자격증명, 원본 삭제, 대량 이관, 보안 완화, 새 비용도 금지한다. |
 
 ## 최신 결정 정정 — Task 6 Sol High PASS (2026-09-21)
 

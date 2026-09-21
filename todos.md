@@ -9,7 +9,9 @@
 - [x] Task8 `77d0f11`·`33d8491`·`2ad9341`: v6 동기화·default 의미 gate·new `prosrc` MD5·marker+identity 동시 self-spoof 음성시험 추가, 상위 재실행 Task7/Task8/push PASS.
 - [x] Sol High 2차 재검증은 HEAD `c38964a`에서 Important 2·Minor 1 FAIL. endpoint backslash 2개·JSON probes 위양성·기록 상세 모순을 보완 대상으로 고정했고, Task7 원본 rollback/policy 및 Task8 default/self-spoof는 PASS.
 - [x] `a521d1b`: dot escape 1개·FCM/Mozilla dotted 허용시험, JSON drift 4종의 독립 fresh fixture/목표 probe와 rollback reject·객체 보존을 보강. 상위 재실행 Task7/Task8/push PASS.
-- [ ] Sol High 3차 재검증 PASS 후에만 Task7 운영 apply/verify를 수행한다. 현재 Task7/Task8 production 미적용.
+- [x] Sol High 3차 재검증은 HEAD `771ccf5`에서 Important 1·Minor 1 FAIL. 운영 SQL 새 결함은 없고 tests/sql 원본 rollback preflight 제거·정확 목표 증거 부족·기록 과장을 보완 대상으로 고정.
+- [x] `4dec81f`: preflight 삭제 변형 제거, same-name targeted CHECK 4종의 원본 `rollbackError(db)`·정확 오류·private schema/public table 보존을 보강. 상위 Task7/Task8/push PASS.
+- [ ] Sol High 4차 재검증 PASS 후에만 Task7 운영 apply/verify를 수행한다. 현재 Task7/Task8 production 미적용.
 - [ ] Task7 운영 검증 뒤 Task8 운영 apply/verify를 수행하고, 그 다음 승인된 단계배포·실사이트 확인을 한다.
 - [ ] 실제 직원 메일·Push·생체입력, 자격증명 입력, 원본 삭제, 대량 이관, 보안 완화, 새 비용은 수행하지 않는다. `직원허브 5차.zip`은 최초 승인 범위 완료 후에만 읽고, `상담문의 등 일원화.zip`은 직원허브 전체 후속으로 남긴다.
 
