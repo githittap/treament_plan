@@ -1,5 +1,13 @@
 # 직원허브 구현 기록
 
+## 2026-09-22 — Task6 production 완료 및 Task7/8 운영 전 최신화
+
+- Task6 production migration `employee_hub_notice_attachments_deposit_access_20260921`을 적용했다. 적용 전 보존 기준 `notices=1`, `deposits=264`는 유지됐다. private `notice-attachments` 버킷은 10MB·6 MIME 제한이며 objects=0이다. Storage API 실제 업로드는 자격증명이 없어 실행·검증하지 않았다.
+- Task7 첫 production apply는 fixed canonical mismatch에서 transaction rollback됐다. migration marker·schema·데이터에 운영 변화가 없음을 기준으로 기록한다.
+- Task7 v5 로컬 완결 커밋: `6941111`(RLS helper 강화), `448bcc2`(snapshot 위변조 검증), `72c4749`(catalog 정합성), `1b2e36b`(구독 동작 검증). 고정 identity는 fingerprint `task7-push-v5-catalog`, manifest `push-v5-catalog-20260922`, semantic SHA256 `ae2606f243d91400b15624dbc9113ae3e6187ed03b7eef6d213d37f56799b53e`, canonical MD5 `8179b7fed8536fe0516a0b29109f1728`이다. PGlite exact catalog/behavior/fail-closed 및 push static PASS, production 미적용이다.
+- Task8 로컬 보완 커밋 `373e829`: Task7 v5 상수·identity·private allowlist, Task8 marker exact shape, negative matrix를 추가로 고정했다. Task8/Task7 PGlite PASS, production 미적용이다.
+- 다음 순서와 보호 경계: Sol High 독립 검증 PASS 후 Task7 운영 apply/verify, Task8 운영 apply/verify, 승인된 단계배포·실사이트 확인을 진행한다. 실제 직원 메일·Push·생체입력, 자격증명 입력, 원본 삭제, 대량 이관, 보안 완화, 새 비용은 금지한다. `직원허브 5차.zip`은 최초 승인 범위 완료 뒤에만 읽고 `상담문의 등 일원화.zip`은 직원허브 전체 후속이다.
+
 ## 2026-09-21 — 운영 릴리스 사전 스냅샷
 
 - 대상 Supabase: `texevhsxttfoqkrucfzl` ACTIVE_HEALTHY. 적용 전 migration에는 Task6/7/8 marker가 없다.

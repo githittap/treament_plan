@@ -1,5 +1,14 @@
 # 직원허브 확정 결정
 
+## 최신 결정 — Task6/7/8 운영 순서 (2026-09-22)
+
+| 시각 | 결정 | 근거와 경계 |
+|---|---|---|
+| 2026-09-22 | Task6 production migration을 완료로 기록한다. | `employee_hub_notice_attachments_deposit_access_20260921` 적용 후 `notices=1`·`deposits=264` 보존, private `notice-attachments` 10MB/6 MIME/objects=0 확인. Storage API 실제 업로드는 자격증명 없이 미검증이다. |
+| 2026-09-22 | Task7 첫 production apply 실패는 운영 변경 없는 rollback으로 고정한다. | fixed canonical mismatch에서 transaction rollback됐으며 Task7은 재적용 전 Sol High 독립 검증이 필요하다. |
+| 2026-09-22 | Task7 v5와 Task8 보완은 로컬 PASS이지 운영 완료가 아니다. | Task7 commits `6941111`·`448bcc2`·`72c4749`·`1b2e36b`, fingerprint/manifest/hash/MD5는 최신 정본과 일치한다. Task8 `373e829`은 상수·identity·private allowlist·marker exact shape·negative matrix를 보강했고 양쪽 PGlite가 PASS했다. |
+| 2026-09-22 | 운영 순서는 Sol High → Task7 → Task8 → 단계배포·실사이트 확인이다. | 실제 직원 메일·Push·생체입력, 자격증명 입력, 원본 삭제, 대량 이관, 보안 완화, 새 비용은 계속 금지한다. 5차 ZIP은 최초 승인 범위 완료 뒤, 상담문의 일원화 ZIP은 전체 후속이다. |
+
 ## 최신 결정 정정 — Task 6 Sol High PASS (2026-09-21)
 
 | 시각 | 결정 | 근거와 경계 |

@@ -1,5 +1,12 @@
 # 직원허브 현재 인수인계
 
+## 최신 인계 — Task6 production 완료, Task7/8 운영 대기 (2026-09-22)
+
+- Task6는 production migration `employee_hub_notice_attachments_deposit_access_20260921` 적용을 완료했다. `notices=1` 및 `deposits=264`는 보존됐고, private `notice-attachments` 버킷은 10MB·6 MIME·objects=0 상태다. 자격증명이 없어 Storage API 실제 업로드는 미검증이다.
+- Task7 첫 production apply는 fixed canonical mismatch로 transaction rollback돼 운영 변화가 없다. Task7 v5 로컬 정본은 `6941111`, `448bcc2`, `72c4749`, `1b2e36b`; fingerprint `task7-push-v5-catalog`, manifest `push-v5-catalog-20260922`, SHA256 `ae2606f243d91400b15624dbc9113ae3e6187ed03b7eef6d213d37f56799b53e`, MD5 `8179b7fed8536fe0516a0b29109f1728`다. PGlite exact catalog/behavior/fail-closed 및 push static PASS, 운영 미적용이다.
+- Task8 로컬 보완 정본은 `373e829`다. Task7 v5 상수·identity·private allowlist, marker exact shape와 negative matrix를 보강했고 Task8/Task7 PGlite PASS다. 운영 미적용이다.
+- 다음: Sol High 독립 검증 PASS → Task7 운영 apply/verify → Task8 운영 apply/verify → 승인된 단계배포·실사이트 확인. 실제 직원 메일·Push·생체입력, 자격증명 입력, 원본 삭제, 대량 이관, 보안 완화, 새 비용은 금지한다. `직원허브 5차.zip`은 최초 승인 범위 완료 뒤에만 읽으며 `상담문의 등 일원화.zip`은 직원허브 전체 후속이다.
+
 ## 재부팅 정본 (2026-09-21)
 
 - Task8 로컬 보완: Task7 fixed fingerprint/manifest·canonical/identity와 Task8 marker owner/ACL/RLS drift, old ACL 필수 EXECUTE 및 Sol M1 EOF 빈 줄을 fail-closed 시험으로 추가했다. 고정 PGlite 0.5.8 Task8·Task7 회귀 및 diff check PASS.

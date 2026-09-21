@@ -1,5 +1,15 @@
 # todos — 내부 도구(T8/D) 작업 목록
 
+## 최신 미완료 — Task6~8 운영 순서 (2026-09-22)
+
+- [x] Task6 production migration `employee_hub_notice_attachments_deposit_access_20260921` 적용. `notices=1`·`deposits=264` 보존, private `notice-attachments` 10MB/6 MIME/objects=0 확인. Storage API 실제 업로드는 자격증명 부재로 미검증.
+- [x] Task7 첫 production apply는 fixed canonical mismatch로 transaction rollback됐으며 운영 변화 없음.
+- [x] Task7 v5 로컬 완결: `6941111` → `448bcc2` → `72c4749` → `1b2e36b`; exact catalog/behavior/fail-closed PGlite와 push static PASS.
+- [x] Task8 로컬 보완: `373e829`; Task7 v5 상수·identity·private allowlist, marker exact shape·negative matrix 보강 및 Task8/Task7 PGlite PASS.
+- [ ] Sol High 독립 검증 PASS 후 Task7 운영 apply/verify를 수행한다.
+- [ ] Task7 운영 검증 뒤 Task8 운영 apply/verify를 수행하고, 그 다음 승인된 단계배포·실사이트 확인을 한다.
+- [ ] 실제 직원 메일·Push·생체입력, 자격증명 입력, 원본 삭제, 대량 이관, 보안 완화, 새 비용은 수행하지 않는다. `직원허브 5차.zip`은 최초 승인 범위 완료 후에만 읽고, `상담문의 등 일원화.zip`은 직원허브 전체 후속으로 남긴다.
+
 ## 재부팅 정본 (2026-09-21)
 
 - [x] Task8 marker drift fail-closed·Task7 marker 정합·old ACL 필수 EXECUTE 보완. Sol M1 EOF 빈 줄은 혼합개행 RED로 재현 후 보완·PGlite Task8/Task7 및 diff check PASS.
