@@ -47,6 +47,8 @@ assert.match(html, /if\(error\)\{await cleanupNoticeUploads\(uploaded\);\$\('#nt
   '공지 행 저장 실패 시 성공한 임시 경로를 정리해야 한다');
 assert.match(sql, /notice_attachments_delete_own_tmp/i,
   '업로더 본인의 임시 첨부만 삭제하는 Storage DELETE 정책이 필요하다');
+assert.match(sql, /not exists\s*\(\s*select 1 from public\.notices/i,
+  '게시된 첨부 경로는 작성자 DELETE 정책에서도 서버측으로 차단해야 한다');
 assert.match(sql, /deposits_select_desk_lead/,
   '예치금 조회 RLS가 공지 작성 RLS와 분리되어야 한다');
 assert.match(sql, /p\.dept='데스크'.*p\.role in \('chief','owner'\)/s,

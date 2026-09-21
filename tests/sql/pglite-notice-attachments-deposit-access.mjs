@@ -19,7 +19,7 @@ const inactive = '55555555-5555-5555-5555-555555555555';
 const prelude = `
 create role anon; create role authenticated; create schema auth; create schema storage;
 create or replace function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('app.test_uid',true),'')::uuid $$;
-create or replace function storage.foldername(value text) returns text[] language sql immutable as $$ select string_to_array(value,'/') $$;
+create or replace function storage.foldername(value text) returns text[] language sql immutable as $$ select case when strpos(value,'/')=0 then array[]::text[] else string_to_array(regexp_replace(value,'/[^/]*$',''),'/') end $$;
 create table public.profiles(user_id uuid primary key, name text, role text, dept text, active boolean default true, approved boolean default true);
 create or replace function public.my_role() returns text language sql stable as $$ select coalesce((select role from public.profiles where user_id=auth.uid()),'staff') $$;
 create table public.notices(id bigint generated always as identity primary key, title text, body text, author text, created_at timestamptz default now());
@@ -110,6 +110,9 @@ try {
   await query(`insert into storage.objects(bucket_id,name,owner_id,metadata) values ('notice-attachments','${staff}/tmp/cleanup.pdf','${staff}','{"mimetype":"application/pdf","size":100}'::jsonb)`);
   await query(`delete from storage.objects where bucket_id='notice-attachments' and name='${staff}/tmp/cleanup.pdf'`);
   assert.equal((await query("select count(*)::int n from storage.objects where bucket_id='notice-attachments'"))[0].n,0);
+  await query(`insert into storage.objects(bucket_id,name,owner_id,metadata) values ('notice-attachments','${staff}/tmp/published.pdf','${staff}','{"mimetype":"application/pdf","size":100}'::jsonb)`);
+  await query(`insert into public.notices(title, author, author_id, attachments) values ('게시 첨부','위조 문자열','${staff}',jsonb_build_array(jsonb_build_object('path','${staff}/tmp/published.pdf')))`);
+  assert.deepEqual(await query(`delete from storage.objects where bucket_id='notice-attachments' and name='${staff}/tmp/published.pdf' returning name`), [], '게시된 첨부는 작성자도 삭제할 수 없어야 한다');
   await db.exec('reset role');
   await query(`insert into storage.objects(bucket_id,name,owner_id,metadata) values
     ('notice-attachments','${staff}/final/kept.pdf','${staff}','{}'::jsonb),
