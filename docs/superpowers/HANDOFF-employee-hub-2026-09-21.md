@@ -1,5 +1,10 @@
 # 직원허브 현재 인수인계
 
+## 재부팅 정본 (2026-09-21)
+
+- HEAD `a6fa4925bf5787d29b7f7a839ee248a068cb5610`: Task8 Sol 독립검증 **FAIL**(Critical 0 / Important 3 / Minor 1). Task6·7·9는 기존 로컬 PASS 기록만 유지한다.
+- 다음: Task8 reapply marker owner/ACL/RLS drift fail-closed, Task7 marker 정합, old ACL 필수 EXECUTE, fixed production MD5·marker/ACL drift·owner pending reject fixture 및 EOF 보완 → Sol 재검증. 그 전 운영 DB/push/deploy/5차 ZIP 열람 금지.
+
 ## Task 8 재부팅 체크포인트 (2026-09-21)
 
 - 로컬 SQL: `db/attendance_owner_chief_gate_patch.sql` / rollback. Task7 private manifest가 선행이며 rollback 순서는 **Task8 → Task7**이다.

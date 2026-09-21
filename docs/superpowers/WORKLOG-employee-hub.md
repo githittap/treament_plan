@@ -43,3 +43,7 @@
 - GREEN `7ee01fd`: `notices.updated_at`과 INSERT/UPDATE 서버시간 강제, snapshot PUBLIC·anon·authenticated ACL 회수·RLS, 트리거 함수 직접 EXECUTE 권한 회수를 추가했다.
 - PGlite: staff가 `created_at`·`updated_at` 2000년을 보내도 서버시간으로 저장되고, anon·authenticated snapshot grant 0개·SELECT/UPDATE 거부, apply→rollback 권한 왕복을 확인했다.
 - 상태: 로컬 보완·시험은 통과했으나 Sol High 최종 재검증 대기다. 운영 DB/Storage·push·배포는 수행하지 않았다.
+# 재부팅 정본 (2026-09-21)
+
+- HEAD `a6fa4925bf5787d29b7f7a839ee248a068cb5610`: Task8 Sol 독립검증 **FAIL**(Critical 0 / Important 3 / Minor 1). Task6·7·9는 기존 로컬 PASS 기록만 유지한다.
+- 다음: marker drift fail-closed·Task7 marker 정합·old ACL 필수 EXECUTE·fixture/EOF 보완 → Sol 재검증. 그 전 운영 DB/push/deploy와 5차 ZIP 열람 금지.

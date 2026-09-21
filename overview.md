@@ -1,5 +1,10 @@
 # overview — 아산정플란트치과 내부 도구 (T8/D 인프라)
 
+## 재부팅 정본 (2026-09-21)
+
+- 현재 HEAD: `a6fa4925bf5787d29b7f7a839ee248a068cb5610`. Task8 Sol 독립검증은 **FAIL**(Critical 0 / Important 3 / Minor 1)이며 완료 주장·운영 적용을 금지한다. Task6·7·9는 기존 로컬 PASS 기록만 유지한다.
+- Task8 보완 시작점: reapply marker owner/ACL/RLS drift fail-closed, Task7 marker fingerprint/manifest/canonical/identity 정합 검사, old ACL의 authenticated/service_role EXECUTE 필수 검사, fixed production MD5·marker/ACL drift·owner pending reject fixture 및 EOF 빈 줄 정정 → Sol 재검증. 운영 DB·push·배포와 `직원허브 5차.zip` 열람은 금지한다.
+
 ## Task 8 로컬 체크포인트 (2026-09-21)
 
 - `db/attendance_owner_chief_gate_patch.sql`과 rollback은 Task 7 private manifest 선행·수기근태 원장 승인 실장승인 제한·private marker fail-closed를 위한 **로컬 초안**이다. 운영 DB/행·push·배포는 수행하지 않았다.
