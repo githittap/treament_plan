@@ -1,5 +1,13 @@
 # todos — 내부 도구(T8/D) 작업 목록
 
+## 최신 상태 — Task11 문서화 완료 및 다음 범위 (2026-09-22)
+
+- [x] Task10 기록 커밋 `41327995d523e6583db14db4840e5628052d20e0`를 `origin/main`에 push했고 최신 Pages run `35666985589` success를 확인했다. 기능 배포 `eeac4f2`·run `35640892992`는 역사 증거로 유지한다.
+- [x] Task11 결과보고서: `Z:\11_codex\00_결과보고서\직원허브_구현결과보고서_2026-09-22.html` (SHA256 `7AACA57558B9D6F6CEE9EB35E4781C1205CEA4217DF70BB5F5AC7E0C48A748F4`).
+- [x] Task11 사용설명서: `Z:\11_codex\03_병원운영·전산\직원허브_수정지침_시안\직원허브_사용설명서.docx` (SHA256 `9CB2DB42EB8C78E2E43F4375C7E5F7F3CD47EB14A4234434BB9AA4B3F81E2B07`). Sol High HTML/content/OOXML/a11y/privacy PASS, 번들 LibreOffice 부재로 전 페이지 PNG visual QA는 미실행인 조건부 인도다.
+- [ ] 실제 4역할 로그인·저장/재조회와 실제 직원 데이터·메일·Push·생체정보는 미검증·금지 경계를 유지한다.
+- [ ] 다음 활성 범위: `직원허브 5차.zip` 원본 보존·해시·인벤토리·요구 대조. 아직 열람·구현하지 않으며, `상담문의 등 일원화.zip`은 직원허브 5차 완료 뒤 별도 후속이다.
+
 ## 최신 상태 — Task10 배포·공개 smoke 완료 (2026-09-22)
 
 - [x] Task10 기능 배포: `eeac4f2d9827f01764be66f8616717b732623fd0`를 `main`에 반영했고 GitHub Pages run `35640892992` build/deploy success를 확인했다.

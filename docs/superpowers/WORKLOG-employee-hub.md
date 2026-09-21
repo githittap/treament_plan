@@ -1,5 +1,12 @@
 # 직원허브 구현 기록
 
+## 2026-09-22 — Task11 결과보고서·사용설명서 완료
+
+- Task10 기록 커밋 `41327995d523e6583db14db4840e5628052d20e0`의 `origin/main` push와 최신 GitHub Pages run `35666985589` success를 기록했다. 기능 배포 `eeac4f2`·run `35640892992`는 역사 증거로 유지한다.
+- 결과보고서 정본은 `Z:\11_codex\00_결과보고서\직원허브_구현결과보고서_2026-09-22.html`(SHA256 `7AACA57558B9D6F6CEE9EB35E4781C1205CEA4217DF70BB5F5AC7E0C48A748F4`), 사용설명서 정본은 `Z:\11_codex\03_병원운영·전산\직원허브_수정지침_시안\직원허브_사용설명서.docx`(SHA256 `9CB2DB42EB8C78E2E43F4375C7E5F7F3CD47EB14A4234434BB9AA4B3F81E2B07`)다.
+- Sol High 독립검증은 HTML/content/OOXML/a11y/privacy PASS다. 번들 LibreOffice 부재로 사용설명서 전 페이지 PNG visual QA는 미실행이며 조건부 인도로 기록한다. 실제 4역할 로그인·저장/재조회와 실제 직원 데이터·메일·Push·생체정보는 미검증·금지다.
+- 최초 `직원허브 수정 지침.zip`에서 외부자료 없이 가능한 승인 범위는 종료했다. 다음은 아직 열지 않은 `직원허브 5차.zip` 원본 보존·해시·인벤토리·요구 대조이며, `상담문의 등 일원화.zip`은 직원허브 5차 완료 후 별도 후속이다.
+
 ## 2026-09-22 — Task10 배포·공개 smoke
 
 - `eeac4f2d9827f01764be66f8616717b732623fd0`를 `main`에 반영했다. GitHub Pages run `35640892992` build/deploy success, `jung-plant.com/hr.html?v=eeac4f2` HTTP 200(498479 bytes), GitHub Pages 501015 bytes를 확인했다.

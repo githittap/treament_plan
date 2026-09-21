@@ -1,5 +1,11 @@
 # 직원허브 ZIP 근무표 수용 추적표
 
+## 최신 승계 표식 — Task11 문서화 완료 및 다음 범위 (2026-09-22)
+
+Task10 기록 커밋 `41327995d523e6583db14db4840e5628052d20e0`는 `origin/main` push 완료이며 최신 GitHub Pages run `35666985589` success다. 기능 배포 `eeac4f2`·run `35640892992`는 역사 증거로 보존한다. Task11 결과보고서 정본은 `Z:\11_codex\00_결과보고서\직원허브_구현결과보고서_2026-09-22.html`(SHA256 `7AACA57558B9D6F6CEE9EB35E4781C1205CEA4217DF70BB5F5AC7E0C48A748F4`), 사용설명서 정본은 `Z:\11_codex\03_병원운영·전산\직원허브_수정지침_시안\직원허브_사용설명서.docx`(SHA256 `9CB2DB42EB8C78E2E43F4375C7E5F7F3CD47EB14A4234434BB9AA4B3F81E2B07`)다.
+
+Sol High 독립검증은 HTML/content/OOXML/a11y/privacy PASS다. 번들 LibreOffice 부재로 사용설명서 전 페이지 PNG visual QA는 미실행인 조건부 인도이며, 실제 4역할 로그인·저장/재조회와 실제 직원 데이터·메일·Push·생체정보는 미검증·금지다. 최초 `직원허브 수정 지침.zip`의 외부자료 없이 가능한 승인 범위는 종료했고, 다음은 아직 열지 않은 `직원허브 5차.zip` 원본 보존·해시·인벤토리·요구 대조다. `상담문의 등 일원화.zip`은 직원허브 5차 완료 뒤 별도 후속이다.
+
 ## 최신 승계 표식 — Task10 배포·공개 smoke 완료 (2026-09-22)
 
 Task10은 `main`=`eeac4f2d9827f01764be66f8616717b732623fd0` 배포와 GitHub Pages run `35640892992` build/deploy success로 완료했다. `jung-plant.com/hr.html?v=eeac4f2` HTTP 200(498479 bytes), GitHub Pages 501015 bytes에서 `push_subscriptions`·`WORK_DOC_GUIDE_OPEN`·`consultation_journals` 표식을 확인했고, 로그인 UI의 CDP reload Runtime.exception·Network.loadingFailed·Log error/warn은 0건이었다(form 권고 verbose 5건만). 직접 JS 24/24·PGlite 9/9·인라인 구문·`git diff --check`도 PASS다. 실제 4역할 로그인·저장/재조회와 실제 데이터·메일·Push·생체정보는 시험 계정/자격증명 없이 미검증이며, 프론트 롤백 기준은 `4865f89`, DB 롤백은 별도 증거 게이트다. 다음은 Task11 설명서다.
