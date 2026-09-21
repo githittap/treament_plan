@@ -100,3 +100,6 @@ Task 6 로컬 구현 HEAD는 `d0222684dd7da4607752c22b2912ad8bf4f0d87a`이며 So
 - push·운영 적용·Opus 검사는 수행하지 않았다. Sol High 최종 PASS 전 push·운영 DB/Storage 적용을 금지한다.
 
 재부팅 후 시작 순서는 인계자료 README → HANDOFF → overview → todos → DECISIONS → WORKLOG → acceptance matrix → source ZIP inventory다. 이후 `git status --short`, `git rev-parse HEAD`, `git log --oneline 4865f89..HEAD`를 확인하고 실제 Supabase `foldername` 의미를 수용시험에 먼저 고정한다.
+
+## 최신 상태 — Task7/8 portable semantic manifest PASS (2026-09-21)
+- Task7·Task8 PGlite PASS. 운영 DB/Storage 적용·실제 push·배포는 미수행.

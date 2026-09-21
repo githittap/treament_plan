@@ -107,3 +107,6 @@ git diff --check
 ```
 
 기록 갱신 시점의 코드 검증 결과는 상담일지 관련 direct Node 시험 PASS, `git diff --check` PASS였다. 위 명령은 운영 로그인·DB 적용을 대신하지 않는다.
+
+## 2026-09-21 Task7/8 최신 인계
+- Task7 portable semantic fixture와 Task8 apply/rollback PGlite PASS. 운영 적용·push·배포는 미수행.

@@ -66,3 +66,6 @@
 
 - HEAD `a6fa4925bf5787d29b7f7a839ee248a068cb5610`: Task8 Sol 독립검증 **FAIL**(Critical 0 / Important 3 / Minor 1). Task6·7·9는 기존 로컬 PASS 기록만 유지한다.
 - 다음: marker drift fail-closed·Task7 marker 정합·old ACL 필수 EXECUTE·fixture/EOF 보완 → Sol 재검증. 그 전 운영 DB/push/deploy와 5차 ZIP 열람 금지.
+
+## 2026-09-21 — Task7/8 portable semantic manifest
+- Task7 PGlite drift matrix와 Task8 apply/rollback PGlite PASS. 운영 변경 없음.

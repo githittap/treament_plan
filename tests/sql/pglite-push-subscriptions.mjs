@@ -1,13 +1,21 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 const root=process.env.PGLITE_PACKAGE_ROOT;if(!root)throw new Error('PGLITE_PACKAGE_ROOT is required');
 const {PGlite}=await import(pathToFileURL(path.join(root,'dist/index.js')).href);
 const draft=fs.readFileSync('db/push_subscriptions_draft.sql','utf8'),rollback=fs.readFileSync('db/push_subscriptions_rollback.sql','utf8');
-assert.equal((draft.match(/EXPECTED_CANONICAL_MD5=([a-f0-9]{32})/)||[])[1],(rollback.match(/EXPECTED_CANONICAL_MD5=([a-f0-9]{32})/)||[])[1],'apply/rollback fixed canonical constant must agree');
+const expectedSemanticSha=(draft.match(/EXPECTED_SEMANTIC_SHA256=([a-f0-9]{64})/)||[])[1];
+assert.match(expectedSemanticSha,/^[a-f0-9]{64}$/,'apply must pin a portable semantic fixture SHA-256');
+assert.equal(expectedSemanticSha,(rollback.match(/EXPECTED_SEMANTIC_SHA256=([a-f0-9]{64})/)||[])[1],'apply/rollback semantic fixture SHA-256 must agree');
+for(const rawCatalogSerializer of ['pg_get_functiondef','pg_get_indexdef','pg_get_constraintdef'])assert.equal(draft.includes(rawCatalogSerializer),false,`portable manifest must not pin ${rawCatalogSerializer} output`);
+assert.equal(draft.includes('EXPECTED_CANONICAL_MD5'),false,'portable manifest must not pin a PGlite canonical MD5');
+const expectedSemanticJson=(draft.match(/EXPECTED_SEMANTIC_JSON=(.+)/)||[])[1];
+assert.ok(expectedSemanticJson,'apply must carry the normalized semantic JSON fixture');
+assert.equal(crypto.createHash('sha256').update(expectedSemanticJson).digest('hex'),expectedSemanticSha,'fixture SHA-256 must match its normalized JSON');
 async function fresh(){const db=new PGlite(),q=s=>db.query(s).then(x=>x.rows);await db.exec("create role anon;create role authenticated;create role service_role;create schema auth;create function auth.uid()returns uuid language sql stable as $$select nullif(current_setting('app.test_uid',true),'')::uuid$$;create table public.profiles(user_id uuid primary key,active boolean,approved boolean);create function gen_random_uuid()returns uuid language sql as $$select 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;alter default privileges grant all on tables to anon,authenticated,service_role;alter default privileges grant execute on functions to anon,authenticated,service_role;");await db.exec(draft);return{db,q}}
-async function rejected(db,sql){let message='';try{await db.exec(sql)}catch(e){message=String(e)}assert.match(message,/fixed canonical|rows or dependencies|collision/);await db.exec('rollback')}
+async function rejected(db,sql){let message='';try{await db.exec(sql)}catch(e){message=String(e)}assert.match(message,/semantic|rows or dependencies|collision/);await db.exec('rollback')}
 async function denied(q,sql){let message='';try{await q(sql)}catch(e){message=String(e)}assert.match(message,/permission denied|schema .* does not exist/)}
 async function state(q){return q("select md5(string_agg(x,'|' order by x)) h from (select n.nspname||':'||c.relname||':'||coalesce(c.relacl::text,'') x from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname in ('public','employee_hub_private') and (c.relname like 'push_subscriptions%' or c.relname='push_subscriptions_migration_marker') union all select 'marker:'||canonical::text||':'||identity::text from employee_hub_private.push_subscriptions_migration_marker) s")}
 // Supabase-like default privileges must not leak the private marker or helpers.
