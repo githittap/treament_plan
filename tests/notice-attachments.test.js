@@ -4,6 +4,8 @@ const fs = require('node:fs');
 const html = fs.readFileSync('hr.html', 'utf8');
 const sql = fs.existsSync('db/notice_attachments_deposit_access_draft.sql')
   ? fs.readFileSync('db/notice_attachments_deposit_access_draft.sql', 'utf8') : '';
+const rollback = fs.existsSync('db/notice_attachments_deposit_access_rollback.sql')
+  ? fs.readFileSync('db/notice_attachments_deposit_access_rollback.sql', 'utf8') : '';
 
 assert.match(html, /id="ntFiles"[^>]*type="file"[^>]*multiple/,
   '공지 작성 화면은 복수 업무파일 선택을 제공해야 한다');
@@ -61,7 +63,7 @@ assert.match(sql, /relname in \('notices','deposits'\)/i,
   'rollback은 notices와 deposits의 기존 RLS 상태를 함께 snapshot해야 한다');
 assert.match(sql, /already applied; preserve snapshot and stop migration/i,
   'migration 재실행은 최초 snapshot을 덮어쓰지 않고 fail-closed 해야 한다');
-assert.match(sql, /unnest\(p\.roles\).*format\('%I'/is,
+assert.match(rollback, /unnest\(p\.roles\).*format\('%I'/is,
   '복수·특수문자 정책 role은 식별자로 인용해 복원해야 한다');
 assert.match(sql, /alter column attachments set default '\[\]'::jsonb.*alter column attachments set not null/is,
   '기존 nullable attachments 열도 검증 뒤 기본값과 NOT NULL을 강제해야 한다');
