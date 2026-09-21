@@ -15,7 +15,7 @@ const expectedSemanticJson=(draft.match(/EXPECTED_SEMANTIC_JSON=(.+)/)||[])[1];
 assert.ok(expectedSemanticJson,'apply must carry the normalized semantic JSON fixture');
 assert.equal(crypto.createHash('sha256').update(expectedSemanticJson).digest('hex'),expectedSemanticSha,'fixture SHA-256 must match its normalized JSON');
 async function fresh(){const db=new PGlite(),q=s=>db.query(s).then(x=>x.rows);await db.exec("create role anon;create role authenticated;create role service_role;create schema auth;create function auth.uid()returns uuid language sql stable as $$select nullif(current_setting('app.test_uid',true),'')::uuid$$;create table public.profiles(user_id uuid primary key,active boolean,approved boolean);create function gen_random_uuid()returns uuid language sql as $$select 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;alter default privileges grant all on tables to anon,authenticated,service_role;alter default privileges grant execute on functions to anon,authenticated,service_role;");await db.exec(draft);return{db,q}}
-async function rejected(db,sql){let message='';try{await db.exec(sql)}catch(e){message=String(e)}assert.match(message,/semantic|rows or dependencies|collision/);await db.exec('rollback')}
+async function rejected(db,sql){let message='';try{await db.exec(sql)}catch(e){message=String(e)}assert.match(message,/semantic|rows or dependencies|collision|allowlist|behavior/);await db.exec('rollback')}
 async function denied(q,sql){let message='';try{await q(sql)}catch(e){message=String(e)}assert.match(message,/permission denied|schema .* does not exist/)}
 async function state(q){return q("select md5(string_agg(x,'|' order by x)) h from (select n.nspname||':'||c.relname||':'||coalesce(c.relacl::text,'') x from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname in ('public','employee_hub_private') and (c.relname like 'push_subscriptions%' or c.relname='push_subscriptions_migration_marker') union all select 'marker:'||canonical::text||':'||identity::text from employee_hub_private.push_subscriptions_migration_marker) s")}
 // Supabase-like default privileges must not leak the private marker or helpers.
@@ -24,6 +24,7 @@ async function state(q){return q("select md5(string_agg(x,'|' order by x)) h fro
 const drifts=[
  "alter table public.push_subscriptions force row level security",
  "alter table public.push_subscriptions add check (length(endpoint)>0)",
+ "alter table public.push_subscriptions drop constraint push_subscriptions_endpoint_check;alter table public.push_subscriptions add constraint push_subscriptions_endpoint_check check(true)",
  "alter table public.push_subscriptions drop constraint push_subscriptions_endpoint_check",
  "alter table public.push_subscriptions alter column endpoint set default 'https://x.example'",
  "grant select on public.push_subscriptions to anon",
@@ -31,12 +32,19 @@ const drifts=[
  "create policy external_policy on public.push_subscriptions for select to authenticated using (true)",
  "create index external_index on public.push_subscriptions(endpoint)",
  "create function public.external_push_trigger() returns trigger language plpgsql as $$begin return new;end$$;create trigger external_push_trigger before insert on public.push_subscriptions for each row execute function public.external_push_trigger()",
+ "alter table public.push_subscriptions disable trigger guard_push_subscription_timestamps",
+ "create function public.replaced_push_trigger() returns trigger language plpgsql security definer set search_path='' as $$begin return new;end$$;drop trigger guard_push_subscription_timestamps on public.push_subscriptions;create trigger guard_push_subscription_timestamps before insert or update on public.push_subscriptions for each row execute function public.replaced_push_trigger()",
  "alter schema employee_hub_private owner to authenticated",
  "grant usage on schema employee_hub_private to anon",
  "alter table employee_hub_private.push_subscriptions_migration_marker alter column canonical set default '[]'::jsonb",
  "alter table employee_hub_private.push_subscriptions_migration_marker owner to authenticated",
  "alter function employee_hub_private.push_subscription_active_approved() owner to authenticated",
  "alter function employee_hub_private.push_subscription_active_approved() set work_mem='1MB'",
+ "create or replace function employee_hub_private.push_subscription_active_approved() returns boolean language sql stable security definer set search_path='' as $$select true$$",
+ "create or replace function employee_hub_private.push_subscription_schema_snapshot() returns jsonb language sql stable security definer set search_path='' as $$select jsonb_build_object('canonical','{}'::jsonb,'identity','{}'::jsonb)$$;alter table public.push_subscriptions force row level security",
+ "create table employee_hub_private.unexpected_private_relation(x int)",
+ "create function employee_hub_private.unexpected_private_function() returns boolean language sql as $$select true$$",
+ "create type employee_hub_private.unexpected_private_type as enum ('x')",
  "grant execute on function employee_hub_private.guard_push_subscription_timestamps() to anon"
 ];
 for(const drift of drifts){const {db,q}=await fresh();try{await db.exec(drift);await q("update employee_hub_private.push_subscriptions_migration_marker set canonical=employee_hub_private.push_subscription_schema_snapshot()->'canonical',identity=employee_hub_private.push_subscription_schema_snapshot()->'identity'");const before=await state(q);await rejected(db,rollback);assert.deepEqual(await state(q),before,drift)}finally{await db.close()}}

@@ -68,4 +68,5 @@
 - 다음: marker drift fail-closed·Task7 marker 정합·old ACL 필수 EXECUTE·fixture/EOF 보완 → Sol 재검증. 그 전 운영 DB/push/deploy와 5차 ZIP 열람 금지.
 
 ## 2026-09-21 — Task7/8 portable semantic manifest
+- Task7/Task8 hardening: PGlite fixture가 same-name CHECK(true), helper body/trigger, private namespace, Task8 marker column/constraint/index/trigger drift를 reapply/rollback에서 fail-closed로 확인했다. 운영 적용 없음.
 - Task7 PGlite drift matrix와 Task8 apply/rollback PGlite PASS. 운영 변경 없음.

@@ -3,7 +3,7 @@
 ## 재부팅 정본 (2026-09-21)
 
 - [x] Task8 marker drift fail-closed·Task7 marker 정합·old ACL 필수 EXECUTE 보완. Sol M1 EOF 빈 줄은 혼합개행 RED로 재현 후 보완·PGlite Task8/Task7 및 diff check PASS.
-- [ ] 다음: EOF 보완 포함 Task8 Sol 독립 재검증. 그 전 운영 preflight/apply·push·smoke와 5차 ZIP 열람 금지.
+- [ ] 다음: Task7/Task8 hardening Sol 독립 재검증. 그 전 운영 preflight/apply·push·smoke와 5차 ZIP 열람 금지.
 
 ## 🟡 Task 8 수기근태 원장-실장 gate 로컬 패치 — 운영 적용 금지 (2026-09-21)
 - Task7 private manifest를 사전 대조하고, pending 수기근태 원장 직접확정을 막는 SQL·역순 rollback 초안을 추가했다. marker/함수 identity·ACL·RLS drift는 중단한다.

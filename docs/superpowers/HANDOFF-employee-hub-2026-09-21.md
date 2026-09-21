@@ -3,7 +3,8 @@
 ## 재부팅 정본 (2026-09-21)
 
 - Task8 로컬 보완: Task7 fixed fingerprint/manifest·canonical/identity와 Task8 marker owner/ACL/RLS drift, old ACL 필수 EXECUTE 및 Sol M1 EOF 빈 줄을 fail-closed 시험으로 추가했다. 고정 PGlite 0.5.8 Task8·Task7 회귀 및 diff check PASS.
-- 다음: Task8 Sol 독립 재검증. 그 전 운영 DB/push/deploy/5차 ZIP 열람 금지.
+- Task7/Task8 hardening 로컬 PASS: Task7 same-name CHECK·helper/trigger·private namespace 및 Task8 marker column/constraint/index/trigger drift는 reapply/rollback 거부 fixture로 확인했다. 운영 미적용.
+- 다음: Sol 독립 재검증. 그 전 운영 DB/push/deploy/5차 ZIP 열람 금지.
 
 ## Task 8 재부팅 체크포인트 (2026-09-21)
 
