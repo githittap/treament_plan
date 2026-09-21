@@ -47,13 +47,14 @@
 - 롤백: 신규 테이블과 갱신 트리거 함수만 제거한다. 적용 뒤 기록이 생성됐다면 이 롤백을 실행하지 말고 데이터 보존 판단을 먼저 받는다.
 - 적용 후 보완: 운영 적용된 실제 객체의 RLS 재시험도 8/8 PASS(실제 기록 0건, 시험 입력은 ROLLBACK)했다. `db/consultation_journal_advisor_hardening.sql`은 Advisor의 고정 `search_path`, `author_id` FK 인덱스, 정책 initPlan 보완만 추가한다.
 
-## 직원허브 현재 배포·인수인계 (2026-09-21 09:43 KST)
+## 직원허브 현재 배포·인수인계 (2026-09-21 09:47 KST)
 
-- 현재 배포 정본: `origin/main`의 `0f3226b` (직접 push 완료). 구현 기준 worktree는 `treament_plan/.worktrees/calendar-ui-release`, 브랜치는 `codex/calendar-ui-release`이다.
+- 기능 배포 기준 커밋: `0f3226b` (직접 push 완료). 구현 기준 worktree는 `treament_plan/.worktrees/calendar-ui-release`, 브랜치는 `codex/calendar-ui-release`이다. 인수인계 문서의 최신 정본은 기록 커밋을 포함한 `origin/main` HEAD를 따른다.
 - 상담일지 기본 migration `add_consultation_journals`은 운영 DB에 적용됐고, 실제 객체 대상으로 RLS 8/8 PASS·Sol 검토 PASS를 확인했다. 시험 입력은 ROLLBACK했고 운영 상담 기록은 0건이었다.
 - `db/consultation_journal_advisor_hardening.sql`은 migration `harden_consultation_journals`로 운영 DB에 적용됐다. 적용 후 실제 객체 RLS 8/8 PASS, 신규 상담일지 Advisor security WARN 0건을 확인했고, performance에는 신규 빈 테이블의 unused-index INFO만 남았다.
 - `https://jung-plant.com/hr.html?v=0f3226b`에서 상담일지·`consultation_journals` 마커 반영, 공개 로그인 화면 정상 및 console error 0건을 확인했다. 인증 후 manager/owner/staff/chief의 실제 입력·저장·재조회만 미검증이다. 자격증명·실제 환자 행·토큰은 이 저장소와 인수인계 문서에 기록하지 않는다.
-- 이 인수인계 문서의 로컬 기록 커밋은 아직 `origin/main`에 포함하지 않는다. 원격 main의 배포 정본은 계속 `0f3226b`이다.
+- 이 인수인계 문서의 로컬 기록 커밋은 아직 `origin/main`에 포함하지 않는다. push 뒤에는 `origin/main` HEAD와 이 문서의 최신본을 함께 확인한다.
+- 최초 ZIP의 승인된 추가형 구현·시험·DB/RLS/Storage·단계배포는 범위 안에서 단계별 재승인 없이 진행한다. 원본 삭제, 대량 이관/수정, 보안 완화, 새 비용, 자격증명 입력, 실제 직원 메일·push·알림, 외부 공개처럼 범위가 확대될 때만 별도 승인이 필요하다.
 - 범위별 현재 상태와 다음 순서는 [직원허브 인수인계](docs/superpowers/HANDOFF-employee-hub-2026-09-21.md)를 정본으로 한다. 기존 ZIP 근무표 수용 이력은 아래 수용추적표에 보존한다.
 
 ## 핵심 규칙·컨벤션
