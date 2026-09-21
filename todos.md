@@ -1,10 +1,14 @@
 # todos — 내부 도구(T8/D) 작업 목록
 
-## 🔄 Task 6 공지 첨부·예치금 권한 분리 — Sol High FAIL 보완 완료, 최종 재검증 대기 (2026-09-21)
+## 🔴 Task 6 공지 첨부·예치금 권한 분리 — 로컬 구현 있으나 최종 Sol High FAIL·배포 차단 (2026-09-21)
 - 이전 `2e1de31`·`ffb58fb` 기록은 permissive 공지 정책 결함 발견으로 대체됐다. 보완 커밋 `4e346cf`, 검증 커밋 `28529d0`: private `notice-attachments` 버킷의 서버 MIME/10MB/UUID tmp 경로, 단일 INSERT 정책, 서버 작성자 이름 고정·불변 필드 트리거, private download·실패 임시객체 정리를 사용한다. DELETE는 승인·활성 본인의 `uid/tmp/...`만 허용하고 타인·비tmp·타버킷은 거부한다. 예치금 조회는 데스크·chief·owner로 분리한다.
 - 검증: 고정 PGlite 0.5.8에서 apply→rollback 정책 식·버킷·권한 왕복, 신규 빈 버킷 제거, 객체 존재 시 중단·보존을 확인했다. 전체 직접 Node 30개 파일, 인라인 JS 구문검사와 `git diff --check`를 통과했다.
 - Sol High FAIL 추가 보완 `7ee01fd`: 클라이언트가 2000년 시각을 보내도 INSERT의 `created_at`·`updated_at`은 서버 시각으로 저장되며, snapshot 표의 anon·authenticated grant 0개와 SELECT·UPDATE 거부를 확인했다. 독립 최종 재검증은 미완료다.
 - [ ] 운영 적용 전: SQL/RLS/Storage 검토·백업/롤백 경로 확인, 별도 시험 계정 역할별 업로드·저장·재조회, 승인된 push·배포 확인. 운영 DB/Storage·실제 계정·실데이터는 변경하지 않았다.
+- [ ] **Sol High FAIL 정정:** `db/notice_attachments_deposit_access_draft.sql:27,29`의 `array_length(storage.foldername(name),1)=3`은 실제 Supabase에서 `uid/tmp/file` → `[uid,tmp]` 길이 2와 불일치한다. 실제 업로드/cleanup DELETE가 RLS 거부되고, 기존 PGlite helper는 파일명까지 포함해 위양성 PASS를 냈다.
+- [ ] 성공 첨부가 `uid/tmp/...`에 남으면 작성자가 게시 첨부를 DELETE해 링크를 깨뜨릴 수 있다. 성공 후 tmp 밖 확정 경로로 이동하거나 게시 객체 DELETE를 서버 절차로 차단해야 한다.
+- [ ] 재검증 순서: 실제 helper 의미를 반영한 RED(길이2, 게시 첨부 삭제 거부) → migration path 조건 수정 및 tmp 밖 확정 경로 GREEN → PGlite/정적/전체 회귀 → Sol High PASS → 사용자 승인된 Opus 읽기전용 외부 검사 → 그 뒤 push/운영 적용 판단.
+- [ ] 검증 집계: Node 23/23, 기존 PGlite 7/7은 Storage 판정 무효, 실제 helper 의미 반영 시험 FAIL, 인라인 2 PASS, diff check PASS. push/운영 적용/Opus 미실행.
 - [ ] Task 7~11: 모바일 push, 출퇴근·PDF 계약 운영 회귀, 메뉴 도움말, 최종인수, 결과보고서·사용설명서. `상담문의 등 일원화.zip`은 선행 전체 완료 후 별도 후속 범위다.
 
 ## ✅ Task 4 직원서류·입사 체크리스트·개인서명 단계배포 완료 (2026-09-21)

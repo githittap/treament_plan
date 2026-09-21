@@ -1,5 +1,13 @@
 # 직원허브 구현 기록
 
+## 2026-09-21 — Sol High 최종 판정 FAIL 정정 인계
+
+- 상태: Task 6은 로컬 구현은 있으나 최종 Sol High FAIL·배포 차단이다. 문서만 갱신했으며 코드·SQL·시험 파일은 수정하지 않았다.
+- FAIL 1: `db/notice_attachments_deposit_access_draft.sql:27,29`의 `array_length(storage.foldername(name),1)=3`이 실제 Supabase 의미와 불일치한다. `uid/tmp/file`의 foldername은 `[uid,tmp]` 길이 2이며 실제 업로드/cleanup DELETE가 RLS 거부된다. 기존 PGlite helper는 파일명 포함 위양성 모사였다.
+- FAIL 2: 성공 첨부가 `uid/tmp/...`에 남아 작성자가 게시 첨부를 DELETE할 수 있고 링크가 깨질 수 있다. 성공 후 tmp 밖 확정 경로 이동 또는 서버 확정 절차와 게시 객체 DELETE 차단이 필요하다.
+- 검증: Node 23/23, 기존 PGlite 7/7은 Storage 판정 무효, 실제 helper 의미 반영 시험 FAIL, 인라인 2 PASS, `git diff --check` PASS. push·운영 적용·Opus 미실행.
+- 다음: 실제 Supabase foldername 의미 수용시험 고정 → RED(길이2·게시 첨부 DELETE 거부) → GREEN(path 수정·tmp 밖 확정·DELETE 차단) → PGlite/정적/전체 회귀 → Sol High PASS → 승인된 Opus 읽기전용 검사 → push/운영 판단.
+
 ## 2026-09-21 — Task 6 로컬 검증 및 인수인계
 
 - 기준: 기능 커밋 `2e1de31`(공지 첨부와 예치금 권한 분리), 작업 브랜치 `codex/calendar-ui-release`.

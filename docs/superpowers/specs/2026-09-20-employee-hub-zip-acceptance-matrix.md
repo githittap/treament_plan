@@ -1,5 +1,20 @@
 # 직원허브 ZIP 근무표 수용 추적표
 
+## Task 6 최신 수용 게이트 — Sol High FAIL (2026-09-21)
+
+Task 6은 **로컬 구현 있으나 최종 Sol High FAIL·배포 차단**이다. 기존 수용·배포 이력은 보존하며 이 게이트를 최신 상태로 적용한다.
+
+| 항목 | 현재 판정 | 다음 수용 조건 |
+|---|---|---|
+| Supabase `foldername` path 조건 | FAIL | `uid/tmp/file` → `[uid,tmp]` 길이 2를 실제 의미로 고정하고 migration 조건 수정 |
+| 실제 업로드/cleanup DELETE | FAIL/미검증 경계 붕괴 | RLS 거부 원인 수정 후 실제 의미 반영 시험에서 통과 |
+| 성공 첨부 보존 | FAIL | tmp 밖 확정 경로 이동 또는 서버 확정 절차, 타인·게시·비tmp DELETE 차단 |
+| 기존 PGlite helper | 무효 | 파일명을 foldername에 포함하지 않는 helper로 교체해 RED/GREEN 재시험 |
+
+검증 집계: Node 23/23, 기존 PGlite 7/7은 helper 오모사로 Storage 판정 무효, 실제 helper 의미 반영 시험 FAIL, 인라인 2 PASS, `git diff --check` PASS. push·운영 적용·Opus 미실행.
+
+재검증 순서는 실제 Supabase foldername 의미 고정 → RED(길이 2·게시 첨부 DELETE 거부) → GREEN(path 수정·tmp 밖 확정·DELETE 차단) → PGlite/정적/전체 회귀 → Sol High PASS → 사용자 승인 Opus 읽기전용 외부 검사 → push/운영 적용 판단이다.
+
 기준 원문: `직원허브 수정 지침.zip` MD 91~102행. 개인정보·원본 엑셀은 시험 입력으로 사용하지 않는다.
 
 | ID | 요구 | 현재 상태 | 수용 증거 |

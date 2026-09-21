@@ -1,5 +1,15 @@
 # 직원허브 확정 결정
 
+## 최신 결정 정정 — Task 6 Sol High FAIL (2026-09-21)
+
+| 시각 | 결정 | 근거와 경계 |
+|---|---|---|
+| 2026-09-21 | Task 6은 최종 Sol High FAIL이며 배포를 차단한다. | `storage.foldername(name)`에서 `uid/tmp/file`은 `[uid,tmp]` 길이 2인데 SQL이 길이 3을 요구한다. 실제 업로드/cleanup DELETE가 RLS 거부되며 기존 PGlite helper는 파일명 포함 위양성 모사였다. |
+| 2026-09-21 | 성공 첨부의 tmp 잔류를 허용하지 않는다. | `uid/tmp/...`에 게시 첨부가 남으면 작성자 DELETE 정책으로 링크가 깨질 수 있다. 성공 후 tmp 밖 확정 경로 이동 또는 서버 확정 절차와 게시 객체 DELETE 차단이 필요하다. |
+| 2026-09-21 | 실제 의미 반영 수용시험을 먼저 고정한다. | RED는 helper 길이 2·게시 첨부 DELETE 거부, GREEN은 path 조건 수정·tmp 밖 확정·타인/게시/비tmp DELETE 차단으로 한다. |
+
+이 정정 전의 PASS·로컬 검증 이력은 삭제하지 않는다. Node 23/23, 기존 PGlite 7/7은 helper 오모사로 Storage 판정이 무효이고, 실제 helper 의미 반영 시험은 FAIL, 인라인 2 및 `git diff --check`는 PASS였다. push·운영 적용·Opus는 미실행이다. Sol High PASS와 사용자 승인된 Opus 읽기전용 외부 검사 전에는 push·운영 DB/Storage 적용을 하지 않는다.
+
 | 시각 | 결정 | 근거와 경계 |
 |---|---|---|
 | 2026-09-21 | 원본 ZIP 명칭을 구분한다. | 시간상 최초 업로드=`직원허브설명서관련.zip`; 승인 구현 정본=`직원허브 수정 지침.zip`. 상세 해시·수량은 source ZIP 인벤토리가 정본이다. |

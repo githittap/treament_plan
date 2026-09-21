@@ -71,3 +71,15 @@
 - 프로젝트 지도: `Z:\09_claude-output\★프로젝트지도.md`(+.html)
 - 설계서·상황판: `Z:\09_claude-output\04_AI·Claude운영\산출물\` (교정보드 v1.1·근태 v1.1·상황판·기술문답·덴트웹 UI참고·설정 설명서)
 - 이 프로젝트용 코딩 규칙: 같은 폴더 `CLAUDE.md`(치료계획.html 함수맵·단축키 등)
+
+## 최신 인계 상태 — Task 6 Sol High 최종 판정 FAIL (2026-09-21)
+
+현재 기준 HEAD는 `1719e3f`이며, 이 기록은 구현·SQL·시험 파일을 변경하지 않고 문서만 갱신한 인계 정본이다. Task 6은 **로컬 구현은 있으나 최종 Sol High FAIL로 배포 차단** 상태다.
+
+- `db/notice_attachments_deposit_access_draft.sql:27,29`의 `array_length(storage.foldername(name),1)=3`은 실제 Supabase 의미와 다르다. `uid/tmp/file`의 `foldername`은 `[uid,tmp]`이므로 길이는 2다.
+- 그 결과 실제 업로드/cleanup DELETE가 RLS에서 거부된다. 기존 PGlite helper는 파일명까지 포함해 모사하여 위양성 PASS를 냈다.
+- 성공 첨부도 `uid/tmp/...`에 남아 DELETE 정책으로 작성자가 게시 첨부를 삭제해 링크를 깨뜨릴 수 있다. 성공 후 tmp 밖 확정 경로로 이동하거나 게시 객체 DELETE를 서버 절차로 차단해야 한다.
+- 검증 결과: Node 23/23, 기존 PGlite 7/7은 helper 오모사 때문에 Storage 판정 무효, 실제 helper 의미 반영 시험 FAIL, 인라인 2 PASS, diff check PASS.
+- push·운영 적용·Opus 검사는 수행하지 않았다. Sol High 최종 PASS 전 push·운영 DB/Storage 적용을 금지한다.
+
+재부팅 후 시작 순서는 인계자료 README → HANDOFF → overview → todos → DECISIONS → WORKLOG → acceptance matrix → source ZIP inventory다. 이후 `git status --short`, `git rev-parse HEAD`, `git log --oneline 4865f89..HEAD`를 확인하고 실제 Supabase `foldername` 의미를 수용시험에 먼저 고정한다.

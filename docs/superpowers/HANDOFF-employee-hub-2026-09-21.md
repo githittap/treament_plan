@@ -1,5 +1,26 @@
 # 직원허브 현재 인수인계
 
+## 최신 정정 — Task 6 Sol High 최종 판정 FAIL (2026-09-21, 문서 갱신)
+
+현재 기준 HEAD: `1719e3f`. Task 6은 **로컬 구현은 있으나 최종 Sol High FAIL·배포 차단**이다. 아래 내용은 기존 완료·검증 이력을 삭제하지 않고 최신 안전 경계를 추가한 것이다.
+
+### FAIL 근거
+
+1. `db/notice_attachments_deposit_access_draft.sql:27,29`의 `array_length(storage.foldername(name),1)=3`은 실제 Supabase Storage 의미와 다르다. `uid/tmp/file`의 `foldername`은 `[uid,tmp]`이므로 길이 2이며, 현재 실제 업로드/cleanup DELETE가 RLS 거부된다. PGlite helper는 파일명까지 포함해 모사하여 위양성 PASS를 냈다.
+2. 성공 첨부도 `uid/tmp/...`에 남는다. 작성자가 게시 첨부를 DELETE할 수 있어 링크가 깨질 수 있다. 성공 후 tmp 밖 확정 경로로 이동하거나 게시 객체 DELETE를 서버 절차로 차단해야 한다.
+
+검증은 Node 23/23, 기존 PGlite 7/7(단, helper 오모사로 Storage 판정 무효), 실제 helper 의미 반영 시험 FAIL, 인라인 2 PASS, `git diff --check` PASS다. push·운영 DB/Storage 적용·Opus 검사는 실행하지 않았다.
+
+### 다음 실행 순서
+
+인계자료 `README.md` → 이 HANDOFF → `overview.md` → `todos.md` → `DECISIONS-employee-hub.md` → `WORKLOG-employee-hub.md` → 수용추적표 → source ZIP inventory 순서로 읽는다. 그 뒤 `git status --short`, `git rev-parse HEAD`, `git log --oneline 4865f89..HEAD`를 확인한다.
+
+코드 수정 전 실제 Supabase `foldername` 공식 의미를 수용시험으로 고정한다. RED는 helper 길이 2와 게시 첨부 DELETE 거부를 검증하고, GREEN은 migration path 조건 수정·성공 첨부의 tmp 밖 확정 경로 이동 또는 서버 확정·타인/게시/비tmp DELETE 차단을 검증한다. PGlite/정적/전체 회귀와 Sol High 재검증 PASS, 사용자 승인된 Opus 읽기전용 외부 검사 뒤에만 push/운영 적용을 판단한다.
+
+### 보호 경계
+
+C: 원본 ZIP 6개는 보존되어 있고, Z: 복사본 6/6은 SHA256 일치한다. Sol PASS 전 push·운영 DB/Storage, 원본 삭제, 실제 직원 알림, 자격증명 노출, 대량 이관, 보안 완화를 금지한다.
+
 - 갱신: 2026-09-21 Task 6 Sol High FAIL 보완 완료·최종 재검증 대기
 - 기능 배포 기준 커밋: `0f3226b` (직접 push 완료)
 - 배포 정본은 `origin/main`=`4865f89`이고, 현재 로컬 HEAD는 Task 6 기능·시험·문서 커밋을 포함한다. 이 로컬 커밋들은 아직 push·배포하지 않는다.
