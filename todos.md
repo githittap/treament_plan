@@ -1,7 +1,7 @@
 # todos — 내부 도구(T8/D) 작업 목록
 
 ## 🟡 Task 7 모바일 Push 로컬 기반 완료 — 운영 연결 대기 (2026-09-21)
-- `hr.html` 업무자료 내부의 준비 상태·내 구독 해제, `sw.js` push/notificationclick, 본인 active/approved RLS 초안을 로컬로 추가했다. RLS 정책의 profile 상태 확인은 전체 `profiles` SELECT 대신 빈 `search_path`의 `security definer` helper를 호출하고, helper 실행은 authenticated에만 부여한다. marker에는 migration 직후 table/marker/helper OID, ACL·RLS, helper owner/config/ACL/definition, 정책·trigger·제약·index 정본 snapshot을 저장해 rollback 전 외부 drift를 fail-closed로 차단한다. 해제는 endpoint 한 행 DB 삭제 성공 뒤 browser unsubscribe를 수행해 DB 실패 시 재시도 가능하다. `tests/push-notifications.test.js`와 `tests/sql/pglite-push-subscriptions.mjs`는 VM·PGlite로 이 경계를 검증한다.
+- `hr.html` 업무자료 내부의 준비 상태·내 구독 해제, `sw.js` push/notificationclick, 본인 active/approved RLS 초안을 로컬로 추가했다. marker·snapshot·guard/helper는 비노출 `employee_hub_private` schema에 있으며 PUBLIC·anon·authenticated·service_role 직접 권한을 회수하고 authenticated에는 상태 helper 실행만 최소 부여한다. 고정 v3 manifest와 migration 직후 OID/ACL/RLS/함수·정책·trigger·제약·index/column snapshot을 rollback 전 비교해 drift를 fail-closed로 차단한다. 해제는 endpoint 한 행 DB 삭제 성공 뒤 browser unsubscribe를 수행해 DB 실패 시 재시도 가능하다. `tests/push-notifications.test.js`와 `tests/sql/pglite-push-subscriptions.mjs`는 VM·PGlite로 이 경계를 검증한다.
 - VAPID·서버 발송·실제 기기 권한/구독·직원 발송·운영 migration은 미수행이며 별도 비용·자격증명·실기기 검증 후 진행한다.
 
 ## ✅ Task 6 공지 첨부·예치금 권한 분리 — Sol High 최종 PASS, 운영 적용 대기 (2026-09-21)
