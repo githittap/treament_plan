@@ -56,7 +56,7 @@
 - 이 인수인계 문서의 로컬 기록 커밋은 아직 `origin/main`에 포함하지 않는다. push 뒤에는 `origin/main` HEAD와 이 문서의 최신본을 함께 확인한다.
 - 최초 ZIP의 승인된 추가형 구현·시험·DB/RLS/Storage·단계배포는 범위 안에서 단계별 재승인 없이 진행한다. 원본 삭제, 대량 이관/수정, 보안 완화, 새 비용, 자격증명 입력, 실제 직원 메일·push·알림, 외부 공개처럼 범위가 확대될 때만 별도 승인이 필요하다.
 - 범위별 현재 상태와 다음 순서는 [직원허브 인수인계](docs/superpowers/HANDOFF-employee-hub-2026-09-21.md)를 정본으로 한다. 기존 ZIP 근무표 수용 이력은 아래 수용추적표에 보존한다.
-- Task 6 로컬 보안 보완 기준은 `960c351`이다. 기존 permissive 공지 INSERT/UPDATE 정책을 제거하고, 서버 작성자 고정·불변 트리거·private 버킷 MIME/10MB/임시경로 검증·첨부 열람/실패 정리를 추가했다. 운영 DB·Storage 적용, push, 배포와 실제 역할별 저장/재조회는 미수행이다.
+- Task 6 로컬 보안 보완은 `4e346cf`, 검증 정본은 `28529d0`이다. 본인의 `uid/tmp/...` DELETE만 허용하고 타인·비tmp·타버킷은 거부하며, 저장 실패·부분 업로드 cleanup이 같은 임시 경로만 정리한다. PGlite에서 apply→rollback 정책 식·버킷 설정·권한 동일성, 신규 빈 버킷 제거, 객체 존재 시 보존 중단을 확인했다. 운영 DB·Storage 적용, push, 배포와 실제 역할별 저장/재조회는 미수행이다.
 - 원본의 시간상 최초 업로드는 `직원허브설명서관련.zip`, 승인 구현 정본은 `직원허브 수정 지침.zip`이다. 상세 해시·수량은 [원본 ZIP 인벤토리](docs/superpowers/specs/2026-09-21-employee-hub-source-zip-inventory.md)를 따른다.
 
 ## 핵심 규칙·컨벤션

@@ -1,6 +1,6 @@
 # 직원허브 현재 인수인계
 
-- 갱신: 2026-09-21 Task 6 로컬 보안 보완
+- 갱신: 2026-09-21 Task 6 DELETE·롤백 왕복 검증 완료
 - 기능 배포 기준 커밋: `0f3226b` (직접 push 완료)
 - 배포 정본은 `origin/main`=`4865f89`이고, 현재 로컬 HEAD는 Task 6 기능·시험·문서 커밋을 포함한다. 이 로컬 커밋들은 아직 push·배포하지 않는다.
 - 구현 worktree: `Z:\코딩 프로젝트(클로드 작업)\치료계획 코딩\treament_plan\.worktrees\calendar-ui-release`
@@ -16,7 +16,7 @@
 | C. `직원허브 3차.zip` 피드백 | D 4차 UI에 흡수·최종 수정·사용자 승인·배포 완료 | 확정된 4차 결과를 현 배포 정본으로 삼는다. |
 | D. 4차 UI/캘린더 보완 | `0f3226b`까지 main 반영 | 인증 후 실제 입력·저장·재조회만 미검증이다. |
 | 후속 상담일지 요구 | 기본 및 `harden_consultation_journals` migration 운영 적용 | 실제 상담 기록은 0건이며, 시험 입력은 ROLLBACK했다. |
-| E. Task 6 공지 첨부·예치금 | 로컬 보안 보완·합성검증 완료, 운영 적용·배포 미수행 | `960c351`; 기존 permissive 정책 제거, 서버 작성자 고정·불변 필드, private Storage 검증·열람·실패 정리까지 포함한다. |
+| E. Task 6 공지 첨부·예치금 | 로컬 보안 보완·합성검증 완료, 운영 적용·배포 미수행 | 보완 `4e346cf`, 검증 `28529d0`; 본인 tmp DELETE 경계와 apply→rollback 정책·버킷·권한 왕복을 포함한다. |
 
 ## 완료·배포·검증 증거
 
@@ -27,14 +27,14 @@
 - `db/consultation_journal_advisor_hardening.sql`: migration `harden_consultation_journals`로 운영 DB 적용 완료. 함수의 고정 `search_path`, `author_id` 인덱스, RLS 정책 initPlan을 보완했고, 적용 후 신규 상담일지 관련 Advisor security WARN은 0건이다. performance에는 신규 빈 테이블의 unused-index INFO만 남았다.
 - 공개 확인: `https://jung-plant.com/hr.html?v=0f3226b`에서 상담일지·`consultation_journals` 마커 반영, 로그인 화면 정상 및 console error 0건.
 - 기존 근무표 단계배포·집계·공개 URL 증거는 `docs/superpowers/specs/2026-09-20-employee-hub-zip-acceptance-matrix.md`에 보존한다.
-- Task 6: `NOTICE_ATTACHMENTS_ACCEPTANCE_PASS`, `PGLITE_NOTICE_ATTACHMENTS_DEPOSIT_ACCESS_PASS`, 전체 직접 Node 회귀, 인라인 JS 구문검사, `git diff --check`를 로컬에서 통과했다. 롤백 SQL은 `db/notice_attachments_deposit_access_rollback.sql`이며, 실제 첨부 생성 뒤에는 데이터 보존 판단 전 실행하지 않는다.
+- Task 6: `NOTICE_ATTACHMENTS_ACCEPTANCE_PASS`, `PGLITE_NOTICE_ATTACHMENTS_DEPOSIT_ACCESS_PASS`, 전체 직접 Node 30개 파일, `INLINE_SCRIPT_SYNTAX=PASS`, `git diff --check`를 로컬에서 통과했다. PGlite는 본인 tmp DELETE 성공·타인/비tmp/타버킷 거부, 기존 버킷 설정·기존 정책 식·table grant 왕복, 신규 빈 버킷 제거, 객체 존재 시 중단·보존을 확인한다.
 - 원본의 시간상 최초 업로드는 `직원허브설명서관련.zip`, 승인 구현 정본은 `직원허브 수정 지침.zip`이다. 원본 6개의 읽기전용 해시·수량은 `docs/superpowers/specs/2026-09-21-employee-hub-source-zip-inventory.md`에 고정한다.
 
 ## 승인 범위·실행 상태
 
 - 최초 ZIP의 승인된 추가형 구현·시험·DB/RLS/Storage·단계배포는 단계별 재승인 없이 진행한다.
 - 별도 승인 게이트는 원본 삭제, 대량 이관/수정, 보안 완화, 새 비용, 자격증명 입력, 실제 직원 메일·push·알림, 외부 공개처럼 기존 범위를 확대하는 경우에만 적용한다.
-- 이전 Terra 실행은 idle이며 재지시하지 않는다. Task 6 검증은 이 worktree에서 완료했다.
+- 이전 Terra 실행은 idle이며 재지시하지 않는다. Task 6 로컬 검증은 `28529d0`까지 완료했고, push·운영 DB/Storage 적용·배포는 하지 않았다.
 
 ## 아직 미완료 — Task 6~11
 

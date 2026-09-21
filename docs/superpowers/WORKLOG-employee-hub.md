@@ -14,3 +14,10 @@
 - 보완 커밋: `960c351` — 기존 INSERT/UPDATE 정책 제거 후 단일 INSERT 정책, 서버 작성자 이름 고정·불변 트리거, private 버킷 MIME/10MB/tmp 경로 검증, 첨부 download·실패 임시객체 정리, 비파괴 롤백 SQL을 추가했다.
 - 검증: RED에서 기존 정책 제거 검증이 실패한 것을 확인한 뒤 GREEN에서 PGlite staff/chief/owner·위조 INSERT·불변 UPDATE·MIME/크기/경로·조회 경계를 통과했다. 전체 직접 Node 회귀, 인라인 JS 구문, `git diff --check`도 통과했다.
 - 운영 경계: 실제 DB/Storage·객체·행은 변경하지 않았고, 적용 전후 스냅샷과 백업/롤백 경로 및 별도 시험 계정 재검증이 필요하다.
+
+## 2026-09-21 — Task 6 DELETE·롤백 왕복 재검증
+
+- 검증 커밋: `28529d0`. `4e346cf`의 정책·롤백 SQL은 추가 수정 없이 강화된 시험을 통과했다.
+- DELETE: 승인·활성 본인의 `uid/tmp/...` 성공, 타인 tmp·본인 비tmp·타버킷 거부를 PGlite RLS로 확인했다. `cleanupNoticeUploads()`는 부분 업로드·공지 저장 실패 모두 이번 요청의 `uploaded` 경로만 전용 버킷에서 정리한다.
+- 롤백: apply 전/롤백 후 공지 INSERT·UPDATE, 예치금 정책의 식과 table grant, 기존 버킷 설정이 동일함을 확인했다. 신규 버킷은 비었을 때만 제거되고, 객체가 있으면 transaction이 중단되어 버킷·객체가 보존된다.
+- 회귀: 직접 Node 30개 파일 통과, `INLINE_SCRIPT_SYNTAX=PASS`, `git diff --check` 통과. 운영 DB/Storage 적용, 실제 계정·데이터 시험, push, 배포는 수행하지 않았다.
