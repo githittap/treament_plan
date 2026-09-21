@@ -1,20 +1,9 @@
-const assert=require('node:assert/strict'),fs=require('node:fs');
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),test=require('node:test');
 const html=fs.readFileSync('hr.html','utf8'),sw=fs.readFileSync('sw.js','utf8'),sql=fs.readFileSync('db/push_subscriptions_draft.sql','utf8'),rollback=fs.readFileSync('db/push_subscriptions_rollback.sql','utf8');
-assert.match(html,/pushNotificationCard\(/,'기존 화면 안에 Push 상태 카드가 있어야 한다');
-assert.match(html,/push_subscriptions/,'구독 해제는 본인 구독 행만 대상으로 해야 한다');
-assert.match(html,/PUSH_VAPID_PUBLIC_KEY/,'VAPID 키 없이 실제 구독을 시작하지 않아야 한다');
-assert.match(html,/pushManager\.getSubscription\(\).*unsubscribe\(\)/s,'해제는 브라우저 구독부터 안전하게 처리해야 한다');
-assert.match(html,/\.eq\('endpoint',subscription\.endpoint\)/,'해제는 현재 브라우저 endpoint 한 건만 삭제해야 한다');
-assert.match(sw,/addEventListener\('push'/,'서비스워커는 push 수신을 처리해야 한다');
-assert.match(sw,/addEventListener\('notificationclick'/,'서비스워커는 notificationclick을 안전하게 처리해야 한다');
-assert.match(sw,/new URL\(/,'외부·비정상 URL은 origin/path 검증해야 한다');
-assert.match(sw,/slice\(0,200\)/,'알림 문자열 길이는 제한해야 한다');
-assert.match(sql,/create table public\.push_subscriptions/i,'구독 테이블 초안이 필요하다');
-assert.match(sql,/auth\.uid\(\)/i,'RLS는 본인 구독으로 한정해야 한다');
-assert.match(sql,/endpoint text not null unique/i,'사용자별 여러 기기를 허용하되 같은 endpoint 중복은 막아야 한다');
-assert.match(sql,/endpoint text not null unique/i,'endpoint는 전역 단일 소유여야 한다');
-assert.match(sql,/subscription->>'endpoint'=endpoint/i,'구독 JSON endpoint는 열 값과 일치해야 한다');
-assert.match(sql,/begin;[\s\S]*commit;/i,'초안은 단일 트랜잭션이어야 한다');
-assert.match(sql,/migration object collision; preserve state and stop/i,'기존 동명 객체는 fail-closed 해야 한다');
-assert.match(rollback,/push subscriptions exist; preserve data and stop rollback/i,'rollback은 구독 행이 있으면 fail-closed 해야 한다');
-console.log('PUSH_NOTIFICATIONS_STATIC_PASS');
+for(const [v,re,msg] of [[html,/pushNotificationCard\(/,'카드'],[html,/PUSH_VAPID_PUBLIC_KEY/,'VAPID 보호'],[html,/\.eq\('endpoint',subscription\.endpoint\)/,'현재 endpoint 삭제'],[sw,/addEventListener\('push'/,'push'],[sw,/addEventListener\('notificationclick'/,'click'],[sw,/new URL\(/,'origin 방어'],[sql,/endpoint text not null unique/i,'endpoint UNIQUE'],[sql,/subscription->>'endpoint'=endpoint/i,'JSON endpoint'],[sql,/migration object collision; preserve state and stop/i,'apply fail-closed'],[rollback,/push subscriptions rows or dependencies exist; preserve data and stop rollback/i,'rollback fail-closed']])assert.match(v,re,msg);
+function worker(){const events={},shown=[],opened=[],self={location:{origin:'https://jung-plant.com'},registration:{showNotification:async(...x)=>shown.push(x)},clients:{claim:async()=>{},matchAll:async()=>[]},skipWaiting(){},addEventListener:(n,f)=>events[n]=f};const c={self,clients:{matchAll:self.clients.matchAll,openWindow:async u=>opened.push(u)},fetch:async()=>{},Response,URL};vm.runInNewContext(sw,c);return{events,shown,opened,c};}
+test('SW payload와 URL을 fail-closed로 정규화한다',async()=>{const x=worker(),wait=[];x.events.push({data:{json:()=>({url:'https://evil.example/a',title:'x'.repeat(201),body:{x:1}})},waitUntil:p=>wait.push(p)});await Promise.all(wait);assert.equal(x.shown[0][0].length,200);assert.equal(x.shown[0][1].body,'새 알림이 있습니다.');assert.equal(x.shown[0][1].data.url,'https://jung-plant.com/hr.html');const y=worker(),w=[];y.events.push({data:{json:()=>{throw Error('bad')}},waitUntil:p=>w.push(p)});await Promise.all(w);assert.equal(y.shown[0][1].data.url,'https://jung-plant.com/hr.html');});
+test('SW click은 동일 origin hr 창만 focus한다',async()=>{const x=worker(),w=[],focused=[];x.c.clients.matchAll=async()=>[{url:'https://evil.example/hr.html',focus:async()=>focused.push('evil')},{url:'https://jung-plant.com/hr.html?x=1',focus:async()=>focused.push('ok')}];x.events.notificationclick({notification:{data:{url:'https://evil.example'},close(){}},waitUntil:p=>w.push(p)});await Promise.all(w);assert.deepEqual(focused,['ok']);assert.deepEqual(x.opened,[]);});
+function ui(subscription,error){let text='',calls=[];const eq=(k,v)=>{calls.push([k,v]);return k==='endpoint'?Promise.resolve({error}):{eq}};const c={navigator:{serviceWorker:{ready:Promise.resolve({pushManager:{getSubscription:async()=>subscription}})}},$:()=>({set textContent(v){text=v}}),ME:{id:'me'},sb:{from:()=>({delete:()=>({eq})})}};vm.runInNewContext(html.match(/async function unsubscribePushNotifications\(\)\{[\s\S]*?\n(?=function renderWorkDocuments)/)[0],c);return{run:()=>c.unsubscribePushNotifications(),get text(){return text},calls};}
+test('UI는 현재 endpoint만 삭제하며 구독 없음은 DB를 건드리지 않는다',async()=>{const a=ui({endpoint:'https://push/a',unsubscribe:async()=>true});await a.run();assert.deepEqual(a.calls,[['user_id','me'],['endpoint','https://push/a']]);assert.match(a.text,/해제했습니다/);const b=ui(null);await b.run();assert.deepEqual(b.calls,[]);assert.match(b.text,/일괄 삭제하지 않았습니다/);const d=ui({endpoint:'https://push/a',unsubscribe:async()=>true},{message:'DB'});await d.run();assert.match(d.text,/삭제 실패/);});
+console.log('PUSH_NOTIFICATIONS_STATIC_AND_VM_PASS');
