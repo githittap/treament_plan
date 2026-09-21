@@ -1,8 +1,9 @@
 # todos — 내부 도구(T8/D) 작업 목록
 
-## ✅ Task 6 공지 첨부·예치금 권한 분리 — 로컬 보안 보완 완료, 운영 적용 대기 (2026-09-21)
+## 🔄 Task 6 공지 첨부·예치금 권한 분리 — Sol High FAIL 보완 완료, 최종 재검증 대기 (2026-09-21)
 - 이전 `2e1de31`·`ffb58fb` 기록은 permissive 공지 정책 결함 발견으로 대체됐다. 보완 커밋 `4e346cf`, 검증 커밋 `28529d0`: private `notice-attachments` 버킷의 서버 MIME/10MB/UUID tmp 경로, 단일 INSERT 정책, 서버 작성자 이름 고정·불변 필드 트리거, private download·실패 임시객체 정리를 사용한다. DELETE는 승인·활성 본인의 `uid/tmp/...`만 허용하고 타인·비tmp·타버킷은 거부한다. 예치금 조회는 데스크·chief·owner로 분리한다.
 - 검증: 고정 PGlite 0.5.8에서 apply→rollback 정책 식·버킷·권한 왕복, 신규 빈 버킷 제거, 객체 존재 시 중단·보존을 확인했다. 전체 직접 Node 30개 파일, 인라인 JS 구문검사와 `git diff --check`를 통과했다.
+- Sol High FAIL 추가 보완 `7ee01fd`: 클라이언트가 2000년 시각을 보내도 INSERT의 `created_at`·`updated_at`은 서버 시각으로 저장되며, snapshot 표의 anon·authenticated grant 0개와 SELECT·UPDATE 거부를 확인했다. 독립 최종 재검증은 미완료다.
 - [ ] 운영 적용 전: SQL/RLS/Storage 검토·백업/롤백 경로 확인, 별도 시험 계정 역할별 업로드·저장·재조회, 승인된 push·배포 확인. 운영 DB/Storage·실제 계정·실데이터는 변경하지 않았다.
 - [ ] Task 7~11: 모바일 push, 출퇴근·PDF 계약 운영 회귀, 메뉴 도움말, 최종인수, 결과보고서·사용설명서. `상담문의 등 일원화.zip`은 선행 전체 완료 후 별도 후속 범위다.
 

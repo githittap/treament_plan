@@ -57,4 +57,4 @@ Task 0 증거: `tests/schedule-zip-acceptance.test.js`는 기존 개인별 selec
 - 공지 첨부·예치금 권한 분리 기능은 `2e1de31`, PGlite 합성시험은 `ffb58fb`에 있다. 공지는 승인·활성 직원의 자기 작성자/UUID 경로, 예치금은 데스크·chief·owner 조회로 분리했다.
 - `NOTICE_ATTACHMENTS_ACCEPTANCE_PASS`, `PGLITE_NOTICE_ATTACHMENTS_DEPOSIT_ACCESS_PASS`, `hr.html` 인라인 JS 구문검사, `git diff --check`가 로컬에서 통과했다.
 - 이 단계는 운영 DB/Storage migration, 실제 파일 업로드·역할별 저장/재조회, push, 배포를 포함하지 않는다. 원본 ZIP의 시간상 최초 업로드와 승인 구현 정본은 다르며, 상세 인벤토리는 [원본 ZIP 인벤토리](2026-09-21-employee-hub-source-zip-inventory.md)를 따른다.
-- 후속 Sol 재검증: 보완 `4e346cf`, 검증 `28529d0`. 본인 tmp DELETE 성공·타인/비tmp/타버킷 거부, cleanup의 이번 요청 경로 한정, apply→rollback 정책 식·버킷·권한 왕복, 신규 빈 버킷 제거, 객체 존재 시 중단·보존을 고정 PGlite 0.5.8에서 확인했다. 운영 미적용·push 미수행 경계는 그대로다.
+- Sol High 재검증 FAIL 보완 `7ee01fd`: INSERT의 `author_id`·`author`·`created_at`·`updated_at`을 서버값으로 고정하고, UPDATE의 작성자·작성시각 불변과 서버 `updated_at`을 강제했다. rollback snapshot은 PUBLIC·anon·authenticated ACL을 모두 회수하고 RLS를 활성화했다. PGlite 보완 시험은 통과했으나 **Sol High 최종 재검증 대기** 상태이다. 운영 미적용·push 미수행 경계는 그대로다.

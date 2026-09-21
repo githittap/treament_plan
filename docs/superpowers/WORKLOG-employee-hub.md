@@ -21,3 +21,10 @@
 - DELETE: 승인·활성 본인의 `uid/tmp/...` 성공, 타인 tmp·본인 비tmp·타버킷 거부를 PGlite RLS로 확인했다. `cleanupNoticeUploads()`는 부분 업로드·공지 저장 실패 모두 이번 요청의 `uploaded` 경로만 전용 버킷에서 정리한다.
 - 롤백: apply 전/롤백 후 공지 INSERT·UPDATE, 예치금 정책의 식과 table grant, 기존 버킷 설정이 동일함을 확인했다. 신규 버킷은 비었을 때만 제거되고, 객체가 있으면 transaction이 중단되어 버킷·객체가 보존된다.
 - 회귀: 직접 Node 30개 파일 통과, `INLINE_SCRIPT_SYNTAX=PASS`, `git diff --check` 통과. 운영 DB/Storage 적용, 실제 계정·데이터 시험, push, 배포는 수행하지 않았다.
+
+## 2026-09-21 — Task 6 Sol High FAIL 추가 보완
+
+- RED: 클라이언트 `updated_at` 컬럼이 없어 2000년 시각 위조 시험이 `column does not exist`로 실패했고, 수용표를 Sol High FAIL 상태로 먼저 낮춰 기록했다.
+- GREEN `7ee01fd`: `notices.updated_at`과 INSERT/UPDATE 서버시간 강제, snapshot PUBLIC·anon·authenticated ACL 회수·RLS, 트리거 함수 직접 EXECUTE 권한 회수를 추가했다.
+- PGlite: staff가 `created_at`·`updated_at` 2000년을 보내도 서버시간으로 저장되고, anon·authenticated snapshot grant 0개·SELECT/UPDATE 거부, apply→rollback 권한 왕복을 확인했다.
+- 상태: 로컬 보완·시험은 통과했으나 Sol High 최종 재검증 대기다. 운영 DB/Storage·push·배포는 수행하지 않았다.
