@@ -1,5 +1,12 @@
 # 직원허브 확정 결정
 
+## 최신 결정 — Sol High 5차 Minor 2 보완 (2026-09-22)
+
+| 시각 | 결정 | 근거와 경계 |
+|---|---|---|
+| 2026-09-22 | rollback 오류 8건은 PGlite `Error.message` 전체를 동등 비교한다. | 기능·독립 시험 PASS에도 partial match는 접두·접미 변화를 놓친다. targeted JSON 4종과 `95c296d` 복원 4건은 하나의 `exact` 상수로 고정하며 4차 FAIL 이력은 유지한다. |
+| 2026-09-22 | Task7/Task8 production은 Sol High 6차 PASS 전 미적용이다. | 5차는 기록 미동기·exact assertion Minor 2 FAIL이며, 이번 보완은 테스트·기록만이다. |
+
 ## 최신 결정 — Sol High 4차 FAIL 보완 (2026-09-22)
 
 | 시각 | 결정 | 근거와 경계 |

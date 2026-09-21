@@ -2,6 +2,7 @@
 
 ## 최신 실행 정본 (2026-09-22)
 
+- Sol High 5차 독립검증은 기능·독립 시험은 PASS였으나 기록 미동기와 targeted JSON 4종/복원 4건 오류의 exact assertion 부재로 Minor 2 FAIL했다. `95c296d` 복원 이력은 유지하고, 실제 PGlite `Error.message`를 접두·접미까지 동등 비교로 고정했다. Task7/Task8 production은 미적용이며 Sol High 6차 재검증 대기다.
 - Sol High 4차 재검증은 핵심 targeted same-name JSON CHECK 4종은 PASS였지만, 빈 DB·기존 profile 없음·유효 row·endpoint CHECK(true)에서 원본 rollback이 기존 객체를 보존하는 영구 회귀 4건이 삭제되어 Important 1로 FAIL했다. 이 보완은 원본 `rollbackError(db)`와 fresh fixture로 정확 오류·행/객체 보존을 다시 고정하며, Task7/Task8 production은 계속 미적용이다.
 - Task6 production 완료: migration `employee_hub_notice_attachments_deposit_access_20260921`을 적용했다. 기존 `notices=1`, `deposits=264`는 보존했고, private `notice-attachments` 버킷은 10MB·6 MIME 제한으로 생성됐으며 객체 수는 0이다. Storage API 실제 업로드는 자격증명이 없어 미검증이다.
 - Task7 첫 production apply는 고정 canonical 불일치로 transaction rollback됐다. 운영 스키마·데이터 변화는 없다.
@@ -12,7 +13,7 @@
 - 보완 `a521d1b`: dot escape를 실제 1개로 고치고 FCM/Mozilla dotted 허용시험을 추가했다. JSON drift 4종은 각각 독립 fresh fixture와 정확한 목표 probe로 원본 rollback reject·객체 보존을 확인했으며 상위 재실행 Task7/Task8/push PASS다.
 - Sol High 3차 재검증은 HEAD `771ccf5`에서 Important 1·Minor 1로 FAIL했다. 운영 SQL 새 결함은 없었으나 tests/sql `onlyJsonProbe`/`checkBehaviorRollback`이 원본 rollback preflight를 제거해 정확한 목표 증거가 부족했고 기록이 과장됐다.
 - `4dec81f`는 테스트만 수정했다. preflight 삭제 변형을 제거하고 same-name targeted CHECK 4종에서 원본 `rollbackError(db)`, 각 정확 오류, private schema/public table 보존을 확인한다. 상위 Task7/Task8/push 재실행 PASS다.
-- 최종 상태는 **Sol High 4차 재검증 대기**이며 Task7/Task8 production 미적용이다. 로컬 회귀 PASS를 독립 재검증 PASS로 단정하지 않는다. 다음은 같은 Sol 재검증 PASS 후에만 Task7 운영 apply/verify → Task8 운영 apply/verify → 승인된 단계배포·실사이트 확인이다. 실제 직원 메일·Push·생체입력, 자격증명 입력, 원본 삭제, 대량 이관, 보안 완화, 새 비용은 금지한다. `직원허브 5차.zip`은 최초 승인 범위 완료 뒤에만 읽으며 `상담문의 등 일원화.zip`은 직원허브 전체 후속이다.
+- 최종 상태는 **Sol High 6차 재검증 대기**이며 Task7/Task8 production 미적용이다. 로컬 회귀 PASS를 독립 재검증 PASS로 단정하지 않는다. 다음은 같은 Sol 재검증 PASS 후에만 Task7 운영 apply/verify → Task8 운영 apply/verify → 승인된 단계배포·실사이트 확인이다. 실제 직원 메일·Push·생체입력, 자격증명 입력, 원본 삭제, 대량 이관, 보안 완화, 새 비용은 금지한다. `직원허브 5차.zip`은 최초 승인 범위 완료 뒤에만 읽으며 `상담문의 등 일원화.zip`은 직원허브 전체 후속이다.
 
 ## 재부팅 정본 (2026-09-21)
 

@@ -1,5 +1,11 @@
 # 직원허브 현재 인수인계
 
+## 최신 인계 — Sol High 5차 Minor 2 보완, 6차 재검증 대기 (2026-09-22)
+
+- Sol High 5차 독립검증은 기능·독립 시험은 PASS였으나 기록 미동기와 targeted JSON 4종 및 `95c296d` 복원 4건의 오류가 부분 match여서 Minor 2 FAIL했다.
+- PGlite가 실제 `Error`를 던지고 `message`를 반환함을 확인해, 8건 기대 오류를 한 `exact` 상수의 전체 문자열 `assert.equal`로 고정했다. 접두·접미 변경도 실패하며, preflight 삭제 변형은 여전히 없다.
+- Task7/Task8 production은 미적용이고, 다음은 Sol High 6차 독립 재검증 PASS다.
+
 ## 최신 인계 — Sol High 4차 FAIL 보완, 재검증 대기 (2026-09-22)
 
 - Sol High 4차 재검증은 Important 1 FAIL했다. `4dec81f`의 targeted same-name JSON CHECK 4종은 PASS였으나 빈 DB·existing profile 없음·유효 row·endpoint CHECK(true)에서 원본 rollback이 오류 후 기존 객체/행을 보존하는 회귀 4건이 삭제되어 있었다.

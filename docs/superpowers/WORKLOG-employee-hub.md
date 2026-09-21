@@ -1,5 +1,11 @@
 # 직원허브 구현 기록
 
+## 2026-09-22 — Sol High 5차 Minor 2 exact assertion 보완
+
+- Sol High 5차 독립검증은 기능·독립 시험 PASS, 기록 미동기와 partial match로 Minor 2 FAIL했다. 4차 FAIL 및 `95c296d`의 기존 데이터 보호 회귀 복원 이력은 삭제하지 않는다.
+- `rollbackError`는 실제 PGlite `Error.message`만 반환하게 확인하고, targeted JSON 4종·복원 4건 기대 오류를 `exact` 상수와 전체 문자열 `assert.equal`로 바꿨다. SQL 변경은 없다.
+- 운영 DB/apply, push, deploy는 수행하지 않았고 Sol High 6차 재검증 대기다.
+
 ## 2026-09-22 — Sol High 4차 FAIL 기존 데이터 보호 회귀 복원
 
 - Sol High 4차는 Important 1 FAIL: `4dec81f` targeted same-name JSON CHECK 4종은 PASS였지만, 기존 데이터 보호 회귀 4건이 삭제됐다. SQL 변경은 없다.
