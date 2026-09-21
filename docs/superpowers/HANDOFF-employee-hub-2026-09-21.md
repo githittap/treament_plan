@@ -2,7 +2,7 @@
 
 ## 재부팅 정본 (2026-09-21)
 
-- Task8 로컬 보완: Task7 fixed fingerprint/manifest·canonical/identity와 Task8 marker owner/ACL/RLS drift, old ACL 필수 EXECUTE를 fail-closed로 추가했다. 고정 PGlite 0.5.8 Task8·Task7 회귀 및 diff check PASS.
+- Task8 로컬 보완: Task7 fixed fingerprint/manifest·canonical/identity와 Task8 marker owner/ACL/RLS drift, old ACL 필수 EXECUTE 및 Sol M1 EOF 빈 줄을 fail-closed 시험으로 추가했다. 고정 PGlite 0.5.8 Task8·Task7 회귀 및 diff check PASS.
 - 다음: Task8 Sol 독립 재검증. 그 전 운영 DB/push/deploy/5차 ZIP 열람 금지.
 
 ## Task 8 재부팅 체크포인트 (2026-09-21)

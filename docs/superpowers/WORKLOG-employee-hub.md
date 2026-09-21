@@ -7,6 +7,11 @@
 - 검증: fixed production MD5 정적검증, marker owner/ACL/RLS·Task7 canonical/identity·old ACL 누락·owner pending 직접승인 거부 PGlite fixture, Task8 apply×2→drift 거부→reset→rollback→old hash→reapply, Task7 PGlite 회귀 및 `git diff --check` PASS.
 - 미수행: Sol 독립 재검증, 운영 DB/push/deploy/5차 ZIP 열람.
 
+## 2026-09-21 — Task 8 Sol M1 EOF 보완
+
+- RED: 기존 `endsWith('\\n\\n')`는 `commit;\n\r\n` 혼합 개행을 놓쳤고, 개행 독립 정규식 시험이 빈 EOF 줄을 검출했다.
+- GREEN: apply SQL 끝을 단일 개행으로 정리했다. Task8·Task7 PGlite 및 `git diff --check` PASS. Sol 독립 재검증 전 운영 변경은 금지한다.
+
 ## 2026-09-21 — Task 6 Sol High 최종 PASS
 
 - 구현 HEAD: `d0222684dd7da4607752c22b2912ad8bf4f0d87a`; Sol High PASS(Critical/Important/Minor 없음), local direct Node 30개·PGlite·인라인 JS·diff check PASS와 clean worktree 확인.

@@ -54,4 +54,3 @@ do $$ declare p oid:='public.review_manual_attendance(bigint,text)'::regprocedur
   if (select count(*) from employee_hub_private.attendance_owner_chief_gate_patch_marker)<>1 then raise exception 'Task 8 marker row count mismatch; preserve state and stop'; end if;
 end $$;
 commit;
-
