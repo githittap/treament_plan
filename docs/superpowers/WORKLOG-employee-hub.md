@@ -1,5 +1,10 @@
 # 직원허브 구현 기록
 
+## 2026-09-22 — Sol High 7차 Minor 1 stale 문서 보완
+
+- Sol High 7차 코드 안전성은 PASS였으나 overview/todos의 6차 대기 두 줄이 stale이라 Minor 1 FAIL했다. 코드·시험·SQL은 변경하지 않는다.
+- 기록 수정 뒤 production apply, push, deploy는 계속 미수행이며 Sol High 8차 최종 문서 대조 대기다.
+
 ## 2026-09-22 — Sol High 6차 Minor 1 기록 동기화
 
 - `e607ff6`은 targeted JSON 4종·`95c296d` 복원 4건의 PGlite 오류를 전체 문자열 exact equality로 고정했다. 전체 JS·PGlite 시험은 PASS했다.

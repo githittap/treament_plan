@@ -3,9 +3,9 @@
 ## 최신 미완료 — Task6~8 운영 순서 (2026-09-22)
 
 - [x] `e607ff6`은 targeted JSON 4종/복원 4건 오류를 전체 문자열 exact equality로 고정했고 전체 JS/PGlite가 PASS했다. Sol High 6차는 이 커밋의 기록 미기재로 Minor 1 FAIL했으며 production은 미적용이다.
-- [ ] Sol High 7차 최종 문서 대조 PASS 후에만 Task7 운영 apply/verify를 수행한다. 현재 Task7/Task8 production 미적용.
+- [ ] Sol High 8차 최종 문서 대조 PASS 후 Supabase PG17 읽기 전용 preflight → Task7 적용/검증 → Task8 적용/검증을 수행한다. 현재 Task7/Task8 production 미적용.
 - [x] Sol High 5차 독립검증은 기능·독립 시험 PASS이나 기록 미동기와 targeted JSON 4종/복원 4건의 exact assertion 부재로 Minor 2 FAIL. `95c296d`의 4차 복원은 보존하고 PGlite `Error.message` 전체 동등 비교로 보완했다.
-- [ ] Sol High 6차 재검증 PASS 후에만 Task7 운영 apply/verify를 수행한다. 현재 Task7/Task8 production 미적용.
+- [x] Sol High 7차는 코드 안전성 PASS이나 overview/todos의 6차 대기 두 줄 stale로 Minor 1 FAIL했다. 이 기록 수정 후 8차 최종 문서 대조 대기이며 production은 미적용이다.
 - [x] Sol High 4차 재검증은 Important 1 FAIL: targeted same-name JSON CHECK 4종은 PASS였으나 빈 DB·existing profile 없음·유효 row·endpoint CHECK(true)의 기존 데이터/객체 보존 회귀 4건이 삭제됐다. 원본 rollback 경로의 정확 오류와 보존 시험을 복원했으며, 독립 재검증 PASS 전 Task7/Task8 production은 미적용이다.
 - [x] Task6 production migration `employee_hub_notice_attachments_deposit_access_20260921` 적용. `notices=1`·`deposits=264` 보존, private `notice-attachments` 10MB/6 MIME/objects=0 확인. Storage API 실제 업로드는 자격증명 부재로 미검증.
 - [x] Task7 첫 production apply는 fixed canonical mismatch로 transaction rollback됐으며 운영 변화 없음.

@@ -14,7 +14,7 @@
 - 보완 `a521d1b`: dot escape를 실제 1개로 고치고 FCM/Mozilla dotted 허용시험을 추가했다. JSON drift 4종은 각각 독립 fresh fixture와 정확한 목표 probe로 원본 rollback reject·객체 보존을 확인했으며 상위 재실행 Task7/Task8/push PASS다.
 - Sol High 3차 재검증은 HEAD `771ccf5`에서 Important 1·Minor 1로 FAIL했다. 운영 SQL 새 결함은 없었으나 tests/sql `onlyJsonProbe`/`checkBehaviorRollback`이 원본 rollback preflight를 제거해 정확한 목표 증거가 부족했고 기록이 과장됐다.
 - `4dec81f`는 테스트만 수정했다. preflight 삭제 변형을 제거하고 same-name targeted CHECK 4종에서 원본 `rollbackError(db)`, 각 정확 오류, private schema/public table 보존을 확인한다. 상위 Task7/Task8/push 재실행 PASS다.
-- 최종 상태는 **Sol High 6차 재검증 대기**이며 Task7/Task8 production 미적용이다. 로컬 회귀 PASS를 독립 재검증 PASS로 단정하지 않는다. 다음은 같은 Sol 재검증 PASS 후에만 Task7 운영 apply/verify → Task8 운영 apply/verify → 승인된 단계배포·실사이트 확인이다. 실제 직원 메일·Push·생체입력, 자격증명 입력, 원본 삭제, 대량 이관, 보안 완화, 새 비용은 금지한다. `직원허브 5차.zip`은 최초 승인 범위 완료 뒤에만 읽으며 `상담문의 등 일원화.zip`은 직원허브 전체 후속이다.
+- 최종 상태는 **Sol High 7차 코드 안전성 PASS·문서 두 줄 stale Minor 1 FAIL 후, 기록 수정 완료 및 8차 최종 문서 대조 대기**이며 Task7/Task8 production 미적용이다. 다음은 8차 PASS 후 Supabase PG17 읽기 전용 preflight → Task7 적용/검증 → Task8 적용/검증이다. 실제 직원 메일·Push·생체입력, 자격증명 입력, 원본 삭제, 대량 이관, 보안 완화, 새 비용은 금지한다. `직원허브 5차.zip`은 최초 승인 범위 완료 뒤에만 읽으며 `상담문의 등 일원화.zip`은 직원허브 전체 후속이다.
 
 ## 재부팅 정본 (2026-09-21)
 

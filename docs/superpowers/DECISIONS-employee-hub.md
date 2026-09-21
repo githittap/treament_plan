@@ -1,5 +1,12 @@
 # 직원허브 확정 결정
 
+## 최신 결정 — Sol High 7차 Minor 1 stale 문서 보완 (2026-09-22)
+
+| 시각 | 결정 | 근거와 경계 |
+|---|---|---|
+| 2026-09-22 | overview/todos의 6차 대기 상태를 7차 결과와 8차 대기로 정정한다. | 7차 코드 안전성 PASS에도 두 stale 줄 때문에 Minor 1 FAIL했다. 이번 변경은 기록-only다. |
+| 2026-09-22 | Task7/Task8 production은 Sol High 8차 문서 대조 PASS 뒤 PG17 읽기 전용 preflight를 거친다. | 순서는 preflight → Task7 적용/검증 → Task8 적용/검증이며 push·배포는 여전히 범위 밖이다. |
+
 ## 최신 결정 — Sol High 6차 Minor 1 기록 동기화 (2026-09-22)
 
 | 시각 | 결정 | 근거와 경계 |

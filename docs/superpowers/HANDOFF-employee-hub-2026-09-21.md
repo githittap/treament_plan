@@ -1,5 +1,10 @@
 # 직원허브 현재 인수인계
 
+## 최신 인계 — Sol High 7차 Minor 1 기록 보완, 8차 최종 문서 대조 대기 (2026-09-22)
+
+- Sol High 7차는 코드 안전성 PASS였으나 overview/todos의 6차 대기 두 줄이 stale이라 Minor 1 FAIL했다. 이번 기록-only 보완으로 그 두 줄을 현재 상태에 맞췄다.
+- Task7/Task8 production은 미적용이며, 다음은 Sol High 8차 최종 문서 대조 PASS 후 Supabase PG17 읽기 전용 preflight → Task7 적용/검증 → Task8 적용/검증이다.
+
 ## 최신 인계 — Sol High 6차 Minor 1 기록 보완, 7차 최종 문서 대조 대기 (2026-09-22)
 
 - `e607ff6`은 PGlite `Error.message`의 오류 8건을 exact equality로 고정했고 전체 JS/PGlite 시험은 PASS했다.
