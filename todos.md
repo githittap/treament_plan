@@ -2,8 +2,8 @@
 
 ## 재부팅 정본 (2026-09-21)
 
-- HEAD `a6fa4925bf5787d29b7f7a839ee248a068cb5610`: Task8 Sol 독립검증 **FAIL**(Critical 0 / Important 3 / Minor 1). Task6·7·9는 기존 로컬 PASS 기록만 유지하며 운영 DB/push/deploy와 5차 ZIP 열람은 금지한다.
-- [ ] 다음: Task8의 marker drift fail-closed·Task7 marker 정합·old ACL 필수 EXECUTE·fixture/EOF 보완 → Sol 재검증. 그 전 운영 preflight/apply·push·smoke 금지.
+- [x] Task8 marker drift fail-closed·Task7 marker 정합·old ACL 필수 EXECUTE·fixture/EOF 보완. 고정 PGlite Task8/Task7 및 diff check PASS.
+- [ ] 다음: Task8 Sol 독립 재검증. 그 전 운영 preflight/apply·push·smoke와 5차 ZIP 열람 금지.
 
 ## 🟡 Task 8 수기근태 원장-실장 gate 로컬 패치 — 운영 적용 금지 (2026-09-21)
 - Task7 private manifest를 사전 대조하고, pending 수기근태 원장 직접확정을 막는 SQL·역순 rollback 초안을 추가했다. marker/함수 identity·ACL·RLS drift는 중단한다.

@@ -2,8 +2,8 @@
 
 ## 재부팅 정본 (2026-09-21)
 
-- 현재 HEAD: `a6fa4925bf5787d29b7f7a839ee248a068cb5610`. Task8 Sol 독립검증은 **FAIL**(Critical 0 / Important 3 / Minor 1)이며 완료 주장·운영 적용을 금지한다. Task6·7·9는 기존 로컬 PASS 기록만 유지한다.
-- Task8 보완 시작점: reapply marker owner/ACL/RLS drift fail-closed, Task7 marker fingerprint/manifest/canonical/identity 정합 검사, old ACL의 authenticated/service_role EXECUTE 필수 검사, fixed production MD5·marker/ACL drift·owner pending reject fixture 및 EOF 빈 줄 정정 → Sol 재검증. 운영 DB·push·배포와 `직원허브 5차.zip` 열람은 금지한다.
+- Task8 보완 완료(로컬): Task7 canonical/identity 정합과 Task8 marker owner/ACL/RLS drift, old ACL 필수 EXECUTE를 fail-closed로 보강했다. 고정 PGlite 0.5.8 Task8·Task7 회귀 및 `git diff --check` PASS. Sol 재검증 전에는 완료 주장·운영 적용을 금지한다.
+- 다음: Task8 Sol 독립 재검증. 운영 DB·push·배포와 `직원허브 5차.zip` 열람은 계속 금지한다.
 
 ## Task 8 로컬 체크포인트 (2026-09-21)
 

@@ -1,5 +1,12 @@
 # 직원허브 구현 기록
 
+## 2026-09-21 — Task 8 Sol FAIL 보완 로컬 PASS
+
+- Task7 marker의 fingerprint/manifest·고정 canonical MD5·저장 canonical/identity를 apply와 rollback에서 비교한다. Task8 marker로 인해 추가되는 정확한 table/pkey 두 이름만 Task7 canonical schema.contents 비교에서 제외하며 identity는 그대로 대조한다.
+- Task8 reapply는 marker owner=postgres, 무권한 ACL, RLS+FORCE RLS drift를 중단한다. old `review_manual_attendance`는 postgres/authenticated/service_role EXECUTE를 모두 요구한다.
+- 검증: fixed production MD5 정적검증, marker owner/ACL/RLS·Task7 canonical/identity·old ACL 누락·owner pending 직접승인 거부 PGlite fixture, Task8 apply×2→drift 거부→reset→rollback→old hash→reapply, Task7 PGlite 회귀 및 `git diff --check` PASS.
+- 미수행: Sol 독립 재검증, 운영 DB/push/deploy/5차 ZIP 열람.
+
 ## 2026-09-21 — Task 6 Sol High 최종 PASS
 
 - 구현 HEAD: `d0222684dd7da4607752c22b2912ad8bf4f0d87a`; Sol High PASS(Critical/Important/Minor 없음), local direct Node 30개·PGlite·인라인 JS·diff check PASS와 clean worktree 확인.
