@@ -1,6 +1,12 @@
 # todos — 내부 도구(T8/D) 작업 목록
 
-## 🔴 Task 6 공지 첨부·예치금 권한 분리 — 로컬 구현 있으나 최종 Sol High FAIL·배포 차단 (2026-09-21)
+## ✅ Task 6 공지 첨부·예치금 권한 분리 — Sol High 최종 PASS, 운영 적용 대기 (2026-09-21)
+- 구현 HEAD `d0222684dd7da4607752c22b2912ad8bf4f0d87a`, Sol High PASS(Critical/Important/Minor 없음), 로컬 직접 Node 30개·PGlite·인라인 JS·diff check PASS 및 worktree clean.
+- 닫힘: foldername 길이2, restrictive DELETE guard, JSON 구조/NULL 강제, 정책·RLS·ACL·버킷 rollback, apply×2 fail-closed, quoted roles.
+- [ ] 운영 전: Storage DELETE/ALL 정책·ACL·RLS·버킷/객체 snapshot, 별도 시험계정 upload/download/cleanup/게시 후 삭제 거부/MIME·10MB, 복제환경 rollback, 단일 migration 실행. push/deploy/운영 DB·Storage·실계정은 아직 미수행.
+- [ ] 최종 직전에만 승인된 외부 Opus 읽기전용 검증. K3는 BUSD MCP_INTERNAL_ERROR·managed Kimi 403으로 제외, 사용자 연결 완료 전 Terra 유지. `C:\Users\elusi\Downloads\직원허브 5차.zip`은 열지 않고 기존 승인 미완료 완료 뒤 대기.
+
+## 과거 Task 6 Sol High FAIL 기록 (2026-09-21)
 - 이전 `2e1de31`·`ffb58fb` 기록은 permissive 공지 정책 결함 발견으로 대체됐다. 보완 커밋 `4e346cf`, 검증 커밋 `28529d0`: private `notice-attachments` 버킷의 서버 MIME/10MB/UUID tmp 경로, 단일 INSERT 정책, 서버 작성자 이름 고정·불변 필드 트리거, private download·실패 임시객체 정리를 사용한다. DELETE는 승인·활성 본인의 `uid/tmp/...`만 허용하고 타인·비tmp·타버킷은 거부한다. 예치금 조회는 데스크·chief·owner로 분리한다.
 - 검증: 고정 PGlite 0.5.8에서 apply→rollback 정책 식·버킷·권한 왕복, 신규 빈 버킷 제거, 객체 존재 시 중단·보존을 확인했다. 전체 직접 Node 30개 파일, 인라인 JS 구문검사와 `git diff --check`를 통과했다.
 - Sol High FAIL 추가 보완 `7ee01fd`: 클라이언트가 2000년 시각을 보내도 INSERT의 `created_at`·`updated_at`은 서버 시각으로 저장되며, snapshot 표의 anon·authenticated grant 0개와 SELECT·UPDATE 거부를 확인했다. 독립 최종 재검증은 미완료다.

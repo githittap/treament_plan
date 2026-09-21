@@ -1,6 +1,13 @@
 # 직원허브 구현 기록
 
-## 2026-09-21 — Sol High 최종 판정 FAIL 정정 인계
+## 2026-09-21 — Task 6 Sol High 최종 PASS
+
+- 구현 HEAD: `d0222684dd7da4607752c22b2912ad8bf4f0d87a`; Sol High PASS(Critical/Important/Minor 없음), local direct Node 30개·PGlite·인라인 JS·diff check PASS와 clean worktree 확인.
+- 닫힘: foldername 길이2, 게시 첨부 restrictive DELETE guard, attachments JSON 구조/NULL 강제, 정책·RLS·ACL·버킷 rollback, apply×2 fail-closed, quoted role 복원.
+- 미수행: push/deploy/운영 DB·Storage/실계정. 운영 전 Storage DELETE/ALL 정책·ACL·RLS·버킷/객체 snapshot, 별도 시험계정 upload/download/cleanup/게시 후 DELETE 거부/MIME·10MB, 복제환경 rollback, 단일 migration 실행 필요. 최종 직전에만 승인된 외부 Opus 읽기전용 검증.
+- K3는 BUSD MCP_INTERNAL_ERROR 및 managed Kimi 403으로 제외, 사용자 연결 완료 전 Terra 유지. `C:\Users\elusi\Downloads\직원허브 5차.zip`은 열지 않고 기존 승인 미완료 뒤 대기.
+
+## 2026-09-21 — 과거 Sol High 최종 판정 FAIL 정정 인계
 
 - 상태: Task 6은 로컬 구현은 있으나 최종 Sol High FAIL·배포 차단이다. 문서만 갱신했으며 코드·SQL·시험 파일은 수정하지 않았다.
 - FAIL 1: `db/notice_attachments_deposit_access_draft.sql:27,29`의 `array_length(storage.foldername(name),1)=3`이 실제 Supabase 의미와 불일치한다. `uid/tmp/file`의 foldername은 `[uid,tmp]` 길이 2이며 실제 업로드/cleanup DELETE가 RLS 거부된다. 기존 PGlite helper는 파일명 포함 위양성 모사였다.

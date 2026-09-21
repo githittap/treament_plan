@@ -72,7 +72,13 @@
 - 설계서·상황판: `Z:\09_claude-output\04_AI·Claude운영\산출물\` (교정보드 v1.1·근태 v1.1·상황판·기술문답·덴트웹 UI참고·설정 설명서)
 - 이 프로젝트용 코딩 규칙: 같은 폴더 `CLAUDE.md`(치료계획.html 함수맵·단축키 등)
 
-## 최신 인계 상태 — Task 6 Sol High 최종 판정 FAIL (2026-09-21)
+## 최신 인계 상태 — Task 6 Sol High 최종 PASS (2026-09-21)
+
+Task 6 로컬 구현 HEAD는 `d0222684dd7da4607752c22b2912ad8bf4f0d87a`이며 Sol High 최종 PASS(Critical/Important/Minor 없음)다. foldername 길이 2, 게시 첨부 restrictive DELETE guard, JSON/NULL 강제, 정책·RLS·ACL·버킷 rollback, apply×2 fail-closed, quoted role 복원을 직접 Node 30개·PGlite·인라인 JS·diff check로 확인했고 worktree는 clean이다. push·배포·운영 DB/Storage·실계정 검증은 미수행이다.
+
+운영 전에는 Storage DELETE/ALL 정책·ACL·RLS·버킷/객체 snapshot, 별도 시험계정 upload/download/cleanup/게시 후 DELETE 거부/MIME·10MB, 복제환경 rollback, 단일 migration 실행이 남는다. 최종 직전에만 승인된 외부 Opus 읽기전용 검증을 수행한다. K3는 BUSD MCP_INTERNAL_ERROR 및 managed Kimi 403 구독 접근 거부로 제외하며 사용자 연결 완료 전 Terra를 유지한다. `C:\Users\elusi\Downloads\직원허브 5차.zip`은 지금 열지 않고 기존 승인 미완료 완료 뒤 원본 보존·요구 대조 대상으로 대기한다.
+
+## 과거 인계 상태 — Task 6 Sol High 최종 판정 FAIL (2026-09-21)
 
 현재 기준 HEAD는 `1719e3f`이며, 이 기록은 구현·SQL·시험 파일을 변경하지 않고 문서만 갱신한 인계 정본이다. Task 6은 **로컬 구현은 있으나 최종 Sol High FAIL로 배포 차단** 상태다.
 

@@ -1,6 +1,14 @@
 # 직원허브 확정 결정
 
-## 최신 결정 정정 — Task 6 Sol High FAIL (2026-09-21)
+## 최신 결정 정정 — Task 6 Sol High PASS (2026-09-21)
+
+| 시각 | 결정 | 근거와 경계 |
+|---|---|---|
+| 2026-09-21 | Task 6 로컬 보안 구현은 Sol High 최종 PASS다. | HEAD `d0222684dd7da4607752c22b2912ad8bf4f0d87a`; Critical/Important/Minor 없음, 직접 Node 30개·PGlite·인라인 JS·diff check PASS, clean worktree. |
+| 2026-09-21 | 운영 적용은 별도 검증 후 단일 migration으로만 한다. | 실제 Storage DELETE/ALL 정책·ACL·RLS·버킷/객체 snapshot, 시험계정 upload/download/cleanup/게시 후 DELETE 거부/MIME·10MB, 복제환경 rollback이 선행 조건이다. |
+| 2026-09-21 | K3와 5차 ZIP은 현재 범위에서 제외한다. | BUSD MCP_INTERNAL_ERROR·managed Kimi 403 해결 및 사용자 연결 완료 전 Terra 유지; `직원허브 5차.zip`은 기존 승인 미완료 뒤 열어 원본 보존·요구 대조한다. |
+
+## 과거 결정 정정 — Task 6 Sol High FAIL (2026-09-21)
 
 | 시각 | 결정 | 근거와 경계 |
 |---|---|---|

@@ -1,6 +1,12 @@
 # 직원허브 현재 인수인계
 
-## 최신 정정 — Task 6 Sol High 최종 판정 FAIL (2026-09-21, 문서 갱신)
+## 최신 정정 — Task 6 Sol High 최종 PASS (2026-09-21, 문서 갱신)
+
+현재 구현 HEAD: `d0222684dd7da4607752c22b2912ad8bf4f0d87a`. Sol High 최종 PASS(Critical/Important/Minor 없음)이며 로컬 직접 Node 30개, PGlite, 인라인 JS, `git diff --check` PASS와 clean worktree를 확인했다. 닫힘 범위는 foldername 길이2, 게시 첨부 restrictive DELETE guard, JSON 구조/NULL 강제, 정책·RLS·ACL·버킷 rollback, apply×2 fail-closed, quoted role 복원이다. push·배포·운영 DB/Storage·실계정은 미수행이다.
+
+운영 전에는 Storage DELETE/ALL 정책·ACL·RLS·버킷/객체 snapshot, 별도 시험계정 upload/download/cleanup/게시 후 삭제 거부/MIME·10MB, 복제환경 rollback, 단일 migration 실행이 필요하다. 최종 직전에만 사용자 승인 외부 Opus 읽기전용 검증을 수행한다. K3는 BUSD MCP_INTERNAL_ERROR 및 managed Kimi 403으로 제외하며 연결 완료 전 Terra 유지한다. `C:\Users\elusi\Downloads\직원허브 5차.zip`은 지금 열지 않고 기존 승인 미완료 뒤 원본 보존·요구 대조 대상으로 대기한다.
+
+## 과거 정정 — Task 6 Sol High 최종 판정 FAIL (2026-09-21, 문서 갱신)
 
 현재 기준 HEAD: `1719e3f`. Task 6은 **로컬 구현은 있으나 최종 Sol High FAIL·배포 차단**이다. 아래 내용은 기존 완료·검증 이력을 삭제하지 않고 최신 안전 경계를 추가한 것이다.
 
