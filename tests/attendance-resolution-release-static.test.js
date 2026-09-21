@@ -27,6 +27,8 @@ test('출석 수직 경로 프론트 연결이 포함되어 있다', () => {
   assert.match(html, /bounds\.start\)\.lt\('work_date',bounds\.next\)/);
   assert.match(html, /소명 저장 실패/);
   assert.match(html, /a\.source==='manual'/);
+  assert.match(html, /r\.status==='실장승인'&&ME\.role==='owner'/);
+  assert.doesNotMatch(html, /\(r\.status==='대기'\|\|r\.status==='실장승인'\)&&ME\.role==='owner'/);
 });
 
 test('월 조회 범위는 한국 현지 월의 반개구간으로 계산한다', () => {
