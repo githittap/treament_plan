@@ -51,3 +51,9 @@ Task 0 증거: `tests/schedule-zip-acceptance.test.js`는 기존 개인별 selec
 - 최초 ZIP의 승인된 추가형 구현·시험·DB/RLS/Storage·단계배포는 단계별 재승인 없이 진행한다. 원본 삭제, 대량 이관/수정, 보안 완화, 새 비용, 자격증명 입력, 실제 직원 메일·push·알림, 외부 공개만 별도 승인 게이트다.
 - 상담일지의 최종 접근 경계는 `manager`·`owner` 허용, `staff`·`chief` 및 anon 거부다. 초기 구현계획의 역할 서술과 다를 경우 실제 운영 적용·RLS 시험 결과를 우선한다.
 - 이어서 할 Task 6~11, 운영 적용 조건, 시험 명령과 보호사항은 [직원허브 인수인계](../HANDOFF-employee-hub-2026-09-21.md)에 고정한다.
+
+## Task 6 로컬 검증 기록 (2026-09-21)
+
+- 공지 첨부·예치금 권한 분리 기능은 `2e1de31`, PGlite 합성시험은 `ffb58fb`에 있다. 공지는 승인·활성 직원의 자기 작성자/UUID 경로, 예치금은 데스크·chief·owner 조회로 분리했다.
+- `NOTICE_ATTACHMENTS_ACCEPTANCE_PASS`, `PGLITE_NOTICE_ATTACHMENTS_DEPOSIT_ACCESS_PASS`, `hr.html` 인라인 JS 구문검사, `git diff --check`가 로컬에서 통과했다.
+- 이 단계는 운영 DB/Storage migration, 실제 파일 업로드·역할별 저장/재조회, push, 배포를 포함하지 않는다. 원본 ZIP의 시간상 최초 업로드와 승인 구현 정본은 다르며, 상세 인벤토리는 [원본 ZIP 인벤토리](2026-09-21-employee-hub-source-zip-inventory.md)를 따른다.
