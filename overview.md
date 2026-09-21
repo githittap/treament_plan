@@ -7,7 +7,9 @@
 - Sol High 첫 독립 검증은 HEAD `39604f8`에서 Important 6건으로 FAIL했다. Task7 원본 rollback `proconfig`, dotted endpoint, policy drift, JSON CHECK drift와 Task8 `applied_at` default/self-spoof, 기록 과장이 대상이다.
 - Task7 v6 보완 `fa61fb2`: fingerprint=`task7-push-v6-catalog`, manifest=`push-v6-catalog-20260922`, SHA256=`b0cd63d9427445de8f2a03113dddd7bc6251cc9667a8655d160cf59512f0d3ff`, semantic MD5=`e4f10430874631e3ca0a9ed1423384d1`, snapshot MD5=`8774aede303f69fccd80680d8e283c4b`로 갱신했다. 원본 apply→rollback, dotted endpoint, policy exact·JSON behavior gate를 추가했고 상위 재실행은 PASS다.
 - Task8 보완 `77d0f11`, `33d8491`, `2ad9341`: v6 동기화, `now/current_timestamp` default 의미 gate, 독립 new `prosrc` MD5=`08d9fa62fcc82616dd9f7cb3f8ebafac`, marker+identity 동시 self-spoof 음성시험을 추가했다. 상위 재실행 Task7/Task8/push는 PASS다.
-- 최종 상태는 **Sol High 재검증 대기**이며 Task7/Task8 production 미적용이다. 다음은 같은 Sol 재검증 PASS 후에만 Task7 운영 apply/verify → Task8 운영 apply/verify → 승인된 단계배포·실사이트 확인이다. 실제 직원 메일·Push·생체입력, 자격증명 입력, 원본 삭제, 대량 이관, 보안 완화, 새 비용은 금지한다. `직원허브 5차.zip`은 최초 승인 범위 완료 뒤에만 읽으며 `상담문의 등 일원화.zip`은 직원허브 전체 후속이다.
+- Sol High 2차 재검증은 HEAD `c38964a`에서 Important 2·Minor 1로 FAIL했다. endpoint regex가 실제 backslash 2개라 dotted FCM을 거부했고, JSON drift probes는 endpoint check에서 먼저 실패해 위양성이었으며 기록 상세도 모순됐다. Task7 원본 rollback/policy drift와 Task8 default/self-spoof는 PASS였다.
+- 보완 `a521d1b`: dot escape를 실제 1개로 고치고 FCM/Mozilla dotted 허용시험을 추가했다. JSON drift 4종은 각각 독립 fresh fixture와 정확한 목표 probe로 원본 rollback reject·객체 보존을 확인했으며 상위 재실행 Task7/Task8/push PASS다.
+- 최종 상태는 **Sol High 3차 재검증 대기**이며 Task7/Task8 production 미적용이다. 로컬 회귀 PASS를 독립 재검증 PASS로 단정하지 않는다. 다음은 같은 Sol 재검증 PASS 후에만 Task7 운영 apply/verify → Task8 운영 apply/verify → 승인된 단계배포·실사이트 확인이다. 실제 직원 메일·Push·생체입력, 자격증명 입력, 원본 삭제, 대량 이관, 보안 완화, 새 비용은 금지한다. `직원허브 5차.zip`은 최초 승인 범위 완료 뒤에만 읽으며 `상담문의 등 일원화.zip`은 직원허브 전체 후속이다.
 
 ## 재부팅 정본 (2026-09-21)
 

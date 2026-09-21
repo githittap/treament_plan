@@ -1,5 +1,11 @@
 # 직원허브 구현 기록
 
+## 2026-09-22 — Sol High 2차 FAIL 보존 및 3차 재검증 대기
+
+- Sol High 2차 재검증은 HEAD `c38964a`에서 Important 2·Minor 1로 FAIL했다. endpoint regex의 실제 backslash 2개가 dotted FCM을 거부했고 JSON drift probes는 endpoint check에서 먼저 실패해 위양성이었으며 기록 상세도 모순됐다. Task7 원본 rollback/policy drift와 Task8 default/self-spoof는 PASS였다. 첫 FAIL과 이 2차 FAIL은 모두 삭제하지 않는다.
+- `a521d1b`는 dot escape를 실제 1개로 고치고 FCM/Mozilla dotted 허용시험을 추가했다. JSON drift 4종은 각각 독립 fresh fixture와 정확한 목표 probe에서 원본 rollback reject·객체 보존을 확인한다. 상위 재실행 Task7/Task8/push PASS다.
+- 최종 판정은 Sol High 3차 재검증 대기다. 로컬 회귀 PASS를 독립 재검증 PASS나 production 완료로 바꾸지 않는다. Task7/Task8 production은 미적용이다.
+
 ## 2026-09-22 — Sol High 첫 FAIL 보존 및 v6 로컬 보완
 
 - Sol High 첫 독립 검증은 HEAD `39604f8`에서 Important 6건 FAIL했다. Task7은 원본 rollback `proconfig`, dotted endpoint, policy drift, JSON CHECK drift이고 Task8은 `applied_at` default/self-spoof 및 기록 과장이다. 이 FAIL 이력은 삭제하지 않는다.

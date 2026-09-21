@@ -7,7 +7,9 @@
 | 2026-09-22 | Task6 production migration을 완료로 기록한다. | `employee_hub_notice_attachments_deposit_access_20260921` 적용 후 `notices=1`·`deposits=264` 보존, private `notice-attachments` 10MB/6 MIME/objects=0 확인. Storage API 실제 업로드는 자격증명 없이 미검증이다. |
 | 2026-09-22 | Task7 첫 production apply 실패는 운영 변경 없는 rollback으로 고정한다. | fixed canonical mismatch에서 transaction rollback됐다. Sol High 첫 독립 검증은 HEAD `39604f8`에서 Important 6건 FAIL했고, 이 판정은 삭제하지 않는다. |
 | 2026-09-22 | Task7 v6·Task8 보완의 상위 재실행 PASS는 최종 독립 검증 PASS가 아니다. | Task7 `fa61fb2`는 v6 fingerprint/manifest/hash/MD5 및 rollback·endpoint·policy/JSON gate를 보강했다. Task8 `77d0f11`·`33d8491`·`2ad9341`은 default 의미·new `prosrc` MD5·동시 self-spoof 음성시험을 보강했다. |
-| 2026-09-22 | Sol High 재검증 PASS 전 Task7/Task8 production 적용을 금지한다. | 같은 Sol 재검증 PASS 후에만 Task7 apply/verify → Task8 apply/verify → 승인된 단계배포·실사이트 확인으로 진행한다. 실제 직원 메일·Push·생체입력, 자격증명, 원본 삭제, 대량 이관, 보안 완화, 새 비용도 금지한다. |
+| 2026-09-22 | Sol High 2차 FAIL 이력을 보존한다. | HEAD `c38964a`에서 Important 2·Minor 1 FAIL: endpoint backslash 2개, JSON probes 위양성, 기록 상세 모순. Task7 원본 rollback/policy 및 Task8 default/self-spoof는 PASS였다. |
+| 2026-09-22 | `a521d1b`의 로컬 회귀 PASS는 3차 독립 재검증 PASS가 아니다. | dot escape 1개·dotted FCM/Mozilla 허용·JSON drift 4종 독립 fixture/목표 probe·rollback reject 및 객체 보존을 보강했고 상위 재실행 Task7/Task8/push는 PASS다. |
+| 2026-09-22 | Sol High 3차 재검증 PASS 전 Task7/Task8 production 적용을 금지한다. | 같은 Sol 재검증 PASS 후에만 Task7 apply/verify → Task8 apply/verify → 승인된 단계배포·실사이트 확인으로 진행한다. 실제 직원 메일·Push·생체입력, 자격증명, 원본 삭제, 대량 이관, 보안 완화, 새 비용도 금지한다. |
 
 ## 최신 결정 정정 — Task 6 Sol High PASS (2026-09-21)
 
