@@ -57,6 +57,14 @@ assert.match(sql, /jsonb_typeof\(new\.attachments\).*jsonb_array_elements/is,
   '공지 첨부는 배열 안의 객체와 비어 있지 않은 path만 허용해야 한다');
 assert.match(sql, /existing notice attachments are invalid/i,
   '기존 비정상 첨부 데이터는 migration이 수정하지 않고 fail-closed 해야 한다');
+assert.match(sql, /relname in \('notices','deposits'\)/i,
+  'rollback은 notices와 deposits의 기존 RLS 상태를 함께 snapshot해야 한다');
+assert.match(sql, /already applied; preserve snapshot and stop migration/i,
+  'migration 재실행은 최초 snapshot을 덮어쓰지 않고 fail-closed 해야 한다');
+assert.match(sql, /unnest\(p\.roles\).*format\('%I'/is,
+  '복수·특수문자 정책 role은 식별자로 인용해 복원해야 한다');
+assert.match(sql, /alter column attachments set default '\[\]'::jsonb.*alter column attachments set not null/is,
+  '기존 nullable attachments 열도 검증 뒤 기본값과 NOT NULL을 강제해야 한다');
 assert.match(sql, /deposits_select_desk_lead/,
   '예치금 조회 RLS가 공지 작성 RLS와 분리되어야 한다');
 assert.match(sql, /p\.dept='데스크'.*p\.role in \('chief','owner'\)/s,

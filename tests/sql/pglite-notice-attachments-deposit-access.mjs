@@ -27,7 +27,6 @@ create table public.deposits(id bigint generated always as identity primary key,
 create table storage.buckets(id text primary key, name text unique, public boolean not null default false, file_size_limit bigint, allowed_mime_types text[]);
 create table storage.objects(id bigint generated always as identity primary key, bucket_id text, name text, owner_id uuid, metadata jsonb default '{}'::jsonb);
 alter table public.notices enable row level security;
-alter table public.deposits enable row level security;
 alter table storage.objects enable row level security;
 grant usage on schema auth, storage to authenticated;
 grant execute on function auth.uid() to authenticated;
@@ -74,13 +73,16 @@ async function snapshotPrivileges() {
         or (table_schema='storage' and table_name='objects'))
     order by table_schema,table_name,grantee,privilege_type`);
 }
+async function snapshotRls() { return query("select n.nspname schemaname,c.relname tablename,c.relrowsecurity rls_enabled from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname in ('notices','deposits') order by c.relname"); }
 
 try {
   await db.exec(prelude);
   const policiesBefore = await snapshotPolicies();
   const privilegesBefore = await snapshotPrivileges();
+  const rlsBefore = await snapshotRls();
   const bucketBefore = (await query("select id,name,public,file_size_limit,allowed_mime_types from storage.buckets where id='notice-attachments'"))[0];
   await db.exec(draft);
+  let reapply = ''; try { await db.exec(draft); } catch (caught) { reapply = String(caught); } assert.match(reapply,/already applied; preserve snapshot and stop migration/);
   assert.equal((await query(`select count(*)::int n from information_schema.role_table_grants where table_schema='public' and table_name='notice_attachments_migration_snapshot' and grantee in ('PUBLIC','anon','authenticated')`))[0].n,0);
   assert.deepEqual((await query("select id, public from storage.buckets where id='notice-attachments'"))[0], { id: 'notice-attachments', public: false });
   assert.deepEqual((await query("select public,file_size_limit,allowed_mime_types from storage.buckets where id='notice-attachments'"))[0], { public: false, file_size_limit: 10485760, allowed_mime_types: ['application/pdf','image/jpeg','image/png','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/x-hwp','application/haansofthwp'] });
@@ -157,6 +159,7 @@ try {
   assert.deepEqual((await query("select id,name,public,file_size_limit,allowed_mime_types from storage.buckets where id='notice-attachments'"))[0], bucketBefore);
   assert.deepEqual(await snapshotPolicies(), policiesBefore);
   assert.deepEqual(await snapshotPrivileges(), privilegesBefore);
+  assert.deepEqual(await snapshotRls(), rlsBefore);
   assert.equal((await query("select count(*)::int n from storage.objects where bucket_id='notice-attachments' and name='legacy/keep.pdf'"))[0].n,1);
   await query("delete from storage.objects where bucket_id='notice-attachments' and name='legacy/keep.pdf'");
 
