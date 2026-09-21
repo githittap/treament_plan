@@ -1,5 +1,9 @@
 # todos — 내부 도구(T8/D) 작업 목록
 
+## 🟡 Task 8 수기근태 원장-실장 gate 로컬 패치 — 운영 적용 금지 (2026-09-21)
+- Task7 private manifest를 사전 대조하고, pending 수기근태 원장 직접확정을 막는 SQL·역순 rollback 초안을 추가했다. marker/함수 identity·ACL·RLS drift는 중단한다.
+- [x] 고정 PGlite 0.5.8 적용×2·drift 거부·RESET·rollback 구 해시·재적용 왕복을 확인했다. 운영 DB 행, push, 배포, 5차 ZIP 열람은 금지한다.
+
 ## 🟡 Task 7 모바일 Push 로컬 기반 완료 — 운영 연결 대기 (2026-09-21)
 - `hr.html` 업무자료 내부의 준비 상태·내 구독 해제, `sw.js` push/notificationclick, 본인 active/approved RLS 초안을 로컬로 추가했다. marker·snapshot·guard/helper는 비노출 `employee_hub_private` schema에 있으며 PUBLIC·anon·authenticated·service_role 직접 권한을 회수하고 authenticated에는 상태 helper 실행만 최소 부여한다. 고정 v3 manifest와 migration 직후 OID/ACL/RLS/함수·정책·trigger·제약·index/column snapshot을 rollback 전 비교해 drift를 fail-closed로 차단한다. 해제는 endpoint 한 행 DB 삭제 성공 뒤 browser unsubscribe를 수행해 DB 실패 시 재시도 가능하다. `tests/push-notifications.test.js`와 `tests/sql/pglite-push-subscriptions.mjs`는 VM·PGlite로 이 경계를 검증한다.
 - VAPID·서버 발송·실제 기기 권한/구독·직원 발송·운영 migration은 미수행이며 별도 비용·자격증명·실기기 검증 후 진행한다.

@@ -1,0 +1,53 @@
+-- Task 8: Task 7 private ownership manifest must already exist.  This patch changes no attendance rows.
+-- OLD_FUNCTION_MD5=f1277c2f9d91a3e434e237e19a6800b9
+begin;
+do $$
+declare p oid:='public.review_manual_attendance(bigint,text)'::regprocedure; marker regclass:=to_regclass('employee_hub_private.attendance_owner_chief_gate_patch_marker');
+begin
+  if to_regnamespace('employee_hub_private') is null or to_regclass('employee_hub_private.push_subscriptions_migration_marker') is null then raise exception 'Task 7 private manifest is required; preserve state and stop'; end if;
+  if (select rolname from pg_roles where oid=(select nspowner from pg_namespace where nspname='employee_hub_private'))<>'postgres' or not has_schema_privilege('authenticated','employee_hub_private','usage') or has_schema_privilege('anon','employee_hub_private','usage') or has_schema_privilege('service_role','employee_hub_private','usage') then raise exception 'Task 7 private schema owner or ACL mismatch; preserve state and stop'; end if;
+  if (select rolname from pg_roles where oid=(select relowner from pg_class where oid='employee_hub_private.push_subscriptions_migration_marker'::regclass))<>'postgres' or exists(select 1 from aclexplode(coalesce((select relacl from pg_class where oid='employee_hub_private.push_subscriptions_migration_marker'::regclass),acldefault('r',(select relowner from pg_class where oid='employee_hub_private.push_subscriptions_migration_marker'::regclass)))) a where a.grantee<>0 and a.grantee<>(select oid from pg_roles where rolname='postgres')) then raise exception 'Task 7 marker owner or ACL mismatch; preserve state and stop'; end if;
+  if marker is null then
+    if md5(pg_get_functiondef(p))<>'f1277c2f9d91a3e434e237e19a6800b9' or not (select prosecdef and proconfig=array['search_path=public'] and (select rolname from pg_roles where oid=proowner)='postgres' from pg_proc where oid=p) or exists(select 1 from aclexplode(coalesce((select proacl from pg_proc where oid=p),acldefault('f',(select proowner from pg_proc where oid=p)))) a where a.privilege_type<>'EXECUTE' or a.grantee not in ((select oid from pg_roles where rolname='postgres'),(select oid from pg_roles where rolname='service_role'),(select oid from pg_roles where rolname='authenticated'))) then raise exception 'old review_manual_attendance identity, owner, security, config, or ACL mismatch; preserve state and stop'; end if;
+  elsif not exists(select 1 from employee_hub_private.attendance_owner_chief_gate_patch_marker m where m.patch='task8-owner-chief-gate-v1' and m.old_md5='f1277c2f9d91a3e434e237e19a6800b9' and m.new_md5=md5(pg_get_functiondef(p)) and m.identity=jsonb_build_object('owner',(select rolname from pg_roles where oid=(select proowner from pg_proc where oid=p)),'security_definer',(select prosecdef from pg_proc where oid=p),'config',(select to_jsonb(proconfig) from pg_proc where oid=p),'acl',(select coalesce(to_jsonb(proacl),'null'::jsonb) from pg_proc where oid=p)) and m.applied_at is not null) or pg_get_functiondef(p)!~* E'elsif\\s+p_action\\s*=\\s*''approve''\\s+and\\s+role_name\\s*=\\s*''owner''\\s+and\\s+r\\.status\\s*=\\s*''실장승인''\\s+then' or pg_get_functiondef(p)~* E'elsif\\s+p_action\\s*=\\s*''approve''\\s+and\\s+role_name\\s*=\\s*''owner''\\s+and\\s+r\\.status\\s+in\\s*\\(\\s*''대기''\\s*,\\s*''실장승인''\\s*\\)\\s+then' then raise exception 'Task 8 marker or corrected function mismatch; preserve state and stop'; end if;
+end $$;
+create table if not exists employee_hub_private.attendance_owner_chief_gate_patch_marker (
+  patch text primary key check(patch='task8-owner-chief-gate-v1'), old_md5 text not null check(old_md5='f1277c2f9d91a3e434e237e19a6800b9'), new_md5 text not null, identity jsonb not null, applied_at timestamptz not null default now()
+);
+alter table employee_hub_private.attendance_owner_chief_gate_patch_marker enable row level security;
+alter table employee_hub_private.attendance_owner_chief_gate_patch_marker force row level security;
+revoke all on employee_hub_private.attendance_owner_chief_gate_patch_marker from public,anon,authenticated,service_role;
+-- Corrected production definition: owner approval is permitted only after chief approval.
+create or replace function public.review_manual_attendance(p_id bigint,p_action text)
+returns public.attendance_manual_entries language plpgsql security definer set search_path=public as $$
+declare r public.attendance_manual_entries; role_name text; actor_name text; v_issue_id bigint; n int;
+begin
+  if not exists(select 1 from public.profiles p where p.user_id=auth.uid() and p.active=true and p.approved=true) then raise exception 'active approved profile required'; end if;
+  role_name:=coalesce(public.my_role(),''); select * into r from public.attendance_manual_entries where id=p_id; if not found then raise exception 'manual attendance not found'; end if;
+  perform pg_advisory_xact_lock(hashtextextended(r.user_id::text||'|'||r.work_date::text,0)); select * into r from public.attendance_manual_entries where id=p_id for update; if not found then raise exception 'manual attendance disappeared'; end if;
+  if r.status='원장확정' then raise exception 'confirmed manual attendance is immutable'; end if; if exists(select 1 from public.attendance_manual_entries newer where newer.supersedes_id=r.id and newer.status in ('대기','실장승인')) then raise exception 'obsolete manual attendance version'; end if;
+  select name into actor_name from public.profiles where user_id=auth.uid();
+  if p_action='reject' and role_name in ('chief','owner') and r.status in ('대기','실장승인') then update public.attendance_manual_entries set status='반려',chief_by=case when role_name='chief' then actor_name else chief_by end,chief_at=case when role_name='chief' then now() else chief_at end,owner_by=case when role_name='owner' then actor_name else owner_by end,owner_at=case when role_name='owner' then now() else owner_at end where id=p_id;
+  elsif p_action='approve' and role_name='chief' and r.status='대기' then update public.attendance_manual_entries set status='실장승인',chief_by=actor_name,chief_at=now() where id=p_id;
+  elsif p_action='approve' and role_name='owner' and r.status='실장승인' then
+    select id into v_issue_id from public.attendance_issues where user_id=r.user_id and work_date=r.work_date and rule_label='지문인식오류' and status='원장확정' order by id desc limit 1;
+    if exists(select 1 from public.attendance where user_id=r.user_id and work_date=r.work_date and source='fp') then
+      if v_issue_id is null then raise exception 'fingerprint evidence requires approved recognition-error issue'; end if;
+      if exists(select 1 from public.attendance_issue_resolutions old where old.issue_id=v_issue_id and (old.user_id is distinct from r.user_id or old.work_date is distinct from r.work_date or old.clock_in is distinct from r.clock_in or old.clock_out is distinct from r.clock_out or old.late_min is distinct from r.late_min or old.early_min is distinct from r.early_min or old.overtime_min is distinct from r.overtime_min)) then raise exception 'different recognition-error resolution already exists'; end if;
+      insert into public.attendance_issue_resolutions(issue_id,user_id,work_date,clock_in,clock_out,late_min,early_min,overtime_min,approved_by) values(v_issue_id,r.user_id,r.work_date,r.clock_in,r.clock_out,r.late_min,r.early_min,r.overtime_min,auth.uid()) on conflict(issue_id) do nothing;
+      if not exists(select 1 from public.attendance_issue_resolutions old where old.issue_id=v_issue_id and old.user_id=r.user_id and old.work_date=r.work_date and old.clock_in is not distinct from r.clock_in and old.clock_out is not distinct from r.clock_out and old.late_min=r.late_min and old.early_min=r.early_min and old.overtime_min=r.overtime_min) then raise exception 'recognition-error resolution could not be recorded'; end if;
+      update public.attendance_manual_entries set status='원장확정',owner_by=actor_name,owner_at=now() where id=p_id;
+    else
+      insert into public.attendance(user_id,work_date,clock_in,clock_out,source,late_min,early_min,overtime_min,memo) values(r.user_id,r.work_date,r.clock_in,r.clock_out,'manual',r.late_min,r.early_min,r.overtime_min,r.reason) on conflict(user_id,work_date) do update set clock_in=excluded.clock_in,clock_out=excluded.clock_out,source='manual',late_min=excluded.late_min,early_min=excluded.early_min,overtime_min=excluded.overtime_min,memo=excluded.memo where public.attendance.source='manual'; get diagnostics n=row_count; if n<>1 then raise exception 'manual attendance finalization conflicted'; end if; update public.attendance_manual_entries set status='원장확정',owner_by=actor_name,owner_at=now() where id=p_id;
+    end if;
+  else raise exception 'manual attendance review is not allowed'; end if;
+  insert into public.manual_attendance_status_history(entry_id,from_status,to_status,actor_id,actor_name) values(p_id,r.status,(select status from public.attendance_manual_entries where id=p_id),auth.uid(),actor_name); select * into r from public.attendance_manual_entries where id=p_id; return r;
+end; $$;
+do $$ declare p oid:='public.review_manual_attendance(bigint,text)'::regprocedure; v text; begin
+  select md5(pg_get_functiondef(p)) into v;
+  if pg_get_functiondef(p)!~* E'elsif\\s+p_action\\s*=\\s*''approve''\\s+and\\s+role_name\\s*=\\s*''owner''\\s+and\\s+r\\.status\\s*=\\s*''실장승인''\\s+then' or pg_get_functiondef(p)~* E'elsif\\s+p_action\\s*=\\s*''approve''\\s+and\\s+role_name\\s*=\\s*''owner''\\s+and\\s+r\\.status\\s+in\\s*\\(\\s*''대기''\\s*,\\s*''실장승인''\\s*\\)\\s+then' then raise exception 'corrected owner-chief semantic assertion failed; preserve state and stop'; end if;
+  insert into employee_hub_private.attendance_owner_chief_gate_patch_marker(patch,old_md5,new_md5,identity) values('task8-owner-chief-gate-v1','f1277c2f9d91a3e434e237e19a6800b9',v,jsonb_build_object('owner',(select rolname from pg_roles where oid=(select proowner from pg_proc where oid=p)),'security_definer',(select prosecdef from pg_proc where oid=p),'config',(select to_jsonb(proconfig) from pg_proc where oid=p),'acl',(select coalesce(to_jsonb(proacl),'null'::jsonb) from pg_proc where oid=p))) on conflict(patch) do nothing;
+  if (select count(*) from employee_hub_private.attendance_owner_chief_gate_patch_marker)<>1 then raise exception 'Task 8 marker row count mismatch; preserve state and stop'; end if;
+end $$;
+commit;
+

@@ -1,5 +1,10 @@
 # 직원허브 현재 인수인계
 
+## Task 8 재부팅 체크포인트 (2026-09-21)
+
+- 로컬 SQL: `db/attendance_owner_chief_gate_patch.sql` / rollback. Task7 private manifest가 선행이며 rollback 순서는 **Task8 → Task7**이다.
+- 고정 PGlite 0.5.8에서 apply×2·drift fail-closed·RESET·rollback 구 함수 hash·reapply를 통과했다. 운영 migration/행 변경·push·배포·5차 ZIP 열람은 하지 않았다.
+
 ## 최신 정정 — Task 6 Sol High 최종 PASS (2026-09-21, 문서 갱신)
 
 현재 구현 HEAD: `d0222684dd7da4607752c22b2912ad8bf4f0d87a`. Sol High 최종 PASS(Critical/Important/Minor 없음)이며 로컬 직접 Node 30개, PGlite, 인라인 JS, `git diff --check` PASS와 clean worktree를 확인했다. 닫힘 범위는 foldername 길이2, 게시 첨부 restrictive DELETE guard, JSON 구조/NULL 강제, 정책·RLS·ACL·버킷 rollback, apply×2 fail-closed, quoted role 복원이다. push·배포·운영 DB/Storage·실계정은 미수행이다.

@@ -1,5 +1,11 @@
 # overview — 아산정플란트치과 내부 도구 (T8/D 인프라)
 
+## Task 8 로컬 체크포인트 (2026-09-21)
+
+- `db/attendance_owner_chief_gate_patch.sql`과 rollback은 Task 7 private manifest 선행·수기근태 원장 승인 실장승인 제한·private marker fail-closed를 위한 **로컬 초안**이다. 운영 DB/행·push·배포는 수행하지 않았다.
+- 고정 PGlite 0.5.8에서 적용×2·함수 drift 거부·RESET·rollback 구 함수 해시·재적용 왕복을 확인했다. 운영 적용 판단은 별도다.
+- 순서: Task 8 rollback을 먼저 성공시킨 뒤에만 Task 7 rollback을 검토한다. 5차 ZIP은 열지 않는다.
+
 > 이 폴더는 병원 내부에서 쓰는 단일 HTML 웹도구 모음이다. 한 저장소에서 여러 도구를 배포한다.
 > 담당 세션: **CC 치료계획(T8 인프라 개발 + T6 CS 인계 대상)**. 마케팅본부 지침의 T#와 구분해 내부 트랙은 **D1~D6**로 부른다.
 
