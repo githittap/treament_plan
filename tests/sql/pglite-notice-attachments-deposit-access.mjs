@@ -41,7 +41,9 @@ create policy notices_insert_approvers on public.notices for insert to authentic
 create policy notices_update_approvers on public.notices for update to authenticated using (public.my_role() in ('chief','owner')) with check (public.my_role() in ('chief','owner'));
 create policy notices_select_authenticated on public.notices for select to authenticated using (true);
 create policy deposits_select_active on public.deposits for select to authenticated using (exists (select 1 from public.profiles as p where p.user_id=auth.uid() and p.active));
-insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types) values ('notice-attachments','notice-attachments',false,null,null);
+create policy storage_objects_permissive_delete on storage.objects for delete to authenticated using (bucket_id='notice-attachments' and name like '%/tmp/%' and auth.uid()='${staff}'::uuid);
+create policy notice_attachments_select_authenticated on storage.objects for select to authenticated using (bucket_id='notice-attachments' and false);
+insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types) values ('notice-attachments','notice-attachments',true,123,array['image/gif']);
 `;
 
 async function as(uid) {
@@ -51,6 +53,11 @@ async function denied(sql) {
   let error = '';
   try { await query(sql); } catch (caught) { error = String(caught); }
   assert.match(error, /row-level security|permission denied|notice author must match|immutable/);
+}
+async function invalidAttachments(value) {
+  let error = '';
+  try { await query(`insert into public.notices(title, author, author_id, attachments) values ('잘못된 첨부','위조','${staff}',${value})`); } catch (caught) { error = String(caught); }
+  assert.match(error, /notice attachments must be an array of objects with non-empty paths/);
 }
 async function snapshotPolicies() {
   return query(`select schemaname,tablename,policyname,permissive,roles,cmd,qual,with_check
@@ -113,6 +120,10 @@ try {
   await query(`insert into storage.objects(bucket_id,name,owner_id,metadata) values ('notice-attachments','${staff}/tmp/published.pdf','${staff}','{"mimetype":"application/pdf","size":100}'::jsonb)`);
   await query(`insert into public.notices(title, author, author_id, attachments) values ('게시 첨부','위조 문자열','${staff}',jsonb_build_array(jsonb_build_object('path','${staff}/tmp/published.pdf')))`);
   assert.deepEqual(await query(`delete from storage.objects where bucket_id='notice-attachments' and name='${staff}/tmp/published.pdf' returning name`), [], '게시된 첨부는 작성자도 삭제할 수 없어야 한다');
+  await invalidAttachments(`'{}'::jsonb`);
+  await invalidAttachments(`'[1]'::jsonb`);
+  await invalidAttachments(`'[null]'::jsonb`);
+  await invalidAttachments(`jsonb_build_array(jsonb_build_object('path',''))`);
   await db.exec('reset role');
   await query(`insert into storage.objects(bucket_id,name,owner_id,metadata) values
     ('notice-attachments','${staff}/final/kept.pdf','${staff}','{}'::jsonb),
@@ -141,10 +152,13 @@ try {
   assert.equal((await query("select count(*)::int n from storage.objects where bucket_id='notice-attachments'"))[0].n,0);
   await denied(`insert into storage.objects(bucket_id,name,owner_id) values ('notice-attachments','${inactive}/tmp/c.pdf','${inactive}')`);
   await db.exec('reset role');
+  await query(`insert into storage.objects(bucket_id,name,owner_id,metadata) values ('notice-attachments','legacy/keep.pdf','${staff}','{}'::jsonb)`);
   await db.exec(rollback);
   assert.deepEqual((await query("select id,name,public,file_size_limit,allowed_mime_types from storage.buckets where id='notice-attachments'"))[0], bucketBefore);
   assert.deepEqual(await snapshotPolicies(), policiesBefore);
   assert.deepEqual(await snapshotPrivileges(), privilegesBefore);
+  assert.equal((await query("select count(*)::int n from storage.objects where bucket_id='notice-attachments' and name='legacy/keep.pdf'"))[0].n,1);
+  await query("delete from storage.objects where bucket_id='notice-attachments' and name='legacy/keep.pdf'");
 
   await query("delete from storage.buckets where id='notice-attachments'");
   await db.exec(draft);
@@ -152,7 +166,7 @@ try {
   await query(`insert into storage.objects(bucket_id,name,owner_id,metadata) values ('notice-attachments','${staff}/tmp/preserve.pdf','${staff}','{}'::jsonb)`);
   let blocked = '';
   try { await db.exec(rollback); } catch (caught) { blocked = String(caught); }
-  assert.match(blocked,/objects exist; preserve data and stop rollback/);
+  assert.match(blocked,/new notice-attachments bucket has objects; preserve data and stop rollback/);
   await db.exec('rollback');
   assert.equal((await query("select count(*)::int n from storage.objects where bucket_id='notice-attachments'"))[0].n,1);
   assert.equal((await query("select count(*)::int n from storage.buckets where id='notice-attachments'"))[0].n,1);

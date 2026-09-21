@@ -49,6 +49,14 @@ assert.match(sql, /notice_attachments_delete_own_tmp/i,
   '업로더 본인의 임시 첨부만 삭제하는 Storage DELETE 정책이 필요하다');
 assert.match(sql, /not exists\s*\(\s*select 1 from public\.notices/i,
   '게시된 첨부 경로는 작성자 DELETE 정책에서도 서버측으로 차단해야 한다');
+assert.match(sql, /as restrictive for delete to authenticated/i,
+  '다른 permissive DELETE 또는 ALL 정책과 OR 결합되어도 게시 첨부 보호는 유지되어야 한다');
+assert.match(sql, /notice_attachments_migration_policy_snapshot/i,
+  '기존 동일 이름 정책은 rollback을 위해 재현 가능한 정의로 snapshot해야 한다');
+assert.match(sql, /jsonb_typeof\(new\.attachments\).*jsonb_array_elements/is,
+  '공지 첨부는 배열 안의 객체와 비어 있지 않은 path만 허용해야 한다');
+assert.match(sql, /existing notice attachments are invalid/i,
+  '기존 비정상 첨부 데이터는 migration이 수정하지 않고 fail-closed 해야 한다');
 assert.match(sql, /deposits_select_desk_lead/,
   '예치금 조회 RLS가 공지 작성 RLS와 분리되어야 한다');
 assert.match(sql, /p\.dept='데스크'.*p\.role in \('chief','owner'\)/s,
