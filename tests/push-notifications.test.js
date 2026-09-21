@@ -9,7 +9,7 @@ assert.match(sw,/addEventListener\('push'/,'서비스워커는 push 수신을 �
 assert.match(sw,/addEventListener\('notificationclick'/,'서비스워커는 notificationclick을 안전하게 처리해야 한다');
 assert.match(sw,/new URL\(/,'외부·비정상 URL은 origin/path 검증해야 한다');
 assert.match(sw,/slice\(0,200\)/,'알림 문자열 길이는 제한해야 한다');
-assert.match(sql,/create table if not exists public\.push_subscriptions/i,'구독 테이블 초안이 필요하다');
+assert.match(sql,/create table public\.push_subscriptions/i,'구독 테이블 초안이 필요하다');
 assert.match(sql,/auth\.uid\(\)/i,'RLS는 본인 구독으로 한정해야 한다');
 assert.match(sql,/unique\(user_id,endpoint\)/i,'사용자별 여러 기기를 허용하되 같은 endpoint 중복은 막아야 한다');
 assert.match(sql,/endpoint text not null unique/i,'endpoint는 전역 단일 소유여야 한다');
