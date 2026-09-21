@@ -33,6 +33,12 @@ assert.match(html, /downloadNoticeAttachment\(/,
   '첨부 열람은 private Storage download 경로를 사용해야 한다');
 assert.match(html, /cleanupNoticeUploads\(/,
   '공지 저장 실패·부분 업로드는 이번 요청의 임시 객체만 정리해야 한다');
+assert.match(html, /async function cleanupNoticeUploads\(paths\)\{if\(paths\.length\)await sb\.storage\.from\('notice-attachments'\)\.remove\(paths\);\}/,
+  '정리 함수는 전용 버킷에서 전달된 이번 요청 경로만 삭제해야 한다');
+assert.match(html, /if\(error\)\{await cleanupNoticeUploads\(uploaded\);\$\('#ntMsg'\)\.textContent='첨부 실패:/,
+  '부분 업로드 실패 시 성공한 임시 경로를 정리해야 한다');
+assert.match(html, /if\(error\)\{await cleanupNoticeUploads\(uploaded\);\$\('#ntMsg'\)\.textContent='공지 저장 실패:/,
+  '공지 행 저장 실패 시 성공한 임시 경로를 정리해야 한다');
 assert.match(sql, /notice_attachments_delete_own_tmp/i,
   '업로더 본인의 임시 첨부만 삭제하는 Storage DELETE 정책이 필요하다');
 assert.match(sql, /deposits_select_desk_lead/,

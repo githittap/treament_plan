@@ -37,9 +37,10 @@ grant select on public.deposits to authenticated;
 grant select, insert on storage.objects to authenticated;
 grant delete on storage.objects to authenticated;
 grant update on public.notices to authenticated;
-create policy notices_insert_approvers on public.notices for insert to authenticated with check (true);
-create policy notices_update_approvers on public.notices for update to authenticated using (true) with check (true);
+create policy notices_insert_approvers on public.notices for insert to authenticated with check (public.my_role() in ('chief','owner'));
+create policy notices_update_approvers on public.notices for update to authenticated using (public.my_role() in ('chief','owner')) with check (public.my_role() in ('chief','owner'));
 create policy notices_select_authenticated on public.notices for select to authenticated using (true);
+create policy deposits_select_active on public.deposits for select to authenticated using (exists (select 1 from public.profiles as p where p.user_id=auth.uid() and p.active));
 insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types) values ('notice-attachments','notice-attachments',false,null,null);
 `;
 
@@ -51,9 +52,28 @@ async function denied(sql) {
   try { await query(sql); } catch (caught) { error = String(caught); }
   assert.match(error, /row-level security|permission denied|notice author must match|immutable/);
 }
+async function snapshotPolicies() {
+  return query(`select schemaname,tablename,policyname,permissive,roles,cmd,qual,with_check
+    from pg_policies
+    where (schemaname='public' and tablename in ('notices','deposits'))
+       or (schemaname='storage' and tablename='objects')
+    order by schemaname,tablename,policyname`);
+}
+async function snapshotPrivileges() {
+  return query(`select table_schema,table_name,grantee,privilege_type
+    from information_schema.role_table_grants
+    where grantee in ('anon','authenticated')
+      and ((table_schema='public' and table_name in ('notices','deposits'))
+        or (table_schema='storage' and table_name='objects'))
+    order by table_schema,table_name,grantee,privilege_type`);
+}
 
 try {
-  await db.exec(prelude + draft);
+  await db.exec(prelude);
+  const policiesBefore = await snapshotPolicies();
+  const privilegesBefore = await snapshotPrivileges();
+  const bucketBefore = (await query("select id,name,public,file_size_limit,allowed_mime_types from storage.buckets where id='notice-attachments'"))[0];
+  await db.exec(draft);
   assert.deepEqual((await query("select id, public from storage.buckets where id='notice-attachments'"))[0], { id: 'notice-attachments', public: false });
   assert.deepEqual((await query("select public,file_size_limit,allowed_mime_types from storage.buckets where id='notice-attachments'"))[0], { public: false, file_size_limit: 10485760, allowed_mime_types: ['application/pdf','image/jpeg','image/png','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/x-hwp','application/haansofthwp'] });
   await query(`insert into public.profiles values
@@ -78,6 +98,16 @@ try {
   await query(`insert into storage.objects(bucket_id,name,owner_id,metadata) values ('notice-attachments','${staff}/tmp/cleanup.pdf','${staff}','{"mimetype":"application/pdf","size":100}'::jsonb)`);
   await query(`delete from storage.objects where bucket_id='notice-attachments' and name='${staff}/tmp/cleanup.pdf'`);
   assert.equal((await query("select count(*)::int n from storage.objects where bucket_id='notice-attachments'"))[0].n,0);
+  await db.exec('reset role');
+  await query(`insert into storage.objects(bucket_id,name,owner_id,metadata) values
+    ('notice-attachments','${staff}/final/kept.pdf','${staff}','{}'::jsonb),
+    ('other-bucket','${staff}/tmp/other.pdf','${staff}','{}'::jsonb)`);
+  await db.exec('set role authenticated'); await as(staff);
+  assert.deepEqual(await query(`delete from storage.objects where bucket_id='notice-attachments' and name='${staff}/final/kept.pdf' returning name`), []);
+  assert.deepEqual(await query(`delete from storage.objects where bucket_id='other-bucket' and name='${staff}/tmp/other.pdf' returning name`), []);
+  await db.exec('reset role');
+  await query(`delete from storage.objects where bucket_id in ('notice-attachments','other-bucket')`);
+  await db.exec('set role authenticated'); await as(staff);
   await denied(`insert into storage.objects(bucket_id,name,owner_id,metadata) values ('notice-attachments','${staff}/final/a.pdf','${staff}','{"mimetype":"application/pdf","size":100}'::jsonb)`);
   await denied(`insert into storage.objects(bucket_id,name,owner_id,metadata) values ('notice-attachments','${staff}/tmp/a.exe','${staff}','{"mimetype":"application/x-msdownload","size":100}'::jsonb)`);
   await denied(`insert into storage.objects(bucket_id,name,owner_id,metadata) values ('notice-attachments','${staff}/tmp/large.pdf','${staff}','{"mimetype":"application/pdf","size":10485761}'::jsonb)`);
@@ -97,11 +127,27 @@ try {
   await denied(`insert into storage.objects(bucket_id,name,owner_id) values ('notice-attachments','${inactive}/tmp/c.pdf','${inactive}')`);
   await db.exec('reset role');
   await db.exec(rollback);
-  assert.deepEqual((await query("select public,file_size_limit,allowed_mime_types from storage.buckets where id='notice-attachments'"))[0], { public: false, file_size_limit: null, allowed_mime_types: null });
-  assert.deepEqual((await query("select policyname from pg_policies where schemaname='public' and tablename='notices' and policyname in ('notices_insert_approvers','notices_update_approvers') order by policyname")).map(row=>row.policyname), ['notices_insert_approvers','notices_update_approvers']);
-  assert.deepEqual((await query("select policyname from pg_policies where schemaname='public' and tablename='deposits' order by policyname")).map(row=>row.policyname), ['deposits_select_active']);
-  assert.equal((await query("select count(*)::int n from pg_policies where schemaname='storage' and tablename='objects' and policyname like 'notice_attachments_%'"))[0].n,0);
-  console.log('PGLITE_NOTICE_ATTACHMENTS_DEPOSIT_ACCESS_PASS: 승인 직원 공지·개인 경로 첨부, 예치금 데스크·lead 분리');
+  assert.deepEqual((await query("select id,name,public,file_size_limit,allowed_mime_types from storage.buckets where id='notice-attachments'"))[0], bucketBefore);
+  assert.deepEqual(await snapshotPolicies(), policiesBefore);
+  assert.deepEqual(await snapshotPrivileges(), privilegesBefore);
+
+  await query("delete from storage.buckets where id='notice-attachments'");
+  await db.exec(draft);
+  assert.equal((await query("select count(*)::int n from storage.buckets where id='notice-attachments'"))[0].n,1);
+  await query(`insert into storage.objects(bucket_id,name,owner_id,metadata) values ('notice-attachments','${staff}/tmp/preserve.pdf','${staff}','{}'::jsonb)`);
+  let blocked = '';
+  try { await db.exec(rollback); } catch (caught) { blocked = String(caught); }
+  assert.match(blocked,/objects exist; preserve data and stop rollback/);
+  await db.exec('rollback');
+  assert.equal((await query("select count(*)::int n from storage.objects where bucket_id='notice-attachments'"))[0].n,1);
+  assert.equal((await query("select count(*)::int n from storage.buckets where id='notice-attachments'"))[0].n,1);
+  await query("delete from storage.objects where bucket_id='notice-attachments'");
+  await db.exec(rollback);
+  assert.equal((await query("select count(*)::int n from storage.buckets where id='notice-attachments'"))[0].n,0);
+  assert.equal((await query("select count(*)::int n from information_schema.tables where table_schema='public' and table_name='notice_attachments_migration_snapshot'"))[0].n,0);
+  assert.deepEqual(await snapshotPolicies(), policiesBefore);
+  assert.deepEqual(await snapshotPrivileges(), privilegesBefore);
+  console.log('PGLITE_NOTICE_ATTACHMENTS_DEPOSIT_ACCESS_PASS: DELETE 경계와 apply/rollback 정책·버킷·권한 왕복 일치');
 } finally {
   await db.close();
 }
