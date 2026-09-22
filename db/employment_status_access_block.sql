@@ -82,7 +82,9 @@ as $$
 $$;
 
 revoke all on function public.employee_hub_access_allowed() from public;
+revoke all on function public.employee_hub_access_allowed() from anon;
 revoke all on function public.my_role() from public;
+revoke all on function public.my_role() from anon;
 grant execute on function public.employee_hub_access_allowed() to authenticated;
 grant execute on function public.my_role() to authenticated;
 
@@ -359,8 +361,10 @@ $$;
 
 revoke all on function public.assert_employment_owner(uuid) from public;
 revoke all on function public.assert_employment_owner(uuid) from anon;
+revoke all on function public.assert_employment_owner(uuid) from authenticated;
 revoke all on function public.assert_employee_approver(uuid) from public;
 revoke all on function public.assert_employee_approver(uuid) from anon;
+revoke all on function public.assert_employee_approver(uuid) from authenticated;
 revoke all on function public.set_employment_status(uuid,text,date,text) from public;
 revoke all on function public.set_employment_status(uuid,text,date,text) from anon;
 revoke all on function public.disable_employee_account_preserve_records(uuid,text,text,date) from public;

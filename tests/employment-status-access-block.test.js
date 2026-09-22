@@ -84,6 +84,19 @@ test('관리 RPC는 명시 anon EXECUTE를 제거하고 authenticated만 허용�
   assert.match(rollback, /from public,anon/i);
 });
 
+test('정책 helper는 authenticated만, 내부 assert는 외부 EXECUTE 없이 유지한다', () => {
+  const sql = fs.readFileSync(sqlPath, 'utf8');
+  const hardening = fs.readFileSync(path.join(root, 'db', 'employment_status_helper_acl_hardening.sql'), 'utf8');
+  const rollback = fs.readFileSync(path.join(root, 'db', 'employment_status_helper_acl_hardening_rollback.sql'), 'utf8');
+  for (const name of ['employee_hub_access_allowed', 'my_role']) {
+    assert.match(sql, new RegExp(`revoke all on function public\\.${name}[\\s\\S]*from anon`, 'i'));
+    assert.match(hardening, new RegExp(name, 'i'));
+  }
+  for (const name of ['assert_employment_owner', 'assert_employee_approver']) assert.match(hardening, new RegExp(`public\\.${name}`, 'i'));
+  assert.match(hardening, /from public,anon,authenticated/i);
+  assert.match(rollback, /fail-safe rollback/i);
+});
+
 test('HR gate와 rollback gate 목록은 기밀 접근·기록을 포함해 대칭이다', () => {
   const sql = fs.readFileSync(sqlPath, 'utf8');
   const rollback = fs.readFileSync(rollbackPath, 'utf8');
