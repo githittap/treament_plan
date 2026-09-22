@@ -569,7 +569,7 @@ async function renderHome(m){
      ${n.notion_url?` · <a href="${esc(n.notion_url)}" target="_blank" rel="noopener">전문 보기 ↗</a>`:''}
      <div class="sub">${esc(n.body||'')}</div></div>`).join(''):'<div class="empty">공지 없음</div>'}</div>`;
   // 읽음 처리
-  for(const n of (notices||[])) sb.from('notice_reads').upsert({notice_id:n.id,user_id:ME.id},{onConflict:'notice_id,user_id'}).then(()=>{});
+  for(const n of (notices||[])) sb.from('notice_reads').upsert({notice_id:n.id,user_id:ME.id},{onConflict:'notice_id,user_id',ignoreDuplicates:true}).then(()=>{});
   refreshBadges();
 }
 
@@ -1242,7 +1242,7 @@ async function renderNotice(m){
       <div class="sub" style="white-space:pre-wrap">${esc(n.body||'')}</div>${noticeAttachmentLinks(n)}
       ${isLead()?`<button class="mini rej" style="margin-top:4px" onclick="delNotice(${n.id})">삭제</button>`:''}</div>`).join(''):'<div class="empty">공지 없음</div>'}
   </div>`;
-  for(const n of (list||[])) sb.from('notice_reads').upsert({notice_id:n.id,user_id:ME.id},{onConflict:'notice_id,user_id'}).then(()=>{});
+  for(const n of (list||[])) sb.from('notice_reads').upsert({notice_id:n.id,user_id:ME.id},{onConflict:'notice_id,user_id',ignoreDuplicates:true}).then(()=>{});
   refreshBadges();
 }
 function noticeAttachmentLinks(notice){const attachments=Array.isArray(notice.attachments)?notice.attachments:[];if(!attachments.length)return '<div class="sub">첨부 없음</div>';return `<div class="sub">첨부: ${attachments.map(a=>`<button class="mini" data-notice-attachment-path="${esc(a.path||'')}" data-notice-attachment-name="${esc(a.name||'첨부파일')}" onclick="downloadNoticeAttachment(this.dataset.noticeAttachmentPath,this.dataset.noticeAttachmentName)">${esc(a.name||'첨부파일')}</button>`).join(' ')}</div>`;}
