@@ -10,3 +10,8 @@
 # db/push_subscriptions_draft.sql). Force LF regardless of core.autocrlf so the
 # checked-out bytes match what the fingerprints were computed against.
 db/*.sql text eol=lf
+
+# 예외: 운영에 적용된 Task 8 함수 본문이 CRLF로 기록돼 있어 해시 08d9fa62와
+# 일치시키기 위함 (db/attendance_owner_chief_gate_patch.sql의
+# EXPECTED_NEW_FUNCTION_PROSRC_MD5는 CRLF 기준으로 고정된 운영 실측값).
+db/attendance_owner_chief_gate_patch.sql text eol=crlf
