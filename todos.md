@@ -6,7 +6,7 @@
 
 ## 직원허브 5차 — 결근/미기록 후보 기준
 
-- [x] 로컬 구현·검증: `absence_confirm_after_minutes`/`absence_exclude_pending_manual` 기본값, 원장 설정 저장, 서울시각 cutoff 및 입사·재직·휴가·수기·실제근태 제외, 기본값만 제거하고 사용자값이면 중단하는 rollback.
+- [x] 로컬 구현·검증: `absence_confirm_after_minutes`/`absence_exclude_pending_manual` 기본값, 원장 설정 저장, 서울시각 cutoff 및 입사·재직·휴가·수기·실제근태 제외. 설정 실패 시 오늘 후보 fail-closed, 비공개 snapshot으로 기존 키의 값·label·updated_at 보존, 실제 삽입 키만 rollback하며 사용자 변경은 중단한다.
 - [ ] 운영 적용·실계정 설정 저장/후보 조회 검증은 별도 범위다. 이 작업에서는 운영 DB·push·deploy하지 않는다.
 
 ## 직원허브 5차 — 수기근태 2단계

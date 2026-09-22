@@ -323,10 +323,12 @@ let SETTINGS = {
   jongeop_weekday_evening:'20:00', jongeop_weekday_day:'18:30',
   jongeop_sat:'17:00', jongeop_sun:'14:00'
 };
+let SETTINGS_LOAD_OK=false,SETTINGS_LOAD_ERROR='';
 let TAB_ROLES={};
 let TAB_OVERRIDES={};
 async function loadSettings(){
-  try{const {data}=await sb.from('app_settings').select('key,value');(data||[]).forEach(s=>{SETTINGS[s.key]=s.value;});}catch(e){}
+  SETTINGS_LOAD_OK=false;SETTINGS_LOAD_ERROR='';
+  try{const result=await sb.from('app_settings').select('key,value');if(!absenceSettingsLoadSucceeded(result))throw result?.error||new Error('설정 응답이 비정상입니다.');result.data.forEach(s=>{SETTINGS[s.key]=s.value;});SETTINGS_LOAD_OK=true;}catch(e){SETTINGS_LOAD_ERROR=e?.message||'설정을 불러오지 못했습니다.';}
   try{TAB_ROLES=JSON.parse(SETTINGS.hr_tab_roles||'{}')||{};}catch(e){TAB_ROLES={};}
   try{TAB_OVERRIDES=JSON.parse(SETTINGS.hr_tab_overrides||'{}')||{};}catch(e){TAB_OVERRIDES={};}
 }
@@ -618,7 +620,8 @@ async function submitManualAttendance(){const msg=$('#manualAttMsg'),lunchRaw=$(
 async function reviewManualAttendance(id,action){const {error}=await sb.rpc('review_manual_attendance',{p_id:id,p_action:action});if(error){alert('처리 실패: '+error.message);return;}setStatus('saved');render();}
 function attendanceMonthBounds(month){const [y,m]=month.split('-').map(Number),next=m===12?`${y+1}-01-01`:`${y}-${String(m+1).padStart(2,'0')}-01`;return {start:`${month}-01`,next};}
 /* absence-candidate:test-start */
-function absenceCandidateDecision({ds,todaySeoul,nowSeoul,siueop,afterMinutes,shift,hasAttendance,leave,manualStatus,excludePendingManual,hireDate,employmentStatus,effectiveDate}){
+function absenceSettingsLoadSucceeded(result){return !result?.error&&Array.isArray(result?.data);}
+function absenceCandidateDecision({ds,todaySeoul,nowSeoul,siueop,afterMinutes,shift,hasAttendance,leave,manualStatus,excludePendingManual,hireDate,employmentStatus,effectiveDate,settingsLoaded}){
   const invalidCutoff=()=>{const m=String(siueop||'').match(/^(\d{2}):(\d{2})$/),n=String(afterMinutes??'').trim();return !m||Number(m[1])>23||Number(m[2])>59||!/^\d+$/.test(n)||Number(n)>1440;};
   const invalidNow=()=>{const m=String(nowSeoul||'').match(/^(\d{2}):(\d{2})$/);return !m||Number(m[1])>23||Number(m[2])>59;};
   if(!ds||shift==='off'||hasAttendance||ds>todaySeoul||(hireDate&&ds<hireDate)||(employmentStatus&&employmentStatus!=='재직'&&effectiveDate&&ds>=effectiveDate))return {candidate:false};
@@ -626,10 +629,12 @@ function absenceCandidateDecision({ds,todaySeoul,nowSeoul,siueop,afterMinutes,sh
   if(leave&&leave.status==='승인')return {candidate:false};
   if(excludePendingManual&&['대기','실장승인','원장확정'].includes(manualStatus))return {candidate:false};
   if(ds<todaySeoul)return {candidate:true};
+  if(settingsLoaded===false)return {candidate:false};
   if(invalidCutoff()||invalidNow())return {candidate:false};
   const [h,m]=siueop.split(':').map(Number),[nh,nm]=nowSeoul.split(':').map(Number);
   return {candidate:nh*60+nm>=h*60+m+Number(afterMinutes)};
 }
+function absenceManualExcluded(rows){return (rows||[]).some(row=>['대기','실장승인','원장확정'].includes(row?.status));}
 /* absence-candidate:test-end */
 function seoulDateTime(){const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date()),get=t=>parts.find(x=>x.type===t)?.value||'';return {date:`${get('year')}-${get('month')}-${get('day')}`,time:`${get('hour')}:${get('minute')}`};}
 function absenceSettingsHtml(){return ME.role==='owner'?`<div class="card"><h2>⚙ 결근/미기록 후보 기준 <span class="sub">(원장)</span></h2><div class="grid"><div class="fld"><label>시업 시각</label><input id="absenceSiueop" type="time" value="${esc(SETTINGS.siueop||'10:00')}"></div><div class="fld"><label>확인 지연(분)</label><input id="absenceDelay" type="number" min="0" max="1440" step="1" value="${esc(SETTINGS.absence_confirm_after_minutes||'0')}"></div><div class="fld"><label><input id="absenceManualExclude" type="checkbox" ${String(SETTINGS.absence_exclude_pending_manual)!=='false'?'checked':''}> 대기·실장승인·원장확정 수기근태는 후보에서 제외</label></div></div><button class="mini stamp" onclick="saveAbsenceSettings()">기준 저장</button><div class="msg" id="absenceSettingsMsg"></div></div>`:'';}
@@ -717,11 +722,11 @@ async function checkAbsent(month){
   ]);if(scResult.error||attResult.error||leaveResult.error||manualResult.error){el.innerHTML=`<div class="cal-error">후보 확인 실패: ${esc((scResult.error||attResult.error||leaveResult.error||manualResult.error).message)}</div>`;return;}
   const sc=scResult.data,att=attResult.data,leaves=leaveResult.data,manuals=manualResult.data;
   const has=new Set((att||[]).map(a=>a.user_id+'|'+a.work_date));
-  const manualByKey=new Map((manuals||[]).map(a=>[a.user_id+'|'+a.work_date,a.status])),now=seoulDateTime(),miss=[],seen=new Set();
+  const manualByKey=new Map();(manuals||[]).forEach(row=>{const key=row.user_id+'|'+row.work_date,rows=manualByKey.get(key)||[];rows.push(row);manualByKey.set(key,rows);});const now=seoulDateTime(),miss=[],seen=new Set(),settingsWarning=SETTINGS_LOAD_OK?'':`<div class="cal-error">설정 불러오기 오류: 오늘 후보는 표시하지 않습니다.</div>`;
   (sc||[]).forEach(s=>{ if(!s.user_id||s.shift==='off')return;
     for(let i=0;i<7;i++){const ds=addDays(s.week_start,i);const d=new Date(ds+'T00:00:00');
-      if(d.getDay()!==s.day||ds.slice(0,7)!==month||seen.has(s.user_id+'|'+ds))return;seen.add(s.user_id+'|'+ds);const p=PROFILES.find(x=>x.user_id===s.user_id)||{},leave=(leaves||[]).find(x=>x.user_id===s.user_id&&x.date_from<=ds&&x.date_to>=ds),decision=absenceCandidateDecision({ds,todaySeoul:now.date,nowSeoul:now.time,siueop:SETTINGS.siueop,afterMinutes:SETTINGS.absence_confirm_after_minutes,shift:s.shift,hasAttendance:has.has(s.user_id+'|'+ds),leave,manualStatus:manualByKey.get(s.user_id+'|'+ds),excludePendingManual:String(SETTINGS.absence_exclude_pending_manual)!=='false',hireDate:p.hire_date,employmentStatus:p.employment_status,effectiveDate:p.employment_effective_date});if(decision.candidate)miss.push({u:s.user_id,ds,shift:s.shift});}});
-  el.innerHTML=miss.length?`<table><tr><th>직원</th><th>날짜</th><th>근무표</th></tr>${miss.sort((a,b)=>a.ds<b.ds?-1:1).map(x=>`<tr class="warn"><td>${esc(nameOf(x.u))}</td><td>${md(x.ds)}</td><td>${SHIFTS[x.shift]?SHIFTS[x.shift].l:esc(x.shift)}</td></tr>`).join('')}</table><div class="hint">결근/미기록 후보입니다. 소명 또는 수기근태를 확인하세요.</div>`:'<div class="empty">결근/미기록 후보 없음 ✓</div>';
+      if(d.getDay()!==s.day||ds.slice(0,7)!==month||seen.has(s.user_id+'|'+ds))return;seen.add(s.user_id+'|'+ds);const p=PROFILES.find(x=>x.user_id===s.user_id)||{},leave=(leaves||[]).find(x=>x.user_id===s.user_id&&x.date_from<=ds&&x.date_to>=ds),decision=absenceCandidateDecision({ds,todaySeoul:now.date,nowSeoul:now.time,siueop:SETTINGS.siueop,afterMinutes:SETTINGS.absence_confirm_after_minutes,shift:s.shift,hasAttendance:has.has(s.user_id+'|'+ds),leave,manualStatus:absenceManualExcluded(manualByKey.get(s.user_id+'|'+ds))?'대기':undefined,excludePendingManual:String(SETTINGS.absence_exclude_pending_manual)!=='false',hireDate:p.hire_date,employmentStatus:p.employment_status,effectiveDate:p.employment_effective_date,settingsLoaded:SETTINGS_LOAD_OK});if(decision.candidate)miss.push({u:s.user_id,ds,shift:s.shift});}});
+  el.innerHTML=settingsWarning+(miss.length?`<table><tr><th>직원</th><th>날짜</th><th>근무표</th></tr>${miss.sort((a,b)=>a.ds<b.ds?-1:1).map(x=>`<tr class="warn"><td>${esc(nameOf(x.u))}</td><td>${md(x.ds)}</td><td>${SHIFTS[x.shift]?SHIFTS[x.shift].l:esc(x.shift)}</td></tr>`).join('')}</table><div class="hint">결근/미기록 후보입니다. 소명 또는 수기근태를 확인하세요.</div>`:'<div class="empty">결근/미기록 후보 없음 ✓</div>');
 }
 
 /* ── 근무표(M2) ── */

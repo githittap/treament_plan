@@ -6,9 +6,9 @@
 
 ## 직원허브 5차 — 결근/미기록 후보 기준 (로컬 검증 완료, 2026-09-22)
 
-- 범위: `app_settings`에 `absence_confirm_after_minutes=0`, `absence_exclude_pending_manual=true`를 `ON CONFLICT DO NOTHING`으로 seed하고 기존 owner RLS를 이용해 원장만 화면에서 저장한다. 신규 테이블은 없다.
-- 판정: 서울 기준 오늘은 시업+지연 뒤에만, 과거는 즉시 후보로 한다. 입사일 전, 비재직 유효일 이후, 승인 leave_requests(반차 포함), 실제 attendance, 설정된 대기/실장승인/원장확정 수기근태는 제외한다. 조회 실패 또는 시업 설정 오류의 오늘 후보는 fail-closed다.
-- rollback: 두 키가 기본값일 때만 제거하며, 기본값이 아닌 사용자 값이 있으면 예외로 중단·보존한다. 로컬 Node 전체 JS/PGlite, 인라인 구문, diff-check 검증 후 로컬 커밋만 한다. 운영 DB 적용·push·deploy·실계정 검증은 미수행이다.
+- 범위: `app_settings`에 `absence_confirm_after_minutes=0`, `absence_exclude_pending_manual=true`를 `ON CONFLICT DO NOTHING`으로 seed하고 기존 owner RLS를 이용해 원장만 화면에서 저장한다. rollback 전용 비공개 snapshot 테이블은 migration 전 두 키의 존재·값·label·updated_at만 보관하며 authenticated를 포함한 공개 역할에 권한을 주지 않는다.
+- 판정: 서울 기준 오늘은 시업+지연 뒤에만, 과거는 즉시 후보로 한다. 입사일 전, 비재직 유효일 이후, 승인 leave_requests(반차 포함), 실제 attendance, 설정된 대기/실장승인/원장확정 수기근태는 제외한다. 설정 조회 실패·비정상 응답 또는 시업 설정 오류의 오늘 후보는 fail-closed다. 같은 직원·날짜의 수기근태는 복수 행 중 제외 상태가 하나라도 있으면 순서와 무관하게 제외한다.
+- rollback: snapshot상 migration 전에 있던 키는 값·label·updated_at을 그대로 보존하고, 실제 추가한 기본값만 제거한다. 기존/사후 사용자 값 또는 snapshot 불일치면 예외로 중단·보존하며 성공 때 marker도 제거한다. 로컬 Node 전체 JS/PGlite, 인라인 구문, diff-check 검증 후 로컬 커밋만 한다. 운영 DB 적용·push·deploy·실계정 검증은 미수행이다.
 
 ## 직원허브 5차 — 1단계 배포·2단계 운영 적용 (2026-09-22)
 
