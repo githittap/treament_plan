@@ -37,6 +37,10 @@ try{
   await assert.rejects(q(`update public.consultation_inbox set status='new' where id='${first[0].id}'`),/row-level security/);await db.exec('rollback');await setUser(manager);
   await assert.rejects(q(`update public.consultation_inbox set journal_id=null where id='${first[0].id}'`),/permission denied/);await db.exec('rollback');await setUser(manager);
   await assert.rejects(q(`select * from public.consultation_inbox_convert_to_journal('${first[0].id}'::uuid)`),/already converted/);await db.exec('rollback');
-  await db.exec('reset role;');await assert.rejects(db.exec(fs.readFileSync(path.join(root,'db/consultation_inbox_rollback.sql'),'utf8')),/contains data/);await db.exec('rollback');
+  const rollback=fs.readFileSync(path.join(root,'db/consultation_inbox_rollback.sql'),'utf8');
+  await db.exec('reset role;');await assert.rejects(db.exec(rollback),/contains data/);await db.exec('rollback');
+  await db.exec('delete from public.consultation_inbox;');await db.exec(rollback);
+  assert.equal((await q("select to_regclass('public.consultation_inbox') is null gone"))[0].gone,true);
+  assert.equal((await q("select count(*)::int count from pg_proc where pronamespace='public'::regnamespace and proname in('set_consultation_inbox_updated_at','consultation_inbox_assignee_allowed','consultation_inbox_convert_to_journal','consultation_inbox_ingest_service')"))[0].count,0);
   console.log('PGLITE_CONSULTATION_INBOX_PASS');
 }finally{await db.close();}
