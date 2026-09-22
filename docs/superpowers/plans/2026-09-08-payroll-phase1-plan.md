@@ -1,6 +1,6 @@
 # M3 급여 — 1단계 구현 계획 (Codex 위임용)
 
-> 작성 2026-09-08 · 설계서 `specs/2026-09-08-payroll-payslip-design-rev1.md`의 1단계
+> 작성 2026-09-08 · 설계서 `specs/2026-09-08-payroll-payslip-design.md`의 1단계
 > 상태: **Codex plan-review 완료·반영함 → 원장 확인 후 구현 위임**
 
 ## 1단계 범위 (이번 세션)
