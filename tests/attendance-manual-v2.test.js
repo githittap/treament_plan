@@ -31,6 +31,24 @@ test('표시 월이 선택 날짜와 달라도 월간 달력은 정확히 하나
   assert.match(nodes.manualAttendanceCalendar.innerHTML,/aria-label="2026-10-01"[^>]*tabindex="0"/);
 });
 
+test('수기 달력은 재렌더 뒤 Arrow/Home/End 연속 이동의 새 날짜 버튼으로 초점을 옮긴다', () => {
+  const start = html.indexOf('function manualCalendarDate');
+  const end = html.indexOf('function overtimeDraftMinutes', start);
+  const focused=[];
+  const calendar={innerHTML:'',querySelector:selector=>({focus:()=>focused.push((selector.match(/"(\d{4}-\d{2}-\d{2})"/)||[])[1])})};
+  const nodes = {manualWorkDate:{value:'2026-09-22'},manualAttendanceCalendar:calendar};
+  const context = {$:id=>nodes[id.slice(1)],today:()=> '2026-09-22'};
+  vm.createContext(context);
+  vm.runInContext(`${html.slice(start,end)}\nthis.manualAttendanceCalendarKey=manualAttendanceCalendarKey;`, context);
+  const event=key=>({key,preventDefault(){}});
+  context.manualAttendanceCalendarKey(event('ArrowRight'),'2026-09-22');
+  context.manualAttendanceCalendarKey(event('ArrowRight'),'2026-09-23');
+  context.manualAttendanceCalendarKey(event('Home'),'2026-09-24');
+  context.manualAttendanceCalendarKey(event('End'),'2026-09-01');
+  assert.equal(nodes.manualWorkDate.value,'2026-09-30');
+  assert.deepEqual(focused,['2026-09-23','2026-09-24','2026-09-01','2026-09-30']);
+});
+
 test('v2 SQL은 총합 호환, 분리 원자료·분 필드, RPC-only/RLS 경계를 보존한다', () => {
   assert.ok(fs.existsSync(sqlPath), 'v2 apply SQL이 없습니다.');
   const sql = fs.readFileSync(sqlPath, 'utf8');
