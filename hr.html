@@ -942,7 +942,7 @@ async function buildPreview(aoa){
 }
 window.mapToken=async(tok,uid)=>{if(!uid)return;const prof=PROFILES.find(p=>p.user_id===uid);
   xlRows.forEach(r=>{if(r.tok===tok){r.user_id=uid;r.name=prof.name;}});
-  if(/^[0-9]+$/.test(tok)){await sb.from('profiles').update({fp_id:tok}).eq('user_id',uid);await loadProfiles();} // 숫자면 지문 사번 기억
+  if(/^[0-9]+$/.test(tok)){const {error}=await sb.rpc('update_employee_profile_field',{p_user_id:uid,p_field:'fp_id',p_value:tok});if(error){setStatus('error');return;}await loadProfiles();} // 숫자면 지문 사번 기억
   renderXlTable();buildUnmappedAfter();setStatus('saved');};
 function buildUnmappedAfter(){const um=[...new Set(xlRows.filter(r=>!r.user_id).map(r=>r.tok))];
   $('#xlUnmapped').innerHTML=um.length?`<div class="hint" style="color:var(--gold)">⚠ 미매핑: ${um.map(f=>`<b>${esc(f)}</b> <select class="mini" onchange="mapToken('${esc(f)}',this.value)"><option value="">이 직원으로</option>${PROFILES.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select>`).join(' &nbsp; ')}</div>`:'<div class="hint" style="color:var(--mint)">✓ 전원 매핑됨</div>';}
@@ -2349,9 +2349,9 @@ async function renderOwner(m){
   </div>`;
   renderOverrideRows();
 }
-async function setRole(uid,role){await sb.from('profiles').update({role}).eq('user_id',uid);await loadProfiles();setStatus('saved');
+async function setRole(uid,role){const {error}=await sb.rpc('update_employee_profile_field',{p_user_id:uid,p_field:'role',p_value:role});if(error){setStatus('error');showScheduleRosterError('권한 변경 실패: '+error.message);return;}await loadProfiles();setStatus('saved');
   if(uid===ME.id){ME.role=role;renderNav();}render();}
-async function setDept(uid,dept){await sb.from('profiles').update({dept:dept||null}).eq('user_id',uid);await loadProfiles();setStatus('saved');render();}
+async function setDept(uid,dept){const {error}=await sb.rpc('update_employee_profile_field',{p_user_id:uid,p_field:'dept',p_value:dept||''});if(error){setStatus('error');showScheduleRosterError('부서 변경 실패: '+error.message);return;}await loadProfiles();setStatus('saved');render();}
 async function setEmploymentStatus(uid){
   const status=$(`#employment-${uid}-status`).value,effectiveDate=$(`#employment-${uid}-effective`).value,reason=$(`#employment-${uid}-reason`).value;
   if(!effectiveDate){setStatus('error');showScheduleRosterError('재직 상태 유효일을 입력하세요.');return;}
@@ -2394,7 +2394,8 @@ async function revokeApproval(uid){
   if(uid===ME.id)return;
   const p=PROFILES.find(x=>x.user_id===uid);
   if(!confirm(`${p?p.name:'이 직원'}의 승인을 취소합니다. 로그인은 되지만 업무 화면과 주요 데이터 접근이 막힙니다. 계속하시겠습니까?`))return;
-  await sb.from('profiles').update({approved:false}).eq('user_id',uid);
+  const {error}=await sb.rpc('revoke_employee_profile_approval',{p_user_id:uid});
+  if(error){setStatus('error');showScheduleRosterError('승인 취소 실패: '+error.message);return;}
   await loadProfiles();setStatus('saved');render();
 }
 async function grantConfid(uid){await sb.from('confidential_access').insert({user_id:uid});setStatus('saved');render();}

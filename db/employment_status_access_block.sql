@@ -51,6 +51,122 @@ drop policy if exists profiles_delete_owner on public.profiles;
 revoke delete on table public.profiles from authenticated;
 revoke delete on table public.profiles from anon;
 
+-- 모든 직원 허브 RLS의 공통 접근 게이트다. SECURITY DEFINER로 profiles
+-- 정책 재귀를 피하고, 차단된 JWT는 기존 self/using(true) 정책에도 통과하지 못한다.
+create or replace function public.employee_hub_access_allowed()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.profiles p
+    where p.user_id = auth.uid()
+      and p.active = true and p.approved = true
+      and p.account_access_status = '활성'
+  );
+$$;
+
+create or replace function public.my_role()
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when public.employee_hub_access_allowed() then coalesce(
+    (select p.role from public.profiles p where p.user_id = auth.uid()),
+    'staff'
+  ) else 'pending' end;
+$$;
+
+revoke all on function public.employee_hub_access_allowed() from public;
+revoke all on function public.my_role() from public;
+grant execute on function public.employee_hub_access_allowed() to authenticated;
+grant execute on function public.my_role() to authenticated;
+
+-- 명시한 직원 허브 테이블만 gate한다. 현재 적용되지 않은 선택 기능 테이블은
+-- to_regclass로 건너뛰므로 이 migration은 기존 순서에도 안전하다.
+create or replace function public._install_employee_hub_access_gate(p_table regclass)
+returns void language plpgsql set search_path = '' as $$
+begin
+  if p_table is not null then
+    execute format('alter table %s enable row level security', p_table);
+    execute format('drop policy if exists employee_hub_access_gate on %s', p_table);
+    execute format('create policy employee_hub_access_gate on %s as restrictive for all to authenticated using (public.employee_hub_access_allowed()) with check (public.employee_hub_access_allowed())', p_table);
+  end if;
+end;
+$$;
+-- 아래 목록은 hr_schema 및 직원 허브 후속 migration의 실제 테이블만 명시한다.
+select public._install_employee_hub_access_gate(to_regclass('public.profiles'));
+select public._install_employee_hub_access_gate(to_regclass('public.attendance'));
+select public._install_employee_hub_access_gate(to_regclass('public.att_months'));
+select public._install_employee_hub_access_gate(to_regclass('public.attendance_issues'));
+select public._install_employee_hub_access_gate(to_regclass('public.schedule_weeks'));
+select public._install_employee_hub_access_gate(to_regclass('public.schedules'));
+select public._install_employee_hub_access_gate(to_regclass('public.schedule_people'));
+select public._install_employee_hub_access_gate(to_regclass('public.leave_requests'));
+select public._install_employee_hub_access_gate(to_regclass('public.leave_ledger'));
+select public._install_employee_hub_access_gate(to_regclass('public.holidays'));
+select public._install_employee_hub_access_gate(to_regclass('public.calendar_events'));
+select public._install_employee_hub_access_gate(to_regclass('public.notices'));
+select public._install_employee_hub_access_gate(to_regclass('public.notice_reads'));
+select public._install_employee_hub_access_gate(to_regclass('public.contract_templates'));
+select public._install_employee_hub_access_gate(to_regclass('public.contracts'));
+select public._install_employee_hub_access_gate(to_regclass('public.approval_docs'));
+select public._install_employee_hub_access_gate(to_regclass('public.approval_steps'));
+select public._install_employee_hub_access_gate(to_regclass('public.payroll_rows'));
+select public._install_employee_hub_access_gate(to_regclass('public.payslips'));
+select public._install_employee_hub_access_gate(to_regclass('public.monthly_reviews'));
+select public._install_employee_hub_access_gate(to_regclass('public.bonus_rules'));
+select public._install_employee_hub_access_gate(to_regclass('public.applicants'));
+select public._install_employee_hub_access_gate(to_regclass('public.ledger_files'));
+select public._install_employee_hub_access_gate(to_regclass('public.onboarding_items'));
+select public._install_employee_hub_access_gate(to_regclass('public.onboarding_checks'));
+select public._install_employee_hub_access_gate(to_regclass('public.profile_employment_history'));
+select public._install_employee_hub_access_gate(to_regclass('public.employee_contract_terms'));
+select public._install_employee_hub_access_gate(to_regclass('public.employee_documents'));
+select public._install_employee_hub_access_gate(to_regclass('public.employee_signature_vault'));
+select public._install_employee_hub_access_gate(to_regclass('public.employee_signature_uses'));
+select public._install_employee_hub_access_gate(to_regclass('public.employee_signature_audit'));
+select public._install_employee_hub_access_gate(to_regclass('public.leave_application_documents'));
+select public._install_employee_hub_access_gate(to_regclass('public.leave_application_document_events'));
+select public._install_employee_hub_access_gate(to_regclass('public.push_subscriptions'));
+drop function public._install_employee_hub_access_gate(regclass);
+
+-- self-only push 구독 helper도 access gate를 직접 확인한다. 나머지 관련
+-- SECURITY DEFINER 경로는 my_role() 또는 위 restrictive table gate를 통과해야 한다.
+do $$
+begin
+  if to_regnamespace('employee_hub_private') is not null then
+    execute $sql$
+      create or replace function employee_hub_private.push_subscription_access_allowed(p_user uuid)
+      returns boolean language sql stable security definer set search_path=''
+      as $fn$ select p_user=auth.uid() and public.employee_hub_access_allowed() $fn$
+    $sql$;
+    revoke all on function employee_hub_private.push_subscription_access_allowed(uuid) from public;
+    grant execute on function employee_hub_private.push_subscription_access_allowed(uuid) to authenticated;
+  end if;
+end;
+$$;
+
+-- 다른 Storage 버킷에는 true가 되어 영향이 없고, 명시한 직원 허브 버킷만 차단한다.
+drop policy if exists employee_hub_storage_access_gate on storage.objects;
+create policy employee_hub_storage_access_gate
+on storage.objects as restrictive for all to authenticated
+using (
+  bucket_id not in ('hr-docs','employee-signatures','leave-docs','notice-attachments')
+  or public.employee_hub_access_allowed()
+)
+with check (
+  bucket_id not in ('hr-docs','employee-signatures','leave-docs','notice-attachments')
+  or public.employee_hub_access_allowed()
+);
+
+drop policy if exists profiles_update_owner on public.profiles;
+revoke update on table public.profiles from authenticated;
+
 create or replace function public.assert_employment_owner(p_user_id uuid)
 returns uuid
 language plpgsql
@@ -61,6 +177,7 @@ declare
   v_actor uuid := auth.uid();
   v_target public.profiles%rowtype;
 begin
+  if not public.employee_hub_access_allowed() then raise exception 'employee hub access required'; end if;
   if v_actor is null then raise exception 'authenticated owner required'; end if;
   if not exists (
     select 1 from public.profiles p
@@ -120,6 +237,7 @@ as $$
 declare
   v_actor uuid := auth.uid();
 begin
+  if not public.employee_hub_access_allowed() then raise exception 'employee hub access required'; end if;
   if v_actor is null then raise exception 'authenticated chief or owner required'; end if;
   if not exists (
     select 1 from public.profiles p
@@ -128,6 +246,60 @@ begin
   if v_actor = p_user_id then raise exception 'cannot approve your own profile'; end if;
   if not exists (select 1 from public.profiles where user_id = p_user_id) then raise exception 'profile not found'; end if;
   return v_actor;
+end;
+$$;
+
+create or replace function public.update_employee_profile_field(
+  p_user_id uuid, p_field text, p_value text
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor uuid := auth.uid();
+  v_target public.profiles%rowtype;
+begin
+  if not public.employee_hub_access_allowed() then raise exception 'employee hub access required'; end if;
+  if not exists (select 1 from public.profiles p where p.user_id=v_actor and p.role='owner') then
+    raise exception 'active approved owner required';
+  end if;
+  if p_field not in ('role','dept','fp_id') then raise exception 'profile field is not allowed'; end if;
+  select * into v_target from public.profiles where user_id=p_user_id for update;
+  if not found then raise exception 'profile not found'; end if;
+  if p_field='role' then
+    if p_value not in ('owner','chief','manager','staff') then raise exception 'invalid profile role'; end if;
+    if v_actor=p_user_id then raise exception 'cannot change your own role'; end if;
+    if v_target.role='owner' and v_target.active and v_target.role is distinct from p_value
+       and (select count(*) from public.profiles where role='owner' and active and approved) <= 1 then
+      raise exception 'cannot change last active owner';
+    end if;
+    update public.profiles set role=p_value where user_id=p_user_id;
+  elsif p_field='dept' then
+    update public.profiles set dept=nullif(btrim(p_value),'') where user_id=p_user_id;
+  else
+    update public.profiles set fp_id=nullif(btrim(p_value),'') where user_id=p_user_id;
+  end if;
+end;
+$$;
+
+create or replace function public.revoke_employee_profile_approval(p_user_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_target public.profiles%rowtype;
+begin
+  perform public.assert_employee_approver(p_user_id);
+  select * into v_target from public.profiles where user_id=p_user_id for update;
+  if v_target.role='owner' and v_target.active and v_target.approved and
+     (select count(*) from public.profiles where role='owner' and active and approved) <= 1 then
+    raise exception 'cannot revoke last active owner approval';
+  end if;
+  update public.profiles set approved=false where user_id=p_user_id;
 end;
 $$;
 
@@ -188,8 +360,12 @@ revoke all on function public.assert_employee_approver(uuid) from public;
 revoke all on function public.set_employment_status(uuid,text,date,text) from public;
 revoke all on function public.disable_employee_account_preserve_records(uuid,text,text,date) from public;
 revoke all on function public.approve_employee_profile(uuid) from public;
+revoke all on function public.update_employee_profile_field(uuid,text,text) from public;
+revoke all on function public.revoke_employee_profile_approval(uuid) from public;
 grant execute on function public.set_employment_status(uuid,text,date,text) to authenticated;
 grant execute on function public.disable_employee_account_preserve_records(uuid,text,text,date) to authenticated;
 grant execute on function public.approve_employee_profile(uuid) to authenticated;
+grant execute on function public.update_employee_profile_field(uuid,text,text) to authenticated;
+grant execute on function public.revoke_employee_profile_approval(uuid) to authenticated;
 
 commit;

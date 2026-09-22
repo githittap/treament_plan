@@ -59,6 +59,18 @@ test('승인은 직접 profiles 갱신이 아닌 차단 계정 거부 RPC를 사
   assert.match(html, /blocked\?'disabled':''/);
 });
 
+test('차단 JWT gate와 UI profile 변경 RPC가 직접 갱신을 대체한다', () => {
+  const sql = fs.readFileSync(sqlPath, 'utf8');
+  assert.match(sql, /create or replace function public\.employee_hub_access_allowed\(\)[\s\S]*account_access_status\s*=\s*'활성'/i);
+  assert.match(sql, /create policy employee_hub_access_gate[\s\S]*as restrictive for all to authenticated/i);
+  assert.match(sql, /employee-signatures','leave-docs','notice-attachments/i);
+  assert.match(sql, /revoke update on table public\.profiles from authenticated/i);
+  for (const rpc of ['update_employee_profile_field', 'revoke_employee_profile_approval']) assert.match(sql, new RegExp(`create or replace function public\\.${rpc}`, 'i'));
+  assert.doesNotMatch(html, /from\('profiles'\)\.update\(/);
+  assert.match(html, /sb\.rpc\('update_employee_profile_field'/);
+  assert.match(html, /sb\.rpc\('revoke_employee_profile_approval'/);
+});
+
 test('rollback은 이력 또는 비재직·차단 데이터가 있으면 보존 중단한다', () => {
   const rollback = fs.readFileSync(rollbackPath, 'utf8');
   assert.match(rollback, /profile_employment_history/i);
