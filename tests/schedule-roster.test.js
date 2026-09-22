@@ -29,7 +29,7 @@ test('주간 근무표도 월간과 같은 직무행 체크박스와 7일 날짜
   const schedule = html.match(/\/\* ── 근무표\(M2\) ── \*\/([\s\S]*?)\/\* 엑셀 파싱 \*\//);
   assert.ok(schedule, '근무표 코드 블록이 없습니다.');
   const source = schedule[1];
-  assert.match(html, /\{key:'sched',\s*label:'근무표계획'/);
+  assert.match(html, /\{key:'sched',\s*label:'근무표'/);
   assert.match(source, /SCHED_VIEW='month'/);
   const weekly = source.match(/async function renderSched\(m\)\{[\s\S]*?async function setShift/);
   assert.ok(weekly, '주간 근무표 렌더 경로가 없습니다.');
@@ -619,7 +619,7 @@ test('월간 캘린더는 모든 조회 오류를 눈에 보이는 하나의 오
 test('4차 캘린더는 기존 DB 부서를 표시군으로만 묶고 날짜 상세를 제공한다', () => {
   const source = calendarBlock[1];
   for (const marker of ["calendarRosterTag('진료·상담'", "calendarRosterTag('소독·행정'", "calendarRosterTag('기공'", 'renderCalendarDayPanel', 'scheduleCalendarIndex']) assert.match(source, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-  assert.match(html, /label:'서류제출'/);
+  assert.match(html, /label:'내 서류함'/);
 });
 
 test('4차 캘린더는 오프라인 PNG·전용 PDF 인쇄와 첫 선택 날짜 일치를 제공한다', () => {

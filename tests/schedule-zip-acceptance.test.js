@@ -28,7 +28,7 @@ test('ZIP 야간 행은 전체 직원 선택과 원래 직무 색 보존 계약�
 });
 
 test('5차 근무표계획은 월간 기본값과 주간 직무행 체크박스 경로를 함께 사용한다', () => {
-  assert.match(html, /\{key:'sched',\s*label:'근무표계획'/);
+  assert.match(html, /\{key:'sched',\s*label:'근무표'/);
   assert.match(schedule, /let SCHED_WEEK=null,SCHED_MONTH=null,SCHED_VIEW='month'/);
   const weekly = schedule.match(/async function renderSched\([\s\S]*?\/\* schedule-roster-admin:test-start \*\//)?.[0] || '';
   assert.match(weekly, /scheduleRoleCell/);

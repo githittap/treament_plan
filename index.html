@@ -194,6 +194,26 @@
     padding:3px 10px;
   }
 
+  /* ---- 도구 묶음 소제목 (조직도 보드 hub.json 정본 · 2026-09-23) ---- */
+  .tools-section{
+    width:100%;
+    max-width:1040px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+  .tools-head{
+    width:100%;
+    font-size:15px;
+    font-weight:800;
+    letter-spacing:0.2px;
+    color:var(--mint-2);
+    margin:44px 0 16px;
+    padding-bottom:9px;
+    border-bottom:1px solid var(--line);
+    animation:riseIn .7s cubic-bezier(.22,.9,.32,1) both;
+  }
+
   footer{
     margin-top:52px;
     font-size:12px;
@@ -225,33 +245,13 @@
     <div class="badge">CLINIC TOOLKIT</div>
   </div>
 
+  <!-- ═══ 카드 배치는 조직도 보드 hub.json(원장 확정) 순서를 그대로 따른다 · 2026-09-23 ═══
+       묶음 밖 항목(직원 허브·치료계획 도구)은 소제목 없이 맨 위, 나머지는 묶음별 소제목 아래.
+       ℹ️ 치료계획 도구에 달린 원장 메모("교정케이스보드처럼 직원허브내에서 탭으로")는 이번 배치 작업 범위 밖이다. -->
+
   <div class="grid">
 
-    <!-- 1. 치료계획 도구 -->
-    <a class="card" href="치료계획.html">
-      <div class="ico">🦷</div>
-      <h2>치과 치료계획 도구</h2>
-      <p class="desc">파노라마 X-ray 위에 임플란트·발치·치료종류를 시각적으로 표시하고, 이미지로 저장·공유합니다.</p>
-      <span class="go">시작하기 →</span>
-    </a>
-
-    <!-- 2. 치과 소식 -->
-    <a class="card" href="뉴스.html">
-      <div class="ico">📰</div>
-      <h2>치과 소식</h2>
-      <p class="desc">치과 뉴스(치의신보 등)·치과 건강보험·의료 판결 소식을 최신순으로 한눈에 봅니다.</p>
-      <span class="go">보러가기 →</span>
-    </a>
-
-    <!-- 2.5 교정 케이스 보드 -->
-    <a class="card" href="ortho.html">
-      <div class="ico">🦷</div>
-      <h2>교정 케이스 보드</h2>
-      <p class="desc">슈어스마일 교정 환자의 진행 단계·납부·배송·내원 기록을 직원 전체가 실시간으로 공유합니다. (직원 로그인)</p>
-      <span class="go">열기 →</span>
-    </a>
-
-    <!-- 2.6 직원 허브(근태) -->
+    <!-- hub:hr -->
     <a class="card" href="hr.html">
       <div class="ico">👥</div>
       <h2>직원 허브 (근태·노무)</h2>
@@ -259,63 +259,108 @@
       <span class="go">열기 →</span>
     </a>
 
-    <!-- 3. 사주 정밀풀이 -->
-    <a class="card" href="사주.html">
-      <div class="ico">🔮</div>
-      <h2>사주 정밀풀이</h2>
-      <p class="desc">생년월일시로 사주팔자·오행·십성·대운을 만세력 기반 정밀 계산으로 풀어드립니다.</p>
+    <!-- hub:treatment_plan -->
+    <a class="card" href="치료계획.html">
+      <div class="ico">🦷</div>
+      <h2>치과 치료계획 도구</h2>
+      <p class="desc">파노라마 X-ray 위에 임플란트·발치·치료종류를 시각적으로 표시하고, 이미지로 저장·공유합니다.</p>
       <span class="go">시작하기 →</span>
-    </a>
-
-    <!-- 4. 직원 뽑기 / 사다리 -->
-    <a class="card" href="직원뽑기.html">
-      <div class="ico">🎯</div>
-      <h2>직원 뽑기 · 사다리</h2>
-      <p class="desc">직원 명단을 넣고 한 명 랜덤 뽑기, 사다리타기로 선물·당번을 공정하게 정합니다.</p>
-      <span class="go">시작하기 →</span>
-    </a>
-
-    <!-- 5. AI 모델 지표 -->
-    <a class="card" href="AI지표.html">
-      <div class="ico">🤖</div>
-      <h2>AI 모델 지표</h2>
-      <p class="desc">코딩·장문분석·차트판독·비환각률 등 업무 직결 6개 지표로 AI 모델을 지표별 상위 순으로 비교합니다.</p>
-      <span class="go">보러가기 →</span>
-    </a>
-
-    <!-- 6. 설명덱 만들기 -->
-    <a class="card" href="설명덱_제작기.html">
-      <div class="ico">🖥️</div>
-      <h2>설명덱 만들기</h2>
-      <p class="desc">클릭하면 한 단계씩 열리는 설명형 발표 슬라이드를, 코딩 없이 만들고 HTML 파일로 저장·공유합니다.</p>
-      <span class="go">시작하기 →</span>
-    </a>
-
-    <!-- 7. 보철 장착 프로토콜 진단기 -->
-    <a class="card" href="보철프로토콜_진단기.html">
-      <div class="ico">🩺</div>
-      <h2>보철 장착 프로토콜</h2>
-      <p class="desc">기공물이 안 맞을 때 누가·어떻게 대응할지, 휴대폰에서 한 단계씩 눌러 바로 확인합니다.</p>
-      <span class="go">시작하기 →</span>
-    </a>
-
-    <!-- 8. 기공차트 · 리메이크 장부 -->
-    <a class="card" href="기공차트_리메이크장부_서식.html">
-      <div class="ico">📋</div>
-      <h2>기공차트 · 리메이크 장부</h2>
-      <p class="desc">보철 장착·리메이크 기록을 화면에서 입력하면 자동 저장·누적되고, 지난 날짜는 잠깁니다. 인쇄까지 됩니다.</p>
-      <span class="go">시작하기 →</span>
-    </a>
-
-    <!-- 9. 작업 진행판 -->
-    <a class="card" href="진행판.html">
-      <div class="ico">📊</div>
-      <h2>작업 진행판</h2>
-      <p class="desc">진행 중인 작업의 목표·단계·다음 할 일을 한눈에 봅니다. 비밀번호를 넣으면 다른 컴퓨터·휴대폰에서도 최신 상황이 실시간으로 보입니다.</p>
-      <span class="go">보러가기 →</span>
     </a>
 
   </div>
+
+  <section class="tools-section">
+    <h2 class="tools-head">📚 정보(치과 소식·AI 모델 지표·설명덱)</h2>
+    <div class="grid">
+
+      <!-- hub:news -->
+      <a class="card" href="뉴스.html">
+        <div class="ico">📰</div>
+        <h2>치과 소식</h2>
+        <p class="desc">치과 뉴스(치의신보 등)·치과 건강보험·의료 판결 소식을 최신순으로 한눈에 봅니다.</p>
+        <span class="go">보러가기 →</span>
+      </a>
+
+      <!-- hub:ai_metrics -->
+      <a class="card" href="AI지표.html">
+        <div class="ico">🤖</div>
+        <h2>AI 모델 지표</h2>
+        <p class="desc">코딩·장문분석·차트판독·비환각률 등 업무 직결 6개 지표로 AI 모델을 지표별 상위 순으로 비교합니다.</p>
+        <span class="go">보러가기 →</span>
+      </a>
+
+      <!-- hub:deck_maker -->
+      <a class="card" href="설명덱_제작기.html">
+        <div class="ico">🖥️</div>
+        <h2>설명덱 만들기</h2>
+        <p class="desc">클릭하면 한 단계씩 열리는 설명형 발표 슬라이드를, 코딩 없이 만들고 HTML 파일로 저장·공유합니다.</p>
+        <span class="go">시작하기 →</span>
+      </a>
+
+    </div>
+  </section>
+
+  <section class="tools-section">
+    <h2 class="tools-head">🦷진료</h2>
+    <div class="grid">
+
+      <!-- hub:lab_remake_ledger -->
+      <a class="card" href="기공차트_리메이크장부_서식.html">
+        <div class="ico">📋</div>
+        <h2>기공차트 · 리메이크 장부</h2>
+        <p class="desc">보철 장착·리메이크 기록을 화면에서 입력하면 자동 저장·누적되고, 지난 날짜는 잠깁니다. 인쇄까지 됩니다.</p>
+        <span class="go">시작하기 →</span>
+      </a>
+
+      <!-- hub:ortho -->
+      <a class="card" href="ortho.html">
+        <div class="ico">🦷</div>
+        <h2>교정 케이스 보드</h2>
+        <p class="desc">슈어스마일 교정 환자의 진행 단계·납부·배송·내원 기록을 직원 전체가 실시간으로 공유합니다. (직원 로그인)</p>
+        <span class="go">열기 →</span>
+      </a>
+
+      <!-- hub:prosthesis_protocol -->
+      <a class="card" href="보철프로토콜_진단기.html">
+        <div class="ico">🩺</div>
+        <h2>보철 장착 프로토콜</h2>
+        <p class="desc">기공물이 안 맞을 때 누가·어떻게 대응할지, 휴대폰에서 한 단계씩 눌러 바로 확인합니다.</p>
+        <span class="go">시작하기 →</span>
+      </a>
+
+    </div>
+  </section>
+
+  <section class="tools-section">
+    <h2 class="tools-head">🎲 재미</h2>
+    <div class="grid">
+
+      <!-- hub:saju -->
+      <a class="card" href="사주.html">
+        <div class="ico">🔮</div>
+        <h2>사주 정밀풀이</h2>
+        <p class="desc">생년월일시로 사주팔자·오행·십성·대운을 만세력 기반 정밀 계산으로 풀어드립니다.</p>
+        <span class="go">시작하기 →</span>
+      </a>
+
+      <!-- hub:progress_board -->
+      <a class="card" href="진행판.html">
+        <div class="ico">📊</div>
+        <h2>작업 진행판</h2>
+        <p class="desc">진행 중인 작업의 목표·단계·다음 할 일을 한눈에 봅니다. 비밀번호를 넣으면 다른 컴퓨터·휴대폰에서도 최신 상황이 실시간으로 보입니다.</p>
+        <span class="go">보러가기 →</span>
+      </a>
+
+      <!-- hub:employee_pick -->
+      <a class="card" href="직원뽑기.html">
+        <div class="ico">🎯</div>
+        <h2>직원 뽑기 · 사다리</h2>
+        <p class="desc">직원 명단을 넣고 한 명 랜덤 뽑기, 사다리타기로 선물·당번을 공정하게 정합니다.</p>
+        <span class="go">시작하기 →</span>
+      </a>
+
+    </div>
+  </section>
 
   <footer>© 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지</footer>
 

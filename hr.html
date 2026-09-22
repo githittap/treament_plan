@@ -48,6 +48,9 @@ header .ttl small{color:var(--mint);font-weight:700;font-size:12px}
 .nav button{background:var(--card);border:1px solid var(--line);color:var(--gray);border-radius:9px;padding:6px 11px;font-size:13px;font-weight:700}
 .nav button.on{background:var(--mint-dk);border-color:var(--mint);color:var(--mint)}
 .nav .cnt{display:inline-block;min-width:16px;padding:0 4px;background:var(--red);color:#fff;border-radius:8px;font-size:10.5px;margin-left:3px}
+.nav2{flex-basis:100%;margin-left:0;padding-top:6px;border-top:1px dashed var(--line)}
+.nav2:empty{display:none}
+.nav2 button{padding:5px 10px;font-size:12.5px}
 .me{margin-left:auto;font-size:12px;color:var(--gray);display:flex;align-items:center;gap:8px}
 .rolechip{background:var(--brand);color:#fff;border-radius:6px;padding:1px 8px;font-size:11px;font-weight:800}
 .hbtn{background:var(--card);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:6px 11px;font-size:12.5px;font-weight:700}
@@ -229,6 +232,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
     <a class="hbtn" href="ortho.html">🦷 교정보드</a>
     <button class="hbtn" id="logoutBtn">로그아웃</button>
   </span>
+  <nav class="nav nav2" id="nav2"></nav>
 </header>
 <main id="main"></main>
 </div>
@@ -443,19 +447,33 @@ const TABS=[
   {key:'home',  label:'홈',        roles:['staff','manager','chief','owner']},
   {key:'att',   label:'출퇴근',    roles:['staff','manager','chief','owner']},
   {key:'deposit',label:'입금',     roles:['staff','manager','chief','owner']},
-  {key:'sched', label:'근무표계획',roles:['staff','manager','chief','owner']},
+  {key:'sched', label:'근무표',    roles:['staff','manager','chief','owner']},
   {key:'leave', label:'연차',      roles:['staff','manager','chief','owner']},
   {key:'appr',  label:'결재함',    roles:['staff','manager','chief','owner']},
   {key:'notice',label:'공지',      roles:['staff','manager','chief','owner']},
   {key:'workdocs',label:'📚 업무자료',roles:['staff','manager','chief','owner']},
   {key:'calendar',label:'📅 캘린더',roles:['staff','manager','chief','owner']},
   {key:'suggestions',label:'💡 건의함',roles:['staff','manager','chief','owner']},
-  {key:'onbo',  label:'서류제출',  roles:['staff','manager','chief','owner']},
-  {key:'confid',label:'케이스노트',roles:['staff','manager','chief','owner'],needsConfid:true},
+  {key:'onbo',  label:'내 서류함',  roles:['staff','manager','chief','owner']},
+  {key:'confid',label:'진료기록',roles:['staff','manager','chief','owner'],needsConfid:true},
   {key:'contract',label:'근로계약서',roles:['staff','manager','chief','owner']},
   {key:'pay',   label:'💰 급여',   roles:['owner']},
   {key:'aicost',label:'💰 AI비용',roles:['owner']},
-  {key:'owner', label:'원장',      roles:['owner']},
+  {key:'owner', label:'🛡️ 계정·권한 관리',roles:['owner']},
+];
+/* ── 메뉴 묶음 (조직도 보드 hr.json 정본 · 2026-09-23) ──
+   위줄 = 묶음 + 묶음에 속하지 않은 탭(홈·입금) / 아래줄 = 고른 묶음(또는 부모 탭)의 탭들.
+   · 탭 key·역할 규칙은 그대로다 — 배치와 이름만 보드를 따른다(딥링크·go() 호출 호환).
+   · '🕘 근무'는 직원도 출퇴근·근무표를 봐야 하므로 원장 전용 밖 최상위에 둔다(원장 지시 2026-09-23).
+   · '❤️커뮤니티' 묶음은 원장 지시로 비워 둔 자리다 — 무엇을 넣을지 정해질 때까지 메뉴에 올리지 않는다.
+   · 묶음은 그 안에 볼 수 있는 탭이 하나라도 있을 때만 위줄에 나온다(권한 없는 사람에게 빈 묶음 금지). */
+const MENU=[
+  {kind:'tab',  key:'home',                                children:['notice','suggestions']},
+  {kind:'group',key:'g-work',  label:'🕘 근무',            children:['sched','calendar','att']},
+  {kind:'group',key:'g-owner', label:'🔒 원장 전용',        children:['owner','aicost','pay']},
+  {kind:'group',key:'g-care',  label:'🩺 환자관리·진료',    children:['confid','workdocs']},
+  {kind:'group',key:'g-docs',  label:'🏖 연차·결재·서류',   children:['contract','onbo','appr','leave']},
+  {kind:'tab',  key:'deposit',                             children:[]},
 ];
 let PAY_VIEW='ledger',PAY_MONTH='',PAY_ROWS=[],PAY_COLUMNS=[],PAY_MESSAGE='',PAY_WAGE_LATEST={};
 let PAY_SLIP_USER='',PAY_SLIP_HTML='',MY_PAYSLIPS=[];
@@ -469,14 +487,41 @@ function employmentTermAlertRows(terms,contracts){
   const latest=new Map();(contracts||[]).filter(r=>r.status!=='취소').forEach(r=>{if(!latest.has(r.user_id))latest.set(r.user_id,r);});
   return PROFILES.filter(p=>p.active!==false&&p.approved!==false).map(p=>{const t=byUser.get(p.user_id);if(t)return {user_id:p.user_id,status:'서명완료',created_at:t.updated_at,fields:{계약종료:t.is_indefinite?'기간의 정함 없음':t.end_date||''}};return latest.get(p.user_id)||{user_id:p.user_id,status:'서명완료',fields:{}};});
 }
-function renderNav(){
-  $('#nav').innerHTML=TABS.filter(t=>ME.role==='owner'
+/* menu-restructure:test-start */
+function tabVisible(t){return ME.role==='owner'
     ?t.roles.includes('owner')&&(!t.needsConfid||ME.confidAccess)
-    :(()=>{const ov=(TAB_OVERRIDES[ME.id]||{})[t.key],base=(TAB_ROLES[t.key]||t.roles).includes(ME.role),shown=ov===true?true:ov===false?false:base;return t.key!=='owner'&&shown&&(!t.needsConfid||ME.confidAccess);})()).map(t=>{
-    const c=BADGE[t.key]?`<span class="cnt">${BADGE[t.key]}</span>`:'';
-    return `<button class="${t.key===TAB?'on':''}" onclick="go('${t.key}')">${t.label}${c}</button>`;
-  }).join('');
+    :(()=>{const ov=(TAB_OVERRIDES[ME.id]||{})[t.key],base=(TAB_ROLES[t.key]||t.roles).includes(ME.role),shown=ov===true?true:ov===false?false:base;return t.key!=='owner'&&shown&&(!t.needsConfid||ME.confidAccess);})();}
+function visibleTabKeys(){return new Set(TABS.filter(tabVisible).map(t=>t.key));}
+function tabLabel(k){const t=TABS.find(x=>x.key===k);return t?t.label:k;}
+function menuChildKeys(e,vis){return e.children.filter(k=>vis.has(k));}
+function menuEntryVisible(e,vis){return e.kind==='group'?menuChildKeys(e,vis).length>0:vis.has(e.key);}
+function menuEntryOf(k){return MENU.find(e=>e.key===k)||MENU.find(e=>e.children.includes(k))||null;}
+function navButton(key,label,on,badge){
+  const c=badge?`<span class="cnt">${badge}</span>`:'';
+  return `<button class="${on?'on':''}" onclick="go('${key}')">${label}${c}</button>`;
 }
+function menuTopRow(vis,cur){
+  return MENU.filter(e=>menuEntryVisible(e,vis)).map(e=>{
+    const kids=menuChildKeys(e,vis),own=e.kind==='tab'?[e.key]:[];
+    // 묶음 버튼은 첫 탭으로 들어가고(이미 그 묶음 안이면 제자리), 뱃지는 보이는 탭 몫을 합쳐 보여 준다.
+    return {key:e.kind==='group'?(cur===e?TAB:kids[0]):e.key,label:e.kind==='group'?e.label:tabLabel(e.key),
+      on:cur===e,badge:own.concat(kids).reduce((n,k)=>n+(BADGE[k]||0),0)};
+  });
+}
+function menuSubRow(vis,cur){
+  if(!cur)return [];
+  const kids=menuChildKeys(cur,vis);
+  // 부모 탭(홈)은 아래줄 첫 항목으로 두어 부모 화면으로 돌아갈 수 있게 한다.
+  const keys=cur.kind==='tab'?(kids.length?[cur.key].concat(kids):[]):kids;
+  return keys.map(k=>({key:k,label:tabLabel(k),on:k===TAB,badge:BADGE[k]||0}));
+}
+function renderNav(){
+  const vis=visibleTabKeys(),cur=menuEntryOf(TAB);
+  $('#nav').innerHTML=menuTopRow(vis,cur).map(b=>navButton(b.key,b.label,b.on,b.badge)).join('');
+  const sub=$('#nav2');if(!sub)return;
+  sub.innerHTML=menuSubRow(vis,cur).map(b=>navButton(b.key,b.label,b.on,b.badge)).join('');
+}
+/* menu-restructure:test-end */
 function go(k){if(k==='leavestatus'){k='calendar';CAL_VIEW='leave';}TAB=k;renderNav();render();}
 
 /* ── 데이터 로드 ── */
@@ -551,17 +596,10 @@ async function renderHome(m){
   const {data:bal}=await sb.from('v_leave_balance').select('*').eq('user_id',ME.id).maybeSingle();
   const {data:mySlips}=await sb.from('payslips').select('id,month,html').eq('user_id',ME.id).eq('issued',true).order('month',{ascending:false}).limit(12);
   MY_PAYSLIPS=mySlips||[];
-  const {data:notices}=await sb.from('notices').select('*').order('pinned',{ascending:false}).order('created_at',{ascending:false}).limit(5);
   const {data:oi}=await sb.from('onboarding_items').select('*').eq('active',true);
   const {data:oc}=await sb.from('onboarding_checks').select('*').eq('user_id',ME.id);
   const doneItems=new Set((oc||[]).filter(c=>c.status!=='미제출').map(c=>c.item_id));
   const undone=(oi||[]).filter(i=>!doneItems.has(i.id));
-  if(isMgr()){
-    const [{data:contracts},{data:terms}]=await Promise.all([sb.from('contracts').select('id,user_id,status,fields,created_at'),sb.from('employee_contract_terms').select('*')]);
-    EMPLOYMENT_TERMS=terms||[];CONTRACT_ALERTS=contractExpiryRows(employmentTermAlertRows(EMPLOYMENT_TERMS,contracts||[]),today());
-    BADGE.contract=CONTRACT_ALERTS.length||0;
-    renderNav();
-  }
   m.innerHTML=`
   <div class="card"><h2>안녕하세요, ${esc(ME.name)}님</h2>
     <div class="rowflex">
@@ -569,18 +607,10 @@ async function renderHome(m){
       <div class="stat"><div class="sub">안 읽은 공지</div><div class="big">${BADGE.notice||0}</div></div>
       <div class="stat"><div class="sub">미제출 서류</div><div class="big" style="color:${undone.length?'var(--gold)':'var(--mint)'}">${undone.length}</div></div>
     </div>
-    ${undone.length?`<div class="hint" style="color:var(--gold)">⚠ 미제출: ${undone.map(i=>esc(i.label)).join(', ')} — [서류제출] 탭에서 제출하세요.</div>`:''}
+    ${undone.length?`<div class="hint" style="color:var(--gold)">⚠ 미제출: ${undone.map(i=>esc(i.label)).join(', ')} — [내 서류함] 탭에서 제출하세요.</div>`:''}
   </div>
-  ${isMgr()?contractAlertsCard(CONTRACT_ALERTS):''}
   ${MY_PAYSLIPS.length?`<div class="card"><h2>💰 내 명세서</h2>${MY_PAYSLIPS.map(s=>`<div class="rowflex" style="justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line)"><span>${esc(s.month)}</span><button class="mini" onclick="openMyPayslip(${s.id})">보기</button></div>`).join('')}</div>`:''}
-  ${canManageConsultation()?'<div class="card" style="padding:12px 14px"><div class="rowflex" style="justify-content:space-between;align-items:center;gap:10px"><div><h2 style="margin-bottom:3px">🗂 상담일지</h2><div class="hint">실장·원장만 상담 기록을 입력·조회·수정합니다.</div></div><button class="mini" onclick="go(\'consult\')">상담일지 열기</button></div></div>':''}
-  <div class="card" style="padding:12px 14px"><div class="rowflex" style="justify-content:space-between;align-items:center;gap:10px"><div><h2 style="margin-bottom:3px">📚 업무자료</h2><div class="hint">직원 업무에 필요한 공개 자료를 한곳에서 확인합니다.</div></div><button class="mini" onclick="go('workdocs')">업무자료 열기</button></div></div>
-  <div class="card"><h2>📢 최근 공지</h2>${(notices||[]).length?(notices||[]).map(n=>
-    `<div style="padding:6px 0;border-bottom:1px dashed var(--line)">${n.pinned?'📌 ':''}<b>${esc(n.title)}</b> <span class="sub">${md(n.created_at)}</span>
-     ${n.notion_url?` · <a href="${esc(n.notion_url)}" target="_blank" rel="noopener">전문 보기 ↗</a>`:''}
-     <div class="sub">${esc(n.body||'')}</div></div>`).join(''):'<div class="empty">공지 없음</div>'}</div>`;
-  // 읽음 처리
-  for(const n of (notices||[])) sb.from('notice_reads').upsert({notice_id:n.id,user_id:ME.id},{onConflict:'notice_id,user_id',ignoreDuplicates:true}).then(()=>{});
+  ${canManageConsultation()?'<div class="card" style="padding:12px 14px"><div class="rowflex" style="justify-content:space-between;align-items:center;gap:10px"><div><h2 style="margin-bottom:3px">🗂 상담일지</h2><div class="hint">실장·원장만 상담 기록을 입력·조회·수정합니다.</div></div><button class="mini" onclick="go(\'consult\')">상담일지 열기</button></div></div>':''}`;
   refreshBadges();
 }
 
@@ -1297,7 +1327,7 @@ function workDocumentsGuideHtml(){return `<div class="guide-shell">
     <section class="guide-section"><h3>📢 공지 확인</h3><p>공지에서 병원 안내와 새 소식을 확인합니다. 제목과 본문을 읽고 필요한 경우 전문 링크를 엽니다.</p></section>
     <section class="guide-section"><h3>📚 업무자료 보기</h3><p>업무자료에서 매뉴얼과 필요물품 요청·구매현황을 검색해 엽니다. 이 설명서도 업무자료 안에서 다시 열 수 있습니다.</p></section>
     <section class="guide-section"><h3>💡 건의함 사용</h3><p>건의함에서 글을 쓰고 다른 글에 좋아요를 누릅니다. 월간 시상은 캠페인 종료 후 공개되는 안내를 확인합니다.</p></section>
-    <section class="guide-section"><h3>📎 서류제출·계약서 열람</h3><p>서류제출에서 필요한 서류를 제출합니다. 직원 서류함에서는 올린 서류와 체결된 근로계약서를 열람할 수 있습니다.</p></section>
+    <section class="guide-section"><h3>📎 내 서류함·계약서 열람</h3><p>내 서류함에서 필요한 서류를 제출합니다. 직원 서류함에서는 올린 서류와 체결된 근로계약서를 열람할 수 있습니다.</p></section>
   </div>
   <div class="hint" style="margin-top:12px">ℹ️ 본인에게 보이지 않는 메뉴는 권한 차이입니다. 필요한 메뉴가 보이지 않으면 관리자에게 문의하세요.</div>
 </div>`;}
@@ -1713,11 +1743,11 @@ async function submitOnbo(itemId){await sb.from('onboarding_checks').upsert({use
 async function confirmOnbo(itemId){await sb.from('onboarding_checks').update({status:'확인',checked_by:ME.name,checked_at:new Date().toISOString()}).eq('item_id',itemId).eq('user_id',ME.id);setStatus('saved');render();}
 async function addOnboItem(){const l=$('#oiNew').value.trim();if(!l)return;await sb.from('onboarding_items').insert({label:l});setStatus('saved');render();}
 
-/* ── 케이스노트 ── */
+/* ── 진료기록(구 케이스노트) ── */
 async function renderConfid(m){
   const {data,error}=await sb.from('confidential_records').select('*').order('created_at',{ascending:false});
   if(error){m.innerHTML='<div class="empty">불러오기 오류</div>';return;}
-  m.innerHTML=`<div class="card"><h2>🔒 케이스노트</h2>
+  m.innerHTML=`<div class="card"><h2>🔒 진료기록</h2>
     <input id="cfQ" placeholder="환자명·차트번호 검색" style="margin-bottom:8px" oninput="filterConfid()">
     <div id="cfList"></div></div>
     <div class="card"><h3>➕ 기록 추가</h3>
@@ -2632,7 +2662,7 @@ async function renderOwner(m){
   const {unlinkedRoster,pendingApproval}=accountFillingLists(SCHEDULE_PEOPLE,PROFILES);
   const {data:accessRows}=await sb.from('confidential_access').select('user_id');
   const accessSet=new Set((accessRows||[]).map(r=>r.user_id));
-  m.innerHTML=`<div class="card"><h2>🔑 원장 전용</h2>
+  m.innerHTML=`<div class="card"><h2>🛡️ 계정·권한 관리</h2>
     <div class="rowflex">
       <div class="stat"><div class="sub">직원 명부</div><div>${PROFILES.length}명 · owner ${PROFILES.filter(p=>p.role==='owner').length}·chief ${PROFILES.filter(p=>p.role==='chief').length}·manager ${PROFILES.filter(p=>p.role==='manager').length}·staff ${PROFILES.filter(p=>p.role==='staff').length}</div></div>
     </div>
@@ -2674,7 +2704,7 @@ async function renderOwner(m){
     <select id="ovUser" onchange="renderOverrideRows()"><option value="">직원을 선택하세요</option>${PROFILES.filter(p=>p.approved!==false&&p.role!=='owner').map(p=>`<option value="${p.user_id}">${esc(p.name)} (${p.role})</option>`).join('')}</select>
     <div id="ovRows"></div>
   </div>
-  <div class="card"><h2>다음 마일스톤 <span class="sub">(설계 완료·구현 예정)</span></h2>
+  <div class="card"><h2>다음 설계 예정/혹은 할일 <span class="sub">(설계 완료·구현 예정)</span></h2>
     <div class="stub">M2 근무표·계약서 자동생성 · M3 급여 대시보드/명세서 발행·월말 평가·휴일근로 계산기 · M4 채용·입금피드·기공차트 통합<br>— 백엔드(표)는 이미 준비됨. 화면만 순차 추가.</div>
   </div>`;
   renderOverrideRows();
