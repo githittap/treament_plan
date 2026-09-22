@@ -53,6 +53,7 @@ try{
     JSON.parse('{"fx":1,"generated":"g","agents":{"__proto__":{"cumUSD":1,"months":[],"inTok":0,"outTok":0}}}')
   ];
   const sessCases=[
+    JSON.parse('{"generated":"g","won_today_total":1,"flagged":[{"name":{"toString":null},"thread":{"toString":null},"sev":{"a":1},"reasons":[{"toString":null},"ok"]},{"name":"정상 항목","sev":"red","active":true,"won_today":1,"reasons":[]}]}'),
     {generated:'g',won_today_total:1,flagged:[{name:'a'+C(0)+'b',thread:C(0xdc00),sev:'red',active:true,won_today:1,reasons:['x'+C(0)+'y',C(0xd83d)]}]},
     {generated:'g',won_today_total:1,flagged:Array.from({length:30},()=>({name:'가'.repeat(120),thread:'t'.repeat(64),sev:'orange',active:false,won_today:5e-324,share:1e-300,reasons:Array(6).fill('나'.repeat(55))}))}
   ];

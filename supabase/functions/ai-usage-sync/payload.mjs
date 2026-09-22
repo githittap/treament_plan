@@ -36,7 +36,8 @@ export async function sha256Hex(text){const bytes=new Uint8Array(await crypto.su
 // 그러면 jsonb 표기로 공백이 늘어도 DB 한도(128KB) 안에 항상 들어간다.
 export const MAX_FLAGGED=30;
 const PERIOD=/^\d{4}-\d{2}(-\d{2})?$/,AGENT=/^[a-z0-9_-]{1,32}$/,NUL=String.fromCharCode(0);
-const text=(v,max)=>String(v??'').split(NUL).join('').slice(0,max).toWellFormed();
+// 글자 칸은 문자열·숫자·참거짓만 받는다. 객체·배열 같은 값은 변환하다 예외가 날 수 있어 빈 글자로 둔다(그 값만 비우고 항목은 살린다).
+const text=(v,max)=>(typeof v==='string'?v:typeof v==='number'||typeof v==='boolean'?String(v):'').split(NUL).join('').slice(0,max).toWellFormed();
 const amount=(v,max)=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=max?Math.round(v*1e6)/1e6:0;
 const count=(v,max)=>Number.isSafeInteger(v)&&v>=0&&v<=max?v:0;
 const bad=error=>({ok:false,error});
