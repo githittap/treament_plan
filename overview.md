@@ -8,6 +8,7 @@
 
 - `absence_confirm_after_minutes=0`, `absence_exclude_pending_manual=true`의 멱등 seed와 원장 전용 UI를 추가했다. 서울 기준 오늘은 시업+지연 뒤, 과거는 즉시 후보화하며 입사일 전·비재직 유효일 이후·승인 휴가(반차 포함)·실제 근태·설정된 수기근태를 제외한다. 설정/조회 오류의 오늘 후보는 fail-closed다.
 - rollback은 비공개 snapshot으로 migration 전 존재·값·label·updated_at을 보존하고, 실제 추가한 기본값만 제거한다. 수기근태는 같은 직원·날짜의 복수 행 중 제외 상태가 하나라도 있으면 순서와 무관하게 제외한다.
+- 운영 후검증 보완: snapshot marker는 RLS만으로 충분하지 않아 `PUBLIC`·`anon`·`authenticated`의 table privilege를 모두 회수했다. 이미 적용된 환경은 `db/absence_candidate_settings_acl_hardening.sql`이 marker 행·설정값을 바꾸지 않고 같은 ACL만 멱등 보완한다.
 - 로컬 Node 전체 JS, 전체 PGlite, 인라인 구문, diff-check 검증 뒤에만 완료로 기록한다. 운영 DB 적용·push·deploy·실계정 저장/재조회는 미수행이다.
 
 ## 직원허브 5차 — 근무표 1단계 배포 및 수기근태 2단계 운영 적용 (2026-09-22)

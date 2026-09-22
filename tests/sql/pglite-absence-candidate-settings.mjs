@@ -11,6 +11,7 @@ const owner='11111111-1111-1111-1111-111111111111',staff='22222222-2222-2222-222
 
 try{
   await db.exec(`
+    create role anon;
     create role authenticated;
     create schema auth;
     create or replace function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('app.test_uid',true),'')::uuid$$;
@@ -20,6 +21,7 @@ try{
   await q("insert into public.app_settings(key,value,label,updated_at) values ('absence_confirm_after_minutes','0','기존 기본값','2001-02-03T04:05:06Z')");
   const preexisting=await q("select value,label,updated_at::text from public.app_settings where key='absence_confirm_after_minutes'");
   await db.exec(fs.readFileSync('db/absence_candidate_settings.sql','utf8'));
+  await db.exec(fs.readFileSync('db/absence_candidate_settings_acl_hardening.sql','utf8'));
   assert.deepEqual(await q("select key,value from public.app_settings where key like 'absence_%' order by key"),[
     {key:'absence_confirm_after_minutes',value:'0'},
     {key:'absence_exclude_pending_manual',value:'true'}
@@ -29,6 +31,17 @@ try{
     {key:'absence_confirm_after_minutes',existed_before:true},
     {key:'absence_exclude_pending_manual',existed_before:false}
   ]);
+  assert.deepEqual(await q(`select
+    has_table_privilege('anon','public.absence_candidate_settings_migration_state','select') anon_select,
+    has_table_privilege('authenticated','public.absence_candidate_settings_migration_state','select') authenticated_select,
+    exists(select 1 from pg_class where oid='public.absence_candidate_settings_migration_state'::regclass and relrowsecurity) rls_enabled,
+    (select count(*)::int from pg_policies where schemaname='public' and tablename='absence_candidate_settings_migration_state') policy_count,
+    (select count(*)::int from pg_class c cross join lateral aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) acl where c.oid='public.absence_candidate_settings_migration_state'::regclass and acl.grantee=0) public_privileges`),[
+    {anon_select:false,authenticated_select:false,rls_enabled:true,policy_count:0,public_privileges:0}
+  ]);
+  await db.exec(`grant select on public.absence_candidate_settings_migration_state to anon;set role anon;`);
+  assert.deepEqual(await q("select * from public.absence_candidate_settings_migration_state"),[],'RLS with no policy must expose zero marker rows even when SELECT is temporarily granted');
+  await db.exec('reset role;revoke all on public.absence_candidate_settings_migration_state from anon;');
   assert.equal((await q("select count(*)::int n from pg_policies where tablename='app_settings' and policyname='app_settings_update_owner'"))[0].n,1);
 
   await db.exec(`

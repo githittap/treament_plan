@@ -11,7 +11,7 @@ create table if not exists public.absence_candidate_settings_migration_state (
   original_updated_at timestamptz
 );
 alter table public.absence_candidate_settings_migration_state enable row level security;
-revoke all on table public.absence_candidate_settings_migration_state from public, authenticated;
+revoke all on table public.absence_candidate_settings_migration_state from public, anon, authenticated;
 
 insert into public.absence_candidate_settings_migration_state
   (key,existed_before,original_value,original_label,original_updated_at)
