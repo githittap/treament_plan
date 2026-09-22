@@ -3,3 +3,6 @@ verify_jwt = true
 
 [functions.ai-usage-sync]
 verify_jwt = true
+
+[functions.push-dispatcher]
+verify_jwt = true
