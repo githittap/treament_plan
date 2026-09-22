@@ -16,7 +16,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
-@media print{ @page{size:A4;margin:10mm} body.leave-printing> *{display:none!important} body.leave-printing>#lvFormMask{display:block!important;position:static!important;background:#fff!important;padding:0!important} body.leave-printing #lvFormMask,body.leave-printing #lvFormMask *{visibility:visible!important} body.leave-printing #lvFormMask .modal{width:100%!important;max-width:none!important;max-height:none!important;overflow:visible!important;box-shadow:none!important;border:0!important;padding:0!important} body.leave-printing #lvFormMask h3{display:none!important} body.leave-printing #lvFormBody>div{padding:8mm!important;font-size:12px!important;line-height:1.45!important} body.leave-printing #lvFormBody table{font-size:12px!important} body.calendar-printing> *{display:none!important} body.calendar-printing>#app,body.calendar-printing>#app main{display:block!important} body.calendar-printing header,body.calendar-printing footer,body.calendar-printing .calendar-actions{display:none!important} body.calendar-printing main{max-width:none!important;padding:0!important} body.calendar-printing #calendarCard{border:0!important;padding:0!important} body.calendar-printing .calendar-layout{grid-template-columns:210px minmax(0,1fr)!important} body.calendar-printing .calendar-day-panel{position:static!important} }
+@media print{ @page{size:A4;margin:10mm} body.leave-printing> *{display:none!important} body.leave-printing>#lvFormMask{display:block!important;position:static!important;background:#fff!important;padding:0!important} body.leave-printing #lvFormMask,body.leave-printing #lvFormMask *{visibility:visible!important} body.leave-printing #lvFormMask .modal{width:100%!important;max-width:none!important;max-height:none!important;overflow:visible!important;box-shadow:none!important;border:0!important;padding:0!important} body.leave-printing #lvFormMask h3{display:none!important} body.leave-printing #lvFormBody>div{padding:8mm!important;font-size:12px!important;line-height:1.45!important} body.leave-printing #lvFormBody table{font-size:12px!important} body.calendar-printing> *{display:none!important} body.calendar-printing>#app,body.calendar-printing>#app main{display:block!important} body.calendar-printing header,body.calendar-printing footer,body.calendar-printing .calendar-actions{display:none!important} body.calendar-printing main{max-width:none!important;padding:0!important} body.calendar-printing #calendarCard{border:0!important;padding:0!important} body.calendar-printing .calendar-layout{grid-template-columns:210px minmax(0,1fr)!important} body.calendar-printing .calendar-day-panel{position:static!important} body.payslip-printing> *{display:none!important} body.payslip-printing>#psMask{display:block!important;position:static!important;background:#fff!important;padding:0!important} body.payslip-printing #psMask,body.payslip-printing #psMask *{visibility:visible!important} body.payslip-printing #psMask .modal{width:100%!important;max-width:none!important;max-height:none!important;overflow:visible!important;box-shadow:none!important;border:0!important;padding:0!important} body.payslip-printing #psMask h3{display:none!important} body.payslip-printing .payslip-doc{padding:10mm!important} @page{margin:12mm} @page{ @top-right{content:counter(page) " / " counter(pages);font-size:9px;color:#556} } }
 :root{
   --bg:#0d1715; --card:#14201d; --panel:#182823; --ink:#e6f2ef; --gray:#8fa5a0; --line:#24332f;
   --mint:#2fd9c4; --mint-dk:#0e2b27; --gold:#e3b341; --gold-bg:#2a2312; --red:#ff7b76; --red-bg:#2b1512;
@@ -296,6 +296,12 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
   <div class="msg" id="xlMsg"></div>
 </div></div>
 
+<!-- 급여명세서 보기/인쇄 -->
+<div class="mask" id="psMask"><div class="modal wide">
+  <h3>💰 급여명세서<button class="hbtn mini" onclick="printPayslip()">🖨️ 인쇄</button><button class="x" onclick="hide('psMask')">✕</button></h3>
+  <div id="psBody"></div>
+</div></div>
+
 <!-- 기존 계약 종료일 보완 -->
 <div class="mask" id="contractEndMask"><div class="modal">
   <h3>📅 계약 종료일 설정<button class="x" onclick="hide('contractEndMask')">✕</button></h3>
@@ -451,6 +457,7 @@ const TABS=[
   {key:'owner', label:'원장',      roles:['owner']},
 ];
 let PAY_VIEW='ledger',PAY_MONTH='',PAY_ROWS=[],PAY_COLUMNS=[],PAY_MESSAGE='',PAY_WAGE_LATEST={};
+let PAY_SLIP_USER='',PAY_SLIP_HTML='',MY_PAYSLIPS=[];
 let DEP_RANGE='month';
 function setDepRange(r){DEP_RANGE=r;render();}
 let BADGE={};
@@ -541,6 +548,8 @@ async function render(){
 /* ── 홈 ── */
 async function renderHome(m){
   const {data:bal}=await sb.from('v_leave_balance').select('*').eq('user_id',ME.id).maybeSingle();
+  const {data:mySlips}=await sb.from('payslips').select('id,month,html').eq('user_id',ME.id).eq('issued',true).order('month',{ascending:false}).limit(12);
+  MY_PAYSLIPS=mySlips||[];
   const {data:notices}=await sb.from('notices').select('*').order('pinned',{ascending:false}).order('created_at',{ascending:false}).limit(5);
   const {data:oi}=await sb.from('onboarding_items').select('*').eq('active',true);
   const {data:oc}=await sb.from('onboarding_checks').select('*').eq('user_id',ME.id);
@@ -562,6 +571,7 @@ async function renderHome(m){
     ${undone.length?`<div class="hint" style="color:var(--gold)">⚠ 미제출: ${undone.map(i=>esc(i.label)).join(', ')} — [서류제출] 탭에서 제출하세요.</div>`:''}
   </div>
   ${isMgr()?contractAlertsCard(CONTRACT_ALERTS):''}
+  ${MY_PAYSLIPS.length?`<div class="card"><h2>💰 내 명세서</h2>${MY_PAYSLIPS.map(s=>`<div class="rowflex" style="justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line)"><span>${esc(s.month)}</span><button class="mini" onclick="openMyPayslip(${s.id})">보기</button></div>`).join('')}</div>`:''}
   ${canManageConsultation()?'<div class="card" style="padding:12px 14px"><div class="rowflex" style="justify-content:space-between;align-items:center;gap:10px"><div><h2 style="margin-bottom:3px">🗂 상담일지</h2><div class="hint">실장·원장만 상담 기록을 입력·조회·수정합니다.</div></div><button class="mini" onclick="go(\'consult\')">상담일지 열기</button></div></div>':''}
   <div class="card" style="padding:12px 14px"><div class="rowflex" style="justify-content:space-between;align-items:center;gap:10px"><div><h2 style="margin-bottom:3px">📚 업무자료</h2><div class="hint">직원 업무에 필요한 공개 자료를 한곳에서 확인합니다.</div></div><button class="mini" onclick="go('workdocs')">업무자료 열기</button></div></div>
   <div class="card"><h2>📢 최근 공지</h2>${(notices||[]).length?(notices||[]).map(n=>
@@ -2289,11 +2299,12 @@ function payNumber(v){
 }
 function payTop(){return `<div class="card"><h2>💰 급여 <span class="sub">(원장 전용)</span></h2>
   <button class="mini ${PAY_VIEW==='ledger'?'stamp':''}" onclick="setPayView('ledger')">급여대장</button>
-  <button class="mini ${PAY_VIEW==='wage'?'stamp':''}" onclick="setPayView('wage')">시급설정</button></div>`;}
+  <button class="mini ${PAY_VIEW==='wage'?'stamp':''}" onclick="setPayView('wage')">시급설정</button>
+  <button class="mini ${PAY_VIEW==='payslip'?'stamp':''}" onclick="setPayView('payslip')">명세서</button></div>`;}
 function setPayView(v){PAY_VIEW=v;PAY_MESSAGE='';render();}
 async function renderPay(m){
   if(ME.role!=='owner'){m.innerHTML='<div class="card"><div class="empty">원장만 사용할 수 있습니다.</div></div>';return;}
-  if(PAY_VIEW==='wage')await renderPayWages(m);else await renderPayLedger(m);
+  if(PAY_VIEW==='wage')await renderPayWages(m);else if(PAY_VIEW==='payslip')await renderPaySlip(m);else await renderPayLedger(m);
 }
 async function renderPayWages(m){
   const {data,error}=await sb.from('wage_info').select('*').order('effective_from',{ascending:false});
@@ -2401,6 +2412,176 @@ async function savePayrollRows(){
   if(error){PAY_MESSAGE='급여대장 저장 실패: '+error.message;setStatus('error');render();return;}
   PAY_MESSAGE=`급여대장 ${payload.length}건 저장 완료`+(skipped?` · 건너뜀 ${skipped}건`:'');setStatus('saved');render();
 }
+
+/* ── 명세서 (M3 2단계) ──
+   숫자의 정본은 항상 payroll_rows.items(업로드된 대장 값)이다. 아래 계산 함수는 "검산"용
+   재계산일 뿐이며 명세서에 찍히는 금액을 절대 바꾸지 않는다(설계서 B장). 국민연금·소득세
+   간이세액표·연말정산·조정수당은 재현 근거가 없어 계산하지 않고 대장 값을 그대로 쓴다(설계서 C장). */
+/* payroll-payslip:test-start */
+const PAYSLIP_RATES_2026={health:0.03595,healthMin:280390,healthMax:127725730,ltc:0.131405,employment:0.009,localTax:0.1,mealNontax:200000};
+function floorTo10(v){
+  // 3,000,000×0.009 같은 값이 부동소수점으로 26999.999999999996가 되어 그냥 floor하면
+  // 10원 틀리게 내려간다. 1e6 단위로 반올림해 표현오차만 지우고(진짜 소수점은 살아있음) floor한다.
+  const n=Number(v)||0,corrected=Math.round(n*1e6)/1e6;return Math.floor(corrected/10)*10;
+}
+function clampNum(v,lo,hi){v=Number(v)||0;return Math.min(hi,Math.max(lo,v));}
+function payslipTaxBase(grossTotal,mealAllow){return (Number(grossTotal)||0)-Math.min(Number(mealAllow)||0,PAYSLIP_RATES_2026.mealNontax);}
+function calcHealthIns(taxBase){return floorTo10(clampNum(taxBase,PAYSLIP_RATES_2026.healthMin,PAYSLIP_RATES_2026.healthMax)*PAYSLIP_RATES_2026.health);}
+// 장기요양은 보수월액이 아니라 건강보험'료'에서 파생(설계서 이식 함정 2번). 국민연금과 달리
+// 건강·고용은 기준액을 천원 절사하지 않는다(함정 1번). 절사 단위는 이 병원 대장 기준 10원(함정 3번).
+function calcLongTermCare(healthInsAmount){return floorTo10((Number(healthInsAmount)||0)*PAYSLIP_RATES_2026.ltc);}
+function calcEmploymentIns(taxBase){return floorTo10((Number(taxBase)||0)*PAYSLIP_RATES_2026.employment);}
+function calcLocalIncomeTax(incomeTax){return floorTo10((Number(incomeTax)||0)*PAYSLIP_RATES_2026.localTax);}
+const PAYSLIP_LEDGER_ONLY_KEYS=['pension','income_tax','income_tax_yearend','local_tax_yearend','ins_adjust','adjust_allow'];
+const PAYSLIP_FIELD_LABELS={health_ins:'건강보험',ltc_ins:'장기요양보험',employment_ins:'고용보험',local_tax:'지방소득세',
+  pension:'국민연금',income_tax:'소득세',income_tax_yearend:'소득세(연말정산)',local_tax_yearend:'지방소득세(연말정산)',ins_adjust:'보험료조정',adjust_allow:'조정수당'};
+function payslipCrossCheck(items){
+  items=items||{};
+  const taxBase=payslipTaxBase(items.gross_total,items.meal_allow),health=calcHealthIns(taxBase);
+  const reproducible=[
+    {key:'health_ins',calc:health},
+    {key:'ltc_ins',calc:calcLongTermCare(health)},
+    {key:'employment_ins',calc:calcEmploymentIns(taxBase)},
+    {key:'local_tax',calc:calcLocalIncomeTax(Number(items.income_tax)||0)}
+  ];
+  const rows=reproducible.map(r=>{
+    const ledger=items[r.key]==null?null:Number(items[r.key]);
+    const diff=ledger==null?null:ledger-r.calc;
+    return {key:r.key,label:PAYSLIP_FIELD_LABELS[r.key],ledger,calc:r.calc,diff,status:ledger==null?'ledger_missing':(Math.abs(diff)>10?'diff':'match')};
+  });
+  PAYSLIP_LEDGER_ONLY_KEYS.forEach(key=>{
+    if(items[key]==null)return;
+    rows.push({key,label:PAYSLIP_FIELD_LABELS[key],ledger:Number(items[key]),calc:null,diff:null,status:'ledger_only'});
+  });
+  return rows;
+}
+function timeToMin(t){if(t==null)return null;const m=String(t).match(/^(\d{1,2}):(\d{2})/);if(!m)return null;return Number(m[1])*60+Number(m[2]);}
+function overlapMinutes(aStart,aEnd,bStart,bEnd){return Math.max(0,Math.min(aEnd,bEnd)-Math.max(aStart,bStart));}
+// 근로기준법 시행령 제27조의2 필수 기재사항(근로일수·총근로시간·연장/야간/휴일 근로시간)을
+// attendance 실측에서 뽑는다. 휴게시간 컬럼이 없어 총근로시간은 출퇴근 시각 차이 그대로이고
+// (근태 화면의 지각·조퇴 판정과 같은 전제), 야간은 법정 22:00~06:00 겹침만 센다.
+function aggregateAttendanceForPayslip(rows){
+  const out={workedDays:0,totalWorkMinutes:0,overtimeMinutes:0,nightMinutes:0,holidayMinutes:0};
+  (rows||[]).forEach(r=>{
+    const ci=timeToMin(r.clock_in),co=timeToMin(r.clock_out);
+    out.overtimeMinutes+=Number(r.overtime_min)||0;
+    if(ci==null||co==null||co<=ci)return;
+    out.workedDays+=1;
+    const span=co-ci;
+    out.totalWorkMinutes+=span;
+    if(r.is_holiday)out.holidayMinutes+=span;
+    if(r.evening)out.nightMinutes+=overlapMinutes(ci,co,22*60,24*60)+overlapMinutes(ci,co,0,6*60);
+  });
+  return out;
+}
+function minutesToHours(min){return Math.round((Number(min)||0)/60*10)/10;}
+/* payroll-payslip:test-end */
+
+const payWon=aicostMoney;
+const PAYSLIP_PAY_ITEMS=[
+  ['base_pay','기본급','월 기본급(일할계산 시 계약월액÷그달일수×근무일수)'],['meal_allow','식대','월 고정(비과세 200,000원 한도)'],
+  ['fixed_ot','포괄시간외근로수당','월 고정(포괄임금)'],['fixed_annual','포괄연차수당','월 고정(포괄임금)'],
+  ['fixed_holiday','포괄휴일수당','월 고정(포괄임금)'],['fixed_holiday_ot','포괄휴일연장수당','월 고정(포괄임금)'],
+  ['extra_ot_pay','추가근무수당','시급 × 연장시간 × 1.5'],['holiday_pay','휴일근로수당','시급 × 시간 × 1.5'],
+  ['holiday_ot_pay','휴일연장수당','시급 × 2 × 시간'],['unused_annual_pay','미사용연차수당','시급 × 8 × 일수'],
+  ['attendance_deduct','근태공제','−(시급 × 근태시간)'],['bonus','상여금','지급 내역에 따름'],
+  ['signing_bonus','입사지원금','지급 내역에 따름'],['welfare','복지비','지급 내역에 따름'],
+  ['adjust_allow','조정수당','대장 값(산출식 미확정)'],['etc_allow','기타수당','지급 내역에 따름']
+];
+const PAYSLIP_DEDUCT_ITEMS=[
+  ['income_tax','소득세','근로소득간이세액표 적용(대장 값)'],['local_tax','지방소득세','소득세 × 10%'],
+  ['pension','국민연금','국민연금공단 가입자내역(대장 값)'],['health_ins','건강보험','과세대상 지급액 × 3.595%'],
+  ['ltc_ins','장기요양보험','건강보험료 × 13.1405%'],['employment_ins','고용보험','과세대상 지급액 × 0.9%'],
+  ['prepaid_deduct','선지급/기타공제','대장 값'],['ins_adjust','보험료조정','연말정산 조정(대장 값)'],
+  ['income_tax_yearend','소득세(연말정산)','연말정산 조정(대장 값)'],['local_tax_yearend','지방소득세(연말정산)','연말정산 조정(대장 값)']
+];
+function payslipStatusBadge(row){
+  if(!row)return '';
+  if(row.status==='ledger_only')return `<span class="sub">대장 값 사용</span>`;
+  if(row.status==='ledger_missing')return `<span class="sub">검산 ${payWon(row.calc)}(대장에 값 없음)</span>`;
+  if(row.status==='diff')return `<span class="sub" style="color:var(--gold)">검산 ${payWon(row.calc)}(차이 ${payWon(Math.abs(row.diff))})</span>`;
+  return `<span class="sub">검산 일치 ${payWon(row.calc)}</span>`;
+}
+function buildPayslipHtml(ctx){
+  const items=ctx.items||{},cc=ctx.crossCheck||[],ccByKey={};cc.forEach(r=>ccByKey[r.key]=r);
+  const payRows=PAYSLIP_PAY_ITEMS.filter(([k])=>items[k]!=null),deductRows=PAYSLIP_DEDUCT_ITEMS.filter(([k])=>items[k]!=null);
+  const ws=ctx.workSummary||{workedDays:0,totalWorkMinutes:0,overtimeMinutes:0,nightMinutes:0,holidayMinutes:0};
+  const th='border:1px solid #111;padding:6px;background:#f4f8f7',td='border:1px solid #111;padding:6px';
+  const issuedLine=ctx.issued
+    ?`<div style="margin-top:10px;text-align:right">${appStamp(ctx.issuedBy,ctx.issuedAt,'발행')}</div>`
+    :`<div class="hint" style="margin-top:10px;color:var(--gold)">⚠ 아직 발행 전 — 미리보기입니다. 발행하면 이 화면 그대로 잠깁니다.</div>`;
+  return `<div class="payslip-doc" style="background:#fff;color:#111;padding:28px;line-height:1.6;font-size:13px">
+    <div style="border-top:4px solid #156f72;border-bottom:1px solid #156f72;padding:10px 0;text-align:center">
+      <div style="font-size:12px;color:#156f72;font-weight:700">아산정플란트치과의원</div><h1 style="margin:4px 0 0;font-size:22px">급 여 명 세 서</h1></div>
+    <table style="width:100%;border-collapse:collapse;margin-top:16px">
+      <tr><th style="${th};width:16%">성명</th><td style="${td};width:34%">${esc(ctx.employee.name)}</td><th style="${th};width:16%">귀속월</th><td style="${td}">${esc(ctx.month)}</td></tr>
+      <tr><th style="${th}">소속</th><td style="${td}">${esc(ctx.employee.dept||'')}</td><th style="${th}">지급일</th><td style="${td}">${ctx.issuedAt?stampDate(ctx.issuedAt):'발행 시 자동 기록'}</td></tr></table>
+    <table style="width:100%;border-collapse:collapse;margin-top:10px">
+      <tr><th style="${th}">근로일수</th><td style="${td}">${ws.workedDays}일</td><th style="${th}">총근로시간</th><td style="${td}">${minutesToHours(ws.totalWorkMinutes)}시간</td></tr>
+      <tr><th style="${th}">연장근로시간</th><td style="${td}">${minutesToHours(ws.overtimeMinutes)}시간</td><th style="${th}">야간근로시간</th><td style="${td}">${minutesToHours(ws.nightMinutes)}시간</td></tr>
+      <tr><th style="${th}">휴일근로시간</th><td style="${td}" colspan="3">${minutesToHours(ws.holidayMinutes)}시간</td></tr></table>
+    <div style="display:flex;gap:12px;margin-top:14px">
+      <div style="flex:1"><div style="font-weight:700;color:#156f72;margin-bottom:4px">지급</div>
+        <table style="width:100%;border-collapse:collapse"><tr><th style="${th}">항목</th><th style="${th};text-align:right">금액</th><th style="${th}">산출식</th></tr>
+        ${payRows.map(([k,label,formula])=>`<tr><td style="${td}">${esc(label)}</td><td style="${td};text-align:right">${payWon(items[k])}</td><td style="${td};font-size:11px;color:#555">${esc(formula)}</td></tr>`).join('')}
+        <tr><td style="${td};font-weight:700">지급액계</td><td style="${td};text-align:right;font-weight:700">${payWon(items.gross_total)}</td><td style="${td}"></td></tr></table></div>
+      <div style="flex:1"><div style="font-weight:700;color:#156f72;margin-bottom:4px">공제</div>
+        <table style="width:100%;border-collapse:collapse"><tr><th style="${th}">항목</th><th style="${th};text-align:right">금액</th><th style="${th}">산출식</th></tr>
+        ${deductRows.map(([k,label,formula])=>`<tr><td style="${td}">${esc(label)}</td><td style="${td};text-align:right">${payWon(items[k])}</td><td style="${td};font-size:11px;color:#555">${esc(formula)}<br>${payslipStatusBadge(ccByKey[k])}</td></tr>`).join('')}
+        <tr><td style="${td};font-weight:700">공제액계</td><td style="${td};text-align:right;font-weight:700">${payWon(items.deduct_total)}</td><td style="${td}"></td></tr></table></div></div>
+    <table style="width:100%;border-collapse:collapse;margin-top:10px"><tr><th style="${th};width:30%">차인지급액(임금총액)</th>
+      <td style="${td};text-align:right;font-size:16px;font-weight:800;color:#156f72">${payWon(items.net_pay!=null?items.net_pay:ctx.net)}원</td></tr></table>
+    <div class="hint" style="margin-top:8px;font-size:11px;color:#889">검산(회색)은 이 병원 급여 규정에 따른 참고 재계산이며, 실제 지급은 항상 왼쪽 대장 금액을 따릅니다. 국민연금·소득세·연말정산·조정수당은 노무법인 산출값을 그대로 사용합니다.</div>
+    ${issuedLine}</div>`;
+}
+async function renderPaySlip(m){
+  if(!PAY_MONTH)PAY_MONTH=today().slice(0,7);
+  const staff=PROFILES.filter(p=>p.active!==false);
+  if(!PAY_SLIP_USER&&staff.length)PAY_SLIP_USER=staff[0].user_id;
+  let body='<div class="empty">직원이 없습니다.</div>';
+  PAY_SLIP_HTML='';
+  if(PAY_SLIP_USER){
+    const bounds=attendanceMonthBounds(PAY_MONTH);
+    const [{data:prow},{data:existing},{data:att}]=await Promise.all([
+      sb.from('payroll_rows').select('*').eq('month',PAY_MONTH).eq('user_id',PAY_SLIP_USER).maybeSingle(),
+      sb.from('payslips').select('*').eq('month',PAY_MONTH).eq('user_id',PAY_SLIP_USER).maybeSingle(),
+      sb.from('attendance').select('clock_in,clock_out,overtime_min,evening,is_holiday').eq('user_id',PAY_SLIP_USER).gte('work_date',bounds.start).lt('work_date',bounds.next)
+    ]);
+    const p=PROFILES.find(x=>x.user_id===PAY_SLIP_USER)||{};
+    if(!prow){
+      body=`<div class="empty">${esc(PAY_MONTH)} 급여대장에 ${esc(p.name||'')} 행이 없습니다. 급여대장 탭에서 먼저 업로드·저장하세요.</div>`;
+    }else{
+      const items=prow.items||{};
+      PAY_SLIP_HTML=buildPayslipHtml({employee:{name:p.name,dept:p.dept},month:PAY_MONTH,items,net:prow.net,
+        crossCheck:payslipCrossCheck(items),workSummary:aggregateAttendanceForPayslip(att||[]),
+        issued:!!(existing&&existing.issued),issuedBy:existing&&existing.issued_by,issuedAt:existing&&existing.issued_at});
+      body=`<div style="border:1px solid var(--line);border-radius:8px;overflow:hidden">${PAY_SLIP_HTML}</div>
+        <div class="rowflex" style="margin-top:10px">
+          <button class="hbtn pri" onclick="issuePayslip()">${existing&&existing.issued?'재발행(덮어쓰기)':'발행'}</button>
+          <button class="mini" onclick="openPayslipHtml(PAY_SLIP_HTML)">🖨️ 인쇄 미리보기</button></div>`;
+    }
+  }
+  m.innerHTML=payTop()+`<div class="card"><h2>명세서</h2>
+    <div class="rowflex"><label>대상 월 <input class="mini" type="month" value="${esc(PAY_MONTH)}" onchange="setPaySlipMonth(this.value)"></label>
+      <label>직원 <select class="mini" onchange="setPaySlipUser(this.value)">${staff.map(p=>`<option value="${p.user_id}" ${p.user_id===PAY_SLIP_USER?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label></div>
+    ${PAY_MESSAGE?`<div class="hint">${esc(PAY_MESSAGE)}</div>`:''}
+    <div style="margin-top:12px">${body}</div></div>`;
+}
+function setPaySlipMonth(v){PAY_MONTH=v;PAY_MESSAGE='';render();}
+function setPaySlipUser(v){PAY_SLIP_USER=v;PAY_MESSAGE='';render();}
+async function issuePayslip(){
+  if(!PAY_SLIP_HTML){PAY_MESSAGE='먼저 급여대장이 있는 월·직원을 선택하세요.';setStatus('error');render();return;}
+  setStatus('saving');
+  const {error}=await sb.from('payslips').upsert({month:PAY_MONTH,user_id:PAY_SLIP_USER,html:PAY_SLIP_HTML,issued:true,issued_at:new Date().toISOString(),issued_by:ME.name},{onConflict:'month,user_id'});
+  if(error){PAY_MESSAGE='발행 실패: '+error.message;setStatus('error');render();return;}
+  PAY_MESSAGE='명세서를 발행했습니다.';setStatus('saved');render();
+}
+function openPayslipHtml(html){$('#psBody').innerHTML=html;show('psMask');}
+function openMyPayslip(id){const s=MY_PAYSLIPS.find(x=>x.id===id);if(s)openPayslipHtml(s.html);}
+// Chrome은 인쇄 CSS의 @page 마진박스(@top-right, counter(page))를 지원하지 않는다(장기 미해결
+// Chromium 버그) — 아래 CSS는 시도만 해 두고(다른 브라우저·향후 지원 대비), 명세서 자체를
+// 1페이지에 들어가도록 설계해 실무 영향을 줄였다. 여러 장이 되면 쪽번호가 안 찍힐 수 있음을 알아둘 것.
+function printPayslip(){document.body.classList.add('payslip-printing');const done=()=>{document.body.classList.remove('payslip-printing');window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);window.print();}
 
 /* ── 원장 ── */
 /* account-filling:test-start */
