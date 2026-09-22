@@ -2322,11 +2322,12 @@ async function renderOwner(m){
       <td><button class="mini stamp" onclick="approveProfile('${p.user_id}')">승인</button></td></tr>`).join('')}</table></div>`:''}
     <h3>직원 권한 관리 <span class="sub">(입퇴사·승진 시 여기서 변경)</span></h3>
     <div class="msg" id="rosterMsg"></div>
-    <div class="tblwrap"><table><tr><th>이름</th><th>부서</th><th>근무부서</th><th>근무표·집계 포함</th><th>재직 상태</th><th>입사</th><th>권한</th><th>승인</th></tr>
+    <div class="tblwrap"><table><tr><th>이름</th><th>부서</th><th>근무부서</th><th>근무표·집계 포함</th><th>근무명부</th><th>재직 상태·유효일·사유</th><th>입사</th><th>권한</th><th>승인</th></tr>
     ${PROFILES.map(p=>{const depts=['진료실','데스크','기공팀','기타'],dept=p.dept||'',roster=SCHEDULE_PEOPLE.find(x=>x.profile_user_id===p.user_id),rosterDept=roster&&(SCHEDULE_DEPARTMENTS.includes(roster.department)?roster.department:'미지정');return `<tr><td>${esc(p.name)}</td><td><select class="mini" onchange="setDept('${p.user_id}',this.value)"><option value="" ${dept===''?'selected':''}>-</option>${depts.map(d=>`<option value="${d}" ${dept===d?'selected':''}>${d}</option>`).join('')}${dept&&!depts.includes(dept)?`<option value="${esc(dept)}" selected>${esc(dept)}</option>`:''}</select></td>
       <td>${roster?`<select class="mini" onchange="setSchedulePersonDepartment('${roster.id}',this.value)">${SCHEDULE_DEPARTMENTS.map(d=>`<option value="${d}" ${rosterDept===d?'selected':''}>${d}</option>`).join('')}</select>`:'<span class="sub">미연결</span>'}</td>
       <td>${roster?`<input type="checkbox" ${roster.included_in_schedule!==false?'checked':''} onchange="setSchedulePersonIncluded('${roster.id}',this.checked)">`:'—'}</td>
-      <td>${roster?`<span class="b ${roster.active===true?'ok':'no'}">${roster.active===true?'재직':'비활성'}</span> <button class="mini ${roster.active===true?'rej':'stamp'}" onclick="setSchedulePersonActive('${roster.id}',${roster.active===true?'false':'true'})">${roster.active===true?'비활성화':'재활성화'}</button>`:'—'}</td><td>${p.hire_date||''}</td>
+      <td>${roster?`<span class="b ${roster.active===true?'ok':'no'}">${roster.active===true?'재직':'비활성'}</span> <button class="mini ${roster.active===true?'rej':'stamp'}" onclick="setSchedulePersonActive('${roster.id}',${roster.active===true?'false':'true'})">${roster.active===true?'비활성화':'재활성화'}</button>`:'—'}</td>
+      <td><select id="employment-${p.user_id}-status" class="mini"><option value="재직" ${(p.employment_status||'재직')==='재직'?'selected':''}>재직</option><option value="자진퇴사" ${p.employment_status==='자진퇴사'?'selected':''}>자진퇴사</option><option value="계약만료" ${p.employment_status==='계약만료'?'selected':''}>계약만료</option><option value="권고사직" ${p.employment_status==='권고사직'?'selected':''}>권고사직</option></select><br><input id="employment-${p.user_id}-effective" class="mini" type="date" value="${p.employment_effective_date||today()}" aria-label="재직 상태 유효일"><br><input id="employment-${p.user_id}-reason" class="mini" value="${esc(p.employment_reason||'')}" placeholder="사유" aria-label="재직 상태 사유"><br><button class="mini stamp" onclick="setEmploymentStatus('${p.user_id}')">상태 저장</button>${p.user_id!==ME.id?` <button class="mini rej" onclick="disableEmployeeAccountPreserveRecords('${p.user_id}')">접속 영구 차단(인사기록 보존)</button>`:''}${p.account_access_status==='차단'?'<div class="sub">계정 차단됨</div>':''}</td><td>${p.hire_date||''}</td>
       <td><select class="mini" onchange="setRole('${p.user_id}',this.value)">${['staff','manager','chief','owner'].map(r=>`<option ${p.role===r?'selected':''}>${r}</option>`).join('')}</select></td>
       <td><span class="b ${p.approved!==false?'ok':'wait'}">${p.approved!==false?'승인됨':'대기'}</span>${p.approved!==false&&p.user_id!==ME.id?` <button class="mini rej" onclick="revokeApproval('${p.user_id}')">승인취소</button>`:''}</td></tr>`}).join('')}</table></div>
     <h3>🔒 케이스노트 접근 명단</h3>
@@ -2351,6 +2352,28 @@ async function renderOwner(m){
 async function setRole(uid,role){await sb.from('profiles').update({role}).eq('user_id',uid);await loadProfiles();setStatus('saved');
   if(uid===ME.id){ME.role=role;renderNav();}render();}
 async function setDept(uid,dept){await sb.from('profiles').update({dept:dept||null}).eq('user_id',uid);await loadProfiles();setStatus('saved');render();}
+async function setEmploymentStatus(uid){
+  const status=$(`#employment-${uid}-status`).value,effectiveDate=$(`#employment-${uid}-effective`).value,reason=$(`#employment-${uid}-reason`).value;
+  if(!effectiveDate){setStatus('error');showScheduleRosterError('재직 상태 유효일을 입력하세요.');return;}
+  setStatus('saving');
+  const {error}=await sb.rpc('set_employment_status',{p_user_id:uid,p_employment_status:status,p_effective_date:effectiveDate,p_reason:reason});
+  if(error){setStatus('error');showScheduleRosterError('재직 상태 저장 실패: '+error.message);return;}
+  try{await Promise.all([loadProfiles(),loadSchedulePeople()]);}
+  catch(error){setStatus('error');showScheduleRosterError('재직 상태 새로고침 실패: '+error.message);return;}
+  setStatus('saved');render();
+}
+async function disableEmployeeAccountPreserveRecords(uid){
+  const p=PROFILES.find(x=>x.user_id===uid),status=$(`#employment-${uid}-status`).value,effectiveDate=$(`#employment-${uid}-effective`).value,reason=$(`#employment-${uid}-reason`).value;
+  if(status==='재직'){setStatus('error');showScheduleRosterError('영구 차단 전 자진퇴사·계약만료·권고사직 중 하나를 선택하세요.');return;}
+  if(!effectiveDate){setStatus('error');showScheduleRosterError('계정 차단 유효일을 입력하세요.');return;}
+  if(!confirm(`${p?p.name:'이 직원'} 계정의 접속을 영구 차단합니다. 인사·계약·출퇴근·휴가·급여 기록은 삭제하지 않습니다. 계속하시겠습니까?`))return;
+  setStatus('saving');
+  const {error}=await sb.rpc('disable_employee_account_preserve_records',{p_user_id:uid,p_employment_status:status,p_reason:reason,p_effective_date:effectiveDate});
+  if(error){setStatus('error');showScheduleRosterError('계정 차단 실패: '+error.message);return;}
+  try{await Promise.all([loadProfiles(),loadSchedulePeople()]);}
+  catch(error){setStatus('error');showScheduleRosterError('계정 차단 새로고침 실패: '+error.message);return;}
+  setStatus('saved');render();
+}
 async function approveProfile(uid){
   if(!isMgr()){setStatus('error');showScheduleRosterError('가입 승인 권한이 없습니다.');return;}
   const p=PROFILES.find(x=>x.user_id===uid);
