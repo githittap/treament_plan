@@ -2167,6 +2167,25 @@ const AICOST_PLATFORMS=['Claude','Codex(OpenAI)','Kimi','기타'];
 let AICOST_MONTH='';
 function setAicostMonth(v){AICOST_MONTH=v;render();}
 function aicostMoney(v){return Number(v||0).toLocaleString('ko-KR');}
+/* ── AI 사용량 현황판: PC가 하루 한 번 올린 Codex 모델별 토큰(ai_model_usage_daily, 원장만 읽기) ── */
+/* ai-usage:test-start */
+function aiUsageWindow(todayStr,days){const end=String(todayStr).slice(0,10),[y,mo,d]=end.split('-').map(Number);return {start:new Date(Date.UTC(y,mo-1,d-(days-1))).toISOString().slice(0,10),end};}
+function aiUsageSummary(rows,start,end){const per={};let total=0,turns=0,lastSynced='';(rows||[]).forEach(r=>{const day=String(r.usage_date||'').slice(0,10);if(!day||day<start||day>end)return;const model=String(r.model||'(unknown)'),t=Number(r.tokens)||0,n=Number(r.turns)||0,p=per[model]||(per[model]={model,tokens:0,turns:0});p.tokens+=t;p.turns+=n;total+=t;turns+=n;if(r.synced_at&&String(r.synced_at)>lastSynced)lastSynced=String(r.synced_at);});
+  const models=Object.values(per).sort((a,b)=>b.tokens-a.tokens||a.model.localeCompare(b.model)).map(x=>({...x,share:total?x.tokens/total*100:0,astra:x.model==='Astra'}));
+  return {total,turns,models,astra:models.find(x=>x.astra)||{model:'Astra',tokens:0,turns:0,share:0,astra:true},lastSynced};}
+function aiUsageCompact(n){n=Number(n)||0;if(n>=1e8)return (n/1e8).toFixed(2).replace(/\.?0+$/,'')+'억';if(n>=1e4)return Math.round(n/1e4).toLocaleString('ko-KR')+'만';return n.toLocaleString('ko-KR');}
+function aiUsageSyncedLabel(iso){const d=new Date(iso),p=n=>String(n).padStart(2,'0');return Number.isNaN(d.getTime())?String(iso):`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;}
+function aiUsagePanelHtml({summary,start,end,error}){
+  const pct=v=>v>0&&v<0.05?'&lt;0.1%':(Math.round(v*10)/10).toFixed(1)+'%',head=`<div class="card" id="aiUsagePanel"><h2>📊 AI 사용량 현황판 <span class="sub">모델별 사용량(최근 7일) · Codex 토큰</span></h2><div class="hint">기간 ${esc(start)} ~ ${esc(end)}${summary&&summary.lastSynced?` · 마지막 동기화 ${esc(aiUsageSyncedLabel(summary.lastSynced))}`:''}</div>`;
+  if(error)return head+`<div class="empty">AI 사용량을 불러오지 못했습니다: ${esc(error)}</div></div>`;
+  if(!summary||!summary.models.length)return head+'<div class="empty">아직 올라온 사용량 기록이 없습니다. PC에서 하루 한 번 올리면 여기에 쌓입니다.</div></div>';
+  const a=summary.astra;
+  return head+`<div data-ai-usage-astra-summary style="margin:10px 0 14px;padding:10px 12px;border:1px solid var(--gold);border-radius:8px;background:var(--gold-bg);color:var(--gold)">⚠ <b>Astra</b>(고비용 검증 모델) ${a.tokens?`<b>${aiUsageCompact(a.tokens)} 토큰</b> · 전체의 <b>${pct(a.share)}</b> · ${a.turns.toLocaleString('ko-KR')}턴`:'최근 7일 사용 기록 없음'}</div>
+    <div style="font-size:13px;color:var(--gray)">7일 합계</div><div style="font-size:24px;font-weight:800;color:var(--mint);margin:2px 0 12px">${aiUsageCompact(summary.total)} 토큰 <span class="sub" style="font-size:13px;font-weight:400">· ${summary.turns.toLocaleString('ko-KR')}턴</span></div>
+    <div class="tblwrap"><table><tr><th>모델</th><th>토큰</th><th>비중</th><th>턴</th></tr>${summary.models.map(x=>`<tr data-ai-usage-model="${esc(x.model)}"${x.astra?' data-ai-usage-astra="true" style="background:var(--gold-bg)"':''}><td>${x.astra?'<b style="color:var(--gold)">⚠ Astra</b>':esc(x.model)}</td><td title="${x.tokens.toLocaleString('ko-KR')} 토큰" style="white-space:nowrap">${aiUsageCompact(x.tokens)}</td><td style="min-width:110px"><div class="rowflex" style="gap:8px;align-items:center;flex-wrap:nowrap"><div style="flex:1;min-width:40px;height:8px;background:var(--line);border-radius:4px"><div style="height:100%;width:${Math.min(100,Math.max(0,x.share)).toFixed(1)}%;background:${x.astra?'var(--gold)':'var(--mint)'};border-radius:4px"></div></div><span style="white-space:nowrap">${pct(x.share)}</span></div></td><td style="white-space:nowrap">${x.turns.toLocaleString('ko-KR')}</td></tr>`).join('')}</table></div>
+    <div class="hint">PC에 남은 Codex 대화 기록을 하루 한 번 모아 올린 값입니다(오늘은 올린 시점까지). 비용이 큰 Astra는 노란색으로 따로 표시합니다.</div></div>`;
+}
+/* ai-usage:test-end */
 async function saveAicost(i){
   if(ME.role!=='owner'||!AICOST_PLATFORMS[i])return;
   const amount=Number($('#aiAmount-'+i).value)||0,note=$('#aiNote-'+i).value.trim()||null;
@@ -2179,10 +2198,12 @@ async function saveAicost(i){
 async function renderAicost(m){
   if(ME.role!=='owner'){m.innerHTML='<div class="card"><div class="empty">원장만 사용할 수 있습니다.</div></div>';return;}
   if(!AICOST_MONTH)AICOST_MONTH=today().slice(0,7);
-  const [{data:rows,error},{data:history,error:historyError},{data:events,error:eventsError}]=await Promise.all([
+  const usageWin=aiUsageWindow(today(),7);
+  const [{data:rows,error},{data:history,error:historyError},{data:events,error:eventsError},{data:usageRows,error:usageError}]=await Promise.all([
     sb.from('ai_billing').select('*').eq('ym',AICOST_MONTH),
     sb.from('ai_billing').select('ym,amount_krw').order('ym',{ascending:false}),
-    sb.from('ai_billing_events').select('platform,amount_krw,source,note,raw_text,received_at').order('received_at',{ascending:false}).limit(300)
+    sb.from('ai_billing_events').select('platform,amount_krw,source,note,raw_text,received_at').order('received_at',{ascending:false}).limit(300),
+    sb.from('ai_model_usage_daily').select('usage_date,model,tokens,turns,synced_at').gte('usage_date',usageWin.start).order('usage_date',{ascending:false}).limit(2000)
   ]);
   if(error||historyError||eventsError){setStatus('error');m.innerHTML=`<div class="card"><div class="empty">AI 비용을 불러오지 못했습니다: ${esc((error||historyError||eventsError).message)}</div></div>`;return;}
   const byPlatform={};(rows||[]).forEach(r=>byPlatform[r.platform]=r);
@@ -2193,6 +2214,7 @@ async function renderAicost(m){
   (events||[]).forEach(e=>{const ym=String(e.received_at).slice(0,7);totals[ym]=(totals[ym]||0)+Number(e.amount_krw||0);});
   const recent=Object.entries(totals).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,6),max=Math.max(1,...recent.map(x=>x[1]));
   const recentEvents=(events||[]).slice(0,20);
+  const usageHtml=aiUsagePanelHtml({summary:aiUsageSummary(usageRows,usageWin.start,usageWin.end),start:usageWin.start,end:usageWin.end,error:usageError?usageError.message:''});
   m.innerHTML=`<div class="card"><h2>💰 AI비용 <span class="sub">(원장 전용)</span></h2>
     <div class="fld" style="max-width:220px"><label>조회 월</label><input type="month" value="${esc(AICOST_MONTH)}" onchange="setAicostMonth(this.value)"></div>
     <div style="font-size:13px;color:var(--gray);margin-top:16px">이번 달 실제 청구액 (직접 입력 + 자동감지 문자 합계)</div>
@@ -2204,6 +2226,7 @@ async function renderAicost(m){
       <td><input class="mini" id="aiNote-${i}" value="${esc(r.note||'')}" placeholder="선택 입력" style="min-width:200px"></td>
       <td><button class="mini stamp" onclick="saveAicost(${i})">저장</button></td></tr>`;}).join('')}</table></div>
     <div class="hint">"직접 입력"은 원장이 넣는 값, "자동감지(문자)"는 결제 문자를 MacroDroid가 자동으로 전송해 쌓인 값(수정 불가·자동 집계). 합계가 위 총액에 함께 반영됩니다.</div></div>
+  ${usageHtml}
   <div class="card"><h2>최근 6개월 실제 청구액</h2>${recent.length?recent.map(([ym,sum])=>`<div style="margin:10px 0"><div class="rowflex" style="justify-content:space-between"><span>${esc(ym)}</span><b>₩${aicostMoney(sum)}</b></div><div style="height:8px;background:var(--line);border-radius:4px;margin-top:5px"><div style="height:100%;width:${Math.round(sum/max*100)}%;background:var(--mint);border-radius:4px"></div></div></div>`).join(''):'<div class="empty">저장된 청구 내역이 없습니다.</div>'}</div>
   <div class="card"><h2>📩 자동감지 내역 <span class="sub">(최근 20건, 문자 웹훅)</span></h2>${recentEvents.length?`<div class="tblwrap"><table><tr><th>수신</th><th>플랫폼</th><th>금액</th><th>원문</th></tr>
     ${recentEvents.map(e=>`<tr><td>${md(String(e.received_at).slice(0,10))} ${String(e.received_at).slice(11,16)}</td><td>${esc(e.platform)}</td><td>₩${aicostMoney(e.amount_krw)}</td><td class="sub" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.raw_text||'')}">${esc(e.raw_text||e.note||'')}</td></tr>`).join('')}</table></div>`:'<div class="empty">아직 자동감지된 결제 문자가 없습니다. MacroDroid 연동 후 결제 문자가 오면 여기 쌓입니다.</div>'}</div>`;

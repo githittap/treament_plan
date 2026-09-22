@@ -1,2 +1,5 @@
 [functions.consultation-ingest]
 verify_jwt = true
+
+[functions.ai-usage-sync]
+verify_jwt = true
