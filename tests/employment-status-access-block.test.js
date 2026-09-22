@@ -108,3 +108,17 @@ test('원장 UI는 상태·유효일·사유 저장과 영구 접속 차단 오�
   assert.doesNotMatch(html, /from\('profiles'\)\.delete\(/);
   assert.doesNotMatch(html, /from\('auth\.users'\)\.delete\(/);
 });
+
+test('운영용 phased SQL은 A→B→C 호환 순서와 독립 rollback을 명시한다', () => {
+  const phase = key => fs.readFileSync(path.join(root, 'db', `employment_status_access_block_phase_${key}.sql`), 'utf8');
+  const rollback = key => fs.readFileSync(path.join(root, 'db', `employment_status_access_block_phase_${key}_rollback.sql`), 'utf8');
+  const [a, b, c] = ['a', 'b', 'c'].map(phase);
+  for (const key of ['a', 'b', 'c']) assert.ok(fs.existsSync(path.join(root, 'db', `employment_status_access_block_phase_${key}_rollback.sql`)));
+  assert.match(a, /기존 RLS\/UPDATE와 UI는 그대로 유지/i);
+  assert.doesNotMatch(a, /employee_hub_access_gate|revoke update on public\.profiles/i);
+  assert.match(b, /기존 profiles UPDATE와 현재 UI는 유지/i);
+  assert.doesNotMatch(b, /revoke update,delete on public\.profiles/i);
+  assert.match(c, /새 hr\.html과 동시에 배포/i);
+  assert.match(c, /revoke update,delete on public\.profiles/i);
+  for (const key of ['a', 'b', 'c']) assert.match(rollback(key), /rollback blocked: preserved data exists/i);
+});
