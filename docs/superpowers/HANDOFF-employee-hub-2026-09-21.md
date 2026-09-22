@@ -3,7 +3,7 @@
 ## 직원허브 5차 — 1단계 배포·2단계 로컬 경계 (2026-09-22)
 
 - 1단계 근무표는 `8cc9030d300a39b43190831785cdfa9405b78239`가 `origin/main` push, Pages run `35672912570` success, `https://jung-plant.com/hr.html?v=8cc9030` HTTP 200·근무표계획/월간 기본 표식 확인까지 완료했다. Sol High: 관련 57/57, 전체 JS 24파일, 인라인 2, diff-check PASS.
-- 2단계 수기근태는 `calendar-ui-release`에서만 추가형 v2를 로컬 구현·시험한다. 운영 DB 적용·push·배포·실제 직원 데이터는 금지이며, DB rollback은 분리 연장 데이터 존재 시 중단해 보존한다.
+- 2단계 수기근태는 `calendar-ui-release`에서만 추가형 v2를 로컬 구현·시험한다. 운영 DB 적용·push·배포·실제 직원 데이터는 금지이며, DB rollback은 분리 연장값이 0인 v2 제출도 revision payload로 감지해 중단·보존한다.
 
 ## 최신 인계 — Task11 문서화 완료 및 다음 범위 (2026-09-22)
 

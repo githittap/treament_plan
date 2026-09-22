@@ -3,7 +3,7 @@
 ## 직원허브 5차 — 근무표 1단계 배포 및 수기근태 2단계 로컬 구현 (2026-09-22)
 
 - 1단계 근무표는 commit `8cc9030d300a39b43190831785cdfa9405b78239`가 `origin/main` push, GitHub Pages run `35672912570` success, 공개 `https://jung-plant.com/hr.html?v=8cc9030` HTTP 200·근무표계획/월간 기본 표식 확인까지 완료했다. Sol High는 관련 57/57·전체 JS 24파일·인라인 2·diff-check PASS로 판정했다.
-- 2단계 수기근태는 이 worktree에서만 월간 7열 키보드 달력, 점심/퇴근 연장 원자료·분 분리, v2 RPC·revision·비파괴 rollback을 구현했다. 관련 정적·PGlite, 기존 전체 JS·PGlite, 인라인 2·diff-check는 로컬 PASS이며, 운영 DB 적용·push·배포·실제 직원 데이터는 금지다.
+- 2단계 수기근태는 이 worktree에서만 월간 7열 키보드 달력, 점심/퇴근 연장 원자료·분 분리, v2 RPC·revision·비파괴 rollback을 구현했다. rollback은 분리값이 0인 v2 제출도 revision payload로 감지해 중단·보존한다. 관련 정적·PGlite, 기존 전체 JS·PGlite, 인라인 2·diff-check는 로컬 PASS이며, 운영 DB 적용·push·배포·실제 직원 데이터는 금지다.
 
 ## 최신 실행 정본 — Task11 문서화 완료 및 다음 범위 (2026-09-22)
 

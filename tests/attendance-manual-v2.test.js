@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 
 const root = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'hr.html'), 'utf8');
@@ -15,6 +16,19 @@ test('수기 출퇴근 v2는 키보드로 고를 수 있는 월간 7열 달력�
   assert.match(html, /manualClockoutOvertimeRaw/);
   assert.match(html, /submit_manual_attendance_v2/);
   assert.doesNotMatch(html.match(/function manualAttendanceFormHtml\(\)[\s\S]*?async function submitManualAttendance/)[0], /type="date"/);
+});
+
+test('표시 월이 선택 날짜와 달라도 월간 달력은 정확히 하나의 키보드 초점 진입점을 둔다', () => {
+  const start = html.indexOf('function manualCalendarDate');
+  const end = html.indexOf('function overtimeDraftMinutes', start);
+  assert.ok(start >= 0 && end > start, '수기 달력 함수 블록이 없습니다.');
+  const nodes = {manualWorkDate:{value:'2026-09-22'},manualAttendanceCalendar:{innerHTML:''}};
+  const context = {$:id=>nodes[id.slice(1)],today:()=> '2026-09-22'};
+  vm.createContext(context);
+  vm.runInContext(`${html.slice(start,end)}\nthis.renderManualAttendanceCalendar=renderManualAttendanceCalendar;`, context);
+  vm.runInContext('renderManualAttendanceCalendar(new Date(2026,9,1));', context);
+  assert.equal((nodes.manualAttendanceCalendar.innerHTML.match(/tabindex="0"/g)||[]).length,1);
+  assert.match(nodes.manualAttendanceCalendar.innerHTML,/aria-label="2026-10-01"[^>]*tabindex="0"/);
 });
 
 test('v2 SQL은 총합 호환, 분리 원자료·분 필드, RPC-only/RLS 경계를 보존한다', () => {
