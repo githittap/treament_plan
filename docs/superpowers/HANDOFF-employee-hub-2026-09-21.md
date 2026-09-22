@@ -1,5 +1,11 @@
 # 직원허브 현재 인수인계
 
+## 최신 인계 — 직원허브 5차 원본 대조·운영 반영 완료 (2026-09-22)
+
+- 원본: `C:\Users\elusi\Downloads\직원허브 5차.zip`, SHA256 `A177836684189BFAA4D0733F1EFF8D39B58B9F5FE71791E1F551DCD7C0EC5E3A`, 항목 4(MD 1, PNG 3). 7개 원본 모두 `Z:\11_codex\03_병원운영·전산\직원허브_원본ZIP`에 비파괴 복사됐고 이름별 SHA256이 Downloads 원본과 일치하며 Downloads 원본은 보존됐다.
+- 완료: 근무표·수기근태·결근/미기록 후보·재직상태/접속차단은 구현·검증·운영 반영까지 완료했다. 세부 운영 증거와 rollback 경계는 아래 각 범위 기록을 보존한다.
+- 남은 문자 그대로의 항목은 실제 Auth 계정 영구삭제 하나이며, 현재 기록보존형 영구 접속차단으로 안전 대체 중이다. 다음 활성 범위는 `상담문의 등 일원화.zip`이다.
+
 ## 직원허브 5차 — 재직상태·접속차단 운영 반영 (2026-09-22)
 
 - 재직상태/접속차단 및 단계형 A/B/C·ACL 보정은 commit `6bffb86`까지 운영 반영 완료로 인계받았다. Pages run `35690778571` success, 공개 HTTP 200·배포 마커 확인까지 완료됐다. 이후 결근/미기록 후보 기준 변경은 로컬 커밋만 하며 운영 DB·push·deploy는 하지 않는다.
@@ -24,7 +30,7 @@
 - Task11 결과보고서 정본: `Z:\11_codex\00_결과보고서\직원허브_구현결과보고서_2026-09-22.html`, SHA256 `7AACA57558B9D6F6CEE9EB35E4781C1205CEA4217DF70BB5F5AC7E0C48A748F4`.
 - Task11 사용설명서 정본: `Z:\11_codex\03_병원운영·전산\직원허브_수정지침_시안\직원허브_사용설명서.docx`, SHA256 `9CB2DB42EB8C78E2E43F4375C7E5F7F3CD47EB14A4234434BB9AA4B3F81E2B07`. Sol High HTML/content/OOXML/a11y/privacy PASS이나 번들 LibreOffice 부재로 전 페이지 PNG visual QA는 미실행인 조건부 인도 경계다.
 - 최초 `직원허브 수정 지침.zip`의 외부자료 없이 가능한 승인 범위 구현·운영적용·배포·문서화는 종료했다. 실제 4역할 로그인·저장/재조회와 실제 직원 데이터·메일·Push·생체정보는 미검증·금지로 남긴다.
-- 다음 활성 범위는 아직 열지 않은 `직원허브 5차.zip` 원본 보존·해시·인벤토리·요구 대조다. `상담문의 등 일원화.zip`은 직원허브 5차 완료 후 별도 후속이다.
+- 다음 활성 범위가 아직 열지 않은 `직원허브 5차.zip` 원본 보존·해시·인벤토리·요구 대조라는 과거 기록은 최신 상단 상태로 대체됨이다. `상담문의 등 일원화.zip`이 다음 활성 범위다.
 
 ## 최신 인계 — Task10 배포·공개 smoke 완료 (2026-09-22)
 
@@ -37,7 +43,7 @@
 - Task7 `employee_hub_push_subscriptions_v6_20260922` 성공: PG17.6, rows=0, RLS, policy 4개, trigger 1개, constraints 5개, canonical=`4f7a3ffc459b04e0a3c87ea8dfda8c28`, 관련 advisor 0건.
 - Task8 `employee_hub_attendance_owner_chief_gate_20260922` 성공: marker 1건, FORCE RLS·역할 SELECT 없음, corrected function `prosrc=08d9fa62fcc82616dd9f7cb3f8ebafac`, chief gate=true·old bypass=false, `attendance_manual_entries=8`·history=9 보존 및 Task7 canonical 유지. private marker no-policy INFO는 의도된 deny-all이다.
 - Task9 메뉴 도움말 완료: 기존 `hr.html` workdocs 탭 안 사용 설명서·열기/닫기·메뉴별 안내·권한 차이를 확인했다. 새 상단탭·민감정보는 없고 work-documents 4/4, guide 2/2, home-work-docs 1/1 PASS다. 통합 `node --test` spawn EPERM은 코드 실패가 아니다.
-- 다음: Task10 역할별 단계배포·최종인수 → Task11 설명서. 실제 직원 Push·실기기·VAPID는 미수행·금지, `직원허브 5차.zip`은 미열람, `상담문의 등 일원화`는 별도 후속이다.
+- Task10 역할별 단계배포·최종인수 → Task11 설명서와 `직원허브 5차.zip` 미열람이라는 과거 상태는 최신 상단 상태로 대체됨이다. 실제 직원 Push·실기기·VAPID는 미수행·금지이며, `상담문의 등 일원화`는 다음 활성 후속이다.
 
 ## 최신 인계 — Sol High 7차 Minor 1 기록 보완, 8차 최종 문서 대조 대기 (2026-09-22)
 
@@ -86,7 +92,7 @@
 - Task6는 production migration `employee_hub_notice_attachments_deposit_access_20260921` 적용을 완료했다. `notices=1` 및 `deposits=264`는 보존됐고, private `notice-attachments` 버킷은 10MB·6 MIME·objects=0 상태다. 자격증명이 없어 Storage API 실제 업로드는 미검증이다.
 - Task7 첫 production apply는 fixed canonical mismatch로 transaction rollback돼 운영 변화가 없다. Task7 v5 로컬 정본은 `6941111`, `448bcc2`, `72c4749`, `1b2e36b`; fingerprint `task7-push-v5-catalog`, manifest `push-v5-catalog-20260922`, SHA256 `ae2606f243d91400b15624dbc9113ae3e6187ed03b7eef6d213d37f56799b53e`, MD5 `8179b7fed8536fe0516a0b29109f1728`다. PGlite exact catalog/behavior/fail-closed 및 push static PASS, 운영 미적용이다.
 - Task8 로컬 보완 정본은 `373e829`다. Task7 v5 상수·identity·private allowlist, marker exact shape와 negative matrix를 보강했고 Task8/Task7 PGlite PASS다. 운영 미적용이다.
-- 다음: Sol High 독립 검증 PASS → Task7 운영 apply/verify → Task8 운영 apply/verify → 승인된 단계배포·실사이트 확인. 실제 직원 메일·Push·생체입력, 자격증명 입력, 원본 삭제, 대량 이관, 보안 완화, 새 비용은 금지한다. `직원허브 5차.zip`은 최초 승인 범위 완료 뒤에만 읽으며 `상담문의 등 일원화.zip`은 직원허브 전체 후속이다.
+- Sol High 독립 검증과 Task7/Task8 운영 적용 대기, `직원허브 5차.zip` 미열람이라는 과거 상태는 최신 상단 상태로 대체됨이다. 실제 직원 메일·Push·생체입력, 자격증명 입력, 원본 삭제, 대량 이관, 보안 완화, 새 비용은 금지한다. `상담문의 등 일원화.zip`은 다음 활성 후속이다.
 
 ## 재부팅 정본 (2026-09-21)
 
@@ -103,7 +109,7 @@
 
 현재 구현 HEAD: `d0222684dd7da4607752c22b2912ad8bf4f0d87a`. Sol High 최종 PASS(Critical/Important/Minor 없음)이며 로컬 직접 Node 30개, PGlite, 인라인 JS, `git diff --check` PASS와 clean worktree를 확인했다. 닫힘 범위는 foldername 길이2, 게시 첨부 restrictive DELETE guard, JSON 구조/NULL 강제, 정책·RLS·ACL·버킷 rollback, apply×2 fail-closed, quoted role 복원이다. push·배포·운영 DB/Storage·실계정은 미수행이다.
 
-운영 전에는 Storage DELETE/ALL 정책·ACL·RLS·버킷/객체 snapshot, 별도 시험계정 upload/download/cleanup/게시 후 삭제 거부/MIME·10MB, 복제환경 rollback, 단일 migration 실행이 필요하다. 최종 직전에만 사용자 승인 외부 Opus 읽기전용 검증을 수행한다. K3는 BUSD MCP_INTERNAL_ERROR 및 managed Kimi 403으로 제외하며 연결 완료 전 Terra 유지한다. `C:\Users\elusi\Downloads\직원허브 5차.zip`은 지금 열지 않고 기존 승인 미완료 뒤 원본 보존·요구 대조 대상으로 대기한다.
+운영 전 Storage 검증과 `직원허브 5차.zip` 미열람 대기라는 과거 상태는 최신 상단 상태로 대체됨이다. K3 관련 당시 기록은 보존한다.
 
 ## 과거 정정 — Task 6 Sol High 최종 판정 FAIL (2026-09-21, 문서 갱신)
 
