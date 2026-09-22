@@ -1,6 +1,7 @@
 -- AI 사용량 현황판 통합분: PC 상황판의 정가 환산 비용(ai_usage_data.json)과 Codex 대화 점검(codex_session_health.json)을 종류별 최신 1건으로 둔다.
 -- Edge Function ai-usage-sync(service-role)만 저장하고 원장만 읽는다. 파생 기록이며, PC 파일 경로·세션 ID는 Edge에서 버린 뒤 저장한다.
--- 크기 한도 128KB는 Edge 본문 한도(64KB)의 2배라, Edge가 통과시킨 스냅샷은 jsonb 표기가 조금 늘어나도 여기서 거절되지 않는다.
+-- 크기 한도 128KB: Edge가 문자열(NUL·짝 없는 서로게이트 제거, 길이 제한)과 금액(소수 6자리)을 정리한 뒤 JSON 64KB 이하만 넘기므로,
+-- jsonb 표기로 공백이 늘어도 이 한도를 넘지 않는다(tests/sql/pglite-ai-usage-snapshots.mjs의 저장 일치 시험).
 create table if not exists public.ai_usage_snapshots (
   kind text primary key check(kind in('platform_cost','codex_sessions')),
   payload jsonb not null check(jsonb_typeof(payload)='object' and octet_length(payload::text)<=131072),
