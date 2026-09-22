@@ -7,6 +7,9 @@ verify_jwt = true
 [functions.deposit-webhook]
 verify_jwt = false
 
+[functions.navertalk-webhook]
+verify_jwt = false
+
 [functions.ai-billing-webhook]
 verify_jwt = false
 
