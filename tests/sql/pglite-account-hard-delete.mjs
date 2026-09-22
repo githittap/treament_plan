@@ -115,7 +115,12 @@ async function main() {
     // 사전 검증 통과 확인(아직 아무것도 지우지 않았다).
     const okRow = await q(`select public.assert_can_hard_delete_account('${target}','${targetName}') actor`);
     assert.equal(okRow[0].actor, owner);
+
+    // 하드닝: auth.users에 로그인 계정이 아직 남아있는 동안은 기록 RPC가 거절돼야 하고, 아무 것도 바뀌면 안 된다.
+    await assert.rejects(q(`select public.record_account_hard_deleted('${target}')`), /auth user still exists; delete the login first/, 'auth.users가 아직 있는데 기록 RPC가 통과함');
     await q('reset role');
+    assert.equal((await q(`select auth_deleted_at is null as untouched from public.profiles where user_id='${target}'`))[0].untouched, true, '아직 삭제 전인데 auth_deleted_at이 채워짐');
+    assert.equal((await q(`select count(*)::int n from public.profile_employment_history where user_id='${target}' and account_action='계정영구삭제'`))[0].n, 0, '아직 삭제 전인데 계정영구삭제 이력이 생김');
 
     assert.equal((await q(`select count(*)::int n from auth.users where id='${target}'`))[0].n, 1, '아직 auth.users에 남아있어야 함');
 

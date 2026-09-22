@@ -120,6 +120,8 @@ end;
 $$;
 
 -- 5) 기록 RPC — Edge Function이 auth.admin.deleteUser() 성공 뒤에만 호출한다. 재검증 후 profiles·이력에 "기록만" 남긴다(행 삭제 없음).
+--    auth.users에 그 행이 실제로 없을 때만 통과한다 — Edge Function이 순서를 지키지 않고 먼저 불러도(또는 잘못 재호출해도)
+--    로그인 계정이 진짜 지워지기 전에는 "삭제됐다"는 기록이 남지 않는다.
 create or replace function public.record_account_hard_deleted(p_user_id uuid)
 returns void
 language plpgsql
@@ -140,6 +142,9 @@ begin
   end if;
   if t.auth_deleted_at is not null then
     raise exception 'account already hard-deleted';
+  end if;
+  if exists (select 1 from auth.users where id = p_user_id) then
+    raise exception 'auth user still exists; delete the login first';
   end if;
   update public.profiles set auth_deleted_at = now(), auth_deleted_by = a where user_id = p_user_id;
   insert into public.profile_employment_history(user_id, from_status, to_status, effective_date, reason, account_action, acted_by)

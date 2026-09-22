@@ -135,6 +135,13 @@ export function mapAssertError(rawMessage: string): ErrorMap {
   };
 }
 
+// GoTrue의 auth.admin.deleteUser()는 이미 없는 사용자에게 "not found" 계열 오류를 준다.
+// 재시도 흐름(삭제는 이전 시도에서 이미 끝났고 기록만 실패했던 경우)에서 이 오류는 실패가 아니라
+// "이미 삭제된 상태"라는 뜻이다.
+export function isAlreadyDeletedError(rawMessage: string): boolean {
+  return /not[\s_-]?found/i.test(rawMessage);
+}
+
 export async function handleRequest(
   req: Request,
   deps?: AccountDeleteDeps,
@@ -227,7 +234,11 @@ export async function handleRequest(
 
   const adminClient = activeDeps.makeAdminClient();
   const deleteResult = await adminClient.auth.admin.deleteUser(userId);
-  if (deleteResult.error) {
+  // "이미 없는 사용자" 오류는 실패가 아니다 — 이전 시도에서 삭제 자체는 이미 끝났고 기록만 실패했을 수 있다.
+  // 그 경우 재시도가 여기서 다시 deleteUser를 부르면 GoTrue가 "없는 사용자"라고 답하는 게 정상이므로,
+  // 이걸 진짜 실패로 취급하면 재시도가 영영 성공할 수 없다. record 단계에서 auth.users 존재 여부를
+  // 다시 확인하므로(하드닝), 여기서는 진행만 시키고 최종 안전판은 그 RPC가 맡는다.
+  if (deleteResult.error && !isAlreadyDeletedError(deleteResult.error.message)) {
     return json(502, {
       ok: false,
       error: "auth_delete_failed",
@@ -242,7 +253,8 @@ export async function handleRequest(
     return json(500, {
       ok: false,
       error: "record_failed_after_delete",
-      message: "로그인 계정은 삭제됐지만 기록 저장에 실패했습니다. 관리자에게 즉시 알리세요.",
+      message:
+        "로그인 계정은 이미 삭제됐습니다. 기록 저장에만 실패했으니, 같은 요청으로 다시 시도해 주세요 — 재시도하면 이번에는 기록까지 정상적으로 끝납니다.",
       target_user_id: userId,
       target_name: confirmName,
     });
