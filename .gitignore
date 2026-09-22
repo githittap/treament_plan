@@ -1,5 +1,8 @@
 node_modules/
 .superpowers/
+# 작업용 git worktree(세션별 격리 작업 폴더) — 저장소에 올리지 않는다.
+.worktrees/
+.claude/worktrees/
 
 # 원장이 읽는 HTML 보기판 — .md 저장 시 전역 md2view 훅이 자동 생성한다.
 # 원본 .md 가 이미 저장소에 있으므로 생성물은 커밋하지 않는다(공개 repo · 파일당 200KB+).
