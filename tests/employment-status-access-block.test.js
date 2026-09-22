@@ -71,6 +71,19 @@ test('차단 JWT gate와 UI profile 변경 RPC가 직접 갱신을 대체한다'
   assert.match(html, /sb\.rpc\('revoke_employee_profile_approval'/);
 });
 
+test('관리 RPC는 명시 anon EXECUTE를 제거하고 authenticated만 허용한다', () => {
+  const sql = fs.readFileSync(sqlPath, 'utf8');
+  const hardening = fs.readFileSync(path.join(root, 'db', 'employment_status_rpc_acl_hardening.sql'), 'utf8');
+  const rollback = fs.readFileSync(path.join(root, 'db', 'employment_status_rpc_acl_hardening_rollback.sql'), 'utf8');
+  for (const name of ['set_employment_status', 'disable_employee_account_preserve_records', 'approve_employee_profile', 'revoke_employee_profile_approval', 'update_employee_profile_field']) {
+    assert.match(sql, new RegExp(`revoke all on function public\\.${name}[\\s\\S]*from anon`, 'i'));
+    assert.match(hardening, new RegExp(name, 'i'));
+  }
+  assert.match(hardening, /from public,anon/i);
+  assert.match(rollback, /fail-safe no-op rollback/i);
+  assert.match(rollback, /from public,anon/i);
+});
+
 test('HR gate와 rollback gate 목록은 기밀 접근·기록을 포함해 대칭이다', () => {
   const sql = fs.readFileSync(sqlPath, 'utf8');
   const rollback = fs.readFileSync(rollbackPath, 'utf8');
