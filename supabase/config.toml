@@ -1,0 +1,2 @@
+[functions.consultation-ingest]
+verify_jwt = true
