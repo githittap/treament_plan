@@ -9,7 +9,7 @@ const html = fs.readFileSync(path.join(root, 'hr.html'), 'utf8');
 const sql = fs.readFileSync(path.join(root, 'db', 'attendance_issue_resolution_release.sql'), 'utf8');
 
 test('출석 수직 경로 프론트 연결이 포함되어 있다', () => {
-  for (const marker of ['applyAttendanceResolutions', 'submitManualAttendance', 'reviewManualAttendance', "sb.rpc('review_attendance_issue'", "sb.rpc('submit_manual_attendance'"]) {
+  for (const marker of ['applyAttendanceResolutions', 'submitManualAttendance', 'reviewManualAttendance', "sb.rpc('review_attendance_issue'", "sb.rpc('submit_manual_attendance_v2'"]) {
     assert.match(html, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
   assert.match(html, /attendance_issue_resolutions/);
