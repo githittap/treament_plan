@@ -80,6 +80,7 @@ th{background:var(--panel);color:var(--gray);font-size:12px;position:sticky;top:
 .schedule-role-table td{height:58px;padding:4px;vertical-align:top}
 .schedule-role-label{color:var(--ink)!important;font-weight:800;white-space:nowrap}
 .schedule-role-cell{font-size:11px}
+.schedule-role-empty{padding:7px 3px;color:var(--gray);font-size:11px;text-align:center}
 .schedule-role-cell summary{cursor:pointer;list-style:none;border:1px solid var(--line);border-radius:6px;padding:5px 4px;color:var(--mint);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .schedule-role-cell summary::-webkit-details-marker{display:none}
 .schedule-check-list{display:grid;gap:3px;margin-top:4px;padding:5px;background:var(--panel);border:1px solid var(--line);border-radius:6px;max-height:180px;overflow:auto}
@@ -431,7 +432,7 @@ const TABS=[
   {key:'home',  label:'홈',        roles:['staff','manager','chief','owner']},
   {key:'att',   label:'출퇴근',    roles:['staff','manager','chief','owner']},
   {key:'deposit',label:'입금',     roles:['staff','manager','chief','owner']},
-  {key:'sched', label:'근무표',    roles:['staff','manager','chief','owner']},
+  {key:'sched', label:'근무표계획',roles:['staff','manager','chief','owner']},
   {key:'leave', label:'연차',      roles:['staff','manager','chief','owner']},
   {key:'appr',  label:'결재함',    roles:['staff','manager','chief','owner']},
   {key:'notice',label:'공지',      roles:['staff','manager','chief','owner']},
@@ -695,7 +696,7 @@ async function checkAbsent(month){
 }
 
 /* ── 근무표(M2) ── */
-let SCHED_WEEK=null,SCHED_MONTH=null,SCHED_VIEW='week',PAINT_VALUE=null,PAINTING=false,SCHEDULE_STATUS_OVERRIDES={},SCHEDULE_WRITE_SEQ={},SCHEDULE_WRITE_TAIL={},SCHEDULE_CELL_VALUES={},SCHEDULE_ROLE_WRITE_SEQ={},SCHEDULE_ROLE_WRITE_TAIL={};
+let SCHED_WEEK=null,SCHED_MONTH=null,SCHED_VIEW='month',PAINT_VALUE=null,PAINTING=false,SCHEDULE_STATUS_OVERRIDES={},SCHEDULE_WRITE_SEQ={},SCHEDULE_WRITE_TAIL={},SCHEDULE_CELL_VALUES={},SCHEDULE_ROLE_WRITE_SEQ={},SCHEDULE_ROLE_WRITE_TAIL={};
 function scheduleMonthWeeks(month){
   const first=month+'-01',last=month+'-'+String(new Date(Number(month.slice(0,4)),Number(month.slice(5,7)),0).getDate()).padStart(2,'0');
   const weeks=[];for(let ws=mondayStr(first);ws<=mondayStr(last);ws=addDays(ws,7))weeks.push(ws);
@@ -733,7 +734,7 @@ function scheduleRoleColor(person){return person&&person.department==='Dr.'?'rol
 function scheduleRoleCell(role,weekStart,ds,people,rows,leaveByUser,canEdit){
   const day=scheduleDayForDate(ds),selected=new Set((rows||[]).filter(r=>r.week_start===weekStart&&r.day===day&&((role==='야간'&&r.shift==='evening')||(role==='OFF'&&r.shift==='off')||(role!=='야간'&&role!=='OFF'&&(r.shift==='work'||r.shift==='evening')))).map(r=>r.person_id));
   if(role==='연차·반차'){const names=Object.values(leaveByUser||{}).filter(v=>v.date===ds).map(v=>v.label);return names.length?'<div class="schedule-leave-list">'+names.map(esc).join('<br>')+'</div>':'-';}
-  const items=scheduleRolePeople(role,people,rows,weekStart,day),html=items.map(p=>{const leave=leaveByUser[(p.profile_user_id||'')+'|'+p.id+'|'+ds],historical=p.active!==true||p.included_in_schedule===false,disabled=!!leave||historical,checked=selected.has(p.id);return '<label class="schedule-check '+scheduleRoleColor(p)+(historical?' schedule-historical':'')+'"><input type="checkbox" '+(checked?'checked ':'')+(disabled?'disabled ':'')+' onchange="toggleScheduleRoleMember(\''+role+'\',\''+p.id+'\',\''+(p.profile_user_id||'')+'\',\''+ds+'\',this.checked,this)"><span>'+esc(schedulePersonLabel(p))+(historical?' · 과거 기록':disabled&&leave?' · '+esc(leave.label):'')+'</span></label>';}).join('');
+  const items=scheduleRolePeople(role,people,rows,weekStart,day);if(!items.length)return '<div class="schedule-role-empty">등록된 대상 없음</div>';const html=items.map(p=>{const leave=leaveByUser[(p.profile_user_id||'')+'|'+p.id+'|'+ds],historical=p.active!==true||p.included_in_schedule===false,disabled=!!leave||historical,checked=selected.has(p.id);return '<label class="schedule-check '+scheduleRoleColor(p)+(historical?' schedule-historical':'')+'"><input type="checkbox" '+(checked?'checked ':'')+(disabled?'disabled ':'')+' onchange="toggleScheduleRoleMember(\''+role+'\',\''+p.id+'\',\''+(p.profile_user_id||'')+'\',\''+ds+'\',this.checked,this)"><span>'+esc(schedulePersonLabel(p))+(historical?' · 과거 기록':disabled&&leave?' · '+esc(leave.label):'')+'</span></label>';}).join('');
   return '<details class="schedule-role-cell"><summary>'+role+' · '+items.filter(p=>selected.has(p.id)).length+'명</summary><div class="schedule-check-list">'+(canEdit?html:html.replace(/<input /g,'<input disabled '))+'</div></details>';
 }
 async function toggleScheduleRoleMember(role,personId,profileUserId,ds,checked,input){
@@ -769,24 +770,15 @@ async function renderSched(m){
   if(weekError){m.innerHTML=`<div class="card"><h2>🗓 근무표</h2><div class="cal-error">근무표 주차 정보를 불러오지 못했습니다: ${esc(weekError.message||'알 수 없는 오류')}</div></div>`;return;}
   const {data:rows,error:scheduleError}=await sb.from('schedules').select('person_id,user_id,week_start,day,shift,note').eq('week_start',ws);
   if(scheduleError){m.innerHTML=`<div class="card"><h2>🗓 근무표</h2><div class="cal-error">근무표를 불러오지 못했습니다: ${esc(scheduleError.message||'알 수 없는 오류')}</div></div>`;return;}
-  const {data:lv,error:leaveError}=await sb.from('leave_requests').select('user_id,date_from,date_to').eq('status','승인').lte('date_from',addDays(ws,6)).gte('date_to',ws);
+  const {data:lv,error:leaveError}=await sb.from('leave_requests').select('user_id,type,type_note,date_from,date_to').eq('status','승인').lte('date_from',addDays(ws,6)).gte('date_to',ws);
   if(leaveError){m.innerHTML=`<div class="card"><h2>🗓 근무표</h2><div class="cal-error">연차 정보를 불러오지 못했습니다: ${esc(leaveError.message||'알 수 없는 오류')}</div></div>`;return;}
-  const smap={};(rows||[]).forEach(r=>smap[r.person_id+'|'+r.day]=r.shift);
-  const leaveDays=new Set();
-  for(const r of lv||[]){const start=r.date_from<ws?ws:r.date_from,end=r.date_to>addDays(ws,6)?addDays(ws,6):r.date_to;
-    for(let ds=start;ds<=end;ds=addDays(ds,1))leaveDays.add(r.user_id+'|'+ds);}
   const staff=schedulePeopleForWeek(SCHEDULE_PEOPLE,rows);
-  const deptNames=['Dr.','진료실','데스크','기공실','상담','행정','미지정'];
-  const groups=deptNames.map(label=>({label,members:staff.filter(p=>(deptNames.includes(p.department)?p.department:'미지정')===label)}));
   const published=wk&&(SCHEDULE_STATUS_OVERRIDES[ws]||wk.status)==='공표';
   const canEdit=!published||isLead();
-  const dow=['일','월','화','수','목','금','토'];
-  const cols=[];for(let i=0;i<7;i++){const ds=addDays(ws,i);cols.push({ds,dd:new Date(ds+'T00:00:00').getDay()});}
-  const optHtml=cur=>Object.keys(SHIFTS).map(k=>`<option value="${k}" ${cur===k?'selected':''}>${SHIFTS[k].l}</option>`).join('');
-  let grid=`<div class="tblwrap"><table><tr><th>직원</th>${cols.map(c=>`<th>${dow[c.dd]}<br><span class="sub">${md(c.ds)}</span></th>`).join('')}</tr>`;
-  grid+=groups.filter(g=>g.members.length).map(g=>`<tr><td colspan="${1+cols.length}" style="font-weight:800;background:var(--panel);color:var(--gray)">${g.label}</td></tr>`+
-    g.members.map(p=>`<tr><td>${esc(schedulePersonLabel(p))}</td>${cols.map(c=>{const cur=smap[p.id+'|'+c.dd]||'',onLeave=p.profile_user_id&&leaveDays.has(p.profile_user_id+'|'+c.ds);
-      return `<td>${canEdit?`<select class="mini ${cur==='evening'?'shift-evening':''}" data-person-id="${p.id}" data-profile-user-id="${p.profile_user_id||''}" data-day="${c.dd}" data-prev-value="${esc(cur)}" onchange="applyScheduleShift(this,this.dataset.personId,this.dataset.profileUserId||null,Number(this.dataset.day),'${ws}',this.value);this.classList.toggle('shift-evening',this.value==='evening')"><option value="">-</option>${optHtml(cur)}</select>`:`<span class="b ${cur==='off'?'no':(cur==='evening'?'no':'ok')}">${cur?SHIFTS[cur].l:'-'}</span>`}${onLeave?'<span class="b ok" style="margin-left:4px">연차</span>':''}</td>`;}).join('')}</tr>`).join('')).join('');
+  const leaveByUser={};for(const r of lv||[]){for(let ds=r.date_from<ws?ws:r.date_from;ds<=(r.date_to>addDays(ws,6)?addDays(ws,6):r.date_to);ds=addDays(ds,1)){const p=(SCHEDULE_PEOPLE||[]).find(x=>x.profile_user_id===r.user_id);if(p)leaveByUser[r.user_id+'|'+p.id+'|'+ds]={date:ds,label:leaveDisplayText(r.type,r.type_note)};}}
+  const roles=['Dr.','진료실','데스크','기공·행정','상담','야간','OFF','연차·반차'],dates=Array.from({length:7},(_,i)=>addDays(ws,i));
+  let grid='<div class="tblwrap"><table class="schedule-role-table"><tr><th>직무·상태</th>'+dates.map(ds=>'<th>'+['월','화','수','목','금','토','일'][scheduleDayForDate(ds)-1<0?6:scheduleDayForDate(ds)-1]+'<br><span class="sub">'+md(ds)+'</span></th>').join('')+'</tr>';
+  for(const role of roles){grid+='<tr><th class="schedule-role-label">'+role+'</th>'+dates.map(ds=>'<td>'+scheduleRoleCell(role,ws,ds,SCHEDULE_PEOPLE,rows||[],leaveByUser,canEdit)+'</td>').join('')+'</tr>';}
   grid+='</table></div>';
   m.innerHTML=`<div class="card"><h2>🗓 근무표 <span class="b ${published?'ok':'wait'}">${published?'공표됨':'초안'}</span></h2>
     <div class="rowflex" style="align-items:center;margin-bottom:8px;gap:8px">
@@ -797,13 +789,8 @@ async function renderSched(m){
       ${isLead()?`<button class="mini stamp" onclick="publishSched('${ws}')">공표(확정)</button>`:''}
     </div>
     ${staff.length?grid:'<div class="empty">근무표에 포함된 인원이 아직 없습니다.</div>'}
-    <div class="hint">근무=정상 · 휴무=off · <b>야간=종업 20:00</b> · 기타=기타 근무. 셀 값을 고른 뒤 그 셀에서 마우스 왼쪽 버튼을 누른 채 다른 셀 위로 끌면 같은 값을 한꺼번에 칠할 수 있습니다. 직원이 초안 작성 → 실장·원장이 <b>공표</b>. 공표된 근무표가 출퇴근 <b>야간·조퇴 판정</b>의 기준이 됩니다. 수정하면 다시 초안이 되어 재공표가 필요합니다.</div>
+    <div class="hint">직무·상태 셀을 열어 여러 명을 선택합니다. 승인 연차자는 근무·야간 선택이 잠깁니다. 모든 승인 직원은 초안을 편집할 수 있고, 공표는 실장·원장만 가능합니다.</div>
   </div>${isMgr()?scheduleRosterAdminCard():''}`;
-  if(!window.__schedPaintBound){window.__schedPaintBound=true;
-    m.addEventListener('mousedown',e=>{const target=e.target.closest&&e.target.closest('select[data-person-id][data-profile-user-id][data-day]');if(!target||!m.contains(target))return;PAINT_VALUE=target.value;PAINTING=true;});
-    m.addEventListener('mouseenter',e=>{const target=e.target.closest&&e.target.closest('select[data-person-id][data-profile-user-id][data-day]');if(!target||!m.contains(target)||!PAINTING||e.buttons!==1)return;target.value=PAINT_VALUE;applyScheduleShift(target,target.dataset.personId,target.dataset.profileUserId||null,Number(target.dataset.day),SCHED_WEEK,PAINT_VALUE).then(()=>target.classList.toggle('shift-evening',target.value==='evening'));},true);
-    document.addEventListener('mouseup',()=>{PAINTING=false;});
-  }
 }
 /* schedule-roster-admin:test-start */
 const SCHEDULE_DEPARTMENTS=['Dr.','진료실','데스크','기공실','미지정','상담','행정'];

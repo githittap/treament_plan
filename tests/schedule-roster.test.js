@@ -17,12 +17,26 @@ test('근무표는 person_id 명부와 person_id 저장 계약을 사용한다',
   const source = schedule[1];
   assert.match(source, /select\('person_id,user_id,week_start,day,shift,note'\)/);
   assert.match(source, /schedulePeopleForWeek\(SCHEDULE_PEOPLE,rows\)/);
-  assert.match(source, /smap\[r\.person_id\+'\|'\+r\.day\]/);
-  assert.match(source, /data-person-id=/);
-  assert.match(source, /data-profile-user-id=/);
+  assert.match(source, /toggleScheduleRoleMember\(role,personId,profileUserId,ds,checked,input\)/);
+  assert.match(source, /scheduleRoleCell\(role,ws,ds,SCHEDULE_PEOPLE,rows\|\|\[\],leaveByUser,canEdit\)/);
+  assert.match(source, /p\.profile_user_id\|\|''/);
   assert.match(source, /async function setShift\(personId,profileUserId,day,ws,shift(?:,writeKey=null,writeSeq=null)?\)/);
   assert.match(source, /sb\.rpc\('set_schedule_cell'/);
   assert.doesNotMatch(source, /from\('schedules'\)\.upsert/);
+});
+
+test('주간 근무표도 월간과 같은 직무행 체크박스와 7일 날짜열을 사용한다', () => {
+  const schedule = html.match(/\/\* ── 근무표\(M2\) ── \*\/([\s\S]*?)\/\* 엑셀 파싱 \*\//);
+  assert.ok(schedule, '근무표 코드 블록이 없습니다.');
+  const source = schedule[1];
+  assert.match(html, /\{key:'sched',\s*label:'근무표계획'/);
+  assert.match(source, /SCHED_VIEW='month'/);
+  const weekly = source.match(/async function renderSched\(m\)\{[\s\S]*?async function setShift/);
+  assert.ok(weekly, '주간 근무표 렌더 경로가 없습니다.');
+  assert.match(weekly[0], /scheduleRoleCell\(role,ws,ds,SCHEDULE_PEOPLE,rows\|\|\[\],leaveByUser,canEdit\)/);
+  assert.match(weekly[0], /Array\.from\(\{length:7\}/);
+  assert.match(source, /schedule-role-empty">등록된 대상 없음/);
+  assert.doesNotMatch(weekly[0], /const smap=/);
 });
 
 test('근무표 저장 실패는 성공 상태로 표시하지 않는다', () => {
