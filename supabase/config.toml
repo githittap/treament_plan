@@ -3,3 +3,12 @@ verify_jwt = true
 
 [functions.ai-usage-sync]
 verify_jwt = true
+
+[functions.deposit-webhook]
+verify_jwt = false
+
+[functions.ai-billing-webhook]
+verify_jwt = false
+
+[functions.contract-pdf-sign]
+verify_jwt = true
