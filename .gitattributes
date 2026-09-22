@@ -1,0 +1,12 @@
+
+# db/*.sql migration files embed self-referential md5 fingerprints of their own
+# function source text (see db/push_subscriptions_draft.sql, which hashes
+# pg_proc.prosrc for functions defined in the same file, including its own
+# multi-line function body). Those fingerprints are hardcoded against LF text.
+# On Windows checkouts, the repo-wide core.autocrlf=true setting rewrites these
+# files to CRLF, which changes the hashed source text and breaks the fixtures'
+# preflight self-checks (see tests/sql/pglite-push-subscriptions.mjs and
+# tests/sql/pglite-employment-status-access-block.mjs, which both apply
+# db/push_subscriptions_draft.sql). Force LF regardless of core.autocrlf so the
+# checked-out bytes match what the fingerprints were computed against.
+db/*.sql text eol=lf
