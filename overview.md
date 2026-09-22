@@ -1,9 +1,9 @@
 # overview — 아산정플란트치과 내부 도구 (T8/D 인프라)
 
-## 직원허브 5차 — 근무표 1단계 배포 및 수기근태 2단계 로컬 구현 (2026-09-22)
+## 직원허브 5차 — 근무표 1단계 배포 및 수기근태 2단계 운영 적용 (2026-09-22)
 
 - 1단계 근무표는 commit `8cc9030d300a39b43190831785cdfa9405b78239`가 `origin/main` push, GitHub Pages run `35672912570` success, 공개 `https://jung-plant.com/hr.html?v=8cc9030` HTTP 200·근무표계획/월간 기본 표식 확인까지 완료했다. Sol High는 관련 57/57·전체 JS 24파일·인라인 2·diff-check PASS로 판정했다.
-- 2단계 수기근태는 이 worktree에서만 월간 7열 키보드 달력, 점심/퇴근 연장 원자료·분 분리, v2 RPC·revision·비파괴 rollback을 구현했다. rollback은 분리값이 0인 v2 제출도 revision payload로 감지해 중단·보존한다. 관련 정적·PGlite, 기존 전체 JS·PGlite, 인라인 2·diff-check는 로컬 PASS이며, 운영 DB 적용·push·배포·실제 직원 데이터는 금지다.
+- 2단계 수기근태 migration `employee_hub_attendance_manual_v2_20260922`는 PG17.6 운영 적용 성공이다. 사전/사후 `manual_entries=8`, `revisions=8`, `attendance=0` 보존, 분리 4열 존재, v2 `prosrc` MD5=`958c29dd1eedaa5d02c071363fc12e72`, SECURITY DEFINER·빈 search_path·anon/public EXECUTE 거부·authenticated만 허용을 확인했다. rollback 실동작은 lunch 20+clockout 30=총 50·대기 상태를 트랜잭션 ROLLBACK으로 확인해 행 수가 동일하다. rollback은 0분 v2 제출도 revision payload로 중단·보존하며 Sol 최종 JS 25·PGlite 10·인라인 2·diff-check PASS다.
 
 ## 최신 실행 정본 — Task11 문서화 완료 및 다음 범위 (2026-09-22)
 

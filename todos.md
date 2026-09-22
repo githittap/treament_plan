@@ -3,8 +3,9 @@
 ## 직원허브 5차 — 수기근태 2단계
 
 - [x] 근무표 1단계: `8cc9030d300a39b43190831785cdfa9405b78239` main push, Pages run `35672912570` success, 공개 `hr.html?v=8cc9030` HTTP 200·월간 기본 표식 확인.
-- [x] 수기근태 2단계 로컬 구현·검증: 월간 달력·점심/퇴근 연장 분리·v2 RPC/rollback, 관련 정적/PGlite·기존 전체 JS/PGlite·인라인 2·diff-check PASS.
-- [ ] 다음: 로컬 커밋 뒤 독립 검증. 운영 DB 적용, push, 배포, 실제 직원 데이터는 하지 않는다.
+- [x] 수기근태 2단계 운영 적용: `employee_hub_attendance_manual_v2_20260922` PG17.6 성공. 기존 `manual_entries=8`·`revisions=8`·`attendance=0` 보존, 4열·v2 보안 경계·ROLLBACK 실동작을 확인했다.
+- [x] Sol 최종: JS 25·PGlite 10·인라인 2·diff-check와 0분 rollback·연속 키보드 focus PASS.
+- [ ] 운영 DB 적용은 완료. 이 기록 커밋의 push·배포와 실제 직원 데이터 시험은 하지 않는다.
 
 ## 최신 상태 — Task11 문서화 완료 및 다음 범위 (2026-09-22)
 
