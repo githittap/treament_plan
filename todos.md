@@ -8,7 +8,8 @@
 
 - [x] 로컬 구현·검증: `absence_confirm_after_minutes`/`absence_exclude_pending_manual` 기본값, 원장 설정 저장, 서울시각 cutoff 및 입사·재직·휴가·수기·실제근태 제외. 설정 실패 시 오늘 후보 fail-closed, 비공개 snapshot으로 기존 키의 값·label·updated_at 보존, 실제 삽입 키만 rollback하며 사용자 변경은 중단한다.
 - [x] 운영 postflight ACL 보완: marker RLS/no-policy 외 `PUBLIC`·`anon`·`authenticated` table privilege를 모두 회수. 이미 적용된 marker에는 `db/absence_candidate_settings_acl_hardening.sql`만 적용하며 행·설정값은 변경하지 않는다.
-- [ ] 운영 적용·실계정 설정 저장/후보 조회 검증은 별도 범위다. 이 작업에서는 운영 DB·push·deploy하지 않는다.
+- [x] 운영 반영·공개 smoke: migration `employee_hub_absence_candidate_settings_20260922`, ACL hardening `employee_hub_absence_candidate_settings_acl_hardening_20260922` success; `main` commit `3efbff9` push, Pages run `35693355918` success, 공개 HTTP 200·필수 표식 확인.
+- [ ] 실제 역할별 설정 저장·후보 조회는 별도 실계정 운영 검증 범위다.
 
 ## 직원허브 5차 — 수기근태 2단계
 

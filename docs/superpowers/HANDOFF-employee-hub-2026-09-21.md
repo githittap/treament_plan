@@ -4,12 +4,14 @@
 
 - 재직상태/접속차단 및 단계형 A/B/C·ACL 보정은 commit `6bffb86`까지 운영 반영 완료로 인계받았다. Pages run `35690778571` success, 공개 HTTP 200·배포 마커 확인까지 완료됐다. 이후 결근/미기록 후보 기준 변경은 로컬 커밋만 하며 운영 DB·push·deploy는 하지 않는다.
 
-## 직원허브 5차 — 결근/미기록 후보 기준 (로컬 검증 완료, 2026-09-22)
+## 직원허브 5차 — 결근/미기록 후보 기준 운영 반영 (2026-09-22)
 
 - 범위: `app_settings`에 `absence_confirm_after_minutes=0`, `absence_exclude_pending_manual=true`를 `ON CONFLICT DO NOTHING`으로 seed하고 기존 owner RLS를 이용해 원장만 화면에서 저장한다. rollback 전용 비공개 snapshot 테이블은 migration 전 두 키의 존재·값·label·updated_at만 보관하며 authenticated를 포함한 공개 역할에 권한을 주지 않는다.
 - 판정: 서울 기준 오늘은 시업+지연 뒤에만, 과거는 즉시 후보로 한다. 입사일 전, 비재직 유효일 이후, 승인 leave_requests(반차 포함), 실제 attendance, 설정된 대기/실장승인/원장확정 수기근태는 제외한다. 설정 조회 실패·비정상 응답 또는 시업 설정 오류의 오늘 후보는 fail-closed다. 같은 직원·날짜의 수기근태는 복수 행 중 제외 상태가 하나라도 있으면 순서와 무관하게 제외한다.
-- rollback: snapshot상 migration 전에 있던 키는 값·label·updated_at을 그대로 보존하고, 실제 추가한 기본값만 제거한다. 기존/사후 사용자 값 또는 snapshot 불일치면 예외로 중단·보존하며 성공 때 marker도 제거한다. 로컬 Node 전체 JS/PGlite, 인라인 구문, diff-check 검증 후 로컬 커밋만 한다. 운영 DB 적용·push·deploy·실계정 검증은 미수행이다.
+- rollback: snapshot상 migration 전에 있던 키는 값·label·updated_at을 그대로 보존하고, 실제 추가한 기본값만 제거한다. 기존/사후 사용자 값 또는 snapshot 불일치면 예외로 중단·보존하며 성공 때 marker도 제거한다.
 - postflight ACL 보완: marker는 RLS enabled/no policy만으로는 `PUBLIC` 상속 privilege를 완전히 막지 못할 수 있다. 본 migration은 `PUBLIC`·`anon`·`authenticated`에서 모두 revoke하며, 이미 marker가 있는 환경에는 `db/absence_candidate_settings_acl_hardening.sql`을 적용한다. 이 SQL은 marker 존재 시 ACL만 회수하고, marker가 없으면 no-op이다. marker 제거는 기존 rollback과 호환한다. PGlite에서 anon/authenticated/PUBLIC privilege false, RLS enabled·policy 0, 임시 SELECT grant에도 anon 0행을 확인했다.
+- 운영 적용: migration `employee_hub_absence_candidate_settings_20260922` success, ACL hardening `employee_hub_absence_candidate_settings_acl_hardening_20260922` success. postflight는 keys `absence_confirm_after_minutes=0`·`absence_exclude_pending_manual=true`, snapshot=2, PUBLIC·anon·authenticated privilege=false, policy=0, profiles=21, 승인 leave_requests=28을 확인했다. attendance_manual_entries는 작업 중 외부 입력으로 9→14 증가했으므로 migration이 수정한 것으로 기록하지 않는다.
+- 배포: `main` commit `3efbff9` push, GitHub Pages run `35693355918` success. 공개 `https://jung-plant.com/hr.html?v=3efbff9`는 HTTP 200·509621 bytes이며 CandidateText·ConfirmDelay·ManualExclude·LoadGuard 표식=true다. 실제 역할별 설정 저장·후보 조회는 아직 별도 실계정 운영 검증 범위다.
 
 ## 직원허브 5차 — 1단계 배포·2단계 운영 적용 (2026-09-22)
 
