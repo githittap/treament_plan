@@ -57,6 +57,8 @@ select public._remove_employee_hub_access_gate(to_regclass('public.applicants'))
 select public._remove_employee_hub_access_gate(to_regclass('public.ledger_files'));
 select public._remove_employee_hub_access_gate(to_regclass('public.onboarding_items'));
 select public._remove_employee_hub_access_gate(to_regclass('public.onboarding_checks'));
+select public._remove_employee_hub_access_gate(to_regclass('public.confidential_access'));
+select public._remove_employee_hub_access_gate(to_regclass('public.confidential_records'));
 select public._remove_employee_hub_access_gate(to_regclass('public.profile_employment_history'));
 select public._remove_employee_hub_access_gate(to_regclass('public.employee_contract_terms'));
 select public._remove_employee_hub_access_gate(to_regclass('public.employee_documents'));

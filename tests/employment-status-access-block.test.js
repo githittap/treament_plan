@@ -71,6 +71,19 @@ test('차단 JWT gate와 UI profile 변경 RPC가 직접 갱신을 대체한다'
   assert.match(html, /sb\.rpc\('revoke_employee_profile_approval'/);
 });
 
+test('HR gate와 rollback gate 목록은 기밀 접근·기록을 포함해 대칭이다', () => {
+  const sql = fs.readFileSync(sqlPath, 'utf8');
+  const rollback = fs.readFileSync(rollbackPath, 'utf8');
+  const hrSchema = fs.readFileSync(path.join(root, 'db', 'hr_schema.sql'), 'utf8');
+  const pattern = /_employee_hub_access_gate\(to_regclass\('public\.([^']+)'\)\)/g;
+  const apply = [...sql.matchAll(pattern)].map(match => match[1]).sort();
+  const undo = [...rollback.matchAll(pattern)].map(match => match[1]).sort();
+  assert.deepEqual(undo, apply);
+  const baseHrTables = [...hrSchema.matchAll(/create table if not exists public\.([a-z_]+)/gi)].map(match => match[1]);
+  for (const table of baseHrTables) assert.ok(apply.includes(table), `hr_schema ${table} gate가 없습니다.`);
+  for (const table of ['confidential_access', 'confidential_records']) assert.ok(apply.includes(table), `${table} gate가 없습니다.`);
+});
+
 test('rollback은 이력 또는 비재직·차단 데이터가 있으면 보존 중단한다', () => {
   const rollback = fs.readFileSync(rollbackPath, 'utf8');
   assert.match(rollback, /profile_employment_history/i);
