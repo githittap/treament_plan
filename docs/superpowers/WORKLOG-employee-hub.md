@@ -1,5 +1,11 @@
 # 직원허브 구현 기록
 
+## 2026-09-22 — 상담문의 일원화 1차 운영 반영·독립 검증 완료
+
+- migration `employee_hub_consultation_inbox_20260922`를 성공 적용했다. postflight는 inbox_rows=0, RLS=true, policies=3, anon SELECT=false, authenticated의 event/hash INSERT=false·message UPDATE=false·status UPDATE=true, ingest auth=false/service=true, convert auth=true, hardened search_path를 확인했다. 실제 DB 트랜잭션에서 동일 외부 이벤트 ingest는 동일 ID·1행으로 PASS했고 rollback도 확인했다.
+- Edge `consultation-ingest` id `4dd75ce0-5b4f-4777-8d62-ab3947fd6ea0` v1 ACTIVE, `verify_jwt=true`, hash `65501969...`를 확인했다. no-auth와 위조 unsigned service-role JWT는 401이다. 코드 `f28379f` main push, Pages run `35699819135` build/deploy success(전체 report job은 대기 가능), 공개 `https://jung-plant.com/hr.html?v=f28379f` HTTP 200·539417 bytes·inbox/table/assignee 표식=true·상단 탭 없음=true다.
+- 독립 검증 PASS 및 Opus5 최종 PASS(입력 11089/출력 1509, 약 $0.093)를 기록한다. 실제 외부 connector는 구현·운영하지 않았다. Kakao Developers 채널 webhook은 1:1 상담 수신용이 아니고, 당근 공개 채팅 수신 API는 미확인, Naver IMAP 993은 별도 서버 자격증명이 필요하다. Auth 계정의 문자 그대로 영구삭제는 의도적으로 하지 않고 기록보존형 영구 접속차단을 안전한 대체로 유지한다.
+
 ## 2026-09-22 — 상담문의 일원화 1차 로컬 구현
 
 - 기존 상담일지 안에 통합 문의함을 추가하고, source/status 필터·목록 마스킹·상세·수기 접수·상담일지 원자 전환을 구현했다. `consultation_inbox`는 기존 접속 허용 경계와 manager/owner 역할을 재사용하며 delete 권한을 주지 않는다.

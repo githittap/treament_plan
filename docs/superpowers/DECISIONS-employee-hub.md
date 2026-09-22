@@ -1,5 +1,13 @@
 # 직원허브 확정 결정
 
+## 최신 결정 — 상담문의 일원화 1차 운영 반영과 외부 연동 보류 (2026-09-22)
+
+| 시각 | 결정 | 근거와 경계 |
+|---|---|---|
+| 2026-09-22 | 통합 문의함의 DB·Edge·공개본 반영을 완료 상태로 기록한다. | migration `employee_hub_consultation_inbox_20260922` success, 실제 중복 ingest 1행/rollback PASS, Edge v1 ACTIVE·`verify_jwt=true`, no-auth/위조 JWT 401, `f28379f` main push, Pages run `35699819135` build/deploy success 및 공개 HTTP/표식 확인을 근거로 한다. |
+| 2026-09-22 | 외부 문의 connector·자동 회신·평문 secret은 계속 보류한다. | Kakao Developers 채널 webhook은 1:1 상담 수신 API가 아니고, 당근 공개 채팅 수신 API는 미확인, Naver IMAP 993은 별도 서버 자격증명이 필요하다. 공식 API·자격증명·별도 승인 전에는 구현하지 않는다. |
+| 2026-09-22 | 실제 Auth 계정 영구삭제는 선택하지 않고 기록보존형 영구 접속차단을 유지한다. | 감사·기록 보존을 우선하는 의도된 안전 대체이며, 계정 삭제 완료로 기록하지 않는다. |
+
 ## 최신 결정 — 상담문의 일원화 1차의 연동 경계 (2026-09-22)
 
 | 시각 | 결정 | 근거와 경계 |

@@ -1,10 +1,11 @@
 # overview — 아산정플란트치과 내부 도구 (T8/D 인프라)
 
-## 상담문의 일원화 1차 — 로컬 구현·검증 완료, 운영 미반영 (2026-09-22)
+## 상담문의 일원화 1차 — 운영 반영·독립 검증 완료 (2026-09-22)
 
-- 기존 상담일지 화면 안에만 `통합 문의함`을 추가했다. 출처/상태 필터, 마스킹 목록, 상세·자기 담당 저장, 수기 접수와 상담일지 원자 전환을 제공한다.
-- `consultation_inbox` RLS/RPC/보존형 rollback 및 service-role 전용 Edge ingest 초안은 로컬 정적·PGlite 검증만 완료했다. 운영 DB·Edge·push·배포는 수행하지 않았다.
-- 실제 외부 수신 연동은 이번 범위에서 하지 않는다. 카카오 채널 webhook은 채널 추가/차단용이며 1:1 상담 수신이 아니고, 당근 공개 채팅 수신 API는 미확인, 네이버 IMAP 993은 별도 서버 자격증명이 필요하다.
+- 기존 상담일지 안의 `통합 문의함`을 운영 반영했다. migration `employee_hub_consultation_inbox_20260922`는 성공했고, inbox 0행·RLS=true·정책 3개·anon SELECT=false·원문/이벤트/해시 직접 입력·수정 차단·status 수정 허용·ingest service 전용·convert 인증·고정 search_path를 postflight로 확인했다.
+- 실제 DB 트랜잭션으로 동일 외부 이벤트 ingest의 동일 ID/1행과 rollback을 확인했다. Edge `consultation-ingest`(id `4dd75ce0-5b4f-4777-8d62-ab3947fd6ea0`, v1 ACTIVE)는 `verify_jwt=true`, hash `65501969...`이며 no-auth와 위조 unsigned service-role JWT는 모두 401이다.
+- 코드 `f28379f`는 `main` push 완료, Pages run `35699819135` build/deploy success다(전체 report job은 대기 상태일 수 있음). 공개 `https://jung-plant.com/hr.html?v=f28379f`는 HTTP 200·539417 bytes이고 inbox/table/assignee 표식=true·새 상단 탭 없음=true를 확인했으며 독립 검증과 Opus5 최종 검토도 PASS다.
+- 실제 외부 수신 connector는 이번 범위에 없다. 카카오 채널 webhook은 채널 추가/차단용이며 1:1 상담 수신이 아니고, 당근 공개 채팅 수신 API는 미확인, 네이버 IMAP 993은 별도 서버 자격증명이 필요하다. Auth 계정의 문자 그대로 영구삭제는 하지 않고 기록보존형 영구 접속차단을 안전한 대체로 유지한다.
 
 ## 직원허브 5차 — 원본 대조·운영 반영 완료 (2026-09-22)
 

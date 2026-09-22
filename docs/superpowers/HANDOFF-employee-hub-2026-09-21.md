@@ -1,10 +1,11 @@
 # 직원허브 현재 인수인계
 
-## 최신 인계 — 상담문의 일원화 1차 로컬 구현 (2026-09-22)
+## 최신 인계 — 상담문의 일원화 1차 운영 반영·독립 검증 완료 (2026-09-22)
 
-- 구현: `hr.html` 기존 상담일지 내부 `통합 문의함`, `db/consultation_inbox.sql`·rollback, service-role JWT 전용 `supabase/functions/consultation-ingest/index.ts`, 정적/PGlite 시험을 추가했다. 운영 DB·Edge 배포·push는 하지 않았다.
+- 운영: migration `employee_hub_consultation_inbox_20260922` success. postflight는 inbox_rows=0, RLS=true, policies=3, anon SELECT=false, authenticated의 event/hash INSERT=false·message UPDATE=false·status UPDATE=true, ingest auth=false/service=true, convert auth=true, search_path hardened를 확인했다. 실제 DB 트랜잭션에서 동일 외부 이벤트 ingest는 같은 ID·1행으로 PASS했고 rollback도 확인했다.
+- Edge/공개: `consultation-ingest` id `4dd75ce0-5b4f-4777-8d62-ab3947fd6ea0` v1 ACTIVE, `verify_jwt=true`, hash `65501969...`; no-auth와 위조 unsigned service-role JWT는 401이다. `f28379f`가 main push됐고 Pages run `35699819135` build/deploy success(전체 report job은 대기 가능), 공개 `https://jung-plant.com/hr.html?v=f28379f` HTTP 200·539417 bytes·inbox/table/assignee 표식=true·상단 탭 없음=true다. 독립 검증 PASS, Opus5 최종 PASS(입력 11089/출력 1509, 약 $0.093)다.
 - 보안/복구: manager·owner와 기존 `employee_hub_access_allowed()`를 함께 요구하고 anon/staff/chief는 차단한다. service ingest는 raw payload·비밀을 저장하지 않으며, inbox→`consultation_journals` 전환은 단일 RPC로 중복 전환을 거부한다. inbox 행 또는 연결이 있으면 rollback은 중단해 기존 상담일지를 보존한다.
-- 외부 경계: Kakao Developers 채널 webhook은 채널 추가/차단이지 1:1 상담 수신이 아니다. 당근 공개 채팅 수신 API는 미확인이고, Naver IMAP 993은 별도 서버 자격증명이 필요하다. 이번 코드에는 connector·평문 secret·자동 회신이 없다.
+- 외부 경계: Kakao Developers 채널 webhook은 채널 추가/차단이지 1:1 상담 수신이 아니다. 당근 공개 채팅 수신 API는 미확인이고, Naver IMAP 993은 별도 서버 자격증명이 필요하다. 실제 connector·평문 secret·자동 회신은 아직 없다. 실제 Auth 계정 영구삭제는 의도적으로 하지 않고 기록보존형 영구 접속차단을 안전한 대체로 유지한다.
 
 ## 최신 인계 — 직원허브 5차 원본 대조·운영 반영 완료 (2026-09-22)
 
