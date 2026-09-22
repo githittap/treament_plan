@@ -6,7 +6,7 @@
 - 운영: migration `employee_hub_ai_model_usage_daily_20260922`·`employee_hub_ai_usage_snapshots_20260922`, Edge `ai-usage-sync` v1(verify_jwt=true), `webhook_secrets`에 `ai_usage_sync_sha256`(해시만). 반영 전후 Task 6 정책·버킷·권한 지문 `53a7a462…`(17개)와 다른 정책 225·함수 46·표 70 지문 동일, notices 1·첨부 객체 0 유지, security/performance advisor 새 경고 0. 운영 RLS: 원장 67행·스냅샷 2, 실장 0·0, anon 42501.
 - PC: 업로더 `C:\Users\elusi\.claude\scripts\hr_ai_usage_uploader.py`, 예약 작업 `직원허브_AI사용량_업로드`(현재 사용자·대화형·제한 권한, 매일 12:50, StartWhenAvailable, 10분 제한), 첫 실행 결과 코드 0. 코덱스문제(2) 세션 스크립트는 수정하지 않고 결과 JSON만 읽는다(원장 지시).
 - 검증: Astra 1차 FAIL(스냅샷 DB 저장 불일치·프로토타입 이름 집계 누락·64KB 읽기 중단)·2차 FAIL(글자 칸 객체 값 예외) 모두 반례 시험으로 보완. 전체 회귀 46/49·LF 46/48, 기준선과 같은 Task 7·8 지문 시험만 실패, Task 6 시험 PASS.
-- 되돌리기: 프런트 `63372e8`, DB `db/ai_usage_snapshots_rollback.sql` → `db/ai_model_usage_daily_rollback.sql`, 예약 작업 해제. 남은 것: 원장 로그인 화면 확인.
+- 되돌리기: 프런트 `63372e8`, DB `db/ai_usage_snapshots_rollback.sql` → `db/ai_model_usage_daily_rollback.sql`, 예약 작업 해제. 원장 로그인 화면 확인 완료(2026-09-22, 원장 확인 + Claude가 원장 세션에서 세 구역 값 직접 확인, 기록 `19d1724`). 남은 것 없음. 점검 중 찾은 원장 결정 대기 3건(운영 함수 소스 GitHub 누락·원본 폴더 141커밋 뒤처짐·공지 재열람 403)은 `todos.md` 미답변 표에 있다.
 
 ## 최신 인계 — 상담문의 일원화 1차 운영 반영·독립 검증 완료 (2026-09-22)
 
