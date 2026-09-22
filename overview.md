@@ -1,5 +1,14 @@
 # overview — 아산정플란트치과 내부 도구 (T8/D 인프라)
 
+## 직원허브 5차 — 재직상태·접속차단 운영 반영 (2026-09-22)
+
+- 재직상태/접속차단과 단계형 A/B/C·ACL 보정은 commit `6bffb86`까지 운영 반영 완료로 인계받았다. GitHub Pages run `35690778571` 성공, 공개본 HTTP 200 및 배포 마커 확인을 기록한다. 이 로컬 후속은 운영 DB·push·deploy를 수행하지 않는다.
+
+## 직원허브 5차 — 결근/미기록 후보 기준 (로컬 검증 완료, 2026-09-22)
+
+- `absence_confirm_after_minutes=0`, `absence_exclude_pending_manual=true`의 멱등 seed와 원장 전용 UI를 추가했다. 서울 기준 오늘은 시업+지연 뒤, 과거는 즉시 후보화하며 입사일 전·비재직 유효일 이후·승인 휴가(반차 포함)·실제 근태·설정된 수기근태를 제외한다. 설정/조회 오류의 오늘 후보는 fail-closed다.
+- 로컬 Node 전체 JS, 전체 PGlite, 인라인 구문, diff-check 검증 뒤에만 완료로 기록한다. 운영 DB 적용·push·deploy·실계정 저장/재조회는 미수행이다.
+
 ## 직원허브 5차 — 근무표 1단계 배포 및 수기근태 2단계 운영 적용 (2026-09-22)
 
 - 1단계 근무표는 commit `8cc9030d300a39b43190831785cdfa9405b78239`가 `origin/main` push, GitHub Pages run `35672912570` success, 공개 `https://jung-plant.com/hr.html?v=8cc9030` HTTP 200·근무표계획/월간 기본 표식 확인까지 완료했다. Sol High는 관련 57/57·전체 JS 24파일·인라인 2·diff-check PASS로 판정했다.

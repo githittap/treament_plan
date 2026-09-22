@@ -319,6 +319,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
    아래는 표를 못 불러왔을 때의 안전 기본값. */
 let SETTINGS = {
   late_cut:'09:40', ot_unit_min:'10',
+  siueop:'10:00', absence_confirm_after_minutes:'0', absence_exclude_pending_manual:'true',
   jongeop_weekday_evening:'20:00', jongeop_weekday_day:'18:30',
   jongeop_sat:'17:00', jongeop_sun:'14:00'
 };
@@ -616,6 +617,23 @@ function normalizeManualClockTime(raw){let s=String(raw||'').trim().toLowerCase(
 async function submitManualAttendance(){const msg=$('#manualAttMsg'),lunchRaw=$('#manualLunchOvertimeRaw').value.trim(),clockoutRaw=$('#manualClockoutOvertimeRaw').value.trim(),lunch=overtimeDraftMinutes(lunchRaw),clockout=overtimeDraftMinutes(clockoutRaw),clockIn=normalizeManualClockTime($('#manualClockIn').value),clockOut=normalizeManualClockTime($('#manualClockOut').value),required=$('#manualReasonRequired').checked,reason=$('#manualReason').value.trim();if(lunch==null||clockout==null||($('#manualClockIn').value.trim()&&!clockIn)||($('#manualClockOut').value.trim()&&!clockOut)||required&&!reason){msg.textContent='출퇴근·연장 원자료 형식 또는 정정 사유를 확인하세요.';return;}const {error}=await sb.rpc('submit_manual_attendance_v2',{p_work_date:$('#manualWorkDate').value,p_clock_in:clockIn,p_clock_out:clockOut,p_late_min:Number($('#manualLate').value||0),p_early_min:Number($('#manualEarly').value||0),p_lunch_overtime_raw_text:lunchRaw,p_lunch_overtime_min:lunch,p_clockout_overtime_raw_text:clockoutRaw,p_clockout_overtime_min:clockout,p_reason:reason||null,p_reason_required:required});msg.textContent=error?'실패: '+error.message:'제출했습니다. 승인 대기 중입니다.';if(!error)setTimeout(()=>render(),700);}
 async function reviewManualAttendance(id,action){const {error}=await sb.rpc('review_manual_attendance',{p_id:id,p_action:action});if(error){alert('처리 실패: '+error.message);return;}setStatus('saved');render();}
 function attendanceMonthBounds(month){const [y,m]=month.split('-').map(Number),next=m===12?`${y+1}-01-01`:`${y}-${String(m+1).padStart(2,'0')}-01`;return {start:`${month}-01`,next};}
+/* absence-candidate:test-start */
+function absenceCandidateDecision({ds,todaySeoul,nowSeoul,siueop,afterMinutes,shift,hasAttendance,leave,manualStatus,excludePendingManual,hireDate,employmentStatus,effectiveDate}){
+  const invalidCutoff=()=>{const m=String(siueop||'').match(/^(\d{2}):(\d{2})$/),n=String(afterMinutes??'').trim();return !m||Number(m[1])>23||Number(m[2])>59||!/^\d+$/.test(n)||Number(n)>1440;};
+  const invalidNow=()=>{const m=String(nowSeoul||'').match(/^(\d{2}):(\d{2})$/);return !m||Number(m[1])>23||Number(m[2])>59;};
+  if(!ds||shift==='off'||hasAttendance||ds>todaySeoul||(hireDate&&ds<hireDate)||(employmentStatus&&employmentStatus!=='재직'&&effectiveDate&&ds>=effectiveDate))return {candidate:false};
+  // 승인 휴가는 종류·일수와 무관하게 해당 날짜를 모두 제외한다. 반차도 후보로 남기지 않는다.
+  if(leave&&leave.status==='승인')return {candidate:false};
+  if(excludePendingManual&&['대기','실장승인','원장확정'].includes(manualStatus))return {candidate:false};
+  if(ds<todaySeoul)return {candidate:true};
+  if(invalidCutoff()||invalidNow())return {candidate:false};
+  const [h,m]=siueop.split(':').map(Number),[nh,nm]=nowSeoul.split(':').map(Number);
+  return {candidate:nh*60+nm>=h*60+m+Number(afterMinutes)};
+}
+/* absence-candidate:test-end */
+function seoulDateTime(){const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date()),get=t=>parts.find(x=>x.type===t)?.value||'';return {date:`${get('year')}-${get('month')}-${get('day')}`,time:`${get('hour')}:${get('minute')}`};}
+function absenceSettingsHtml(){return ME.role==='owner'?`<div class="card"><h2>⚙ 결근/미기록 후보 기준 <span class="sub">(원장)</span></h2><div class="grid"><div class="fld"><label>시업 시각</label><input id="absenceSiueop" type="time" value="${esc(SETTINGS.siueop||'10:00')}"></div><div class="fld"><label>확인 지연(분)</label><input id="absenceDelay" type="number" min="0" max="1440" step="1" value="${esc(SETTINGS.absence_confirm_after_minutes||'0')}"></div><div class="fld"><label><input id="absenceManualExclude" type="checkbox" ${String(SETTINGS.absence_exclude_pending_manual)!=='false'?'checked':''}> 대기·실장승인·원장확정 수기근태는 후보에서 제외</label></div></div><button class="mini stamp" onclick="saveAbsenceSettings()">기준 저장</button><div class="msg" id="absenceSettingsMsg"></div></div>`:'';}
+async function saveAbsenceSettings(){const msg=$('#absenceSettingsMsg'),siueop=$('#absenceSiueop').value,delay=$('#absenceDelay').value;if(!/^\d{2}:\d{2}$/.test(siueop)||!/^\d+$/.test(delay)||Number(delay)>1440){msg.textContent='시업 시각과 지연 분(0~1440)을 확인하세요.';setStatus('error');return;}const rows=[{key:'siueop',value:siueop},{key:'absence_confirm_after_minutes',value:delay},{key:'absence_exclude_pending_manual',value:$('#absenceManualExclude').checked?'true':'false'}],{error}=await sb.from('app_settings').upsert(rows,{onConflict:'key'});if(error){msg.textContent='저장 실패: '+error.message;setStatus('error');return;}rows.forEach(x=>SETTINGS[x.key]=x.value);msg.textContent='저장했습니다.';setStatus('saved');}
 async function fetchAttendancePages(makeQuery,pageSize=500){const rows=[];for(let page=0;page<20;page++){const {data,error}=await makeQuery().range(page*pageSize,(page+1)*pageSize-1);if(error)return {data:null,error};rows.push(...(data||[]));if((data||[]).length<pageSize)break;}return {data:rows,error:null};}
 async function renderAtt(m){
   const month=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit'}).format(new Date()),bounds=attendanceMonthBounds(month);
@@ -640,9 +658,10 @@ async function renderAtt(m){
     ${manualAttendanceFormHtml()}
     <div class="card"><h2>🧾 지문 오류 승인 인정 근태 <span class="sub">(${month})</span></h2>${(issueResolutions||[]).length?`<div class="tblwrap"><table><tr><th>직원</th><th>날짜</th><th>인정 출퇴근</th><th>상태</th><th>승인일</th></tr>${issueResolutions.map(r=>`<tr><td>${esc(nameOf(r.user_id))}</td><td>${md(r.work_date)}</td><td>${r.clock_in||'-'} ~ ${r.clock_out||'-'}</td><td>${r.late_min||0}분 / ${r.early_min||0}분 / ${r.overtime_min||0}분</td><td>${r.approved_at?esc(new Date(r.approved_at).toLocaleDateString('ko-KR')):'-'}</td></tr>`).join('')}</table></div>`:'<div class="empty">별도 인정 근태 없음</div>'}</div>
     ${isLead()&&!manualError&&!fpError?`<div class="card"><h2>📝 수기 출퇴근 검토</h2>${(manualRows||[]).length?`<div class="tblwrap"><table><tr><th>직원</th><th>날짜</th><th>수기</th><th>지문</th><th>상태</th><th></th></tr>${manualRows.map(r=>{const fp=fpByKey.get(r.user_id+'|'+r.work_date);return `<tr><td>${esc(nameOf(r.user_id))}</td><td>${md(r.work_date)}</td><td>${r.clock_in||'-'} ~ ${r.clock_out||'-'}</td><td>${fp?`${fp.clock_in||'-'} ~ ${fp.clock_out||'-'}`:'-'}</td><td><span class="b ${r.status==='원장확정'?'ok':(r.status==='반려'?'no':'wait')}">${esc(r.status)}</span></td><td>${r.status==='대기'&&ME.role==='chief'?`<button class="mini stamp" onclick="reviewManualAttendance(${r.id},'approve')">실장 승인</button>`:''}${r.status==='실장승인'&&ME.role==='owner'?`<button class="mini stamp" onclick="reviewManualAttendance(${r.id},'approve')">원장 확정</button>`:''}${(r.status==='대기'||r.status==='실장승인')?` <button class="mini rej" onclick="reviewManualAttendance(${r.id},'reject')">반려</button>`:''}</td></tr>`;}).join('')}</table></div>`:'<div class="empty">수기 입력 없음</div>'}</div>`:isLead()?`<div class="card"><h2>📝 수기 출퇴근 검토</h2><div class="cal-error">수기 근태 조회 실패: ${esc(manualError?.message||fpError?.message||'DB 초안이 아직 적용되지 않았습니다.')}</div></div>`:''}
-    <div class="card"><h2>🚫 근무표 대비 결근·미기록 <span class="sub">(${month})</span></h2>
+    ${absenceSettingsHtml()}
+    <div class="card"><h2>🚫 결근/미기록 후보 <span class="sub">(${month})</span></h2>
       <button class="mini" onclick="checkAbsent('${month}')">확인하기</button>
-      <div id="absentBox" style="margin-top:8px"><div class="sub">버튼을 누르면 "근무표=근무인데 지문 기록이 없는 날"을 찾아줍니다.</div></div>
+      <div id="absentBox" style="margin-top:8px"><div class="sub">근무표와 기록을 대조해 확인이 필요한 후보만 보여줍니다.</div></div>
     </div>
     <div class="card"><h2>🙋 지문누락 소명 <span class="sub">(실장·원장 승인)</span></h2>
       ${(iss||[]).length?`<div class="tblwrap"><table><tr><th>직원</th><th>날짜</th><th>유형</th><th>사유</th><th>상태</th><th></th></tr>
@@ -691,14 +710,18 @@ async function closeMonth(month){
 }
 async function checkAbsent(month){
   const el=$('#absentBox');el.innerHTML='확인 중…';
-  const {data:sc}=await sb.from('schedules').select('person_id,user_id,day,week_start,shift');
-  const bounds=attendanceMonthBounds(month);const {data:att}=await sb.from('attendance').select('user_id,work_date').gte('work_date',bounds.start).lt('work_date',bounds.next);
+  const bounds=attendanceMonthBounds(month),[scResult,attResult,leaveResult,manualResult]=await Promise.all([
+    sb.from('schedules').select('person_id,user_id,day,week_start,shift'),sb.from('attendance').select('user_id,work_date').gte('work_date',bounds.start).lt('work_date',bounds.next),
+    sb.from('leave_requests').select('user_id,date_from,date_to,days,type,status').eq('status','승인').lte('date_from',bounds.next).gte('date_to',bounds.start),
+    sb.from('attendance_manual_entries').select('user_id,work_date,status').gte('work_date',bounds.start).lt('work_date',bounds.next)
+  ]);if(scResult.error||attResult.error||leaveResult.error||manualResult.error){el.innerHTML=`<div class="cal-error">후보 확인 실패: ${esc((scResult.error||attResult.error||leaveResult.error||manualResult.error).message)}</div>`;return;}
+  const sc=scResult.data,att=attResult.data,leaves=leaveResult.data,manuals=manualResult.data;
   const has=new Set((att||[]).map(a=>a.user_id+'|'+a.work_date));
-  const miss=[];
+  const manualByKey=new Map((manuals||[]).map(a=>[a.user_id+'|'+a.work_date,a.status])),now=seoulDateTime(),miss=[],seen=new Set();
   (sc||[]).forEach(s=>{ if(!s.user_id||s.shift==='off')return;
     for(let i=0;i<7;i++){const ds=addDays(s.week_start,i);const d=new Date(ds+'T00:00:00');
-      if(d.getDay()===s.day && ds.slice(0,7)===month && ds<=today() && !has.has(s.user_id+'|'+ds))miss.push({u:s.user_id,ds,shift:s.shift});}});
-  el.innerHTML=miss.length?`<table><tr><th>직원</th><th>날짜</th><th>근무표</th></tr>${miss.sort((a,b)=>a.ds<b.ds?-1:1).map(x=>`<tr class="warn"><td>${esc(nameOf(x.u))}</td><td>${md(x.ds)}</td><td>${SHIFTS[x.shift]?SHIFTS[x.shift].l:esc(x.shift)}</td></tr>`).join('')}</table><div class="hint">근무표=근무인데 지문 기록 없음 = 결근/미기록. 소명받거나 수기 처리하세요.</div>`:'<div class="empty">근무표 대비 미기록 없음 ✓</div>';
+      if(d.getDay()!==s.day||ds.slice(0,7)!==month||seen.has(s.user_id+'|'+ds))return;seen.add(s.user_id+'|'+ds);const p=PROFILES.find(x=>x.user_id===s.user_id)||{},leave=(leaves||[]).find(x=>x.user_id===s.user_id&&x.date_from<=ds&&x.date_to>=ds),decision=absenceCandidateDecision({ds,todaySeoul:now.date,nowSeoul:now.time,siueop:SETTINGS.siueop,afterMinutes:SETTINGS.absence_confirm_after_minutes,shift:s.shift,hasAttendance:has.has(s.user_id+'|'+ds),leave,manualStatus:manualByKey.get(s.user_id+'|'+ds),excludePendingManual:String(SETTINGS.absence_exclude_pending_manual)!=='false',hireDate:p.hire_date,employmentStatus:p.employment_status,effectiveDate:p.employment_effective_date});if(decision.candidate)miss.push({u:s.user_id,ds,shift:s.shift});}});
+  el.innerHTML=miss.length?`<table><tr><th>직원</th><th>날짜</th><th>근무표</th></tr>${miss.sort((a,b)=>a.ds<b.ds?-1:1).map(x=>`<tr class="warn"><td>${esc(nameOf(x.u))}</td><td>${md(x.ds)}</td><td>${SHIFTS[x.shift]?SHIFTS[x.shift].l:esc(x.shift)}</td></tr>`).join('')}</table><div class="hint">결근/미기록 후보입니다. 소명 또는 수기근태를 확인하세요.</div>`:'<div class="empty">결근/미기록 후보 없음 ✓</div>';
 }
 
 /* ── 근무표(M2) ── */

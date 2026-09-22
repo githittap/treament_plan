@@ -1,5 +1,15 @@
 # 직원허브 현재 인수인계
 
+## 직원허브 5차 — 재직상태·접속차단 운영 반영 (2026-09-22)
+
+- 재직상태/접속차단 및 단계형 A/B/C·ACL 보정은 commit `6bffb86`까지 운영 반영 완료로 인계받았다. Pages run `35690778571` success, 공개 HTTP 200·배포 마커 확인까지 완료됐다. 이후 결근/미기록 후보 기준 변경은 로컬 커밋만 하며 운영 DB·push·deploy는 하지 않는다.
+
+## 직원허브 5차 — 결근/미기록 후보 기준 (로컬 검증 완료, 2026-09-22)
+
+- 범위: `app_settings`에 `absence_confirm_after_minutes=0`, `absence_exclude_pending_manual=true`를 `ON CONFLICT DO NOTHING`으로 seed하고 기존 owner RLS를 이용해 원장만 화면에서 저장한다. 신규 테이블은 없다.
+- 판정: 서울 기준 오늘은 시업+지연 뒤에만, 과거는 즉시 후보로 한다. 입사일 전, 비재직 유효일 이후, 승인 leave_requests(반차 포함), 실제 attendance, 설정된 대기/실장승인/원장확정 수기근태는 제외한다. 조회 실패 또는 시업 설정 오류의 오늘 후보는 fail-closed다.
+- rollback: 두 키가 기본값일 때만 제거하며, 기본값이 아닌 사용자 값이 있으면 예외로 중단·보존한다. 로컬 Node 전체 JS/PGlite, 인라인 구문, diff-check 검증 후 로컬 커밋만 한다. 운영 DB 적용·push·deploy·실계정 검증은 미수행이다.
+
 ## 직원허브 5차 — 1단계 배포·2단계 운영 적용 (2026-09-22)
 
 - 1단계 근무표는 `8cc9030d300a39b43190831785cdfa9405b78239`가 `origin/main` push, Pages run `35672912570` success, `https://jung-plant.com/hr.html?v=8cc9030` HTTP 200·근무표계획/월간 기본 표식 확인까지 완료했다. Sol High: 관련 57/57, 전체 JS 24파일, 인라인 2, diff-check PASS.

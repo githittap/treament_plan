@@ -1,5 +1,14 @@
 # todos — 내부 도구(T8/D) 작업 목록
 
+## 직원허브 5차 — 재직상태·접속차단 운영 반영
+
+- [x] 재직상태/접속차단, 단계형 A/B/C, ACL 보정 운영 반영: commit `6bffb86`, Pages run `35690778571` 성공, 공개 HTTP 200·배포 마커 확인. 이 로컬 후속은 운영 DB·push·deploy 금지.
+
+## 직원허브 5차 — 결근/미기록 후보 기준
+
+- [x] 로컬 구현·검증: `absence_confirm_after_minutes`/`absence_exclude_pending_manual` 기본값, 원장 설정 저장, 서울시각 cutoff 및 입사·재직·휴가·수기·실제근태 제외, 기본값만 제거하고 사용자값이면 중단하는 rollback.
+- [ ] 운영 적용·실계정 설정 저장/후보 조회 검증은 별도 범위다. 이 작업에서는 운영 DB·push·deploy하지 않는다.
+
 ## 직원허브 5차 — 수기근태 2단계
 
 - [x] 근무표 1단계: `8cc9030d300a39b43190831785cdfa9405b78239` main push, Pages run `35672912570` success, 공개 `hr.html?v=8cc9030` HTTP 200·월간 기본 표식 확인.
