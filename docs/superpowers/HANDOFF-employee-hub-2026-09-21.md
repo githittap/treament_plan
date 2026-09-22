@@ -1,5 +1,13 @@
 # 직원허브 현재 인수인계
 
+## 최신 인계 — AI 사용량 현황판 AI비용 탭 통합 운영 반영 (2026-09-22)
+
+- 범위: 원장 전용 AI비용 탭에 현황판 카드(모델별 사용량 7일·Astra 강조, 정가 환산 사용가치, Codex 대화 효율 점검). 브랜치 `feature/ai-usage-panel` 커밋 `7939c8a`·`70f6017`·`3fb7714`·`74291e2` → `main` fast-forward `74291e2`, Pages run `35712403783` success, `jung-plant.com/hr.html?v=74291e2` HTTP 200·공개 SHA256이 커밋 blob과 동일·로그인 화면 콘솔 오류 0.
+- 운영: migration `employee_hub_ai_model_usage_daily_20260922`·`employee_hub_ai_usage_snapshots_20260922`, Edge `ai-usage-sync` v1(verify_jwt=true), `webhook_secrets`에 `ai_usage_sync_sha256`(해시만). 반영 전후 Task 6 정책·버킷·권한 지문 `53a7a462…`(17개)와 다른 정책 225·함수 46·표 70 지문 동일, notices 1·첨부 객체 0 유지, security/performance advisor 새 경고 0. 운영 RLS: 원장 67행·스냅샷 2, 실장 0·0, anon 42501.
+- PC: 업로더 `C:\Users\elusi\.claude\scripts\hr_ai_usage_uploader.py`, 예약 작업 `직원허브_AI사용량_업로드`(현재 사용자·대화형·제한 권한, 매일 12:50, StartWhenAvailable, 10분 제한), 첫 실행 결과 코드 0. 코덱스문제(2) 세션 스크립트는 수정하지 않고 결과 JSON만 읽는다(원장 지시).
+- 검증: Astra 1차 FAIL(스냅샷 DB 저장 불일치·프로토타입 이름 집계 누락·64KB 읽기 중단)·2차 FAIL(글자 칸 객체 값 예외) 모두 반례 시험으로 보완. 전체 회귀 46/49·LF 46/48, 기준선과 같은 Task 7·8 지문 시험만 실패, Task 6 시험 PASS.
+- 되돌리기: 프런트 `63372e8`, DB `db/ai_usage_snapshots_rollback.sql` → `db/ai_model_usage_daily_rollback.sql`, 예약 작업 해제. 남은 것: 원장 로그인 화면 확인.
+
 ## 최신 인계 — 상담문의 일원화 1차 운영 반영·독립 검증 완료 (2026-09-22)
 
 - 운영: migration `employee_hub_consultation_inbox_20260922` success. postflight는 inbox_rows=0, RLS=true, policies=3, anon SELECT=false, authenticated의 event/hash INSERT=false·message UPDATE=false·status UPDATE=true, ingest auth=false/service=true, convert auth=true, search_path hardened를 확인했다. 실제 DB 트랜잭션에서 동일 외부 이벤트 ingest는 같은 ID·1행으로 PASS했고 rollback도 확인했다.

@@ -1,5 +1,16 @@
 # todos — 내부 도구(T8/D) 작업 목록
 
+## AI 사용량 현황판 — AI비용 탭 통합 운영 반영 (2026-09-22)
+
+- [x] 브랜치 `feature/ai-usage-panel`(기준 `63372e8`) → `main` fast-forward `74291e2`, Pages run `35712403783` success, 공개 `hr.html?v=74291e2` HTTP 200·표식 확인, 공개 파일 SHA256이 커밋과 동일, 로그인 화면 콘솔 오류 0.
+- [x] 화면: AI비용 탭(원장 전용) 청구액 카드 아래 '📊 AI 사용량 현황판' 카드 한 장 — ① 모델별 사용량(최근 7일, Astra 노란 강조) ② 정가 환산 사용가치(청구액 아님, PC 상황판 값) ③ Codex 대화 효율 점검(오늘). 새 상단 탭 없음. 로컬 `AI사용량_상황판.html`은 그대로.
+- [x] 운영 DB: migration `employee_hub_ai_model_usage_daily_20260922`·`employee_hub_ai_usage_snapshots_20260922`. 두 표 모두 RLS·원장 SELECT 정책 1개·anon 거부, 쓰기는 service_role 전용 함수(`ai_model_usage_replace`·`ai_usage_snapshot_put`)만. 반영 전후 Task 6 지문(`53a7a462…` 17개)·다른 정책 225·함수 46·표 70 지문 동일, advisor 새 경고 0.
+- [x] Edge `ai-usage-sync` v1(id `c5d45a3f…`, verify_jwt=true): X-Sync-Token SHA-256을 `webhook_secrets(ai_usage_sync_sha256)`과 비교(원문 토큰은 PC `~/.config/ai-usage-sync/token`에만). 운영 거절 경로 8/8(JWT 없음·토큰 없음·틀린 토큰 401, GET 405, 모르는 kind·깨진 JSON·음수 400, 70KB 413).
+- [x] 업로더 `C:\Users\elusi\.claude\scripts\hr_ai_usage_uploader.py` + 전용 예약 작업 `직원허브_AI사용량_업로드`(매일 12:50, 창 없음, 놓치면 켜진 뒤 실행). 코덱스문제(2) 세션 스크립트(`codex_watchdog.ps1`·`codex_session_health.py`·`codex_model_usage.py`·`collect_ai_usage.py`)는 수정하지 않고 결과 JSON 3개만 읽는다. 첫 실행: 모델 사용량 67행(보낸 행=저장 행)·스냅샷 2종, 결과 코드 0, 로그 `~/.claude/logs/hr_ai_usage_uploader.log`(토큰·대화 이름 미기록).
+- [x] 검증: 새 시험 패널 11·통합 12·PGlite 2종(모델명 JS·SQL 판정 18종 일치, 검사 통과 스냅샷 DB 저장 일치)·로컬 Edge 23·업로더 8 PASS. 전체 회귀 46/49(실패 3건은 작업 전 기준선과 같은 Task 7·8 지문 시험). Astra 1차 FAIL(중요 2·경미 1)·2차 FAIL(중요 1) 지적은 반례를 시험으로 만들어 모두 보완(`3fb7714`·`74291e2`), 최대 2회 규칙상 3차는 돌리지 않음.
+- [ ] 원장 로그인 화면 확인(아래 미답변 표). 운영 DB에서 원장 67행·실장 0행·비로그인 거부는 확인함.
+- 되돌리기: 프런트는 `63372e8` 재배포(이후 변경 없을 때), DB는 `db/ai_usage_snapshots_rollback.sql` → `db/ai_model_usage_daily_rollback.sql`(파생 데이터라 보존 게이트 없음), 예약 작업은 `Unregister-ScheduledTask -TaskName 직원허브_AI사용량_업로드`.
+
 ## 상담문의 일원화 1차
 
 - [x] 운영 반영·독립 검증: migration `employee_hub_consultation_inbox_20260922`, Edge `consultation-ingest` v1 ACTIVE·`verify_jwt=true`, 동일 외부 이벤트의 DB 트랜잭션 idempotency/rollback, 권한·RLS·고정 search_path postflight, no-auth/위조 JWT 401, 공개 smoke와 독립 검증 PASS.
@@ -254,6 +265,8 @@ M3급여1단계(db/payroll.sql+💰급여탭, 8월 급여대장 실검증, 급�
 - **큐 순서(원장 1순위 근로계약서)**: ①근로계약서(D2+D4) ②D5 코드 ③직원 개인정보표(+원장전용섹션) ④AI 비용 상황판 ⑤캘린더/근무표 월뷰 ⑥D3 허브(보류·리마인드).
 
 ## 아직 원장이 답하지 않은 것
+- ⏳ **AI 사용량 현황판 원장 로그인 확인(2026-09-22)** — 배포 후 AI비용 탭에서 '📊 AI 사용량 현황판' 카드(모델별 사용량·정가 환산 사용가치·Codex 대화 효율 점검)가 보이는지 원장 확인 필요. Claude는 로그인할 수 없어 공개 페이지 로딩·코드·DB만 검증한다.
+- ✅ **원장 결정(2026-09-22, 재질문 금지)**: ① 예전 기록의 `ai-billing-webhook` 토큰 원문은 **지우지 않고 그대로 둔다. 토큰도 바꾸지 않는다.** ② 현황판 업로드는 **별도 업로더 스크립트(`~/.claude/scripts/hr_ai_usage_uploader.py`) + 별도 예약 작업**으로 하고, 감시 작업(`codex_watchdog.ps1`)·코덱스문제(2) 세션 스크립트(`codex_session_health.py`·`codex_model_usage.py`·`collect_ai_usage.py`)는 고치지 않고 결과 JSON만 읽는다. 대화 이름은 민감하므로 원장 전용 RLS로만 보인다.
 - **Codex에 Supabase MCP 연결(2026-09-14, 원장 요청)** — Codex가 이미 `[mcp_servers.*]`(node_repl·serena 등) 구조 사용 중 확인, Supabase만 추가하면 됨. 절차 전달함: ①supabase.com 대시보드→Access Tokens→"Codex CLI"용 새 토큰 발급 ②`C:\Users\elusi\.codex\config.toml`에 `[mcp_servers.supabase]`(command=npx, args=-y @supabase/mcp-server-supabase@latest --project-ref=texevhsxttfoqkrucfzl) + `[mcp_servers.supabase.env]` SUPABASE_ACCESS_TOKEN 추가. **기존 Claude 쪽 키는 재사용 안 함**(평문 노출 위험, 신규 발급 권장). 원장이 진행했는지 확인 필요.
 - 🔴 **임은숙 "연차 신청했는데 안 보인다" — 원인 추정·조치 완료(2026-09-14)** — `leave_requests` 실측 결과 **신·구 계정 모두 신청 내역 0건**(RLS는 chief 본인 INSERT를 막지 않음, 정상 확인). 코드 확인 결과 `submitLeave()`의 **동시연차 제한 규칙**(그날 이미 2명↑ 휴가=차단, 1명+특별사유無=차단)이 **작은 텍스트로만 알림 후 저장 자체를 안 함** — 유력 원인으로 추정(insert 자체가 하드블록됨, DB에러 아님). 즉시 조치: 차단 메시지를 **빨간 굵은 글씨 "⚠ 신청되지 않았습니다"**로 변경 배포(재발방지). **원장 확인 필요**: 임은숙이 신청하려던 날짜에 이미 다른 직원 연차가 있었는지, 있다면 특별사유 적고 재신청 안내.
 - ✅ **캘린더에 휴무(off) 표시 배포(2026-09-14, 원장 "휴무도 보여야 편함")** — 캘린더 날짜칸에 승인연차(🏖)뿐 아니라 그날 근무표상 휴무(off)인 직원도 🛋로 함께 표시. `schedules.shift='off'` 실시간 반영. 원장 확인: 잘 보임.

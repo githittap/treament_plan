@@ -1,5 +1,11 @@
 # overview — 아산정플란트치과 내부 도구 (T8/D 인프라)
 
+## AI 사용량 현황판 — AI비용 탭 통합 운영 반영 (2026-09-22)
+
+- `hr.html` AI비용 탭(원장 전용)에 '📊 AI 사용량 현황판' 카드: 모델별 사용량(최근 7일, Astra 강조)·정가 환산 사용가치(청구액 아님)·Codex 대화 효율 점검. `main` `74291e2`, Pages run `35712403783` success, 공개 SHA256 = 커밋.
+- 데이터 흐름: PC 결과 JSON 3개(`codex_model_usage.json`·`ai_usage_data.json`·`codex_session_health.json`, 코덱스문제(2) 세션 생성기 소관 — 수정 금지) → 업로더 `~/.claude/scripts/hr_ai_usage_uploader.py`(전용 예약 작업 `직원허브_AI사용량_업로드`, 매일 12:50) → Edge `ai-usage-sync`(verify_jwt, X-Sync-Token SHA-256) → `ai_model_usage_daily`(날짜별 교체)·`ai_usage_snapshots`(종류별 최신 1건). 두 표 모두 원장만 SELECT, 쓰기는 service_role 함수만. 대화 이름은 민감할 수 있어 원장 전용 RLS·로그 미기록.
+- 반영 전후 Task 6·기타 객체 지문 동일, advisor 새 경고 0. 원장 결정: 예전 AI비용 문자 수신 토큰 원문은 그대로 두고 교체하지 않음(재질문 금지).
+
 ## 상담문의 일원화 1차 — 운영 반영·독립 검증 완료 (2026-09-22)
 
 - 기존 상담일지 안의 `통합 문의함`을 운영 반영했다. migration `employee_hub_consultation_inbox_20260922`는 성공했고, inbox 0행·RLS=true·정책 3개·anon SELECT=false·원문/이벤트/해시 직접 입력·수정 차단·status 수정 허용·ingest service 전용·convert 인증·고정 search_path를 postflight로 확인했다.
