@@ -57,6 +57,17 @@ try{
     assert.equal((await q("select count(*)::int n from public.ai_model_usage_daily where usage_date='2026-09-21'"))[0].n,2,`${label}: 원자성 위반`);
   }
 
+  // JS(Edge 검사)와 SQL(CHECK·캐스팅)의 모델명 판정이 같아야 한다 — JS가 통과시킨 값을 DB가 거절하면 그날 동기화 전체가 실패한다.
+  const {validateUsagePayload}=await import(pathToFileURL(path.join(root,'supabase/functions/ai-usage-sync/payload.mjs')).href);
+  const C=String.fromCharCode,names=['Sol','gpt-5.5','K3(Kimi)','(unknown)','codex-auto-review','x y','a'.repeat(64),'','Sol ',' Sol','a'.repeat(65),'모델','A'+C(0xa0)+'B','A'+C(0x85)+'B','A'+C(0xd800)+'B',String.fromCodePoint(0x1f600).repeat(33),'a'+C(9)+'b','a'+C(0x7f)+'b'];
+  for(const name of names){
+    const one={'2026-09-19':{[name]:{tokens:1,turns:1}}},js=validateUsagePayload(one,'2026-09-22').ok;
+    await asService();let sql=true;
+    try{await q(`select public.ai_model_usage_replace('${JSON.stringify(one).replace(/'/g,"''")}'::jsonb)`);}catch{sql=false;await db.exec('rollback');}
+    assert.equal(sql,js,`모델명 판정 불일치: ${JSON.stringify(name)} js=${js} sql=${sql}`);
+  }
+  await db.exec("reset role;delete from public.ai_model_usage_daily where usage_date='2026-09-19';");
+
   await setUser(owner);
   assert.equal((await q('select * from public.ai_model_usage_daily')).length,3);
   await assert.rejects(q("insert into public.ai_model_usage_daily(usage_date,model,tokens,turns) values('2026-09-19','Sol',1,1)"),/permission denied/);await db.exec('rollback');await setUser(owner);

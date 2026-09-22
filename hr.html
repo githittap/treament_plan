@@ -2167,7 +2167,7 @@ const AICOST_PLATFORMS=['Claude','Codex(OpenAI)','Kimi','기타'];
 let AICOST_MONTH='';
 function setAicostMonth(v){AICOST_MONTH=v;render();}
 function aicostMoney(v){return Number(v||0).toLocaleString('ko-KR');}
-/* ── AI 사용량 현황판: PC가 하루 한 번 올린 Codex 모델별 토큰(ai_model_usage_daily, 원장만 읽기) ── */
+/* ── AI 사용량 현황판: PC가 올린 Codex 모델별 토큰(ai_model_usage_daily)과 PC 상황판 스냅샷(ai_usage_snapshots: 정가 환산 비용·대화 점검), 원장만 읽기 ── */
 /* ai-usage:test-start */
 function aiUsageWindow(todayStr,days){const end=String(todayStr).slice(0,10),[y,mo,d]=end.split('-').map(Number);return {start:new Date(Date.UTC(y,mo-1,d-(days-1))).toISOString().slice(0,10),end};}
 function aiUsageSummary(rows,start,end){const per={};let total=0,turns=0,lastSynced='';(rows||[]).forEach(r=>{const day=String(r.usage_date||'').slice(0,10);if(!day||day<start||day>end)return;const model=String(r.model||'(unknown)'),t=Number(r.tokens)||0,n=Number(r.turns)||0,p=per[model]||(per[model]={model,tokens:0,turns:0});p.tokens+=t;p.turns+=n;total+=t;turns+=n;if(r.synced_at&&String(r.synced_at)>lastSynced)lastSynced=String(r.synced_at);});
@@ -2175,15 +2175,42 @@ function aiUsageSummary(rows,start,end){const per={};let total=0,turns=0,lastSyn
   return {total,turns,models,astra:models.find(x=>x.astra)||{model:'Astra',tokens:0,turns:0,share:0,astra:true},lastSynced};}
 function aiUsageCompact(n){n=Number(n)||0;if(n>=1e8)return (n/1e8).toFixed(2).replace(/\.?0+$/,'')+'억';if(n>=1e4)return Math.round(n/1e4).toLocaleString('ko-KR')+'만';return n.toLocaleString('ko-KR');}
 function aiUsageSyncedLabel(iso){const d=new Date(iso),p=n=>String(n).padStart(2,'0');return Number.isNaN(d.getTime())?String(iso):`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;}
-function aiUsagePanelHtml({summary,start,end,error}){
-  const pct=v=>v>0&&v<0.05?'&lt;0.1%':(Math.round(v*10)/10).toFixed(1)+'%',head=`<div class="card" id="aiUsagePanel"><h2>📊 AI 사용량 현황판 <span class="sub">모델별 사용량(최근 7일) · Codex 토큰</span></h2><div class="hint">기간 ${esc(start)} ~ ${esc(end)}${summary&&summary.lastSynced?` · 마지막 동기화 ${esc(aiUsageSyncedLabel(summary.lastSynced))}`:''}</div>`;
+function aiUsageModelSection({summary,start,end,error}){
+  const pct=v=>v>0&&v<0.05?'&lt;0.1%':(Math.round(v*10)/10).toFixed(1)+'%',head=`<div data-ai-usage-model-section><h3>🤖 모델별 사용량(최근 7일) <span class="sub">Codex 토큰</span></h3><div class="hint">기간 ${esc(start)} ~ ${esc(end)}${summary&&summary.lastSynced?` · 마지막 동기화 ${esc(aiUsageSyncedLabel(summary.lastSynced))}`:''}</div>`;
   if(error)return head+`<div class="empty">AI 사용량을 불러오지 못했습니다: ${esc(error)}</div></div>`;
   if(!summary||!summary.models.length)return head+'<div class="empty">아직 올라온 사용량 기록이 없습니다. PC에서 하루 한 번 올리면 여기에 쌓입니다.</div></div>';
   const a=summary.astra;
   return head+`<div data-ai-usage-astra-summary style="margin:10px 0 14px;padding:10px 12px;border:1px solid var(--gold);border-radius:8px;background:var(--gold-bg);color:var(--gold)">⚠ <b>Astra</b>(고비용 검증 모델) ${a.tokens?`<b>${aiUsageCompact(a.tokens)} 토큰</b> · 전체의 <b>${pct(a.share)}</b> · ${a.turns.toLocaleString('ko-KR')}턴`:'최근 7일 사용 기록 없음'}</div>
     <div style="font-size:13px;color:var(--gray)">7일 합계</div><div style="font-size:24px;font-weight:800;color:var(--mint);margin:2px 0 12px">${aiUsageCompact(summary.total)} 토큰 <span class="sub" style="font-size:13px;font-weight:400">· ${summary.turns.toLocaleString('ko-KR')}턴</span></div>
     <div class="tblwrap"><table><tr><th>모델</th><th>토큰</th><th>비중</th><th>턴</th></tr>${summary.models.map(x=>`<tr data-ai-usage-model="${esc(x.model)}"${x.astra?' data-ai-usage-astra="true" style="background:var(--gold-bg)"':''}><td>${x.astra?'<b style="color:var(--gold)">⚠ Astra</b>':esc(x.model)}</td><td title="${x.tokens.toLocaleString('ko-KR')} 토큰" style="white-space:nowrap">${aiUsageCompact(x.tokens)}</td><td style="min-width:110px"><div class="rowflex" style="gap:8px;align-items:center;flex-wrap:nowrap"><div style="flex:1;min-width:40px;height:8px;background:var(--line);border-radius:4px"><div style="height:100%;width:${Math.min(100,Math.max(0,x.share)).toFixed(1)}%;background:${x.astra?'var(--gold)':'var(--mint)'};border-radius:4px"></div></div><span style="white-space:nowrap">${pct(x.share)}</span></div></td><td style="white-space:nowrap">${x.turns.toLocaleString('ko-KR')}</td></tr>`).join('')}</table></div>
-    <div class="hint">PC에 남은 Codex 대화 기록을 하루 한 번 모아 올린 값입니다(오늘은 올린 시점까지). 비용이 큰 Astra는 노란색으로 따로 표시합니다.</div></div>`;
+    <div class="hint">PC에 남은 Codex 대화 기록을 모아 올린 값입니다(오늘은 올린 시점까지). 비용이 큰 Astra는 노란색으로 따로 표시합니다.</div></div>`;
+}
+const AI_COST_LABELS={claude:'Claude Code',codex:'Codex (OpenAI)',kimi:'Kimi (Moonshot)',openclaw:'OpenClaw'};
+function aiCostWon(usd,fx){return '₩'+Math.round((Number(usd)||0)*(Number(fx)||0)).toLocaleString('ko-KR');}
+function aiCostSectionHtml({cost,error}){
+  const head='<div data-ai-cost-section style="margin-top:22px"><h3>💸 정가 환산 사용가치 <span class="sub">청구액 아님 · PC 상황판 값</span></h3>';
+  if(error)return head+`<div class="empty">비용 기록을 불러오지 못했습니다: ${esc(error)}</div></div>`;
+  if(!cost||!cost.agents)return head+'<div class="empty">아직 올라온 비용 기록이 없습니다. PC 상황판이 갱신된 뒤 올리면 여기에 보입니다.</div></div>';
+  const fx=Number(cost.fx)||0,thisM=String(cost.this_month||''),agents=Object.entries(cost.agents).sort((a,b)=>(Number(b[1].cumUSD)||0)-(Number(a[1].cumUSD)||0));
+  const monthUsd=cost.month_usd||{},months=Object.keys(monthUsd).filter(k=>k!=='?').sort().slice(-6),max=Math.max(1,...months.map(k=>Number(monthUsd[k])||0));
+  const rows=agents.map(([k,a])=>{const cur=(a.months||[]).find(x=>x.m===thisM);return `<tr data-ai-cost-platform="${esc(k)}"><td>${esc(AI_COST_LABELS[k]||k)}</td><td style="white-space:nowrap"><b>${aiCostWon(cur?cur.usd:0,fx)}</b></td><td style="white-space:nowrap">${aiCostWon(a.cumUSD,fx)}</td><td class="sub" style="white-space:nowrap">${aiUsageCompact(a.inTok)} / ${aiUsageCompact(a.outTok)}</td></tr>`;}).join('');
+  const bars=months.map(k=>{const v=Number(monthUsd[k])||0;return `<div data-ai-cost-month="${esc(k)}" style="margin:8px 0"><div class="rowflex" style="justify-content:space-between"><span>${esc(k)}</span><b>${aiCostWon(v,fx)}</b></div><div style="height:8px;background:var(--line);border-radius:4px;margin-top:4px"><div style="height:100%;width:${Math.round(v/max*100)}%;background:var(--mint);border-radius:4px"></div></div></div>`;}).join('');
+  return head+`<div class="hint">기준 ${esc(cost.generated)} · 환율 US$1 = ₩${Math.round(fx).toLocaleString('ko-KR')}${cost.fx_src?` (${esc(cost.fx_src)})`:''}</div>
+    <div style="font-size:13px;color:var(--gray);margin-top:10px">이번 달(${esc(thisM||'-')}) 정가 환산 · 청구액 아님</div><div style="font-size:24px;font-weight:800;color:var(--mint);margin:2px 0 12px">${aiCostWon(cost.this_usd,fx)} <span class="sub" style="font-size:13px;font-weight:400">· 누적 ${aiCostWon(cost.total_usd,fx)}</span></div>
+    <div class="tblwrap"><table><tr><th>플랫폼</th><th>이번 달</th><th>누적</th><th>토큰(입력/출력)</th></tr>${rows}</table></div>
+    ${bars?`<div style="margin-top:12px"><b style="font-size:13px">월별 합계(전 플랫폼)</b>${bars}</div>`:''}
+    <div class="hint">쓴 토큰을 API 정가로 환산한 <b>사용 가치</b>입니다. Claude·Codex는 구독제라 실제 결제는 이보다 훨씬 적습니다. 실제 청구액은 맨 위 표를 보세요.</div></div>`;
+}
+function aiSessionSectionHtml({sessions,error}){
+  const head='<div data-ai-session-section style="margin-top:22px"><h3>🩺 Codex 대화 효율 점검 <span class="sub">오늘 · 돈이 새는 대화</span></h3>';
+  if(error)return head+`<div class="empty">점검 기록을 불러오지 못했습니다: ${esc(error)}</div></div>`;
+  if(!sessions||!Array.isArray(sessions.flagged))return head+'<div class="empty">아직 올라온 점검 기록이 없습니다.</div></div>';
+  const meta=`<div class="hint">기준 ${esc(sessions.generated)} · 오늘 전체 약 ₩${Math.round(Number(sessions.won_today_total)||0).toLocaleString('ko-KR')} · 🔴 지금 헛도는 중(멈추고 새 대화에서 #이어서) · 🟠 오늘 비쌈 · 추정 비용은 대략값</div>`;
+  if(!sessions.flagged.length)return head+meta+'<div class="empty">지금 돈이 새는 대화 없음</div></div>';
+  return head+meta+sessions.flagged.slice(0,8).map(f=>`<div data-ai-session="${esc(f.thread||'')}" style="border-top:1px solid var(--line);padding:6px 0"><div class="rowflex" style="justify-content:space-between;gap:8px;flex-wrap:nowrap"><span>${f.sev==='red'?'🔴':'🟠'} ${esc(f.name||f.thread||'')} <span class="sub">(${f.active?'활성':'멈춤'})</span></span><b style="white-space:nowrap">약 ₩${Math.round(Number(f.won_today)||0).toLocaleString('ko-KR')}</b></div><div class="sub">${esc((f.reasons||[]).join(' · '))}</div></div>`).join('')+'</div>';
+}
+function aiUsagePanelHtml({summary,start,end,error,cost,costError,sessions,sessionsError}){
+  return `<div class="card" id="aiUsagePanel"><h2>📊 AI 사용량 현황판 <span class="sub">원장 전용 · PC가 모아 올린 값</span></h2>${aiUsageModelSection({summary,start,end,error})}${aiCostSectionHtml({cost,error:costError})}${aiSessionSectionHtml({sessions,error:sessionsError})}</div>`;
 }
 /* ai-usage:test-end */
 async function saveAicost(i){
@@ -2199,11 +2226,12 @@ async function renderAicost(m){
   if(ME.role!=='owner'){m.innerHTML='<div class="card"><div class="empty">원장만 사용할 수 있습니다.</div></div>';return;}
   if(!AICOST_MONTH)AICOST_MONTH=today().slice(0,7);
   const usageWin=aiUsageWindow(today(),7);
-  const [{data:rows,error},{data:history,error:historyError},{data:events,error:eventsError},{data:usageRows,error:usageError}]=await Promise.all([
+  const [{data:rows,error},{data:history,error:historyError},{data:events,error:eventsError},{data:usageRows,error:usageError},{data:snapshots,error:snapshotError}]=await Promise.all([
     sb.from('ai_billing').select('*').eq('ym',AICOST_MONTH),
     sb.from('ai_billing').select('ym,amount_krw').order('ym',{ascending:false}),
     sb.from('ai_billing_events').select('platform,amount_krw,source,note,raw_text,received_at').order('received_at',{ascending:false}).limit(300),
-    sb.from('ai_model_usage_daily').select('usage_date,model,tokens,turns,synced_at').gte('usage_date',usageWin.start).order('usage_date',{ascending:false}).limit(2000)
+    sb.from('ai_model_usage_daily').select('usage_date,model,tokens,turns,synced_at').gte('usage_date',usageWin.start).order('usage_date',{ascending:false}).limit(2000),
+    sb.from('ai_usage_snapshots').select('kind,payload,synced_at').in('kind',['platform_cost','codex_sessions'])
   ]);
   if(error||historyError||eventsError){setStatus('error');m.innerHTML=`<div class="card"><div class="empty">AI 비용을 불러오지 못했습니다: ${esc((error||historyError||eventsError).message)}</div></div>`;return;}
   const byPlatform={};(rows||[]).forEach(r=>byPlatform[r.platform]=r);
@@ -2214,7 +2242,9 @@ async function renderAicost(m){
   (events||[]).forEach(e=>{const ym=String(e.received_at).slice(0,7);totals[ym]=(totals[ym]||0)+Number(e.amount_krw||0);});
   const recent=Object.entries(totals).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,6),max=Math.max(1,...recent.map(x=>x[1]));
   const recentEvents=(events||[]).slice(0,20);
-  const usageHtml=aiUsagePanelHtml({summary:aiUsageSummary(usageRows,usageWin.start,usageWin.end),start:usageWin.start,end:usageWin.end,error:usageError?usageError.message:''});
+  const snap={};(snapshots||[]).forEach(s=>snap[s.kind]=s.payload);
+  const usageHtml=aiUsagePanelHtml({summary:aiUsageSummary(usageRows,usageWin.start,usageWin.end),start:usageWin.start,end:usageWin.end,error:usageError?usageError.message:'',
+    cost:snap.platform_cost||null,costError:snapshotError?snapshotError.message:'',sessions:snap.codex_sessions||null,sessionsError:snapshotError?snapshotError.message:''});
   m.innerHTML=`<div class="card"><h2>💰 AI비용 <span class="sub">(원장 전용)</span></h2>
     <div class="fld" style="max-width:220px"><label>조회 월</label><input type="month" value="${esc(AICOST_MONTH)}" onchange="setAicostMonth(this.value)"></div>
     <div style="font-size:13px;color:var(--gray);margin-top:16px">이번 달 실제 청구액 (직접 입력 + 자동감지 문자 합계)</div>

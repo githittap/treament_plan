@@ -1,8 +1,9 @@
 -- AI 사용량 현황판: PC의 ~/.claude/logs/codex_model_usage.json(날짜×모델 토큰)을 Edge Function ai-usage-sync(service-role)만 적재하고 원장만 읽는다.
 -- 파생 기록(PC의 Codex 로그에서 다시 계산 가능)이며 대화 원문·비밀은 저장하지 않는다. 같은 날짜는 올릴 때마다 통째로 교체한다.
+-- 모델명 규칙은 Edge 검사(payload.mjs)와 같다: 인쇄 가능한 ASCII 1~64자, 앞뒤 공백 없음.
 create table if not exists public.ai_model_usage_daily (
   usage_date date not null,
-  model text not null check(char_length(model) between 1 and 64 and model=btrim(model) and model!~'[[:cntrl:]]'),
+  model text not null check(model~'^[!-~]([ -~]{0,62}[!-~])?$'),
   tokens bigint not null check(tokens between 0 and 1000000000000000),
   turns integer not null check(turns between 0 and 1000000000),
   synced_at timestamptz not null default now(),
