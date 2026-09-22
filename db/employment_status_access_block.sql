@@ -66,12 +66,12 @@ begin
     select 1 from public.profiles p
     where p.user_id = v_actor and p.active = true and p.approved = true and p.role = 'owner'
   ) then raise exception 'active approved owner required'; end if;
-  if v_actor = p_user_id then raise exception 'cannot change your own employment status'; end if;
   select * into v_target from public.profiles where user_id = p_user_id;
   if not found then raise exception 'profile not found'; end if;
   if v_target.role = 'owner' and v_target.active = true and (
     select count(*) from public.profiles where role = 'owner' and active = true
   ) <= 1 then raise exception 'cannot change last active owner'; end if;
+  if v_actor = p_user_id then raise exception 'cannot change your own employment status'; end if;
   return v_actor;
 end;
 $$;
