@@ -31,7 +31,8 @@ begin
   end if;
 
   if to_regprocedure('public.assert_can_hard_delete_account(uuid,text)') is null
-     or to_regprocedure('public.record_account_hard_deleted(uuid)') is null
+     or to_regprocedure('public.record_account_hard_deleted(uuid,text)') is null
+     or to_regprocedure('public.transfer_storage_objects_to_owner(uuid)') is null
   then
     raise exception 'account hard delete rollback blocked: 되돌릴 함수가 없다; preserve state and stop';
   end if;
@@ -45,9 +46,13 @@ begin
 end $$;
 
 revoke execute on function public.assert_can_hard_delete_account(uuid, text) from authenticated;
-revoke execute on function public.record_account_hard_deleted(uuid) from authenticated;
+revoke execute on function public.record_account_hard_deleted(uuid, text) from authenticated;
+revoke execute on function public.transfer_storage_objects_to_owner(uuid) from authenticated;
 drop function public.assert_can_hard_delete_account(uuid, text);
-drop function public.record_account_hard_deleted(uuid);
+drop function public.record_account_hard_deleted(uuid, text);
+-- storage.objects의 소유권은 되돌리지 않는다 — 이미 원장에게 넘긴 파일을 퇴사자에게 되돌려 줄 이유가 없고,
+-- 하드 삭제가 한 번이라도 있었으면 위 사전 점검이 롤백 자체를 막는다(이 지점에는 이전 이력이 없는 상태만 온다).
+drop function public.transfer_storage_objects_to_owner(uuid);
 
 alter table public.profile_employment_history drop constraint profile_employment_history_account_action_check;
 alter table public.profile_employment_history add constraint profile_employment_history_account_action_check

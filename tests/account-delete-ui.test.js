@@ -73,6 +73,20 @@ test('renderOwner의 로그인 계정 영구 삭제 버튼은 접속 영구 차�
 });
 
 /* ── hardDeleteAccountPreserveRecords 동작 ── */
+// supabase-js v2는 HTTP 오류일 때 서버 JSON을 error.context(Response)에 담고, error.message에는
+// "Edge Function returned a non-2xx status code"만 넣는다. 실제 반환 모양 그대로 재현한다.
+const NON_2XX = 'Edge Function returned a non-2xx status code';
+function httpErrorResult(status, payload) {
+  return {
+    data: null,
+    error: {
+      name: 'FunctionsHttpError',
+      message: NON_2XX,
+      context: new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } })
+    }
+  };
+}
+
 function hardDeleteHarness({ profile, confirmReturns = true, promptReturns = '김직원', invokeResult = { data: { ok: true, message: '김직원님의 로그인 계정을 영구 삭제했습니다.' }, error: null } } = {}) {
   assert.ok(hardDeleteSource, 'hardDeleteAccountPreserveRecords 함수를 찾을 수 없습니다.');
   assert.ok(block, 'account-delete-ui 코드 블록을 찾을 수 없습니다.');
@@ -119,6 +133,14 @@ test('첫 확인창 문구는 로그인·이메일 영구 삭제와 근무 기�
   assert.match(msg, /근무.*연차.*계약.*출퇴근.*기록/);
 });
 
+// confidential_access.user_id는 auth.users를 ON DELETE CASCADE로 참조한다 — 로그인 계정을 지우면
+// 그 직원의 케이스노트 접근권한 행도 함께 사라진다(근무 기록과 달리 보존되지 않는다).
+test('첫 확인창 문구는 케이스노트 접근권한이 함께 사라진다는 것도 알린다', async () => {
+  const { ctx, calls } = hardDeleteHarness({ confirmReturns: false });
+  await ctx.hardDeleteAccountPreserveRecords('staff-1');
+  assert.match(calls.confirmMsgs[0], /케이스노트 접근권한/);
+});
+
 test('이름 입력창에서 취소(null)하면 조용히 멈춘다', async () => {
   const { ctx, calls } = hardDeleteHarness({ promptReturns: null });
   await ctx.hardDeleteAccountPreserveRecords('staff-1');
@@ -152,9 +174,9 @@ test('정상 흐름: account-delete 함수를 caller 세션으로(sb.functions.i
   assert.match(calls.errors.at(-1), /영구 삭제했습니다/, '함수가 돌려준 한국어 결과 메시지를 보여줘야 함');
 });
 
-test('함수 호출이 실패(data.ok=false)하면 저장 실패로 표시하고 새로고침하지 않는다', async () => {
+test('함수 호출이 실패(HTTP 409)하면 저장 실패로 표시하고 새로고침하지 않는다', async () => {
   const { ctx, calls } = hardDeleteHarness({
-    invokeResult: { data: { ok: false, error: 'not_blocked', message: '먼저 계정을 차단한 뒤에만 삭제할 수 있습니다.' }, error: null }
+    invokeResult: httpErrorResult(409, { ok: false, error: 'not_blocked', stage: 'before_delete', message: '먼저 계정을 차단한 뒤에만 삭제할 수 있습니다.' })
   });
   await ctx.hardDeleteAccountPreserveRecords('staff-1');
   assert.equal(calls.status.at(-1), 'error');
@@ -170,6 +192,87 @@ test('함수 자체가 배포되지 않아 네트워크 오류(error)가 나도 
   await ctx.hardDeleteAccountPreserveRecords('staff-1');
   assert.equal(calls.status.at(-1), 'error');
   assert.match(calls.errors.at(-1), /Failed to send a request/);
+});
+
+/* ── 부분 성공 안내: 세 단계가 서로 다른 문구로 보여야 한다 ──
+   supabase-js가 error.message에 넣는 "Edge Function returned a non-2xx status code"만 보여주면
+   이미 로그인 계정이 지워졌는데도(되돌릴 수 없음) 원장이 "실패"로 오인한다. */
+
+test('①삭제 전 실패: 아무것도 지워지지 않았음을 분명히 말하고, non-2xx 원문만 보여주지 않는다', async () => {
+  const { ctx, calls } = hardDeleteHarness({
+    invokeResult: httpErrorResult(409, { ok: false, error: 'not_blocked', stage: 'before_delete', message: '먼저 계정을 차단한 뒤에만 삭제할 수 있습니다.' })
+  });
+  await ctx.hardDeleteAccountPreserveRecords('staff-1');
+  const msg = calls.errors.at(-1);
+  assert.doesNotMatch(msg, /non-2xx/, 'supabase-js 내부 문구가 그대로 노출되면 안 됨');
+  assert.match(msg, /아무것도 지워지지 않았/);
+  assert.match(msg, /먼저 계정을 차단한 뒤에만 삭제할 수 있습니다\./, '서버가 준 구체적 이유를 함께 보여줘야 함');
+  assert.equal(calls.status.at(-1), 'error');
+});
+
+test('②로그인 계정은 지워졌고 기록만 실패: 되돌릴 수 없음 + 같은 버튼 재시도 안내가 분명히 보인다', async () => {
+  const { ctx, calls } = hardDeleteHarness({
+    invokeResult: httpErrorResult(500, {
+      ok: false, error: 'record_failed_after_delete', stage: 'deleted_record_failed',
+      message: '로그인 계정은 이미 삭제됐습니다. 기록 저장에만 실패했습니다.',
+      target_user_id: 'staff-1', target_name: '김직원'
+    })
+  });
+  await ctx.hardDeleteAccountPreserveRecords('staff-1');
+  const msg = calls.errors.at(-1);
+  assert.doesNotMatch(msg, /non-2xx/);
+  assert.match(msg, /로그인 계정은 이미 삭제/, '이미 지워졌다는 사실이 분명히 보여야 함');
+  assert.doesNotMatch(msg, /아무것도 지워지지 않았/, '지워졌는데 안 지워졌다고 하면 안 됨');
+  assert.match(msg, /되돌릴 수 없/);
+  assert.match(msg, /같은 버튼을 한 번 더 누르|같은 버튼을 다시 누르/, '같은 버튼을 다시 누르면 기록이 채워진다고 안내해야 함');
+});
+
+test('③이미 완료: 추가로 지워진 것이 없다고 알리고 실패처럼 보이지 않게 한다', async () => {
+  const { ctx, calls } = hardDeleteHarness({
+    invokeResult: httpErrorResult(409, { ok: false, error: 'already_deleted', stage: 'already_deleted', message: '이미 영구 삭제된 계정입니다.' })
+  });
+  await ctx.hardDeleteAccountPreserveRecords('staff-1');
+  const msg = calls.errors.at(-1);
+  assert.doesNotMatch(msg, /non-2xx/);
+  assert.match(msg, /이미 영구 삭제/);
+  assert.doesNotMatch(msg, /아무것도 지워지지 않았/);
+});
+
+test('세 단계 문구는 서로 달라야 한다', async () => {
+  const texts = [];
+  for (const [status, stage, message] of [
+    [409, 'before_delete', '먼저 계정을 차단한 뒤에만 삭제할 수 있습니다.'],
+    [500, 'deleted_record_failed', '로그인 계정은 이미 삭제됐습니다. 기록 저장에만 실패했습니다.'],
+    [409, 'already_deleted', '이미 영구 삭제된 계정입니다.']
+  ]) {
+    const { ctx, calls } = hardDeleteHarness({ invokeResult: httpErrorResult(status, { ok: false, stage, message }) });
+    await ctx.hardDeleteAccountPreserveRecords('staff-1');
+    texts.push(calls.errors.at(-1));
+  }
+  assert.equal(new Set(texts).size, 3, '세 단계가 같은 문구로 보이면 구분이 안 됨');
+});
+
+test('소유권 이전 실패(삭제 전)는 파일을 지우라고 안내하지 않는다', async () => {
+  const { ctx, calls } = hardDeleteHarness({
+    invokeResult: httpErrorResult(409, {
+      ok: false, error: 'storage_transfer_failed', stage: 'before_delete',
+      message: '이 직원이 올린 파일의 소유권을 원장 계정으로 넘기지 못해 삭제를 시작하지 않았습니다. 잠시 후 다시 시도하거나 관리자에게 문의하세요.'
+    })
+  });
+  await ctx.hardDeleteAccountPreserveRecords('staff-1');
+  const msg = calls.errors.at(-1);
+  assert.match(msg, /소유권/);
+  assert.match(msg, /아무것도 지워지지 않았/);
+  assert.equal(calls.load, 0);
+});
+
+test('error.context의 본문이 JSON이 아니어도(파싱 실패) 죽지 않고 실패로 처리한다', async () => {
+  const { ctx, calls } = hardDeleteHarness({
+    invokeResult: { data: null, error: { message: NON_2XX, context: new Response('<html>502 Bad Gateway</html>', { status: 502 }) } }
+  });
+  await ctx.hardDeleteAccountPreserveRecords('staff-1');
+  assert.equal(calls.status.at(-1), 'error');
+  assert.match(calls.errors.at(-1), /아무것도 지워지지 않았/);
 });
 
 test('이미 삭제된 계정(auth_deleted_at 있음)이면 확인창 없이 거절한다', async () => {

@@ -2611,6 +2611,21 @@ function accountDeleteRowState(p,meId){
   if(p.user_id===meId)return {show:'blocked'};
   return {show:'blocked-deletable'};
 }
+// supabase-js v2는 HTTP 오류일 때 서버 JSON을 error.context(Response)에 담고, error.message에는
+// "Edge Function returned a non-2xx status code"만 넣는다. 그 문구만 보여주면 이미 로그인 계정이
+// 지워졌는데도(되돌릴 수 없음) 원장이 "실패"로 오인한다 — 그래서 본문의 stage를 꺼내 세 가지를 구분한다.
+async function accountDeleteFailureText(error,data){
+  let payload=data&&typeof data==='object'?data:null;
+  try{
+    const ctx=error&&error.context;
+    if(ctx&&typeof ctx.json==='function'){const parsed=await ctx.json();if(parsed&&typeof parsed==='object')payload=parsed;}
+  }catch(_parseError){/* 본문이 JSON이 아니면(502 HTML 등) 아래 기본 문구로 떨어진다 */}
+  const detail=(payload&&payload.message)||(error&&error.message)||'함수 미배포';
+  const stage=payload&&payload.stage;
+  if(stage==='deleted_record_failed')return '⚠️ 로그인 계정은 이미 삭제됐습니다(되돌릴 수 없습니다). 기록 저장만 실패했으니 같은 버튼을 한 번 더 누르면 남은 기록이 채워집니다. — '+detail;
+  if(stage==='already_deleted')return '이미 영구 삭제가 끝난 계정입니다(이번에 추가로 지워진 것은 없습니다). — '+detail;
+  return '로그인 계정 삭제 실패 — 아무것도 지워지지 않았습니다: '+detail;
+}
 /* account-delete-ui:test-end */
 let BULK_ROLE_SELECTED=new Set();
 async function renderOwner(m){
@@ -2709,14 +2724,14 @@ async function disableEmployeeAccountPreserveRecords(uid){
 async function hardDeleteAccountPreserveRecords(uid){
   const p=PROFILES.find(x=>x.user_id===uid);
   if(!p||accountDeleteRowState(p,ME.id).show!=='blocked-deletable'){setStatus('error');showScheduleRosterError('로그인 계정을 삭제할 수 있는 상태가 아닙니다.');return;}
-  if(!confirm(`${p.name} 님의 로그인 계정(이메일 포함)을 영구히 삭제합니다. 되돌릴 수 없습니다. 근무·연차·계약·출퇴근 기록은 그대로 남습니다. 계속하시겠습니까?`))return;
+  if(!confirm(`${p.name} 님의 로그인 계정(이메일 포함)을 영구히 삭제합니다. 되돌릴 수 없습니다.\n\n· 근무·연차·계약·출퇴근 기록은 그대로 남습니다.\n· 이 직원이 올린 파일도 지우지 않고, 소유권만 원장 계정으로 옮깁니다.\n· 다만 케이스노트 접근권한은 함께 사라집니다(다시 주려면 새로 부여해야 합니다).\n\n계속하시겠습니까?`))return;
   const raw=prompt(`정말로 삭제하려면 이름을 정확히 입력하세요: ${p.name}`);
   if(raw===null)return;
   const typed=raw.trim();
   if(typed!==p.name){setStatus('error');showScheduleRosterError('입력한 이름이 일치하지 않아 취소했습니다.');return;}
   setStatus('saving');
   const {data,error}=await sb.functions.invoke('account-delete',{body:{user_id:uid,confirm_name:typed}});
-  if(error||!data?.ok){setStatus('error');showScheduleRosterError('로그인 계정 삭제 실패: '+(data?.message||error?.message||'함수 미배포'));return;}
+  if(error||!data?.ok){setStatus('error');showScheduleRosterError(await accountDeleteFailureText(error,data));return;}
   try{await loadProfiles();}
   catch(refreshError){setStatus('error');showScheduleRosterError('로그인 계정 삭제 새로고침 실패: '+refreshError.message);return;}
   showScheduleRosterError(data.message||'로그인 계정을 영구 삭제했습니다.');

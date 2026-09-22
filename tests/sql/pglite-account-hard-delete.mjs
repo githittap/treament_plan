@@ -31,7 +31,15 @@ create role anon; create role authenticated; create role service_role;
 create schema auth; create schema storage;
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('app.test_uid',true),'')::uuid $$;
 create table auth.users(id uuid primary key, email text);
-create table storage.objects(bucket_id text, name text);
+-- 실제 Supabase의 storage.objects는 owner(uuid)가 auth.users를 NO ACTION으로 참조한다 —
+-- 그래서 파일을 올린 직원의 로그인 계정 삭제가 그대로는 막힌다(이 시험의 핵심).
+create table storage.objects(
+  id uuid primary key,
+  bucket_id text,
+  name text,
+  owner uuid references auth.users(id),
+  owner_id text
+);
 create table public.profiles(
   user_id uuid primary key ${profilesFk},
   name text not null,
@@ -63,6 +71,11 @@ insert into public.attendance(user_id, work_date) values ('${target}','2026-09-0
 insert into public.leave_requests(user_id, date_from) values ('${target}','2026-09-01');
 insert into public.consultation_inbox(id, created_by, message) values ('aaaaaaaa-0000-0000-0000-000000000001','${target}','상담 메모');
 insert into public.consultation_journals(id, author_id, note) values ('aaaaaaaa-0000-0000-0000-000000000002','${target}','상담 일지');
+-- 대상 직원이 자기 세션으로 올린 파일 두 개(개인서명·연차 증빙) + 다른 사람 파일 한 개(건드리면 안 됨).
+insert into storage.objects(id, bucket_id, name, owner, owner_id) values
+  ('bbbbbbbb-0000-0000-0000-000000000001','hr-docs','signatures/${target}.png','${target}','${target}'),
+  ('bbbbbbbb-0000-0000-0000-000000000002','hr-docs','leave/${target}/proof.pdf','${target}','${target}'),
+  ('bbbbbbbb-0000-0000-0000-000000000003','hr-docs','signatures/${unblockedStaff}.png','${unblockedStaff}','${unblockedStaff}');
 `;
 }
 
@@ -88,7 +101,8 @@ async function main() {
   // ---- 1) 본 흐름: 마이그레이션 적용 -> 가드 거절들 -> 실제 auth.users 삭제 -> profiles/자식 행 보존 -> 기록 -> RLS 차단 유지 -> 롤백 거절 ----
   const { d, q } = await fresh(blockTarget + migration);
   try {
-    await q('grant execute on function public.assert_can_hard_delete_account(uuid,text), public.record_account_hard_deleted(uuid) to authenticated');
+    // storage.objects에 authenticated 권한은 일부러 주지 않는다 — 이전은 security definer RPC만 할 수 있어야 한다.
+    await q('grant execute on function public.assert_can_hard_delete_account(uuid,text), public.record_account_hard_deleted(uuid,text), public.transfer_storage_objects_to_owner(uuid) to authenticated');
 
     // 마이그레이션이 profiles_user_id_fkey 등 auth.users FK 세 개를 끊었는지 먼저 확인한다.
     assert.equal((await q("select count(*)::int n from pg_constraint where conrelid='public.profiles'::regclass and conname='profiles_user_id_fkey'"))[0].n, 0, 'profiles_user_id_fkey가 남아있음');
@@ -112,6 +126,20 @@ async function main() {
     await assert.rejects(q(`select public.assert_can_hard_delete_account('${owner2}','부원장')`), /owner account cannot be hard-deleted/, '원장 대상 거절 안 됨');
     await assert.rejects(q(`select public.assert_can_hard_delete_account('${target}','다른이름')`), /confirmation name mismatch/, '확인 문구 불일치 거절 안 됨');
 
+    // 소유권 이전 RPC도 같은 가드를 독립적으로 다시 확인한다(순서를 어겨 먼저 불러도 안전해야 함).
+    await assert.rejects(q(`select public.transfer_storage_objects_to_owner('${unblockedStaff}')`), /account must be blocked before hard delete/, '차단 안 된 대상의 소유권을 옮기면 안 됨');
+    await assert.rejects(q(`select public.transfer_storage_objects_to_owner('${owner2}')`), /owner account cannot be hard-deleted/, '원장 대상 소유권 이전이 통과함');
+    await q('reset role');
+    await q(`select set_config('app.test_uid','${nonOwnerCaller}',false)`);
+    await q('set role authenticated');
+    await assert.rejects(q(`select public.transfer_storage_objects_to_owner('${target}')`), /active approved owner required/, '원장 아닌 호출자가 소유권을 옮길 수 있으면 안 됨');
+    await q('reset role');
+    assert.equal((await q(`select count(*)::int n from storage.objects where owner='${target}'`))[0].n, 2, '거절된 호출이 객체를 건드리면 안 됨');
+    await asOwner(q);
+    await q('set role authenticated');
+    // authenticated는 storage.objects를 직접 만질 수 없다 — security definer RPC만 통로여야 한다.
+    await assert.rejects(q(`update storage.objects set owner='${owner}' where owner='${target}'`), /permission denied|denied for table objects/, 'authenticated가 storage.objects를 직접 고칠 수 있으면 안 됨');
+
     // 사전 검증 통과 확인(아직 아무것도 지우지 않았다).
     const okRow = await q(`select public.assert_can_hard_delete_account('${target}','${targetName}') actor`);
     assert.equal(okRow[0].actor, owner);
@@ -123,6 +151,21 @@ async function main() {
     assert.equal((await q(`select count(*)::int n from public.profile_employment_history where user_id='${target}' and account_action='계정영구삭제'`))[0].n, 0, '아직 삭제 전인데 계정영구삭제 이력이 생김');
 
     assert.equal((await q(`select count(*)::int n from auth.users where id='${target}'`))[0].n, 1, '아직 auth.users에 남아있어야 함');
+
+    // 결함 3: Storage 객체를 소유한 직원은 소유권을 넘기기 전에는 삭제 자체가 막힌다(objects_owner_fkey).
+    await assert.rejects(q(`delete from auth.users where id='${target}'`), /owner/, 'Storage 객체를 소유한 채로 삭제가 통과하면 안 됨(현실과 다름)');
+
+    // 소유권 이전 RPC: 원장 세션으로 부르고, 파일 자체는 그대로 둔 채 owner/owner_id만 원장에게 넘긴다.
+    await q('set role authenticated');
+    await asOwner(q);
+    const moved = await q(`select public.transfer_storage_objects_to_owner('${target}') n`);
+    assert.equal(moved[0].n, 2, '대상이 소유한 객체 두 개를 옮겨야 함');
+    await q('reset role');
+
+    assert.equal((await q(`select count(*)::int n from storage.objects where owner='${target}' or owner_id='${target}'`))[0].n, 0, '대상 소유로 남은 객체가 있으면 삭제가 다시 막힌다');
+    assert.equal((await q(`select count(*)::int n from storage.objects where owner='${owner}' and owner_id='${owner}'`))[0].n, 2, 'owner와 owner_id 둘 다 원장으로 갱신돼야 함');
+    assert.equal((await q(`select count(*)::int n from storage.objects`))[0].n, 3, '파일(객체 행) 자체는 하나도 지우면 안 됨 — 근무 증빙 보존');
+    assert.equal((await q(`select count(*)::int n from storage.objects where owner='${unblockedStaff}'`))[0].n, 1, '남의 파일 소유권을 건드리면 안 됨');
 
     // 실제 삭제는 서비스 롤(=여기서는 테이블 소유자) 권한으로 한다 — GoTrue 관리자 API가 하는 일을 흉내낸다.
     await q(`delete from auth.users where id='${target}'`);
@@ -137,15 +180,19 @@ async function main() {
     // 기록 RPC: profiles.auth_deleted_at/by + profile_employment_history에 계정영구삭제 한 줄.
     await q('set role authenticated');
     await asOwner(q);
-    await q(`select public.record_account_hard_deleted('${target}')`);
+    await q(`select public.record_account_hard_deleted('${target}','Storage 객체 2건 소유권을 원장 계정으로 이전')`);
     await q('reset role');
     const marked = await q(`select auth_deleted_at is not null as deleted, auth_deleted_by from public.profiles where user_id='${target}'`);
     assert.equal(marked[0].deleted, true);
     assert.equal(marked[0].auth_deleted_by, owner);
-    const hist = await q(`select acted_by, to_status, from_status from public.profile_employment_history where user_id='${target}' and account_action='계정영구삭제'`);
+    const hist = await q(`select acted_by, to_status, from_status, reason from public.profile_employment_history where user_id='${target}' and account_action='계정영구삭제'`);
     assert.equal(hist.length, 1, '계정영구삭제 이력이 정확히 한 줄 남아야 함');
     assert.equal(hist[0].acted_by, owner);
     assert.equal(hist[0].to_status, '자진퇴사');
+    assert.match(hist[0].reason ?? '', /Storage 객체 2건 소유권/, '소유권을 넘긴 사실이 감사 기록에 남아야 함');
+
+    // 삭제가 끝난 뒤에도 파일 행은 전부 남아있어야 한다(근무 증빙 보존).
+    assert.equal((await q('select count(*)::int n from storage.objects'))[0].n, 3, '삭제 과정에서 파일 행이 사라졌다');
 
     // 다시 지우려 하면 막힌다.
     await q('set role authenticated');
@@ -175,7 +222,8 @@ async function main() {
       await d2.exec(rollback);
       assert.equal((await q2("select column_name from information_schema.columns where table_schema='public' and table_name='profiles' and column_name in ('auth_deleted_at','auth_deleted_by')")).length, 0, '롤백 후 auth_deleted_* 칼럼이 남아있음');
       assert.equal((await q2("select to_regprocedure('public.assert_can_hard_delete_account(uuid,text)') r"))[0].r, null);
-      assert.equal((await q2("select to_regprocedure('public.record_account_hard_deleted(uuid)') r"))[0].r, null);
+      assert.equal((await q2("select to_regprocedure('public.record_account_hard_deleted(uuid,text)') r"))[0].r, null);
+      assert.equal((await q2("select to_regprocedure('public.transfer_storage_objects_to_owner(uuid)') r"))[0].r, null, '롤백 후 소유권 이전 함수가 남아있음');
 
       const fkDefs = await q2(`
         select conname, pg_get_constraintdef(oid) def from pg_constraint
@@ -193,6 +241,11 @@ async function main() {
 
       // consultation_inbox/consultation_journals FK도 복원됐으므로(NO ACTION) target을 참조하는 행이 남아있으면
       // auth.users 삭제 자체가 막힌다 — 그 복원을 먼저 확인한 뒤, profiles CASCADE만 따로 검증하기 위해 참조 행을 치운다.
+      // storage.objects.owner FK는 마이그레이션이 건드리지 않는다(소유권 이전으로 우회하므로) —
+      // 롤백 후에도 그대로 남아 삭제를 막는다. 여러 FK 중 어느 것이 먼저 걸리는지는 정해져 있지 않으므로
+      // 막는 FK를 하나씩 치우면서 각각이 실제로 복원돼 있는지 확인한다.
+      await assert.rejects(q2(`delete from auth.users where id='${target}'`), /objects_owner_fkey/, 'storage.objects owner FK가 삭제를 막지 않음(현실과 다름)');
+      await q2(`update storage.objects set owner=null, owner_id=null where owner='${target}'`);
       await assert.rejects(q2(`delete from auth.users where id='${target}'`), /consultation_inbox_created_by_fkey/, 'consultation_inbox FK가 복원되지 않음(삭제가 막히지 않음)');
       await q2(`delete from public.consultation_inbox where created_by='${target}'`);
       await assert.rejects(q2(`delete from auth.users where id='${target}'`), /consultation_journals_author_id_fkey/, 'consultation_journals FK가 복원되지 않음(삭제가 막히지 않음)');
@@ -228,6 +281,28 @@ async function main() {
       console.log('PGLITE_ACCOUNT_HARD_DELETE_DRIFT_PASS: profiles_user_id_fkey 정의 어긋나면 사전 점검이 막고 아무 것도 바뀌지 않음');
     } finally {
       await d3.close();
+    }
+  }
+
+  // ---- 4) 음성 시험: storage.objects에 owner/owner_id가 없으면(소유권을 넘길 수 없으므로) 사전 점검에서 그대로 멈춘다 ----
+  {
+    const d4 = new PGlite();
+    const q4 = sql => d4.query(sql).then(r => r.rows);
+    try {
+      await d4.exec(base() + phaseA + phaseB + 'alter table storage.objects drop column owner_id;');
+      let blocked = '';
+      try {
+        await d4.exec(migration);
+      } catch (caught) {
+        blocked = String(caught);
+      }
+      assert.match(blocked, /storage\.objects|account hard delete preflight/, 'owner_id가 없는데 사전 점검이 통과함');
+      await d4.exec('rollback');
+      assert.equal((await q4("select count(*)::int n from information_schema.columns where table_schema='public' and table_name='profiles' and column_name='auth_deleted_at'"))[0].n, 0, '실패한 마이그레이션인데 칼럼이 추가됨');
+      assert.equal((await q4("select to_regprocedure('public.transfer_storage_objects_to_owner(uuid)') r"))[0].r, null, '실패한 마이그레이션인데 함수가 생성됨');
+      console.log('PGLITE_ACCOUNT_HARD_DELETE_STORAGE_PREFLIGHT_PASS: storage.objects owner/owner_id 없으면 사전 점검이 막고 아무 것도 바뀌지 않음');
+    } finally {
+      await d4.close();
     }
   }
 }
