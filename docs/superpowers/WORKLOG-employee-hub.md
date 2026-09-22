@@ -1,5 +1,11 @@
 # 직원허브 구현 기록
 
+## 2026-09-22 — 상담문의 일원화 1차 로컬 구현
+
+- 기존 상담일지 안에 통합 문의함을 추가하고, source/status 필터·목록 마스킹·상세·수기 접수·상담일지 원자 전환을 구현했다. `consultation_inbox`는 기존 접속 허용 경계와 manager/owner 역할을 재사용하며 delete 권한을 주지 않는다.
+- local static 2개와 PGlite migration apply×2, service ingest idempotency, ACL/RLS 모양, 상담일지 전환 및 데이터 보존 rollback gate를 확인했다. 운영 DB·Edge function·Git push/배포는 미수행이다.
+- 외부 connector는 의도적으로 미구현이다: Kakao Developers 채널 webhook은 1:1 상담 수신 API가 아니고, 당근 공개 채팅 수신 API는 미확인, Naver IMAP 993은 별도 서버 자격증명이 필요하다.
+
 ## 2026-09-22 — Task11 결과보고서·사용설명서 완료
 
 - Task10 기록 커밋 `41327995d523e6583db14db4840e5628052d20e0`의 `origin/main` push와 최신 GitHub Pages run `35666985589` success를 기록했다. 기능 배포 `eeac4f2`·run `35640892992`는 역사 증거로 유지한다.

@@ -1,5 +1,11 @@
 # 직원허브 현재 인수인계
 
+## 최신 인계 — 상담문의 일원화 1차 로컬 구현 (2026-09-22)
+
+- 구현: `hr.html` 기존 상담일지 내부 `통합 문의함`, `db/consultation_inbox.sql`·rollback, service-role JWT 전용 `supabase/functions/consultation-ingest/index.ts`, 정적/PGlite 시험을 추가했다. 운영 DB·Edge 배포·push는 하지 않았다.
+- 보안/복구: manager·owner와 기존 `employee_hub_access_allowed()`를 함께 요구하고 anon/staff/chief는 차단한다. service ingest는 raw payload·비밀을 저장하지 않으며, inbox→`consultation_journals` 전환은 단일 RPC로 중복 전환을 거부한다. inbox 행 또는 연결이 있으면 rollback은 중단해 기존 상담일지를 보존한다.
+- 외부 경계: Kakao Developers 채널 webhook은 채널 추가/차단이지 1:1 상담 수신이 아니다. 당근 공개 채팅 수신 API는 미확인이고, Naver IMAP 993은 별도 서버 자격증명이 필요하다. 이번 코드에는 connector·평문 secret·자동 회신이 없다.
+
 ## 최신 인계 — 직원허브 5차 원본 대조·운영 반영 완료 (2026-09-22)
 
 - 원본: `C:\Users\elusi\Downloads\직원허브 5차.zip`, SHA256 `A177836684189BFAA4D0733F1EFF8D39B58B9F5FE71791E1F551DCD7C0EC5E3A`, 항목 4(MD 1, PNG 3). 7개 원본 모두 `Z:\11_codex\03_병원운영·전산\직원허브_원본ZIP`에 비파괴 복사됐고 이름별 SHA256이 Downloads 원본과 일치하며 Downloads 원본은 보존됐다.
