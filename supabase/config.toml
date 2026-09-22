@@ -12,3 +12,6 @@ verify_jwt = false
 
 [functions.contract-pdf-sign]
 verify_jwt = true
+
+[functions.push-dispatcher]
+verify_jwt = true
