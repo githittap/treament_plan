@@ -879,6 +879,11 @@ function approvalHarness({ existingRoster = false, rosterError = null, profileEr
     loadSchedulePeople: async () => { calls.loadRoster++; },
     render: () => { calls.render++; },
     sb: {
+      rpc(name, payload) {
+        calls.order.push('profile');
+        calls.profilePayloads.push({ name, payload });
+        return Promise.resolve({ error: profileErrors.length ? profileErrors.shift() : null });
+      },
       from(table) {
         if (table === 'schedule_people') {
           return {
@@ -886,19 +891,6 @@ function approvalHarness({ existingRoster = false, rosterError = null, profileEr
               calls.order.push('roster');
               calls.rosterPayloads.push({ payload, options });
               return { error: rosterError };
-            }
-          };
-        }
-        if (table === 'profiles') {
-          return {
-            update(payload) {
-              return {
-                eq: async (column, value) => {
-                  calls.order.push('profile');
-                  calls.profilePayloads.push({ payload, column, value });
-                  return { error: profileErrors.length?profileErrors.shift():null };
-                }
-              };
             }
           };
         }
@@ -915,7 +907,7 @@ test('연결 명부가 없으면 명부 저장 성공 후에만 프로필을 승
   const { context, calls } = approvalHarness();
   await context.approveProfile('user-1');
   assert.deepEqual(calls.order, ['roster', 'profile']);
-  assert.deepEqual(JSON.parse(JSON.stringify(calls.profilePayloads)), [{ payload: { approved: true }, column: 'user_id', value: 'user-1' }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(calls.profilePayloads)), [{ name: 'approve_employee_profile', payload: { p_user_id: 'user-1' } }]);
   assert.equal(calls.status.at(-1), 'saved');
 });
 

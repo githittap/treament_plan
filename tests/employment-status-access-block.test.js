@@ -32,7 +32,7 @@ test('이력은 chief/owner만 읽고 직접 쓰기 권한은 없다', () => {
   assert.doesNotMatch(sql, /create policy profile_employment_history_.*(?:insert|update|delete)/i);
 });
 
-test('두 RPC는 SECURITY DEFINER·빈 search_path·원장 활성승인·자기자신/마지막원장 차단을 강제한다', () => {
+test('상태 RPC는 SECURITY DEFINER·빈 search_path·원장 활성승인·자기자신/마지막원장 차단과 차단계정 복귀 거부를 강제한다', () => {
   const sql = fs.readFileSync(sqlPath, 'utf8');
   for (const name of ['set_employment_status', 'disable_employee_account_preserve_records']) {
     assert.match(sql, new RegExp(`create or replace function public\\.${name}`, 'i'));
@@ -43,7 +43,20 @@ test('두 RPC는 SECURITY DEFINER·빈 search_path·원장 활성승인·자기�
   assert.match(sql, /p\.active\s*=\s*true[\s\S]*p\.approved\s*=\s*true[\s\S]*p\.role\s*=\s*'owner'/i);
   assert.match(sql, /update public\.schedule_people[\s\S]*included_in_schedule\s*=\s*false/i);
   assert.match(sql, /approved\s*=\s*false/i);
+  assert.match(sql, /v_access_status\s*=\s*'차단' then raise exception 'blocked account cannot return to employed status'/i);
   assert.match(sql, /grant execute on function public\.set_employment_status/i);
+});
+
+test('승인은 직접 profiles 갱신이 아닌 차단 계정 거부 RPC를 사용한다', () => {
+  const sql = fs.readFileSync(sqlPath, 'utf8');
+  assert.match(sql, /create or replace function public\.approve_employee_profile/i);
+  assert.match(sql, /active approved chief or owner required/i);
+  assert.match(sql, /blocked account cannot be approved/i);
+  assert.match(sql, /grant execute on function public\.approve_employee_profile/i);
+  assert.match(html, /sb\.rpc\('approve_employee_profile'/);
+  assert.doesNotMatch(html, /function approveProfile\(uid\)\{[\s\S]*?from\('profiles'\)\.update\(\{approved:true\}\)/);
+  assert.match(html, /blocked=p\.account_access_status==='차단'/);
+  assert.match(html, /blocked\?'disabled':''/);
 });
 
 test('rollback은 이력 또는 비재직·차단 데이터가 있으면 보존 중단한다', () => {

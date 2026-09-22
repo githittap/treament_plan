@@ -12,6 +12,9 @@ $$;
 
 revoke execute on function public.set_employment_status(uuid,text,date,text) from authenticated;
 revoke execute on function public.disable_employee_account_preserve_records(uuid,text,text,date) from authenticated;
+revoke execute on function public.approve_employee_profile(uuid) from authenticated;
+drop function if exists public.approve_employee_profile(uuid);
+drop function if exists public.assert_employee_approver(uuid);
 drop function if exists public.disable_employee_account_preserve_records(uuid,text,text,date);
 drop function if exists public.set_employment_status(uuid,text,date,text);
 drop function if exists public.assert_employment_owner(uuid);

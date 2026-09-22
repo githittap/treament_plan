@@ -2319,15 +2319,15 @@ async function renderOwner(m){
     ${pending.length?`<h3>🆕 가입 승인 대기 (${pending.length}명)</h3>
     <div class="tblwrap"><table><tr><th>이름</th><th>부서</th><th>가입일</th><th></th></tr>
     ${pending.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.dept||'')}</td><td>${p.created_at?md(p.created_at):''}</td>
-      <td><button class="mini stamp" onclick="approveProfile('${p.user_id}')">승인</button></td></tr>`).join('')}</table></div>`:''}
+      <td>${p.account_access_status==='차단'?'<span class="sub">계정 차단됨</span>':'<button class="mini stamp" onclick="approveProfile(\''+p.user_id+'\')">승인</button>'}</td></tr>`).join('')}</table></div>`:''}
     <h3>직원 권한 관리 <span class="sub">(입퇴사·승진 시 여기서 변경)</span></h3>
     <div class="msg" id="rosterMsg"></div>
     <div class="tblwrap"><table><tr><th>이름</th><th>부서</th><th>근무부서</th><th>근무표·집계 포함</th><th>근무명부</th><th>재직 상태·유효일·사유</th><th>입사</th><th>권한</th><th>승인</th></tr>
-    ${PROFILES.map(p=>{const depts=['진료실','데스크','기공팀','기타'],dept=p.dept||'',roster=SCHEDULE_PEOPLE.find(x=>x.profile_user_id===p.user_id),rosterDept=roster&&(SCHEDULE_DEPARTMENTS.includes(roster.department)?roster.department:'미지정');return `<tr><td>${esc(p.name)}</td><td><select class="mini" onchange="setDept('${p.user_id}',this.value)"><option value="" ${dept===''?'selected':''}>-</option>${depts.map(d=>`<option value="${d}" ${dept===d?'selected':''}>${d}</option>`).join('')}${dept&&!depts.includes(dept)?`<option value="${esc(dept)}" selected>${esc(dept)}</option>`:''}</select></td>
+    ${PROFILES.map(p=>{const depts=['진료실','데스크','기공팀','기타'],dept=p.dept||'',roster=SCHEDULE_PEOPLE.find(x=>x.profile_user_id===p.user_id),rosterDept=roster&&(SCHEDULE_DEPARTMENTS.includes(roster.department)?roster.department:'미지정'),blocked=p.account_access_status==='차단';return `<tr><td>${esc(p.name)}</td><td><select class="mini" onchange="setDept('${p.user_id}',this.value)"><option value="" ${dept===''?'selected':''}>-</option>${depts.map(d=>`<option value="${d}" ${dept===d?'selected':''}>${d}</option>`).join('')}${dept&&!depts.includes(dept)?`<option value="${esc(dept)}" selected>${esc(dept)}</option>`:''}</select></td>
       <td>${roster?`<select class="mini" onchange="setSchedulePersonDepartment('${roster.id}',this.value)">${SCHEDULE_DEPARTMENTS.map(d=>`<option value="${d}" ${rosterDept===d?'selected':''}>${d}</option>`).join('')}</select>`:'<span class="sub">미연결</span>'}</td>
       <td>${roster?`<input type="checkbox" ${roster.included_in_schedule!==false?'checked':''} onchange="setSchedulePersonIncluded('${roster.id}',this.checked)">`:'—'}</td>
       <td>${roster?`<span class="b ${roster.active===true?'ok':'no'}">${roster.active===true?'재직':'비활성'}</span> <button class="mini ${roster.active===true?'rej':'stamp'}" onclick="setSchedulePersonActive('${roster.id}',${roster.active===true?'false':'true'})">${roster.active===true?'비활성화':'재활성화'}</button>`:'—'}</td>
-      <td><select id="employment-${p.user_id}-status" class="mini"><option value="재직" ${(p.employment_status||'재직')==='재직'?'selected':''}>재직</option><option value="자진퇴사" ${p.employment_status==='자진퇴사'?'selected':''}>자진퇴사</option><option value="계약만료" ${p.employment_status==='계약만료'?'selected':''}>계약만료</option><option value="권고사직" ${p.employment_status==='권고사직'?'selected':''}>권고사직</option></select><br><input id="employment-${p.user_id}-effective" class="mini" type="date" value="${p.employment_effective_date||today()}" aria-label="재직 상태 유효일"><br><input id="employment-${p.user_id}-reason" class="mini" value="${esc(p.employment_reason||'')}" placeholder="사유" aria-label="재직 상태 사유"><br><button class="mini stamp" onclick="setEmploymentStatus('${p.user_id}')">상태 저장</button>${p.user_id!==ME.id?` <button class="mini rej" onclick="disableEmployeeAccountPreserveRecords('${p.user_id}')">접속 영구 차단(인사기록 보존)</button>`:''}${p.account_access_status==='차단'?'<div class="sub">계정 차단됨</div>':''}</td><td>${p.hire_date||''}</td>
+      <td><select id="employment-${p.user_id}-status" class="mini" ${blocked?'disabled':''}><option value="재직" ${(p.employment_status||'재직')==='재직'?'selected':''}>재직</option><option value="자진퇴사" ${p.employment_status==='자진퇴사'?'selected':''}>자진퇴사</option><option value="계약만료" ${p.employment_status==='계약만료'?'selected':''}>계약만료</option><option value="권고사직" ${p.employment_status==='권고사직'?'selected':''}>권고사직</option></select><br><input id="employment-${p.user_id}-effective" class="mini" type="date" value="${p.employment_effective_date||today()}" aria-label="재직 상태 유효일" ${blocked?'disabled':''}><br><input id="employment-${p.user_id}-reason" class="mini" value="${esc(p.employment_reason||'')}" placeholder="사유" aria-label="재직 상태 사유" ${blocked?'disabled':''}><br><button class="mini stamp" onclick="setEmploymentStatus('${p.user_id}')" ${blocked?'disabled':''}>상태 저장</button>${p.user_id!==ME.id&&!blocked?` <button class="mini rej" onclick="disableEmployeeAccountPreserveRecords('${p.user_id}')">접속 영구 차단(인사기록 보존)</button>`:''}${blocked?'<div class="sub">계정 차단됨</div>':''}</td><td>${p.hire_date||''}</td>
       <td><select class="mini" onchange="setRole('${p.user_id}',this.value)">${['staff','manager','chief','owner'].map(r=>`<option ${p.role===r?'selected':''}>${r}</option>`).join('')}</select></td>
       <td><span class="b ${p.approved!==false?'ok':'wait'}">${p.approved!==false?'승인됨':'대기'}</span>${p.approved!==false&&p.user_id!==ME.id?` <button class="mini rej" onclick="revokeApproval('${p.user_id}')">승인취소</button>`:''}</td></tr>`}).join('')}</table></div>
     <h3>🔒 케이스노트 접근 명단</h3>
@@ -2375,15 +2375,16 @@ async function disableEmployeeAccountPreserveRecords(uid){
   setStatus('saved');render();
 }
 async function approveProfile(uid){
-  if(!isMgr()){setStatus('error');showScheduleRosterError('가입 승인 권한이 없습니다.');return;}
+  if(!['chief','owner'].includes(ME.role)){setStatus('error');showScheduleRosterError('가입 승인 권한이 없습니다.');return;}
   const p=PROFILES.find(x=>x.user_id===uid);
   if(!p){setStatus('error');showScheduleRosterError('승인할 프로필을 찾지 못했습니다.');return;}
+  if(p.account_access_status==='차단'){setStatus('error');showScheduleRosterError('차단된 계정은 승인할 수 없습니다.');return;}
   setStatus('saving');
   if(!SCHEDULE_PEOPLE.some(person=>person.profile_user_id===uid)){
     const {error:rosterError}=await sb.from('schedule_people').upsert({profile_user_id:uid,name:p.name,department:'미지정',included_in_schedule:true,active:true},{onConflict:'profile_user_id',ignoreDuplicates:true});
     if(rosterError){setStatus('error');showScheduleRosterError('연결 근무명부 저장 실패: '+rosterError.message);return;}
   }
-  const {error:profileError}=await sb.from('profiles').update({approved:true}).eq('user_id',uid);
+  const {error:profileError}=await sb.rpc('approve_employee_profile',{p_user_id:uid});
   if(profileError){setStatus('error');showScheduleRosterError('가입 승인 실패: '+profileError.message);return;}
   try{await Promise.all([loadProfiles(),loadSchedulePeople()]);}
   catch(error){setStatus('error');showScheduleRosterError('승인 정보 새로고침 실패: '+error.message);return;}
