@@ -90,6 +90,9 @@ test('rollback은 이력 또는 비재직·차단 데이터가 있으면 보존 
   assert.match(rollback, /employment_status\s*<>\s*'재직'/i);
   assert.match(rollback, /account_access_status\s*<>\s*'활성'/i);
   assert.match(rollback, /raise exception/i);
+  assert.match(rollback, /create or replace function employee_hub_private\.push_subscription_access_allowed/i);
+  assert.match(rollback, /p\.active and p\.approved/i);
+  assert.ok(rollback.indexOf('push_subscription_access_allowed') < rollback.indexOf('drop function if exists public.employee_hub_access_allowed'), 'push helper는 gate helper 삭제 전에 복원되어야 합니다.');
 });
 
 test('원장 UI는 상태·유효일·사유 저장과 영구 접속 차단 오류복구를 제공한다', () => {

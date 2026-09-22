@@ -69,6 +69,21 @@ select public._remove_employee_hub_access_gate(to_regclass('public.leave_applica
 select public._remove_employee_hub_access_gate(to_regclass('public.leave_application_document_events'));
 select public._remove_employee_hub_access_gate(to_regclass('public.push_subscriptions'));
 drop function public._remove_employee_hub_access_gate(regclass);
+-- apply가 push helper를 차단-aware 정의로 바꿨으므로, gate helper를 지우기 전에
+-- push migration의 원래 active+approved 의미와 권한을 복원한다.
+do $$
+begin
+  if to_regnamespace('employee_hub_private') is not null then
+    execute $sql$
+      create or replace function employee_hub_private.push_subscription_access_allowed(p_user uuid)
+      returns boolean language sql stable security definer set search_path=''
+      as $fn$ select p_user=auth.uid() and exists(select 1 from public.profiles p where p.user_id=p_user and p.active and p.approved) $fn$
+    $sql$;
+    revoke all on function employee_hub_private.push_subscription_access_allowed(uuid) from public,anon,authenticated,service_role;
+    grant execute on function employee_hub_private.push_subscription_access_allowed(uuid) to authenticated;
+  end if;
+end;
+$$;
 drop function if exists public.employee_hub_access_allowed();
 drop policy if exists profile_employment_history_select_lead on public.profile_employment_history;
 drop table public.profile_employment_history;
