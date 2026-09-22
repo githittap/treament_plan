@@ -3,7 +3,7 @@
 ## 2026-09-22 — 상담문의 일원화 1차 로컬 구현
 
 - 기존 상담일지 안에 통합 문의함을 추가하고, source/status 필터·목록 마스킹·상세·수기 접수·상담일지 원자 전환을 구현했다. `consultation_inbox`는 기존 접속 허용 경계와 manager/owner 역할을 재사용하며 delete 권한을 주지 않는다.
-- local static 3개와 PGlite migration apply×2, service ingest idempotency, ACL/RLS·차단계정, 원문/감사 필드 변조 거부, 열 단위 status/assigned_to 권한, 허용 담당 검증, 명시 담당 변경, 상담일지 전환 단일 journal 및 데이터 보존 rollback gate를 확인했다. rollback은 데이터가 있으면 중단하고, 빈 상태에서는 정책·trigger·RPC·table·helper를 의존성 순서대로 제거해 commit까지 확인했다. Edge 입력은 허용키·타입/길이·RFC3339 달력 유효 수신시각만 받으며 `supabase/config.toml`의 function JWT 검증을 켠다. 운영 DB·Edge function·Git push/배포는 미수행이다.
+- local static 3개와 PGlite migration apply×2, service ingest idempotency, ACL/RLS·차단계정, 원문/감사 필드 변조 거부, 열 단위 status/assigned_to 권한, 허용 담당 검증, 명시 담당 변경, 상담일지 전환 단일 journal 및 데이터 보존 rollback gate를 확인했다. service dedupe hash는 pgcrypto SHA-256이고 semantic `(source,external_event_id)` conflict로 idempotent return한다. 수기 접수 hash는 DB default가 만들며 수기 권한은 허용 열로 제한해 service event/hash 선점을 막는다. rollback은 데이터가 있으면 중단하고, 빈 상태에서는 정책·trigger·RPC·table·helper를 의존성 순서대로 제거해 commit까지 확인했다. Edge는 허용키·타입/길이·RFC3339 달력 유효 수신시각과 service-key bearer 정확 일치만 받고 `supabase/config.toml`의 function JWT 검증을 켠다. 운영 DB·Edge function·Git push/배포는 미수행이다.
 - 외부 connector는 의도적으로 미구현이다: Kakao Developers 채널 webhook은 1:1 상담 수신 API가 아니고, 당근 공개 채팅 수신 API는 미확인, Naver IMAP 993은 별도 서버 자격증명이 필요하다.
 
 ## 2026-09-22 — Task11 결과보고서·사용설명서 완료
