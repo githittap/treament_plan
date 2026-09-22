@@ -3,6 +3,8 @@
 ## 상담문의 일원화 1차
 
 - [x] 운영 반영·독립 검증: migration `employee_hub_consultation_inbox_20260922`, Edge `consultation-ingest` v1 ACTIVE·`verify_jwt=true`, 동일 외부 이벤트의 DB 트랜잭션 idempotency/rollback, 권한·RLS·고정 search_path postflight, no-auth/위조 JWT 401, 공개 smoke와 독립 검증 PASS.
+- [x] 결과보고서·사용설명서 최신화: 보고서 템플릿 자리표시자와 저장 스크립트, 사용설명서의 상담일지 내부 통합 문의함 절·8개 안내·기존 이미지 보존을 정적으로 확인했다.
+- [ ] 사용설명서 전 페이지 PNG render visual QA는 번들 LibreOffice 부재로 미검증이다.
 - [ ] 외부 수신 connector는 다음 승인 범위다. 카카오 채널 webhook은 1:1 상담 수신용이 아니며, 당근 수신 API 미확인·네이버 IMAP 993 별도 서버 자격증명은 별도 공식 API·자격증명 확인 뒤에만 검토한다.
 
 ## 직원허브 5차 — 원본 대조·운영 반영 완료
@@ -10,7 +12,7 @@
 - [x] `직원허브 5차.zip` SHA256 `A177836684189BFAA4D0733F1EFF8D39B58B9F5FE71791E1F551DCD7C0EC5E3A` 요구 대조 완료. 7개 원본은 보존 복사본과 이름별 SHA256 일치, Downloads 원본 보존.
 - [x] 근무표·수기근태·결근/미기록 후보·재직상태/접속차단 구현·검증·운영 반영 완료.
 - [ ] 실제 Auth 계정 영구삭제만 문자 그대로 남음. 이는 의도적으로 수행하지 않으며 기록보존형 영구 접속차단을 안전한 대체로 유지한다.
-- [ ] 다음 활성 범위: `상담문의 등 일원화.zip`.
+- [x] `상담문의 등 일원화.zip`의 1차 범위인 상담일지 내부 통합 문의함은 운영 반영·문서 최신화까지 완료했다. 외부 자동 connector는 다음 승인 범위다.
 
 ## 직원허브 5차 — 재직상태·접속차단 운영 반영
 

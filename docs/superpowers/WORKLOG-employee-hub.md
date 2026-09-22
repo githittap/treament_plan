@@ -1,5 +1,11 @@
 # 직원허브 구현 기록
 
+## 2026-09-22 — 직원허브 결과보고서·사용설명서 최신화
+
+- 템플릿 기반 결과보고서 `Z:\11_codex\00_결과보고서\직원허브_구현결과보고서_2026-09-22.html`을 전체 직원허브 범위(근무·휴가·서류·출퇴근·재직·자료·건의·상담·단계배포)와 운영 증거로 최신화했다. SHA256 `1F0A93119B9E2B5E1A96D9B6CE6D57DDDAEAF631720C3F71A1106CBC50FEF428`; 자리표시자 제거 및 하단 PNG/PDF 저장 스크립트가 템플릿과 동일함을 확인했다.
+- 사용설명서 `Z:\11_codex\03_병원운영·전산\직원허브_수정지침_시안\직원허브_사용설명서.docx`에 상담일지 내부 통합 문의함 절을 추가했다. 목록·필터·상세·담당자·상태·1회 전환·빠른 수기 접수·401/중복/권한 오류 대응을 안내하고 별도 상단 탭·외부 connector 미연결을 명시했다. SHA256 `71C1E69283176426A4FC12238E4E61BAE4915E22063512E26B38C51F7A78C792`; 문단 50·표 6·기존 이미지 1, 새 절·8개 안내를 정적으로 확인했다.
+- 번들 LibreOffice 부재로 `render_docx.py`의 전 페이지 PNG 렌더는 실행되지 못했다. 따라서 DOCX visual QA는 미검증으로 남기며, 실제 외부 카카오·당근·네이버 자동 connector도 구현·운영하지 않았다.
+
 ## 2026-09-22 — 상담문의 일원화 1차 운영 반영·독립 검증 완료
 
 - migration `employee_hub_consultation_inbox_20260922`를 성공 적용했다. postflight는 inbox_rows=0, RLS=true, policies=3, anon SELECT=false, authenticated의 event/hash INSERT=false·message UPDATE=false·status UPDATE=true, ingest auth=false/service=true, convert auth=true, hardened search_path를 확인했다. 실제 DB 트랜잭션에서 동일 외부 이벤트 ingest는 동일 ID·1행으로 PASS했고 rollback도 확인했다.
