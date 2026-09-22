@@ -4,7 +4,7 @@
 
 - [x] 운영 반영·독립 검증: migration `employee_hub_consultation_inbox_20260922`, Edge `consultation-ingest` v1 ACTIVE·`verify_jwt=true`, 동일 외부 이벤트의 DB 트랜잭션 idempotency/rollback, 권한·RLS·고정 search_path postflight, no-auth/위조 JWT 401, 공개 smoke와 독립 검증 PASS.
 - [x] 결과보고서·사용설명서 최신화: 보고서 템플릿 자리표시자와 저장 스크립트, 사용설명서의 상담일지 내부 통합 문의함 절·8개 안내·기존 이미지 보존을 정적으로 확인했다.
-- [ ] 사용설명서 전 페이지 PNG render visual QA는 번들 LibreOffice 부재로 미검증이다.
+- [x] 사용설명서 시각 QA: Pandoc→Edge headless→PDF→6페이지 PNG에서 제목 번호 결함을 발견·수정했고 전 페이지 가독성/잘림을 확인했다(PASS, Word 원본 렌더가 아닌 대체 렌더).
 - [ ] 외부 수신 connector는 다음 승인 범위다. 카카오 채널 webhook은 1:1 상담 수신용이 아니며, 당근 수신 API 미확인·네이버 IMAP 993 별도 서버 자격증명은 별도 공식 API·자격증명 확인 뒤에만 검토한다.
 
 ## 직원허브 5차 — 원본 대조·운영 반영 완료
