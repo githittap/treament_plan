@@ -1,9 +1,13 @@
 {
   "version": "5",
   "specifiers": {
+    "npm:@electric-sql/pglite@0.3.14": "0.3.14",
     "npm:@supabase/supabase-js@2.110.9": "2.110.9"
   },
   "npm": {
+    "@electric-sql/pglite@0.3.14": {
+      "integrity": "sha512-3DB258dhqdsArOI1fIt7cb9RpUOgcDg5hXWVgVHAeqVQ/qxtFy605QKs4gx6mFq3jWsSPqDN8TgSEsqC3OfV9Q=="
+    },
     "@supabase/auth-js@2.110.9": {
       "integrity": "sha512-XQIWyJfwEUdtzinuLUWPNSJbJKWdCQPqC7dDY45lA1qhX/OzvGPE+4OyPPZVOVWVh4DlPvk5RT2XL6SEAY0MoA==",
       "dependencies": [
