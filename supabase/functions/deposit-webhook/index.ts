@@ -199,21 +199,18 @@ export async function extractPayload(
 }
 
 export function buildTelegramMessage(record: DepositRecord): string {
-  const kstTime = new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date(record.bank_dt));
-
+  const kst = new Date(new Date(record.bank_dt).getTime() + KST_OFFSET_MS);
+  const month = String(kst.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(kst.getUTCDate()).padStart(2, "0");
+  const hour = String(kst.getUTCHours()).padStart(2, "0");
+  const minute = String(kst.getUTCMinutes()).padStart(2, "0");
+  const timestamp = `${month}.${day}. ${hour}:${minute}`;
   const amountText = record.amount.toLocaleString("ko-KR");
 
   if (record.is_card) {
-    return `💳 카드결제(추정) ${amountText}원\n${kstTime}`;
+    return `💳 카드결제(추정) ${amountText}원 · ${timestamp}`;
   }
-  return `💰 입금 ${amountText}원 - ${record.payer_raw}\n${kstTime}`;
+  return `💰 입금 ${amountText}원 · ${record.payer_raw} ${timestamp}`;
 }
 
 async function notifyTelegram(record: DepositRecord): Promise<void> {
