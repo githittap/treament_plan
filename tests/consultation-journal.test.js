@@ -120,8 +120,8 @@ test('server_search_filter_survives_render: 버튼 입력은 렌더 전 상태�
   assert.match(html, /const currentQuery=CONSULTATION_FILTERS\.query,currentSheet=CONSULTATION_FILTERS\.sheet,currentStatus=CONSULTATION_FILTERS\.status/);
 });
 
-test('직원허브는 별도 상단 탭 없이 실장·원장 전용 상담 화면과 오류 경로를 제공한다', () => {
-  assert.doesNotMatch(html, /\{key:'consult'/);
+test('직원허브는 실장·원장 전용 상담 화면을 메뉴 탭과 오류 경로로 제공한다', () => {
+  assert.match(html, /\{key:'consult',label:'🗂 상담일지',roles:\['manager','owner'\]\}/);
   assert.match(html, /상담일지 열기/);
   assert.match(html, /else if\(TAB==='consult'\)await renderConsultationJournal\(m\)/);
   assert.match(html, /function canManageConsultation\(\)\{return consultationCanAccess\(ME\.role\);\}/);

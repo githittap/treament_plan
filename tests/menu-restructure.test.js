@@ -24,7 +24,7 @@ const BOARD = [
   { kind: 'tab', key: 'home', label: '홈', children: [['notice', '공지'], ['suggestions', '💡 건의함']] },
   { kind: 'group', key: 'g-work', label: '🕘 근무', children: [['sched', '근무표'], ['calendar', '📅 캘린더'], ['att', '출퇴근']] },
   { kind: 'group', key: 'g-owner', label: '🔒 원장 전용', children: [['owner', '🛡️ 계정·권한 관리'], ['aicost', '💰 AI비용'], ['pay', '💰 급여']] },
-  { kind: 'group', key: 'g-care', label: '🩺 환자관리·진료', children: [['confid', '진료기록'], ['workdocs', '📚 업무자료']] },
+  { kind: 'group', key: 'g-care', label: '🩺 환자관리·진료', children: [['confid', '진료기록'], ['workdocs', '📚 업무자료'], ['inbox', '📥 문의함'], ['consult', '🗂 상담일지']] },
   { kind: 'group', key: 'g-docs', label: '🏖 연차·결재·서류', children: [['contract', '근로계약서'], ['onbo', '내 서류함'], ['appr', '결재함'], ['leave', '연차']] },
   { kind: 'tab', key: 'deposit', label: '입금', children: [] }
 ];
@@ -34,7 +34,10 @@ const ALL = ['staff', 'manager', 'chief', 'owner'];
 const TAB_ROLE_RULES = {
   home: ALL, att: ALL, deposit: ALL, sched: ALL, leave: ALL, appr: ALL, notice: ALL,
   workdocs: ALL, calendar: ALL, suggestions: ALL, onbo: ALL, confid: ALL, contract: ALL,
-  pay: ['owner'], aicost: ['owner'], owner: ['owner']
+  pay: ['owner'], aicost: ['owner'], owner: ['owner'],
+  /* 원장 승인 2026-09-23(노션 댓글 "승인한다."): 통합 문의함을 메뉴로 꿄내면서
+     상담일지도 같은 묶음에 올렸다. 권한은 consultationCanAccess(manager·owner) 그대로다. */
+  inbox: ['manager', 'owner'], consult: ['manager', 'owner']
 };
 /* 재편 전 renderNav 의 노출 판정식 — 글자 하나도 바꾸지 않는다(공백만 무시해 비교). */
 const VISIBILITY_RULE = `ME.role==='owner'
@@ -169,7 +172,7 @@ test('권한 없는 탭은 어느 줄에도 나오지 않는다 (staff·manager�
   }
   const withConfid = harness({ role: 'owner', confidAccess: true, tab: 'confid' });
   withConfid.ctx.renderNav();
-  assert.deepEqual(keysOf(withConfid.nav2.innerHTML), ['confid', 'workdocs']);
+  assert.deepEqual(keysOf(withConfid.nav2.innerHTML), ['confid', 'workdocs', 'inbox', 'consult']);
 });
 
 test('역할별 위줄 묶음 구성이 보드 순서대로 나온다', () => {
@@ -199,14 +202,19 @@ test('아래줄은 고른 묶음의 탭들이고, 자식 있는 탭은 자기 �
   assert.match(hr, /<nav class="nav nav2" id="nav2"><\/nav>/);
 });
 
-test('옛 탭 id·딥링크·숨은 상담일지 경로가 그대로 동작한다', () => {
+test('옛 탭 id·딥링크는 그대로이고, 상담 화면 2개가 메뉴에 올라왔다', () => {
   assert.match(hr, /function go\(k\)\{if\(k==='leavestatus'\)\{k='calendar';CAL_VIEW='leave';\}TAB=k;renderNav\(\);render\(\);\}/);
-  assert.match(hr, /onclick="go\(\\'consult\\'\)"/);
-  const h = harness({ role: 'owner', tab: 'consult' });   // 상단 메뉴에 없는 숨은 화면
+  assert.match(hr, /onclick="go\(\\'consult\\'\)"/);   // 홈 카드의 상담일지 바로가기는 그대로
+  const h = harness({ role: 'owner', tab: 'consult' });
   h.ctx.renderNav();
-  assert.equal(h.ctx.menuEntryOf('consult'), null);
-  assert.equal(h.nav2.innerHTML, '');
-  assert.equal(labelsOf(h.nav.innerHTML).length, 6, '숨은 화면에서도 위줄은 그대로 나온다');
+  assert.equal(h.ctx.menuEntryOf('consult').key, 'g-care', '상담일지는 이제 환자관리·진료 묶음에 있다');
+  assert.equal(h.ctx.menuEntryOf('inbox').key, 'g-care');
+  assert.deepEqual(keysOf(h.nav2.innerHTML), ['workdocs', 'inbox', 'consult'], '진료기록은 접근 명단이 없으면 빠진다');
+  assert.equal(onKeyOf(h.nav2.innerHTML), 'consult');
+  assert.equal(labelsOf(h.nav.innerHTML).length, 6);
+  const staff = harness({ role: 'staff' });   // 직원에게는 여전히 안 보인다
+  assert.equal(staff.ctx.visibleTabKeys().has('inbox'), false);
+  assert.equal(staff.ctx.visibleTabKeys().has('consult'), false);
 });
 
 test('묶음 버튼 뱃지는 그 안 탭들의 안 읽은 수를 합쳐 보여 준다', () => {
