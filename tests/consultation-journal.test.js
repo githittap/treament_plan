@@ -120,8 +120,15 @@ test('server_search_filter_survives_render: 버튼 입력은 렌더 전 상태�
   assert.match(html, /const currentQuery=CONSULTATION_FILTERS\.query,currentSheet=CONSULTATION_FILTERS\.sheet,currentStatus=CONSULTATION_FILTERS\.status/);
 });
 
-test('직원허브는 실장·원장 전용 상담 화면을 메뉴 탭과 오류 경로로 제공한다', () => {
-  assert.match(html, /\{key:'consult',label:'🗂 상담일지',roles:\['manager','owner'\]\}/);
+test('직원허브는 매니저·실장·원장 전용 상담 화면을 메뉴 탭과 오류 경로로 제공한다', () => {
+  assert.match(html, /\{key:'consult',label:'🗂 상담일지',roles:\['manager','chief','owner'\]\}/);
+  /* 원장 지시 2026-09-23: 실장(chief)이 못 보던 것을 고쳤다. DB 쪽은 db\/consultation_access_widen.sql */
+  assert.match(html, /function consultationCanAccess\(role\)\{return role==='manager'\|\|role==='chief'\|\|role==='owner';\}/);
+  /* 글과 동작이 어긋나지 않는다 — 화면 문구에도 매니저가 들어간다. */
+  assert.doesNotMatch(html, /class="hint">실장·원장 전용입니다/);
+  assert.doesNotMatch(html, /class="hint">실장·원장만 상담 기록을/);
+  assert.match(html, /class="hint">매니저·실장·원장만 상담 기록을/);
+  assert.match(html, /class="hint">매니저·실장·원장만 볼 수 있습니다/);
   assert.match(html, /상담일지 열기/);
   assert.match(html, /else if\(TAB==='consult'\)await renderConsultationJournal\(m\)/);
   assert.match(html, /function canManageConsultation\(\)\{return consultationCanAccess\(ME\.role\);\}/);

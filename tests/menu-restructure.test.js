@@ -37,7 +37,7 @@ const TAB_ROLE_RULES = {
   pay: ['owner'], aicost: ['owner'], owner: ['owner'],
   /* 원장 승인 2026-09-23(노션 댓글 "승인한다."): 통합 문의함을 메뉴로 꿄내면서
      상담일지도 같은 묶음에 올렸다. 권한은 consultationCanAccess(manager·owner) 그대로다. */
-  inbox: ['manager', 'owner'], consult: ['manager', 'owner']
+  inbox: ['staff', 'manager', 'chief', 'owner'], consult: ['manager', 'chief', 'owner']
 };
 /* 재편 전 renderNav 의 노출 판정식 — 글자 하나도 바꾸지 않는다(공백만 무시해 비교). */
 const VISIBILITY_RULE = `ME.role==='owner'
@@ -147,7 +147,7 @@ test('⑤ 볼 수 있는 탭이 없는 묶음은 렌더링되지 않는다', () 
   staff.ctx.renderNav();
   assert.equal(labelsOf(staff.nav.innerHTML).includes('🔒 원장 전용'), false);
   // 탭 노출 설정으로 묶음 안 탭을 모두 닫으면 그 묶음도 사라진다.
-  const closed = harness({ role: 'staff', tabRoles: { workdocs: ['owner'] } });
+  const closed = harness({ role: 'staff', tabRoles: { workdocs: ['owner'], inbox: ['owner'] } });
   closed.ctx.renderNav();
   assert.equal(labelsOf(closed.nav.innerHTML).includes('🩺 환자관리·진료'), false);
 });
@@ -212,9 +212,13 @@ test('옛 탭 id·딥링크는 그대로이고, 상담 화면 2개가 메뉴에 
   assert.deepEqual(keysOf(h.nav2.innerHTML), ['workdocs', 'inbox', 'consult'], '진료기록은 접근 명단이 없으면 빠진다');
   assert.equal(onKeyOf(h.nav2.innerHTML), 'consult');
   assert.equal(labelsOf(h.nav.innerHTML).length, 6);
-  const staff = harness({ role: 'staff' });   // 직원에게는 여전히 안 보인다
-  assert.equal(staff.ctx.visibleTabKeys().has('inbox'), false);
+  /* 원장 지시 2026-09-23: 문의함은 모두 보고, 상담일지는 매니저·실장·원장만 본다. */
+  const staff = harness({ role: 'staff' });
+  assert.equal(staff.ctx.visibleTabKeys().has('inbox'), true);
   assert.equal(staff.ctx.visibleTabKeys().has('consult'), false);
+  const chief = harness({ role: 'chief' });
+  assert.equal(chief.ctx.visibleTabKeys().has('inbox'), true);
+  assert.equal(chief.ctx.visibleTabKeys().has('consult'), true, '실장이 상담일지를 못 보던 버그');
 });
 
 test('묶음 버튼 뱃지는 그 안 탭들의 안 읽은 수를 합쳐 보여 준다', () => {
