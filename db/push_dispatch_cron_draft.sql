@@ -27,21 +27,26 @@ declare missing text; already integer;
 begin
   -- 필요한 vault 비밀이 "있고 비어 있지 않은지"까지 본다.
   -- ⚠️ 이름만 세면 빈 문자열·공백도 통과해서, 예약은 등록되고 매분 조용히 401 이 난다.
-  -- ⚠️ btrim(x) 는 ASCII 공백 하나만 지운다 — 탭·줄바꿈·NBSP(\u00A0)·전각공백(\u3000) 만 든 값이
-  --    그대로 통과하는 것을 실제로 재현했다(4개 중 4개 통과). 그래서 지울 문자를 직접 지정한다.
+  -- ⚠️ btrim(x) 는 ASCII 공백만 지운다 — 탭·줄바꿈·NBSP(\u00A0)·전각공백(\u3000) 만 든 값이
+  --    그대로 통과하는 것을 실제로 재현했다(4개 중 4개 통과). 지울 문자를 나열하는 것도 끝이 없다(VT·FF·NEL·ZWSP·BOM …).
+  --    → "눈에 보이는 글자가 하나라도 있나"([[:graph:]]) 로 한 번에 본다.
+  --      확인: 안 보이는 문자 15가지 전부 거부, 정상 값 4가지 전부 통과.
   --    값 자체는 화면에 내보내지 않고 비었는지·형식만 본다.
   select string_agg(n, ', ') into missing
   from unnest(array['push_dispatch_bearer','push_dispatch_secret','push_dispatch_url']) n
   where not exists (
     select 1 from vault.decrypted_secrets s
-    where s.name = n
-      and coalesce(btrim(s.decrypted_secret, E' \t\r\n\u00A0\u3000'), '') <> ''
+    where s.name = n and s.decrypted_secret ~ '[[:graph:]]'
   );
   if missing is not null then
     raise exception 'vault 비밀이 없거나 비어 있다: % — 파일 맨 위 안내대로 먼저 넣어라', missing;
   end if;
 
   -- 보내는 주소가 정말 발송기 주소인지도 본다(오타·엉뚱한 주소로 매분 두드리는 것 방지).
+  -- ℹ️ 참조는 20자 영소문자+숫자로 본다. 이 계정의 3개는 마침 다 글자뿐이지만, 표본 3개로
+  --    '숫자 없음'까지 좁히면 숫자가 섞인 정상 프로젝트를 나중에 막는다. 정규식으로
+  --    '존재하는 참조'인지는 어차피 알 수 없다 — 오타·다른 호스트를 거르는 것이 목적이다.
+  -- ℹ️ 주소는 앵커(^…$)가 붙어 있어 앞뒤에 보이지 않는 문자가 끼면 그 자체로 탈락한다.
   if not exists (
     select 1 from vault.decrypted_secrets
     where name = 'push_dispatch_url'
