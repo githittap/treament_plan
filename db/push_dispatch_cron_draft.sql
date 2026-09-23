@@ -27,12 +27,15 @@ declare missing text; already integer;
 begin
   -- 필요한 vault 비밀이 "있고 비어 있지 않은지"까지 본다.
   -- ⚠️ 이름만 세면 빈 문자열·공백도 통과해서, 예약은 등록되고 매분 조용히 401 이 난다.
-  --    값 자체는 화면에 내보내지 않고 길이·형식만 본다.
+  -- ⚠️ btrim(x) 는 ASCII 공백 하나만 지운다 — 탭·줄바꿈·NBSP(\u00A0)·전각공백(\u3000) 만 든 값이
+  --    그대로 통과하는 것을 실제로 재현했다(4개 중 4개 통과). 그래서 지울 문자를 직접 지정한다.
+  --    값 자체는 화면에 내보내지 않고 비었는지·형식만 본다.
   select string_agg(n, ', ') into missing
   from unnest(array['push_dispatch_bearer','push_dispatch_secret','push_dispatch_url']) n
   where not exists (
     select 1 from vault.decrypted_secrets s
-    where s.name = n and coalesce(btrim(s.decrypted_secret), '') <> ''
+    where s.name = n
+      and coalesce(btrim(s.decrypted_secret, E' \t\r\n\u00A0\u3000'), '') <> ''
   );
   if missing is not null then
     raise exception 'vault 비밀이 없거나 비어 있다: % — 파일 맨 위 안내대로 먼저 넣어라', missing;
@@ -42,9 +45,10 @@ begin
   if not exists (
     select 1 from vault.decrypted_secrets
     where name = 'push_dispatch_url'
-      and btrim(decrypted_secret) ~ '^https://[a-z0-9-]+\.supabase\.co/functions/v1/push-dispatcher$'
+      and btrim(decrypted_secret, E' \t\r\n\u00A0\u3000')
+          ~ '^https://[a-z0-9]{20}\.supabase\.co/functions/v1/push-dispatcher$'
   ) then
-    raise exception 'push_dispatch_url 이 https://<프로젝트>.supabase.co/functions/v1/push-dispatcher 모양이 아니다';
+    raise exception 'push_dispatch_url 이 https://<프로젝트참조 20자>.supabase.co/functions/v1/push-dispatcher 모양이 아니다';
   end if;
 
   -- pg_cron 을 방금 만들었을 수도 있으므로 조회는 EXECUTE 로 미룬다.
@@ -58,7 +62,8 @@ begin
     '* * * * *',
     $cron$
     select net.http_post(
-      url := (select decrypted_secret from vault.decrypted_secrets where name = 'push_dispatch_url'),
+      url := (select btrim(decrypted_secret, E' \t\r\n\u00A0\u3000')
+                from vault.decrypted_secrets where name = 'push_dispatch_url'),
       headers := jsonb_build_object(
         'Content-Type', 'application/json',
         'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'push_dispatch_bearer'),
