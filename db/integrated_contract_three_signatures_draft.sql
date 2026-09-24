@@ -47,6 +47,58 @@ $pledge$,
 where id=1 and body_html like '%data-sign-slot="employee"%'
   and body_html not like '%data-sign-slot="medical"%';
 
+-- 서로 다른 직원 계약의 날짜·임금·사직 통보기간은 공용 고정값으로 채우지 않는다.
+-- 사직 통보기간은 원본 XLSX의 3주와 원본 PDF의 4주가 달라 계약마다 명시적으로 선택한다.
+update public.doc_templates
+set fields=coalesce(fields,'[]'::jsonb)||jsonb_build_array(
+  jsonb_build_object('key','사직서제출기한','label','사직서 제출 기한 (원본별 확인)','type','select','options',jsonb_build_array('3주 전','4주 전'),'required',true),
+  jsonb_build_object('key','퇴직임금지급기준','label','퇴직 시 임금 지급 기준 (원본별 확인)','type','select','options',jsonb_build_array('익월 임금지급일','퇴직일이 속한 달에 해당하는 정기급여일'),'required',true),
+  jsonb_build_object('key','병원주소','label','사업장 주소','type','text','required',true),
+  jsonb_build_object('key','직원이메일','label','직원 이메일 (해당 시)','type','text'),
+  jsonb_build_object('key','최초입사일','label','최초 입사일 (해당 시)','type','date'),
+  jsonb_build_object('key','주 소정근로시간','label','주 소정근로시간','type','text','required',true),
+  jsonb_build_object('key','연봉세전','label','연봉 세전 (해당 계약만)','type','text'),
+  jsonb_build_object('key','기본급산정시간','label','기본급 산정 기준/계산식 (해당 시)','type','text'),
+  jsonb_build_object('key','기본급','label','기본급','type','text','required',true),
+  jsonb_build_object('key','식대','label','식대 (해당 시)','type','text'),
+  jsonb_build_object('key','포괄시간외근로수당','label','포괄시간외근로수당 (해당 시)','type','text'),
+  jsonb_build_object('key','포괄시간외시간','label','포괄시간외 산정 기준/계산식 (해당 시)','type','text'),
+  jsonb_build_object('key','포괄연차수당','label','포괄연차수당 (해당 시)','type','text'),
+  jsonb_build_object('key','포괄연차시간','label','포괄연차 산정 기준/계산식 (해당 시)','type','text'),
+  jsonb_build_object('key','포괄휴일수당','label','포괄휴일수당 (해당 시)','type','text'),
+  jsonb_build_object('key','포괄휴일시간','label','포괄휴일 산정 기준/계산식 (해당 시)','type','text'),
+  jsonb_build_object('key','육아수당','label','육아수당 (해당 시)','type','text'),
+  jsonb_build_object('key','직책수당','label','직책수당 (해당 시)','type','text'),
+  jsonb_build_object('key','포괄휴일연장수당','label','포괄휴일연장수당 (해당 시)','type','text'),
+  jsonb_build_object('key','포괄휴일연장시간','label','포괄휴일연장 산정 기준/계산식 (해당 시)','type','text'),
+  jsonb_build_object('key','기타수당','label','기타수당 (해당 시)','type','text'),
+  jsonb_build_object('key','통상시급','label','통상시급 (해당 시)','type','text')
+),
+body_html=replace(
+  replace(replace(body_html,'사직 희망일로부터 3주 전','사직 희망일로부터 <b>{{사직서제출기한}}</b>'),'익월 임금지급일','<b>{{퇴직임금지급기준}}</b>'),
+  '<section class="contract-part" data-contract-part="medical"',
+  $extra$
+<section class="contract-part" data-contract-part="employment-addenda" style="margin-top:24px">
+<h3>근로계약 추가 조건</h3>
+<p>사업장 주소 <b>{{병원주소}}</b> · 직원 이메일(해당 시) <b>{{직원이메일}}</b> · 최초 입사일(해당 시) <b>{{최초입사일}}</b></p>
+<p>{{기간계약종료문구}}</p>
+<ol>
+<li>사용자의 승인을 받고 외근할 때 발생한 경비·실비는 사용자가 부담한다.</li>
+<li>1주 소정근로시간은 <b>{{주 소정근로시간}}</b> 이내로 한다. 직원은 근무 시작 시 업무에 착수할 수 있어야 하며, 업무 수행 중 지각·조퇴 또는 정당하지 않은 이탈 시 인사상 불이익을 받을 수 있다.</li>
+<li>추가 근무는 사용자 명시 승인 후 인정하며 미승인 시간은 근로시간으로 인정하지 않는다. 근로 제공이 불가능할 때에는 사유를 미리 보고·승인받고 해당 시간은 무급으로 처리한다. 질병·경조사로 결근할 때에는 객관적인 증빙 서류를 제출하며, 제출하지 않으면 무단결근으로 본다.</li>
+<li>연봉(세전, 해당 계약만) <b>{{연봉세전}}</b>, 기본급 산정 기준/계산식(해당 시) <b>{{기본급산정시간}}</b>, 통상시급(해당 시) <b>{{통상시급}}</b>. 임금 구성은 아래 표와 같으며 해당 없는 항목은 표에서 제외한다. 포괄시간외·연차·휴일·휴일연장 수당의 산정 기준과 가산율은 계약별 포괄내역과 임금 구성값에 따른다. {{임금구성표}}</li>
+<li>계약 체결 뒤 변경되는 보험료·세금 등은 해당 근로자 부담분에 반영하며, 중도퇴사·연말정산으로 발생한 환급액은 근로자에게 귀속된다. 세금 변동에 따라 실수령액이 달라질 수 있다.</li>
+<li>주휴일은 1주 소정근로일 개근 시 유급이며 사전 고지하여 다른 날로 변경될 수 있다. 근로자의 날과 관계 법령상의 공휴일을 적용하고 휴일이 겹치면 하나의 휴일로 본다. 주휴일·공휴일 근무 시 미리 다른 근무일로 대체 휴무할 수 있다. 1개월 개근 시 발생하는 연차와 휴가일 협의는 관계 법령·병원 사정을 따른다.</li>
+<li>기존 계약해지 조항 외 종료 사유: 이력·경력을 위조해 허위 입사, 허락 없는 불법 집단행동의 주도·가담 또는 직장 내 성희롱·괴롭힘 등 물의, 음주 상태 근무 또는 근무 중 음주·병원 신용·명예 훼손, 업무시간 중 개인용무로 경고 2회 누적 또는 고객 컴플레인 3회 이상, 조직 폐지·축소·담당 업무 소멸 등 경영상 감원 불가피, 피성년후견인·피한정후견인·파산선고·자격정지 처분 또는 형사사건 고소·고발에 따른 입건·범죄사실 인정 조사. 사직 승인 없이 출근하지 않으면 수리일까지 무단결근으로 처리한다.</li>
+<li>근무 중 업무상 지시 또는 동의를 받아 촬영한 홍보용 사진·영상·음성은 진료 안내·병원 홍보·내부 교육 등에 사용할 수 있다. 이미 제작·배포된 홍보물의 저작권·사용권은 병원에 귀속되며 퇴직 뒤 그 삭제 또는 사용 중지를 요구하지 않는다는 별도 조건을 확인한다.</li>
+<li>계약 위반 또는 고의·과실로 병원에 손해를 끼친 경우 배상하며, 근로자의 귀책으로 환자 등 제3자에게 손해를 발생시켜 병원이 배상책임을 지게 되면 관련 민·형사상 책임을 부담한다.</li>
+</ol>
+</section>
+<section class="contract-part" data-contract-part="medical"$extra$
+)
+where id=1 and body_html like '%data-sign-slot="medical"%'
+  and body_html not like '%data-contract-part="employment-addenda"%';
+
 -- 기존 단일 서명 계약과 체결본은 원래 RPC로 처리한다. 신규 통합본만 거부한다.
 create or replace function public.apply_employee_contract_signature(
   p_contract_id bigint,p_merged_html text,p_sign_slots jsonb,p_signed_at timestamptz,p_signature_id bigint default null

@@ -2358,6 +2358,15 @@ function contractLongDate(ds=today()){
 }
 function contractDate(s){return s?stampDate(s):'-';}
 function contractStatusClass(s){return s==='서명완료'?'ok':(s==='취소'?'no':'wait');}
+/* contract-integrated-terms:test-start */
+const CONTRACT_WAGE_PARTS=[['기본급','기본급','기본급산정시간'],['식대','식대(비과세)'],['포괄시간외근로수당','포괄시간외근로수당','포괄시간외시간'],['포괄연차수당','포괄연차수당','포괄연차시간'],['포괄휴일수당','포괄휴일수당','포괄휴일시간'],['육아수당','육아수당(비과세)'],['직책수당','직책수당'],['포괄휴일연장수당','포괄휴일연장수당','포괄휴일연장시간'],['기타수당','기타수당']];
+const CONTRACT_OPTIONAL_DETAIL_KEYS=new Set(['연봉세전','기본급산정시간','통상시급','직원이메일','최초입사일']);
+function contractWageHtml(fields){
+  const rows=CONTRACT_WAGE_PARTS.filter(([key])=>String(fields[key]||'').trim()).map(([key,label,hoursKey])=>`<tr><th style="border:1px solid #aaa;padding:4px">${label}${hoursKey&&fields[hoursKey]?` (산정: ${esc(fields[hoursKey])})`:''}</th><td style="border:1px solid #aaa;padding:4px">${esc(fields[key])}</td></tr>`);
+  return rows.length?`<table style="width:100%;border-collapse:collapse;margin:7px 0"><caption>직원별 임금 구성 · 계약 발송 전 확인</caption><tbody>${rows.join('')}</tbody></table>`:'<p>임금 구성은 계약 발송 전에 직원별로 기입합니다.</p>';
+}
+function fixedTermClause(fields){return /^\d{4}-\d{2}-\d{2}$/.test(String(fields['계약종료']||''))?'기간 만료 시 근로관계는 종료됩니다. 기간 중 사업운영이 더 이상 어렵거나 담당 직무가 폐지되는 경우에는 관련 절차에 따릅니다.':'';}
+/* contract-integrated-terms:test-end */
 function mergeContractHtml(template,values){
   const fields=values||{},seal=`<img src="${CLINIC_SEAL}" alt="원장 도장" style="height:70px;vertical-align:middle">`;
   return String((template&&template.body_html)||'').replace(/\{\{([^{}]+)\}\}/g,(all,raw)=>{
@@ -2365,17 +2374,20 @@ function mergeContractHtml(template,values){
     if(key==='도장_원장')return seal;
     if(key==='계약일자')return esc(contractLongDate());
     if(key==='근무시간표')return contractScheduleHtml(fields[key]);
+    if(key==='임금구성표')return contractWageHtml(fields);
+    if(key==='기간계약종료문구')return fixedTermClause(fields);
     if(key==='공휴일근무문구')return fields['공휴일근무']==='포함'?'■ 설·추석 등 공휴일 근무 포함<br>':'';
+    if(CONTRACT_OPTIONAL_DETAIL_KEYS.has(key)&&!String(fields[key]||'').trim())return '해당 없음';
     return Object.prototype.hasOwnProperty.call(fields,key)?esc(fields[key]):all;
   });
 }
-const CONTRACT_DETAIL_KEYS=new Set(['근무장소','수행업무','포괄내역','주휴일']);
+const CONTRACT_DETAIL_KEYS=new Set(['근무장소','수행업무','포괄내역','주휴일','사직서제출기한','퇴직임금지급기준','병원주소','직원이메일','최초입사일','주 소정근로시간','연봉세전','기본급산정시간','기본급','식대','포괄시간외근로수당','포괄시간외시간','포괄연차수당','포괄연차시간','포괄휴일수당','포괄휴일시간','육아수당','직책수당','포괄휴일연장수당','포괄휴일연장시간','기타수당','통상시급']);
 function contractFieldInputs(template,employee,details=false){
   return contractArray(template&&template.fields).filter(f=>String(f.key||'')!=='성명'&&CONTRACT_DETAIL_KEYS.has(String(f.key||''))===details).map((f,i)=>{
     const key=String(f.key||''),type=['text','date','select','work_schedule'].includes(f.type)?f.type:'text';
     const value=CONTRACT_EDIT_FIELDS&&Object.prototype.hasOwnProperty.call(CONTRACT_EDIT_FIELDS,key)?CONTRACT_EDIT_FIELDS[key]:(key==='성명'?(employee?employee.name:''):(f.default==null?'':f.default));
     const control=type==='work_schedule'?contractScheduleInputs(key,value):type==='select'
-      ?`<select data-contract-key="${esc(key)}">${contractArray(f.options).map(o=>`<option value="${esc(o)}" ${String(o)===String(value)?'selected':''}>${esc(o)}</option>`).join('')}</select>`
+      ?`<select data-contract-key="${esc(key)}">${f.required?'<option value="">선택 필요</option>':''}${contractArray(f.options).map(o=>`<option value="${esc(o)}" ${String(o)===String(value)?'selected':''}>${esc(o)}</option>`).join('')}</select>`
       :`<input type="${type}" data-contract-key="${esc(key)}" value="${esc(value)}" ${key==='계약종료'?'onchange="syncContractEnd()"':''}>`;
     return `<div class="fld" data-contract-field-index="${i}"><label>${esc(f.label||key)}</label>${control}</div>`;
   }).join('');
@@ -2421,6 +2433,8 @@ function previewContract(){
 async function sendContract(){
   const d=currentContractDraft(),msg=$('#contractMsg');
   if(!d.template||!d.employeeId||!d.due){if(msg)msg.textContent='서식, 직원, 서명 만료일을 모두 선택하세요.';return;}
+  const missing=contractArray(d.template.fields).filter(f=>f.required&&!String(d.fields[String(f.key||'')]||'').trim());
+  if(missing.length){if(msg)msg.textContent='필수 계약 조건을 입력하세요: '+missing.map(f=>f.label||f.key).join(', ');return;}
   if(!/^\d{4}-\d{2}-\d{2}$/.test(String(d.fields['계약종료']||''))&&d.fields['계약종료']!=='기간의 정함 없음'){
     if(msg)msg.textContent="계약 종료일을 입력하거나 '기간의 정함 없음'을 선택하세요.";return;
   }

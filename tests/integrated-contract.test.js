@@ -47,6 +47,21 @@ test('보안서약 체크리스트는 본인 계약 세 서명 완료 또는 서
   assert.equal(c.done('보안서약',{},[{document_type:'보안서약서'}],[],'a'),true);
 });
 
+test('서로 다른 원본의 기간·임금은 직원별 입력으로 남고 공용 숫자로 고정되지 않는다',()=>{
+  const terms=html.match(/\/\* contract-integrated-terms:test-start \*\/([\s\S]*?)\/\* contract-integrated-terms:test-end \*\//);
+  assert.ok(terms);
+  const c={esc:v=>String(v).replaceAll('&','&amp;').replaceAll('<','&lt;')};
+  vm.runInNewContext(`${terms[1]};this.h={contractWageHtml,fixedTermClause};`,c);
+  const result=c.h.contractWageHtml({기본급:'2,000,000',기본급산정시간:'209',식대:'',포괄연차수당:'80,000',포괄연차시간:'8'});
+  assert.match(result,/기본급 \(산정: 209\)/);assert.match(result,/포괄연차수당 \(산정: 8\)/);
+  assert.doesNotMatch(result,/식대/);
+  assert.equal(c.h.fixedTermClause({계약종료:'기간의 정함 없음'}),'');
+  assert.match(c.h.fixedTermClause({계약종료:'2026-12-31'}),/기간 만료/);
+  assert.match(sql,/사직서제출기한[\s\S]*'3주 전','4주 전'/);
+  assert.match(sql,/퇴직임금지급기준/);
+  assert.doesNotMatch(sql,/27,216,720|2,268,060|3,165,680/);
+});
+
 test('통합 계약 완료는 서버의 3건 원자적 기록과 PDF 세 위치를 거친다',()=>{
   assert.match(html,/apply_integrated_contract_signatures/);
   assert.match(html,/id="contractComplete-\$\{row\.id\}" disabled/);
