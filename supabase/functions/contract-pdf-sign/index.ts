@@ -43,9 +43,10 @@ export function createContractPdfSignHandler(deps: { createClient?: any; PDFDocu
     if (userError || !user) throw new Error("authenticated employee required");
     const body = await req.json();
     const contractId = Number(body.contract_id);
+    const signatureId = body.signature_id == null ? null : Number(body.signature_id);
     const pageNo = Number(body.page_no);
     const x = Number(body.x), y = Number(body.y), width = Number(body.width), height = Number(body.height);
-    if (!Number.isInteger(contractId) || !Number.isInteger(pageNo) || pageNo < 1 || [x, y, width, height].some((v) => !Number.isFinite(v) || v < 0) || width <= 0 || height <= 0 || width > 1200 || height > 800) throw new Error("invalid PDF signature coordinates");
+    if (!Number.isInteger(contractId) || (signatureId !== null && (!Number.isInteger(signatureId) || signatureId < 1)) || !Number.isInteger(pageNo) || pageNo < 1 || [x, y, width, height].some((v) => !Number.isFinite(v) || v < 0) || width <= 0 || height <= 0 || width > 1200 || height > 800) throw new Error("invalid PDF signature coordinates");
     const signatureBytes = dataUrlBytes(body.signature_png);
     const signatureHash = await sha256(signatureBytes);
     const { data: preflight, error: preflightError } = await userClient.from("contracts").select("*").eq("id", contractId).maybeSingle();
@@ -86,10 +87,10 @@ export function createContractPdfSignHandler(deps: { createClient?: any; PDFDocu
       if (await sha256(finalSignedBytes) !== signedHash) throw new Error("existing signed PDF differs from this attempt");
     }
     const finalSignedHash = await sha256(finalSignedBytes);
-    const { error: recordError } = await admin.rpc("record_contract_pdf_signature", {
+    const { error: recordError } = await admin.rpc("record_contract_pdf_signature_with_use", {
       p_contract_id: contractId, p_user_id: user.id, p_attempt_id: contract.pdf_signing_attempt_id, p_source_sha256: sourceHash, p_signed_path: signedPath,
       p_signed_sha256: finalSignedHash, p_signature_sha256: await sha256(signatureBytes), p_page_no: pageNo,
-      p_x: x, p_y: y, p_width: width, p_height: height,
+      p_x: x, p_y: y, p_width: width, p_height: height, p_signature_id: signatureId,
     });
     if (recordError) throw new Error(`contract signature record failed: ${recordError.message}`);
     return json({ contract_id: contractId, signed_pdf_path: signedPath, signed_pdf_sha256: finalSignedHash });

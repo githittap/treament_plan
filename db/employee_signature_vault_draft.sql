@@ -39,7 +39,7 @@ alter table public.employee_signature_audit enable row level security;
 revoke all on table public.employee_signature_vault,public.employee_signature_uses,public.employee_signature_audit from anon,authenticated;
 grant select,insert on table public.employee_signature_vault to authenticated;
 grant update(revoked_at) on table public.employee_signature_vault to authenticated;
-grant select,insert on table public.employee_signature_uses to authenticated;
+grant select on table public.employee_signature_uses to authenticated;
 grant select on table public.employee_signature_audit to authenticated;
 revoke all on sequence public.employee_signature_vault_id_seq,public.employee_signature_uses_id_seq,public.employee_signature_audit_id_seq from anon,authenticated;
 grant usage,select on sequence public.employee_signature_vault_id_seq,public.employee_signature_uses_id_seq to authenticated;
@@ -100,7 +100,7 @@ begin
     end if;
     insert into public.employee_signature_uses(contract_id,signature_id,document_kind,confirmed_at,used_by)
       values(p_contract_id,p_signature_id,'근로계약서',p_signed_at,auth.uid())
-      on conflict (contract_id,signature_id,document_kind) do update set confirmed_at=excluded.confirmed_at,used_by=excluded.used_by
+      on conflict (contract_id,signature_id,document_kind) where contract_id is not null do update set confirmed_at=excluded.confirmed_at,used_by=excluded.used_by
       returning id into v_use_id;
   end if;
   update public.contracts set merged_html=p_merged_html,sign_slots=p_sign_slots,signed_at=p_signed_at,status='서명완료'
