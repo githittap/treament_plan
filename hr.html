@@ -2285,7 +2285,9 @@ function currentContractDraft(){
 function contractEmployeeJobGroupInfo(employeeId){
   const employee=(PROFILES||[]).find(profile=>profile.user_id===employeeId);
   if(!employee)return '';
-  const model=employeeJobGroupModel({profile_user_id:employee.user_id,department:employee.dept==='Dr.'?'Dr.':null},new Map([[employee.user_id,employee]]));
+  const rosterPerson=(SCHEDULE_PEOPLE||[]).find(person=>person.profile_user_id===employee.user_id);
+  if(!rosterPerson)return '<div class="hint contract-job-group-info">직무 분류 참고: 미지정</div>';
+  const model=employeeJobGroupModel(rosterPerson,new Map([[employee.user_id,employee]]));
   if(model.kind==='doctor')return '';
   return `<div class="hint contract-job-group-info">직무 분류 참고: ${esc(model.label)}</div>`;
 }
