@@ -541,7 +541,8 @@ async function saveEmployeeJobGroupPreview() {
     setStatus('error');
   }
 }
-function schedulePersonLabel(person){return person&&person.department==='Dr.'?'Dr. '+person.name:person&&person.name||'';}
+function schedulePersonName(person){return person&&person.department==='Dr.'?'Dr. '+person.name:person&&person.name||'';}
+function schedulePersonLabel(person,profilesById=new Map((typeof PROFILES==='undefined'?[]:PROFILES||[]).map(profile=>[profile.user_id,profile]))){const base=schedulePersonName(person),model=employeeJobGroupModel(person,profilesById);return model.kind==='doctor'?base:base+' · '+model.label;}
 function schedulePeopleForWeek(people,rows){
   const scheduled=new Set((rows||[]).map(r=>r.person_id).filter(Boolean));
   return (people||[]).filter(p=>p.included_in_schedule!==false&&(p.active===true||scheduled.has(p.id)));
@@ -553,7 +554,7 @@ function scheduleDate(weekStart,day){
 }
 function scheduleWeekForDate(ds){return mondayStr(ds);}
 function scheduleDayForDate(ds){return new Date(ds+'T00:00:00').getDay();}
-function scheduleCalendarIndex(rows,people,weeks){
+function scheduleCalendarIndex(rows,people,weeks,profilesById=new Map()){
   const personById=new Map((people||[]).map(p=>[p.id,p]));
   const weekByStart=new Map((weeks||[]).map(w=>[w.week_start,w]));
   const index={},seen={};
@@ -563,12 +564,12 @@ function scheduleCalendarIndex(rows,people,weeks){
     const date=scheduleDate(row.week_start,row.day);
     if(!index[date]){
       const week=weekByStart.get(row.week_start),status=week&&week.status;
-      index[date]={departments:{'Dr.':[],'진료실':[],'데스크':[],'기공실':[],'상담':[],'행정':[],'미지정':[]},evening:[],off:[],etc:[],weekStatus:status==='공표'?'published':status==='초안'?'draft':null};
+      index[date]={departments:Object.fromEntries([['Dr.',[]],...EMPLOYEE_JOB_GROUPS.map(group=>[group.label,[]]),['미지정',[]]]),evening:[],off:[],etc:[],weekStatus:status==='공표'?'published':status==='초안'?'draft':null};
       seen[date]=new Set();
     }
     if(seen[date].has(person.id))return;
     seen[date].add(person.id);
-    const label=schedulePersonLabel(person),department=Object.prototype.hasOwnProperty.call(index[date].departments,person.department)?person.department:'미지정';
+    const group=employeeJobGroupModel(person,profilesById),label=schedulePersonName(person),department=group.kind==='doctor'?'Dr.':group.label;
     if(row.shift==='work'||row.shift==='evening')index[date].departments[department].push({person,label});
     if(row.shift==='evening')index[date].evening.push({person,label});
     if(row.shift==='off')index[date].off.push({person,label});
@@ -587,7 +588,7 @@ function calendarLeaveIndex(rows,people,from,to,nameForUser,includeDetails=false
   (rows||[]).forEach(row=>{
     const person=personByUser.get(row.user_id);
     if(person&&person.included_in_schedule===false)return;
-    const key=person?person.id:row.user_id,label=person?schedulePersonLabel(person):nameForUser(row.user_id),start=row.date_from<from?from:row.date_from,end=row.date_to>to?to:row.date_to;
+    const key=person?person.id:row.user_id,label=person?schedulePersonName(person):nameForUser(row.user_id),start=row.date_from<from?from:row.date_from,end=row.date_to>to?to:row.date_to;
     for(let ds=start;ds<=end;ds=nextDay(ds)){if(!index[ds]){index[ds]=[];seen[ds]=new Set();}if(!seen[ds].has(key)){seen[ds].add(key);index[ds].push(includeDetails?{label,type:row.type||'연차',type_note:row.type_note||null}:label);}}
   });
   return index;
@@ -1566,10 +1567,7 @@ function calendarDepartmentGroups(roster){
   const departments=roster&&roster.departments||{};
   return [
     ['Dr.',departments['Dr.']||[],'dept dr'],
-    ['진료·상담',[...(departments['진료실']||[]),...(departments['상담']||[])],'dept room'],
-    ['데스크',departments['데스크']||[],'dept desk'],
-    ['소독·행정',departments['행정']||[],'dept admin'],
-    ['기공',departments['기공실']||[],'dept lab'],
+    ...EMPLOYEE_JOB_GROUPS.map(group=>[group.label,departments[group.label]||[],'dept job-group']),
     ['미지정',departments['미지정']||[],'unassigned']
   ];
 }
@@ -1610,6 +1608,7 @@ function printWithClass(className){
   if(printStyle){printStyle.textContent='@media print{@page{size:A4 landscape;margin:8mm}body.schedule-printing> *{display:none!important}body.schedule-printing>#app,body.schedule-printing>#app main{display:block!important}body.schedule-printing header,body.schedule-printing footer,body.schedule-printing .schedule-actions,body.schedule-printing .nav,body.schedule-printing .nav2,body.schedule-printing .hint,body.schedule-printing .schedule-roster-admin{display:none!important}body.schedule-printing main{max-width:none!important;padding:0!important}body.schedule-printing .card{border:0!important;box-shadow:none!important;margin:0!important;padding:0!important}body.schedule-printing .tblwrap{max-height:none!important;overflow:visible!important}body.schedule-printing .schedule-week-block{break-inside:avoid;page-break-inside:avoid}body.schedule-printing .schedule-role-table{min-width:0!important;font-size:9px!important}}';(document.head||document.documentElement).appendChild(printStyle);}
   const done=()=>{document.body.classList.remove(className);if(printStyle)printStyle.remove();window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);window.print();
 }
+function emptyCalendarRoster(){return {departments:Object.fromEntries([['Dr.',[]],...EMPLOYEE_JOB_GROUPS.map(group=>[group.label,[]]),['미지정',[]]]),evening:[],off:[],etc:[]};}
 function printCalendar(){printWithClass('calendar-printing');}
 function printSchedule(){printWithClass('schedule-printing');}
 /* schedule-print:test-end */
@@ -1644,7 +1643,7 @@ async function renderCalendar(m){
   const loadError=holidaysError||eventsError||leaveError||schedulesError||weeksError;
   if(loadError){m.innerHTML='<div class="card"><h2>📅 캘린더</h2><div class="cal-error">캘린더 정보를 불러오지 못했습니다. 잠시 후 다시 시도하세요.</div><button class="mini stamp" onclick="render()">다시 시도</button></div>';return;}
   const leaveByDate=calendarLeaveIndex(lv||[],SCHEDULE_PEOPLE,from,to,nameOf);
-  const scheduleByDate=scheduleCalendarIndex(scheduleRowsWithoutApprovedLeave(schedules||[],lv||[]),SCHEDULE_PEOPLE,weeks||[]);
+  const scheduleByDate=scheduleCalendarIndex(scheduleRowsWithoutApprovedLeave(schedules||[],lv||[]),SCHEDULE_PEOPLE,weeks||[],new Map((PROFILES||[]).map(profile=>[profile.user_id,profile])));
   const weekByStart=new Map((weeks||[]).map(w=>[w.week_start,w]));
   const byDate={};
   const day=ds=>byDate[ds]||(byDate[ds]={holidays:[],events:[]});
@@ -1662,7 +1661,7 @@ async function renderCalendar(m){
   const cellsHtml=cells.map((c,idx)=>{
     if(c.out)return `<div class="cal-cell out"><div class="d">${c.d}</div></div>`;
     const info=byDate[c.ds]||{holidays:[],events:[]};
-    const roster=scheduleByDate[c.ds]||{departments:{'Dr.':[],'진료실':[],'데스크':[],'기공실':[],'상담':[],'행정':[],'미지정':[]},evening:[],off:[],etc:[]};
+    const roster=scheduleByDate[c.ds]||emptyCalendarRoster();
     const week=weekByStart.get(mondayStr(c.ds)),weekStatus=roster.weekStatus||(week&&week.status==='공표'?'published':week&&week.status==='초안'?'draft':null);
     const dowIdx=idx%7;
     const dCls=info.holidays.length?'hol':(dowIdx===0?'sun':(dowIdx===6?'sat':''));
@@ -1670,10 +1669,7 @@ async function renderCalendar(m){
       ...info.holidays.map(h=>`<span class="cal-tag hol"><span title="${esc(h.name)}">${esc(h.name)}</span></span>`),
       ...info.events.map(e=>`<span class="cal-tag ev"><span title="${esc(e.kind)} ${esc(e.title)}">${esc(e.title)}</span>${isLead()?`<a href="javascript:void(0)" onclick="event.stopPropagation();deleteCalendarEvent(${e.id})">✕</a>`:''}</span>`),
       calendarRosterTag('Dr.',roster.departments['Dr.'],'dept dr'),
-      calendarRosterTag('진료·상담',[...roster.departments['진료실'],...roster.departments['상담']],'dept room'),
-      calendarRosterTag('데스크',roster.departments['데스크'],'dept desk'),
-      calendarRosterTag('소독·행정',roster.departments['행정'],'dept admin'),
-      calendarRosterTag('기공',roster.departments['기공실'],'dept lab'),
+      ...EMPLOYEE_JOB_GROUPS.map(group=>calendarRosterTag(group.label,roster.departments[group.label],'dept job-group')),
       calendarRosterTag('미지정',roster.departments['미지정'],'unassigned'),
       calendarRosterTag('야간',roster.evening,'evening'),
       CAL_VIEW==='all'?calendarRosterTag('연차',leaveByDate[c.ds]||[],'lv'):'',
@@ -1683,7 +1679,7 @@ async function renderCalendar(m){
     ].filter(Boolean).join('');
     return `<div class="cal-cell${c.ds===todayStr?' today':''}${c.ds===CAL_SELECTED_DATE?' selected':''}" tabindex="0" role="button" aria-expanded="${c.ds===CAL_SELECTED_DATE}" onclick="selectCalendarDay('${c.ds}',event)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectCalendarDay('${c.ds}',event)}"><div class="d ${dCls}">${c.d}</div>${tags}</div>`;
   }).join('');
-  const selectedRoster=scheduleByDate[CAL_SELECTED_DATE]||{departments:{'Dr.':[],'진료실':[],'데스크':[],'기공실':[],'상담':[],'행정':[],'미지정':[]},evening:[],off:[],etc:[]};
+  const selectedRoster=scheduleByDate[CAL_SELECTED_DATE]||emptyCalendarRoster();
   m.innerHTML=`<div class="card" id="calendarCard"><h2>📅 캘린더</h2>
     <div class="rowflex"><button class="mini ${CAL_VIEW==='all'?'stamp':''}" onclick="setCalendarView('all')">전체</button><button class="mini ${CAL_VIEW==='work'?'stamp':''}" onclick="setCalendarView('work')">근무</button><button class="mini ${CAL_VIEW==='leave'?'stamp':''}" onclick="setCalendarView('leave')">연차</button></div>
     <div class="rowflex calendar-actions"><label>대상 월 <input class="mini" type="month" value="${CAL_MONTH}" onchange="CAL_MONTH=this.value;render()"></label><button class="mini" onclick="saveCalendarPng()">PNG로 저장</button><button class="mini" onclick="printCalendar()">PDF로 저장</button></div>
@@ -2286,10 +2282,17 @@ function currentContractDraft(){
   const fields=contractFormValues();if($('#contractNoEnd')&&$('#contractNoEnd').checked)fields['계약종료']='기간의 정함 없음';
   return {template,employeeId,due:$('#contractDue')?$('#contractDue').value:'',fields};
 }
+function contractEmployeeJobGroupInfo(employeeId){
+  const employee=(PROFILES||[]).find(profile=>profile.user_id===employeeId);
+  if(!employee)return '';
+  const model=employeeJobGroupModel({profile_user_id:employee.user_id,department:employee.dept==='Dr.'?'Dr.':null},new Map([[employee.user_id,employee]]));
+  if(model.kind==='doctor')return '';
+  return `<div class="hint contract-job-group-info">직무 분류 참고: ${esc(model.label)}</div>`;
+}
 function previewContract(){
   const d=currentContractDraft(),box=$('#contractPreview');
   if(!d.template||!box)return;
-  box.innerHTML=`<h3>미리보기</h3><div class="contract-doc">${mergeContractHtml(d.template,d.fields)}</div>`;
+  box.innerHTML=`<h3>미리보기</h3>${contractEmployeeJobGroupInfo(d.employeeId)}<div class="contract-doc">${mergeContractHtml(d.template,d.fields)}</div>`;
   box.scrollIntoView({behavior:'smooth',block:'start'});
 }
 async function sendContract(){
@@ -2407,7 +2410,7 @@ async function renderContractOwner(m){
   m.innerHTML=`<div class="card"><h2>📝 새 근로계약서</h2>
   ${template?`<div class="grid">
       <div class="fld"><label>서식</label><select id="contractTemplate" onchange="selectContractTemplate(this.value)">${CONTRACT_TEMPLATES.map(t=>`<option value="${t.id}" ${Number(t.id)===Number(CONTRACT_TEMPLATE_ID)?'selected':''}>${esc(t.name||t.title||('서식 '+t.id))}</option>`).join('')}</select></div>
-      <div class="fld"><label>직원</label><select id="contractEmployee" onchange="selectContractEmployee(this.value)">${staff.map(p=>`<option value="${p.user_id}" ${p.user_id===CONTRACT_EMPLOYEE_ID?'selected':''}>${esc(p.name)}${p.dept?' · '+esc(p.dept):''}</option>`).join('')}</select></div>
+      <div class="fld"><label>직원</label><select id="contractEmployee" onchange="selectContractEmployee(this.value)">${staff.map(p=>`<option value="${p.user_id}" ${p.user_id===CONTRACT_EMPLOYEE_ID?'selected':''}>${esc(p.name)}</option>`).join('')}</select></div>
       <div class="fld"><label>역할(부서)</label><select id="contractPreset" onchange="applyContractPreset(this.value)"><option value="">선택 안 함</option>${presets.map(k=>`<option value="${esc(k)}">${esc(k)}</option>`).join('')}</select></div>
       ${contractFieldInputs(template,employee,false)}
       <div class="fld"><label>계약 기간</label><label style="font-size:13px;color:var(--ink)"><input type="checkbox" id="contractNoEnd" onchange="toggleContractNoEnd()"> 기간의 정함 없음</label></div>

@@ -167,8 +167,8 @@ if (block) {
 
   test('의사 부서는 표시 이름에만 Dr. 접두사를 붙인다', () => {
     assert.equal(context.schedulePersonLabel({ name: '홍길동', department: 'Dr.' }), 'Dr. 홍길동');
-    assert.equal(context.schedulePersonLabel({ name: '홍길동', department: '진료실' }), '홍길동');
-    assert.equal(context.schedulePersonLabel({ name: '홍길동', department: 'Dr' }), '홍길동');
+    assert.equal(context.schedulePersonLabel({ name: '홍길동', department: '진료실' }), '홍길동 · 미지정');
+    assert.equal(context.schedulePersonLabel({ name: '홍길동', department: 'Dr' }), '홍길동 · 미지정');
   });
 
   test('새 주차는 활성화되고 포함된 명부만 표시한다', () => {
@@ -201,7 +201,7 @@ if (block) {
     const people = [
       { id: 'dr-b', name: '나의사', department: 'Dr.', sort_order: 2, included_in_schedule: true },
       { id: 'dr-a', name: '가의사', department: 'Dr.', sort_order: 1, included_in_schedule: true },
-      { id: 'desk', name: '김데스크', department: '데스크', sort_order: 1, included_in_schedule: true },
+      { id: 'desk', name: '김데스크', department: '데스크', job_group: 'desk', sort_order: 1, included_in_schedule: true },
       { id: 'off', name: '박휴무', department: '진료실', sort_order: 1, included_in_schedule: true },
       { id: 'etc', name: '최기타', department: '기공실', sort_order: 1, included_in_schedule: true },
       { id: 'excluded', name: '숨김', department: '진료실', sort_order: 0, included_in_schedule: false }
@@ -219,8 +219,8 @@ if (block) {
     const day = index['2026-09-14'];
     assert.deepEqual(JSON.parse(JSON.stringify(day.departments['Dr.'])), ['Dr. 가의사', 'Dr. 나의사']);
     assert.deepEqual(JSON.parse(JSON.stringify(day.departments['데스크'])), ['김데스크']);
-    assert.deepEqual(JSON.parse(JSON.stringify(day.departments['진료실'])), []);
-    assert.deepEqual(JSON.parse(JSON.stringify(day.departments['기공실'])), []);
+    assert.deepEqual(JSON.parse(JSON.stringify(day.departments['진료·상담'])), []);
+    assert.deepEqual(JSON.parse(JSON.stringify(day.departments['기공'])), []);
     assert.deepEqual(JSON.parse(JSON.stringify(day.departments['미지정'])), []);
     assert.deepEqual(JSON.parse(JSON.stringify(day.evening)), ['Dr. 가의사']);
     assert.deepEqual(JSON.parse(JSON.stringify(day.off)), ['박휴무']);
@@ -236,6 +236,28 @@ if (block) {
     );
     assert.deepEqual(JSON.parse(JSON.stringify(index['2026-09-20'].departments['미지정'])), ['무소속']);
     assert.equal(index['2026-09-20'].weekStatus, 'draft');
+  });
+
+  test('캘린더는 공통 직무 분류를 사용하며 날짜·야간·Dr. 분기를 보존한다', () => {
+    const profiles = new Map([['linked', { job_group: 'lab' }]]);
+    const people = [
+      { id: 'linked-person', name: '연결직원', profile_user_id: 'linked', department: '진료실', job_group: 'desk', sort_order: 1, included_in_schedule: true },
+      { id: 'unlinked-person', name: '비로그인직원', department: '기공실', job_group: 'desk', sort_order: 2, included_in_schedule: true },
+      { id: 'unknown-person', name: '미지정직원', department: '상담', job_group: null, sort_order: 3, included_in_schedule: true },
+      { id: 'doctor', name: '의사', profile_user_id: 'doctor-profile', department: 'Dr.', job_group: 'desk', sort_order: 0, included_in_schedule: true }
+    ];
+    const rows = [
+      { week_start: '2026-09-14', day: 2, person_id: 'linked-person', shift: 'work' },
+      { week_start: '2026-09-14', day: 2, person_id: 'unlinked-person', shift: 'work' },
+      { week_start: '2026-09-14', day: 2, person_id: 'unknown-person', shift: 'work' },
+      { week_start: '2026-09-14', day: 2, person_id: 'doctor', shift: 'evening' }
+    ];
+    const day = context.scheduleCalendarIndex(rows, people, [], profiles)['2026-09-15'];
+    assert.deepEqual(JSON.parse(JSON.stringify(day.departments['기공'])), ['연결직원']);
+    assert.deepEqual(JSON.parse(JSON.stringify(day.departments['데스크'])), ['비로그인직원']);
+    assert.deepEqual(JSON.parse(JSON.stringify(day.departments['미지정'])), ['미지정직원']);
+    assert.deepEqual(JSON.parse(JSON.stringify(day.departments['Dr.'])), ['Dr. 의사']);
+    assert.deepEqual(JSON.parse(JSON.stringify(day.evening)), ['Dr. 의사']);
   });
 
   test('연차 인덱스는 제외 명부를 숨기고 연결되지 않은 프로필 이름은 보존한다', () => {
@@ -298,7 +320,7 @@ if (block) {
     const scheduleIndex = context.scheduleCalendarIndex(filtered, people, []);
     const leaveIndex = context.calendarLeaveIndex(leave, people, '2026-09-01', '2026-09-30', value => value);
     assert.deepEqual(JSON.parse(JSON.stringify(scheduleIndex['2026-09-14'].departments['Dr.'])), []);
-    assert.deepEqual(JSON.parse(JSON.stringify(scheduleIndex['2026-09-14'].departments['진료실'])), ['근무직원']);
+    assert.deepEqual(JSON.parse(JSON.stringify(scheduleIndex['2026-09-14'].departments['미지정'])), ['근무직원']);
     assert.deepEqual(JSON.parse(JSON.stringify(scheduleIndex['2026-09-14'].evening)), []);
     assert.deepEqual(JSON.parse(JSON.stringify(leaveIndex['2026-09-14'])), ['Dr. 연차의사']);
     assert.deepEqual(JSON.parse(JSON.stringify(scheduleIndex['2026-09-15'].off)), ['Dr. 연차의사']);
@@ -693,7 +715,7 @@ test('월간 캘린더는 월 경계 주차의 전체 근무와 주차 상태를
   assert.match(source, /from\('schedules'\)\.select\('person_id,user_id,week_start,day,shift,note'\)\.gte\('week_start',weekFrom\)\.lte\('week_start',weekTo\)/);
   assert.match(source, /from\('schedule_weeks'\)\.select\('week_start,status'\)\.gte\('week_start',weekFrom\)\.lte\('week_start',weekTo\)/);
   assert.doesNotMatch(source, /from\('schedules'\)[\s\S]*?\.eq\('shift','off'\)/);
-  assert.match(source, /scheduleCalendarIndex\(scheduleRowsWithoutApprovedLeave\(schedules\|\|\[\],lv\|\|\[\]\),SCHEDULE_PEOPLE,weeks\|\|\[\]\)/);
+  assert.match(source, /scheduleCalendarIndex\(scheduleRowsWithoutApprovedLeave\(schedules\|\|\[\],lv\|\|\[\]\),SCHEDULE_PEOPLE,weeks\|\|\[\],new Map\(/);
 });
 
 test('월간 캘린더는 모든 조회 오류를 눈에 보이는 하나의 오류 문구로 표시한다', () => {
@@ -704,9 +726,9 @@ test('월간 캘린더는 모든 조회 오류를 눈에 보이는 하나의 오
   assert.match(source, /캘린더 정보를 불러오지 못했습니다/);
 });
 
-test('4차 캘린더는 기존 DB 부서를 표시군으로만 묶고 날짜 상세를 제공한다', () => {
+test('캘린더는 공통 직무 그룹으로 날짜 상세를 제공한다', () => {
   const source = calendarBlock[1];
-  for (const marker of ["calendarRosterTag('진료·상담'", "calendarRosterTag('소독·행정'", "calendarRosterTag('기공'", 'renderCalendarDayPanel', 'scheduleCalendarIndex']) assert.match(source, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  for (const marker of ['EMPLOYEE_JOB_GROUPS.map(group=>[group.label', 'EMPLOYEE_JOB_GROUPS.map(group=>calendarRosterTag(group.label', 'renderCalendarDayPanel', 'scheduleCalendarIndex']) assert.match(source, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(html, /label:'내 서류함'/);
 });
 
@@ -728,7 +750,7 @@ test('캘린더 렌더 순서는 공휴일과 이벤트, 부서, 야간, 연차,
   const tagSource = source.slice(source.indexOf('const tags=['));
   const markers = [
     'cal-tag hol', 'cal-tag ev',
-    "calendarRosterTag('Dr.'", "calendarRosterTag('진료·상담'", "calendarRosterTag('데스크'", "calendarRosterTag('소독·행정'", "calendarRosterTag('기공'", "calendarRosterTag('미지정'",
+    "calendarRosterTag('Dr.'", 'EMPLOYEE_JOB_GROUPS.map(group=>calendarRosterTag(group.label', "calendarRosterTag('미지정'",
     "calendarRosterTag('야간'", "calendarRosterTag('연차'", "calendarRosterTag('OFF'", "calendarRosterTag('기타'", 'cal-tag status'
   ];
   let previous = -1;
