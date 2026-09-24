@@ -26,6 +26,35 @@ test('D장 출퇴근은 시·분 선택 UI와 날짜 상세 패널을 사용한�
   assert.match(html, /toggleManualAttendanceDetail/);
 });
 
+test('세 종류 추가근무 입력 변경이 실제 합계를 즉시 갱신한다', () => {
+  const start = html.indexOf('function overtimeDraftMinutes');
+  const end = html.indexOf('function normalizeManualClockTime', start);
+  const nodes = {
+    '#manualLunchOvertimeRaw': {value: '9'}, '#manualClockoutOvertimeRaw': {value: '10'},
+    '#manualEveningOvertimeRaw': {value: '19'}, '#manualOvertimeTotal': {textContent: ''},
+  };
+  const context = {$: id => nodes[id]};
+  vm.createContext(context);
+  vm.runInContext(`${html.slice(start, end)}\nthis.updateManualOvertimeTotal=updateManualOvertimeTotal;`, context);
+  context.updateManualOvertimeTotal();
+  assert.equal(nodes['#manualOvertimeTotal'].textContent, '20분');
+  nodes['#manualLunchOvertimeRaw'].value = '20';
+  context.updateManualOvertimeTotal();
+  assert.equal(nodes['#manualOvertimeTotal'].textContent, '40분');
+});
+
+test('저장된 반차가 편집 선택값과 날짜 상세에 복원된다', () => {
+  const start = html.indexOf('let MANUAL_DETAIL_OPEN');
+  const end = html.indexOf('function manualCalendarDate', start);
+  const source = html.slice(start, end);
+  const context = {today: () => '2026-09-24', esc: value => String(value), $: () => null};
+  vm.createContext(context);
+  vm.runInContext(`${source};this.manualAttendanceFormHtml=manualAttendanceFormHtml;`, context);
+  const output = context.manualAttendanceFormHtml([{work_date: '2026-09-24', half_day: '오후 반차', manual_note: '오후 진료'}]);
+  assert.match(output, /<option selected>오후 반차<\/option>/);
+  assert.match(output, /오후 반차 · 오후 진료/);
+});
+
 test('10분 단위 기존 계산 로직과 경계값 9·10·19를 보존한다', () => {
   const fn = html.match(/function overtimeDraftMinutes\(raw\)\{[\s\S]*?\n}/)?.[0];
   assert.ok(fn);
