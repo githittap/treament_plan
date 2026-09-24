@@ -241,7 +241,8 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 <div class="mask" id="lvMask"><div class="modal">
   <h3>📅 연차 신청<button class="x" onclick="hide('lvMask')">✕</button></h3>
   <div class="grid">
-    <div class="fld"><label>유형</label><select id="lvType"><option>연차</option><option>반차</option><option>기타</option></select></div>
+    <div class="fld"><label>유형</label><select id="lvType"><option>연차</option><option>반차</option><option>조퇴</option><option>기타</option></select></div>
+    <div class="fld" id="lvTimeWrap" style="display:none"><label>시간 범위</label><div class="rowflex"><input type="time" id="lvTimeFrom"><span>~</span><input type="time" id="lvTimeTo"></div></div>
     <div class="fld" id="lvNoteWrap" style="display:none"><label>기타 사유(타이핑)</label><input id="lvNote"></div>
     <div class="fld"><label>시작일</label><input type="date" id="lvFrom"></div>
     <div class="fld"><label>종료일</label><input type="date" id="lvTo"></div>
@@ -330,7 +331,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
    아래는 표를 못 불러왔을 때의 안전 기본값. */
 let SETTINGS = {
   late_cut:'09:40', ot_unit_min:'10',
-  siueop:'10:00', absence_confirm_after_minutes:'0', absence_exclude_pending_manual:'true',
+  siueop:'10:00', absence_confirm_after_minutes:'0', absence_confirm_after_days:'1', absence_exclude_pending_manual:'true',
   jongeop_weekday_evening:'20:00', jongeop_weekday_day:'18:30',
   jongeop_sat:'17:00', jongeop_sun:'14:00'
 };
@@ -689,8 +690,8 @@ function absenceCandidateDecision({ds,todaySeoul,nowSeoul,siueop,afterMinutes,sh
 function absenceManualExcluded(rows){return (rows||[]).some(row=>['대기','실장승인','원장확정'].includes(row?.status));}
 /* absence-candidate:test-end */
 function seoulDateTime(){const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date()),get=t=>parts.find(x=>x.type===t)?.value||'';return {date:`${get('year')}-${get('month')}-${get('day')}`,time:`${get('hour')}:${get('minute')}`};}
-function absenceSettingsHtml(){return ME.role==='owner'?`<div class="card"><h2>⚙ 결근/미기록 후보 기준 <span class="sub">(원장)</span></h2><div class="grid"><div class="fld"><label>시업 시각</label><input id="absenceSiueop" type="time" value="${esc(SETTINGS.siueop||'10:00')}"></div><div class="fld"><label>확인 지연(분)</label><input id="absenceDelay" type="number" min="0" max="1440" step="1" value="${esc(SETTINGS.absence_confirm_after_minutes||'0')}"></div><div class="fld"><label><input id="absenceManualExclude" type="checkbox" ${String(SETTINGS.absence_exclude_pending_manual)!=='false'?'checked':''}> 대기·실장승인·원장확정 수기근태는 후보에서 제외</label></div></div><button class="mini stamp" onclick="saveAbsenceSettings()">기준 저장</button><div class="msg" id="absenceSettingsMsg"></div></div>`:'';}
-async function saveAbsenceSettings(){const msg=$('#absenceSettingsMsg'),siueop=$('#absenceSiueop').value,delay=$('#absenceDelay').value;if(!/^\d{2}:\d{2}$/.test(siueop)||!/^\d+$/.test(delay)||Number(delay)>1440){msg.textContent='시업 시각과 지연 분(0~1440)을 확인하세요.';setStatus('error');return;}const rows=[{key:'siueop',value:siueop},{key:'absence_confirm_after_minutes',value:delay},{key:'absence_exclude_pending_manual',value:$('#absenceManualExclude').checked?'true':'false'}],{error}=await sb.from('app_settings').upsert(rows,{onConflict:'key'});if(error){msg.textContent='저장 실패: '+error.message;setStatus('error');return;}rows.forEach(x=>SETTINGS[x.key]=x.value);msg.textContent='저장했습니다.';setStatus('saved');}
+function absenceSettingsHtml(){return ME.role==='owner'?`<div class="card"><h2>⚙ 결근/미기록 후보 기준 <span class="sub">(원장)</span></h2><div class="grid"><div class="fld"><label>시업 시각</label><input id="absenceSiueop" type="time" value="${esc(SETTINGS.siueop||'10:00')}"></div><div class="fld"><label>확인 지연(분)</label><input id="absenceDelay" type="number" min="0" max="1440" step="1" value="${esc(SETTINGS.absence_confirm_after_minutes||'0')}"></div><div class="fld"><label>무단결근 기준 일수</label><input id="absenceDays" type="number" min="0" max="365" step="1" value="${esc(SETTINGS.absence_confirm_after_days||'1')}"></div><div class="fld"><label><input id="absenceManualExclude" type="checkbox" ${String(SETTINGS.absence_exclude_pending_manual)!=='false'?'checked':''}> 대기·실장승인·원장확정 수기근태는 후보에서 제외</label></div></div><button class="mini stamp" onclick="saveAbsenceSettings()">기준 저장</button><div class="msg" id="absenceSettingsMsg"></div></div>`:'';}
+async function saveAbsenceSettings(){const msg=$('#absenceSettingsMsg'),siueop=$('#absenceSiueop').value,delay=$('#absenceDelay').value,days=$('#absenceDays').value;if(!/^\d{2}:\d{2}$/.test(siueop)||!/^\d+$/.test(delay)||Number(delay)>1440||!/^(?:0|[1-9]\d*)$/.test(days)||Number(days)>365){msg.textContent='시업 시각·지연 분·무단결근 일수를 확인하세요.';setStatus('error');return;}const rows=[{key:'siueop',value:siueop},{key:'absence_confirm_after_minutes',value:delay},{key:'absence_confirm_after_days',value:days},{key:'absence_exclude_pending_manual',value:$('#absenceManualExclude').checked?'true':'false'}],{error}=await sb.from('app_settings').upsert(rows,{onConflict:'key'});if(error){msg.textContent='저장 실패: '+error.message;setStatus('error');return;}rows.forEach(x=>SETTINGS[x.key]=x.value);msg.textContent='저장했습니다.';setStatus('saved');}
 async function fetchAttendancePages(makeQuery,pageSize=500){const rows=[];for(let page=0;page<20;page++){const {data,error}=await makeQuery().range(page*pageSize,(page+1)*pageSize-1);if(error)return {data:null,error};rows.push(...(data||[]));if((data||[]).length<pageSize)break;}return {data:rows,error:null};}
 async function renderAtt(m){
   const month=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit'}).format(new Date()),bounds=attendanceMonthBounds(month);
@@ -1066,7 +1067,7 @@ async function saveAttendance(){
 /* ── 연차 ── */
 let LEAVE_ARCHIVE_MONTH=null,LEAVE_EDIT_ID=null;
 async function computeLeaveDays(uid,from,to,type){
-  if(type==='반차')return 0.5;
+  if(type==='반차'||type==='조퇴')return 0.5;
   const dates=[];for(let d=from;d<=to;d=addDays(d,1))dates.push(d);
   const holiSet=new Set((await sb.from('holidays').select('date')).data?.map(h=>h.date)||[]);
   const weekStarts=[...new Set(dates.map(d=>mondayStr(d)))];
@@ -1121,7 +1122,7 @@ async function renderLeave(m){
     <select id="gvKind" class="mini"><option>부여</option><option>조정</option></select>
     <input id="gvDays" class="mini" type="number" step="0.5" placeholder="일수" style="width:80px">
     <input id="gvNote" class="mini" placeholder="메모(예: 2026년 정기부여)">
-    <button class="mini stamp" onclick="grantLeave()">기록</button></div>
+    <button class="mini stamp" onclick="grantLeave()">저장</button></div>
     <div class="hint">‘부여’는 추가 기록, ‘조정’은 목표 잔액으로 맞추는 절대 설정입니다. 입사 1년(365일) 도달 시 15일 일괄 부여가 원칙이며, 1년 미만은 월 개근 1일 제안값을 확인 후 기록합니다.</div></div>`:'';
   m.innerHTML=`
   <div class="card"><h2>📅 내 연차</h2>
@@ -1129,13 +1130,14 @@ async function renderLeave(m){
     <button class="hbtn pri" style="margin-top:10px" onclick="openLeave()">연차 신청</button>
     <h3>내 신청 내역</h3>
     ${(mine||[]).length?`<div class="tblwrap"><table><tr><th>유형</th><th>기간</th><th>일수</th><th>상태</th><th></th></tr>
-    ${(mine||[]).map(r=>`<tr><td>${esc(r.type)}</td><td>${md(r.date_from)}~${md(r.date_to)}</td><td>${r.days}</td>
+    ${(mine||[]).map(r=>`<tr><td>${esc(r.type)}${r.type_note&&r.type!=='기타'?' · '+esc(r.type_note):''}</td><td>${md(r.date_from)}~${md(r.date_to)}</td><td>${r.days}</td>
       <td><span class="b ${r.status==='승인'?'ok':(r.status==='반려'?'no':'wait')}">${esc(r.status)}</span></td><td><button class="mini" onclick="openLeaveForm(${r.id})">📄 신청서</button> ${r.status==='대기'?`<button class="mini" onclick="openLeaveEdit(${r.id})">수정</button><button class="mini rej" onclick="cancelPendingLeave(${r.id})">취소</button>`:''}</td></tr>`).join('')}</table></div>`:'<div class="empty">신청 내역 없음</div>'}
   </div>${leadHtml}${archiveHtml}${grantHtml}`;
 }
-$('#lvType') && $('#lvType').addEventListener('change',e=>{$('#lvNoteWrap').style.display=e.target.value==='기타'?'':'none';});
-function openLeave(){LEAVE_EDIT_ID=null;$('#lvFrom').value=today();$('#lvTo').value=today();$('#lvReason').value='';$('#lvNote').value='';$('#lvContact').value='';$('#lvSpecial').value='';$('#lvSpecialWrap').style.display='none';$('#lvMsg').textContent='';$('#lvOverlap').textContent='';show('lvMask');checkClash();}
-async function openLeaveEdit(id){const {data:r,error}=await sb.from('leave_requests').select('*').eq('id',id).eq('user_id',ME.id).maybeSingle();if(error||!r||r.status!=='대기'){alert('대기 중인 본인 신청만 수정할 수 있습니다.');return;}LEAVE_EDIT_ID=id;$('#lvType').value=r.type||'연차';$('#lvNote').value=r.type_note||'';$('#lvFrom').value=r.date_from;$('#lvTo').value=r.date_to;$('#lvReason').value=r.reason||'';$('#lvContact').value=r.contact||'';$('#lvSpecial').value=r.special_reason||'';$('#lvMsg').textContent='수정 후 저장하세요.';show('lvMask');checkClash();}
+function refreshLeaveTypeFields(){const type=$('#lvType').value,isTimed=type==='반차'||type==='조퇴';$('#lvNoteWrap').style.display=type==='기타'?'':'none';$('#lvTimeWrap').style.display=isTimed?'':'none';}
+$('#lvType') && $('#lvType').addEventListener('change',refreshLeaveTypeFields);
+function openLeave(){LEAVE_EDIT_ID=null;$('#lvFrom').value=today();$('#lvTo').value=today();$('#lvType').value='연차';$('#lvTimeFrom').value='';$('#lvTimeTo').value='';$('#lvReason').value='';$('#lvNote').value='';$('#lvContact').value='';$('#lvSpecial').value='';$('#lvSpecialWrap').style.display='none';$('#lvMsg').textContent='';$('#lvOverlap').textContent='';refreshLeaveTypeFields();show('lvMask');checkClash();}
+async function openLeaveEdit(id){const {data:r,error}=await sb.from('leave_requests').select('*').eq('id',id).eq('user_id',ME.id).maybeSingle();if(error||!r||r.status!=='대기'){alert('대기 중인 본인 신청만 수정할 수 있습니다.');return;}LEAVE_EDIT_ID=id;$('#lvType').value=r.type||'연차';const times=/^(\d{2}:\d{2})~(\d{2}:\d{2})$/.exec(r.type_note||'');$('#lvTimeFrom').value=times?times[1]:'';$('#lvTimeTo').value=times?times[2]:'';$('#lvNote').value=r.type==='기타'?r.type_note||'':'';$('#lvFrom').value=r.date_from;$('#lvTo').value=r.date_to;$('#lvReason').value=r.reason||'';$('#lvContact').value=r.contact||'';$('#lvSpecial').value=r.special_reason||'';$('#lvMsg').textContent='수정 후 저장하세요.';refreshLeaveTypeFields();show('lvMask');checkClash();}
 async function cancelPendingLeave(id){if(!confirm('아직 승인 전인 연차 신청을 취소할까요?'))return;const result=await sb.rpc('process_leave_request',{p_id:id,p_action:'cancel'});if(result.error){alert('취소 실패: '+result.error.message);return;}if(!result.data||!result.data.length){alert('취소 결과를 확인하지 못했습니다.');return;}setStatus('saved');render();refreshBadges();}
 function printLeaveForm(){document.body.classList.add('leave-printing');const done=()=>{document.body.classList.remove('leave-printing');window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);window.print();}
 ['lvFrom','lvTo'].forEach(id=>{const el=$('#'+id);if(el)el.addEventListener('change',checkClash);});
@@ -1162,12 +1164,14 @@ async function submitLeave(){
   const f=$('#lvFrom').value,t=$('#lvTo').value;if(!f||!t){$('#lvMsg').textContent='기간을 입력하세요.';return;}
   if(t<f){$('#lvMsg').textContent='종료일이 시작일보다 빠릅니다.';return;}
   const type=$('#lvType').value;
+  const timeFrom=$('#lvTimeFrom').value,timeTo=$('#lvTimeTo').value;
+  if((type==='반차'||type==='조퇴')&&(!timeFrom||!timeTo||timeTo<=timeFrom)){ $('#lvMsg').textContent='반차·조퇴의 시간 범위를 확인하세요.';return; }
   const others=await leaveConflict(f,t);
   if(others>=2){$('#lvMsg').innerHTML='<b style="color:var(--red)">⚠ 신청되지 않았습니다 — 그 날 이미 2명이 휴가입니다.</b>';return;}
   const special=others===1&&$('#lvSpecial').value.trim()!=='';
   if(others===1&&!special){$('#lvMsg').innerHTML='<b style="color:var(--red)">⚠ 신청되지 않았습니다 — 그날 이미 휴가자가 있어 특별사정 사유를 적어야 신청됩니다.</b>';return;}
   const days=await computeLeaveDays(ME.id,f,t,type);
-  const payload={type,type_note:type==='기타'?$('#lvNote').value:null,date_from:f,date_to:t,days,reason:$('#lvReason').value||null,contact:$('#lvContact').value||null,special,special_reason:special?$('#lvSpecial').value:null};
+  const payload={type,type_note:(type==='반차'||type==='조퇴')?`${timeFrom}~${timeTo}`:type==='기타'?$('#lvNote').value:null,date_from:f,date_to:t,days,reason:$('#lvReason').value||null,contact:$('#lvContact').value||null,special,special_reason:special?$('#lvSpecial').value:null};
   let error=null;
   if(LEAVE_EDIT_ID){const result=await sb.rpc('replace_pending_leave_request',{p_id:LEAVE_EDIT_ID,p_type:type,p_type_note:payload.type_note,p_date_from:f,p_date_to:t,p_days:days,p_reason:payload.reason,p_contact:payload.contact,p_special:special,p_special_reason:payload.special_reason});error=result.error;}
   else{const created=await sb.from('leave_requests').insert({...payload,user_id:ME.id}).select('id').maybeSingle();error=created.error||(!created.data?{message:'신청 저장 결과를 확인하지 못했습니다.'}:null);}
@@ -1597,8 +1601,8 @@ function buildLeaveCalendarIndex(rows,monthFrom,monthTo){
 function leaveCalendarLabel(item,role){
   const circled=['','①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩','⑪','⑫','⑬','⑭','⑮','⑯','⑰','⑱','⑲','⑳'];
   const rank=circled[item.rank]||String(item.rank)+'.',row=item.row,name=row.user_name||row.name||'';
-  if(role!=='owner')return rank+' '+name;
-  return rank+' '+name+' · '+(row.type||'')+' · 신청 '+(formatLeaveTimestamp(row.created_at)||'미상')+' · 승인 '+(formatLeaveTimestamp(row.owner_at||row.chief_at)||'미상');
+  if(role!=='owner')return rank+' '+name+(row.type_note?' · '+row.type_note:'');
+  return rank+' '+name+' · '+(row.type||'')+(row.type_note?' · '+row.type_note:'')+' · 신청 '+(formatLeaveTimestamp(row.created_at)||'미상')+' · 승인 '+(formatLeaveTimestamp(row.owner_at||row.chief_at)||'미상');
 }
 /* leave-calendar:test-end */
 /* leave-calendar:render-start */
@@ -2721,7 +2725,7 @@ async function renderOwner(m){
       <td>${roster?`<select class="mini" onchange="setSchedulePersonDepartment('${roster.id}',this.value)">${SCHEDULE_DEPARTMENTS.map(d=>`<option value="${d}" ${rosterDept===d?'selected':''}>${d}</option>`).join('')}</select>`:'<span class="sub">미연결</span>'}</td>
       <td>${roster?`<input type="checkbox" ${roster.included_in_schedule!==false?'checked':''} onchange="setSchedulePersonIncluded('${roster.id}',this.checked)">`:'—'}</td>
       <td>${roster?`<span class="b ${roster.active===true?'ok':'no'}">${roster.active===true?'재직':'비활성'}</span> <button class="mini ${roster.active===true?'rej':'stamp'}" onclick="setSchedulePersonActive('${roster.id}',${roster.active===true?'false':'true'})">${roster.active===true?'비활성화':'재활성화'}</button>`:'—'}</td>
-      <td><select id="employment-${p.user_id}-status" class="mini" ${blocked?'disabled':''}><option value="재직" ${(p.employment_status||'재직')==='재직'?'selected':''}>재직</option><option value="자진퇴사" ${p.employment_status==='자진퇴사'?'selected':''}>자진퇴사</option><option value="계약만료" ${p.employment_status==='계약만료'?'selected':''}>계약만료</option><option value="권고사직" ${p.employment_status==='권고사직'?'selected':''}>권고사직</option></select><br><input id="employment-${p.user_id}-effective" class="mini" type="date" value="${p.employment_effective_date||today()}" aria-label="재직 상태 유효일" ${blocked?'disabled':''}><br><input id="employment-${p.user_id}-reason" class="mini" value="${esc(p.employment_reason||'')}" placeholder="사유" aria-label="재직 상태 사유" ${blocked?'disabled':''}><br><button class="mini stamp" onclick="setEmploymentStatus('${p.user_id}')" ${blocked?'disabled':''}>상태 저장</button>${p.user_id!==ME.id&&!blocked?` <button class="mini rej" onclick="disableEmployeeAccountPreserveRecords('${p.user_id}')">접속 영구 차단(인사기록 보존)</button>`:''}${acctState.show==='blocked-deletable'?`<div class="sub">계정 차단됨</div> <button class="mini rej" onclick="hardDeleteAccountPreserveRecords('${p.user_id}')">로그인 계정 영구 삭제</button>`:acctState.show==='deleted'?`<div class="sub">로그인 계정 삭제됨(${md(acctState.authDeletedAt)})</div>`:acctState.show==='blocked'?'<div class="sub">계정 차단됨</div>':''}</td><td>${p.hire_date||''}</td>
+      <td><select id="employment-${p.user_id}-status" class="mini" ${blocked?'disabled':''}><option value="재직" ${(p.employment_status||'재직')==='재직'?'selected':''}>재직</option><option value="자진퇴사" ${p.employment_status==='자진퇴사'?'selected':''}>자진퇴사</option><option value="계약만료" ${p.employment_status==='계약만료'?'selected':''}>계약기간만료</option><option value="권고사직" ${p.employment_status==='권고사직'?'selected':''}>권고사직</option></select><br><input id="employment-${p.user_id}-effective" class="mini" type="date" value="${p.employment_effective_date||today()}" aria-label="재직 상태 유효일" ${blocked?'disabled':''}><br><input id="employment-${p.user_id}-reason" class="mini" value="${esc(p.employment_reason||'')}" placeholder="사유" aria-label="재직 상태 사유" ${blocked?'disabled':''}><br><button class="mini stamp" onclick="setEmploymentStatus('${p.user_id}')" ${blocked?'disabled':''}>상태 저장</button>${p.user_id!==ME.id&&!blocked?` <button class="mini rej" onclick="disableEmployeeAccountPreserveRecords('${p.user_id}')">접속 영구 차단(인사기록 보존)</button>`:''}${acctState.show==='blocked-deletable'?`<div class="sub">계정 차단됨</div> <button class="mini rej" onclick="hardDeleteAccountPreserveRecords('${p.user_id}')">로그인 계정 영구 삭제</button>`:acctState.show==='deleted'?`<div class="sub">로그인 계정 삭제됨(${md(acctState.authDeletedAt)})</div>`:acctState.show==='blocked'?'<div class="sub">계정 차단됨</div>':''}</td><td>${p.hire_date||''}</td>
       <td><select class="mini" onchange="setRole('${p.user_id}',this.value)">${['staff','manager','chief','owner'].map(r=>`<option ${p.role===r?'selected':''}>${r}</option>`).join('')}</select></td>
       <td><span class="b ${p.approved!==false?'ok':'wait'}">${p.approved!==false?'승인됨':'대기'}</span>${p.approved!==false&&p.user_id!==ME.id?` <button class="mini rej" onclick="revokeApproval('${p.user_id}')">승인취소</button>`:''}</td></tr>`}).join('')}</table></div>
     <div class="rowflex" style="margin-top:6px">
