@@ -11,9 +11,10 @@ test('F장 공지 첨부와 서류 허용 형식이 xlsx·pptx·txt·hwpx를 포
   assert.match(html,/\.xlsx/);assert.match(html,/\.pptx/);assert.match(html,/\.txt/);assert.match(html,/\.hwpx/);
 });
 
-test('로컬 Storage 정책 SQL도 공지·서류 형식 목록을 함께 허용한다',()=>{
-  for(const type of ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.openxmlformats-officedocument.presentationml.presentation','text/plain'])assert.match(noticeSql,new RegExp(type.replace(/[.+]/g,'\\$&')));
-  for(const type of ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.openxmlformats-officedocument.presentationml.presentation','text/plain'])assert.match(employeeSql,new RegExp(type.replace(/[.+]/g,'\\$&')));
+test('로컬 Storage 정책은 HWPX와 빈·브라우저 MIME를 확장자와 함께 허용하고 차단목록만 거부한다',()=>{
+  assert.match(html,/application\/vnd\.hancom\.hwpx|\.hwpx/);
+  assert.match(noticeSql,/application\/vnd\.hancom\.hwpx/);assert.match(noticeSql,/allowed_mime_types\) values[^\n]*null|allowed_mime_types=null/);assert.match(employeeSql,/application\/vnd\.hancom\.hwpx/);
+  for(const sql of [noticeSql,employeeSql]){assert.match(sql,/!~\*/);assert.match(sql,/exe\|msi\|bat/);}
   assert.match(html,/BLOCKED_DOCUMENT_EXT/);assert.match(html,/실행 파일·압축 파일/);
 });
 
@@ -43,6 +44,22 @@ test('실제 submitNotice가 xlsx 첨부를 Storage 업로드와 notices INSERT�
   vm.runInNewContext(source,context);
   await context.submitNotice();
   assert.equal(uploaded.bucket,'notice-attachments');assert.equal(inserted.attachments[0].name,'자료.xlsx');
+});
+
+test('실제 paste→submit이 본문 marker를 저장하고 renderNoticeBody가 이미지만 렌더링한다',async()=>{
+  const image={name:'capture.gif',type:'image/gif',size:12},bodyField={value:'안전한 본문',dataset:{},listeners:{},addEventListener(type,fn){this.listeners[type]=fn;},dispatchEvent(event){this.listeners[event.type]?.(event);}},fileField={files:[],value:''},fields={ntTitle:{value:'공지'},ntBody:bodyField,ntUrl:{value:''},ntPin:{checked:false},ntFiles:fileField,ntMsg:{textContent:''}};
+  let inserted,uploaded;
+  const sb={storage:{from(){return {upload:async(path,file)=>{uploaded={path,file};return {error:null};},download:async()=>({data:new Blob(['image'],{type:'image/gif'}),error:null}),remove:async()=>{}};}},from(table){return table==='notices'?{insert:async row=>{inserted=row;return {error:null};}}:{}}};
+  const base=html.slice(html.indexOf('const NOTICE_ATTACHMENT_ALLOWED_TYPES'),html.indexOf('const isLeaveDocsLead'));
+  const source=base+html.slice(html.indexOf('async function submitNotice'),html.indexOf('async function delNotice'))+'; this.submitNotice=submitNotice;';
+  const context={sb,ME:{id:'u1'},NOTICE_PASTED_IMAGES:[image],crypto:{randomUUID:()=> 'id'},$:(id)=>id==='#ntBody'?bodyField:id==='#ntFiles'?fileField:fields[id.slice(1)],hide:()=>{},setStatus:()=>{},render:()=>{},renderNoticePastePreview:()=>{}};
+  vm.runInNewContext(source,context);bodyField.dispatchEvent({type:'paste',preventDefault(){},clipboardData:{items:[{kind:'file',type:'image/gif',getAsFile:()=>image}]}});await context.submitNotice();
+  assert.equal(uploaded.file,image);assert.match(inserted.body,/안전한 본문\n\[\[notice-image:u1\/tmp\/id-capture\.gif\]\]/);assert.equal(inserted.attachments[0].type,'image/gif');
+  const renderStart=html.indexOf('async function renderNoticeBody'),renderEnd=html.indexOf('async function renderNotice(m)',renderStart);
+  const renderedContext={sb,URL:{createObjectURL:()=> 'blob:inline'},esc:value=>String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')};
+  vm.runInNewContext(html.slice(renderStart,renderEnd)+'; this.renderNoticeBody=renderNoticeBody;',renderedContext);
+  const rendered=await renderedContext.renderNoticeBody('본문 <img src=x onerror=alert(1)> [[notice-image:u1/tmp/id-capture.gif]]',[{path:'u1/tmp/id-capture.gif',name:'capture.gif',type:'image/gif'}]);
+  assert.match(rendered,/blob:inline/);assert.doesNotMatch(rendered,/<img src=x/);assert.match(rendered,/&lt;img/);
 });
 
 test('실제 이미지·PDF 미리보기 함수는 새 창 대신 허브 미리보기 영역을 채운다',async()=>{

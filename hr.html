@@ -367,9 +367,11 @@ const md=s=>s?String(s).slice(5).replace('-','/'):'';
 const isLead=()=>['chief','owner'].includes(ME.role);
 const isMgr=()=>['manager','chief','owner'].includes(ME.role);
 const canViewDeposit=me=>me?.role==='owner'||me?.role==='chief'||me?.department==='데스크';
-const NOTICE_ATTACHMENT_ALLOWED_TYPES=new Set(['application/pdf','image/jpeg','image/png','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/x-hwp','application/haansofthwp','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.presentationml.presentation','application/vnd.ms-powerpoint','text/plain']);
+const NOTICE_ATTACHMENT_ALLOWED_TYPES=new Set(['application/pdf','image/jpeg','image/png','image/gif','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/x-hwp','application/haansofthwp','application/vnd.hancom.hwpx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.presentationml.presentation','application/vnd.ms-powerpoint','text/plain','application/vnd.oasis.opendocument.text']);
 const NOTICE_ATTACHMENT_MAX_BYTES=10*1024*1024;
-function isAllowedNoticeAttachment(file){return !!file&&file.size>0&&file.size<=NOTICE_ATTACHMENT_MAX_BYTES&&NOTICE_ATTACHMENT_ALLOWED_TYPES.has(file.type);}
+const NOTICE_BLOCKED_EXT=/\.(exe|msi|bat|cmd|com|scr|js|vbs|ps1|sh|jar|dll|dmg|iso|apk|ipa|wasm|zip|rar|7z|tar|gz|bz2|xz)$/i;
+const NOTICE_BLOCKED_TYPES=new Set(['application/x-msdownload','application/x-msdos-program','application/x-7z-compressed','application/zip','application/x-rar-compressed','application/vnd.rar','application/gzip','application/x-gzip','application/x-bzip2','application/x-xz','application/x-tar','application/x-sh','text/javascript','application/javascript','application/x-javascript','application/java-archive']);
+function isAllowedNoticeAttachment(file){return !!file&&file.size>0&&file.size<=NOTICE_ATTACHMENT_MAX_BYTES&&!NOTICE_BLOCKED_EXT.test(String(file.name||''))&&!NOTICE_BLOCKED_TYPES.has(String(file.type||''));}
 let NOTICE_PASTED_IMAGES=[];
 function renderNoticePastePreview(){const box=$('#ntPastePreview');if(!box)return;box.innerHTML=NOTICE_PASTED_IMAGES.map((file,i)=>`<span class="sub">📷 ${esc(file.name||'캡처 이미지 '+(i+1))}</span>`).join(' ');}
 function handleNoticePaste(event){const items=[...(event.clipboardData?.items||[])],images=items.filter(item=>item.kind==='file'&&String(item.type||'').startsWith('image/')).map(item=>item.getAsFile()).filter(Boolean);if(!images.length)return;event.preventDefault();NOTICE_PASTED_IMAGES.push(...images);renderNoticePastePreview();}
@@ -1305,14 +1307,28 @@ function approvalRequestTitle(label,title){return label==='재직증명서 발�
 function approvalRequestBody(label,body){return label==='재직증명서 발급'?'[재직증명서 발급 요청]\n'+(body||''):body||'';}
 /* approval-request:test-end */
 /* ── 공지 ── */
+async function renderNoticeBody(body,attachments){
+  const parts=String(body||'').split(/(\[\[notice-image:[^\]]+\]\])/g),items=Array.isArray(attachments)?attachments:[];
+  return (await Promise.all(parts.map(async part=>{
+    const match=/^\[\[notice-image:([A-Za-z0-9._/-]+)\]\]$/.exec(part);
+    if(!match)return esc(part);
+    const attachment=items.find(item=>item&&item.path===match[1]&&String(item.type||'').startsWith('image/'));
+    if(!attachment)return esc(part);
+    const result=await sb.storage.from('notice-attachments').download(attachment.path);
+    if(result.error||!result.data)return esc(part);
+    const url=URL.createObjectURL(result.data);
+    return `<img src="${esc(url)}" alt="${esc(attachment.name||'본문 이미지')}" style="max-width:100%;height:auto;display:block;margin:6px 0">`;
+  }))).join('');
+}
 async function renderNotice(m){
   const {data:list}=await sb.from('notices').select('*').order('pinned',{ascending:false}).order('created_at',{ascending:false});
-  m.innerHTML=`<div class="card"><h2>📢 공지</h2><button class="hbtn pri" onclick="show('ntMask')">공지 작성</button>
-    ${(list||[]).length?(list||[]).map(n=>`<div style="padding:8px 0;border-bottom:1px dashed var(--line)">
+  const rows=await Promise.all((list||[]).map(async n=>`<div style="padding:8px 0;border-bottom:1px dashed var(--line)">
       ${n.pinned?'📌 ':''}<b>${esc(n.title)}</b> <span class="sub">${md(n.created_at)} · ${esc(n.author||'')}</span>
       ${n.notion_url?` · <a href="${esc(n.notion_url)}" target="_blank" rel="noopener">전문 ↗</a>`:''}
-      <div class="sub" style="white-space:pre-wrap">${esc(n.body||'')}</div>${noticeAttachmentLinks(n)}
-      ${isLead()?`<button class="mini rej" style="margin-top:4px" onclick="delNotice(${n.id})">삭제</button>`:''}</div>`).join(''):'<div class="empty">공지 없음</div>'}
+      <div class="sub" style="white-space:pre-wrap">${await renderNoticeBody(n.body,n.attachments)}</div>${noticeAttachmentLinks(n)}
+      ${isLead()?`<button class="mini rej" style="margin-top:4px" onclick="delNotice(${n.id})">삭제</button>`:''}</div>`));
+  m.innerHTML=`<div class="card"><h2>📢 공지</h2><button class="hbtn pri" onclick="show('ntMask')">공지 작성</button>
+    ${(list||[]).length?rows.join(''):'<div class="empty">공지 없음</div>'}
   </div>`;
   for(const n of (list||[])) sb.from('notice_reads').upsert({notice_id:n.id,user_id:ME.id},{onConflict:'notice_id,user_id',ignoreDuplicates:true}).then(()=>{});
   refreshBadges();
@@ -1324,9 +1340,10 @@ async function downloadNoticeAttachment(path,name){return previewNoticeAttachmen
 async function cleanupNoticeUploads(paths){if(paths.length)await sb.storage.from('notice-attachments').remove(paths);}
 async function submitNotice(){
   const title=$('#ntTitle').value.trim();if(!title){$('#ntMsg').textContent='제목을 입력하세요.';return;}
-  const files=[...($('#ntFiles').files||[]),...NOTICE_PASTED_IMAGES];if(files.some(f=>!isAllowedNoticeAttachment(f))){$('#ntMsg').textContent='허용되지 않은 파일 형식 또는 10MB 초과 파일이 있습니다.';return;}
-  const attachments=[],uploaded=[];for(const file of files){const name=file.name||`capture-${Date.now()}.png`,path=`${ME.id}/tmp/${crypto.randomUUID()}-${name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;const {error}=await sb.storage.from('notice-attachments').upload(path,file,{contentType:file.type,upsert:false});if(error){await cleanupNoticeUploads(uploaded);$('#ntMsg').textContent='첨부 실패: '+error.message;return;}uploaded.push(path);attachments.push({path,name,type:file.type,size:file.size});}
-  const {error}=await sb.from('notices').insert({title,body:$('#ntBody').value,notion_url:$('#ntUrl').value||null,pinned:$('#ntPin').checked,author_id:ME.id,attachments});if(error){await cleanupNoticeUploads(uploaded);$('#ntMsg').textContent='공지 저장 실패: '+error.message;return;}
+  const selectedFiles=[...($('#ntFiles').files||[])],pastedFiles=[...NOTICE_PASTED_IMAGES],files=[...selectedFiles,...pastedFiles];if(files.some(f=>!isAllowedNoticeAttachment(f))){$('#ntMsg').textContent='허용되지 않은 파일 형식 또는 10MB 초과 파일이 있습니다.';return;}
+  const attachments=[],uploaded=[],inlineMarkers=[];for(const file of files){const name=file.name||`capture-${Date.now()}.png`,path=`${ME.id}/tmp/${crypto.randomUUID()}-${name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;const {error}=await sb.storage.from('notice-attachments').upload(path,file,{contentType:file.type,upsert:false});if(error){await cleanupNoticeUploads(uploaded);$('#ntMsg').textContent='첨부 실패: '+error.message;return;}uploaded.push(path);attachments.push({path,name,type:file.type,size:file.size});if(pastedFiles.includes(file))inlineMarkers.push(`[[notice-image:${path}]]`);}
+  const body=[String($('#ntBody').value||''),...inlineMarkers].filter(Boolean).join('\n');
+  const {error}=await sb.from('notices').insert({title,body,notion_url:$('#ntUrl').value||null,pinned:$('#ntPin').checked,author_id:ME.id,attachments});if(error){await cleanupNoticeUploads(uploaded);$('#ntMsg').textContent='공지 저장 실패: '+error.message;return;}
   hide('ntMask');$('#ntTitle').value='';$('#ntBody').value='';$('#ntUrl').value='';$('#ntFiles').value='';$('#ntPin').checked=false;NOTICE_PASTED_IMAGES=[];renderNoticePastePreview();setStatus('saved');render();
 }
 async function delNotice(id){if(!confirm('삭제할까요?'))return;await sb.from('notices').delete().eq('id',id);setStatus('saved');render();}
@@ -1706,14 +1723,13 @@ function employeeDocumentsErrorMessages(docsError,contractsError){
 function contractPreviewHtml(row){return String(row&&row.merged_html||'');}
 /* employee-documents-contract:test-end */
 /* employee-documents:test-start */
-const BLOCKED_DOCUMENT_EXT=/\.(exe|msi|bat|cmd|com|scr|js|vbs|ps1|sh|zip|rar|7z|tar|gz)$/i;
-const BLOCKED_DOCUMENT_TYPES=new Set(['application/x-msdownload','application/x-msdos-program','application/x-7z-compressed','application/zip','application/x-rar-compressed','application/gzip','application/x-gzip','application/x-sh','text/javascript','application/javascript']);
+const BLOCKED_DOCUMENT_EXT=/\.(exe|msi|bat|cmd|com|scr|js|vbs|ps1|sh|jar|dll|dmg|iso|apk|ipa|wasm|zip|rar|7z|tar|gz|bz2|xz)$/i;
+const BLOCKED_DOCUMENT_TYPES=new Set(['application/x-msdownload','application/x-msdos-program','application/x-7z-compressed','application/zip','application/x-rar-compressed','application/vnd.rar','application/gzip','application/x-gzip','application/x-bzip2','application/x-xz','application/x-tar','application/x-sh','text/javascript','application/javascript','application/x-javascript','application/java-archive']);
 function validateGeneralDocument(file){
   if(!file)return '파일을 선택하세요.';
   if(file.size<=0)return '0바이트 파일은 올릴 수 없습니다.';
   if(file.size>10*1024*1024)return '파일은 10MB 이하만 올릴 수 있습니다.';
   if(BLOCKED_DOCUMENT_EXT.test(String(file.name||''))||BLOCKED_DOCUMENT_TYPES.has(String(file.type||'')))return '실행 파일·압축 파일은 올릴 수 없습니다.';
-  if(String(file.type||'')==='application/octet-stream'&&!/\.(pdf|docx?|xlsx?|pptx?|txt|hwp|hwpx|png|jpe?g)$/i.test(String(file.name||'')))return '파일 형식을 확인하세요.';
   return '';
 }
 function validateEmployeeDocument(file){return validateGeneralDocument(file);}
