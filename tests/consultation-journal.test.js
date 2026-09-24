@@ -15,7 +15,7 @@ function loadConsultationHelpers() {
   const match = html.match(/\/\* consultation-journal:test-start \*\/([\s\S]*?)\/\* consultation-journal:test-end \*\//);
   assert.ok(match, '상담일지 테스트용 순수 함수 블록이 있어야 합니다.');
   const context = {};
-  require('node:vm').runInNewContext(`${match[1]}\nthis.helpers={consultationCanAccess,consultationMaskPhone,consultationSafeSearch,consultationPageRange,consultationRequestError,consultationApplyFilterState,consultationServerQueryPlan};`, context);
+  require('node:vm').runInNewContext(`${match[1]}\nthis.helpers={consultationCanAccess,consultationMaskPhone,consultationSafeSearch,consultationPageRange,consultationRequestError,consultationApplyFilterState,consultationServerQueryPlan,consultationActionTiming};`, context);
   return context.helpers;
 }
 
@@ -95,6 +95,8 @@ test('익명 하네스는 권한·짧은 연락처 마스킹·검색 정화·페
   assert.equal(helpers.consultationCanAccess('anon'), false);
   assert.equal(helpers.consultationCanAccess('staff'), false);
   assert.equal(helpers.consultationCanAccess('manager'), true);
+  assert.equal(helpers.consultationCanAccess('chief'), true);
+  assert.equal(helpers.consultationCanAccess('deputy'), false);
   assert.equal(helpers.consultationMaskPhone('12345'), '12•45');
   assert.equal(helpers.consultationMaskPhone('1234567'), '12•••67');
   assert.equal(helpers.consultationMaskPhone('1234'), '');
@@ -105,6 +107,26 @@ test('익명 하네스는 권한·짧은 연락처 마스킹·검색 정화·페
   assert.equal(helpers.consultationRequestError('create', { message: 'denied' }), '상담일지 저장 실패: denied');
   assert.equal(helpers.consultationRequestError('update', { message: 'denied' }), '상담일지 수정 실패: denied');
   assert.equal(helpers.consultationRequestError('list', { message: 'denied' }), '상담일지 불러오기 실패: denied');
+});
+
+test('다음 조치는 완료되지 않은 예정일만 오늘·기한 지남으로 분류한다', () => {
+  const {consultationActionTiming:timing}=loadConsultationHelpers();
+  assert.equal(timing({next_action:'전화',action_due_on:'2026-09-24',action_done:false},'2026-09-25'),'overdue');
+  assert.equal(timing({next_action:'전화',action_due_on:'2026-09-25',action_done:false},'2026-09-25'),'today');
+  for(const row of [
+    {next_action:'전화',action_due_on:'2026-09-26',action_done:false},
+    {next_action:'전화',action_due_on:'2026-09-24',action_done:true},
+    {next_action:'',action_due_on:'2026-09-24',action_done:false},
+    {next_action:'전화',action_due_on:null,action_done:false}
+  ])assert.equal(timing(row,'2026-09-25'),'');
+});
+
+test('기존 상담일지 안에서 오늘·기한 지남 목록과 다음 조치 담당자·예정일·완료 체크를 연결한다',()=>{
+  const feature=html.match(/\/\* ── 상담일지:[\s\S]*?\/\* ── 근로계약서/)?.[0]||'';
+  for(const id of ['cjActionQueue','cjActionAssignee','cjActionDue','cjActionDone'])assert.match(feature,new RegExp(`id="${id}"`));
+  assert.match(feature,/from\('consultation_journals'\)[\s\S]*?eq\('action_done',false\)[\s\S]*?lte\('action_due_on',today\(\)\)/);
+  assert.match(feature,/action_assignee_id:|action_assignee_id,action_due_on,action_done/);
+  assert.doesNotMatch(feature,/go\('action'\)|key:'action'/,'새 업무 탭은 만들지 않음');
 });
 
 test('server_search_filter_survives_render: 버튼 입력은 렌더 전 상태에 저장되고 서버 쿼리 계획까지 보존된다', () => {
