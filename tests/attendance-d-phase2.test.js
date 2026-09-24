@@ -1,0 +1,47 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+
+const root = path.join(__dirname, '..');
+const html = fs.readFileSync(path.join(root, 'hr.html'), 'utf8');
+
+test('D장 출퇴근 입력은 저녁 추가근무·합계·요일·비고·반차를 제공한다', () => {
+  for (const marker of ['manualEveningOvertimeRaw', 'manualOvertimeTotal', 'manualWeekday', 'manualNote', 'manualHalfDay']) {
+    assert.match(html, new RegExp(marker));
+  }
+  assert.match(html, /저녁 추가근무/);
+  assert.match(html, /추가근무 합계/);
+  assert.match(html, /비고/);
+  assert.match(html, /반차/);
+});
+
+test('D장 출퇴근은 시·분 선택 UI와 날짜 상세 패널을 사용한다', () => {
+  assert.match(html, /id="manualClockInHour"/);
+  assert.match(html, /id="manualClockInMinute"/);
+  assert.match(html, /id="manualClockOutHour"/);
+  assert.match(html, /id="manualClockOutMinute"/);
+  assert.match(html, /manualAttendanceDayDetail/);
+  assert.match(html, /toggleManualAttendanceDetail/);
+});
+
+test('10분 단위 기존 계산 로직과 경계값 9·10·19를 보존한다', () => {
+  const fn = html.match(/function overtimeDraftMinutes\(raw\)\{[\s\S]*?\n}/)?.[0];
+  assert.ok(fn);
+  assert.match(fn, /Math\.floor\(n\/10\)\*10/);
+  const context = {};
+  vm.createContext(context);
+  vm.runInContext(`${fn};this.overtimeDraftMinutes=overtimeDraftMinutes;`, context);
+  assert.deepEqual([9, 10, 19].map(n => context.overtimeDraftMinutes(String(n))), [0, 10, 10]);
+});
+
+test('저녁 추가근무는 기존 evening boolean과 별도 분 단위 저장 초안과 롤백을 가진다', () => {
+  const sql = fs.readFileSync(path.join(root, 'db', 'attendance_manual_evening_overtime_draft.sql'), 'utf8');
+  assert.match(sql, /evening_overtime_raw_text/);
+  assert.match(sql, /evening_overtime_min/);
+  assert.match(sql, /manual_note/);
+  assert.match(sql, /half_day/);
+  assert.match(sql, /submit_manual_attendance_d/);
+  assert.ok(fs.existsSync(path.join(root, 'db', 'attendance_manual_evening_overtime_rollback.sql')));
+});
