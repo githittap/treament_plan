@@ -16,6 +16,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
+.job-group-admin{border:1px solid var(--line);border-radius:10px;padding:12px;margin:12px 0;min-width:0;overflow:hidden}.job-group-doctors{display:flex;gap:8px;flex-wrap:wrap;padding:8px;background:var(--panel);border-radius:8px}.job-group-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(180px,.5fr);gap:10px;margin-top:10px}.job-group-form fieldset{min-width:0}.job-group-form label{display:flex;flex-direction:column;gap:6px}.job-group-people{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.job-group-person{display:flex;align-items:center;gap:8px;min-width:0;padding:6px;border:1px solid var(--line);border-radius:6px}.job-group-person span{overflow-wrap:anywhere}.job-group-person span:last-child{margin-left:auto;color:var(--gray)}.job-group-preview{width:100%;box-sizing:border-box;margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:8px;overflow-wrap:anywhere}.job-group-preview ul{margin:6px 0;padding-left:22px}.job-group-actions{position:sticky;bottom:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;background:var(--card);border-top:1px solid var(--line)}.job-group-actions #jobGroupMessage{min-width:0;overflow-wrap:anywhere}
+@media(max-width:640px){.job-group-form{grid-template-columns:1fr}.job-group-people{grid-template-columns:1fr}.job-group-preview{width:100%}.job-group-actions{position:sticky;bottom:0;flex-direction:column;align-items:stretch}.job-group-actions button{width:100%}.job-group-admin{max-width:100%;box-sizing:border-box}}
 @media print{ @page{size:A4;margin:10mm} body.leave-printing> *{display:none!important} body.leave-printing>#lvFormMask{display:block!important;position:static!important;background:#fff!important;padding:0!important} body.leave-printing #lvFormMask,body.leave-printing #lvFormMask *{visibility:visible!important} body.leave-printing #lvFormMask .modal{width:100%!important;max-width:none!important;max-height:none!important;overflow:visible!important;box-shadow:none!important;border:0!important;padding:0!important} body.leave-printing #lvFormMask h3{display:none!important} body.leave-printing #lvFormBody>div{padding:8mm!important;font-size:12px!important;line-height:1.45!important} body.leave-printing #lvFormBody table{font-size:12px!important} body.calendar-printing> *{display:none!important} body.calendar-printing>#app,body.calendar-printing>#app main{display:block!important} body.calendar-printing header,body.calendar-printing footer,body.calendar-printing .calendar-actions{display:none!important} body.calendar-printing main{max-width:none!important;padding:0!important} body.calendar-printing #calendarCard{border:0!important;padding:0!important} body.calendar-printing .calendar-layout{grid-template-columns:210px minmax(0,1fr)!important} body.calendar-printing .calendar-day-panel{position:static!important} body.payslip-printing> *{display:none!important} body.payslip-printing>#psMask{display:block!important;position:static!important;background:#fff!important;padding:0!important} body.payslip-printing #psMask,body.payslip-printing #psMask *{visibility:visible!important} body.payslip-printing #psMask .modal{width:100%!important;max-width:none!important;max-height:none!important;overflow:visible!important;box-shadow:none!important;border:0!important;padding:0!important} body.payslip-printing #psMask h3{display:none!important} body.payslip-printing .payslip-doc{padding:10mm!important} @page{margin:12mm} @page{ @top-right{content:counter(page) " / " counter(pages);font-size:9px;color:#556} } }
 :root{
   --bg:#0d1715; --card:#14201d; --panel:#182823; --ink:#e6f2ef; --gray:#8fa5a0; --line:#24332f;
@@ -408,6 +410,127 @@ function isCurrentJobGroupMember(person, profileById, asOfDate) {
   if (!profile) return false;
   const leaving = profile.employment_status && profile.employment_status !== '재직';
   return !(leaving && profile.employment_effective_date && profile.employment_effective_date <= asOfDate);
+}
+function buildJobGroupPreview(people = [], selected = [], targetGroup = '', asOfDate, profiles = []) {
+  if (!asOfDate) throw new Error('asOfDate is required');
+  const profileById = profiles && typeof profiles.get === 'function' ? profiles : new Map(profiles.map(profile => [profile.user_id, profile]));
+  const current = people.filter(person => isCurrentJobGroupMember(person, profileById, asOfDate));
+  const selectedIds = selected.map(item => item.personId);
+  const chosen = selected.map(item => current.find(person => person.id === item.personId));
+  const validTarget = EMPLOYEE_JOB_GROUPS.some(group => group.code === targetGroup);
+  const before = Object.fromEntries(EMPLOYEE_JOB_GROUPS.map(group => [group.code, 0]));
+  let unassignedBefore = 0;
+  for (const person of current) {
+    const model = employeeJobGroupModel(person, profileById);
+    if (model.kind === 'unassigned') unassignedBefore++;
+    else before[model.code]++;
+  }
+  const moves = validTarget ? chosen.filter(Boolean).map((person, index) => {
+    const model = employeeJobGroupModel(person, profileById);
+    const actual = model.kind === 'unassigned' ? null : model.code;
+    return { id: person.id, name: person.name, profileUserId: person.profile_user_id || null,
+      from: actual, to: targetGroup, stale: selected[index].oldGroup !== actual };
+  }).filter(move => move.from !== move.to) : [];
+  const after = { ...before };
+  let unassignedAfter = unassignedBefore;
+  for (const move of moves) {
+    if (move.from) after[move.from]--;
+    else unassignedAfter--;
+    after[targetGroup]++;
+  }
+  const canSave = validTarget && selectedIds.length > 0 && chosen.length === selectedIds.length && chosen.every(Boolean) &&
+    new Set(selectedIds).size === selectedIds.length && moves.length > 0 &&
+    chosen.every((person, index) => {
+      if (!person) return false;
+      const model = employeeJobGroupModel(person, profileById);
+      return selected[index].oldGroup === (model.kind === 'unassigned' ? null : model.code);
+    });
+  return { before, after, beforeCounts: before, afterCounts: after, unassignedBefore, unassignedAfter, moves, canSave,
+    invalidIds: selectedIds.filter(id => !current.some(person => person.id === id)) };
+}
+let JOB_GROUP_SELECTION = new Map();
+function renderJobGroupAdmin() {
+  const profileById = new Map(PROFILES.map(profile => [profile.user_id, profile]));
+  const current = SCHEDULE_PEOPLE.filter(person => isCurrentJobGroupMember(person, profileById, today()));
+  const rows = current.map(person => {
+    const model = employeeJobGroupModel(person, profileById);
+    const oldGroup = model.kind === 'unassigned' ? '' : model.code;
+    return `<label class="job-group-person"><input type="checkbox" data-job-person="${esc(person.id)}" onchange="toggleJobGroupPerson('${person.id}',this.checked,'${oldGroup}')"><span>${esc(person.name)}</span><span>${model.label}</span></label>`;
+  }).join('');
+  const doctors = SCHEDULE_PEOPLE.filter(person => person.department === 'Dr.');
+  return `<section class="job-group-admin" aria-labelledby="jobGroupTitle"><h3 id="jobGroupTitle">직무 분류</h3>
+    <div class="job-group-doctors" role="note"><strong>Dr. 별도 유지 · 편집 제외</strong><span>${doctors.length ? doctors.map(person => `Dr. ${esc(person.name)}`).join(' · ') : '근무표의 기존 Dr. 항목 유지'}</span></div>
+    <div class="job-group-form"><fieldset><legend>1. 대상 선택</legend><div class="job-group-people">${rows || '<span class="sub">현재 분류할 재직 직원 없음</span>'}</div></fieldset>
+      <label>2. 새 분류<select id="jobGroupTarget" onchange="previewEmployeeJobGroup()"><option value="">분류 선택</option>${EMPLOYEE_JOB_GROUPS.map(group => `<option value="${group.code}">${group.label}</option>`).join('')}</select></label></div>
+    <div id="jobGroupPreview" class="job-group-preview" aria-live="polite">대상을 선택하고 새 분류를 고르면 미리보기가 표시됨</div>
+    <div class="job-group-actions"><span id="jobGroupMessage" role="status"></span><button id="jobGroupSave" class="mini stamp" disabled onclick="saveEmployeeJobGroupPreview()">미리보기대로 저장</button></div></section>`;
+}
+function toggleJobGroupPerson(id, checked, oldGroup) {
+  if (checked) JOB_GROUP_SELECTION.set(id, { personId: id, oldGroup: oldGroup || null });
+  else JOB_GROUP_SELECTION.delete(id);
+  previewEmployeeJobGroup();
+}
+function previewEmployeeJobGroup() {
+  const previewNode = $('#jobGroupPreview'), button = $('#jobGroupSave');
+  if (!previewNode || !button) return;
+  const preview = buildJobGroupPreview(SCHEDULE_PEOPLE, [...JOB_GROUP_SELECTION.values()], $('#jobGroupTarget')?.value || '', today(), PROFILES);
+  window.JOB_GROUP_PREVIEW = preview;
+  previewNode.innerHTML = `<div><strong>변경 전</strong> ${EMPLOYEE_JOB_GROUPS.map(group => `${group.label} ${preview.beforeCounts[group.code]}명`).join(' · ')} · 미지정 ${preview.unassignedBefore}명</div>
+    <div><strong>변경 후</strong> ${EMPLOYEE_JOB_GROUPS.map(group => `${group.label} ${preview.afterCounts[group.code]}명`).join(' · ')} · 미지정 ${preview.unassignedAfter}명</div>
+    <ul>${preview.moves.map(move => `<li>${esc(move.name)}: ${move.from || '미지정'} → ${move.to}${move.stale ? ' · 값이 바뀌었음' : ''}</li>`).join('') || '<li>변경 대상 없음</li>'}</ul>`;
+  button.disabled = !preview.canSave;
+}
+async function saveEmployeeJobGroupPreview() {
+  const preview = window.JOB_GROUP_PREVIEW, target = $('#jobGroupTarget')?.value;
+  const message = $('#jobGroupMessage'), button = $('#jobGroupSave');
+  if (!preview?.canSave || !target) { if (message) message.textContent = '저장할 수 없음: 대상을 다시 선택하고 미리보기를 확인하세요.'; return; }
+  if (!ME?.id) { if (message) message.textContent = '로그인 세션 없음 — 다시 로그인한 뒤 재시도하세요.'; return; }
+  if (button) button.disabled = true;
+  if (message) message.textContent = '저장 중…';
+  const failed = [];
+  for (const move of preview.moves) {
+    const table = move.profileUserId ? 'profiles' : 'schedule_people';
+    const key = move.profileUserId ? 'user_id' : 'id';
+    const id = move.profileUserId || move.id;
+    let request = sb.from(table).update({ job_group: target }).eq(key, id);
+    request = move.from === null ? request.is('job_group', null) : request.eq('job_group', move.from);
+    try {
+      const result = await request.select(key);
+      if (result.error) failed.push({ id: move.id, reason: result.error.message, code: result.error.code });
+      else if (result.data?.length !== 1) failed.push({ id: move.id, reason: '분류 값 동시 변경', code: 'CONFLICT' });
+    } catch (error) { failed.push({ id: move.id, reason: error.message || '서버 연결 오류', code: 'SERVER' }); }
+  }
+  try {
+    const [profileResult, peopleResult] = await Promise.all([
+      sb.from('profiles').select('*').order('name'),
+      sb.from('schedule_people').select('*').order('sort_order').order('name')
+    ]);
+    if (profileResult.error) throw new Error('profiles 재조회 실패: ' + profileResult.error.message);
+    if (peopleResult.error) throw new Error('schedule_people 재조회 실패: ' + peopleResult.error.message);
+    PROFILES = profileResult.data || []; SCHEDULE_PEOPLE = peopleResult.data || [];
+    const refreshedProfiles = new Map(PROFILES.map(profile => [profile.user_id, profile]));
+    const verified = preview.moves.filter(move => {
+      const person = SCHEDULE_PEOPLE.find(item => item.id === move.id);
+      return person && employeeJobGroupModel(person, refreshedProfiles).code === target;
+    }).map(move => move.id);
+    const finalFailed = preview.moves.map(move => move.id).filter(id => !verified.includes(id));
+    JOB_GROUP_SELECTION = new Map(); await render();
+    const finalMessage = $('#jobGroupMessage');
+    const sessionFailed = failed.some(item => item.code === '401' || /jwt|session|token/i.test(item.reason));
+    const permissionFailed = failed.some(item => item.code === '42501' || item.code === '403' || /permission|rls|denied/i.test(item.reason));
+    const serverFailed = failed.some(item => item.code === 'SERVER' || /^5/.test(String(item.code || '')));
+    const conflictFailed = failed.some(item => item.code === 'CONFLICT');
+    const resultMessage = finalFailed.length
+      ? `${sessionFailed ? '세션 만료' : permissionFailed ? '권한 거부' : serverFailed ? '서버 오류' : conflictFailed ? '동시 변경 충돌' : '일부 저장 실패'} · 성공 ${verified.length}명 / 실패 ${finalFailed.length}명 · 실패 ID ${finalFailed.join(', ')}`
+      : `분류 변경 저장 확인됨: ${verified.length}명`;
+    if (finalMessage) finalMessage.textContent = resultMessage;
+    setStatus(finalFailed.length ? 'error' : 'saved');
+  } catch (error) {
+    JOB_GROUP_SELECTION = new Map(); await render();
+    const refreshedMessage = $('#jobGroupMessage');
+    if (refreshedMessage) refreshedMessage.textContent = `저장 후 재조회 실패 — 성공 여부 불명확, 완료로 처리하지 않음: ${error.message || error}`;
+    setStatus('error');
+  }
 }
 function schedulePersonLabel(person){return person&&person.department==='Dr.'?'Dr. '+person.name:person&&person.name||'';}
 function schedulePeopleForWeek(people,rows){
@@ -2833,6 +2956,7 @@ async function renderOwner(m){
     <div class="rowflex">
       <div class="stat"><div class="sub">직원 명부</div><div>${PROFILES.length}명 · owner ${PROFILES.filter(p=>p.role==='owner').length}·chief ${PROFILES.filter(p=>p.role==='chief').length}·manager ${PROFILES.filter(p=>p.role==='manager').length}·deputy ${PROFILES.filter(p=>p.role==='deputy').length}·staff ${PROFILES.filter(p=>p.role==='staff').length}</div></div>
     </div>
+    ${renderJobGroupAdmin()}
     ${(unlinkedRoster.length||pendingApproval.length)?`<h3>🧩 미가입자·승인 대기</h3>
     <div class="hint">근무명부에는 있지만 계정이 없는 사람과, 가입 후 원장 승인을 기다리는 사람을 모았습니다.</div>
     <button class="mini" onclick="copyInviteMessage()">가입 안내 문구 복사</button>
@@ -2874,6 +2998,7 @@ async function renderOwner(m){
   <div class="card"><h2>다음 설계 예정/혹은 할일 <span class="sub">(설계 완료·구현 예정)</span></h2>
     <div class="stub">M2 근무표·계약서 자동생성 · M3 급여 대시보드/명세서 발행·월말 평가·휴일근로 계산기 · M4 채용·입금피드·기공차트 통합<br>— 백엔드(표)는 이미 준비됨. 화면만 순차 추가.</div>
   </div>`;
+  previewEmployeeJobGroup();
   renderOverrideRows();
 }
 async function setRole(uid,role){const {error}=await sb.rpc('update_employee_profile_field',{p_user_id:uid,p_field:'role',p_value:role});if(error){setStatus('error');showScheduleRosterError('권한 변경 실패: '+error.message);return;}await loadProfiles();setStatus('saved');

@@ -49,6 +49,20 @@ try {
     'clinical_consult', 'clinical_consult', 'sterilization_admin', 'lab',
     'desk', null, null, null,
   ]);
+  const conditionalUpdate = async (table, key, value, oldGroup, nextGroup) => {
+    const oldClause = oldGroup === null ? 'job_group IS NULL' : `job_group='${oldGroup}'`;
+    const result = await db.query(`UPDATE public.${table} SET job_group='${nextGroup}' WHERE ${key}='${value}' AND ${oldClause} RETURNING ${key}`);
+    return result.rows.length;
+  };
+  assert.equal(await conditionalUpdate('profiles', 'user_id', id(1), 'clinical_consult', 'desk'), 1, 'linked profile updates only from previewed old value');
+  assert.equal(await conditionalUpdate('profiles', 'user_id', id(1), 'clinical_consult', 'lab'), 0, 'stale linked profile preview conflicts');
+  assert.equal(await conditionalUpdate('schedule_people', 'id', id(201), 'clinical_consult', 'lab'), 1, 'unlinked roster updates conditionally');
+  assert.equal(await conditionalUpdate('schedule_people', 'id', id(202), 'desk', 'lab'), 0, 'stale unlinked roster preview conflicts');
+  assert.equal((await query(`SELECT job_group FROM public.schedule_people WHERE id='${id(101)}'`))[0].job_group, null, 'linked roster job_group remains untouched');
+  assert.deepEqual([
+    await conditionalUpdate('profiles', 'user_id', id(3), 'lab', 'desk'),
+    await conditionalUpdate('schedule_people', 'id', id(203), 'desk', 'lab'),
+  ], [1, 0], 'partial success reports individual successful and conflicting rows');
   const originalRows = await query(`SELECT sp.name,sp.department,p.dept
     FROM public.schedule_people sp LEFT JOIN public.profiles p ON p.user_id=sp.profile_user_id
     ORDER BY sp.id`);

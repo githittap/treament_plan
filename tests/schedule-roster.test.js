@@ -75,7 +75,61 @@ test('통합 명부 순수 함수 코드 블록이 포함되어 있다', () => {
 if (block) {
   const context = {};
   vm.createContext(context);
-  vm.runInContext(`${block[1]};this.schedulePersonLabel=schedulePersonLabel;this.schedulePeopleForWeek=schedulePeopleForWeek;this.scheduleDate=scheduleDate;this.scheduleCalendarIndex=scheduleCalendarIndex;this.calendarLeaveIndex=typeof calendarLeaveIndex==='function'?calendarLeaveIndex:null;this.scheduleRowsWithoutApprovedLeave=typeof scheduleRowsWithoutApprovedLeave==='function'?scheduleRowsWithoutApprovedLeave:null;this.EMPLOYEE_JOB_GROUPS=typeof EMPLOYEE_JOB_GROUPS==='undefined'?null:EMPLOYEE_JOB_GROUPS;this.employeeJobGroupModel=typeof employeeJobGroupModel==='function'?employeeJobGroupModel:null;this.isCurrentJobGroupMember=typeof isCurrentJobGroupMember==='function'?isCurrentJobGroupMember:null;`, context);
+  vm.runInContext(`${block[1]};this.schedulePersonLabel=schedulePersonLabel;this.schedulePeopleForWeek=schedulePeopleForWeek;this.scheduleDate=scheduleDate;this.scheduleCalendarIndex=scheduleCalendarIndex;this.calendarLeaveIndex=typeof calendarLeaveIndex==='function'?calendarLeaveIndex:null;this.scheduleRowsWithoutApprovedLeave=typeof scheduleRowsWithoutApprovedLeave==='function'?scheduleRowsWithoutApprovedLeave:null;this.EMPLOYEE_JOB_GROUPS=typeof EMPLOYEE_JOB_GROUPS==='undefined'?null:EMPLOYEE_JOB_GROUPS;this.employeeJobGroupModel=typeof employeeJobGroupModel==='function'?employeeJobGroupModel:null;this.isCurrentJobGroupMember=typeof isCurrentJobGroupMember==='function'?isCurrentJobGroupMember:null;this.buildJobGroupPreview=typeof buildJobGroupPreview==='function'?buildJobGroupPreview:null;`, context);
+
+  test('분류 미리보기는 선택된 재직자 이동 전후 집계와 미지정 수를 계산한다', () => {
+    assert.ok(context.buildJobGroupPreview, '분류 미리보기 계산 함수가 있어야 한다');
+    const profiles = new Map([
+      ['profile-1', { job_group: 'clinical_consult', employment_status: '재직' }]
+    ]);
+    const people = [
+      { id: 'linked-1', name: '연결직원', profile_user_id: 'profile-1', department: '미지정', job_group: 'desk', active: true },
+      { id: 'unlinked-1', name: '비로그인직원', profile_user_id: null, department: '데스크', job_group: 'desk', active: true },
+      { id: 'unassigned-1', name: '미지정직원', profile_user_id: null, department: '미지정', job_group: null, active: true },
+      { id: 'lab-1', name: '기공직원', profile_user_id: null, department: '기공실', job_group: 'lab', active: true },
+      { id: 'dr-1', name: '원장', profile_user_id: 'profile-dr', department: 'Dr.', job_group: null, active: true }
+    ];
+    const selected = [
+      { personId: 'linked-1', oldGroup: 'clinical_consult' },
+      { personId: 'unlinked-1', oldGroup: 'desk' },
+      { personId: 'unassigned-1', oldGroup: null }
+    ];
+    const preview = context.buildJobGroupPreview(people, selected, 'lab', '2026-09-24', profiles);
+    assert.equal(preview.canSave, true);
+    assert.deepEqual(JSON.parse(JSON.stringify(preview.beforeCounts)), {
+      clinical_consult: 1, sterilization_admin: 0, lab: 1, desk: 1
+    });
+    assert.deepEqual(JSON.parse(JSON.stringify(preview.afterCounts)), {
+      clinical_consult: 0, sterilization_admin: 0, lab: 4, desk: 0
+    });
+    assert.equal(preview.moves.length, 3);
+    assert.equal(preview.moves[0].from, 'clinical_consult');
+    assert.equal(preview.moves[0].profileUserId, 'profile-1');
+    assert.equal(preview.moves[0].to, 'lab');
+    assert.equal(preview.unassignedAfter, 0);
+  });
+
+  test('미리보기는 빈 선택·잘못된 그룹·퇴사자·Dr.·낡은 값·변경 없음 저장을 차단한다', () => {
+    assert.ok(context.buildJobGroupPreview, '분류 미리보기 계산 함수가 있어야 한다');
+    const profiles = new Map([
+      ['leaving', { job_group: 'desk', employment_status: '자진퇴사', employment_effective_date: '2026-09-20' }],
+      ['employed', { job_group: 'lab', employment_status: '재직' }]
+    ]);
+    const people = [
+      { id: 'former', name: '퇴사자', profile_user_id: 'leaving', department: '데스크', active: true },
+      { id: 'dr', name: '의사', profile_user_id: 'doctor', department: 'Dr.', active: true },
+      { id: 'active', name: '재직자', profile_user_id: 'employed', department: '기공실', active: true }
+    ];
+    const preview = selected => context.buildJobGroupPreview(people, selected, 'desk', '2026-09-24', profiles);
+    for (const invalid of [
+      preview([]),
+      context.buildJobGroupPreview(people, [{ personId: 'active', oldGroup: 'lab' }], 'other', '2026-09-24', profiles),
+      preview([{ personId: 'former', oldGroup: 'desk' }]),
+      preview([{ personId: 'dr', oldGroup: null }]),
+      preview([{ personId: 'active', oldGroup: 'desk' }]),
+      context.buildJobGroupPreview(people, [{ personId: 'active', oldGroup: 'lab' }], 'lab', '2026-09-24', profiles)
+    ]) assert.equal(invalid.canSave, false);
+  });
 
   test('네 직무 분류는 프로필 값을 우선하고 비로그인 행 값과 Dr. 별도 그룹을 유지한다', () => {
     assert.ok(context.EMPLOYEE_JOB_GROUPS, '공통 직무 분류 상수가 있어야 한다');
@@ -894,6 +948,20 @@ test('owner 직원 권한 표는 연결 명부 상태를 보여 주고 승인 �
   assert.match(approve[0], /upsert\(\{profile_user_id:uid,name:p\.name,department:'미지정',included_in_schedule:true,active:true\}/);
   assert.match(approve[0], /onConflict:'profile_user_id',ignoreDuplicates:true/);
   assert.match(approve[0], /if\(rosterError\).*setStatus\('error'\)/s);
+});
+
+test('관리자 직무 분류 화면은 순서·Dr 분리·저장 조건·모바일 1열을 제공한다', () => {
+  const owner = html.match(/async function renderOwner\([\s\S]*?async function setRole/);
+  assert.match(html, /function renderJobGroupAdmin\(/);
+  assert.match(owner?.[0] || '', /renderJobGroupAdmin\(\)/);
+  assert.match(html, /1\. 대상 선택[\s\S]*?2\. 새 분류/);
+  assert.match(html, /Dr\. 별도 유지 · 편집 제외/);
+  assert.match(html, /button\.disabled = !preview\.canSave/);
+  assert.match(html, /@media\(max-width:640px\)\{\.job-group-form\{grid-template-columns:1fr\}/);
+  assert.match(html, /\.job-group-preview\{width:100%\}/);
+  assert.match(html, /\.job-group-actions\{position:sticky;bottom:0/);
+  assert.match(html, /request = move\.from === null \? request\.is\('job_group', null\) : request\.eq\('job_group', move\.from\)/);
+  assert.match(html, /저장 후 재조회 실패 — 성공 여부 불명확/);
 });
 
 function approvalHarness({ existingRoster = false, rosterError = null, profileError = null } = {}) {
