@@ -962,6 +962,44 @@ test('관리자 직무 분류 화면은 순서·Dr 분리·저장 조건·모바
   assert.match(html, /\.job-group-actions\{position:sticky;bottom:0/);
   assert.match(html, /request = move\.from === null \? request\.is\('job_group', null\) : request\.eq\('job_group', move\.from\)/);
   assert.match(html, /저장 후 재조회 실패 — 성공 여부 불명확/);
+  assert.match(html, /job-group-summary-card[\s\S]*clinical_consult/);
+  assert.match(html, /job-group-unassigned-warning[\s\S]*미지정/);
+  assert.match(html, /aria-label="\$\{esc\(person\.name\)\} 직무 분류 대상"/);
+  assert.match(html, /aria-label="새 직무 분류"/);
+  assert.match(html, /EMPLOYEE_JOB_GROUPS\.find\(group => group\.code === move\.from\)\?\.label/);
+});
+
+test('직무 요약 네 카드는 일반 재직자만 세고 미지정 경고에 Dr.를 넣지 않는다', () => {
+  const modelSource = html.match(/\/\* schedule-roster:test-start \*\/([\s\S]*?)\/\* schedule-roster:test-end \*\//);
+  const local = {};
+  vm.createContext(local);
+  vm.runInContext(`${modelSource[1]};this.employeeJobGroupModel=employeeJobGroupModel;this.isCurrentJobGroupMember=isCurrentJobGroupMember;`, local);
+  const source = html.match(/function renderJobGroupAdmin\([\s\S]*?(?=function toggleJobGroupPerson)/);
+  assert.ok(source, '관리자 직무 분류 렌더러가 있어야 한다');
+  local.PROFILES = [
+    { user_id: 'p1', job_group: 'clinical_consult', employment_status: '재직' },
+    { user_id: 'p2', job_group: 'desk', employment_status: '재직' },
+    { user_id: 'p3', job_group: null, employment_status: '재직' },
+    { user_id: 'dr', job_group: null, employment_status: '재직' }
+  ];
+  local.SCHEDULE_PEOPLE = [
+    { id: '1', name: '진료직원', profile_user_id: 'p1', department: '미지정', active: true },
+    { id: '2', name: '데스크직원', profile_user_id: 'p2', department: '데스크', active: true },
+    { id: '3', name: '미지정직원', profile_user_id: 'p3', department: '기타', active: true },
+    { id: '4', name: '원장', profile_user_id: 'dr', department: 'Dr.', active: true }
+  ];
+  local.today = () => '2026-09-24';
+  local.esc = value => String(value);
+  vm.runInContext(`${source[0]};this.renderJobGroupAdmin=renderJobGroupAdmin`, local);
+  const markup = local.renderJobGroupAdmin();
+  assert.equal((markup.match(/class="job-group-summary-card"/g) || []).length, 4);
+  for (const color of ['#2563eb', '#7c3aed', '#0891b2', '#059669']) assert.ok(markup.includes(`border-left:4px solid ${color}`));
+  assert.match(markup, /진료·상담<\/strong><span>1명/);
+  assert.match(markup, /미지정 직원 1명/);
+  const warning = markup.match(/class="job-group-unassigned-warning"[\s\S]*?<\/div>/)?.[0] || '';
+  assert.match(warning, /미지정직원/);
+  assert.doesNotMatch(warning, /원장/);
+  assert.doesNotMatch(markup.match(/class="job-group-summary"[\s\S]*?<\/div><div class="job-group-unassigned-warning"/)?.[0] || '', /원장/);
 });
 
 function approvalHarness({ existingRoster = false, rosterError = null, profileError = null } = {}) {
