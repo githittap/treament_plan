@@ -1,5 +1,13 @@
 # 직원허브 구현 기록
 
+## 2026-09-24 — 직원 직무 분류 Task 5 PGlite rollback 보강·최종 로컬 검증
+
+- 대상 커밋: `1094547` migration, `acc98b0` 공통 판정, `2295e85` 퇴사자 필터, `8edc9ea` 관리자 미리보기 저장, `6a18c9f` 카드·접근성, `bede4a6` 모바일 1열, `ae07563` 화면 표시 통합, `52c5852` 명부 Dr. 계약 분기 보존.
+- `tests/sql/pglite-employee-job-groups.mjs`에서 분류값이 있는 rollback이 거부되며 기존 profile/roster job_group를 보존하고, 모든 job_group가 NULL인 경우에만 rollback이 컬럼을 제거하는 것을 PGlite로 검증했다. rollback 전후 `dept`, `department`, Dr. 명부 행과 연결 profile이 유지됨도 검증했다.
+- 시험: PGlite SQL 스크립트 29/29 PASS(고정 PGlite 0.5.8), 관련 JS 76/76, 전체 JS 377/377, `hr.html` inline script 2개 vm compile PASS, `git diff --check` PASS.
+- 운영 DB/Storage/Edge/Auth 적용, main, 원격 push, 배포는 하지 않았다. 운영 적용만 별도 승인 게이트로 남긴다.
+- 원장 지시서 요구추적표는 131건이며 기존 판정상 `❌누락 37`, `❌누락(고침 미배포) 1`, `❌미답 1`, `🟡부분 28`이다. 직무 분류 관련 구현과 다른 ❌/🟡 요구를 혼동하지 않으며, 현재 인계 결과에 실제 증거·미완료를 구분해 적는다.
+
 ## 2026-09-22 — 직원허브 결과보고서·사용설명서 최신화
 
 - 템플릿 기반 결과보고서 `Z:\11_codex\00_결과보고서\직원허브_구현결과보고서_2026-09-22.html`을 전체 직원허브 범위(근무·휴가·서류·출퇴근·재직·자료·건의·상담·단계배포)와 운영 증거로 최신화했다. SHA256 `1F0A93119B9E2B5E1A96D9B6CE6D57DDDAEAF631720C3F71A1106CBC50FEF428`; 자리표시자 제거 및 하단 PNG/PDF 저장 스크립트가 템플릿과 동일함을 확인했다.

@@ -81,13 +81,26 @@ try {
   }
   await assert.rejects(db.exec(rollback), /job_group|classification/i);
   await db.exec('ROLLBACK').catch(() => {});
+  assert.equal((await query(`SELECT job_group FROM public.profiles WHERE user_id='${id(1)}'`))[0].job_group, 'desk',
+    'populated rollback refusal preserves profile classification');
+  assert.equal((await query(`SELECT job_group FROM public.schedule_people WHERE id='${id(201)}'`))[0].job_group, 'lab',
+    'populated rollback refusal preserves unlinked roster classification');
   await db.exec(`UPDATE public.profiles SET job_group=NULL;
     UPDATE public.schedule_people SET job_group=NULL;`);
+  const beforeRollbackSources = await query(`SELECT sp.id::text,sp.name,sp.department,p.dept,p.user_id::text AS profile_user_id
+    FROM public.schedule_people sp LEFT JOIN public.profiles p ON p.user_id=sp.profile_user_id ORDER BY sp.id`);
+  assert.equal((await query(`SELECT count(*)::int AS count FROM public.profiles WHERE job_group IS NOT NULL`))[0].count, 0);
+  assert.equal((await query(`SELECT count(*)::int AS count FROM public.schedule_people WHERE job_group IS NOT NULL`))[0].count, 0);
   await db.exec(rollback);
   const columns = await query(`SELECT table_name,column_name FROM information_schema.columns
     WHERE table_schema='public' AND column_name='job_group'`);
   assert.deepEqual(columns, []);
-  console.log('PGLITE_EMPLOYEE_JOB_GROUPS_PASS: mappings, Dr exclusion, no linked-row copy, rerun preservation, constraints, guarded rollback');
+  assert.deepEqual(await query(`SELECT sp.id::text,sp.name,sp.department,p.dept,p.user_id::text AS profile_user_id
+    FROM public.schedule_people sp LEFT JOIN public.profiles p ON p.user_id=sp.profile_user_id ORDER BY sp.id`), beforeRollbackSources,
+    'rollback leaves department/dept, Dr. roster rows, and linked profiles intact');
+  assert.deepEqual((await query(`SELECT user_id::text,dept,role FROM public.profiles ORDER BY user_id`)).map(row => row.user_id),
+    [id(1), id(2), id(3), id(4), id(5), id(6)], 'rollback preserves all source profiles including Dr.-linked profiles');
+  console.log('PGLITE_EMPLOYEE_JOB_GROUPS_PASS: mappings, Dr exclusion, no linked-row copy, rerun preservation, constraints, populated rollback refusal, empty rollback, source and Dr/profile preservation');
 } finally {
   await db.close();
 }
