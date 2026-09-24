@@ -3,14 +3,41 @@
 -- 여기서는 outbox(push_events/push_event_deliveries)와 발송기 전용 RPC만 추가한다.
 -- push_subscriptions은 RLS enable 후 service_role에는 아무 GRANT도 남지 않으므로(원장 승인 반영, 최소권한),
 -- 발송기는 반드시 아래 SECURITY DEFINER 함수를 통해서만 읽고/지운다(테이블 직접 권한 부여 없음).
+-- 선행: db/employment_status_access_block_phase_b.sql (profiles.account_access_status),
+-- db/employee_documents.sql, db/consultation_inbox.sql, db/consultation_access_widen.sql,
+-- db/payment_requests_draft.sql, db/notice_attachments_deposit_access_draft.sql
+-- (hr_schema.sql의 notices에 author_id 추가), db/push_subscriptions_draft.sql.
+-- leave_requests/profiles는 기존 허브 기본 스키마가 먼저 있어야 한다. 모든 선행 객체는 로컬 확인 후 적용한다.
 begin;
 do $$ begin
+  if to_regclass('public.profiles') is null or to_regclass('public.leave_requests') is null
+     or to_regclass('public.push_subscriptions') is null or to_regclass('public.payment_requests') is null
+     or to_regclass('public.notices') is null or to_regclass('public.approval_steps') is null or to_regclass('public.employee_documents') is null
+     or to_regclass('public.consultation_inbox') is null then
+    raise exception 'push notification prerequisite table missing; preserve state and stop';
+  end if;
+  if exists(
+    select 1 from (values
+      ('profiles','user_id'),('profiles','role'),('profiles','active'),('profiles','approved'),('profiles','account_access_status'),
+      ('leave_requests','id'),('leave_requests','user_id'),('leave_requests','status'),
+      ('push_subscriptions','id'),('push_subscriptions','user_id'),('push_subscriptions','endpoint'),('push_subscriptions','subscription'),
+      ('payment_requests','id'),('payment_requests','status'),
+      ('approval_steps','id'),('approval_steps','doc_id'),('approval_steps','seq'),('approval_steps','status'),
+      ('notices','id'),('notices','author_id'),
+      ('employee_documents','id'),('employee_documents','user_id'),('employee_documents','checked_at'),
+      ('consultation_inbox','id')
+    ) required(table_name,column_name)
+    where not exists(select 1 from information_schema.columns c
+      where c.table_schema='public' and c.table_name=required.table_name and c.column_name=required.column_name)
+  ) then
+    raise exception 'push notification prerequisite column missing; preserve state and stop';
+  end if;
   if to_regclass('public.push_events') is not null
      or to_regclass('public.push_event_deliveries') is not null
      or to_regprocedure('public.enqueue_push_event(text,uuid,text,jsonb)') is not null
      or to_regprocedure('public.claim_push_events(uuid,integer)') is not null
      or to_regprocedure('public.record_push_delivery(bigint,uuid,uuid,text,integer)') is not null
-     or exists(select 1 from pg_trigger where tgname='queue_leave_push_event' and tgrelid='public.leave_requests'::regclass)
+     or exists(select 1 from pg_trigger where tgname in ('queue_leave_push_event','queue_payment_push_event','queue_approval_push_event','queue_notice_push_event','queue_document_push_event','queue_consultation_push_event'))
   then raise exception 'push notification outbox migration object collision; preserve state and stop'; end if;
 end $$;
 
@@ -19,7 +46,7 @@ create table public.push_events (
   id bigint generated always as identity primary key,
   event_key text not null unique,
   recipient_id uuid not null references public.profiles(user_id) on delete cascade,
-  event_type text not null check (event_type in ('leave_submitted','leave_status_changed')),
+  event_type text not null check (event_type in ('leave_submitted','leave_status_changed','payment_pending','approval_submitted','notice_published','document_approved','consultation_received')),
   payload jsonb not null,
   status text not null default 'queued' check (status in ('queued','sent','failed')),
   attempts integer not null default 0,
@@ -82,6 +109,85 @@ end; $$;
 revoke all on function public.queue_leave_push_event() from public,anon,authenticated,service_role;
 create trigger queue_leave_push_event after insert or update of status on public.leave_requests
 for each row execute function public.queue_leave_push_event();
+
+-- 추가 알림 payload에는 업무 원문을 담지 않는다.
+-- payload에는 고정 빈 객체만 저장한다(결재 금액·계좌, 공지 본문, 문서 경로, 환자 문의 원문 제외).
+create function public.queue_payment_push_event()
+returns trigger language plpgsql security definer set search_path=public as $$
+declare recipient record; target_role text;
+begin
+  if tg_op='INSERT' and new.status='chief_pending' then target_role:='chief';
+  elsif tg_op='UPDATE' and old.status is distinct from new.status and new.status='owner_pending' then target_role:='owner';
+  else return new; end if;
+  for recipient in select user_id from public.profiles
+    where role=target_role and active=true and approved=true and account_access_status='활성' loop
+    perform public.enqueue_push_event(format('payment-request:%s:%s:%s',new.id,new.status,recipient.user_id),recipient.user_id,'payment_pending','{}'::jsonb);
+  end loop;
+  return new;
+end; $$;
+revoke all on function public.queue_payment_push_event() from public,anon,authenticated,service_role;
+create trigger queue_payment_push_event after insert or update of status on public.payment_requests
+for each row execute function public.queue_payment_push_event();
+
+create function public.queue_approval_push_event()
+returns trigger language plpgsql security definer set search_path=public as $$
+declare recipient record; target_role text;
+begin
+  if tg_op='INSERT' and new.seq=1 and new.status='대기' then target_role:='chief';
+  elsif tg_op='UPDATE' and new.seq=1 and old.status is distinct from new.status and new.status='승인' then target_role:='owner';
+  else return new; end if;
+  for recipient in select user_id from public.profiles
+    where role=target_role and active=true and approved=true and account_access_status='활성' loop
+    perform public.enqueue_push_event(format('approval-doc:%s:step:%s:%s',new.doc_id,new.seq,recipient.user_id),recipient.user_id,'approval_submitted','{}'::jsonb);
+  end loop;
+  return new;
+end; $$;
+revoke all on function public.queue_approval_push_event() from public,anon,authenticated,service_role;
+create trigger queue_approval_push_event after insert or update of status on public.approval_steps
+for each row execute function public.queue_approval_push_event();
+
+create function public.queue_notice_push_event()
+returns trigger language plpgsql security definer set search_path=public as $$
+declare recipient record;
+begin
+  for recipient in select user_id from public.profiles
+    where user_id is distinct from new.author_id and active=true and approved=true and account_access_status='활성' loop
+    perform public.enqueue_push_event(format('notice:%s:%s',new.id,recipient.user_id),recipient.user_id,'notice_published','{}'::jsonb);
+  end loop;
+  return new;
+end; $$;
+revoke all on function public.queue_notice_push_event() from public,anon,authenticated,service_role;
+create trigger queue_notice_push_event after insert on public.notices
+for each row execute function public.queue_notice_push_event();
+
+create function public.queue_document_push_event()
+returns trigger language plpgsql security definer set search_path=public as $$
+begin
+  if old.checked_at is null and new.checked_at is not null and exists(
+    select 1 from public.profiles p where p.user_id=new.user_id
+      and p.active=true and p.approved=true and p.account_access_status='활성') then
+    perform public.enqueue_push_event(format('employee-document:%s:approved:%s',new.id,new.user_id),new.user_id,'document_approved','{}'::jsonb);
+  end if;
+  return new;
+end; $$;
+revoke all on function public.queue_document_push_event() from public,anon,authenticated,service_role;
+create trigger queue_document_push_event after update of checked_at on public.employee_documents
+for each row execute function public.queue_document_push_event();
+
+-- consultation_access_widen.sql의 최신 권한: manager/chief/owner 모두 문의함을 처리할 수 있다.
+create function public.queue_consultation_push_event()
+returns trigger language plpgsql security definer set search_path=public as $$
+declare recipient record;
+begin
+  for recipient in select user_id from public.profiles
+    where role in ('manager','chief','owner') and active=true and approved=true and account_access_status='활성' loop
+    perform public.enqueue_push_event(format('consultation:%s:%s',new.id,recipient.user_id),recipient.user_id,'consultation_received','{}'::jsonb);
+  end loop;
+  return new;
+end; $$;
+revoke all on function public.queue_consultation_push_event() from public,anon,authenticated,service_role;
+create trigger queue_consultation_push_event after insert on public.consultation_inbox
+for each row execute function public.queue_consultation_push_event();
 
 -- 아래부터는 push-dispatcher(service_role)만 호출하는 RPC. 전부 claim_token 소유권을 검증하는
 -- SECURITY DEFINER이며, push_subscriptions/push_events/push_event_deliveries에는 service_role에게

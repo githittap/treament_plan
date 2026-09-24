@@ -12,11 +12,16 @@ create table if not exists public.employee_signature_vault (
 create table if not exists public.employee_signature_uses (
   id bigint generated always as identity primary key,
   signature_id bigint not null references public.employee_signature_vault(id),
+  contract_id bigint references public.contracts(id),
   document_kind text not null,
   confirmed_at timestamptz not null,
   used_by uuid not null default auth.uid() references public.profiles(user_id),
   created_at timestamptz not null default now()
 );
+alter table public.employee_signature_uses add column if not exists contract_id bigint references public.contracts(id);
+create unique index if not exists employee_signature_uses_contract_signature_idx
+  on public.employee_signature_uses(contract_id,signature_id,document_kind)
+  where contract_id is not null;
 
 create table if not exists public.employee_signature_audit (
   id bigint generated always as identity primary key,
@@ -34,7 +39,7 @@ alter table public.employee_signature_audit enable row level security;
 revoke all on table public.employee_signature_vault,public.employee_signature_uses,public.employee_signature_audit from anon,authenticated;
 grant select,insert on table public.employee_signature_vault to authenticated;
 grant update(revoked_at) on table public.employee_signature_vault to authenticated;
-grant select,insert on table public.employee_signature_uses to authenticated;
+grant select on table public.employee_signature_uses to authenticated;
 grant select on table public.employee_signature_audit to authenticated;
 revoke all on sequence public.employee_signature_vault_id_seq,public.employee_signature_uses_id_seq,public.employee_signature_audit_id_seq from anon,authenticated;
 grant usage,select on sequence public.employee_signature_vault_id_seq,public.employee_signature_uses_id_seq to authenticated;
@@ -77,6 +82,35 @@ revoke all on function employee_private.audit_employee_signature_use() from publ
 drop trigger if exists employee_signature_use_audit on public.employee_signature_uses;
 create trigger employee_signature_use_audit after insert on public.employee_signature_uses
 for each row execute function employee_private.audit_employee_signature_use();
+
+-- 계약 본문 변경과 보관 서명 사용기록을 한 트랜잭션으로 묶는다.
+create or replace function public.apply_employee_contract_signature(
+  p_contract_id bigint, p_merged_html text, p_sign_slots jsonb,
+  p_signed_at timestamptz, p_signature_id bigint default null
+) returns bigint
+language plpgsql security definer set search_path=public,pg_temp as $$
+declare v_use_id bigint := null; v_user_id uuid;
+begin
+  select user_id into v_user_id from public.contracts
+   where id=p_contract_id and user_id=auth.uid() and status='대기' for update;
+  if v_user_id is null then raise exception 'contract is not pending or not owned by current user'; end if;
+  if p_signature_id is not null then
+    if not exists(select 1 from public.employee_signature_vault v where v.id=p_signature_id and v.user_id=auth.uid() and v.revoked_at is null) then
+      raise exception 'signature is not available to current user';
+    end if;
+    insert into public.employee_signature_uses(contract_id,signature_id,document_kind,confirmed_at,used_by)
+      values(p_contract_id,p_signature_id,'근로계약서',p_signed_at,auth.uid())
+      on conflict (contract_id,signature_id,document_kind) where contract_id is not null do update set confirmed_at=excluded.confirmed_at,used_by=excluded.used_by
+      returning id into v_use_id;
+  end if;
+  update public.contracts set merged_html=p_merged_html,sign_slots=p_sign_slots,signed_at=p_signed_at,status='서명완료'
+    where id=p_contract_id and user_id=auth.uid() and status='대기';
+  if not found then raise exception 'contract changed while signing'; end if;
+  return coalesce(v_use_id,0);
+end;
+$$;
+revoke all on function public.apply_employee_contract_signature(bigint,text,jsonb,timestamptz,bigint) from public,anon,authenticated;
+grant execute on function public.apply_employee_contract_signature(bigint,text,jsonb,timestamptz,bigint) to authenticated;
 
 insert into storage.buckets (id,name,public,file_size_limit,allowed_mime_types)
 values ('employee-signatures','employee-signatures',false,1048576,array['image/png']::text[])

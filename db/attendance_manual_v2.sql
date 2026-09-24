@@ -19,6 +19,7 @@ declare r public.attendance_manual_entries; prior public.attendance_manual_entri
   clockout_raw text:=pg_catalog.btrim(coalesce(p_clockout_overtime_raw_text,''));
   lunch_min int; clockout_min int; match text[];
 begin
+  if public.my_role()='deputy' then raise exception 'deputy cannot submit manual attendance'; end if;
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(auth.uid()::text||'|'||coalesce(p_work_date::text,''),0));
   if not exists(select 1 from public.profiles p where p.user_id=auth.uid() and p.active=true and p.approved=true)
     or public.my_role() not in ('staff','manager','chief','owner')

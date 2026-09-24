@@ -68,6 +68,7 @@ select public._remove_employee_hub_access_gate(to_regclass('public.employee_sign
 select public._remove_employee_hub_access_gate(to_regclass('public.leave_application_documents'));
 select public._remove_employee_hub_access_gate(to_regclass('public.leave_application_document_events'));
 select public._remove_employee_hub_access_gate(to_regclass('public.push_subscriptions'));
+select public._remove_employee_hub_access_gate(to_regclass('public.app_settings'));
 drop function public._remove_employee_hub_access_gate(regclass);
 -- apply가 push helper를 차단-aware 정의로 바꿨으므로, gate helper를 지우기 전에
 -- push migration의 원래 active+approved 의미와 권한을 복원한다.

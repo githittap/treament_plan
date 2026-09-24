@@ -6,6 +6,17 @@ Deno.test("push payload is generic and same-origin", () => {
   if (payload.body.includes("사유") || !payload.url.startsWith("/hr.html")) throw new Error("unsafe notification payload");
 });
 
+Deno.test("business push events have a safe message and a real hub tab", () => {
+  const expected = new Map([
+    ["approval_submitted", "appr"], ["payment_pending", "onbo"], ["notice_published", "notice"],
+    ["document_approved", "onbo"], ["consultation_received", "inbox"],
+  ]);
+  for (const [type, tab] of expected) {
+    const payload = safeNotification(type);
+    if (!payload || payload.url !== `/hr.html?tab=${tab}` || payload.body.includes("환자")) throw new Error(`unsafe or missing payload: ${type}`);
+  }
+});
+
 Deno.test("endpoint guard blocks non-HTTPS and private targets", () => {
   if (isSafePushEndpoint("http://localhost:54321/push")) throw new Error("localhost allowed");
   if (isSafePushEndpoint("https://192.168.0.10/push")) throw new Error("private address allowed");

@@ -15,7 +15,12 @@ test('입사 증빙 완료 기준은 공통 함수로 고정한다', () => {
   assert.equal(done('계좌', { bank_name: '국민', account_number: '' }, []), false);
   assert.equal(done('Notion', { notion_id: 'a', notion_app_installed: true, notion_workspace_logged_in: true }, []), true);
   assert.equal(done('Notion', { notion_id: 'a', notion_app_installed: true, notion_workspace_logged_in: false }, []), false);
-  assert.equal(done('잠복결핵', {}, [{ document_type: '잠복결핵 검사서' }]), true);
+  assert.equal(done('잠복결핵', {}, [{ document_type: '잠복결핵 검사서', mime_type: 'application/pdf' }]), true);
+  for (const mime_type of ['image/png','image/jpeg','image/gif']) {
+    assert.equal(done('잠복결핵', {}, [{ document_type: '잠복결핵 검사서', mime_type }]), true);
+  }
+  assert.equal(done('잠복결핵', {}, [{ document_type: '잠복결핵 검사서', mime_type: 'text/plain' }]), false);
+  assert.equal(done('잠복결핵', {}, [{ document_type: '잠복결핵 검사서', mime_type: '' }]), false);
   assert.equal(done('자격증', {}, []), false);
   assert.equal(done('보안서약', {}, [{ document_type: '보안서약서' }]), true);
 });

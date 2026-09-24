@@ -1,5 +1,14 @@
 # 직원허브 현재 인수인계
 
+## 최신 인계 — 직원 직무 분류 2단계 로컬 검증 (2026-09-24)
+
+- 현재 worktree/branch: `codex/employee-hub-phase2-20260923`; 원본 main 작업트리·다른 worktree는 건드리지 않았고 마지막 기록 변경 commit 후 `git status` clean을 확인했다.
+- 직무 분류 Task1~4 로컬 구현 커밋은 `1094547`, `acc98b0`, `2295e85`, `8edc9ea`, `6a18c9f`, `bede4a6`, `ae07563`, `52c5852`다. Task5 PGlite rollback 보존 assertion과 기록 5종은 `65fda68`로 commit했고, 인계 상태 정정은 `e4afb02`로 남겼다. 첫 일반 셸 commit 시 권한 오류가 있었으나 승인된 대상 파일만 재시도해 완료했다.
+- 로컬 시험: PGlite SQL 29/29, 관련 JS 76/76, 전체 JS 377/377, inline script 2개 구문 compile PASS, `git diff --check` PASS.
+- 보호: Dr. 명부·연결 profile은 네 그룹/backfill·편집 대상에서 제외, profile 분류를 연결 명부로 복제하지 않음, 원본 dept/department 보존, 계약 역할/스냅샷 불변. 운영 DB/Storage/Edge/Auth·main·push·배포 미실행.
+- 구현지시서/CSV 경로는 `Z:\09_claude-output\03_병원운영·전산\직원허브_T8검증\`이다. CSV 131개 요구 중 기존 판정 기준 미완료는 67개이며 직무 분류의 Z④-14~17, Z⑦-06~07만 이번 기능 커밋이 다룬다. 전체 요구는 결과 파일에서 코드·커밋·시험 증거를 구분하고 미해결을 숨기지 않는다.
+- 다음: 상위 실행 세션이 131개 요구 중 미완료 묶음을 골라 별도 지시한다. 기존 결과보고서는 미완료 66건과 과거 증거 재검증 필요를 명시하며 전체 완료를 주장하지 않는다. UI 시안/원장 승인 규칙은 계속 적용한다.
+
 ## 최신 인계 — AI 사용량 현황판 AI비용 탭 통합 운영 반영 (2026-09-22)
 
 - 범위: 원장 전용 AI비용 탭에 현황판 카드(모델별 사용량 7일·Astra 강조, 정가 환산 사용가치, Codex 대화 효율 점검). 브랜치 `feature/ai-usage-panel` 커밋 `7939c8a`·`70f6017`·`3fb7714`·`74291e2` → `main` fast-forward `74291e2`, Pages run `35712403783` success, `jung-plant.com/hr.html?v=74291e2` HTTP 200·공개 SHA256이 커밋 blob과 동일·로그인 화면 콘솔 오류 0.

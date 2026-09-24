@@ -168,3 +168,18 @@ test('finalize는 null person_id를 먼저 거부하고 not null을 적용한다
   assert.match(finalize, /alter table public\.schedules[\s\S]*alter column person_id set not null/i);
   assert.match(finalize, /user_id|rollback/i);
 });
+
+test('직무 분류 migration은 nullable 코드 컬럼과 Dr. 제외 backfill을 보장한다', () => {
+  const file = path.join(__dirname, '..', 'db', 'employee_job_groups.sql');
+  assert.ok(fs.existsSync(file), '직무 분류 migration 파일이 있어야 한다');
+  const sql = fs.readFileSync(file, 'utf8');
+  assert.match(sql, /alter table public\.profiles\s+add column if not exists job_group text/i);
+  assert.match(sql, /alter table public\.schedule_people\s+add column if not exists job_group text/i);
+  for (const code of ['clinical_consult', 'sterilization_admin', 'lab', 'desk']) {
+    assert.ok(sql.includes(`'${code}'`), `${code} 코드를 migration에 선언해야 한다`);
+  }
+  assert.match(sql, /profile_user_id is null[\s\S]*department\s*<>\s*'Dr\.'/i);
+  assert.match(sql, /not exists\s*\([\s\S]*profile_user_id\s*=\s*p\.user_id[\s\S]*department\s*=\s*'Dr\.'/i);
+  assert.doesNotMatch(sql, /update public\.schedule_people sp set job_group = p\.job_group/i);
+  assert.match(sql, /job_group is null/i);
+});

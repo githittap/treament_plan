@@ -181,7 +181,7 @@ returns public.contracts language plpgsql security definer set search_path=publi
 declare r public.contracts; actor uuid:=auth.uid();
 begin
   if p_contract_id is null or p_user_id is null or p_attempt_id is null or p_source_sha256 is null or p_source_sha256 !~ '^[0-9a-f]{64}$' or p_signed_sha256 is null or p_signed_sha256 !~ '^[0-9a-f]{64}$' or p_signature_sha256 is null or p_signature_sha256 !~ '^[0-9a-f]{64}$' or p_page_no is null or p_page_no<1 or p_x is null or p_y is null or p_width is null or p_height is null or p_x<0 or p_y<0 or p_width<=0 or p_height<=0 then raise exception 'invalid contract PDF signature metadata'; end if;
-  if not exists(select 1 from public.profiles p where p.user_id=p_user_id and p.active=true and p.approved=true and p.role in ('staff','manager','chief','owner')) then raise exception 'active approved employee profile required'; end if;
+  if not exists(select 1 from public.profiles p where p.user_id=p_user_id and p.active=true and p.approved=true and p.role in ('staff','manager','chief','owner','deputy')) then raise exception 'active approved employee profile required'; end if;
   select * into r from public.contracts where id=p_contract_id for update;
   if not found then raise exception 'contract not found'; end if;
   if r.user_id is distinct from p_user_id or r.source_pdf_sha256 is distinct from p_source_sha256 or r.source_pdf_path is distinct from format('contracts/%s/source.pdf',p_contract_id) or r.source_pdf_version is null or trim(r.source_pdf_version)='' then raise exception 'contract PDF identity mismatch'; end if;
@@ -201,7 +201,7 @@ create or replace function public.begin_contract_pdf_signing(p_contract_id bigin
 returns public.contracts language plpgsql security definer set search_path=public,pg_temp as $$
 declare r public.contracts; actor uuid:=auth.uid();
 begin
-  if not exists(select 1 from public.profiles p where p.user_id=actor and p.active=true and p.approved=true and p.role in ('staff','manager','chief','owner')) then raise exception 'active approved employee profile required'; end if;
+  if not exists(select 1 from public.profiles p where p.user_id=actor and p.active=true and p.approved=true and p.role in ('staff','manager','chief','owner','deputy')) then raise exception 'active approved employee profile required'; end if;
   if p_signature_sha256 is null or p_signature_sha256 !~ '^[0-9a-f]{64}$' or p_page_no is null or p_page_no<1 or p_x is null or p_y is null or p_width is null or p_height is null or p_x<0 or p_y<0 or p_width<=0 or p_height<=0 then raise exception 'invalid contract PDF signing payload'; end if;
   select * into r from public.contracts where id=p_contract_id and user_id=actor for update;
   if not found then raise exception 'contract PDF access denied'; end if;
@@ -219,7 +219,7 @@ create or replace function public.confirm_contract_pdf_source(p_contract_id bigi
 returns public.contracts language plpgsql security definer set search_path=public,pg_temp as $$
 declare r public.contracts; actor uuid:=auth.uid();
 begin
-  if not exists(select 1 from public.profiles p where p.user_id=actor and p.active=true and p.approved=true and p.role in ('staff','manager','chief','owner')) then raise exception 'active approved employee profile required'; end if;
+  if not exists(select 1 from public.profiles p where p.user_id=actor and p.active=true and p.approved=true and p.role in ('staff','manager','chief','owner','deputy')) then raise exception 'active approved employee profile required'; end if;
   select * into r from public.contracts where id=p_contract_id and user_id=actor for update;
   if not found then raise exception 'contract PDF confirmation access denied'; end if;
   if r.status<>'대기' or r.sent_at is null or r.due_at is null or r.due_at<now() or r.source_pdf_path is distinct from format('contracts/%s/source.pdf',p_contract_id) or r.source_pdf_version is null or trim(r.source_pdf_version)='' or r.source_pdf_sha256 is null or r.signed_at is not null then raise exception 'contract PDF is not confirmable'; end if;

@@ -1,5 +1,30 @@
 # overview — 아산정플란트치과 내부 도구 (T8/D 인프라)
 
+## 직원허브 직무 분류 2단계 (2026-09-24)
+
+- 로컬 구현 커밋 `1094547`~`52c5852`: nullable job_group migration/guarded rollback, 공통 네 분류와 Dr. 별도 처리, 미리보기·조건부 저장, 근무표·캘린더·계약 표시 통합.
+- 검증: PGlite 29/29, 관련 JS 76/76, 전체 JS 377/377, hr.html inline 2개 compile, diff-check PASS. PGlite 보강·기록 커밋 `65fda68` 이후 worktree clean임.
+- 운영 미적용: 운영 DB/Storage/Edge/Auth, main, push, deploy 미실행. 작업 브랜치 `codex/employee-hub-phase2-20260923`임.
+- 별도 요구 추적표에는 131건이 있음; 직무 분류 요구만 해결됐다고 전체 직원허브 미완료 67건을 완료로 간주하지 않는다. 상세 evidence/handoff는 구현결과 및 WORKLOG/HANDOFF 참고.
+
+## 직원허브 2단계 H-2/H-4 — 로컬 초안 완료 (2026-09-24)
+
+- H-2 `f99d927`: 서류함에서 결제건·금액·마감일·계좌·영수증을 접수하고 실장→원장 결재로 처리한다. 민감 요청·영수증은 요청자와 결재선만 조회하며 전용 Storage와 보존형 rollback을 둔다.
+- H-4 `c6c8aac`: 운영에서 읽기 전용으로 확인한 기존 `ai_billing_events` 7열을 보존한 additive 초안이다. 기존 `ai-billing-webhook`에 네이버 광고 충전·노출중단 파서를 더하고, 문의함 맨 위 owner·manager 전용 붉은 띠와 charged actor/time 감사를 연결한다.
+- 두 초안 모두 로컬 브랜치 전용이며 운영 DB·Storage·Edge 배포·MacroDroid 변경은 하지 않았다. H-4 운영 적용 전에는 migration preview와 PC/mobile 캡처를 별도 확인한다.
+
+## 직원허브 2단계 A-1 — 보안서약서 업로드 경로 복구 (2026-09-24)
+
+- 기존 직원 서류함의 서류 종류에 `보안서약서`를 추가해, 기존 체크리스트의 완료 판정(`document_type='보안서약서'`)까지 실제 업로드 경로가 연결된다. 새 화면·새 DB 객체·운영 데이터 변경은 없다.
+- 새 수용 시험 포함 JS 321/321, 인라인 구문 3/3, `git diff --check` PASS다. PGlite는 SQL 변경이 없어 재실행 대상이 아니다.
+- 원본 두 서약서를 합친 허브 직접서명 템플릿은 별도 화면 시안 승인이 필요해 아직 만들지 않았다.
+
+## 직원허브 2단계 A-2 — 연차 자동발생 로컬 구현 완료 (2026-09-24)
+
+- 기준 `9c78557`에서 `f42464a`·`9768ca0`으로 연차 자동발생 SQL과 시험을 추가했다. 첫 1년은 1~11개월 월차만 생기고, 입사 1주년 당일에는 추가가 없으며 다음 날 연차 15일이 별도로 더해져 총 26일이 된다.
+- 검증은 JS 320/320, PGlite 22/22, 인라인 구문 3/3, `git diff --check` PASS다. PGlite는 1주년 당일 월차 11일만·다음 날 annual target/grant 15일·총 26일, 수기 26일이면 자동 0일, staff/manager/chief/owner RLS를 확인했다.
+- 로컬 브랜치 전용이다. push·배포·운영 DB/Storage/Edge/Auth·실제 직원 데이터는 변경하지 않았고, 운영 적용은 preview → 원장 확인 → 명시 apply 순서로만 한다.
+
 ## AI 사용량 현황판 — AI비용 탭 통합 운영 반영 (2026-09-22)
 
 - `hr.html` AI비용 탭(원장 전용)에 '📊 AI 사용량 현황판' 카드: 모델별 사용량(최근 7일, Astra 강조)·정가 환산 사용가치(청구액 아님)·Codex 대화 효율 점검. `main` `74291e2`, Pages run `35712403783` success, 공개 SHA256 = 커밋.

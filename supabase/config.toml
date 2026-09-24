@@ -10,6 +10,9 @@ verify_jwt = false
 [functions.navertalk-webhook]
 verify_jwt = false
 
+[functions.consultation-notification]
+verify_jwt = false
+
 [functions.ai-billing-webhook]
 verify_jwt = false
 
