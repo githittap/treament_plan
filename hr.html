@@ -1265,6 +1265,7 @@ function suggestGrantDays(hireDate){
   if(m==null)return null;
   return m>=12?15:Math.min(11,m);
 }
+let LEAVE_ACCRUAL_PREVIEW=[],LEAVE_ACCRUAL_AS_OF='';
 async function renderLeave(m){
   const {data:bal}=await sb.from('v_leave_balance').select('*').eq('user_id',ME.id).maybeSingle();
   const {data:mine}=await sb.from('leave_requests').select('*').eq('user_id',ME.id).order('created_at',{ascending:false}).limit(20);
@@ -1294,7 +1295,8 @@ async function renderLeave(m){
     <input id="gvDays" class="mini" type="number" step="0.5" placeholder="일수" style="width:80px">
     <input id="gvNote" class="mini" placeholder="메모(예: 2026년 정기부여)">
     <button class="mini stamp" onclick="grantLeave()">저장</button></div>
-    <div class="hint">‘부여’는 추가 기록, ‘조정’은 목표 잔액으로 맞추는 절대 설정입니다. 입사 1년(365일) 도달 시 15일 일괄 부여가 원칙이며, 1년 미만은 월 개근 1일 제안값을 확인 후 기록합니다.</div></div>`:'';
+    <div class="hint">‘부여’는 추가 기록, ‘조정’은 목표 잔액으로 맞추는 절대 설정입니다. 아래 자동 적립과 수기 부여가 겹치지 않도록 장부를 확인하세요. 15일 적립은 입사 365일 경과 다음 날 별도로 발생합니다.</div></div>`:'';
+  const accrualHtml=ME.role==='owner'?`<div class="card"><h2>📆 자동 연차 적립 확인 <span class="sub">(원장)</span></h2><div class="hint">먼저 발생 예정 내역을 확인하고, 각 기간의 개근·재직을 원장이 확인한 뒤 적용합니다. 기존 수기 지급분은 중복 지급하지 않도록 반영됩니다.</div><div class="rowflex" style="margin-top:8px"><label>기준일 <input id="laAsOf" class="mini" type="date" value="${esc(LEAVE_ACCRUAL_AS_OF||today())}" max="${today()}"></label><button class="mini" onclick="previewLeaveAccrual()">미리보기</button><button id="laApply" class="mini stamp" onclick="applyLeaveAccrual()" disabled>확인한 항목 적용</button></div><div id="laMsg" class="hint" style="margin-top:8px">적용 전 미리보기가 필요합니다.</div><div id="laRows"></div></div>`:'';
   m.innerHTML=`
   <div class="card"><h2>📅 내 연차</h2>
     <div class="rowflex"><div class="stat"><div class="sub">잔여</div><div class="big">${bal?bal.balance:0}<span style="font-size:14px"> 일</span></div></div></div>
@@ -1303,7 +1305,7 @@ async function renderLeave(m){
     ${(mine||[]).length?`<div class="tblwrap"><table><tr><th>유형</th><th>기간</th><th>일수</th><th>상태</th><th></th></tr>
     ${(mine||[]).map(r=>`<tr><td>${esc(r.type)}${r.type_note&&r.type!=='기타'?' · '+esc(r.type_note):''}</td><td>${md(r.date_from)}~${md(r.date_to)}</td><td>${r.days}</td>
       <td><span class="b ${r.status==='승인'?'ok':(r.status==='반려'?'no':'wait')}">${esc(r.status)}</span></td><td><button class="mini" onclick="openLeaveForm(${r.id})">📄 신청서</button> ${r.status==='대기'?`<button class="mini" onclick="openLeaveEdit(${r.id})">수정</button><button class="mini rej" onclick="cancelPendingLeave(${r.id})">취소</button>`:''}</td></tr>`).join('')}</table></div>`:'<div class="empty">신청 내역 없음</div>'}
-  </div>${leadHtml}${archiveHtml}${grantHtml}`;
+  </div>${leadHtml}${archiveHtml}${grantHtml}${accrualHtml}`;
 }
 function refreshLeaveTypeFields(){const type=$('#lvType').value,isTimed=type==='반차'||type==='조퇴';$('#lvNoteWrap').style.display=type==='기타'?'':'none';$('#lvTimeWrap').style.display=isTimed?'':'none';}
 $('#lvType') && $('#lvType').addEventListener('change',refreshLeaveTypeFields);
@@ -1395,6 +1397,35 @@ async function grantLeave(){
   if(result.error){alert('연차 기록 실패: '+result.error.message);return;}
   if(!result.data||!result.data.length){alert('잔액 설정 결과를 확인하지 못했습니다.');return;}
   setStatus('saved');render();
+}
+async function previewLeaveAccrual(){
+  if(ME.role!=='owner')return;
+  const asOf=$('#laAsOf').value,msg=$('#laMsg'),rows=$('#laRows');
+  LEAVE_ACCRUAL_PREVIEW=[];LEAVE_ACCRUAL_AS_OF='';$('#laApply').disabled=true;rows.innerHTML='';
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(asOf)||asOf>today()){msg.textContent='오늘 이전의 올바른 기준일을 선택하세요.';return false;}
+  msg.textContent='미리보기 불러오는 중…';
+  const {data,error}=await sb.rpc('preview_monthly_leave_accruals',{p_as_of:asOf});
+  if(error){msg.textContent='연차 미리보기 실패: '+error.message;setStatus('error');return false;}
+  LEAVE_ACCRUAL_AS_OF=asOf;LEAVE_ACCRUAL_PREVIEW=data||[];
+  rows.innerHTML=LEAVE_ACCRUAL_PREVIEW.length?`<div class="tblwrap"><table><tr><th>개근·재직 확인</th><th>직원</th><th>입사일</th><th>발생일</th><th>구분</th><th>단계</th><th>기존 수기 포함</th><th>이번 지급</th></tr>${LEAVE_ACCRUAL_PREVIEW.map((r,i)=>`<tr><td>${r.already_recorded?'<span class="b ok">기록됨</span>':`<input type="checkbox" data-la-index="${i}" aria-label="${esc(r.user_name||'직원')} ${esc(r.due_date)} 개근·재직 확인">`}</td><td>${esc(r.user_name||'')}</td><td>${esc(r.hire_date||'')}</td><td>${esc(r.due_date||'')}</td><td>${r.accrual_kind==='annual'?'1년 15일':'월차'}</td><td>${esc(String(r.target_days))}일</td><td>${esc(String(r.existing_credit_days))}일</td><td>${esc(String(r.grant_days))}일</td></tr>`).join('')}</table></div>`:'<div class="empty">기준일까지 발생한 내역이 없습니다.</div>';
+  $('#laApply').disabled=!LEAVE_ACCRUAL_PREVIEW.some(r=>!r.already_recorded);
+  msg.textContent='적용할 발생일마다 개근·재직을 확인해 체크하세요. 0일도 수기 지급 충족 기록을 남길 수 있습니다.';
+  return true;
+}
+async function applyLeaveAccrual(){
+  if(ME.role!=='owner'||!LEAVE_ACCRUAL_AS_OF||$('#laAsOf').value!==LEAVE_ACCRUAL_AS_OF){$('#laMsg').textContent='기준일을 다시 미리보기로 확인하세요.';return;}
+  const selected=[...$('#laRows').querySelectorAll('[data-la-index]:checked')].map(el=>LEAVE_ACCRUAL_PREVIEW[Number(el.dataset.laIndex)]).filter(r=>r&&!r.already_recorded);
+  if(!selected.length){$('#laMsg').textContent='개근·재직을 확인한 항목을 선택하세요.';return;}
+  const days=selected.reduce((sum,r)=>sum+Number(r.grant_days||0),0);
+  if(!confirm(`${selected.length}개 발생일의 개근·재직을 확인하고, 미리보기 기준 ${days}일을 연차 장부에 적용할까요?`))return;
+  $('#laApply').disabled=true;$('#laMsg').textContent='적용 중…';
+  const confirmations=selected.map(r=>({user_id:r.user_id,due_date:r.due_date,full_attendance:true}));
+  const {data,error}=await sb.rpc('apply_monthly_leave_accruals',{p_as_of:LEAVE_ACCRUAL_AS_OF,p_attendance_confirmations:confirmations,p_apply_confirmed:true});
+  if(error){$('#laMsg').textContent='적용 실패: '+error.message;$('#laApply').disabled=false;setStatus('error');return;}
+  const granted=(data||[]).reduce((sum,r)=>sum+Number(r.granted_days||0),0),created=(data||[]).reduce((sum,r)=>sum+Number(r.created_runs||0),0);
+  setStatus('saved');await renderLeave($('#main'));const refreshed=await previewLeaveAccrual();
+  if(refreshed)$('#laMsg').textContent=created?`적용 완료: ${created}건 기록, 실제 ${granted}일 지급. 기록 상태를 확인하세요.`:'새로 적용된 기록이 없습니다. 이미 기록된 발생일인지 확인하세요.';
+  else $('#laMsg').textContent='적용 응답은 성공했으나 재조회 실패 — '+$('#laMsg').textContent;
 }
 
 /* ── 결재함 ── */

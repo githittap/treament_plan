@@ -142,7 +142,7 @@ begin
       p.profile_employment_effective_date,
       'annual'::text as milestone_kind,
       12 as milestone_months,
-      (p.profile_hire_date + interval '1 year' + interval '1 day')::date as milestone_due_date,
+      (p.profile_hire_date + interval '366 days')::date as milestone_due_date,
       15::numeric as milestone_target_days,
       26::numeric as milestone_cumulative_due_days
     from profile_base p
@@ -237,6 +237,9 @@ declare
 begin
   if p_as_of is null then
     raise exception 'as-of date required';
+  end if;
+  if p_as_of>(now() at time zone 'Asia/Seoul')::date then
+    raise exception 'future as-of date not allowed';
   end if;
   if auth.uid() is null or coalesce(public.my_role(),'')<>'owner'
      or not exists(

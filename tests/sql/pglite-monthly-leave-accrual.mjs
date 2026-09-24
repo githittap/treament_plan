@@ -41,6 +41,8 @@ const annualStaff='44444444-4444-4444-4444-444444444444';
 const monthEndStaff='55555555-5555-5555-5555-555555555555';
 const formerStaff='66666666-6666-6666-6666-666666666666';
 const coveredAnnualStaff='88888888-8888-8888-8888-888888888888';
+const leapBoundaryStaff='99999999-9999-9999-9999-999999999999';
+const applyStaff='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const iso = value => new Date(value).toISOString().slice(0,10);
 const confirmationJson = rows => JSON.stringify(rows.map(row => ({
   user_id: row.user_id,
@@ -58,7 +60,9 @@ try {
     ('${annualStaff}','365일직원','2025-09-24','staff',true,true,'재직',null),
     ('${monthEndStaff}','월말직원','2026-01-31','staff',true,true,'재직',null),
     ('${formerStaff}','중도퇴사직원','2026-01-15','staff',false,false,'자진퇴사','2026-03-10'),
-    ('${coveredAnnualStaff}','수기충족직원','2025-09-24','staff',true,true,'재직',null)`);
+    ('${coveredAnnualStaff}','수기충족직원','2025-09-24','staff',true,true,'재직',null),
+    ('${leapBoundaryStaff}','윤년경계직원','2023-03-01','staff',true,true,'재직',null),
+    ('${applyStaff}','적용시험직원','2026-07-18','staff',true,true,'재직',null)`);
 
   const asUser=async userId=>{await query('set role authenticated');await query(`select set_config('app.test_uid','${userId}',false)`);};
   const directRun=(dueDate,confirmedBy)=>`insert into public.leave_accrual_runs(user_id,due_date,accrual_kind,months_completed,target_days,days,attendance_confirmed_by,attendance_confirmed_at) values('${staff}','${dueDate}','monthly',1,1,0,'${confirmedBy}',now())`;
@@ -95,28 +99,33 @@ try {
   assert.equal(anniversaryPreview.length,11); assert.equal(anniversaryPreview.some(row=>row.accrual_kind==='annual'),false);
   const annualPreview = (await query("select * from public.preview_monthly_leave_accruals('2026-09-25')")).filter(row=>row.user_id===annualStaff);
   assert.equal(annualPreview.length,12); assert.equal(annualPreview.at(-1).accrual_kind,'annual'); assert.equal(annualPreview.at(-1).months_completed,12); assert.equal(iso(annualPreview.at(-1).due_date),'2026-09-25'); assert.equal(Number(annualPreview.at(-1).target_days),15); assert.equal(Number(annualPreview.at(-1).grant_days),15);
+  const leapBefore=(await query("select * from public.preview_monthly_leave_accruals('2024-02-29')")).filter(row=>row.user_id===leapBoundaryStaff);
+  assert.equal(leapBefore.some(row=>row.accrual_kind==='annual'),false);
+  const leapAfter=(await query("select * from public.preview_monthly_leave_accruals('2024-03-01')")).filter(row=>row.user_id===leapBoundaryStaff);
+  assert.equal(iso(leapAfter.at(-1).due_date),'2024-03-01'); assert.equal(leapAfter.at(-1).accrual_kind,'annual');
 
   await query(`insert into public.leave_ledger(user_id,kind,days,note) values('${coveredAnnualStaff}','부여',26,'기존 수기 전체 충족')`);
   const coveredAnnualPreview=(await query("select * from public.preview_monthly_leave_accruals('2026-09-25')")).filter(row=>row.user_id===coveredAnnualStaff);
   assert.equal(coveredAnnualPreview.length,12); assert.equal(Number(coveredAnnualPreview.at(-1).target_days),15); assert.equal(Number(coveredAnnualPreview.at(-1).grant_days),0);
 
-  let blocked=''; try { await query("select * from public.apply_monthly_leave_accruals('2026-10-18')"); } catch(error) { blocked=String(error); } assert.match(blocked,/explicit apply confirmation required; preview only/);
-  const firstConfirmation=confirmationJson(preview.filter(row=>row.months_completed===1));
-  blocked=''; try { await query(`select * from public.apply_monthly_leave_accruals('2026-10-18',${sqlJson(firstConfirmation)},false)`); } catch(error) { blocked=String(error); } assert.match(blocked,/explicit apply confirmation required; preview only/);
-  const falseConfirmation=JSON.stringify([{user_id:staff,due_date:'2026-10-18',full_attendance:false}]);
-  blocked=''; try { await query(`select * from public.apply_monthly_leave_accruals('2026-10-18',${sqlJson(falseConfirmation)},true)`); } catch(error) { blocked=String(error); } assert.match(blocked,/full attendance confirmation required/);
+  let blocked=''; try { await query("select * from public.apply_monthly_leave_accruals('2026-08-18')"); } catch(error) { blocked=String(error); } assert.match(blocked,/explicit apply confirmation required; preview only/);
+  const firstConfirmation=confirmationJson((await query("select * from public.preview_monthly_leave_accruals('2026-08-18')")).filter(row=>row.user_id===applyStaff&&row.months_completed===1));
+  blocked=''; try { await query(`select * from public.apply_monthly_leave_accruals('2026-08-18',${sqlJson(firstConfirmation)},false)`); } catch(error) { blocked=String(error); } assert.match(blocked,/explicit apply confirmation required; preview only/);
+  const falseConfirmation=JSON.stringify([{user_id:applyStaff,due_date:'2026-08-18',full_attendance:false}]);
+  blocked=''; try { await query(`select * from public.apply_monthly_leave_accruals('2026-08-18',${sqlJson(falseConfirmation)},true)`); } catch(error) { blocked=String(error); } assert.match(blocked,/full attendance confirmation required/);
+  blocked=''; try { await query(`select * from public.apply_monthly_leave_accruals('2099-01-01',${sqlJson(firstConfirmation)},true)`); } catch(error) { blocked=String(error); } assert.match(blocked,/future as-of date not allowed/);
 
-  let applied = await query(`select * from public.apply_monthly_leave_accruals('2026-10-18',${sqlJson(firstConfirmation)},true)`);
-  assert.deepEqual(applied.map(row=>({user_id:row.user_id,days:Number(row.granted_days),runs:row.created_runs})),[{user_id:staff,days:1,runs:1}]);
-  assert.equal((await query(`select count(*)::int n from public.leave_ledger where user_id='${staff}'`))[0].n,1);
-  applied = await query(`select * from public.apply_monthly_leave_accruals('2026-10-18',${sqlJson(firstConfirmation)},true)`); assert.equal(applied.length,0);
+  let applied = await query(`select * from public.apply_monthly_leave_accruals('2026-08-18',${sqlJson(firstConfirmation)},true)`);
+  assert.deepEqual(applied.map(row=>({user_id:row.user_id,days:Number(row.granted_days),runs:row.created_runs})),[{user_id:applyStaff,days:1,runs:1}]);
+  assert.equal((await query(`select count(*)::int n from public.leave_ledger where user_id='${applyStaff}'`))[0].n,1);
+  applied = await query(`select * from public.apply_monthly_leave_accruals('2026-08-18',${sqlJson(firstConfirmation)},true)`); assert.equal(applied.length,0);
 
-  await query(`insert into public.leave_ledger(user_id,kind,days,note) values('${staff}','부여',1,'기존 수기 월차')`);
-  const secondPreview=(await query("select * from public.preview_monthly_leave_accruals('2026-11-18')")).filter(row=>row.user_id===staff&&row.months_completed===2);
+  await query(`insert into public.leave_ledger(user_id,kind,days,note) values('${applyStaff}','부여',1,'기존 수기 월차')`);
+  const secondPreview=(await query("select * from public.preview_monthly_leave_accruals('2026-09-18')")).filter(row=>row.user_id===applyStaff&&row.months_completed===2);
   assert.equal(secondPreview.length,1); assert.equal(Number(secondPreview[0].existing_credit_days),2); assert.equal(Number(secondPreview[0].grant_days),0);
-  applied=await query(`select * from public.apply_monthly_leave_accruals('2026-11-18',${sqlJson(confirmationJson(secondPreview))},true)`);
+  applied=await query(`select * from public.apply_monthly_leave_accruals('2026-09-18',${sqlJson(confirmationJson(secondPreview))},true)`);
   assert.deepEqual(applied.map(row=>({days:Number(row.granted_days),runs:row.created_runs})),[{days:0,runs:1}]);
-  assert.equal((await query(`select count(*)::int n from public.leave_ledger where user_id='${staff}'`))[0].n,2);
+  assert.equal((await query(`select count(*)::int n from public.leave_ledger where user_id='${applyStaff}'`))[0].n,2);
 
   applied=await query(`select * from public.apply_monthly_leave_accruals('2026-09-25',${sqlJson(confirmationJson(annualPreview))},true)`);
   assert.deepEqual(applied.map(row=>({user_id:row.user_id,days:Number(row.granted_days),runs:row.created_runs})),[{user_id:annualStaff,days:26,runs:12}]);
@@ -132,5 +141,13 @@ try {
   preview = (await query("select * from public.preview_monthly_leave_accruals('2027-09-19')")).filter(row=>row.user_id===staff);
   assert.equal(preview.length,12); assert.equal(preview.at(-1).accrual_kind,'annual'); assert.equal(iso(preview.at(-1).due_date),'2027-09-19'); assert.equal(Number(preview.at(-1).target_days),15); assert.equal(Number(preview.at(-1).grant_days),15);
   await asUser(manager); let denied=''; try { await query("select * from public.apply_monthly_leave_accruals('2026-12-18')"); } catch(error) { denied=String(error); } assert.match(denied,/owner execution required/);
+  await asUser(owner);
+  const beforeRollback=(await query(`select count(*)::int n from public.leave_accrual_runs where user_id='${annualStaff}'`))[0].n;
+  await query('reset role');
+  await db.exec(fs.readFileSync(path.resolve('db/monthly_leave_accrual_safe_rollback.sql'),'utf8'));
+  await asUser(owner);
+  await assert.rejects(query(`select * from public.apply_monthly_leave_accruals('2026-09-25',${sqlJson(confirmationJson(annualPreview))},true)`),/automatic leave accrual paused; preview only/);
+  assert.equal((await query(`select count(*)::int n from public.leave_accrual_runs where user_id='${annualStaff}'`))[0].n,beforeRollback);
+  assert.equal(Number((await query(`select coalesce(sum(days),0) total from public.leave_ledger where user_id='${annualStaff}' and kind in('부여','조정')`))[0].total),26);
   console.log('PGLITE_MONTHLY_LEAVE_PASS: 월말·퇴사·1주년 다음 날 별도 15일·수기상계·4역할 RLS·명시 개근확인 적용');
 } finally { await db.close(); }
