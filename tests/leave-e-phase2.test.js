@@ -61,6 +61,37 @@ test('실제 조퇴 신청 함수가 조퇴 type과 시간범위 payload를 INSE
   assert.equal(inserted.user_id,'user-1');
 });
 
+test('실제 반차 신청 payload가 조회 결과를 거쳐 캘린더에 시간과 함께 표시된다', async () => {
+  const fields = new Map([
+    ['lvFrom', {value:'2026-09-24'}], ['lvTo', {value:'2026-09-24'}],
+    ['lvType', {value:'반차'}], ['lvTimeFrom', {value:'09:00'}], ['lvTimeTo', {value:'13:00'}],
+    ['lvReason', {value:'개인 일정'}], ['lvContact', {value:''}], ['lvSpecial', {value:''}],
+    ['lvNote', {value:''}], ['lvMsg', {textContent:'', innerHTML:''}], ['lvOverlap', {value:'',textContent:''}]
+  ]);
+  let inserted;
+  const sb = {from(table){assert.equal(table,'leave_requests');return {insert(payload){inserted=payload;return {select:()=>({maybeSingle:async()=>({data:{id:42},error:null})})};}};}};
+  const context = {sb, ME:{id:'user-half-day'}, LEAVE_EDIT_ID:null, $:id=>fields.get(String(id).replace(/^#/,'') ), leaveConflict:async()=>0,
+    computeLeaveDays:async()=>0.5, hide:()=>{}, setStatus:()=>{}, render:()=>{}, refreshBadges:()=>{}};
+  vm.runInNewContext('(async()=>{'+extractFunction('submitLeave','stampDate')+'; this.submitLeave=submitLeave;})()', context);
+  await context.submitLeave();
+
+  assert.equal(inserted.type,'반차');
+  assert.equal(inserted.type_note,'09:00~13:00');
+  assert.equal(inserted.days,0.5);
+  assert.match(html, /\.select\(['"]user_id,type,type_note,date_from,date_to['"]\)/);
+
+  const calendarSource = html.slice(html.indexOf('function calendarLeaveIndex'), html.indexOf('function scheduleRowsWithoutApprovedLeave'))
+    + extractFunction('leaveDisplayText','mondayStr')
+    + '; this.calendarLeaveIndex=calendarLeaveIndex; this.leaveDisplayText=leaveDisplayText;';
+  const calendarContext = {schedulePersonName:person=>person.name};
+  vm.runInNewContext(calendarSource, calendarContext);
+  const queriedRows = [{...inserted,status:'승인'}];
+  const calendar = calendarContext.calendarLeaveIndex(queriedRows, [{id:'staff-1',profile_user_id:'user-half-day',name:'합성 직원'}],
+    '2026-09-01','2026-09-30',()=> '합성 직원',true);
+  assert.deepEqual(JSON.parse(JSON.stringify(calendar['2026-09-24'])), [{label:'합성 직원',type:'반차',type_note:'09:00~13:00'}]);
+  assert.equal(calendarContext.leaveDisplayText(calendar['2026-09-24'][0].type,calendar['2026-09-24'][0].type_note),'반차 · 09:00~13:00');
+});
+
 test('실제 무단결근 후보 계산이 설정된 일수 1일과 10일을 구분한다', () => {
   const source = html.slice(html.indexOf('function absenceCandidateDecision'), html.indexOf('function absenceManualExcluded'))+'; this.absenceCandidateDecision=absenceCandidateDecision;';
   const context = {};
