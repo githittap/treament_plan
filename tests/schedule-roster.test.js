@@ -728,7 +728,7 @@ test('월간 캘린더는 모든 조회 오류를 눈에 보이는 하나의 오
 
 test('캘린더는 공통 직무 그룹으로 날짜 상세를 제공한다', () => {
   const source = calendarBlock[1];
-  for (const marker of ['EMPLOYEE_JOB_GROUPS.map(group=>[group.label', 'EMPLOYEE_JOB_GROUPS.map(group=>calendarRosterTag(group.label', 'renderCalendarDayPanel', 'scheduleCalendarIndex']) assert.match(source, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  for (const marker of ['EMPLOYEE_JOB_GROUPS.map((group,index)=>[group.label', 'EMPLOYEE_JOB_GROUPS.map((group,index)=>calendarRosterTag(group.label', 'renderCalendarDayPanel', 'calendarWeekRoleRows', 'scheduleCalendarIndex']) assert.match(source, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(html, /label:'내 서류함'/);
 });
 
@@ -739,7 +739,7 @@ test('4차 캘린더는 오프라인 PNG·전용 PDF 인쇄와 첫 선택 날짜
   assert.match(source, /id="calendarCard"/);
   assert.match(source, /PNG로 저장/);
   assert.match(source, /PDF로 저장/);
-  assert.ok(source.indexOf("if(!CAL_SELECTED_DATE||!CAL_SELECTED_DATE.startsWith(CAL_MONTH+'-'))CAL_SELECTED_DATE=from;") < source.indexOf('const cellsHtml='), '선택 날짜는 셀 HTML보다 먼저 확정해야 합니다.');
+  assert.ok(source.indexOf('if(!CAL_SELECTED_DATE||CAL_SELECTED_DATE<from||CAL_SELECTED_DATE>to)CAL_SELECTED_DATE=') < source.indexOf('const cellsHtml='), '선택 날짜는 화면 범위와 맞춘 뒤 셀 HTML에 반영해야 합니다.');
   assert.match(html, /body\.calendar-printing/);
   assert.match(html, /\.calendar-actions\{display:none!important\}/);
   assert.doesNotMatch(html, /\[입사서류\] 탭|입사서류에서/);
@@ -750,7 +750,7 @@ test('캘린더 렌더 순서는 공휴일과 이벤트, 부서, 야간, 연차,
   const tagSource = source.slice(source.indexOf('const tags=['));
   const markers = [
     'cal-tag hol', 'cal-tag ev',
-    "calendarRosterTag('Dr.'", 'EMPLOYEE_JOB_GROUPS.map(group=>calendarRosterTag(group.label', "calendarRosterTag('미지정'",
+    "calendarRosterTag('Dr.'", 'EMPLOYEE_JOB_GROUPS.map((group,index)=>calendarRosterTag(group.label', "calendarRosterTag('미지정'",
     "calendarRosterTag('야간'", "calendarLeaveTags(leaveByDate[c.ds]||[])", "calendarRosterTag('OFF'", "calendarRosterTag('기타'", 'cal-tag status'
   ];
   let previous = -1;
@@ -763,7 +763,7 @@ test('캘린더 렌더 순서는 공휴일과 이벤트, 부서, 야간, 연차,
   assert.match(source, /weekByStart\.get\(mondayStr\(c\.ds\)\)/);
 });
 
-test('캘린더는 전체·근무·연차 3단 전환과 상담·행정 직무를 유지한다', () => {
+test('캘린더는 전체·근무·연차 필터와 주간 기본 직무행 숫자 요약을 제공한다', () => {
   const source = calendarBlock[1];
   assert.match(source, /CAL_VIEW==='all'/);
   assert.match(source, />전체</);
@@ -970,6 +970,29 @@ test('owner 직원 권한 표는 연결 명부 상태를 보여 주고 승인 �
   assert.match(approve[0], /upsert\(\{profile_user_id:uid,name:p\.name,department:'미지정',included_in_schedule:true,active:true\}/);
   assert.match(approve[0], /onConflict:'profile_user_id',ignoreDuplicates:true/);
   assert.match(approve[0], /if\(rosterError\).*setStatus\('error'\)/s);
+});
+
+test('캘린더는 오늘 주간 기본, 주·월 전환과 직무행 숫자 요약을 제공한다', () => {
+  const source=calendarBlock[1];
+  assert.match(source,/CAL_PERIOD='week'/);
+  assert.match(source,/function setCalendarPeriod\(period\)/);
+  assert.match(source,/function shiftCalendarPeriod\(amount\)/);
+  assert.match(source,/calendarWeekDates\(from\)/);
+  assert.match(source,/주간<\/button>/);
+  assert.match(source,/월간<\/button>/);
+  assert.match(source,/calendar-week-table/);
+  assert.match(source,/class="\$\{color\}"/);
+  assert.match(html,/\.cal-tag\.cal-roster \.cal-names\{display:none\}/);
+  const context={EMPLOYEE_JOB_GROUPS:[{label:'진료·상담'},{label:'소독·행정'},{label:'기공행정'},{label:'데스크'}],esc:value=>String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;'),dstr:date=>date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0'),today:()=> '2026-09-24'};
+  vm.createContext(context);
+  vm.runInContext(`${source};this.calendarWeekDates=calendarWeekDates;this.renderCalendarWeekTable=renderCalendarWeekTable;this.emptyCalendarRoster=emptyCalendarRoster;this.calendarWeekRoleRows=calendarWeekRoleRows;`,context);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.calendarWeekDates('2026-09-28'))),['2026-09-28','2026-09-29','2026-09-30','2026-10-01','2026-10-02','2026-10-03','2026-10-04']);
+  const roster=context.emptyCalendarRoster();roster.departments['Dr.']=['Dr. A'];roster.departments['진료·상담']=['직원 A','직원 B'];
+  const leave=[{label:'직원 C',type:'연차'},{label:'직원 D',type:'반차',type_note:'오전'}];
+  const rows=JSON.parse(JSON.stringify(context.calendarWeekRoleRows(roster,leave)));
+  assert.deepEqual(rows.map(row=>row[0]).slice(0,8),['Dr.','진료·상담','소독·행정','기공행정','데스크','미지정','야간','OFF']);
+  assert.deepEqual(rows.filter(row=>['연차','반차'].includes(row[0])).map(row=>[row[0],row[2].length]),[['연차',1],['반차',1]]);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.calendarWeekRoleRows(roster,leave).slice(0,5).map(row=>row[1]))),['dr','job-0','job-1','job-2','job-3']);
 });
 
 test('월간 캘린더 상세 팝업은 근무·OFF·연차·반차를 구분하고 접근 가능한 닫기를 제공한다', () => {
