@@ -81,6 +81,26 @@ test('저장된 반차가 편집 선택값과 날짜 상세에 복원된다', ()
   assert.match(output, /오후 반차 · 오후 진료/);
 });
 
+test('날짜 클릭 상세에 정정 사유와 비고가 함께 보이고 HTML을 이스케이프한다', () => {
+  const start = html.indexOf('let MANUAL_DETAIL_OPEN');
+  const end = html.indexOf('function manualAttendanceFormHtml', start);
+  const nodes = new Map([
+    ['#manualAttendanceDayDetailText', {innerHTML:''}], ['#manualWeekday', {value:''}],
+    ['#manualHalfDay', {value:''}],
+  ]);
+  const context = {$: id => nodes.get(id), esc: value => String(value).replaceAll('<', '&lt;')};
+  vm.runInNewContext(`${html.slice(start, end)};this.setRows=rows=>MANUAL_DETAIL_ROWS=rows;this.renderManualAttendanceDayDetail=renderManualAttendanceDayDetail;`, context);
+  context.setRows([{work_date:'2026-09-24', lunch_overtime_min:0, clockout_overtime_min:10,
+    evening_overtime_min:10, half_day:'오전 반차', reason:'출근 지문 누락', manual_note:'<오후 진료>'}]);
+  context.renderManualAttendanceDayDetail('2026-09-24');
+  const detail = nodes.get('#manualAttendanceDayDetailText').innerHTML;
+  assert.match(detail, /10분 퇴근 · 10분 저녁 · 오전 반차/);
+  assert.match(detail, /정정 사유: 출근 지문 누락 · 비고: &lt;오후 진료>/);
+  assert.equal(nodes.get('#manualWeekday').value, '목요일');
+  context.renderManualAttendanceDayDetail('2026-09-25');
+  assert.match(nodes.get('#manualAttendanceDayDetailText').innerHTML, /사유·비고 없음/);
+});
+
 test('10분 단위 기존 계산 로직과 경계값 9·10·19를 보존한다', () => {
   const fn = html.match(/function overtimeDraftMinutes\(raw\)\{[\s\S]*?\n}/)?.[0];
   assert.ok(fn);

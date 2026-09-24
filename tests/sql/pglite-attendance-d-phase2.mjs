@@ -21,10 +21,15 @@ try{
   const rows=await q(`select * from public.submit_manual_attendance_d('2026-09-24','09:00','18:00',0,0,'9',0,'10',10,'19',10,'메모',false,'저녁 확인','오전 반차')`);
   assert.equal(rows[0].overtime_min,10);assert.equal(rows[0].evening_overtime_min,10);assert.equal(rows[0].evening_overtime_raw_text,'19');assert.equal(rows[0].manual_note,'저녁 확인');assert.equal(rows[0].half_day,'오전 반차');
   const rev=await q('select payload from public.attendance_manual_revisions where entry_id=1');assert.equal(rev[0].payload.overtime_min,10);
+  for(const [day,raw,expected] of [['26','9',0],['27','10',10],['28','19',10]]){
+    const boundary=await q(`select * from public.submit_manual_attendance_d('2026-09-${day}','09:00','18:00',0,0,'${raw}',${expected},'${raw}',${expected},'${raw}',${expected},null,false,null,'없음')`);
+    assert.equal(boundary[0].overtime_min,expected*2,`${raw}분 점심·퇴근 계산`);
+    assert.equal(boundary[0].evening_overtime_min,expected,`${raw}분 저녁 계산`);
+  }
   let mismatch='';try{await q(`select * from public.submit_manual_attendance_d('2026-09-25','09:00','18:00',0,0,'',0,'',0,'19',19,null,false,null,'없음')`)}catch(e){mismatch=String(e)}assert.match(mismatch,/evening overtime value mismatch/);
   let blocked='';try{await db.exec(fs.readFileSync('db/attendance_manual_evening_overtime_rollback.sql','utf8'))}catch(e){blocked=String(e)}assert.match(blocked,/rollback stopped/);assert.equal((await q("select count(*)::int n from information_schema.columns where table_name='attendance_manual_entries' and column_name='evening_overtime_min'"))[0].n,1);
   await q('reset role');await q('delete from public.manual_attendance_status_history');await q('delete from public.attendance_manual_revisions');await q('delete from public.attendance_manual_entries');
   await db.exec(fs.readFileSync('db/attendance_manual_evening_overtime_rollback.sql','utf8'));
   assert.equal((await q("select count(*)::int n from information_schema.columns where table_name='attendance_manual_entries' and column_name='evening_overtime_min'"))[0].n,0);
-  console.log('PGLITE_ATTENDANCE_D_PHASE2_PASS: evening-minutes/total/note/half-day/10-minute-server-check');
+  console.log('PGLITE_ATTENDANCE_D_PHASE2_PASS: evening-minutes/total/note/half-day/9-10-19-minute-server-check');
 }finally{await db.close();}
