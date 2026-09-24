@@ -1,0 +1,26 @@
+const assert=require('node:assert/strict'),fs=require('node:fs');
+const html=fs.readFileSync('hr.html','utf8');
+const sql=fs.readFileSync('db/payment_requests_draft.sql','utf8');
+const rollback=fs.readFileSync('db/payment_requests_rollback.sql','utf8');
+
+assert.match(html,/paymentRequestCard\(/,'서류함에 결제 요청 카드가 있어야 합니다.');
+assert.match(html,/결제 요청/,'직원이 서류함에서 결제 요청을 시작할 수 있어야 합니다.');
+assert.match(html,/submit_payment_request/,'민감 필드는 RPC로만 접수해야 합니다.');
+assert.match(html,/payment-receipts/,'영수증은 전용 비공개 Storage 버킷을 써야 합니다.');
+assert.match(html,/payment_request_add_receipt/,'업로드한 영수증은 서버에서 요청에 연결해야 합니다.');
+assert.match(html,/payment_request_act/,'실장·원장 결재는 서버 상태전이여야 합니다.');
+assert.match(sql,/create table if not exists public\.payment_requests/i);
+assert.match(sql,/create table if not exists public\.payment_request_receipts/i);
+assert.match(sql,/create table if not exists public\.payment_request_actions/i);
+assert.match(sql,/create or replace function public\.submit_payment_request/i);
+assert.match(sql,/create or replace function public\.payment_request_act/i);
+assert.match(sql,/chief_pending.*owner_pending.*approved.*rejected/is);
+assert.match(sql,/v_role='chief'/);
+assert.match(sql,/v_role='owner'/);
+assert.match(sql,/requester_id=auth\.uid\(\).*public\.my_role\(\) in \('chief','owner'\)/is,'본인과 결재선만 민감 요청을 읽어야 합니다.');
+assert.match(sql,/bucket_id='payment-receipts'/);
+assert.match(sql,/payment_request_receipts.*storage_path/is,'첨부 조회도 결재선 범위여야 합니다.');
+assert.match(sql,/revoke all on table public\.payment_requests from public, anon, authenticated/i);
+assert.match(sql,/grant select on table public\.payment_requests,public\.payment_request_receipts,public\.payment_request_actions to authenticated/i);
+assert.match(rollback,/payment_requests contains data; rollback stopped/i);
+console.log('PAYMENT_REQUESTS_ACCEPTANCE_PASS');
