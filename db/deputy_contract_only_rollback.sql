@@ -1,7 +1,7 @@
 -- H-3 로컬 초안 롤백. 운영 적용 금지.
 begin;
 do $$ declare t text; begin
-  foreach t in array array['attendance','att_months','attendance_issues','attendance_manual_entries','schedule_weeks','schedules','schedule_people','leave_requests','leave_ledger','leave_application_documents','holidays','calendar_events','notices','notice_reads','approval_docs','approval_steps','payroll_rows','payslips','monthly_reviews','bonus_rules','ledger_files','employee_documents','fingerprint_registration_requests','deposits'] loop
+  foreach t in array array['attendance','att_months','attendance_issues','attendance_manual_entries','attendance_manual_revisions','attendance_issue_resolutions','schedule_weeks','schedules','schedule_people','leave_requests','leave_ledger','leave_application_documents','holidays','calendar_events','notices','notice_reads','approval_docs','approval_steps','payroll_rows','payslips','monthly_reviews','bonus_rules','ledger_files','employee_documents','fingerprint_registration_requests','deposits'] loop
     if to_regclass('public.'||t) is not null then execute format('drop policy if exists deputy_contract_only_block on public.%I',t); end if;
   end loop;
 end $$;

@@ -52,6 +52,10 @@ alter table public.attendance_manual_entries enable row level security;
 alter table public.manual_attendance_status_history enable row level security;
 alter table public.attendance_manual_revisions enable row level security;
 alter table public.attendance_issue_resolutions enable row level security;
+drop policy if exists deputy_attendance_manual_revision_block on public.attendance_manual_revisions;
+create policy deputy_attendance_manual_revision_block on public.attendance_manual_revisions as restrictive for all to authenticated using (public.my_role()<>'deputy') with check (public.my_role()<>'deputy');
+drop policy if exists deputy_attendance_issue_resolution_block on public.attendance_issue_resolutions;
+create policy deputy_attendance_issue_resolution_block on public.attendance_issue_resolutions as restrictive for all to authenticated using (public.my_role()<>'deputy') with check (public.my_role()<>'deputy');
 alter table public.attendance_issues enable row level security;
 
 revoke all on table public.attendance_manual_entries,public.manual_attendance_status_history,public.attendance_manual_revisions,public.attendance_issue_resolutions from public,anon,authenticated;
@@ -113,6 +117,7 @@ create or replace function public.submit_attendance_issue(p_work_date date,p_typ
 returns public.attendance_issues language plpgsql security definer set search_path=public as $$
 declare r public.attendance_issues;
 begin
+  if public.my_role()='deputy' then raise exception 'deputy cannot submit attendance issues'; end if;
   if not exists(select 1 from public.profiles p where p.user_id=auth.uid() and p.active=true and p.approved=true) or p_work_date is null or p_type<>'정정' or p_rule_label not in ('지문인식오류','입력오류','기타') or coalesce(trim(p_reason),'')='' then raise exception 'invalid attendance issue submission'; end if;
   insert into public.attendance_issues(user_id,work_date,type,rule_label,reason) values(auth.uid(),p_work_date,p_type,p_rule_label,p_reason) returning * into r;
   return r;
@@ -134,6 +139,7 @@ create or replace function public.submit_manual_attendance(p_work_date date,p_cl
 returns public.attendance_manual_entries language plpgsql security definer set search_path=public as $$
 declare r public.attendance_manual_entries; prior public.attendance_manual_entries; actor_name text; calculated_ot int;
 begin
+  if public.my_role()='deputy' then raise exception 'deputy cannot submit manual attendance'; end if;
   perform pg_advisory_xact_lock(hashtextextended(auth.uid()::text||'|'||coalesce(p_work_date::text,''),0));
   if not exists(select 1 from public.profiles p where p.user_id=auth.uid() and p.active=true and p.approved=true) or p_work_date is null or p_late_min is null or p_late_min<0 or p_early_min is null or p_early_min<0 or (p_reason_required and coalesce(trim(p_reason),'')='') then raise exception 'invalid manual attendance submission'; end if;
   calculated_ot:=public.release_normalize_overtime(coalesce(p_overtime_raw_text,'')); if p_overtime_min is distinct from calculated_ot then raise exception 'overtime value mismatch'; end if;

@@ -29,7 +29,7 @@ create policy contracts_select_deputy_self on public.contracts for select to aut
 using (public.my_role() in ('manager','chief','owner') or (public.my_role()='deputy' and user_id=auth.uid()) or (user_id=auth.uid() and (status='대기' or (status='서명완료' and signed_at>now()-interval '5 days'))));
 
 do $$ declare t text; begin
-  foreach t in array array['attendance','att_months','attendance_issues','attendance_manual_entries','schedule_weeks','schedules','schedule_people','leave_requests','leave_ledger','leave_application_documents','holidays','calendar_events','notices','notice_reads','approval_docs','approval_steps','payroll_rows','payslips','monthly_reviews','bonus_rules','ledger_files','employee_documents','fingerprint_registration_requests','deposits'] loop
+  foreach t in array array['attendance','att_months','attendance_issues','attendance_manual_entries','attendance_manual_revisions','attendance_issue_resolutions','schedule_weeks','schedules','schedule_people','leave_requests','leave_ledger','leave_application_documents','holidays','calendar_events','notices','notice_reads','approval_docs','approval_steps','payroll_rows','payslips','monthly_reviews','bonus_rules','ledger_files','employee_documents','fingerprint_registration_requests','deposits'] loop
     if to_regclass('public.'||t) is not null then
       execute format('alter table public.%I enable row level security',t);
       execute format('drop policy if exists deputy_contract_only_block on public.%I',t);
@@ -43,8 +43,8 @@ do $$ begin
     alter table storage.objects enable row level security;
     drop policy if exists deputy_contract_only_storage_block on storage.objects;
     create policy deputy_contract_only_storage_block on storage.objects as restrictive for all to authenticated
-      using (public.my_role()<>'deputy' or bucket_id not in ('leave-docs','notice-attachments'))
-      with check (public.my_role()<>'deputy' or bucket_id not in ('leave-docs','notice-attachments'));
+      using (public.my_role()<>'deputy' or bucket_id not in ('leave-docs','notice-attachments','hr-docs') or (name ~ '^contracts/[0-9]+/(source|signed)\.pdf$' and exists(select 1 from public.contracts c where c.id::text=split_part(name,'/',2) and c.user_id=auth.uid())))
+      with check (public.my_role()<>'deputy' or bucket_id not in ('leave-docs','notice-attachments','hr-docs') or (name ~ '^contracts/[0-9]+/(source|signed)\.pdf$' and exists(select 1 from public.contracts c where c.id::text=split_part(name,'/',2) and c.user_id=auth.uid())));
   end if;
 end $$;
 

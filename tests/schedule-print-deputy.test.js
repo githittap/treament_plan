@@ -72,9 +72,17 @@ test('role migration and rollback explicitly allow deputy without widening contr
   assert.match(sql, /deputy_contract_only_block/);
   assert.match(sql, /rollback/i);
   assert.match(sql, /contracts_select_deputy_self/);
-  for (const table of ['schedule_people','deposits','attendance_manual_entries','leave_application_documents']) assert.match(sql, new RegExp(table));
+  for (const table of ['schedule_people','deposits','attendance_manual_entries','attendance_manual_revisions','attendance_issue_resolutions','leave_application_documents']) assert.match(sql, new RegExp(table));
   assert.match(sql, /storage\.objects/);
   assert.match(sql, /enable row level security/i);
   assert.match(rollback, /contracts_select_scoped/);
   assert.match(rollback, /invalid profile role/);
+  const pdfMigration = fs.readFileSync('db/20260924_deputy_contract_pdf_role_access.sql', 'utf8');
+  const pdfRollback = fs.readFileSync('db/20260924_deputy_contract_pdf_role_access_rollback.sql', 'utf8');
+  assert.match(pdfMigration, /record_contract_pdf_signature[\s\S]*deputy/);
+  assert.match(pdfRollback, /record_contract_pdf_signature/);
+  assert.match(fs.readFileSync('db/attendance_issue_resolution_release.sql', 'utf8'), /deputy cannot submit attendance issues/);
+  assert.match(fs.readFileSync('db/attendance_manual_v2.sql', 'utf8'), /deputy cannot submit manual attendance/);
+  assert.match(fs.readFileSync('db/20260924_deputy_hr_docs_contract_only.sql', 'utf8'), /hr-docs[\s\S]*contracts\//);
+  assert.match(fs.readFileSync('supabase/functions/contract-pdf-sign/index.ts', 'utf8'), /record_contract_pdf_signature_with_use/);
 });
