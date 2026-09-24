@@ -322,7 +322,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 </div></div>
 
 <div class="mask" id="certificateMask"><div class="modal wide">
-  <h3>📄 재직증명서 <button class="hbtn mini" onclick="printEmploymentCertificate()">🖨️ 인쇄·PDF 저장</button><button class="x" onclick="hide('certificateMask')">✕</button></h3>
+  <h3>📄 재직증명서 <button class="hbtn mini" onclick="downloadEmploymentCertificate()">⬇️ 발급본 다운로드</button><button class="hbtn mini" onclick="printEmploymentCertificate()">🖨️ 인쇄·PDF 저장</button><button class="x" onclick="hide('certificateMask')">✕</button></h3>
   <div id="certificateBody"></div>
 </div></div>
 <div class="mask" id="noticePreviewMask"><div class="modal wide"><h3>📎 첨부 미리보기<button class="x" onclick="hide('noticePreviewMask')">✕</button></h3><div id="noticePreviewBody"></div></div></div>
@@ -1556,9 +1556,18 @@ function approvalRequestBody(label,body){return label==='재직증명서 발급'
 function isEmploymentCertificateRequest(doc){return doc?.kind==='기타'&&doc.title?.startsWith('[재직증명서 발급] ')&&doc.body?.startsWith('[재직증명서 발급 요청]');}
 async function openEmploymentCertificate(id){
   const {data:r,error}=await sb.from('employment_certificates').select('*').eq('id',id).maybeSingle();
-  if(error||!r){alert('발급본을 열 수 없습니다.');return;}
-  $('#certificateBody').innerHTML=`<div style="background:#fff;color:#111;padding:18mm;min-height:240mm;line-height:1.8"><h1 style="text-align:center;margin:12mm 0 24mm">재 직 증 명 서</h1><table style="width:100%;border-collapse:collapse"><tr><th style="border:1px solid #111;padding:8px;width:25%">성명</th><td style="border:1px solid #111;padding:8px">${esc(r.employee_name)}</td></tr><tr><th style="border:1px solid #111;padding:8px">소속</th><td style="border:1px solid #111;padding:8px">${esc(r.department||'확인된 정보 없음')}</td></tr><tr><th style="border:1px solid #111;padding:8px">입사일</th><td style="border:1px solid #111;padding:8px">${esc(r.hire_date)}</td></tr><tr><th style="border:1px solid #111;padding:8px">재직 확인일</th><td style="border:1px solid #111;padding:8px">${esc(stampDate(r.issued_at))}</td></tr></table><p style="margin-top:24mm;text-align:center">위 사람은 발급일 현재 재직 중임을 확인합니다.</p><p style="margin-top:22mm;text-align:center">${esc(stampDate(r.issued_at))}</p><p style="margin-top:14mm;text-align:right">${esc(r.issuer_name)}</p><p style="margin-top:20mm;font-size:11px">발급번호 ${esc(r.id)} · 결재문서 ${esc(r.approval_doc_id)}</p></div>`;
+  if(error||!r?.issued_html){alert('보관된 발급본을 열 수 없습니다.');return;}
+  $('#certificateBody').innerHTML=r.issued_html;
+  window.CURRENT_EMPLOYMENT_CERTIFICATE={id:r.id,html:r.issued_html};
   show('certificateMask');
+}
+function downloadEmploymentCertificate(){
+  const certificate=window.CURRENT_EMPLOYMENT_CERTIFICATE;
+  if(!certificate)return;
+  const file=new Blob(['<!doctype html><html lang="ko"><meta charset="utf-8"><title>재직증명서</title>',certificate.html,'</html>'],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(file),link=document.createElement('a');
+  link.href=url;link.download=`employment-certificate-${certificate.id}.html`;link.click();
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
 }
 function printEmploymentCertificate(){document.body.classList.add('certificate-printing');const done=()=>{document.body.classList.remove('certificate-printing');window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);window.print();}
 /* approval-request:test-end */

@@ -99,6 +99,8 @@ test('재직증명서는 최종 승인 후 보관된 발급본을 열도록 안�
   assert.match(html, /재직증명서는 최종 승인 시 재직 정보를 확인해 발급되며/);
   assert.match(html, /issue_employment_certificate/);
   assert.match(html, /openEmploymentCertificate/);
+  assert.match(html, /r\.issued_html/);
+  assert.match(html, /downloadEmploymentCertificate\(\)/);
 });
 
 test('계정·Notion 체크는 통합 서류함 뒤쪽에 렌더링된다', () => {

@@ -8,9 +8,15 @@ create table if not exists public.employment_certificates (
   department text,
   hire_date date not null,
   issuer_name text not null default '아산정플란트치과의원',
+  issued_html text not null,
   issued_at timestamptz not null default now(),
   issued_by uuid not null references public.profiles(user_id)
 );
+create or replace function public.employment_certificate_escape(p_value text)
+returns text language sql immutable set search_path='' as $$
+  select pg_catalog.replace(pg_catalog.replace(pg_catalog.replace(pg_catalog.replace(pg_catalog.replace(
+    coalesce(p_value,''),'&','&amp;'),'<','&lt;'),'>','&gt;'),'"','&quot;'),'''','&#39;')
+$$;
 alter table public.employment_certificates enable row level security;
 revoke all on public.employment_certificates from public,anon,authenticated;
 grant select on public.employment_certificates to authenticated;
@@ -31,6 +37,8 @@ declare
   p public.profiles%rowtype;
   certificate public.employment_certificates%rowtype;
   owner_step_id bigint;
+  issued_date date;
+  issued_html text;
 begin
   if auth.uid() is null or not exists (
     select 1 from public.profiles actor
@@ -67,9 +75,16 @@ begin
     stamp=(select name from public.profiles where user_id=auth.uid()),acted_at=now()
     where id=owner_step_id;
   update public.approval_docs set status='완결' where id=p_doc_id;
+  issued_date:=(now() at time zone 'Asia/Seoul')::date;
+  issued_html:=pg_catalog.format(
+    '<div style="background:#fff;color:#111;padding:18mm;min-height:240mm;line-height:1.8"><h1 style="text-align:center;margin:12mm 0 24mm">재 직 증 명 서</h1><table style="width:100%%;border-collapse:collapse"><tr><th style="border:1px solid #111;padding:8px;width:25%%">성명</th><td style="border:1px solid #111;padding:8px">%s</td></tr><tr><th style="border:1px solid #111;padding:8px">소속</th><td style="border:1px solid #111;padding:8px">%s</td></tr><tr><th style="border:1px solid #111;padding:8px">입사일</th><td style="border:1px solid #111;padding:8px">%s</td></tr><tr><th style="border:1px solid #111;padding:8px">재직 확인일</th><td style="border:1px solid #111;padding:8px">%s</td></tr></table><p style="margin-top:24mm;text-align:center">위 사람은 발급일 현재 재직 중임을 확인합니다.</p><p style="margin-top:22mm;text-align:center">%s</p><p style="margin-top:14mm;text-align:right">아산정플란트치과의원</p><p style="margin-top:20mm;font-size:11px">결재문서 %s</p></div>',
+    public.employment_certificate_escape(p.name),
+    public.employment_certificate_escape(coalesce(nullif(pg_catalog.btrim(p.dept),''),'확인된 정보 없음')),
+    p.hire_date::text,issued_date::text,issued_date::text,p_doc_id::text
+  );
   insert into public.employment_certificates
-    (approval_doc_id,employee_id,employee_name,department,hire_date,issued_by)
-  values (p_doc_id,p.user_id,p.name,nullif(btrim(p.dept),''),p.hire_date,auth.uid())
+    (approval_doc_id,employee_id,employee_name,department,hire_date,issued_html,issued_by)
+  values (p_doc_id,p.user_id,p.name,nullif(btrim(p.dept),''),p.hire_date,issued_html,auth.uid())
   returning * into certificate;
   return certificate;
 end; $$;
