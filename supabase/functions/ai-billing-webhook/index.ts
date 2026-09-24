@@ -85,7 +85,8 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
   }
 
-  const composedNote = [note, naverAd?.note, usd_amount != null ? `USD ${usd_amount} 자동환산` : null].filter(Boolean).join(' / ') || null;
+  // 광고 중단 표시는 DB/UI/RPC가 같은 고정 marker로 판정한다. 원문은 raw_text에 보존한다.
+  const composedNote = naverAd?.note || [note, usd_amount != null ? `USD ${usd_amount} 자동환산` : null].filter(Boolean).join(' / ') || null;
 
   const { error: insertErr } = await client.from('ai_billing_events').insert({
     platform: String(platform),
