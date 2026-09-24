@@ -7,6 +7,5 @@ begin
 end;
 $$;
 drop function if exists public.apply_employee_contract_signature(bigint,text,jsonb,timestamptz,bigint);
-drop function if exists public.record_contract_pdf_signature_with_use(bigint,uuid,uuid,text,text,text,text,integer,numeric,numeric,numeric,numeric,bigint);
 drop index if exists public.employee_signature_uses_contract_signature_idx;
 alter table public.employee_signature_uses drop column if exists contract_id;
