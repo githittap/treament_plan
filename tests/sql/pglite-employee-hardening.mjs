@@ -26,6 +26,28 @@ try {
   await query(`insert into public.profiles values ('${staff}','staff',true,true),('${manager}','manager',true,true),('${chief}','chief',true,true),('${other}','staff',true,true),('${inactiveManager}','manager',false,true)`);
   await db.exec('set role authenticated'); await query(`select set_config('app.test_uid','${staff}',false)`);
   await query(`insert into public.onboarding_evidence(user_id,bank_name,account_number) values ('${staff}','국민','123')`);
+  const ordinaryDocuments=[
+    ['계약.docx','application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+    ['표.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+    ['발표.pptx','application/vnd.openxmlformats-officedocument.presentationml.presentation'],
+    ['메모.txt','text/plain'],
+    ['양식.hwpx','application/vnd.hancom.hwpx'],
+    ['기타.bin','application/octet-stream'],
+    ['빈형식.hwpx','']
+  ];
+  for(const [name,mime] of ordinaryDocuments){
+    const filePath=`${staff}/documents/${name}`;
+    await query(`insert into storage.objects(bucket_id,name,owner_id,metadata) values ('hr-docs','${filePath}','${staff}',jsonb_build_object('mimetype','${mime}','size',100))`);
+    await query(`insert into public.employee_documents(user_id,document_type,original_name,storage_path,mime_type,size_bytes) values ('${staff}','기타','${name}','${filePath}','${mime}',100)`);
+  }
+  assert.equal((await query(`select count(*)::int n from public.employee_documents where user_id='${staff}'`))[0].n,ordinaryDocuments.length);
+  assert.equal((await query(`select count(*)::int n from storage.objects where bucket_id='hr-docs' and name like '${staff}/documents/%'`))[0].n,ordinaryDocuments.length);
+  let blockedDocument='';
+  try { await query(`insert into public.employee_documents(user_id,document_type,original_name,storage_path,mime_type,size_bytes) values ('${staff}','기타','차단.exe','${staff}/documents/blocked.exe','application/pdf',100)`); } catch(error) { blockedDocument=String(error); }
+  assert.match(blockedDocument,/check constraint/i);
+  let blockedUpload='';
+  try { await query(`insert into storage.objects(bucket_id,name,owner_id,metadata) values ('hr-docs','${staff}/documents/blocked.pdf','${staff}','{"mimetype":"application/x-msdownload","size":100}'::jsonb)`); } catch(error) { blockedUpload=String(error); }
+  assert.match(blockedUpload,/row-level security|permission denied/i);
   assert.equal((await query(`select * from public.onboarding_evidence where user_id='${other}'`)).length,0);
   let otherDocument=''; try { await query(`insert into public.employee_documents(user_id,document_type,original_name,storage_path,mime_type,size_bytes) values ('${other}','자격증','x.pdf','${other}/x.pdf','application/pdf',1)`); } catch (error) { otherDocument=String(error); } assert.match(otherDocument,/row-level security|permission denied/);
   await query(`select set_config('app.test_uid','${manager}',false)`); assert.equal((await query(`select * from public.onboarding_evidence`)).length,0); assert.equal((await query(`select * from public.onboarding_evidence_completion where user_id='${staff}'`))[0].bank_complete,true);
@@ -35,6 +57,6 @@ try {
   assert.equal((await query(`select has_table_privilege('anon','public.onboarding_evidence','select') allowed`))[0].allowed,false);
   assert.equal((await query(`select count(*)::int n from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='onboarding_evidence_completion'`))[0].n,0);
   assert.equal((await query(`select has_function_privilege('authenticated','employee_private.sync_onboarding_evidence_completion()','execute') allowed`))[0].allowed,false);
-  await query(`select set_config('app.test_uid','${chief}',false)`); assert.equal((await query(`select count(*)::int n from public.employee_documents where user_id='${staff}'`))[0].n,0);
+  await query(`select set_config('app.test_uid','${chief}',false)`); assert.equal((await query(`select count(*)::int n from public.employee_documents where user_id='${staff}'`))[0].n,ordinaryDocuments.length);
   console.log('PGLITE_EMPLOYEE_HARDENING_PASS: 본인·관리자 문서/증빙 범위와 MIME·크기 제한');
 } finally { await db.close(); }

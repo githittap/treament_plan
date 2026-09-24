@@ -18,6 +18,40 @@ test('로컬 Storage 정책은 HWPX와 빈·브라우저 MIME를 확장자와 �
   assert.match(html,/BLOCKED_DOCUMENT_EXT/);assert.match(html,/실행 파일·압축 파일/);
 });
 
+test('공지와 직원 서류는 일반 형식을 허용하고 실행·압축 확장자와 MIME를 거부한다',()=>{
+  const noticeStart=html.indexOf('const NOTICE_ATTACHMENT_ALLOWED_TYPES');
+  const noticeEnd=html.indexOf('let NOTICE_PASTED_IMAGES',noticeStart);
+  const employeeStart=html.indexOf('const BLOCKED_DOCUMENT_EXT=');
+  const employeeEnd=html.indexOf('/* employee-documents:test-end */',employeeStart);
+  assert.ok(noticeStart>=0&&noticeEnd>noticeStart);
+  assert.ok(employeeStart>=0&&employeeEnd>employeeStart);
+  const notice={};
+  vm.runInNewContext(html.slice(noticeStart,noticeEnd)+';this.isAllowedNoticeAttachment=isAllowedNoticeAttachment;',notice);
+  const employee={};
+  vm.runInNewContext(html.slice(employeeStart,employeeEnd)+';this.validateGeneralDocument=validateGeneralDocument;',employee);
+  const formats=[
+    ['기안.docx','application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+    ['표.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+    ['발표.pptx','application/vnd.openxmlformats-officedocument.presentationml.presentation'],
+    ['메모.txt','text/plain'],
+    ['양식.hwpx','application/vnd.hancom.hwpx'],
+    ['기타.unknown','application/octet-stream'],
+    ['빈형식.hwpx','']
+  ];
+  for(const [name,type] of formats){
+    const file={name,type,size:100};
+    assert.equal(notice.isAllowedNoticeAttachment(file),true,name);
+    assert.equal(employee.validateGeneralDocument(file),'',name);
+  }
+  for(const [name,type] of [['실행.exe','application/pdf'],['압축.zip','text/plain'],['문서.pdf','application/x-msdownload']]){
+    const file={name,type,size:100};
+    assert.equal(notice.isAllowedNoticeAttachment(file),false,name);
+    assert.match(employee.validateGeneralDocument(file),/실행 파일·압축 파일/,name);
+  }
+  assert.match(employee.validateGeneralDocument({name:'빈.pdf',type:'application/pdf',size:0}),/0바이트/);
+  assert.match(employee.validateGeneralDocument({name:'큰.pdf',type:'application/pdf',size:10*1024*1024+1}),/10MB/);
+});
+
 test('실제 공지 붙여넣기 이벤트가 캡처 이미지를 보관한다',()=>{
   const start=html.indexOf('function renderNoticePastePreview');
   const bindEnd=html.indexOf("bindNoticePaste($('#ntBody'));",start);
