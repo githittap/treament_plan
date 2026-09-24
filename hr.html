@@ -267,11 +267,11 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 <div class="mask" id="apMask"><div class="modal">
   <h3>🖊 결재 올리기<button class="x" onclick="hide('apMask')">✕</button></h3>
   <div class="grid">
-    <div class="fld"><label>종류</label><select id="apKind"><option>사직서</option><option>보고</option><option>소명</option><option>기타</option></select></div>
+    <div class="fld"><label>종류</label><select id="apKind"><option>연차 신청</option><option>사직서</option><option>재직증명서 발급</option><option>보고</option><option>소명</option><option>기타</option></select></div>
     <div class="fld w2"><label>제목</label><input id="apTitle"></div>
     <div class="fld w4"><label>내용</label><textarea id="apBody"></textarea></div>
   </div>
-  <div class="hint">결재선: 나 → 실장 → 원장 (각 단계 도장). 사직서는 취업규칙상 최소 4주 전 제출입니다.</div>
+  <div class="hint">결재선: 나 → 실장 → 원장 (각 단계 도장). 재직증명서는 결재 요청만 기록되며, 현재 자동 발급·다운로드 기능은 연결되지 않았습니다.</div>
   <button class="hbtn pri" style="margin-top:10px" onclick="submitApproval()">올리기</button>
   <div class="msg" id="apMsg"></div>
 </div></div>
@@ -1629,7 +1629,7 @@ function onboardingChecklistRows(evidence,documents){
 /* onboarding-evidence:test-end */
 async function renderOnbo(m){
   const contractQuery=(isMgr()?sb.from('contracts').select('id,user_id,template_id,fields,merged_html,signed_at,status'):sb.from('contracts').select('id,user_id,template_id,fields,merged_html,signed_at,status').eq('user_id',ME.id)).eq('status','서명완료');
-  const [{data:items},{data:checks},{data:docs,error:docsError},{data:contracts,error:contractsError},{data:leaveDocs,error:leaveDocsError},{data:leaveRequests},{data:evidence},{data:signatures,error:signaturesError}]=await Promise.all([
+  const [{data:items},{data:checks},{data:docs,error:docsError},{data:contracts,error:contractsError},{data:leaveDocs,error:leaveDocsError},{data:leaveRequests},{data:evidence},{data:signatures,error:signaturesError},{data:approvalDocs,error:approvalDocsError}]=await Promise.all([
     sb.from('onboarding_items').select('*').eq('active',true).order('order_no'),
     sb.from('onboarding_checks').select('*').eq('user_id',ME.id),
     isMgr()?sb.from('employee_documents').select('*').order('created_at',{ascending:false}):sb.from('employee_documents').select('*').eq('user_id',ME.id).order('created_at',{ascending:false}),
@@ -1637,11 +1637,12 @@ async function renderOnbo(m){
     isLeaveDocsLead()?sb.from('leave_application_documents').select('*').order('created_at',{ascending:false}):sb.from('leave_application_documents').select('*').eq('user_id',ME.id).order('created_at',{ascending:false}),
     sb.from('leave_requests').select('id,date_from,date_to,type').eq('user_id',ME.id).order('date_from',{ascending:false}).limit(30),
     sb.from('onboarding_evidence').select('*').eq('user_id',ME.id).maybeSingle(),
-    sb.from('employee_signature_vault').select('*').is('revoked_at',null).order('created_at',{ascending:false})
+    sb.from('employee_signature_vault').select('*').is('revoked_at',null).order('created_at',{ascending:false}),
+    sb.from('approval_docs').select('*').order('created_at',{ascending:false}).limit(50)
   ]);
   const contractRows=signedContractRows(contracts||[],isMgr(),ME.id,contractTitle);
   const cmap={};(checks||[]).forEach(c=>cmap[c.item_id]=c);
-  m.innerHTML=`${onboardingChecklistCard(evidence,docs||[])}<div class="card"><h2>📋 내 입사 제출물</h2>
+  m.innerHTML=`${employeeDocumentsCard(docs||[],docsError,contractRows,contractsError,leaveDocs||[],leaveDocsError,leaveRequests||[],approvalDocs||[],approvalDocsError)}<div class="card"><h2>📋 내 입사 제출물</h2>
     <table><tr><th>항목</th><th>상태</th><th></th></tr>
     ${(items||[]).map(it=>{const c=cmap[it.id];const s=c?c.status:'미제출';
       return `<tr><td>${esc(it.label)}${it.required?' <span class="sub">(필수)</span>':''}</td>
@@ -1649,9 +1650,8 @@ async function renderOnbo(m){
       <td>${s==='미제출'?`<button class="mini" onclick="submitOnbo(${it.id})">제출함</button>`:(s==='제출'&&isLead()?`<button class="mini stamp" onclick="confirmOnbo(${it.id})">확인</button>`:'')}</td></tr>`;}).join('')}
     </table>${isLead()?'<div style="margin-top:8px"><input id="oiNew" class="mini" placeholder="새 제출 항목"> <button class="mini" onclick="addOnboItem()">항목 추가</button></div>':''}
   </div>
-  ${employeeDocumentsCard(docs||[],docsError,contractRows,contractsError)}
   ${employeeSignatureVaultCard(signatures||[],signaturesError)}
-  ${leaveApplicationDocumentsCard(leaveDocs||[],leaveDocsError,leaveRequests||[])}
+  ${onboardingChecklistCard(evidence,docs||[])}
   ${isMgr()?await onboOverview():''}`;
 }
 function onboardingChecklistCard(evidence,docs){
@@ -1684,20 +1684,32 @@ function validateEmployeeDocument(file){
   return '';
 }
 /* employee-documents:test-end */
-function employeeDocumentsCard(docs,error,contractRows,contractError){
+function employeeDocumentsCard(docs,error,contractRows,contractError,leaveDocs,leaveError,leaveRequests,approvalDocs,approvalError){
   const lead=isMgr(),staff=PROFILES.filter(p=>p.active!==false&&p.approved!==false);
   const allRows=mergeEmployeeDocumentRows(docs,contractRows);EMPLOYEE_CONTRACT_PREVIEWS={};(contractRows||[]).forEach(r=>{EMPLOYEE_CONTRACT_PREVIEWS[r.id]=r;});
   const errors=employeeDocumentsErrorMessages(error,contractError);
-  const errorText=(errors.documents?'<div class="hint" style="color:var(--red)">서류함을 불러오지 못했습니다: '+esc(errors.documents)+'</div>':'')+(errors.contracts?'<div class="hint" style="color:var(--red)">체결된 근로계약서를 불러오지 못했습니다: '+esc(errors.contracts)+'</div>':'');
-  const rows=allRows.map(d=>'<tr>'+(lead?'<td>'+esc(nameOf(d.user_id))+'</td>':'')+'<td>'+esc(d.document_type)+'</td><td>'+esc(d.original_name)+'</td><td>'+contractDate(d.created_at)+'</td><td>'+ (d._kind==='contract'?'<button class="mini" onclick="previewEmployeeContract('+d.id+')">열기</button>':'<button class="mini" onclick="downloadEmployeeDocument('+d.id+')">열기</button>')+'</td></tr>').join('');
-  const list=allRows.length?'<div class="tblwrap"><table><tr>'+(lead?'<th>직원</th>':'')+'<th>종류</th><th>파일</th><th>올린 날</th><th></th></tr>'+rows+'</table></div>':'<div class="empty">올린 서류가 없습니다.</div>';
-  return `<div class="card"><h2>📎 직원 서류함 <span class="sub">(PDF·JPG·PNG·DOC·DOCX·HWP, 최대 10MB)</span></h2>${errorText}${list}<div id="employeeContractPreview" class="contract-doc" style="display:none;margin-top:10px"></div>
+  const errorText=(errors.documents?'<div class="hint" style="color:var(--red)">서류함을 불러오지 못했습니다: '+esc(errors.documents)+'</div>':'')+(errors.contracts?'<div class="hint" style="color:var(--red)">체결된 근로계약서를 불러오지 못했습니다: '+esc(errors.contracts)+'</div>':'')+(leaveError?'<div class="hint" style="color:var(--red)">연차 증빙을 불러오지 못했습니다: '+esc(leaveError.message||leaveError)+'</div>':'')+(approvalError?'<div class="hint" style="color:var(--red)">결재 요청을 불러오지 못했습니다: '+esc(approvalError.message||approvalError)+'</div>':'');
+  const who=d=>lead?'<td>'+esc(nameOf(d.user_id))+'</td>':'';
+  const docRows=allRows.map(d=>'<tr data-doc-filter="직원서류">'+who(d)+'<td>'+esc(d.document_type||'근로계약서')+'</td><td>'+esc(d.original_name)+'</td><td>'+contractDate(d.created_at)+'</td><td>'+ (d._kind==='contract'?'<button class="mini" onclick="previewEmployeeContract('+d.id+')">열기</button>':'<button class="mini" onclick="downloadEmployeeDocument('+d.id+')">열기</button>')+'</td></tr>').join('');
+  const leaveRows=(leaveDocs||[]).map(d=>'<tr data-doc-filter="연차증빙">'+who(d)+'<td>연차증빙</td><td>'+esc(d.original_name)+'</td><td>'+md(d.created_at)+'</td><td><button class="mini" onclick="downloadLeaveApplicationDocument('+d.id+')">열기</button></td></tr>').join('');
+  const approvalRows=(approvalDocs||[]).map(d=>'<tr data-doc-filter="결재 요청">'+who(d)+'<td>결재 요청 · '+esc(d.kind)+'</td><td>'+esc(d.title)+'</td><td>'+md(d.created_at)+'</td><td><span class="b '+(d.status==='완결'?'ok':d.status==='반려'?'no':'wait')+'">'+esc(d.status)+'</span></td></tr>').join('');
+  const allCount=allRows.length+(leaveDocs||[]).length+(approvalDocs||[]).length;
+  const rows=docRows+leaveRows+approvalRows;
+  const list=allCount?'<div class="tblwrap"><table><tr>'+(lead?'<th>직원</th>':'')+'<th>종류</th><th>문서</th><th>날짜</th><th>상태·열기</th></tr>'+rows+'</table></div>':'<div class="empty">올린 서류가 없습니다.</div>';
+  return `<div class="card" id="employeeDocumentBox"><h2>📎 서류함</h2><div class="hint">어떤 서류든 여기로 올리시면 됩니다. 직원서류와 연차증빙, 결재 요청을 종류별로 한 화면에서 확인합니다.</div>
+    <div class="rowflex" role="group" aria-label="서류함 필터" style="margin:10px 0"><button class="mini stamp" data-doc-filter-button="전체 문서" onclick="filterEmployeeDocuments('전체 문서')">전체 문서</button><button class="mini" data-doc-filter-button="직원서류" onclick="filterEmployeeDocuments('직원서류')">직원서류</button><button class="mini" data-doc-filter-button="연차증빙" onclick="filterEmployeeDocuments('연차증빙')">연차증빙</button><button class="mini" data-doc-filter-button="결재 요청" onclick="filterEmployeeDocuments('결재 요청')">결재 요청</button></div>
+    <div class="rowflex" style="margin-bottom:10px"><button class="hbtn pri" onclick="openLeave()">연차 신청</button><button class="hbtn" onclick="show('apMask');$('#apMsg').textContent='';">결재 올리기</button></div>${errorText}${list}<div id="employeeContractPreview" class="contract-doc" style="display:none;margin-top:10px"></div>
     <div class="grid" style="margin-top:10px">
       ${lead?`<div class="fld"><label>직원</label><select id="edUser">${staff.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select></div>`:''}
       <div class="fld"><label>서류 종류</label><select id="edType"><option>잠복결핵 검사서</option><option>자격증</option><option>보안서약서</option><option>면허증</option><option>신분증 사본</option><option>기타</option></select></div>
       <div class="fld"><label>파일</label><input type="file" id="edFile" accept="application/pdf,image/jpeg,image/png,.doc,.docx,.hwp"></div>
     </div><button class="hbtn pri" style="margin-top:10px" onclick="uploadEmployeeDocument()">서류 올리기</button><div class="msg" id="edMsg"></div>
   </div>`;
+}
+function filterEmployeeDocuments(kind){
+  const box=$('#employeeDocumentBox');if(!box)return;
+  box.querySelectorAll('[data-doc-filter]').forEach(row=>{row.style.display=kind==='전체 문서'||row.dataset.docFilter===kind?'':'none';});
+  box.querySelectorAll('[data-doc-filter-button]').forEach(btn=>btn.classList.toggle('stamp',btn.dataset.docFilterButton===kind));
 }
 function previewEmployeeContract(id){
   const box=$('#employeeContractPreview'),row=EMPLOYEE_CONTRACT_PREVIEWS[id];if(!box||!row)return;
