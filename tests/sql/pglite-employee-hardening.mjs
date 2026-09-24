@@ -31,6 +31,7 @@ try {
     ['표.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
     ['발표.pptx','application/vnd.openxmlformats-officedocument.presentationml.presentation'],
     ['메모.txt','text/plain'],
+    ['양식.hwp','application/x-hwp'],
     ['양식.hwpx','application/vnd.hancom.hwpx'],
     ['기타.bin','application/octet-stream'],
     ['빈형식.hwpx','']

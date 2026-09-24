@@ -34,6 +34,7 @@ test('공지와 직원 서류는 일반 형식을 허용하고 실행·압축 �
     ['표.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
     ['발표.pptx','application/vnd.openxmlformats-officedocument.presentationml.presentation'],
     ['메모.txt','text/plain'],
+    ['양식.hwp','application/x-hwp'],
     ['양식.hwpx','application/vnd.hancom.hwpx'],
     ['기타.unknown','application/octet-stream'],
     ['빈형식.hwpx','']
