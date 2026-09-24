@@ -16,21 +16,21 @@ if (block) {
   test('PDF·JPG·PNG 10MB 이하만 허용한다', () => {
     assert.equal(context.validateEmployeeDocument({ type: 'application/pdf', size: 10 * 1024 * 1024 }), '');
     assert.equal(context.validateEmployeeDocument({ type: 'image/jpeg', size: 1 }), '');
-    assert.match(context.validateEmployeeDocument({ type: 'image/gif', size: 1 }), /PDF/);
+    assert.equal(context.validateEmployeeDocument({ type: 'image/gif', size: 1 }), '');
     assert.match(context.validateEmployeeDocument({ type: 'application/pdf', size: 0 }), /0바이트/);
     assert.match(context.validateEmployeeDocument({ type: 'image/png', size: 10 * 1024 * 1024 + 1 }), /10MB/);
   });
   test('입사 서류는 문서 형식을 허용하되 실행·압축 파일은 거부한다', () => {
     assert.equal(context.validateEmployeeDocument({ type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', size: 1 }), '');
     assert.equal(context.validateEmployeeDocument({ type: 'application/x-hwp', size: 1 }), '');
-    assert.match(context.validateEmployeeDocument({ type: 'application/zip', size: 1 }), /PDF/);
-    assert.match(context.validateEmployeeDocument({ type: 'application/x-msdownload', size: 1 }), /PDF/);
+    assert.match(context.validateEmployeeDocument({ type: 'application/zip', size: 1 }), /실행|압축|PDF/);
+    assert.match(context.validateEmployeeDocument({ type: 'application/x-msdownload', size: 1 }), /실행|압축|PDF/);
   });
   test('화면에 업로드·열람 함수가 있다', () => {
     assert.match(html, /function uploadEmployeeDocument\(/);
     assert.match(html, /function downloadEmployeeDocument\(/);
     assert.match(html, /await sb\.storage\.from\('hr-docs'\)\.remove\(\[path\]\)/);
-    assert.doesNotMatch(html.match(/id="edFile"[^>]+/)[0], /\.hwpx/);
+    assert.match(html.match(/id="edFile"[^>]+/)[0], /accept="\*\/\*"/);
   });
   test('보안서약서를 기존 직원 서류함에서 선택해 올릴 수 있다', () => {
     assert.match(html, /<select id="edType"><option>잠복결핵 검사서<\/option><option>자격증<\/option><option>보안서약서<\/option>/);

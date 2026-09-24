@@ -3,7 +3,7 @@ alter table public.employee_documents drop constraint if exists employee_documen
 alter table public.employee_documents add constraint employee_documents_mime_type_check check (mime_type in (
   'application/pdf','image/jpeg','image/png','application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/x-hwp','application/vnd.hancom.hwp'
+  'application/x-hwp','application/vnd.hancom.hwp','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.presentationml.presentation','application/vnd.ms-powerpoint','text/plain'
 ));
 alter table public.employee_documents drop constraint if exists employee_documents_size_bytes_check;
 alter table public.employee_documents add constraint employee_documents_size_bytes_check check (size_bytes > 0 and size_bytes <= 10485760);
@@ -17,5 +17,5 @@ alter policy hr_docs_insert_scoped on storage.objects
 with check (bucket_id='hr-docs' and (public.my_role() in ('manager','chief','owner') or (storage.foldername(name))[1] = auth.uid()::text) and metadata->>'mimetype' in (
   'application/pdf','image/jpeg','image/png','application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/x-hwp','application/vnd.hancom.hwp'
+  'application/x-hwp','application/vnd.hancom.hwp','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.presentationml.presentation','application/vnd.ms-powerpoint','text/plain'
 ) and coalesce(metadata->>'size','') ~ '^[0-9]+$' and (metadata->>'size')::bigint between 1 and 10485760);
