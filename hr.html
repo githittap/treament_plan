@@ -1918,21 +1918,22 @@ function onboardingGuideCard(){return `<div class="card"><h2>🧭 신입 첫날 
 /* onboarding-guide:test-end */
 /* onboarding-evidence:test-start */
 function isAllowedLatentTuberculosisEvidenceMime(mime){return ['application/pdf','image/png','image/jpeg','image/gif'].includes(String(mime||'').trim().toLowerCase());}
-function onboardingEvidenceComplete(kind,profile,documents){
+function onboardingEvidenceComplete(kind,profile,documents,contracts=[],userId=null){
   const p=profile||{},docs=documents||[];
   if(kind==='계좌')return !!(String(p.bank_name||'').trim()&&String(p.account_number||'').trim());
   if(kind==='Notion')return !!(String(p.notion_id||'').trim()&&p.notion_app_installed&&p.notion_workspace_logged_in);
+  if(kind==='보안서약'&&(contracts||[]).some(c=>c.user_id===userId&&c.status==='서명완료'&&Array.isArray(c.sign_slots)&&['employment','medical','privacy'].every(part=>c.sign_slots.some(s=>s.part===part&&s.signed===true))))return true;
   const typeMap={'잠복결핵':'잠복결핵 검사서','자격증':'자격증','보안서약':'보안서약서'};
   if(!typeMap[kind])return true;
   return docs.some(d=>d.document_type===typeMap[kind]&&(kind!=='잠복결핵'||isAllowedLatentTuberculosisEvidenceMime(d.mime_type)));
 }
-function onboardingChecklistRows(evidence,documents){
+function onboardingChecklistRows(evidence,documents,contracts=[],userId=null){
   const e=evidence||{},docs=documents||[];
-  return [['계좌','급여 계좌','은행명과 계좌번호',onboardingEvidenceComplete('계좌',e,docs)],['Notion','Notion','ID·앱 설치·워크스페이스 로그인',onboardingEvidenceComplete('Notion',e,docs)],['자격증','자격증','파일',onboardingEvidenceComplete('자격증',e,docs)],['잠복결핵','잠복결핵','파일',onboardingEvidenceComplete('잠복결핵',e,docs)],['보안서약','보안서약','파일',onboardingEvidenceComplete('보안서약',e,docs)]];
+  return [['계좌','급여 계좌','은행명과 계좌번호',onboardingEvidenceComplete('계좌',e,docs)],['Notion','Notion','ID·앱 설치·워크스페이스 로그인',onboardingEvidenceComplete('Notion',e,docs)],['자격증','자격증','파일',onboardingEvidenceComplete('자격증',e,docs)],['잠복결핵','잠복결핵','파일',onboardingEvidenceComplete('잠복결핵',e,docs)],['보안서약','보안서약','파일 또는 허브 서명',onboardingEvidenceComplete('보안서약',e,docs,contracts,userId)]];
 }
 /* onboarding-evidence:test-end */
 async function renderOnbo(m){
-  const contractQuery=(isMgr()?sb.from('contracts').select('id,user_id,template_id,fields,merged_html,signed_at,status'):sb.from('contracts').select('id,user_id,template_id,fields,merged_html,signed_at,status').eq('user_id',ME.id)).eq('status','서명완료');
+  const contractQuery=(isMgr()?sb.from('contracts').select('id,user_id,template_id,fields,merged_html,sign_slots,signed_at,status'):sb.from('contracts').select('id,user_id,template_id,fields,merged_html,sign_slots,signed_at,status').eq('user_id',ME.id)).eq('status','서명완료');
   const [{data:items},{data:checks},{data:docs,error:docsError},{data:contracts,error:contractsError},{data:leaveDocs,error:leaveDocsError},{data:leaveRequests},{data:evidence},{data:signatures,error:signaturesError},{data:approvalDocs,error:approvalDocsError},{data:paymentRequests,error:paymentRequestsError},{data:paymentReceipts,error:paymentReceiptsError},{data:fingerprintRequests}]=await Promise.all([
     sb.from('onboarding_items').select('*').eq('active',true).order('order_no'),
     sb.from('onboarding_checks').select('*').eq('user_id',ME.id),
@@ -1961,12 +1962,12 @@ async function renderOnbo(m){
   ${onboardingGuideVisibleForRole(ME.role)?onboardingGuideCard():''}
   ${fingerprintRegistrationCard(fingerprintRequests||[])}
   ${employeeSignatureVaultCard(signatures||[],signaturesError)}
-  ${onboardingChecklistCard(evidence,docs||[])}
+  ${onboardingChecklistCard(evidence,docs||[],contracts||[],ME.id)}
   ${isMgr()?await onboOverview():''}`;
   bindPaymentReceiptPreviewHandlers(m);
 }
-function onboardingChecklistCard(evidence,docs){
-  const e=evidence||{},rows=onboardingChecklistRows(e,docs);
+function onboardingChecklistCard(evidence,docs,contracts=[],userId=null){
+  const e=evidence||{},rows=onboardingChecklistRows(e,docs,contracts,userId);
   return `<div class="card"><h2>✅ 공통 입사 체크리스트</h2><div class="hint">계좌번호는 은행명과 계좌번호가 모두 있어야 완료입니다. Notion은 ID, 앱 설치, 워크스페이스 로그인 확인이 모두 있어야 완료입니다. 잠복결핵·자격증·보안서약은 파일을 올리면 완료됩니다.</div><table><tr><th>항목</th><th>완료 기준</th><th>상태</th></tr>${rows.map(r=>`<tr><td>${r[1]}</td><td>${r[2]}</td><td><span class="b ${r[3]?'ok':'no'}">${r[3]?'완료':'확인 필요'}</span></td></tr>`).join('')}</table><div class="grid"><div class="fld"><label>은행명</label><input id="oeBank" value="${esc(e.bank_name||'')}"></div><div class="fld"><label>계좌번호</label><input id="oeAccount" value="${esc(e.account_number||'')}"></div><div class="fld"><label>Notion ID</label><input id="oeNotion" value="${esc(e.notion_id||'')}"></div><div class="fld"><label><input type="checkbox" id="oeApp" ${e.notion_app_installed?'checked':''}> 앱 설치 확인</label><label><input type="checkbox" id="oeWorkspace" ${e.notion_workspace_logged_in?'checked':''}> 워크스페이스 로그인 확인</label></div></div><button class="hbtn pri" style="margin-top:10px" onclick="saveOnboardingEvidence()">체크리스트 정보 저장</button><div class="msg" id="oeMsg"></div></div>`;
 }
 async function saveOnboardingEvidence(){const msg=$('#oeMsg'),row={user_id:ME.id,bank_name:$('#oeBank').value.trim(),account_number:$('#oeAccount').value.trim(),notion_id:$('#oeNotion').value.trim(),notion_app_installed:$('#oeApp').checked,notion_workspace_logged_in:$('#oeWorkspace').checked,updated_at:new Date().toISOString()};const {error}=await sb.from('onboarding_evidence').upsert(row,{onConflict:'user_id'});if(error){msg.textContent='체크리스트 저장 실패: '+error.message;setStatus('error');return;}setStatus('saved');render();}
@@ -2554,12 +2555,18 @@ function employmentTermsCard(){
 function toggleEmploymentTerm(uid){const no=$('#termNoEnd-'+uid).checked,input=$('#termDate-'+uid);input.disabled=no;if(no)input.value='';}
 async function saveEmploymentTerm(uid){const no=$('#termNoEnd-'+uid).checked,start=$('#termStart-'+uid).value,end=$('#termDate-'+uid).value;if(start&&!/^\d{4}-\d{2}-\d{2}$/.test(start)){alert('계약 시작일을 확인하세요.');return;}if(!no&&!/^\d{4}-\d{2}-\d{2}$/.test(end)){alert("종료일을 입력하거나 '기간의 정함 없음'을 선택하세요.");return;}if(start&&end&&start>end){alert('계약 종료일은 시작일보다 빠를 수 없습니다.');return;}setStatus('saving');const {error}=await sb.from('employee_contract_terms').upsert({user_id:uid,start_date:start||null,end_date:no?null:end,is_indefinite:no,updated_by:ME.name,updated_at:new Date().toISOString()},{onConflict:'user_id'});if(error){alert('저장 실패: '+error.message);setStatus('error');return;}setStatus('saved');render();}
 function contractExpired(row){return !!row.due_at&&new Date(row.due_at).getTime()<Date.now();}
+/* integrated-contract:test-start */
+const CONTRACT_PARTS=[['employment','근로계약'],['medical','의료정보 보안 서약'],['privacy','개인정보 취급자 서약']];
+function integratedContract(row){return CONTRACT_PARTS.every(([key])=>String(row?.merged_html||'').includes(`data-sign-slot="${key}"`));}
+function integratedContractReady(id){return CONTRACT_PARTS.every(([key])=>document.querySelector(`canvas[data-contract-signature="${id}-${key}"]`)?.dataset.dirty==='true');}
+function integratedContractPayload(id){return CONTRACT_PARTS.map(([key])=>{const canvas=document.querySelector(`canvas[data-contract-signature="${id}-${key}"]`);return {part:key,signature_png:canvas.toDataURL('image/png'),signature_id:canvas.dataset.signatureId?Number(canvas.dataset.signatureId):null};});}
+/* integrated-contract:test-end */
 function initContractSignatures(){
   document.querySelectorAll('canvas[data-contract-signature]').forEach(canvas=>{
     const ctx=canvas.getContext('2d');ctx.lineWidth=2.4;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#111';let drawing=false;
     const point=e=>{const r=canvas.getBoundingClientRect();return {x:(e.clientX-r.left)*canvas.width/r.width,y:(e.clientY-r.top)*canvas.height/r.height};};
     canvas.addEventListener('pointerdown',e=>{e.preventDefault();drawing=true;canvas.setPointerCapture(e.pointerId);const p=point(e);ctx.beginPath();ctx.moveTo(p.x,p.y);});
-    canvas.addEventListener('pointermove',e=>{if(!drawing)return;e.preventDefault();const p=point(e);ctx.lineTo(p.x,p.y);ctx.stroke();canvas.dataset.dirty='true';delete canvas.dataset.signatureId;});
+    canvas.addEventListener('pointermove',e=>{if(!drawing)return;e.preventDefault();const p=point(e);ctx.lineTo(p.x,p.y);ctx.stroke();canvas.dataset.dirty='true';delete canvas.dataset.signatureId;updateIntegratedContractButton(canvas.dataset.contractId);});
     const stop=e=>{if(!drawing)return;drawing=false;e.preventDefault();};canvas.addEventListener('pointerup',stop);canvas.addEventListener('pointercancel',stop);
   });
 }
@@ -2573,14 +2580,42 @@ async function useStoredContractSignature(id,options={}){
   const {data,error:downloadError}=await sb.storage.from('employee-signatures').download(vault.storage_path);if(downloadError||!data){if(msg)msg.textContent='보관 서명을 불러오지 못했습니다.';return;}
   const url=URL.createObjectURL(data),img=new Image();img.onload=()=>{
     if(options.automatic&&canvas.dataset.dirty==='true'){URL.revokeObjectURL(url);return;}
-    const ctx=canvas.getContext('2d');ctx.clearRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);canvas.dataset.signatureId=String(vault.id);canvas.dataset.dirty='true';URL.revokeObjectURL(url);if(msg)msg.textContent='보관 서명을 불러왔습니다. 원문 확인 후 저장하세요.';
+    const ctx=canvas.getContext('2d');ctx.clearRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);canvas.dataset.signatureId=String(vault.id);canvas.dataset.dirty='true';URL.revokeObjectURL(url);if(canvas.dataset.contractId)updateIntegratedContractButton(canvas.dataset.contractId);if(msg)msg.textContent='보관 서명을 불러왔습니다. 원문 확인 후 저장하세요.';
   };img.src=url;
 }
-function autoLoadStoredContractSignatures(rows){(rows||[]).filter(r=>r.status==='대기').forEach(r=>{void useStoredContractSignature(r.id,{automatic:true});});}
+function autoLoadStoredContractSignatures(rows){(rows||[]).filter(r=>r.status==='대기').forEach(r=>{(String(r.merged_html||'').includes('data-sign-slot="medical"')?['employment','medical','privacy'].map(key=>`${r.id}-${key}`):[r.id]).forEach(id=>{void useStoredContractSignature(id,{automatic:true});});});}
 /* contract-signature:test-end */
 function clearContractSignature(id){
   const canvas=document.querySelector(`canvas[data-contract-signature="${id}"]`);if(!canvas)return;
-  canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);canvas.dataset.dirty='false';delete canvas.dataset.signatureId;
+  canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);canvas.dataset.dirty='false';delete canvas.dataset.signatureId;updateIntegratedContractButton(canvas.dataset.contractId);
+}
+function updateIntegratedContractButton(id){if(!id)return;const button=$(`#contractComplete-${id}`);if(button)button.disabled=!integratedContractReady(id);}
+async function completeIntegratedContract(id){
+  const row=CONTRACT_ROWS.find(r=>Number(r.id)===Number(id)),msg=$(`#contractSignMsg-${id}`);
+  if(!row||row.status!=='대기'||!integratedContract(row)||contractExpired(row)||!integratedContractReady(id)){if(msg)msg.textContent='세 구역의 내용을 확인하고 각각 서명하세요.';return;}
+  if(!confirm('근로계약·의료정보 보안·개인정보 취급자 서약을 각각 확인하고 세 서명을 완료합니까?'))return;
+  const signatures=integratedContractPayload(id);setStatus('saving');if(msg)msg.textContent='세 서명 저장 중…';
+  if(row.source_pdf_path){
+    const coordinates=CONTRACT_PARTS.map(([part])=>{const n=key=>Number(document.querySelector(`[data-pdf-${key}="${id}-${part}"]`)?.value);return {part,page_no:n('page'),x:n('x'),y:n('y'),width:n('width'),height:n('height')};});
+    if(coordinates.some(c=>!Number.isInteger(c.page_no)||c.page_no<1||[c.x,c.y,c.width,c.height].some(n=>!Number.isFinite(n))||c.x<0||c.y<0||c.width<=0||c.height<=0)){if(msg)msg.textContent='세 PDF 서명 위치를 확인하세요.';setStatus('error');return;}
+    const {error:confirmError}=await sb.rpc('confirm_contract_pdf_source',{p_contract_id:id});
+    if(confirmError){if(msg)msg.textContent='원본 PDF 확인 기록 실패: '+confirmError.message;setStatus('error');return;}
+    const {data,error}=await sb.functions.invoke('contract-pdf-sign',{body:{contract_id:id,signatures,coordinates}});
+    if(error||data?.error){if(msg)msg.textContent='PDF 서명 실패: '+(data?.error||error?.message||'함수 미배포');setStatus('error');return;}
+  }else{
+    const {error}=await sb.rpc('apply_integrated_contract_signatures',{p_contract_id:id,p_signatures:signatures});
+    if(error){if(msg)msg.textContent='세 서명 저장 실패: '+error.message;setStatus('error');return;}
+  }
+  setStatus('saved');render();
+}
+function integratedSignatureCard(row,part){
+  const label=CONTRACT_PARTS.find(([key])=>key===part)?.[1]||part;
+  return `<section class="card" style="margin:12px 0"><h3>${label} 서명</h3>${row.source_pdf_path?`<div class="rowflex" style="margin:8px 0"><label>페이지 <input class="mini" type="number" min="1" placeholder="쪽" data-pdf-page="${row.id}-${part}" style="width:60px"></label><label>X <input class="mini" type="number" min="0" placeholder="X" data-pdf-x="${row.id}-${part}" style="width:70px"></label><label>Y <input class="mini" type="number" min="0" placeholder="Y" data-pdf-y="${row.id}-${part}" style="width:70px"></label><label>가로 <input class="mini" type="number" min="1" placeholder="가로" data-pdf-width="${row.id}-${part}" style="width:70px"></label><label>세로 <input class="mini" type="number" min="1" placeholder="세로" data-pdf-height="${row.id}-${part}" style="width:70px"></label></div>`:''}<canvas class="contract-signature" width="720" height="180" data-contract-signature="${row.id}-${part}" data-contract-id="${row.id}" data-dirty="false" aria-label="${label} 서명"></canvas><div class="rowflex" style="margin-top:8px"><button class="mini" onclick="clearContractSignature('${row.id}-${part}')">지우기</button><button class="mini" onclick="useStoredContractSignature('${row.id}-${part}')">보관 서명 사용</button></div></section>`;
+}
+function integratedContractPage(row){
+  const html=String(row.merged_html||''),med=html.indexOf('<section class="contract-part" data-contract-part="medical"'),privacy=html.indexOf('<section class="contract-part" data-contract-part="privacy"');
+  if(med<0||privacy<=med)return '<div class="cal-error">통합 계약 본문 구성을 확인할 수 없습니다.</div>';
+  return `<div class="contract-doc" style="margin-top:10px">${html.slice(0,med)}</div>${integratedSignatureCard(row,'employment')}<div class="contract-doc">${html.slice(med,privacy)}</div>${integratedSignatureCard(row,'medical')}<div class="contract-doc">${html.slice(privacy)}</div>${integratedSignatureCard(row,'privacy')}<button class="hbtn pri" id="contractComplete-${row.id}" disabled onclick="completeIntegratedContract(${row.id})">3개 모두 서명 후 완료</button><div class="msg" id="contractSignMsg-${row.id}"></div>`;
 }
 async function saveContractSignature(id){
   const row=CONTRACT_ROWS.find(r=>Number(r.id)===Number(id)),canvas=document.querySelector(`canvas[data-contract-signature="${id}"]`),msg=$(`#contractSignMsg-${id}`);
@@ -2625,10 +2660,12 @@ async function renderContractEmployee(m,options={}){
   const html=`<div class="card"><h2>📝 내 근로계약서</h2>${ownRows.length?'<div class="sub">계약 내용을 확인한 뒤 서명란에 직접 서명하세요.</div>':'<div class="empty">받은 근로계약서가 없습니다.</div>'}</div>`+
     ownRows.map(r=>{const expired=r.status==='대기'&&contractExpired(r),signed=r.status==='서명완료';return `<div class="card"><h2>${esc(contractTitle(r))} <span class="b ${contractStatusClass(r.status)}">${esc(r.status)}</span></h2>
       <div class="sub">발송 ${contractDate(r.sent_at)} · 서명기한 ${contractDate(r.due_at)}${r.signed_at?' · 서명 '+contractDate(r.signed_at):''}</div>
-      ${(r.status==='대기'||signed)&&!r.source_pdf_path?`<div class="contract-doc" style="margin-top:10px">${r.merged_html||''}</div>`:''}
+      ${(r.status==='대기'||signed)&&!r.source_pdf_path&&!integratedContract(r)?`<div class="contract-doc" style="margin-top:10px">${r.merged_html||''}</div>`:''}
+      ${r.status==='대기'&&!expired&&integratedContract(r)?integratedContractPage(r):''}
       ${r.source_pdf_path?`<div class="hint">이 계약의 기준 문서는 원본 PDF이며, HTML 계약 본문과 별도 보관됩니다.${signed&&r.signed_pdf_path?` <button class="mini" onclick="downloadContractPdf(${r.id})">완료 PDF 다운로드</button>`:''}</div>`:''}
       ${expired?'<div class="hint" style="color:var(--red)">서명 기간 만료, 원장에게 문의</div>':''}
-      ${r.status==='대기'&&!expired?`<h3>직원 서명</h3>${r.source_pdf_path?`<div class="hint">원본 PDF를 먼저 확인하세요. 좌표 기준은 PDF 왼쪽 아래이며, 실제 페이지에 맞게 조정합니다.</div><div class="rowflex" style="margin:8px 0"><button class="mini" onclick="openContractPdfSource(${r.id})">원본 PDF 확인</button><label class="mini">페이지 <input class="mini" type="number" min="1" value="1" data-pdf-page="${r.id}" style="width:60px"></label><label class="mini">X <input class="mini" type="number" min="0" value="72" data-pdf-x="${r.id}" style="width:70px"></label><label class="mini">Y <input class="mini" type="number" min="0" value="72" data-pdf-y="${r.id}" style="width:70px"></label><label class="mini">가로 <input class="mini" type="number" min="1" value="150" data-pdf-width="${r.id}" style="width:70px"></label><label class="mini">세로 <input class="mini" type="number" min="1" value="50" data-pdf-height="${r.id}" style="width:70px"></label></div>`:''}<canvas class="contract-signature" width="720" height="180" data-contract-signature="${r.id}" data-dirty="false"></canvas>
+      ${r.status==='대기'&&!expired&&integratedContract(r)&&r.source_pdf_path?`<div class="hint">원본 PDF의 세 서명 위치를 확인하세요. 좌표 기준은 PDF 왼쪽 아래입니다.</div><button class="mini" onclick="openContractPdfSource(${r.id})">원본 PDF 확인</button>`:''}
+      ${r.status==='대기'&&!expired&&!integratedContract(r)?`<h3>직원 서명</h3>${r.source_pdf_path?`<div class="hint">원본 PDF를 먼저 확인하세요. 좌표 기준은 PDF 왼쪽 아래이며, 실제 페이지에 맞게 조정합니다.</div><div class="rowflex" style="margin:8px 0"><button class="mini" onclick="openContractPdfSource(${r.id})">원본 PDF 확인</button><label class="mini">페이지 <input class="mini" type="number" min="1" value="1" data-pdf-page="${r.id}" style="width:60px"></label><label class="mini">X <input class="mini" type="number" min="0" value="72" data-pdf-x="${r.id}" style="width:70px"></label><label class="mini">Y <input class="mini" type="number" min="0" value="72" data-pdf-y="${r.id}" style="width:70px"></label><label class="mini">가로 <input class="mini" type="number" min="1" value="150" data-pdf-width="${r.id}" style="width:70px"></label><label class="mini">세로 <input class="mini" type="number" min="1" value="50" data-pdf-height="${r.id}" style="width:70px"></label></div>`:''}<canvas class="contract-signature" width="720" height="180" data-contract-signature="${r.id}" data-dirty="false"></canvas>
         <div class="rowflex" style="margin-top:8px"><button class="mini" onclick="clearContractSignature(${r.id})">지우기</button><button class="mini" onclick="useStoredContractSignature(${r.id})">보관 서명 사용</button>${r.source_pdf_path?`<button class="hbtn pri" onclick="signContractPdf(${r.id})">원본 확인 후 PDF 서명</button>`:`<button class="hbtn pri" onclick="saveContractSignature(${r.id})">원문 확인 후 서명 저장</button>`}</div><div class="msg" id="contractSignMsg-${r.id}"></div>`:''}
       ${signed?'<div class="hint" style="color:var(--mint)">✓ 서명 완료</div>':''}</div>`;}).join('');
   if(append)m.insertAdjacentHTML('beforeend',html);else m.innerHTML=html;
