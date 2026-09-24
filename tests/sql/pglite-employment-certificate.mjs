@@ -32,6 +32,7 @@ try{
       (1,1,'chief','승인','${chief}',now()),(1,2,'owner','대기',null,null);
   `);
   await db.exec(fs.readFileSync('db/employment_certificate_draft.sql','utf8'));
+  assert.equal((await q(`select public.employment_certificate_escape('<script>&"') value`))[0].value,'&lt;script&gt;&amp;&quot;');
   await as(staff);
   await assert.rejects(q('select * from public.issue_employment_certificate(1)'),/owner approval required/);
   await as(owner);
@@ -53,6 +54,7 @@ try{
   await as(staff);
   assert.equal((await q('select employee_name from public.employment_certificates'))[0].employee_name,'합성직원');
   assert.equal((await q('select issued_html from public.employment_certificates'))[0].issued_html,originalHtml);
+  await assert.rejects(q("update public.employment_certificates set issued_html='변조' where approval_doc_id=1"),/permission denied/);
   await as(other);
   assert.equal((await q('select count(*)::int n from public.employment_certificates'))[0].n,0);
   await as(chief);

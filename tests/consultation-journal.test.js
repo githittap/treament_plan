@@ -11,6 +11,46 @@ const htmlPath = path.join(root, 'hr.html');
 const sql = fs.existsSync(sqlPath) ? fs.readFileSync(sqlPath, 'utf8') : '';
 const html = fs.readFileSync(htmlPath, 'utf8');
 
+test('원본 상담일지 6종의 시트별 칸은 공통 필드와 분리해 저장·재열람한다', () => {
+  const source = html.match(/const CONSULTATION_SOURCE_FIELDS=([\s\S]*?);\nconst CONSULTATION_STATUSES=/);
+  assert.ok(source, '시트별 원본 칸 정의가 있어야 함');
+  const context = {};
+  require('node:vm').runInNewContext(`this.fields=${source[1]}`, context);
+  const fields = context.fields;
+  assert.deepEqual(Object.keys(fields), ['교정','확정','미확정 및 부분확정','홈페이지','카카오,네이버예약,당근','원본']);
+  for (const sheet of Object.keys(fields)) {
+    const keys=fields[sheet].map(row=>row[0]);
+    assert.equal(new Set(keys).size,keys.length,`${sheet}의 저장 키 중복`);
+    for (const label of ['상담시 사용한 소구법'])assert.ok(fields[sheet].some(row=>row[1]===label));
+  }
+  assert.ok(fields['교정'].some(row=>row[1]==='발치여부'));
+  assert.ok(fields['확정'].some(row=>row[1]==='4차리콜'));
+  assert.ok(fields['미확정 및 부분확정'].some(row=>row[1]==='계획된 진료'));
+  assert.ok(fields['홈페이지'].some(row=>row[1]==='통화'));
+  assert.equal(fields['카카오,네이버예약,당근'].filter(row=>row[1].startsWith('주호소')).length,2);
+  assert.ok(fields['원본'].some(row=>row[1]==='내원경로'));
+  assert.ok(fields['확정'].some(row=>row[1]==='11열'));
+  assert.ok(fields['미확정 및 부분확정'].some(row=>row[1]==='4열'));
+  assert.match(html,/source_fields:consultationSourceFieldValues\(\)/);
+  assert.match(html,/special_note,source_fields'\)/);
+  const migration=fs.readFileSync(path.join(root,'db','consultation_journal_source_fields_draft.sql'),'utf8');
+  assert.match(migration,/add column if not exists source_fields jsonb not null default '\{\}'::jsonb/);
+});
+
+test('시트별 추가 칸은 입력값을 다시 표시하고 시트 변경에도 저장값을 유지한다', () => {
+  const source=html.match(/const CONSULTATION_SOURCE_FIELDS=([\s\S]*?);\nconst CONSULTATION_STATUSES=/);
+  const functions=html.match(/function consultationRenderSourceFields\([\s\S]*?\nfunction consultationDraftFromForm/);
+  assert.ok(source&&functions);
+  const box={innerHTML:'',querySelectorAll:()=>[{dataset:{sourceKey:'recall_1'},value:'전화 예정'}]};
+  const sheet={value:'확정'};
+  const context={$:id=>id==='#cjSourceFields'?box:sheet,esc:s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;'),console};
+  require('node:vm').runInNewContext(`const CONSULTATION_SOURCE_FIELDS=${source[1]};let CONSULTATION_SOURCE_SAVED_FIELDS={old_note:'보존'};${functions[0].replace(/\nfunction consultationDraftFromForm$/,'')}\nthis.render=consultationRenderSourceFields;this.values=consultationSourceFieldValues;`,context);
+  context.render({recall_1:'<표시>'});
+  assert.match(box.innerHTML,/1차리콜/);
+  assert.match(box.innerHTML,/&lt;표시>/);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.values())),{old_note:'보존',recall_1:'전화 예정'});
+});
+
 function loadConsultationHelpers() {
   const match = html.match(/\/\* consultation-journal:test-start \*\/([\s\S]*?)\/\* consultation-journal:test-end \*\//);
   assert.ok(match, '상담일지 테스트용 순수 함수 블록이 있어야 합니다.');
