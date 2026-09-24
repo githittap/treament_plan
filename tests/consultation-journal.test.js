@@ -12,7 +12,7 @@ const sql = fs.existsSync(sqlPath) ? fs.readFileSync(sqlPath, 'utf8') : '';
 const html = fs.readFileSync(htmlPath, 'utf8');
 
 test('원본 상담일지 6종의 시트별 칸은 공통 필드와 분리해 저장·재열람한다', () => {
-  const source = html.match(/const CONSULTATION_SOURCE_FIELDS=([\s\S]*?);\nconst CONSULTATION_STATUSES=/);
+  const source = html.match(/const CONSULTATION_SOURCE_FIELDS=([\s\S]*?);\r?\nconst CONSULTATION_STATUSES=/);
   assert.ok(source, '시트별 원본 칸 정의가 있어야 함');
   const context = {};
   require('node:vm').runInNewContext(`this.fields=${source[1]}`, context);
@@ -38,8 +38,8 @@ test('원본 상담일지 6종의 시트별 칸은 공통 필드와 분리해 �
 });
 
 test('시트별 추가 칸은 입력값을 다시 표시하고 시트 변경에도 저장값을 유지한다', () => {
-  const source=html.match(/const CONSULTATION_SOURCE_FIELDS=([\s\S]*?);\nconst CONSULTATION_STATUSES=/);
-  const functions=html.match(/function consultationRenderSourceFields\([\s\S]*?\nfunction consultationDraftFromForm/);
+  const source=html.match(/const CONSULTATION_SOURCE_FIELDS=([\s\S]*?);\r?\nconst CONSULTATION_STATUSES=/);
+  const functions=html.match(/function consultationRenderSourceFields\([\s\S]*?\r?\nfunction consultationDraftFromForm/);
   assert.ok(source&&functions);
   const box={innerHTML:'',querySelectorAll:()=>[{dataset:{sourceKey:'recall_1'},value:'전화 예정'}]};
   const sheet={value:'확정'};

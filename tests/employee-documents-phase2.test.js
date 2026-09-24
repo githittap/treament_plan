@@ -32,7 +32,7 @@ test('서류함은 승인된 4개 필터를 한 화면에 제공한다', () => {
 });
 
 test('직원서류와 연차증빙은 하나의 파일 입력·전송 버튼에서 종류별로 저장한다', () => {
-  const card = html.match(/function employeeDocumentsCard\([\s\S]*?\n}\nfunction filterEmployeeDocuments/);
+  const card = html.match(/function employeeDocumentsCard\([\s\S]*?\r?\n}\r?\nfunction filterEmployeeDocuments/);
   assert.ok(card);
   assert.match(card[0], /id="edScope"[\s\S]*value="직원서류"[\s\S]*value="연차증빙"/);
   assert.match(card[0], /id="edLeaveRequest"/);
@@ -62,7 +62,7 @@ test('업로드 종류를 바꾸면 해당 서류 종류·연차 신청 선택�
 });
 
 test('서류함 상단에서 연차 신청과 결재 올리기를 시작할 수 있다', () => {
-  const block = html.match(/function employeeDocumentsCard\([\s\S]*?\n}\nfunction filterEmployeeDocuments/);
+  const block = html.match(/function employeeDocumentsCard\([\s\S]*?\r?\n}\r?\nfunction filterEmployeeDocuments/);
   assert.ok(block);
   assert.match(block[0], /onclick="openLeave\(\)"/);
   assert.match(block[0], /onclick="show\('apMask'\)/);
@@ -104,7 +104,7 @@ test('재직증명서는 최종 승인 후 보관된 발급본을 열도록 안�
 });
 
 test('계정·Notion 체크는 통합 서류함 뒤쪽에 렌더링된다', () => {
-  const onbo = html.match(/async function renderOnbo\(m\)\{([\s\S]*?)\n}\nfunction onboardingChecklistCard/);
+  const onbo = html.match(/async function renderOnbo\(m\)\{([\s\S]*?)\r?\n}\r?\nfunction onboardingChecklistCard/);
   assert.ok(onbo);
   assert.ok(onbo[1].indexOf('employeeDocumentsCard') < onbo[1].indexOf('onboardingChecklistCard'));
 });
