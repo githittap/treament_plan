@@ -1307,6 +1307,8 @@ function approvalRequestTitle(label,title){return label==='재직증명서 발�
 function approvalRequestBody(label,body){return label==='재직증명서 발급'?'[재직증명서 발급 요청]\n'+(body||''):body||'';}
 /* approval-request:test-end */
 /* ── 공지 ── */
+let NOTICE_INLINE_OBJECT_URLS=[];
+function revokeNoticeInlineObjectUrls(){for(const url of NOTICE_INLINE_OBJECT_URLS.splice(0))URL.revokeObjectURL(url);}
 async function renderNoticeBody(body,attachments){
   const parts=String(body||'').split(/(\[\[notice-image:[^\]]+\]\])/g),items=Array.isArray(attachments)?attachments:[];
   return (await Promise.all(parts.map(async part=>{
@@ -1316,11 +1318,12 @@ async function renderNoticeBody(body,attachments){
     if(!attachment)return esc(part);
     const result=await sb.storage.from('notice-attachments').download(attachment.path);
     if(result.error||!result.data)return esc(part);
-    const url=URL.createObjectURL(result.data);
+    const url=URL.createObjectURL(result.data);NOTICE_INLINE_OBJECT_URLS.push(url);
     return `<img src="${esc(url)}" alt="${esc(attachment.name||'본문 이미지')}" style="max-width:100%;height:auto;display:block;margin:6px 0">`;
   }))).join('');
 }
 async function renderNotice(m){
+  revokeNoticeInlineObjectUrls();
   const {data:list}=await sb.from('notices').select('*').order('pinned',{ascending:false}).order('created_at',{ascending:false});
   const rows=await Promise.all((list||[]).map(async n=>`<div style="padding:8px 0;border-bottom:1px dashed var(--line)">
       ${n.pinned?'📌 ':''}<b>${esc(n.title)}</b> <span class="sub">${md(n.created_at)} · ${esc(n.author||'')}</span>

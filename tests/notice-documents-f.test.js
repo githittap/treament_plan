@@ -55,11 +55,12 @@ test('실제 paste→submit이 본문 marker를 저장하고 renderNoticeBody가
   const context={sb,ME:{id:'u1'},NOTICE_PASTED_IMAGES:[image],crypto:{randomUUID:()=> 'id'},$:(id)=>id==='#ntBody'?bodyField:id==='#ntFiles'?fileField:fields[id.slice(1)],hide:()=>{},setStatus:()=>{},render:()=>{},renderNoticePastePreview:()=>{}};
   vm.runInNewContext(source,context);bodyField.dispatchEvent({type:'paste',preventDefault(){},clipboardData:{items:[{kind:'file',type:'image/gif',getAsFile:()=>image}]}});await context.submitNotice();
   assert.equal(uploaded.file,image);assert.match(inserted.body,/안전한 본문\n\[\[notice-image:u1\/tmp\/id-capture\.gif\]\]/);assert.equal(inserted.attachments[0].type,'image/gif');
-  const renderStart=html.indexOf('async function renderNoticeBody'),renderEnd=html.indexOf('async function renderNotice(m)',renderStart);
-  const renderedContext={sb,URL:{createObjectURL:()=> 'blob:inline'},esc:value=>String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')};
-  vm.runInNewContext(html.slice(renderStart,renderEnd)+'; this.renderNoticeBody=renderNoticeBody;',renderedContext);
+  const renderStart=html.indexOf('let NOTICE_INLINE_OBJECT_URLS'),renderEnd=html.indexOf('async function renderNotice(m)',renderStart);
+  const revoked=[],renderedContext={sb,URL:{createObjectURL:()=> 'blob:inline',revokeObjectURL:url=>revoked.push(url)},esc:value=>String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')};
+  vm.runInNewContext(html.slice(renderStart,renderEnd)+'; this.renderNoticeBody=renderNoticeBody; this.revokeNoticeInlineObjectUrls=revokeNoticeInlineObjectUrls;',renderedContext);
   const rendered=await renderedContext.renderNoticeBody('본문 <img src=x onerror=alert(1)> [[notice-image:u1/tmp/id-capture.gif]]',[{path:'u1/tmp/id-capture.gif',name:'capture.gif',type:'image/gif'}]);
   assert.match(rendered,/blob:inline/);assert.doesNotMatch(rendered,/<img src=x/);assert.match(rendered,/&lt;img/);
+  await renderedContext.renderNoticeBody('두 번째 [[notice-image:u1/tmp/id-capture.gif]]',[{path:'u1/tmp/id-capture.gif',name:'capture.gif',type:'image/gif'}]);renderedContext.revokeNoticeInlineObjectUrls();assert.deepEqual(revoked,['blob:inline','blob:inline']);
 });
 
 test('실제 이미지·PDF 미리보기 함수는 새 창 대신 허브 미리보기 영역을 채운다',async()=>{
