@@ -3,7 +3,7 @@
 ## 직원허브 2단계 H-2/H-4 — 로컬 초안 완료 (2026-09-24)
 
 - H-2 `f99d927`: 서류함에서 결제건·금액·마감일·계좌·영수증을 접수하고 실장→원장 결재로 처리한다. 민감 요청·영수증은 요청자와 결재선만 조회하며 전용 Storage와 보존형 rollback을 둔다.
-- H-4 `c6c8aac`: 운영에서 읽기 전용으로 확인한 기존 `ai_billing_events` 6열을 보존한 additive 초안이다. 기존 `ai-billing-webhook`에 네이버 광고 충전·노출중단 파서를 더하고, 문의함 맨 위 owner·manager 전용 붉은 띠와 charged actor/time 감사를 연결한다.
+- H-4 `c6c8aac`: 운영에서 읽기 전용으로 확인한 기존 `ai_billing_events` 7열을 보존한 additive 초안이다. 기존 `ai-billing-webhook`에 네이버 광고 충전·노출중단 파서를 더하고, 문의함 맨 위 owner·manager 전용 붉은 띠와 charged actor/time 감사를 연결한다.
 - 두 초안 모두 로컬 브랜치 전용이며 운영 DB·Storage·Edge 배포·MacroDroid 변경은 하지 않았다. H-4 운영 적용 전에는 migration preview와 PC/mobile 캡처를 별도 확인한다.
 
 ## 직원허브 2단계 A-1 — 보안서약서 업로드 경로 복구 (2026-09-24)

@@ -61,6 +61,7 @@ declare v_id bigint;
 begin
   if not public.employee_hub_access_allowed() or not exists(select 1 from public.payment_requests p where p.id=p_request_id and p.requester_id=auth.uid() and p.status='chief_pending') then raise exception 'payment receipt not allowed'; end if;
   if p_storage_path !~ ('^'||auth.uid()::text||'/'||p_request_id::text||'/') or coalesce(length(btrim(p_original_name)),0)=0 or p_size_bytes is null or p_size_bytes<=0 or p_size_bytes>10485760 then raise exception 'payment receipt invalid'; end if;
+  if not exists(select 1 from storage.objects o where o.bucket_id='payment-receipts' and o.name=p_storage_path and o.owner_id=auth.uid()::text and coalesce((o.metadata->>'size')::bigint,-1)=p_size_bytes) then raise exception 'payment receipt object not found'; end if;
   insert into public.payment_request_receipts(request_id,storage_path,original_name,mime_type,size_bytes) values(p_request_id,p_storage_path,btrim(p_original_name),nullif(btrim(p_mime_type),''),p_size_bytes) returning id into v_id;
   return v_id;
 end $$;

@@ -1,4 +1,4 @@
--- H-4: 운영 실측 ai_billing_events 6개 열(id/platform/amount_krw/source/note/raw_text/received_at)을 보존한다.
+-- H-4: 운영 실측 ai_billing_events 7개 열(id/platform/amount_krw/source/note/raw_text/received_at)을 보존한다.
 begin;
 alter table public.ai_billing_events add column if not exists charged_at timestamptz;
 alter table public.ai_billing_events add column if not exists charged_by uuid references public.profiles(user_id);
