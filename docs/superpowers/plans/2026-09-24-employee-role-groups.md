@@ -326,7 +326,7 @@ Run: `node --test tests/schedule-roster.test.js tests/schedule-roster-sql.test.j
 
 - [ ] **Step 4: 전체 JavaScript 시험 수행** (5분)
 
-Run: `npm test`; Expected: 전체 시험 `# fail 0`. 기존 무관 실패가 있으면 기준 브랜치에서도 재현되는지 확인하고 새 실패와 분리해 기록함.
+Run: `node --test --test-isolation=none tests/*.test.js`; Expected: `tests 367 이상`, `fail 0`. 기준 실행에서 확인된 전체 JS test 명령을 사용함. 기존 무관 실패가 있으면 기준 브랜치에서도 재현되는지 확인하고 새 실패와 분리해 기록함.
 
 - [ ] **Step 5: hr.html inline script 구문 검증** (3분)
 
