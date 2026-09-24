@@ -2834,15 +2834,41 @@ function payslipCrossCheck(items){
 }
 function timeToMin(t){if(t==null)return null;const m=String(t).match(/^(\d{1,2}):(\d{2})/);if(!m)return null;return Number(m[1])*60+Number(m[2]);}
 function overlapMinutes(aStart,aEnd,bStart,bEnd){return Math.max(0,Math.min(aEnd,bEnd)-Math.max(aStart,bStart));}
+function payslipAttendanceRows(rows,manualRows,resolutions){
+  const confirmed=new Map(),approved=new Map();
+  for(const r of manualRows||[]){
+    if(r.status!=='원장확정')continue;
+    const prior=confirmed.get(r.work_date);
+    if(!prior||Number(r.id)>Number(prior.id))confirmed.set(r.work_date,r);
+  }
+  for(const r of resolutions||[]){
+    if(r.source!=='issue_adjustment'||!r.approved_at)continue;
+    const prior=approved.get(r.work_date);
+    if(!prior||String(r.approved_at)>String(prior.approved_at))approved.set(r.work_date,r);
+  }
+  return (rows||[]).map(row=>{
+    const resolution=row.source==='fp'?approved.get(row.work_date):null;
+    const effective=resolution?{...row,clock_in:resolution.clock_in,clock_out:resolution.clock_out,overtime_min:resolution.overtime_min}:{...row};
+    const manual=confirmed.get(row.work_date);
+    const matchingManual=manual&&(row.source==='manual'||resolution)
+      &&timeToMin(manual.clock_in)!=null&&timeToMin(manual.clock_in)===timeToMin(effective.clock_in)
+      &&timeToMin(manual.clock_out)!=null&&timeToMin(manual.clock_out)===timeToMin(effective.clock_out)
+      &&Number(manual.overtime_min)===Number(effective.overtime_min);
+    effective.evening_overtime_min=matchingManual?Number(manual.evening_overtime_min)||0:0;
+    return effective;
+  });
+}
 // 근로기준법 시행령 제27조의2 필수 기재사항(근로일수·총근로시간·연장/야간/휴일 근로시간)을
-// attendance 실측에서 뽑는다. 휴게시간 컬럼이 없어 총근로시간은 출퇴근 시각 차이 그대로이고
-// (근태 화면의 지각·조퇴 판정과 같은 전제), 야간은 법정 22:00~06:00 겹침만 센다.
+// attendance와 승인 보정에서 뽑는다. 휴게시간 컬럼이 없어 총근로시간은 출퇴근 시각 차이 그대로이고
+// (근태 화면의 지각·조퇴 판정과 같은 전제), 저녁 분을 시각 차이에 다시 더하지 않는다.
+// 야간은 법정 22:00~06:00 겹침만 센다.
 function aggregateAttendanceForPayslip(rows){
   const out={workedDays:0,totalWorkMinutes:0,overtimeMinutes:0,nightMinutes:0,holidayMinutes:0};
   (rows||[]).forEach(r=>{
     const ci=timeToMin(r.clock_in),co=timeToMin(r.clock_out);
     out.overtimeMinutes+=Number(r.overtime_min)||0;
     if(ci==null||co==null||co<=ci)return;
+    out.overtimeMinutes+=Number(r.evening_overtime_min)||0;
     out.workedDays+=1;
     const span=co-ci;
     out.totalWorkMinutes+=span;
@@ -2919,18 +2945,22 @@ async function renderPaySlip(m){
   PAY_SLIP_HTML='';
   if(PAY_SLIP_USER){
     const bounds=attendanceMonthBounds(PAY_MONTH);
-    const [{data:prow},{data:existing},{data:att}]=await Promise.all([
+    const [{data:prow},{data:existing},{data:att,error:attError},{data:manualRows,error:manualError},{data:issueResolutions,error:resolutionError}]=await Promise.all([
       sb.from('payroll_rows').select('*').eq('month',PAY_MONTH).eq('user_id',PAY_SLIP_USER).maybeSingle(),
       sb.from('payslips').select('*').eq('month',PAY_MONTH).eq('user_id',PAY_SLIP_USER).maybeSingle(),
-      sb.from('attendance').select('clock_in,clock_out,overtime_min,evening,is_holiday').eq('user_id',PAY_SLIP_USER).gte('work_date',bounds.start).lt('work_date',bounds.next)
+      sb.from('attendance').select('work_date,source,clock_in,clock_out,overtime_min,evening,is_holiday').eq('user_id',PAY_SLIP_USER).gte('work_date',bounds.start).lt('work_date',bounds.next),
+      sb.from('attendance_manual_entries').select('id,work_date,status,clock_in,clock_out,overtime_min,evening_overtime_min').eq('user_id',PAY_SLIP_USER).eq('status','원장확정').gte('work_date',bounds.start).lt('work_date',bounds.next),
+      sb.from('attendance_issue_resolutions').select('work_date,source,approved_at,clock_in,clock_out,overtime_min').eq('user_id',PAY_SLIP_USER).gte('work_date',bounds.start).lt('work_date',bounds.next)
     ]);
     const p=PROFILES.find(x=>x.user_id===PAY_SLIP_USER)||{};
-    if(!prow){
+    if(attError||manualError||resolutionError){
+      body=`<div class="cal-error">근태 시간 집계를 불러오지 못했습니다: ${esc((attError||manualError||resolutionError).message)}</div>`;
+    }else if(!prow){
       body=`<div class="empty">${esc(PAY_MONTH)} 급여대장에 ${esc(p.name||'')} 행이 없습니다. 급여대장 탭에서 먼저 업로드·저장하세요.</div>`;
     }else{
       const items=prow.items||{};
       PAY_SLIP_HTML=buildPayslipHtml({employee:{name:p.name,dept:p.dept},month:PAY_MONTH,items,net:prow.net,
-        crossCheck:payslipCrossCheck(items),workSummary:aggregateAttendanceForPayslip(att||[]),
+        crossCheck:payslipCrossCheck(items),workSummary:aggregateAttendanceForPayslip(payslipAttendanceRows(att||[],manualRows||[],issueResolutions||[])),
         issued:!!(existing&&existing.issued),issuedBy:existing&&existing.issued_by,issuedAt:existing&&existing.issued_at});
       body=`<div style="border:1px solid var(--line);border-radius:8px;overflow:hidden">${PAY_SLIP_HTML}</div>
         <div class="rowflex" style="margin-top:10px">
