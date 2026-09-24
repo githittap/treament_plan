@@ -107,6 +107,7 @@ if (block) {
     assert.equal(context.isCurrentJobGroupMember(row, profiles, '2026-09-25'), false);
     assert.equal(context.isCurrentJobGroupMember(row, profiles, '2026-09-26'), false);
     assert.equal(context.isCurrentJobGroupMember({ profile_user_id: null, department: '진료실', active: false }, profiles, '2026-09-24'), false);
+    assert.equal(context.isCurrentJobGroupMember({ profile_user_id: 'employed', department: '데스크', active: false }, profiles, '2026-09-24'), false);
     assert.equal(context.isCurrentJobGroupMember({ profile_user_id: 'employed', department: 'Dr.', active: true }, profiles, '2026-09-24'), false);
   });
 

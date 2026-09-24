@@ -402,7 +402,7 @@ function employeeJobGroupModel(person, profileById = new Map()) {
 }
 
 function isCurrentJobGroupMember(person, profileById, asOfDate) {
-  if (!person || person.department === 'Dr.') return false;
+  if (!person || person.department === 'Dr.' || person.active === false) return false;
   if (!person.profile_user_id) return person.active === true;
   const profile = profileById?.get(person.profile_user_id);
   if (!profile) return false;
