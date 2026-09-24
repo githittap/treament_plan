@@ -71,6 +71,8 @@ main{padding:16px 16px 70px;max-width:1080px;margin:0 auto}
 .workdoc-card .workdoc-icon{font-size:24px}.workdoc-card h3{margin:0}.workdoc-card p{color:var(--gray);font-size:12.5px;flex:1}
 .guide-shell{max-width:900px}.guide-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:1px solid var(--line);padding-bottom:12px}.guide-breadcrumb{font-size:11px;color:var(--gray);letter-spacing:.02em;margin-bottom:5px}.guide-lead{color:var(--gray);margin:4px 0 0;font-size:13px}.guide-flow{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:14px 0}.guide-flow span{padding:8px 6px;border:1px solid var(--line);border-radius:8px;background:var(--panel);font-size:11px;text-align:center;color:var(--gray)}.guide-flow b{display:block;color:var(--mint);font-size:13px;margin-bottom:2px}.guide-sections{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.guide-section{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px}.guide-section h3{margin:0 0 6px;color:var(--ink);font-size:13px}.guide-section p{margin:0;color:var(--gray);font-size:12.5px;line-height:1.55}.guide-section ul{margin:6px 0 0;padding-left:18px;color:var(--gray);font-size:12px;line-height:1.6}.guide-mock{margin-top:14px;border:1px solid rgba(47,217,196,.35);border-radius:10px;background:#081214;padding:10px}.guide-mock-nav{display:flex;gap:5px;flex-wrap:wrap}.guide-mock-nav span{font-size:10px;padding:4px 7px;border-radius:5px;color:var(--gray);background:rgba(255,255,255,.05)}.guide-mock-nav .active{color:#062421;background:var(--mint);font-weight:800}.guide-mock-row{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:9px;padding:8px;border:1px solid var(--line);border-radius:7px;font-size:11px}.guide-pill{color:var(--mint);font-size:10px}.guide-caption{margin:7px 0 0;color:var(--gray);font-size:11px}.guide-caption b{color:var(--mint)}.guide-close{white-space:nowrap}.guide-shell button:focus-visible,.guide-shell a:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
 @media(max-width:640px){.guide-flow{grid-template-columns:repeat(2,1fr)}.guide-sections{grid-template-columns:1fr}.guide-head{align-items:stretch;flex-direction:column}.guide-close{align-self:flex-start}}
+.guide-shot{margin:10px 0 0}.guide-shot img{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:8px}.guide-shot figcaption{font-size:11px;color:var(--gray);margin-top:5px}
+@media(min-width:641px) and (max-width:900px){.guide-shell{max-width:100%}}
 .big{font-size:30px;font-weight:800;color:var(--mint)}
 .sub{font-size:12px;color:var(--gray)}
 .rowflex{display:flex;flex-wrap:wrap;gap:10px}
@@ -95,6 +97,9 @@ th{background:var(--panel);color:var(--gray);font-size:12px;position:sticky;top:
 .schedule-check.role-dr{color:#f0b8ff}.schedule-check.role-clinic{color:#7fd8ff}.schedule-check.role-desk{color:#ffd477}.schedule-check.role-consult{color:#9ee6a9}.schedule-check.role-etc{color:#c7cbd3}.schedule-check.schedule-historical{color:var(--gray);opacity:.8}
 .schedule-leave-list{font-size:11px;color:var(--gold);line-height:1.35}
 @media(max-width:640px){.schedule-role-table{min-width:700px}.schedule-role-table th:not(:first-child){min-width:82px}.schedule-role-table td{height:52px;padding:3px}.schedule-check-list{max-height:150px}.schedule-role-cell summary{font-size:10px;padding:4px 2px}}
+@media(max-width:900px){.schedule-actions{flex-wrap:wrap}.schedule-actions>*{flex:0 1 auto}.schedule-week-block{min-width:0}}
+.schedule-mobile-days{display:none}
+@media(max-width:640px){.schedule-role-table{display:none}.schedule-mobile-days{display:grid;gap:10px}.schedule-mobile-day{border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--panel)}.schedule-mobile-day h4{margin:0 0 8px;color:var(--mint)}.schedule-mobile-role{display:grid;grid-template-columns:minmax(72px,28%) minmax(0,1fr);gap:8px;align-items:start;padding:6px 0;border-top:1px solid var(--line)}.schedule-mobile-role>strong{font-size:12px}.schedule-mobile-role .schedule-check-list{max-height:none}.schedule-mobile-role summary{font-size:12px;text-align:left;white-space:normal}.schedule-actions .mini{min-height:36px}}
 tr.warn td{background:var(--red-bg)}
 tr.new td{background:var(--mint-dk)}
 .b{display:inline-block;border-radius:5px;padding:1px 7px;font-size:11px;font-weight:700}
@@ -937,7 +942,7 @@ async function renderAtt(m){
     <div class="card"><h2>🕘 내 출퇴근 <span class="sub">(${month})</span></h2>
       ${(effectiveAtt||[]).length?`<div class="tblwrap"><table><tr><th>날짜</th><th>출근</th><th>퇴근</th><th>지각</th><th>연장</th><th>기준</th></tr>
       ${(effectiveAtt||[]).map(a=>`<tr class="${a.late_min>0?'warn':''}"><td>${md(a.work_date)}</td><td>${a.clock_in||'-'}${a.is_issue_adjustment?` <span class="sub">(원 ${a.original_clock_in||'-'})</span>`:''}</td><td>${a.clock_out||'-'}${a.is_issue_adjustment?` <span class="sub">(원 ${a.original_clock_out||'-'})</span>`:''}</td>
-        <td>${a.late_min>0?'<span class="b no">지각 '+a.late_min+'분</span>':'-'}${a.is_issue_adjustment?` <span class="sub">(원 ${a.original_late_min}분)</span>`:''}</td><td>${a.overtime_min>0?a.overtime_min+'분':'-'}${a.is_issue_adjustment?` <span class="sub">(원 ${a.original_overtime_min}분)</span>`:''}</td><td>${a.is_issue_adjustment?'<span class="b ok">승인 보정</span>':a.source==='manual'?'<span class="b wait">수기 기록</span>':'지문 원장'}</td></tr>`).join('')}</table></div>`
+        <td>${a.late_min>0?'<span class="b no">지각 '+a.late_min+'분</span>':'-'}${a.is_issue_adjustment?` <span class="sub">(원 ${a.original_late_min}분)</span>`:''}</td><td>${a.overtime_min>0?a.overtime_min+'분':'-'}${a.is_issue_adjustment?` <span class="sub">(원 ${a.original_overtime_min}분)</span>`:''}</td><td>${a.is_issue_adjustment?'<span class="b ok">승인 보정</span>':a.source==='manual'?'<span class="b wait">수기 기록</span>':'지문 기록'}</td></tr>`).join('')}</table></div>`
       :'<div class="empty">이번 달 기록 없음 (지문은 월말 일괄 입력)</div>'}
       ${(manualRows||[]).length?`<div class="hint">수기 제출 내역: ${manualRows.map(r=>`${md(r.work_date)} ${esc(r.status)}`).join(' · ')}</div>`:''}
       <div class="hint">기록이 실제와 다르면 관리자에게 <b>지문누락 소명</b>을 요청하세요.
@@ -1030,6 +1035,10 @@ async function toggleScheduleRoleMember(role,personId,profileUserId,ds,checked,i
   const operation=prior.catch(()=>{}).then(()=>setShift(personId,profileUserId||null,scheduleDayForDate(ds),scheduleWeekForDate(ds),shift)).catch(()=>false);const queued=operation.finally(()=>{if(SCHEDULE_ROLE_WRITE_TAIL[key]===queued)delete SCHEDULE_ROLE_WRITE_TAIL[key];});SCHEDULE_ROLE_WRITE_TAIL[key]=queued;
   const ok=await operation;if(SCHEDULE_ROLE_WRITE_SEQ[key]!==seq)return null;if(!ok){if(input)input.checked=!checked;setStatus('error');return false;}setStatus('saved');render();return true;
 }
+function scheduleMobileRoleDays(weekStart,dates,roles,people,rows,leaveByUser,canEdit){
+  const weekdays=['일','월','화','수','목','금','토'];
+  return '<div class="schedule-mobile-days">'+dates.map(ds=>'<section class="schedule-mobile-day"><h4>'+md(ds)+' '+weekdays[scheduleDayForDate(ds)]+'요일</h4>'+roles.map(role=>'<div class="schedule-mobile-role"><strong>'+esc(role)+'</strong><div>'+scheduleRoleCell(role,weekStart,ds,people,rows,leaveByUser,canEdit)+'</div></div>').join('')+'</section>').join('')+'</div>';
+}
 async function renderScheduleMonth(m){
   if(!SCHED_MONTH)SCHED_MONTH=today().slice(0,7);
   const range=scheduleMonthWeeks(SCHED_MONTH),weeks=range.weeks,first=range.first,last=range.last;
@@ -1044,7 +1053,7 @@ async function renderScheduleMonth(m){
   let html='<div class="card"><h2>🗓 근무표</h2><div class="rowflex schedule-actions"><button class="mini" onclick="SCHED_VIEW=\'week\';render()">주간 편집</button><button class="mini stamp" onclick="SCHED_VIEW=\'month\';render()">월간 직무표</button><button class="mini" onclick="printSchedule(\'pdf\')">PDF 저장</button><button class="mini" onclick="printSchedule(\'print\')">인쇄</button><label>대상 월 <input class="mini" type="month" value="'+esc(SCHED_MONTH)+'" onchange="SCHED_MONTH=this.value;render()"></label></div>';
   for(const ws of weeks){const status=(weekRows||[]).find(w=>w.week_start===ws)?.status||'초안';const canEdit=status!=='공표'||isLead();const dates=Array.from({length:7},(_,i)=>addDays(ws,i));html+='<section class="schedule-week-block"><h3>'+md(ws)+' ~ '+md(addDays(ws,6))+' <span class="b '+(status==='공표'?'ok':'wait')+'">'+(status==='공표'?'확정':'작성 중')+'</span></h3><div class="tblwrap"><table class="schedule-role-table"><tr><th>직무·상태</th>'+dates.map(ds=>'<th>'+['월','화','수','목','금','토','일'][scheduleDayForDate(ds)-1<0?6:scheduleDayForDate(ds)-1]+'<br><span class="sub">'+md(ds)+'</span></th>').join('')+'</tr>';
     for(const role of roles){html+='<tr><th class="schedule-role-label">'+role+'</th>'+dates.map(ds=>'<td>'+scheduleRoleCell(role,ws,ds,SCHEDULE_PEOPLE,rows||[],leaveByUser,canEdit)+'</td>').join('')+'</tr>';}
-    html+='</table></div></section>';}
+    html+='</table></div>'+scheduleMobileRoleDays(ws,dates,roles,SCHEDULE_PEOPLE,rows||[],leaveByUser,canEdit)+'</section>';}
   html+='<div class="hint">직무·상태 셀을 열어 여러 명을 선택합니다. 승인 연차자는 근무·야간 선택이 잠깁니다. 모든 승인 직원은 초안을 편집할 수 있고, 공표는 실장·원장만 가능합니다.</div></div>'+(isMgr()?scheduleRosterAdminCard():'');m.innerHTML=html;
 }
 async function applyScheduleShift(el,personId,profileUserId,day,ws,shift){const previous=el&&el.dataset?el.dataset.prevValue||'':'';const key=personId+'|'+ws+'|'+day;if(!Object.hasOwn(SCHEDULE_CELL_VALUES,key))SCHEDULE_CELL_VALUES[key]=previous;const seq=(SCHEDULE_WRITE_SEQ[key]||0)+1;SCHEDULE_WRITE_SEQ[key]=seq;const previousTail=SCHEDULE_WRITE_TAIL[key]||Promise.resolve();const operation=previousTail.catch(()=>{}).then(()=>setShift(personId,profileUserId,day,ws,shift)).catch(()=>{if(SCHEDULE_WRITE_SEQ[key]===seq)setStatus('error');return false;});const queued=operation.finally(()=>{if(SCHEDULE_WRITE_TAIL[key]===queued)delete SCHEDULE_WRITE_TAIL[key];});SCHEDULE_WRITE_TAIL[key]=queued;const ok=await operation;const latest=SCHEDULE_WRITE_SEQ[key]===seq;if(ok)SCHEDULE_CELL_VALUES[key]=shift;if(!latest)return null;if(!ok&&el){el.value=SCHEDULE_CELL_VALUES[key]??previous;}else if(ok&&el?.dataset)el.dataset.prevValue=shift;return ok;}
@@ -1066,7 +1075,7 @@ async function renderSched(m){
   const roles=['Dr.','진료실','데스크','기공·행정','상담','야간','OFF','연차·반차'],dates=Array.from({length:7},(_,i)=>addDays(ws,i));
   let grid='<div class="tblwrap"><table class="schedule-role-table"><tr><th>직무·상태</th>'+dates.map(ds=>'<th>'+['월','화','수','목','금','토','일'][scheduleDayForDate(ds)-1<0?6:scheduleDayForDate(ds)-1]+'<br><span class="sub">'+md(ds)+'</span></th>').join('')+'</tr>';
   for(const role of roles){grid+='<tr><th class="schedule-role-label">'+role+'</th>'+dates.map(ds=>'<td>'+scheduleRoleCell(role,ws,ds,SCHEDULE_PEOPLE,rows||[],leaveByUser,canEdit)+'</td>').join('')+'</tr>';}
-  grid+='</table></div>';
+  grid+='</table></div>'+scheduleMobileRoleDays(ws,dates,roles,SCHEDULE_PEOPLE,rows||[],leaveByUser,canEdit);
   m.innerHTML=`<div class="card"><h2>🗓 근무표 <span class="b ${published?'ok':'wait'}">${published?'공표됨':'초안'}</span></h2>
     <div class="rowflex schedule-actions" style="align-items:center;margin-bottom:8px;gap:8px">
       <button class="mini ${SCHED_VIEW==='week'?'stamp':''}" onclick="SCHED_VIEW='week';render()">주간 편집</button><button class="mini ${SCHED_VIEW==='month'?'stamp':''}" onclick="SCHED_VIEW='month';SCHED_MONTH='${ws.slice(0,7)}';render()">월간 편집</button><button class="mini" onclick="navWeek(-7)">◀ 지난주</button>
@@ -1481,7 +1490,7 @@ async function renderAppr(m){
     const {data:completed}=await sb.from('approval_docs').select('*').in('status',['완결','취소']).order('created_at',{ascending:false}).limit(50);
     archive=`<div class="card"><h2>🗂 완결된 결재 문서</h2>${(completed||[]).length?(completed||[]).map(d=>`<div>${docCard(d,false,issuedByDoc)}${d.status==='완결'&&!issuedByDoc.has(d.id)?`<div style="margin:-4px 0 10px"><button class="mini rej" onclick="cancelApprovalDoc(${d.id})">취소</button></div>`:''}</div>`).join(''):'<div class="empty">없음</div>'}</div>`;
   }
-  m.innerHTML=`<div class="card"><h2>🖊 결재</h2><button class="hbtn pri" onclick="show('apMask');$('#apMsg').textContent='';">결재 올리기</button></div>
+  m.innerHTML=`<div class="card"><h2>🖊 결재</h2><p class="hint">직원은 문서를 올리고 진행 상태를 확인합니다. 실장은 올라온 문서를 먼저 검토하고, 원장이 최종 결재합니다.</p><button class="hbtn pri" onclick="show('apMask');$('#apMsg').textContent='';">결재 올리기</button></div>
   ${inbox}
   ${archive}
   <div class="card"><h2>📄 내가 올린 문서</h2>${(mine||[]).length?(mine||[]).map(d=>docCard(d,false,issuedByDoc)).join(''):'<div class="empty">없음</div>'}</div>`;
@@ -1619,14 +1628,14 @@ function renderWorkDocumentResults(){const results=document.querySelector('#work
 function workDocumentsGuideHtml(){return `<div class="guide-shell">
   <div class="guide-head"><div><div class="guide-breadcrumb">업무자료 | 직원 허브 사용 설명서</div><h2>직원 허브 사용 설명서</h2><p class="guide-lead">매일 필요한 메뉴를 짧게 따라가 보세요. 보이는 메뉴만 사용하면 됩니다.</p></div><button type="button" class="mini guide-close" onclick="closeWorkDocumentsGuide()">← 업무자료로 돌아가기</button></div>
   <div class="guide-flow" aria-label="직원 허브 기본 동선"><span><b>01</b>홈</span><span><b>02</b>근무표·연차</span><span><b>03</b>결재·공지</span><span><b>04</b>자료·서류</span></div>
-  <div class="guide-mock" aria-label="직원 화면 미니 예시"><div class="guide-mock-nav"><span class="active">홈</span><span>근무표</span><span>연차</span><span>결재</span><span>공지</span></div><div class="guide-mock-row"><b>오늘 확인할 일</b><span class="guide-pill">공지 2 · 미제출 1</span></div><p class="guide-caption"><b>①</b> 위쪽 메뉴에서 원하는 화면을 고르고, 카드 안의 버튼을 누르면 해당 작업으로 이동합니다.</p></div>
+  <p class="guide-caption">위쪽 메뉴에서 원하는 화면을 고르고, 카드 안의 버튼을 누르면 해당 작업으로 이동합니다. 아래 사진은 실제 직원 허브 화면입니다.</p>
   <div class="guide-sections">
-    <section class="guide-section"><h3>🏠 홈에서 할 일 확인</h3><p>홈에서 오늘 확인할 공지, 남은 연차, 미제출 서류를 먼저 봅니다.</p></section>
-    <section class="guide-section"><h3>🗓 근무표 확인</h3><p>근무표에서 내 근무일과 시간을 확인합니다. 날짜를 누르면 자세한 내용이 보입니다.</p></section>
-    <section class="guide-section"><h3>🌿 연차 신청·확인</h3><ul><li>연차 화면에서 종류와 날짜를 입력해 신청합니다.</li><li>승인된 연차는 캘린더 안의 연차 보기에서 확인합니다.</li><li>공휴일 표시는 병원 휴무 의미가 아닐 수 있습니다.</li></ul></section>
-    <section class="guide-section"><h3>🖊 결재 문서 올리기·상태 확인</h3><p>결재에서 제목과 내용을 입력해 문서를 올립니다. 내가 올린 문서의 진행·완결·반려 상태를 확인할 수 있습니다.</p></section>
-    <section class="guide-section"><h3>📢 공지 확인</h3><p>공지에서 병원 안내와 새 소식을 확인합니다. 제목과 본문을 읽고 필요한 경우 전문 링크를 엽니다.</p></section>
-    <section class="guide-section"><h3>📚 업무자료 보기</h3><p>업무자료에서 매뉴얼과 필요물품 요청·구매현황을 검색해 엽니다. 이 설명서도 업무자료 안에서 다시 열 수 있습니다.</p></section>
+    <section class="guide-section"><h3>🏠 홈에서 할 일 확인</h3><p>홈에서 오늘 확인할 공지, 남은 연차, 미제출 서류를 먼저 봅니다.</p><figure class="guide-shot"><img src="docs/guide-home.png" alt="직원 허브 홈의 연차·공지·미제출 서류 카드" loading="lazy"><figcaption>실제 화면: 홈</figcaption></figure></section>
+    <section class="guide-section"><h3>🗓 근무표 확인</h3><p>근무표에서 내 근무일과 시간을 확인합니다. 날짜를 누르면 자세한 내용이 보입니다.</p><figure class="guide-shot"><img src="docs/guide-schedule.png" alt="직원 허브 주간 근무표 실제 화면" loading="lazy"><figcaption>실제 화면: 근무표</figcaption></figure></section>
+    <section class="guide-section"><h3>🌿 연차 신청·확인</h3><ul><li>연차 화면에서 종류와 날짜를 입력해 신청합니다.</li><li>승인된 연차는 캘린더 안의 연차 보기에서 확인합니다.</li><li>공휴일 표시는 병원 휴무 의미가 아닐 수 있습니다.</li></ul><figure class="guide-shot"><img src="docs/guide-leave.png" alt="직원 허브 연차 신청과 내 신청 내역 화면" loading="lazy"><figcaption>실제 화면: 연차</figcaption></figure></section>
+    <section class="guide-section"><h3>🖊 결재 문서 올리기·상태 확인</h3><p>결재에서 제목과 내용을 입력해 문서를 올립니다. 내가 올린 문서의 진행·완결·반려 상태를 확인할 수 있습니다.</p><figure class="guide-shot"><img src="docs/guide-approval.png" alt="직원 허브 결재 올리기와 결재 대기·완결 문서 화면" loading="lazy"><figcaption>실제 화면: 결재함</figcaption></figure></section>
+    <section class="guide-section"><h3>📢 공지 확인</h3><p>공지에서 병원 안내와 새 소식을 확인합니다. 제목과 본문을 읽고 필요한 경우 전문 링크를 엽니다.</p><figure class="guide-shot"><img src="docs/guide-notice.png" alt="직원 허브 공지 목록 실제 화면" loading="lazy"><figcaption>실제 화면: 공지</figcaption></figure></section>
+    <section class="guide-section"><h3>📚 업무자료 보기</h3><p>업무자료에서 매뉴얼과 필요물품 요청·구매현황을 검색해 엽니다. 이 설명서도 업무자료 안에서 다시 열 수 있습니다.</p><figure class="guide-shot"><img src="docs/guide-work-documents.png" alt="직원 허브 업무자료 검색과 자료 카드 화면" loading="lazy"><figcaption>실제 화면: 업무자료</figcaption></figure></section>
     <section class="guide-section"><h3>💡 건의함 사용</h3><p>건의함에서 글을 쓰고 다른 글에 좋아요를 누릅니다. 월간 시상은 캠페인 종료 후 공개되는 안내를 확인합니다.</p></section>
     <section class="guide-section"><h3>📎 내 서류함·계약서 열람</h3><p>내 서류함에서 필요한 서류를 제출합니다. 직원 서류함에서는 올린 서류와 체결된 근로계약서를 열람할 수 있습니다.</p></section>
   </div>
@@ -3466,6 +3475,8 @@ async function onAuthed(session){
         const {data:ca}=await sb.from('confidential_access').select('user_id').eq('user_id',ME.id).maybeSingle();
         ME.confidAccess=!!ca||ME.role==='owner';
       }catch(e){ME.confidAccess=false;} // 조회 실패 시 fail closed — 탭을 숨기는 쪽으로
+      const requestedTab=typeof location!=='undefined'&&typeof URLSearchParams==='function'?new URLSearchParams(location.search).get('tab'):null;
+      if(requestedTab&&visibleTabKeys().has(requestedTab))TAB=requestedTab;
       $('#meName').textContent=ME.name;$('#meRole').textContent=ME.role;
       renderNav();await render();await refreshBadges();
       // 결재선 표시(비동기)

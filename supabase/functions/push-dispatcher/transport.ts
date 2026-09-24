@@ -16,6 +16,11 @@ export function isSafePushEndpoint(value: string): boolean {
 export function safeNotification(eventType: string): { title: string; body: string; url: string; tag: string } | null {
   if (eventType === "leave_submitted") return { title: "연차 신청 알림", body: "새 연차 신청을 확인해 주세요.", url: "/hr.html?tab=leave", tag: "leave-submitted" };
   if (eventType === "leave_status_changed") return { title: "연차 신청 상태 변경", body: "연차 신청 상태가 변경되었습니다.", url: "/hr.html?tab=leave", tag: "leave-status" };
+  if (eventType === "approval_submitted") return { title: "결재 대기 알림", body: "확인할 결재 문서가 있습니다.", url: "/hr.html?tab=appr", tag: "approval-pending" };
+  if (eventType === "payment_pending") return { title: "결제 요청 알림", body: "확인할 결제 요청이 있습니다.", url: "/hr.html?tab=onbo", tag: "payment-pending" };
+  if (eventType === "notice_published") return { title: "새 공지 알림", body: "새 공지가 등록되었습니다.", url: "/hr.html?tab=notice", tag: "notice-published" };
+  if (eventType === "document_approved") return { title: "서류 승인 알림", body: "제출한 서류가 승인되었습니다.", url: "/hr.html?tab=onbo", tag: "document-approved" };
+  if (eventType === "consultation_received") return { title: "새 문의 알림", body: "새 문의가 도착했습니다.", url: "/hr.html?tab=inbox", tag: "consultation-received" };
   return null;
 }
 

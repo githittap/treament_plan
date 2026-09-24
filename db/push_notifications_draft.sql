@@ -12,7 +12,7 @@ begin;
 do $$ begin
   if to_regclass('public.profiles') is null or to_regclass('public.leave_requests') is null
      or to_regclass('public.push_subscriptions') is null or to_regclass('public.payment_requests') is null
-     or to_regclass('public.notices') is null or to_regclass('public.employee_documents') is null
+     or to_regclass('public.notices') is null or to_regclass('public.approval_steps') is null or to_regclass('public.employee_documents') is null
      or to_regclass('public.consultation_inbox') is null then
     raise exception 'push notification prerequisite table missing; preserve state and stop';
   end if;
@@ -22,6 +22,7 @@ do $$ begin
       ('leave_requests','id'),('leave_requests','user_id'),('leave_requests','status'),
       ('push_subscriptions','id'),('push_subscriptions','user_id'),('push_subscriptions','endpoint'),('push_subscriptions','subscription'),
       ('payment_requests','id'),('payment_requests','status'),
+      ('approval_steps','id'),('approval_steps','doc_id'),('approval_steps','seq'),('approval_steps','status'),
       ('notices','id'),('notices','author_id'),
       ('employee_documents','id'),('employee_documents','user_id'),('employee_documents','checked_at'),
       ('consultation_inbox','id')
@@ -36,7 +37,7 @@ do $$ begin
      or to_regprocedure('public.enqueue_push_event(text,uuid,text,jsonb)') is not null
      or to_regprocedure('public.claim_push_events(uuid,integer)') is not null
      or to_regprocedure('public.record_push_delivery(bigint,uuid,uuid,text,integer)') is not null
-     or exists(select 1 from pg_trigger where tgname in ('queue_leave_push_event','queue_payment_push_event','queue_notice_push_event','queue_document_push_event','queue_consultation_push_event'))
+     or exists(select 1 from pg_trigger where tgname in ('queue_leave_push_event','queue_payment_push_event','queue_approval_push_event','queue_notice_push_event','queue_document_push_event','queue_consultation_push_event'))
   then raise exception 'push notification outbox migration object collision; preserve state and stop'; end if;
 end $$;
 
@@ -45,7 +46,7 @@ create table public.push_events (
   id bigint generated always as identity primary key,
   event_key text not null unique,
   recipient_id uuid not null references public.profiles(user_id) on delete cascade,
-  event_type text not null check (event_type in ('leave_submitted','leave_status_changed','payment_pending','notice_published','document_approved','consultation_received')),
+  event_type text not null check (event_type in ('leave_submitted','leave_status_changed','payment_pending','approval_submitted','notice_published','document_approved','consultation_received')),
   payload jsonb not null,
   status text not null default 'queued' check (status in ('queued','sent','failed')),
   attempts integer not null default 0,
@@ -109,7 +110,7 @@ revoke all on function public.queue_leave_push_event() from public,anon,authenti
 create trigger queue_leave_push_event after insert or update of status on public.leave_requests
 for each row execute function public.queue_leave_push_event();
 
--- 추가 4종은 Push 문구 시안 승인 전까지 outbox만 적재한다. 발송기는 미지원 event_type을 발송하지 않는다.
+-- 추가 알림 payload에는 업무 원문을 담지 않는다.
 -- payload에는 고정 빈 객체만 저장한다(결재 금액·계좌, 공지 본문, 문서 경로, 환자 문의 원문 제외).
 create function public.queue_payment_push_event()
 returns trigger language plpgsql security definer set search_path=public as $$
@@ -127,6 +128,23 @@ end; $$;
 revoke all on function public.queue_payment_push_event() from public,anon,authenticated,service_role;
 create trigger queue_payment_push_event after insert or update of status on public.payment_requests
 for each row execute function public.queue_payment_push_event();
+
+create function public.queue_approval_push_event()
+returns trigger language plpgsql security definer set search_path=public as $$
+declare recipient record; target_role text;
+begin
+  if tg_op='INSERT' and new.seq=1 and new.status='대기' then target_role:='chief';
+  elsif tg_op='UPDATE' and new.seq=1 and old.status is distinct from new.status and new.status='승인' then target_role:='owner';
+  else return new; end if;
+  for recipient in select user_id from public.profiles
+    where role=target_role and active=true and approved=true and account_access_status='활성' loop
+    perform public.enqueue_push_event(format('approval-doc:%s:step:%s:%s',new.doc_id,new.seq,recipient.user_id),recipient.user_id,'approval_submitted','{}'::jsonb);
+  end loop;
+  return new;
+end; $$;
+revoke all on function public.queue_approval_push_event() from public,anon,authenticated,service_role;
+create trigger queue_approval_push_event after insert or update of status on public.approval_steps
+for each row execute function public.queue_approval_push_event();
 
 create function public.queue_notice_push_event()
 returns trigger language plpgsql security definer set search_path=public as $$

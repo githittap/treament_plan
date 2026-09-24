@@ -30,6 +30,7 @@ async function fresh({applyDraft=true,noticeAuthorId=true}={}){
     create table public.profiles(user_id uuid primary key,role text not null default 'staff',active boolean not null default true,approved boolean not null default true,account_access_status text not null default '활성');
     create table public.leave_requests(id bigint generated always as identity primary key,user_id uuid not null references public.profiles(user_id),status text not null default '대기');
     create table public.employee_documents(id bigint generated always as identity primary key,user_id uuid not null references public.profiles(user_id),checked_at timestamptz);
+    create table public.approval_steps(id bigint generated always as identity primary key,doc_id bigint not null,seq integer not null,approver_role text not null,status text not null default '대기');
     create table public.consultation_inbox(id uuid primary key,created_by uuid,contact text,message text not null);
     create table public.push_subscriptions(id uuid primary key,user_id uuid not null references public.profiles(user_id) on delete cascade,endpoint text not null,subscription jsonb not null,created_at timestamptz not null default now(),updated_at timestamptz not null default now(),unique(user_id,endpoint));
     grant select,insert,update,delete on public.profiles,public.leave_requests,public.push_subscriptions to authenticated;
@@ -224,6 +225,18 @@ async function rollbackError(db){try{await db.exec(rollback);return null}catch(e
   await q("update public.payment_requests set status='owner_pending'");
   await q("update public.payment_requests set status='owner_pending'");
   events=await q("select recipient_id from public.push_events where event_type='payment_pending' order by recipient_id");
+  assert.deepEqual(events.map(r=>r.recipient_id).sort(),[chief,owner].sort());
+}finally{await db.close()}}
+
+// 11-1) 일반 결재는 첫 단계 실장, 실장 승인 뒤 원장에게 각각 한 번만 쌓인다.
+{const {db,q}=await fresh();try{
+  await q("insert into public.approval_steps(doc_id,seq,approver_role) values (42,1,'chief'),(42,2,'owner')");
+  let events=await q("select recipient_id,payload from public.push_events where event_type='approval_submitted'");
+  assert.deepEqual(events.map(r=>r.recipient_id),[chief]);
+  assert.deepEqual(events[0].payload,{});
+  await q("update public.approval_steps set status='승인' where doc_id=42 and seq=1");
+  await q("update public.approval_steps set status='승인' where doc_id=42 and seq=1");
+  events=await q("select recipient_id from public.push_events where event_type='approval_submitted' order by recipient_id");
   assert.deepEqual(events.map(r=>r.recipient_id).sort(),[chief,owner].sort());
 }finally{await db.close()}}
 

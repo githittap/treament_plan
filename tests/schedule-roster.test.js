@@ -495,7 +495,7 @@ test('근무표 연차 조회 오류는 대상과 escape된 메시지만 표시�
 function scheduleMonthRenderHarness({ role = 'staff', leaveRows = [] } = {}) {
   const source = html.match(/async function renderScheduleMonth\([\s\S]*?\r?\n\}\r?\nasync function applyScheduleShift/);
   assert.ok(source, 'renderScheduleMonth 함수를 찾을 수 없습니다.');
-  const helpers = [html.match(/function scheduleMonthWeeks[\s\S]*?\n\}/)?.[0], html.match(/function scheduleShiftOptions[\s\S]*?\n\}/)?.[0], html.match(/function syncScheduleCellValues[\s\S]*?\n\}/)?.[0], html.match(/function scheduleRolePeople[\s\S]*?\n\}/)?.[0], html.match(/function scheduleRoleColor[\s\S]*?\n\}/)?.[0], html.match(/function scheduleRoleCell[\s\S]*?\n\}/)?.[0], html.match(/async function toggleScheduleRoleMember[\s\S]*?\n\}/)?.[0]].filter(Boolean).join('\n');
+  const helpers = [html.match(/function scheduleMonthWeeks[\s\S]*?\n\}/)?.[0], html.match(/function scheduleShiftOptions[\s\S]*?\n\}/)?.[0], html.match(/function syncScheduleCellValues[\s\S]*?\n\}/)?.[0], html.match(/function scheduleRolePeople[\s\S]*?\n\}/)?.[0], html.match(/function scheduleRoleColor[\s\S]*?\n\}/)?.[0], html.match(/function scheduleRoleCell[\s\S]*?\n\}/)?.[0], html.match(/async function toggleScheduleRoleMember[\s\S]*?\n\}/)?.[0], html.match(/function scheduleMobileRoleDays[\s\S]*?\n\}/)?.[0]].filter(Boolean).join('\n');
   const m = { innerHTML: '' };
   const rows = [{ person_id: 'person-1', user_id: 'user-1', week_start: '2028-01-31', day: 2, shift: 'evening' }, { person_id: 'evening-1', user_id: 'user-2', week_start: '2028-01-31', day: 2, shift: 'evening' }, { person_id: 'work-1', user_id: 'user-3', week_start: '2028-01-31', day: 2, shift: 'work' }, { person_id: 'guest-1', user_id: null, week_start: '2028-02-21', day: 4, shift: 'evening' }, { person_id: 'old-1', user_id: null, week_start: '2028-01-31', day: 2, shift: 'evening' }];
   const weekRows = [{ week_start: '2028-01-31', status: '초안' }, { week_start: '2028-02-07', status: '공표' }, { week_start: '2028-02-14', status: '초안' }, { week_start: '2028-02-21', status: '공표' }, { week_start: '2028-02-28', status: '초안' }];
@@ -522,6 +522,7 @@ test('월간 렌더는 윤년 월경계·비로그인 Dr 저장키와 혼합 공
   await context.renderScheduleMonth(m);
   assert.match(m.innerHTML, /2028-02/);
   assert.match(m.innerHTML, /schedule-role-table/);
+  assert.match(m.innerHTML, /schedule-mobile-days/);
   assert.match(m.innerHTML, /Dr\.|진료실|야간|연차·반차/);
   assert.match(m.innerHTML, /type="checkbox"/);
   assert.match(m.innerHTML, /2028-02/);
