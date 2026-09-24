@@ -958,6 +958,7 @@ test('관리자 직무 분류 화면은 순서·Dr 분리·저장 조건·모바
   assert.match(html, /Dr\. 별도 유지 · 편집 제외/);
   assert.match(html, /button\.disabled = !preview\.canSave/);
   assert.match(html, /@media\(max-width:640px\)\{\.job-group-form\{grid-template-columns:1fr\}/);
+  assert.match(html, /@media\(max-width:640px\)[\s\S]*?\.job-group-summary\{grid-template-columns:1fr\}/);
   assert.match(html, /\.job-group-preview\{width:100%\}/);
   assert.match(html, /\.job-group-actions\{position:sticky;bottom:0/);
   assert.match(html, /request = move\.from === null \? request\.is\('job_group', null\) : request\.eq\('job_group', move\.from\)/);
