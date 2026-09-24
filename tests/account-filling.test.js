@@ -91,8 +91,8 @@ if (block) {
     assert.deepEqual(result, ['staff-1']);
   });
 
-  test('staff/manager/chief는 정상적으로 대상 목록을 만든다', () => {
-    for (const role of ['staff', 'manager', 'chief']) {
+  test('staff/manager/chief/deputy는 정상적으로 대상 목록을 만든다', () => {
+    for (const role of ['staff', 'manager', 'chief', 'deputy']) {
       const selected = new Set(['staff-1', 'staff-2']);
       const result = plain(context.bulkRoleApplyTargets(profiles, selected, 'owner-1', role));
       assert.deepEqual(result.sort(), ['staff-1', 'staff-2'].sort());
@@ -105,7 +105,7 @@ if (block) {
   });
 
   test('허용 role 목록은 owner를 포함하지 않는다', () => {
-    assert.deepEqual(plain(context.BULK_ROLE_ALLOWED_ROLES), ['staff', 'manager', 'chief']);
+    assert.deepEqual(plain(context.BULK_ROLE_ALLOWED_ROLES), ['staff', 'manager', 'chief', 'deputy']);
   });
 
   /* ── inviteMessageText ── */
