@@ -29,12 +29,23 @@ create policy contracts_select_deputy_self on public.contracts for select to aut
 using (public.my_role() in ('manager','chief','owner') or (public.my_role()='deputy' and user_id=auth.uid()) or (user_id=auth.uid() and (status='대기' or (status='서명완료' and signed_at>now()-interval '5 days'))));
 
 do $$ declare t text; begin
-  foreach t in array array['attendance','att_months','attendance_issues','schedule_weeks','schedules','leave_requests','leave_ledger','holidays','calendar_events','notices','notice_reads','approval_docs','approval_steps','payroll_rows','payslips','monthly_reviews','bonus_rules','ledger_files','employee_documents','fingerprint_registration_requests'] loop
+  foreach t in array array['attendance','att_months','attendance_issues','attendance_manual_entries','schedule_weeks','schedules','schedule_people','leave_requests','leave_ledger','leave_application_documents','holidays','calendar_events','notices','notice_reads','approval_docs','approval_steps','payroll_rows','payslips','monthly_reviews','bonus_rules','ledger_files','employee_documents','fingerprint_registration_requests','deposits'] loop
     if to_regclass('public.'||t) is not null then
+      execute format('alter table public.%I enable row level security',t);
       execute format('drop policy if exists deputy_contract_only_block on public.%I',t);
       execute format('create policy deputy_contract_only_block on public.%I as restrictive for all to authenticated using (public.my_role() <> ''deputy'') with check (public.my_role() <> ''deputy'')',t);
     end if;
   end loop;
+end $$;
+
+do $$ begin
+  if to_regclass('storage.objects') is not null then
+    alter table storage.objects enable row level security;
+    drop policy if exists deputy_contract_only_storage_block on storage.objects;
+    create policy deputy_contract_only_storage_block on storage.objects as restrictive for all to authenticated
+      using (public.my_role()<>'deputy' or bucket_id not in ('leave-docs','notice-attachments'))
+      with check (public.my_role()<>'deputy' or bucket_id not in ('leave-docs','notice-attachments'));
+  end if;
 end $$;
 
 revoke all on function public.update_employee_profile_field(uuid,text,text) from public,anon;
@@ -44,10 +55,11 @@ commit;
 -- ROLLBACK (로컬 초안 전용): deputy 정책을 제거하고 기존 4역할 계약으로 복귀한다.
 -- begin;
 -- do $$ declare t text; begin
---   foreach t in array array['attendance','att_months','attendance_issues','schedule_weeks','schedules','leave_requests','leave_ledger','holidays','calendar_events','notices','notice_reads','approval_docs','approval_steps','payroll_rows','payslips','monthly_reviews','bonus_rules','ledger_files','employee_documents','fingerprint_registration_requests'] loop
+--   foreach t in array array['attendance','att_months','attendance_issues','attendance_manual_entries','schedule_weeks','schedules','schedule_people','leave_requests','leave_ledger','leave_application_documents','holidays','calendar_events','notices','notice_reads','approval_docs','approval_steps','payroll_rows','payslips','monthly_reviews','bonus_rules','ledger_files','employee_documents','fingerprint_registration_requests','deposits'] loop
 --     if to_regclass('public.'||t) is not null then execute format('drop policy if exists deputy_contract_only_block on public.%I',t); end if;
 --   end loop;
 -- end $$;
+-- drop policy if exists deputy_contract_only_storage_block on storage.objects;
 -- drop policy if exists contracts_select_deputy_self on public.contracts;
 -- alter table if exists public.profiles drop constraint if exists profiles_role_check;
 -- alter table if exists public.profiles add constraint profiles_role_check check (role in ('owner','chief','manager','staff'));

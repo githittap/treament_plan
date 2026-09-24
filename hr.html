@@ -170,19 +170,6 @@ tr.new td{background:var(--mint-dk)}
 footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px;color:#4a5f5a;padding:4px;background:var(--bg);border-top:1px solid var(--line);z-index:20}
 @media(max-width:640px){.nav button{padding:5px 8px;font-size:12px} main{padding:12px 10px 66px}}
 </style>
-<style>
-@media print{
-  @page{size:A4 landscape;margin:8mm}
-  body.schedule-printing> *{display:none!important}
-  body.schedule-printing>#app,body.schedule-printing>#app main{display:block!important}
-  body.schedule-printing header,body.schedule-printing footer,body.schedule-printing .schedule-actions,body.schedule-printing .nav,body.schedule-printing .nav2,body.schedule-printing .hint,body.schedule-printing .schedule-roster-admin{display:none!important}
-  body.schedule-printing main{max-width:none!important;padding:0!important}
-  body.schedule-printing .card{border:0!important;box-shadow:none!important;margin:0!important;padding:0!important}
-  body.schedule-printing .tblwrap{max-height:none!important;overflow:visible!important}
-  body.schedule-printing .schedule-week-block{break-inside:avoid;page-break-inside:avoid}
-  body.schedule-printing .schedule-role-table{min-width:0!important;font-size:9px!important}
-}
-</style>
 </head>
 <body>
 
@@ -1461,7 +1448,10 @@ async function saveCalendarPng(){
 }
 /* schedule-print:test-start */
 function printWithClass(className){
-  document.body.classList.add(className);const done=()=>{document.body.classList.remove(className);window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);window.print();
+  document.body.classList.add(className);
+  const printStyle=className==='schedule-printing'?document.createElement('style'):null;
+  if(printStyle){printStyle.textContent='@media print{@page{size:A4 landscape;margin:8mm}body.schedule-printing> *{display:none!important}body.schedule-printing>#app,body.schedule-printing>#app main{display:block!important}body.schedule-printing header,body.schedule-printing footer,body.schedule-printing .schedule-actions,body.schedule-printing .nav,body.schedule-printing .nav2,body.schedule-printing .hint,body.schedule-printing .schedule-roster-admin{display:none!important}body.schedule-printing main{max-width:none!important;padding:0!important}body.schedule-printing .card{border:0!important;box-shadow:none!important;margin:0!important;padding:0!important}body.schedule-printing .tblwrap{max-height:none!important;overflow:visible!important}body.schedule-printing .schedule-week-block{break-inside:avoid;page-break-inside:avoid}body.schedule-printing .schedule-role-table{min-width:0!important;font-size:9px!important}}';(document.head||document.documentElement).appendChild(printStyle);}
+  const done=()=>{document.body.classList.remove(className);if(printStyle)printStyle.remove();window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);window.print();
 }
 function printCalendar(){printWithClass('calendar-printing');}
 function printSchedule(){printWithClass('schedule-printing');}
