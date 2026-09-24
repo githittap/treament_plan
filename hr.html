@@ -1836,12 +1836,14 @@ function onboardingGuideVisibleForRole(role){return ['staff','manager','chief','
 function onboardingGuideCard(){return `<div class="card"><h2>🧭 신입 첫날 안내</h2><div class="hint">가입 직후 확인하는 공통 안내입니다. 실장·매니저도 신규 직원에게 같은 내용을 안내합니다.</div><ol>${onboardingGuideItems().map(item=>`<li>${esc(item)}</li>`).join('')}</ol></div>`;}
 /* onboarding-guide:test-end */
 /* onboarding-evidence:test-start */
+function isAllowedLatentTuberculosisEvidenceMime(mime){return ['application/pdf','image/png','image/jpeg','image/gif'].includes(String(mime||'').trim().toLowerCase());}
 function onboardingEvidenceComplete(kind,profile,documents){
   const p=profile||{},docs=documents||[];
   if(kind==='계좌')return !!(String(p.bank_name||'').trim()&&String(p.account_number||'').trim());
   if(kind==='Notion')return !!(String(p.notion_id||'').trim()&&p.notion_app_installed&&p.notion_workspace_logged_in);
   const typeMap={'잠복결핵':'잠복결핵 검사서','자격증':'자격증','보안서약':'보안서약서'};
-  return !typeMap[kind]||docs.some(d=>d.document_type===typeMap[kind]);
+  if(!typeMap[kind])return true;
+  return docs.some(d=>d.document_type===typeMap[kind]&&(kind!=='잠복결핵'||isAllowedLatentTuberculosisEvidenceMime(d.mime_type)));
 }
 function onboardingChecklistRows(evidence,documents){
   const e=evidence||{},docs=documents||[];
@@ -1918,7 +1920,15 @@ function validateGeneralDocument(file){
   if(BLOCKED_DOCUMENT_EXT.test(String(file.name||''))||BLOCKED_DOCUMENT_TYPES.has(String(file.type||'')))return '실행 파일·압축 파일은 올릴 수 없습니다.';
   return '';
 }
-function validateEmployeeDocument(file){return validateGeneralDocument(file);}
+function validateEmployeeDocument(file,documentType){
+  const problem=validateGeneralDocument(file);if(problem)return problem;
+  if(documentType==='잠복결핵 검사서'){
+    const mime=String(file.type||'').trim().toLowerCase(),name=String(file.name||'');
+    const extensionByMime={'application/pdf':/\.pdf$/i,'image/png':/\.png$/i,'image/jpeg':/\.(jpg|jpeg)$/i,'image/gif':/\.gif$/i};
+    if(!isAllowedLatentTuberculosisEvidenceMime(mime)||!extensionByMime[mime]?.test(name))return '잠복결핵 검사서는 PDF 또는 이미지(PNG/JPG/GIF) 파일만 올릴 수 있습니다.';
+  }
+  return '';
+}
 /* employee-documents:test-end */
 function employeeDocumentsCard(docs,error,contractRows,contractError,leaveDocs,leaveError,leaveRequests,approvalDocs,approvalError,paymentRequests,paymentError,paymentReceipts,paymentReceiptsError){
   const lead=isMgr(),staff=PROFILES.filter(p=>p.active!==false&&p.approved!==false);
@@ -1981,8 +1991,8 @@ function previewEmployeeContract(id){
   box.style.display='block';box.innerHTML='<h3>'+esc(row.original_name||'근로계약서')+'</h3><iframe title="근로계약서 미리보기" sandbox="" style="width:100%;min-height:520px;border:1px solid var(--line);border-radius:8px;background:#fff" srcdoc="'+esc(contractPreviewHtml(row))+'"></iframe>';
 }
 async function uploadEmployeeDocument(){
-  const file=$('#edFile').files[0],msg=$('#edMsg'),problem=validateEmployeeDocument(file);if(problem){msg.textContent=problem;return;}
-  const userId=isMgr()?$('#edUser').value:ME.id,type=$('#edType').value,path=`${userId}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+  const file=$('#edFile').files[0],msg=$('#edMsg'),type=$('#edType').value,problem=validateEmployeeDocument(file,type);if(problem){msg.textContent=problem;return;}
+  const userId=isMgr()?$('#edUser').value:ME.id,path=`${userId}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
   setStatus('saving');msg.textContent='업로드 중…';
   const {error:storageError}=await sb.storage.from('hr-docs').upload(path,file,{contentType:file.type,upsert:false});
   if(storageError){msg.textContent='파일 업로드 실패: '+storageError.message;setStatus('error');return;}
