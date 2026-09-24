@@ -75,7 +75,40 @@ test('통합 명부 순수 함수 코드 블록이 포함되어 있다', () => {
 if (block) {
   const context = {};
   vm.createContext(context);
-  vm.runInContext(`${block[1]};this.schedulePersonLabel=schedulePersonLabel;this.schedulePeopleForWeek=schedulePeopleForWeek;this.scheduleDate=scheduleDate;this.scheduleCalendarIndex=scheduleCalendarIndex;this.calendarLeaveIndex=typeof calendarLeaveIndex==='function'?calendarLeaveIndex:null;this.scheduleRowsWithoutApprovedLeave=typeof scheduleRowsWithoutApprovedLeave==='function'?scheduleRowsWithoutApprovedLeave:null;`, context);
+  vm.runInContext(`${block[1]};this.schedulePersonLabel=schedulePersonLabel;this.schedulePeopleForWeek=schedulePeopleForWeek;this.scheduleDate=scheduleDate;this.scheduleCalendarIndex=scheduleCalendarIndex;this.calendarLeaveIndex=typeof calendarLeaveIndex==='function'?calendarLeaveIndex:null;this.scheduleRowsWithoutApprovedLeave=typeof scheduleRowsWithoutApprovedLeave==='function'?scheduleRowsWithoutApprovedLeave:null;this.EMPLOYEE_JOB_GROUPS=typeof EMPLOYEE_JOB_GROUPS==='undefined'?null:EMPLOYEE_JOB_GROUPS;this.employeeJobGroupModel=typeof employeeJobGroupModel==='function'?employeeJobGroupModel:null;this.isCurrentJobGroupMember=typeof isCurrentJobGroupMember==='function'?isCurrentJobGroupMember:null;`, context);
+
+  test('네 직무 분류는 프로필 값을 우선하고 비로그인 행 값과 Dr. 별도 그룹을 유지한다', () => {
+    assert.ok(context.EMPLOYEE_JOB_GROUPS, '공통 직무 분류 상수가 있어야 한다');
+    assert.ok(context.employeeJobGroupModel, '공통 직무 분류 변환 함수가 있어야 한다');
+    assert.deepEqual(JSON.parse(JSON.stringify(context.EMPLOYEE_JOB_GROUPS.map(group => group.code))), [
+      'clinical_consult', 'sterilization_admin', 'lab', 'desk'
+    ]);
+    const profiles = new Map([
+      ['profile-1', { job_group: 'clinical_consult' }],
+      ['profile-dr', { job_group: 'desk' }]
+    ]);
+    assert.equal(context.employeeJobGroupModel({ profile_user_id: 'profile-1', job_group: 'lab' }, profiles).code, 'clinical_consult');
+    assert.equal(context.employeeJobGroupModel({ profile_user_id: null, job_group: 'desk' }, profiles).code, 'desk');
+    assert.equal(context.employeeJobGroupModel({ profile_user_id: null, job_group: null }, profiles).kind, 'unassigned');
+    assert.deepEqual(JSON.parse(JSON.stringify(context.employeeJobGroupModel({ department: 'Dr.', job_group: 'clinical_consult' }, profiles))), {
+      kind: 'doctor', code: null, label: 'Dr.', color: null, order: -1
+    });
+    assert.equal(context.employeeJobGroupModel({ profile_user_id: 'profile-dr', department: 'Dr.' }, profiles).label, 'Dr.');
+  });
+
+  test('현재 분류 대상은 퇴사 유효일 전날까지 포함하고 유효일부터 제외한다', () => {
+    assert.ok(context.isCurrentJobGroupMember, '현재 재직 판정 함수가 있어야 한다');
+    const profiles = new Map([
+      ['leaving', { employment_status: '자진퇴사', employment_effective_date: '2026-09-25', job_group: 'desk' }],
+      ['employed', { employment_status: '재직', employment_effective_date: null, job_group: 'lab' }]
+    ]);
+    const row = { profile_user_id: 'leaving', department: '데스크', active: true };
+    assert.equal(context.isCurrentJobGroupMember(row, profiles, '2026-09-24'), true);
+    assert.equal(context.isCurrentJobGroupMember(row, profiles, '2026-09-25'), false);
+    assert.equal(context.isCurrentJobGroupMember(row, profiles, '2026-09-26'), false);
+    assert.equal(context.isCurrentJobGroupMember({ profile_user_id: null, department: '진료실', active: false }, profiles, '2026-09-24'), false);
+    assert.equal(context.isCurrentJobGroupMember({ profile_user_id: 'employed', department: 'Dr.', active: true }, profiles, '2026-09-24'), false);
+  });
 
   test('의사 부서는 표시 이름에만 Dr. 접두사를 붙인다', () => {
     assert.equal(context.schedulePersonLabel({ name: '홍길동', department: 'Dr.' }), 'Dr. 홍길동');
