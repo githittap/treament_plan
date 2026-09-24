@@ -434,7 +434,7 @@ function scheduleRowsWithoutApprovedLeave(rows,leaveRows){
     return !(leaveRows||[]).some(leave=>leave.type!=='반차'&&leave.user_id===row.user_id&&leave.date_from<=date&&leave.date_to>=date);
   });
 }
-function leaveDisplayText(type,note){const label=type==='반차'?'반차':type==='기타'?'기타':'연차';return note?label+' · '+note:label;}
+function leaveDisplayText(type,note){const label=type==='반차'?'반차':type==='조퇴'?'조퇴':type==='기타'?'기타':'연차';return note?label+' · '+note:label;}
 /* schedule-roster:test-end */
 function mondayStr(ds){const d=new Date(ds+'T00:00:00');const g=d.getDay();d.setDate(d.getDate()+(g===0?-6:1-g));return dstr(d);}
 const SHIFTS={work:{l:'근무'},off:{l:'off'},evening:{l:'야간'},etc:{l:'기타'}};
@@ -674,14 +674,16 @@ async function reviewManualAttendance(id,action){const {error}=await sb.rpc('rev
 function attendanceMonthBounds(month){const [y,m]=month.split('-').map(Number),next=m===12?`${y+1}-01-01`:`${y}-${String(m+1).padStart(2,'0')}-01`;return {start:`${month}-01`,next};}
 /* absence-candidate:test-start */
 function absenceSettingsLoadSucceeded(result){return !result?.error&&Array.isArray(result?.data);}
-function absenceCandidateDecision({ds,todaySeoul,nowSeoul,siueop,afterMinutes,shift,hasAttendance,leave,manualStatus,excludePendingManual,hireDate,employmentStatus,effectiveDate,settingsLoaded}){
+function absenceCandidateDecision({ds,todaySeoul,nowSeoul,siueop,afterMinutes,afterDays,shift,hasAttendance,leave,manualStatus,excludePendingManual,hireDate,employmentStatus,effectiveDate,settingsLoaded}){
   const invalidCutoff=()=>{const m=String(siueop||'').match(/^(\d{2}):(\d{2})$/),n=String(afterMinutes??'').trim();return !m||Number(m[1])>23||Number(m[2])>59||!/^\d+$/.test(n)||Number(n)>1440;};
   const invalidNow=()=>{const m=String(nowSeoul||'').match(/^(\d{2}):(\d{2})$/);return !m||Number(m[1])>23||Number(m[2])>59;};
   if(!ds||shift==='off'||hasAttendance||ds>todaySeoul||(hireDate&&ds<hireDate)||(employmentStatus&&employmentStatus!=='재직'&&effectiveDate&&ds>=effectiveDate))return {candidate:false};
   // 승인 휴가는 종류·일수와 무관하게 해당 날짜를 모두 제외한다. 반차도 후보로 남기지 않는다.
   if(leave&&leave.status==='승인')return {candidate:false};
   if(excludePendingManual&&['대기','실장승인','원장확정'].includes(manualStatus))return {candidate:false};
-  if(ds<todaySeoul)return {candidate:true};
+  const dayDelay=String(afterDays??'').trim()===''?0:Number(afterDays),todayDate=new Date(`${todaySeoul}T00:00:00`),targetDate=new Date(`${ds}T00:00:00`),ageDays=Math.floor((todayDate-targetDate)/86400000);
+  if(!Number.isInteger(dayDelay)||dayDelay<0||dayDelay>365||!Number.isFinite(ageDays))return {candidate:false};
+  if(ds<todaySeoul)return {candidate:ageDays>=dayDelay};
   if(settingsLoaded===false)return {candidate:false};
   if(invalidCutoff()||invalidNow())return {candidate:false};
   const [h,m]=siueop.split(':').map(Number),[nh,nm]=nowSeoul.split(':').map(Number);
@@ -778,7 +780,7 @@ async function checkAbsent(month){
   const manualByKey=new Map();(manuals||[]).forEach(row=>{const key=row.user_id+'|'+row.work_date,rows=manualByKey.get(key)||[];rows.push(row);manualByKey.set(key,rows);});const now=seoulDateTime(),miss=[],seen=new Set(),settingsWarning=SETTINGS_LOAD_OK?'':`<div class="cal-error">설정 불러오기 오류: 오늘 후보는 표시하지 않습니다.</div>`;
   (sc||[]).forEach(s=>{ if(!s.user_id||s.shift==='off')return;
     for(let i=0;i<7;i++){const ds=addDays(s.week_start,i);const d=new Date(ds+'T00:00:00');
-      if(d.getDay()!==s.day||ds.slice(0,7)!==month||seen.has(s.user_id+'|'+ds))return;seen.add(s.user_id+'|'+ds);const p=PROFILES.find(x=>x.user_id===s.user_id)||{},leave=(leaves||[]).find(x=>x.user_id===s.user_id&&x.date_from<=ds&&x.date_to>=ds),decision=absenceCandidateDecision({ds,todaySeoul:now.date,nowSeoul:now.time,siueop:SETTINGS.siueop,afterMinutes:SETTINGS.absence_confirm_after_minutes,shift:s.shift,hasAttendance:has.has(s.user_id+'|'+ds),leave,manualStatus:absenceManualExcluded(manualByKey.get(s.user_id+'|'+ds))?'대기':undefined,excludePendingManual:String(SETTINGS.absence_exclude_pending_manual)!=='false',hireDate:p.hire_date,employmentStatus:p.employment_status,effectiveDate:p.employment_effective_date,settingsLoaded:SETTINGS_LOAD_OK});if(decision.candidate)miss.push({u:s.user_id,ds,shift:s.shift});}});
+      if(d.getDay()!==s.day||ds.slice(0,7)!==month||seen.has(s.user_id+'|'+ds))return;seen.add(s.user_id+'|'+ds);const p=PROFILES.find(x=>x.user_id===s.user_id)||{},leave=(leaves||[]).find(x=>x.user_id===s.user_id&&x.date_from<=ds&&x.date_to>=ds),decision=absenceCandidateDecision({ds,todaySeoul:now.date,nowSeoul:now.time,siueop:SETTINGS.siueop,afterMinutes:SETTINGS.absence_confirm_after_minutes,afterDays:SETTINGS.absence_confirm_after_days,shift:s.shift,hasAttendance:has.has(s.user_id+'|'+ds),leave,manualStatus:absenceManualExcluded(manualByKey.get(s.user_id+'|'+ds))?'대기':undefined,excludePendingManual:String(SETTINGS.absence_exclude_pending_manual)!=='false',hireDate:p.hire_date,employmentStatus:p.employment_status,effectiveDate:p.employment_effective_date,settingsLoaded:SETTINGS_LOAD_OK});if(decision.candidate)miss.push({u:s.user_id,ds,shift:s.shift});}});
   el.innerHTML=settingsWarning+(miss.length?`<table><tr><th>직원</th><th>날짜</th><th>근무표</th></tr>${miss.sort((a,b)=>a.ds<b.ds?-1:1).map(x=>`<tr class="warn"><td>${esc(nameOf(x.u))}</td><td>${md(x.ds)}</td><td>${SHIFTS[x.shift]?SHIFTS[x.shift].l:esc(x.shift)}</td></tr>`).join('')}</table><div class="hint">결근/미기록 후보입니다. 소명 또는 수기근태를 확인하세요.</div>`:'<div class="empty">결근/미기록 후보 없음 ✓</div>');
 }
 
