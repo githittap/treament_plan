@@ -14,7 +14,21 @@ do $$ begin
   if not exists(select 1 from pg_trigger where tgname='queue_leave_push_event' and tgrelid='public.leave_requests'::regclass) then
     raise exception 'queue_leave_push_event trigger missing; preserve state and stop rollback';
   end if;
+  if not exists(select 1 from pg_trigger where tgname='queue_payment_push_event' and tgrelid='public.payment_requests'::regclass)
+     or not exists(select 1 from pg_trigger where tgname='queue_notice_push_event' and tgrelid='public.notices'::regclass)
+     or not exists(select 1 from pg_trigger where tgname='queue_document_push_event' and tgrelid='public.employee_documents'::regclass)
+     or not exists(select 1 from pg_trigger where tgname='queue_consultation_push_event' and tgrelid='public.consultation_inbox'::regclass) then
+    raise exception 'additional push trigger missing; preserve state and stop rollback';
+  end if;
 end $$;
+drop trigger queue_consultation_push_event on public.consultation_inbox;
+drop function public.queue_consultation_push_event();
+drop trigger queue_document_push_event on public.employee_documents;
+drop function public.queue_document_push_event();
+drop trigger queue_notice_push_event on public.notices;
+drop function public.queue_notice_push_event();
+drop trigger queue_payment_push_event on public.payment_requests;
+drop function public.queue_payment_push_event();
 drop trigger queue_leave_push_event on public.leave_requests;
 drop function public.queue_leave_push_event();
 drop function public.release_push_event(bigint,uuid,text,text,timestamptz,timestamptz);

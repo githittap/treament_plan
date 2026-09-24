@@ -23,8 +23,12 @@ async function fresh(){
     create schema auth;
     create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('app.test_uid',true),'')::uuid $$;
     grant usage on schema auth to authenticated,service_role;grant execute on function auth.uid() to authenticated,service_role;
-    create table public.profiles(user_id uuid primary key,role text not null default 'staff',active boolean not null default true,approved boolean not null default true);
+    create table public.profiles(user_id uuid primary key,role text not null default 'staff',active boolean not null default true,approved boolean not null default true,account_access_status text not null default '활성');
     create table public.leave_requests(id bigint generated always as identity primary key,user_id uuid not null references public.profiles(user_id),status text not null default '대기');
+    create table public.payment_requests(id bigint generated always as identity primary key,requester_id uuid not null references public.profiles(user_id),status text not null default 'chief_pending');
+    create table public.notices(id bigint generated always as identity primary key,author_id uuid not null references public.profiles(user_id),title text not null);
+    create table public.employee_documents(id bigint generated always as identity primary key,user_id uuid not null references public.profiles(user_id),checked_at timestamptz);
+    create table public.consultation_inbox(id uuid primary key,created_by uuid,contact text,message text not null);
     create table public.push_subscriptions(id uuid primary key,user_id uuid not null references public.profiles(user_id) on delete cascade,endpoint text not null,subscription jsonb not null,created_at timestamptz not null default now(),updated_at timestamptz not null default now(),unique(user_id,endpoint));
     grant select,insert,update,delete on public.profiles,public.leave_requests,public.push_subscriptions to authenticated;
     grant usage,select on all sequences in schema public to authenticated;
@@ -199,4 +203,46 @@ async function rollbackError(db){try{await db.exec(rollback);return null}catch(e
   assert.equal(await rollbackError(db),'push notification outbox tables missing; nothing to roll back or already rolled back');
 }finally{await db.close()}}
 
-console.log('PGLITE_PUSH_NOTIFICATIONS_PASS: outbox enqueue/claim/deliver/expire, least-privilege RPC-only access, fail-closed rollback');
+// 11) 결재는 실제 결재 단계가 열린 사람에게만 한 번씩 쌓인다. 반복 UPDATE는 중복되지 않는다.
+{const {db,q}=await fresh();try{
+  await q(`insert into public.payment_requests(requester_id) values ('${staff}')`);
+  let events=await q("select event_type,recipient_id,payload from public.push_events where event_type='payment_pending'");
+  assert.deepEqual(events.map(r=>r.recipient_id),[chief]);
+  assert.deepEqual(events[0].payload,{});
+  await q("update public.payment_requests set status='owner_pending'");
+  await q("update public.payment_requests set status='owner_pending'");
+  events=await q("select recipient_id from public.push_events where event_type='payment_pending' order by recipient_id");
+  assert.deepEqual(events.map(r=>r.recipient_id).sort(),[chief,owner].sort());
+}finally{await db.close()}}
+
+// 12) 공지는 작성자를 빼고 활성·승인·접근 가능한 전 직원에게만 적재한다.
+{const {db,q}=await fresh();try{
+  await q(`update public.profiles set account_access_status='차단' where user_id='${manager}'`);
+  await q(`insert into public.notices(author_id,title) values ('${chief}','민감한 공지 제목')`);
+  const events=await q("select recipient_id,payload from public.push_events where event_type='notice_published' order by recipient_id");
+  assert.deepEqual(events.map(r=>r.recipient_id).sort(),[staff,owner].sort());
+  assert.ok(events.every(r=>JSON.stringify(r.payload)==='{}'));
+}finally{await db.close()}}
+
+// 13) 서류는 최초 checked_at 전이에만 소유자에게 쌓이고 재확인은 발송하지 않는다.
+{const {db,q}=await fresh();try{
+  await q(`insert into public.employee_documents(user_id) values ('${staff}')`);
+  await q("update public.employee_documents set checked_at=now()");
+  await q("update public.employee_documents set checked_at=now()");
+  const events=await q("select recipient_id,payload from public.push_events where event_type='document_approved'");
+  assert.equal(events.length,1);assert.equal(events[0].recipient_id,staff);assert.deepEqual(events[0].payload,{});
+}finally{await db.close()}}
+
+// 14) 문의는 실제 처리 권한이 있는 manager/chief/owner만 받으며 원문은 적재하지 않는다.
+{const {db,q}=await fresh();try{
+  await q("insert into public.consultation_inbox(id,contact,message) values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','010-1234-5678','환자 문의 원문')");
+  const events=await q("select recipient_id,payload from public.push_events where event_type='consultation_received' order by recipient_id");
+  assert.deepEqual(events.map(r=>r.recipient_id).sort(),[manager,chief,owner].sort());
+  assert.ok(events.every(r=>JSON.stringify(r.payload)==='{}'));
+  await q('set role authenticated');
+  await assert.rejects(q('select public.queue_consultation_push_event()'),/permission denied|trigger functions can only be called as triggers/i);
+  await assert.rejects(q('select * from public.push_events'),/permission denied/i);
+  await q('set role none');
+}finally{await db.close()}}
+
+console.log('PGLITE_PUSH_NOTIFICATIONS_PASS: outbox enqueue/claim/deliver/expire, four additional event queues, least-privilege RPC-only access, fail-closed rollback');
