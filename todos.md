@@ -4,7 +4,7 @@
 
 - [x] Task1~4 구현: migration/rollback, 공통 네 분류 모델, Dr. 제외·별도 표시, 관리자 미리보기/조건부 저장, 근무표·캘린더·계약 참고표시. 커밋 `1094547`, `acc98b0`, `2295e85`, `8edc9ea`, `6a18c9f`, `bede4a6`, `ae07563`, `52c5852`.
 - [x] PGlite rollback 테스트에서 값 있음 거부·NULL만 제거 허용·원본 dept/department·Dr./프로필 보존을 검증. 전체 PGlite 29/29, 관련 JS 76/76, 전체 JS 377/377, inline 2개, diff-check PASS.
-- [ ] `tests/sql/pglite-employee-job-groups.mjs` 및 기록 5종 변경을 커밋하고 clean 상태 확인. 직전 `git commit`은 index 권한 거부로 미완료(index.lock 없음, Git 프로세스 4개); 프로세스 강제 종료·lock 삭제 금지.
+- [x] `tests/sql/pglite-employee-job-groups.mjs` 및 기록 5종 커밋 `65fda68`; commit 후 worktree clean 확인.
 - [ ] 구현지시서 요구추적표 131건의 실제 현재 상태를 코드/커밋/시험에 대조해 `구현결과.md`로 남김. 기존 CSV 판정상 미완료 67건(37 누락, 1 고침 미배포, 1 미답, 28 부분)이며 직무 분류 작업만으로 완료 처리하지 않는다.
 - [ ] 직무 분류 운영 DB/Storage/Edge/Auth 적용·main·push·배포는 별도 승인 전 금지.
 

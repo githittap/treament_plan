@@ -3,7 +3,7 @@
 ## 직원허브 직무 분류 2단계 (2026-09-24)
 
 - 로컬 구현 커밋 `1094547`~`52c5852`: nullable job_group migration/guarded rollback, 공통 네 분류와 Dr. 별도 처리, 미리보기·조건부 저장, 근무표·캘린더·계약 표시 통합.
-- 검증: PGlite 29/29, 관련 JS 76/76, 전체 JS 377/377, hr.html inline 2개 compile, diff-check PASS. 마지막 rollback preservation assertion은 현재 uncommitted test change라 최종 commit 재시도 필요함.
+- 검증: PGlite 29/29, 관련 JS 76/76, 전체 JS 377/377, hr.html inline 2개 compile, diff-check PASS. PGlite 보강·기록 커밋 `65fda68` 이후 worktree clean임.
 - 운영 미적용: 운영 DB/Storage/Edge/Auth, main, push, deploy 미실행. 작업 브랜치 `codex/employee-hub-phase2-20260923`임.
 - 별도 요구 추적표에는 131건이 있음; 직무 분류 요구만 해결됐다고 전체 직원허브 미완료 67건을 완료로 간주하지 않는다. 상세 evidence/handoff는 구현결과 및 WORKLOG/HANDOFF 참고.
 
