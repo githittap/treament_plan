@@ -1989,18 +1989,19 @@ function employeeDocumentsCard(docs,error,contractRows,contractError,leaveDocs,l
   const docRows=allRows.map(d=>'<tr data-doc-filter="직원서류">'+who(d)+'<td>'+esc(d.document_type||'근로계약서')+'</td><td>'+esc(d.original_name)+'</td><td>'+contractDate(d.created_at)+'</td><td>'+ (d._kind==='contract'?'<button class="mini" onclick="previewEmployeeContract('+d.id+')">열기</button>':'<button class="mini" onclick="downloadEmployeeDocument('+d.id+')">열기</button>')+'</td></tr>').join('');
   const leaveRows=(leaveDocs||[]).map(d=>'<tr data-doc-filter="연차증빙">'+who(d)+'<td>연차증빙</td><td>'+esc(d.original_name)+'</td><td>'+md(d.created_at)+'</td><td><button class="mini" onclick="downloadLeaveApplicationDocument('+d.id+')">열기</button></td></tr>').join('');
   const approvalRows=(approvalDocs||[]).map(d=>'<tr data-doc-filter="결재 요청">'+who(d)+'<td>결재 요청 · '+esc(d.kind)+'</td><td>'+esc(d.title)+'</td><td>'+md(d.created_at)+'</td><td><span class="b '+(d.status==='완결'?'ok':d.status==='반려'?'no':'wait')+'">'+esc(d.status)+'</span></td></tr>').join('');
-  const paymentRows=(paymentRequests||[]).map(r=>'<tr data-doc-filter="결제 요청"><td>'+esc(r.payment_item)+'</td><td>'+Number(r.amount_krw||0).toLocaleString('ko-KR')+'원</td><td>'+md(r.requested_at)+'</td><td><span class="b '+(r.status==='approved'?'ok':r.status==='rejected'?'no':'wait')+'">'+esc(paymentRequestStatusLabel(r.status))+'</span></td></tr>').join('');
-  const allCount=allRows.length+(leaveDocs||[]).length+(approvalDocs||[]).length+(paymentRequests||[]).length;
-  const rows=docRows+leaveRows+approvalRows+paymentRows;
+  const allCount=allRows.length+(leaveDocs||[]).length+(approvalDocs||[]).length;
+  const rows=docRows+leaveRows+approvalRows;
   const list=allCount?'<div class="tblwrap"><table><thead><tr>'+(lead?'<th>직원</th>':'')+'<th>종류</th><th>문서</th><th>날짜</th><th>상태·열기</th></tr></thead><tbody id="employeeDocumentRows">'+rows+'<tr id="employeeDocumentEmpty" style="display:none"><td colspan="'+(lead?5:4)+'" class="empty">해당 종류의 문서가 없습니다.</td></tr></tbody></table></div>':'<div class="empty">올린 서류가 없습니다.</div>';
   return `<div class="card" id="employeeDocumentBox"><h2>📎 서류함</h2><div class="hint">어떤 서류든 여기로 올리시면 됩니다. 직원서류와 연차증빙, 결재 요청을 종류별로 한 화면에서 확인합니다.</div>
-    <div class="rowflex" role="group" aria-label="서류함 필터" style="margin:10px 0"><button class="mini stamp" data-doc-filter-button="전체 문서" onclick="filterEmployeeDocuments('전체 문서')">전체 문서</button><button class="mini" data-doc-filter-button="직원서류" onclick="filterEmployeeDocuments('직원서류')">직원서류</button><button class="mini" data-doc-filter-button="연차증빙" onclick="filterEmployeeDocuments('연차증빙')">연차증빙</button><button class="mini" data-doc-filter-button="결재 요청" onclick="filterEmployeeDocuments('결재 요청')">결재 요청</button><button class="mini" data-doc-filter-button="결제 요청" onclick="filterEmployeeDocuments('결제 요청')">결제 요청</button></div>
+    <div class="rowflex" role="group" aria-label="서류함 필터" style="margin:10px 0"><button class="mini stamp" data-doc-filter-button="전체 문서" onclick="filterEmployeeDocuments('전체 문서')">전체 문서</button><button class="mini" data-doc-filter-button="직원서류" onclick="filterEmployeeDocuments('직원서류')">직원서류</button><button class="mini" data-doc-filter-button="연차증빙" onclick="filterEmployeeDocuments('연차증빙')">연차증빙</button><button class="mini" data-doc-filter-button="결재 요청" onclick="filterEmployeeDocuments('결재 요청')">결재 요청</button></div>
     <div class="rowflex" style="margin-bottom:10px"><button class="hbtn pri" onclick="openLeave()">연차 신청</button><button class="hbtn" onclick="show('apMask');$('#apMsg').textContent='';">결재 올리기</button></div>${errorText}${list}<div id="employeeContractPreview" class="contract-doc" style="display:none;margin-top:10px"></div>
     <div class="grid" style="margin-top:10px">
-      ${lead?`<div class="fld"><label>직원</label><select id="edUser">${staff.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select></div>`:''}
-      <div class="fld"><label>서류 종류</label><select id="edType"><option>잠복결핵 검사서</option><option>자격증</option><option>보안서약서</option><option>면허증</option><option>신분증 사본</option><option>기타</option></select></div>
+      <div class="fld"><label>올릴 종류</label><select id="edScope" onchange="setEmployeeDocumentUploadScope()"><option value="직원서류">직원서류</option><option value="연차증빙">연차증빙</option></select></div>
+      ${lead?`<div class="fld" id="edUserWrap"><label>직원</label><select id="edUser">${staff.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select></div>`:''}
+      <div class="fld" id="edTypeWrap"><label>서류 종류</label><select id="edType"><option>잠복결핵 검사서</option><option>자격증</option><option>보안서약서</option><option>면허증</option><option>신분증 사본</option><option>기타</option></select></div>
+      <div class="fld" id="edLeaveRequestWrap" style="display:none"><label>내 연차 신청</label><select id="edLeaveRequest">${(leaveRequests||[]).map(r=>`<option value="${r.id}">${esc(md(r.date_from)+'~'+md(r.date_to)+' '+(r.type||'연차'))}</option>`).join('')}</select></div>
       <div class="fld"><label>파일</label><input type="file" id="edFile" accept="*/*"></div>
-    </div><button class="hbtn pri" style="margin-top:10px" onclick="uploadEmployeeDocument()">서류 올리기</button><div class="msg" id="edMsg"></div>
+    </div><button id="edUploadButton" class="hbtn pri" style="margin-top:10px" onclick="submitEmployeeDocumentUpload()">서류 올리기</button><div class="msg" id="edMsg"></div>
   </div>${paymentRequestCard(paymentRequests||[],paymentError,paymentReceipts||[],paymentReceiptsError)}`;
 }
 function filterEmployeeDocuments(kind){
@@ -2009,6 +2010,18 @@ function filterEmployeeDocuments(kind){
   rows.forEach(row=>{const show=kind==='전체 문서'||row.dataset.docFilter===kind;row.style.display=show?'':'none';if(show)visible++;});
   const empty=$('#employeeDocumentEmpty');if(empty)empty.style.display=visible?'none':'';
   box.querySelectorAll('[data-doc-filter-button]').forEach(btn=>btn.classList.toggle('stamp',btn.dataset.docFilterButton===kind));
+}
+function setEmployeeDocumentUploadScope(){
+  const leave=$('#edScope')?.value==='연차증빙';
+  const typeWrap=$('#edTypeWrap'),userWrap=$('#edUserWrap'),requestWrap=$('#edLeaveRequestWrap'),button=$('#edUploadButton');
+  if(typeWrap)typeWrap.style.display=leave?'none':'';
+  if(userWrap)userWrap.style.display=leave?'none':'';
+  if(requestWrap)requestWrap.style.display=leave?'':'none';
+  if(button)button.textContent=leave?'연차 증빙 올리기':'서류 올리기';
+}
+async function submitEmployeeDocumentUpload(){
+  if($('#edScope')?.value==='연차증빙')return uploadLeaveApplicationDocument();
+  return uploadEmployeeDocument();
 }
 function previewEmployeeContractBoundary(){}
 /* payment-request:test-start */
@@ -2041,7 +2054,7 @@ function previewEmployeeContract(id){
   box.style.display='block';box.innerHTML='<h3>'+esc(row.original_name||'근로계약서')+'</h3><iframe title="근로계약서 미리보기" sandbox="" style="width:100%;min-height:520px;border:1px solid var(--line);border-radius:8px;background:#fff" srcdoc="'+esc(contractPreviewHtml(row))+'"></iframe>';
 }
 async function uploadEmployeeDocument(){
-  const file=$('#edFile').files[0],msg=$('#edMsg'),type=$('#edType').value,problem=validateEmployeeDocument(file,type);if(problem){msg.textContent=problem;return;}
+  const file=$('#edFile')?.files?.[0],msg=$('#edMsg'),type=$('#edType')?.value,problem=validateEmployeeDocument(file,type);if(problem){msg.textContent=problem;return;}
   const userId=isMgr()?$('#edUser').value:ME.id,path=`${userId}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
   setStatus('saving');msg.textContent='업로드 중…';
   const {error:storageError}=await sb.storage.from('hr-docs').upload(path,file,{contentType:file.type,upsert:false});
@@ -2058,7 +2071,7 @@ function leaveApplicationDocumentsCard(docs,error,requests){
   return '<div class="card"><h2>📄 직원 서류함 · 연차 신청 증빙</h2><div class="hint">일반 직원서류와 분리한 비공개 보관함입니다. 본인 신청 건에만 올릴 수 있습니다.</div>'+(rows?'<div class="tblwrap"><table><tr>'+(lead?'<th>직원</th>':'')+'<th>파일</th><th>종류</th><th>등록일</th><th></th></tr>'+rows+'</table></div>':'<div class="empty">등록된 연차 신청 증빙이 없습니다.</div>')+'<div class="grid" style="margin-top:10px"><div class="fld"><label>내 연차 신청</label><select id="ladRequest">'+options+'</select></div><div class="fld"><label>파일</label><input type="file" id="ladFile" accept="application/pdf,image/jpeg,image/png,.doc,.docx,.hwp,.hwpx"></div></div><button class="hbtn pri" style="margin-top:10px" onclick="uploadLeaveApplicationDocument()">연차 증빙 올리기</button><div class="msg" id="ladMsg"></div></div>';
 }
 async function uploadLeaveApplicationDocument(){
-  if(LEAVE_APPLICATION_DOCUMENT_SAVING)return;const file=$('#ladFile')?.files?.[0],requestId=$('#ladRequest')?.value,msg=$('#ladMsg'),problem=validateLeaveApplicationDocument(file);if(problem){if(msg)msg.textContent=problem;return;}if(!requestId){if(msg)msg.textContent='내 연차 신청을 먼저 선택하세요.';return;}
+  if(LEAVE_APPLICATION_DOCUMENT_SAVING)return;const file=$('#edFile')?.files?.[0],requestId=$('#edLeaveRequest')?.value,msg=$('#edMsg'),problem=validateLeaveApplicationDocument(file);if(problem){if(msg)msg.textContent=problem;return;}if(!requestId){if(msg)msg.textContent='내 연차 신청을 먼저 선택하세요.';return;}
   LEAVE_APPLICATION_DOCUMENT_SAVING=true;if(msg)msg.textContent='업로드 중…';const path=ME.id+'/tmp/'+crypto.randomUUID()+'-'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_'),upload=await sb.storage.from('leave-docs').upload(path,file,{contentType:file.type,upsert:false});if(upload.error){if(msg)msg.textContent='파일 업로드 실패: '+upload.error.message;LEAVE_APPLICATION_DOCUMENT_SAVING=false;return;}const result=await sb.from('leave_application_documents').insert({request_id:Number(requestId),user_id:ME.id,document_type:'연차 신청서',original_name:file.name,storage_path:path,mime_type:file.type,size_bytes:file.size});if(result.error){await sb.storage.from('leave-docs').remove([path]);if(msg)msg.textContent='연차 신청 증빙 저장 실패: '+result.error.message;LEAVE_APPLICATION_DOCUMENT_SAVING=false;return;}LEAVE_APPLICATION_DOCUMENT_SAVING=false;setStatus('saved');render();
 }
 async function downloadLeaveApplicationDocument(id){const {data:doc,error}=await sb.from('leave_application_documents').select('storage_path,original_name').eq('id',id).maybeSingle();if(error||!doc){alert('연차 신청 증빙을 찾지 못했습니다.');return;}const {data,error:downloadError}=await sb.storage.from('leave-docs').download(doc.storage_path);if(downloadError){alert('파일을 열지 못했습니다: '+downloadError.message);return;}const url=URL.createObjectURL(data),a=document.createElement('a');a.href=url;a.download=doc.original_name||'연차 신청 증빙';a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}

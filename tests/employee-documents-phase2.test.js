@@ -9,12 +9,13 @@ const vm = require('node:vm');
 
 function inlineFunction(name) {
   const patterns = {
-    filterEmployeeDocuments: /function filterEmployeeDocuments\(kind\)\{[\s\S]*?\r?\n}\r?\nfunction previewEmployeeContract/,
+    filterEmployeeDocuments: /function filterEmployeeDocuments\(kind\)\{[\s\S]*?\r?\n}/,
+    setEmployeeDocumentUploadScope: /function setEmployeeDocumentUploadScope\(\)\{[\s\S]*?\r?\n}/,
     submitApproval: /async function submitApproval\(\)\{[\s\S]*?\r?\n}/
   };
   const match = html.match(patterns[name]);
   assert.ok(match, `${name} 실제 인라인 함수가 없습니다.`);
-  return match[0].replace(/\nfunction previewEmployeeContract[\s\S]*$/, '');
+  return match[0];
 }
 
 function classList() {
@@ -26,7 +27,38 @@ test('서류함은 승인된 4개 필터를 한 화면에 제공한다', () => {
   for (const label of ['전체 문서', '직원서류', '연차증빙', '결재 요청']) {
     assert.match(html, new RegExp(`data-doc-filter-button="${label}"`));
   }
+  assert.deepEqual([...html.matchAll(/data-doc-filter-button="([^"]+)"/g)].map(match => match[1]), ['전체 문서','직원서류','연차증빙','결재 요청']);
   assert.match(html, /function filterEmployeeDocuments\(kind\)/);
+});
+
+test('직원서류와 연차증빙은 하나의 파일 입력·전송 버튼에서 종류별로 저장한다', () => {
+  const card = html.match(/function employeeDocumentsCard\([\s\S]*?\n}\nfunction filterEmployeeDocuments/);
+  assert.ok(card);
+  assert.match(card[0], /id="edScope"[\s\S]*value="직원서류"[\s\S]*value="연차증빙"/);
+  assert.match(card[0], /id="edLeaveRequest"/);
+  assert.equal((card[0].match(/type="file"/g)||[]).length, 1);
+  assert.match(card[0], /onclick="submitEmployeeDocumentUpload\(\)"/);
+  assert.match(card[0], /data-doc-filter="연차증빙"/);
+});
+
+test('업로드 종류를 바꾸면 해당 서류 종류·연차 신청 선택기만 보인다', () => {
+  const values = {
+    '#edScope': { value: '연차증빙' }, '#edTypeWrap': { style: {} }, '#edUserWrap': { style: {} },
+    '#edLeaveRequestWrap': { style: {} }, '#edUploadButton': { textContent: '' }
+  };
+  const context = { $: selector => values[selector] };
+  vm.runInNewContext(`${inlineFunction('setEmployeeDocumentUploadScope')};this.setEmployeeDocumentUploadScope=setEmployeeDocumentUploadScope;`, context);
+  context.setEmployeeDocumentUploadScope();
+  assert.equal(values['#edTypeWrap'].style.display, 'none');
+  assert.equal(values['#edUserWrap'].style.display, 'none');
+  assert.equal(values['#edLeaveRequestWrap'].style.display, '');
+  assert.equal(values['#edUploadButton'].textContent, '연차 증빙 올리기');
+  values['#edScope'].value = '직원서류';
+  context.setEmployeeDocumentUploadScope();
+  assert.equal(values['#edTypeWrap'].style.display, '');
+  assert.equal(values['#edUserWrap'].style.display, '');
+  assert.equal(values['#edLeaveRequestWrap'].style.display, 'none');
+  assert.equal(values['#edUploadButton'].textContent, '서류 올리기');
 });
 
 test('서류함 상단에서 연차 신청과 결재 올리기를 시작할 수 있다', () => {
