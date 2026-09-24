@@ -5,6 +5,22 @@ const fs = require('node:fs');
 const html = fs.readFileSync('hr.html', 'utf8');
 const schema = fs.readFileSync('db/hr_schema.sql', 'utf8');
 const policies = fs.readFileSync('db/hr_policies.sql', 'utf8');
+const vm = require('node:vm');
+
+function inlineFunction(name) {
+  const patterns = {
+    filterEmployeeDocuments: /function filterEmployeeDocuments\(kind\)\{[\s\S]*?\r?\n}\r?\nfunction previewEmployeeContract/,
+    submitApproval: /async function submitApproval\(\)\{[\s\S]*?\r?\n}/
+  };
+  const match = html.match(patterns[name]);
+  assert.ok(match, `${name} 실제 인라인 함수가 없습니다.`);
+  return match[0].replace(/\nfunction previewEmployeeContract[\s\S]*$/, '');
+}
+
+function classList() {
+  const values = new Set();
+  return { toggle(name, on) { on ? values.add(name) : values.delete(name); }, has(name) { return values.has(name); } };
+}
 
 test('서류함은 승인된 4개 필터를 한 화면에 제공한다', () => {
   for (const label of ['전체 문서', '직원서류', '연차증빙', '결재 요청']) {
@@ -61,4 +77,46 @@ test('계정·Notion 체크는 통합 서류함 뒤쪽에 렌더링된다', () =
 test('필터에 해당 문서가 없으면 빈 결과 문구를 표시한다', () => {
   assert.match(html, /id="employeeDocumentEmpty" style="display:none"/);
   assert.match(html, /해당 종류의 문서가 없습니다/);
+});
+
+test('실제 filterEmployeeDocuments가 4필터 행·활성 버튼·EMPTY를 실행한다', () => {
+  const rows = ['직원서류', '연차증빙', '결재 요청'].map(kind => ({ dataset: { docFilter: kind }, style: {} }));
+  const buttons = ['전체 문서', '직원서류', '연차증빙', '결재 요청'].map(kind => ({ dataset: { docFilterButton: kind }, classList: classList() }));
+  const empty = { style: { display: 'none' } };
+  const box = { querySelectorAll(selector) { return selector === '[data-doc-filter]' ? rows : buttons; } };
+  const context = { $: selector => selector === '#employeeDocumentBox' ? box : selector === '#employeeDocumentEmpty' ? empty : null };
+  vm.runInNewContext(`${inlineFunction('filterEmployeeDocuments')};this.filterEmployeeDocuments=filterEmployeeDocuments;`, context);
+  for (const kind of ['전체 문서', '직원서류', '연차증빙', '결재 요청']) {
+    context.filterEmployeeDocuments(kind);
+    assert.deepEqual(rows.map(row => row.style.display), rows.map(row => kind === '전체 문서' || row.dataset.docFilter === kind ? '' : 'none'));
+    assert.deepEqual(buttons.map(button => button.classList.has('stamp')), buttons.map(button => button.dataset.docFilterButton === kind));
+    assert.equal(empty.style.display, 'none');
+  }
+  context.filterEmployeeDocuments('없는 종류');
+  assert.ok(rows.every(row => row.style.display === 'none'));
+  assert.equal(empty.style.display, '');
+});
+
+test('실제 submitApproval은 연차 흐름과 재직증명서 저장 payload를 실행한다', async () => {
+  const submitSource = inlineFunction('submitApproval');
+  const helperBlock = html.match(/\/\* approval-request:test-start \*\/([\s\S]*?)\/\* approval-request:test-end \*\//);
+  assert.ok(helperBlock);
+  const calls = [];
+  const values = { '#apKind': { value: '연차 신청' }, '#apTitle': { value: '휴가' }, '#apBody': { value: '7월 휴가' }, '#apMsg': { textContent: '' } };
+  const context = {
+    $: selector => values[selector],
+    hide: () => calls.push(['hide']), openLeave: () => calls.push(['openLeave']), setStatus: () => {}, render: () => {},
+    refreshBadges: () => {}, ME: { id: 'staff-1' },
+    sb: { from: table => { calls.push(['from', table]); return { insert: payload => { calls.push(['insert', payload]); return { select: () => ({ single: async () => ({ data: { id: 7 }, error: null }) }) }; } }; } }
+  };
+  vm.runInNewContext(`${helperBlock[1]};${submitSource};this.submitApproval=submitApproval;`, context);
+  await context.submitApproval();
+  assert.equal(calls.filter(call => call[0] === 'insert').length, 0);
+  assert.deepEqual(calls.filter(call => call[0] === 'openLeave'), [['openLeave']]);
+
+  calls.length = 0; values['#apKind'].value = '재직증명서 발급'; values['#apTitle'].value = '발급 요청'; values['#apBody'].value = '2026년 재직 확인';
+  await context.submitApproval();
+  const docInsert = calls.find(call => call[0] === 'insert')[1];
+  assert.deepEqual(JSON.parse(JSON.stringify(docInsert)), { kind: '기타', title: '[재직증명서 발급] 발급 요청', body: '[재직증명서 발급 요청]\n2026년 재직 확인', author: 'staff-1' });
+  assert.equal(calls.filter(call => call[0] === 'insert').length, 2);
 });
