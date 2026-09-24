@@ -56,7 +56,7 @@ test('자동 불러온 서명은 원문 확인·명시적 저장 전에는 저�
   vm.runInNewContext(`${block[1]};this.h={useStoredContractSignature};`,c);
   await c.h.useStoredContractSignature(77,{automatic:true});
   assert.equal(imageUrl,'blob:signature');assert.deepEqual(drawn[0],['clear',0,0,720,180]);assert.equal(drawn[1][0],'draw');
-  assert.equal(canvas.dataset.signatureId,'21');assert.equal(canvas.dataset.dirty,'true');
+  assert.equal(canvas.dataset.signatureId,'21');assert.equal(canvas.dataset.dirty,'true');assert.equal(canvas.dataset.confirmed,'false');
   assert.match(msg.textContent,/원문 확인 후 저장/);
   assert.equal(calls.some(call=>call[0]==='order'&&call[1]==='created_at'&&call[2].ascending===false),true);
   assert.match(html,/if\(!confirm\('원본 PDF를 확인했고/);

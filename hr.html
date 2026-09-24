@@ -2571,16 +2571,17 @@ async function saveEmploymentTerm(uid){const no=$('#termNoEnd-'+uid).checked,sta
 function contractExpired(row){return !!row.due_at&&new Date(row.due_at).getTime()<Date.now();}
 /* integrated-contract:test-start */
 const CONTRACT_PARTS=[['employment','근로계약'],['medical','의료정보 보안 서약'],['privacy','개인정보 취급자 서약']];
-function integratedContract(row){return CONTRACT_PARTS.every(([key])=>String(row?.merged_html||'').includes(`data-sign-slot="${key}"`));}
-function integratedContractReady(id){return CONTRACT_PARTS.every(([key])=>document.querySelector(`canvas[data-contract-signature="${id}-${key}"]`)?.dataset.dirty==='true');}
-function integratedContractPayload(id){return CONTRACT_PARTS.map(([key])=>{const canvas=document.querySelector(`canvas[data-contract-signature="${id}-${key}"]`);return {part:key,signature_png:canvas.toDataURL('image/png'),signature_id:canvas.dataset.signatureId?Number(canvas.dataset.signatureId):null};});}
+function integratedContract(row){return row?.integrated_signature_required===true||CONTRACT_PARTS.every(([key])=>String(row?.merged_html||'').includes(`data-sign-slot="${key}"`));}
+function integratedContractReady(id){return CONTRACT_PARTS.every(([key])=>{const canvas=document.querySelector(`canvas[data-contract-signature="${id}-${key}"]`);return canvas?.dataset.dirty==='true'&&canvas.dataset.confirmed==='true';});}
+function integratedContractPayload(id){return CONTRACT_PARTS.map(([key])=>{const canvas=document.querySelector(`canvas[data-contract-signature="${id}-${key}"]`);return {part:key,signature_png:canvas.toDataURL('image/png'),signature_id:canvas.dataset.signatureId?Number(canvas.dataset.signatureId):null,confirmed:canvas.dataset.confirmed==='true'};});}
+function confirmIntegratedContractPart(id,part,checked){const canvas=document.querySelector(`canvas[data-contract-signature="${id}-${part}"]`);if(!canvas)return;canvas.dataset.confirmed=checked&&canvas.dataset.dirty==='true'?'true':'false';updateIntegratedContractButton(id);}
 /* integrated-contract:test-end */
 function initContractSignatures(){
   document.querySelectorAll('canvas[data-contract-signature]').forEach(canvas=>{
     const ctx=canvas.getContext('2d');ctx.lineWidth=2.4;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#111';let drawing=false;
     const point=e=>{const r=canvas.getBoundingClientRect();return {x:(e.clientX-r.left)*canvas.width/r.width,y:(e.clientY-r.top)*canvas.height/r.height};};
     canvas.addEventListener('pointerdown',e=>{e.preventDefault();drawing=true;canvas.setPointerCapture(e.pointerId);const p=point(e);ctx.beginPath();ctx.moveTo(p.x,p.y);});
-    canvas.addEventListener('pointermove',e=>{if(!drawing)return;e.preventDefault();const p=point(e);ctx.lineTo(p.x,p.y);ctx.stroke();canvas.dataset.dirty='true';delete canvas.dataset.signatureId;updateIntegratedContractButton(canvas.dataset.contractId);});
+    canvas.addEventListener('pointermove',e=>{if(!drawing)return;e.preventDefault();const p=point(e);ctx.lineTo(p.x,p.y);ctx.stroke();canvas.dataset.dirty='true';delete canvas.dataset.signatureId;canvas.dataset.confirmed='false';const check=document.querySelector(`[data-contract-confirm="${canvas.dataset.contractId}-${canvas.dataset.part}"]`);if(check)check.checked=false;updateIntegratedContractButton(canvas.dataset.contractId);});
     const stop=e=>{if(!drawing)return;drawing=false;e.preventDefault();};canvas.addEventListener('pointerup',stop);canvas.addEventListener('pointercancel',stop);
   });
 }
@@ -2594,14 +2595,14 @@ async function useStoredContractSignature(id,options={}){
   const {data,error:downloadError}=await sb.storage.from('employee-signatures').download(vault.storage_path);if(downloadError||!data){if(msg)msg.textContent='보관 서명을 불러오지 못했습니다.';return;}
   const url=URL.createObjectURL(data),img=new Image();img.onload=()=>{
     if(options.automatic&&canvas.dataset.dirty==='true'){URL.revokeObjectURL(url);return;}
-    const ctx=canvas.getContext('2d');ctx.clearRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);canvas.dataset.signatureId=String(vault.id);canvas.dataset.dirty='true';URL.revokeObjectURL(url);if(canvas.dataset.contractId)updateIntegratedContractButton(canvas.dataset.contractId);if(msg)msg.textContent='보관 서명을 불러왔습니다. 원문 확인 후 저장하세요.';
+    const ctx=canvas.getContext('2d');ctx.clearRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);canvas.dataset.signatureId=String(vault.id);canvas.dataset.dirty='true';canvas.dataset.confirmed='false';const check=document.querySelector(`[data-contract-confirm="${canvas.dataset.contractId}-${canvas.dataset.part}"]`);if(check)check.checked=false;URL.revokeObjectURL(url);if(canvas.dataset.contractId)updateIntegratedContractButton(canvas.dataset.contractId);if(msg)msg.textContent='보관 서명을 불러왔습니다. 원문 확인 후 저장하세요. 통합 계약은 각 구역을 별도로 확인하세요.';
   };img.src=url;
 }
-function autoLoadStoredContractSignatures(rows){(rows||[]).filter(r=>r.status==='대기').forEach(r=>{(String(r.merged_html||'').includes('data-sign-slot="medical"')?['employment','medical','privacy'].map(key=>`${r.id}-${key}`):[r.id]).forEach(id=>{void useStoredContractSignature(id,{automatic:true});});});}
+function autoLoadStoredContractSignatures(rows){(rows||[]).filter(r=>r.status==='대기').forEach(r=>{(r.integrated_signature_required===true||String(r.merged_html||'').includes('data-sign-slot="medical"')?['employment','medical','privacy'].map(key=>`${r.id}-${key}`):[r.id]).forEach(id=>{void useStoredContractSignature(id,{automatic:true});});});}
 /* contract-signature:test-end */
 function clearContractSignature(id){
   const canvas=document.querySelector(`canvas[data-contract-signature="${id}"]`);if(!canvas)return;
-  canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);canvas.dataset.dirty='false';delete canvas.dataset.signatureId;updateIntegratedContractButton(canvas.dataset.contractId);
+  canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);canvas.dataset.dirty='false';canvas.dataset.confirmed='false';delete canvas.dataset.signatureId;const check=document.querySelector(`[data-contract-confirm="${canvas.dataset.contractId}-${canvas.dataset.part}"]`);if(check)check.checked=false;updateIntegratedContractButton(canvas.dataset.contractId);
 }
 function updateIntegratedContractButton(id){if(!id)return;const button=$(`#contractComplete-${id}`);if(button)button.disabled=!integratedContractReady(id);}
 async function completeIntegratedContract(id){
@@ -2624,7 +2625,7 @@ async function completeIntegratedContract(id){
 }
 function integratedSignatureCard(row,part){
   const label=CONTRACT_PARTS.find(([key])=>key===part)?.[1]||part;
-  return `<section class="card" style="margin:12px 0"><h3>${label} 서명</h3>${row.source_pdf_path?`<div class="rowflex" style="margin:8px 0"><label>페이지 <input class="mini" type="number" min="1" placeholder="쪽" data-pdf-page="${row.id}-${part}" style="width:60px"></label><label>X <input class="mini" type="number" min="0" placeholder="X" data-pdf-x="${row.id}-${part}" style="width:70px"></label><label>Y <input class="mini" type="number" min="0" placeholder="Y" data-pdf-y="${row.id}-${part}" style="width:70px"></label><label>가로 <input class="mini" type="number" min="1" placeholder="가로" data-pdf-width="${row.id}-${part}" style="width:70px"></label><label>세로 <input class="mini" type="number" min="1" placeholder="세로" data-pdf-height="${row.id}-${part}" style="width:70px"></label></div>`:''}<canvas class="contract-signature" width="720" height="180" data-contract-signature="${row.id}-${part}" data-contract-id="${row.id}" data-dirty="false" aria-label="${label} 서명"></canvas><div class="rowflex" style="margin-top:8px"><button class="mini" onclick="clearContractSignature('${row.id}-${part}')">지우기</button><button class="mini" onclick="useStoredContractSignature('${row.id}-${part}')">보관 서명 사용</button></div></section>`;
+  return `<section class="card" style="margin:12px 0"><h3>${label} 서명</h3>${row.source_pdf_path?`<div class="rowflex" style="margin:8px 0"><label>페이지 <input class="mini" type="number" min="1" placeholder="쪽" data-pdf-page="${row.id}-${part}" style="width:60px"></label><label>X <input class="mini" type="number" min="0" placeholder="X" data-pdf-x="${row.id}-${part}" style="width:70px"></label><label>Y <input class="mini" type="number" min="0" placeholder="Y" data-pdf-y="${row.id}-${part}" style="width:70px"></label><label>가로 <input class="mini" type="number" min="1" placeholder="가로" data-pdf-width="${row.id}-${part}" style="width:70px"></label><label>세로 <input class="mini" type="number" min="1" placeholder="세로" data-pdf-height="${row.id}-${part}" style="width:70px"></label></div>`:''}<canvas class="contract-signature" width="720" height="180" data-contract-signature="${row.id}-${part}" data-contract-id="${row.id}" data-part="${part}" data-dirty="false" data-confirmed="false" aria-label="${label} 서명"></canvas><div class="rowflex" style="margin-top:8px"><button class="mini" onclick="clearContractSignature('${row.id}-${part}')">지우기</button><button class="mini" onclick="useStoredContractSignature('${row.id}-${part}')">보관 서명 사용</button></div><label><input type="checkbox" data-contract-confirm="${row.id}-${part}" onchange="confirmIntegratedContractPart(${row.id},'${part}',this.checked)"> ${label} 내용을 읽고 이 서명을 확인함</label></section>`;
 }
 function integratedContractPage(row){
   const html=String(row.merged_html||''),med=html.indexOf('<section class="contract-part" data-contract-part="medical"'),privacy=html.indexOf('<section class="contract-part" data-contract-part="privacy"');

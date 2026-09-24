@@ -13,8 +13,8 @@ test('직원허브 인라인 스크립트 구문이 유효하다',()=>{
   for(const match of html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g))if(match[1].trim())new vm.Script(match[1]);
 });
 
-function helpers(dirty){
-  const canvases=new Map(['employment','medical','privacy'].map(part=>[part,{dataset:{dirty:dirty[part]?'true':'false',signatureId:part==='medical'?'7':''},toDataURL:()=>`png-${part}`} ]));
+function helpers(dirty,confirmed=dirty){
+  const canvases=new Map(['employment','medical','privacy'].map(part=>[part,{dataset:{dirty:dirty[part]?'true':'false',confirmed:confirmed[part]?'true':'false',signatureId:part==='medical'?'7':''},toDataURL:()=>`png-${part}`} ]));
   const context={document:{querySelector:selector=>canvases.get(selector.match(/data-contract-signature="1-([a-z]+)"/)?.[1])||null}};
   vm.runInNewContext(`${block[1]};this.h={integratedContract,integratedContractReady,integratedContractPayload};`,context);
   return context.h;
@@ -24,6 +24,7 @@ test('세 서명 가운데 하나라도 비어 있으면 완료할 수 없다',(
   const full={employment:true,medical:true,privacy:true};
   assert.equal(helpers(full).integratedContractReady(1),true);
   for(const part of Object.keys(full))assert.equal(helpers({...full,[part]:false}).integratedContractReady(1),false,part);
+  for(const part of Object.keys(full))assert.equal(helpers(full,{...full,[part]:false}).integratedContractReady(1),false,`${part} 확인 없음`);
   assert.equal(helpers(full).integratedContract({merged_html:'<span data-sign-slot="employment"></span><span data-sign-slot="medical"></span><span data-sign-slot="privacy"></span>'}),true);
   assert.equal(helpers(full).integratedContract({merged_html:'<span data-sign-slot="employee"></span>'}),false);
 });
@@ -33,6 +34,7 @@ test('각 구역 서명은 독립 payload로 전송하고 보관 서명 ID도 �
   assert.deepEqual(value.map(row=>row.part),['employment','medical','privacy']);
   assert.deepEqual(value.map(row=>row.signature_png),['png-employment','png-medical','png-privacy']);
   assert.deepEqual(value.map(row=>row.signature_id),[null,7,null]);
+  assert.deepEqual(value.map(row=>row.confirmed),[true,true,true]);
 });
 
 test('보안서약 체크리스트는 본인 계약 세 서명 완료 또는 서약서 파일로 충족된다',()=>{
@@ -69,6 +71,9 @@ test('통합 계약 완료는 서버의 3건 원자적 기록과 PDF 세 위치�
   assert.match(sql,/create constraint trigger integrated_contract_parts_complete[\s\S]*deferrable initially deferred/);
   assert.match(sql,/if jsonb_typeof\(p_signatures\) is distinct from 'array' or jsonb_array_length\(p_signatures\)<>3/);
   assert.match(sql,/integrated contract requires three independent signatures/);
+  assert.match(sql,/old\.integrated_signature_required/);
+  assert.match(sql,/each contract part must be confirmed/);
+  assert.match(html,/data-contract-confirm="\$\{row\.id\}-\$\{part\}"/);
   assert.match(edge,/for \(const entry of entries\)[\s\S]*page\.drawImage/);
   assert.match(edge,/record_integrated_contract_pdf_signatures/);
 });

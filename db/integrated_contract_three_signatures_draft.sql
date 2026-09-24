@@ -76,7 +76,7 @@ set fields=coalesce(fields,'[]'::jsonb)||jsonb_build_array(
 ),
 body_html=replace(
   replace(replace(body_html,'사직 희망일로부터 3주 전','사직 희망일로부터 <b>{{사직서제출기한}}</b>'),'익월 임금지급일','<b>{{퇴직임금지급기준}}</b>'),
-  '<section class="contract-part" data-contract-part="medical"',
+  '<div class="signrow"',
   $extra$
 <section class="contract-part" data-contract-part="employment-addenda" style="margin-top:24px">
 <h3>근로계약 추가 조건</h3>
@@ -94,10 +94,40 @@ body_html=replace(
 <li>계약 위반 또는 고의·과실로 병원에 손해를 끼친 경우 배상하며, 근로자의 귀책으로 환자 등 제3자에게 손해를 발생시켜 병원이 배상책임을 지게 되면 관련 민·형사상 책임을 부담한다.</li>
 </ol>
 </section>
-<section class="contract-part" data-contract-part="medical"$extra$
+<div class="signrow"$extra$
 )
 where id=1 and body_html like '%data-sign-slot="medical"%'
   and body_html not like '%data-contract-part="employment-addenda"%';
+
+-- 발송 당시 통합 여부를 직원이 수정할 수 없는 별도 열에 고정한다.
+alter table public.contracts add column if not exists integrated_signature_required boolean not null default false;
+create or replace function public.lock_integrated_contract_kind()
+returns trigger language plpgsql security definer set search_path=public,pg_temp as $$
+begin
+  if tg_op='INSERT' then
+    new.integrated_signature_required := coalesce(new.integrated_signature_required,false)
+      or (new.merged_html like '%data-sign-slot="employment"%' and new.merged_html like '%data-sign-slot="medical"%' and new.merged_html like '%data-sign-slot="privacy"%');
+  else
+    if old.integrated_signature_required and not new.integrated_signature_required then
+      raise exception 'integrated contract kind is immutable';
+    end if;
+    new.integrated_signature_required := new.integrated_signature_required or old.integrated_signature_required
+      or (new.merged_html like '%data-sign-slot="employment"%' and new.merged_html like '%data-sign-slot="medical"%' and new.merged_html like '%data-sign-slot="privacy"%');
+    if old.integrated_signature_required and old.status='대기' and new.status='대기'
+      and (new.merged_html is distinct from old.merged_html or new.sign_slots is distinct from old.sign_slots) then
+      raise exception 'pending integrated contract content is immutable';
+    end if;
+  end if;
+  return new;
+end $$;
+drop trigger if exists lock_integrated_contract_kind on public.contracts;
+create trigger lock_integrated_contract_kind before insert or update on public.contracts
+for each row execute function public.lock_integrated_contract_kind();
+update public.contracts set integrated_signature_required=true
+where status='대기' and not integrated_signature_required
+  and merged_html like '%data-sign-slot="employment"%'
+  and merged_html like '%data-sign-slot="medical"%'
+  and merged_html like '%data-sign-slot="privacy"%';
 
 -- 기존 단일 서명 계약과 체결본은 원래 RPC로 처리한다. 신규 통합본만 거부한다.
 create or replace function public.apply_employee_contract_signature(
@@ -107,7 +137,7 @@ declare v_use_id bigint:=null; r public.contracts;
 begin
   select * into r from public.contracts where id=p_contract_id and user_id=auth.uid() and status='대기' for update;
   if not found then raise exception 'contract is not pending or not owned by current user'; end if;
-  if r.merged_html like '%data-sign-slot="medical"%' then raise exception 'integrated contract requires three independent signatures'; end if;
+  if r.integrated_signature_required then raise exception 'integrated contract requires three independent signatures'; end if;
   if p_signature_id is not null then
     if not exists(select 1 from public.employee_signature_vault v where v.id=p_signature_id and v.user_id=auth.uid() and v.revoked_at is null) then raise exception 'signature is not available to current user'; end if;
     insert into public.employee_signature_uses(contract_id,signature_id,document_kind,confirmed_at,used_by)
@@ -140,13 +170,14 @@ returns bigint language plpgsql security definer set search_path=public,pg_temp 
 declare r public.contracts; v_part text; v_item jsonb; v_png text; v_id bigint; v_html text; v_slot text; v_now timestamptz:=now(); v_bytes bytea;
 begin
   select * into r from public.contracts where id=p_contract_id and user_id=auth.uid() and status='대기' for update;
-  if not found or r.source_pdf_path is not null or r.due_at<now() then raise exception 'contract is not signable'; end if;
+  if not found or not r.integrated_signature_required or r.source_pdf_path is not null or r.due_at<now() then raise exception 'contract is not signable'; end if;
   if r.merged_html not like '%data-sign-slot="employment"%' or r.merged_html not like '%data-sign-slot="medical"%' or r.merged_html not like '%data-sign-slot="privacy"%' then raise exception 'three signature slots required'; end if;
   if jsonb_typeof(p_signatures) is distinct from 'array' or jsonb_array_length(p_signatures)<>3 then raise exception 'three signatures required'; end if;
   v_html:=r.merged_html;
   foreach v_part in array array['employment','medical','privacy'] loop
     select value into v_item from jsonb_array_elements(p_signatures) where value->>'part'=v_part;
     if not found or (select count(*) from jsonb_array_elements(p_signatures) where value->>'part'=v_part)<>1 then raise exception 'one signature per part required'; end if;
+    if v_item->>'confirmed' is distinct from 'true' then raise exception 'each contract part must be confirmed'; end if;
     v_png:=v_item->>'signature_png';
     if v_png is null or length(v_png)>1400000 or v_png !~ '^data:image/png;base64,[A-Za-z0-9+/]+={0,2}$' then raise exception 'invalid PNG signature'; end if;
     v_bytes:=decode(substr(v_png,23),'base64');
@@ -180,11 +211,11 @@ create or replace function public.record_integrated_contract_pdf_signatures(
 declare r public.contracts; v_part text; v_item jsonb; v_id bigint;
 begin
   select * into r from public.contracts where id=p_contract_id for update;
-  if not found or r.user_id is distinct from p_user_id or r.status<>'대기' or r.merged_html not like '%data-sign-slot="employment"%' or r.merged_html not like '%data-sign-slot="medical"%' or r.merged_html not like '%data-sign-slot="privacy"%' then raise exception 'integrated PDF contract unavailable'; end if;
+  if not found or r.user_id is distinct from p_user_id or r.status<>'대기' or not r.integrated_signature_required or r.merged_html not like '%data-sign-slot="employment"%' or r.merged_html not like '%data-sign-slot="medical"%' or r.merged_html not like '%data-sign-slot="privacy"%' then raise exception 'integrated PDF contract unavailable'; end if;
   if jsonb_typeof(p_signatures) is distinct from 'array' or jsonb_array_length(p_signatures)<>3 then raise exception 'three signatures required'; end if;
   foreach v_part in array array['employment','medical','privacy'] loop
     select value into v_item from jsonb_array_elements(p_signatures) where value->>'part'=v_part;
-    if not found or (select count(*) from jsonb_array_elements(p_signatures) where value->>'part'=v_part)<>1 or coalesce(v_item->>'signature_hash','') !~ '^[0-9a-f]{64}$' then raise exception 'one valid signature per part required'; end if;
+    if not found or (select count(*) from jsonb_array_elements(p_signatures) where value->>'part'=v_part)<>1 or v_item->>'confirmed' is distinct from 'true' or coalesce(v_item->>'signature_hash','') !~ '^[0-9a-f]{64}$' then raise exception 'one confirmed signature per part required'; end if;
     v_id:=nullif(v_item->>'signature_id','')::bigint;
     if v_id is not null and not exists(select 1 from public.employee_signature_vault where id=v_id and user_id=p_user_id and revoked_at is null) then raise exception 'stored signature unavailable'; end if;
   end loop;
@@ -210,9 +241,7 @@ create or replace function public.require_integrated_contract_part_signatures()
 returns trigger language plpgsql security definer set search_path=public,pg_temp as $$
 begin
   if new.status='서명완료' and old.status is distinct from '서명완료'
-    and old.merged_html like '%data-sign-slot="employment"%'
-    and old.merged_html like '%data-sign-slot="medical"%'
-    and old.merged_html like '%data-sign-slot="privacy"%'
+    and old.integrated_signature_required
     and (select count(*) from public.contract_part_signatures where contract_id=new.id)<>3 then
     raise exception 'integrated contract requires all three recorded signatures';
   end if;
