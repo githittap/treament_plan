@@ -1355,9 +1355,7 @@ async function delNotice(id){if(!confirm('삭제할까요?'))return;await sb.fro
 /* ── 업무자료 ── */
 /* work-documents:test-start */
 const workDocuments=[
-  {icon:'🩺',category:'진료 매뉴얼',title:'진료 매뉴얼',description:'진료실 직무에 필요한 업무 안내를 확인합니다.',depts:['진료실'],manual:true,url:'https://app.notion.com/p/1f7ba489f082806e9761e748524994bc?source=copy_link'},
-  {icon:'💬',category:'상담 매뉴얼',title:'상담 매뉴얼',description:'상담 직무에 필요한 업무 안내를 확인합니다.',depts:['상담'],manual:true,url:'https://app.notion.com/p/163ba489f082805c9db2e2949b98a2d2?source=copy_link'},
-  {icon:'🛒',category:'구매',title:'필요물품 요청·구매현황',description:'필요물품 요청과 구매 진행현황을 확인합니다.',url:'https://app.notion.com/p/163ba489f082805c9db2e2949b98a2d2?source=copy_link'}
+  {icon:'🩺',category:'진료 매뉴얼',title:'진료 매뉴얼',description:'진료실·상담 직무에 필요한 업무 안내를 확인합니다.',depts:['진료실','상담'],manual:true,url:'https://app.notion.com/p/1f7ba489f082806e9761e748524994bc?source=copy_link'}
 ];
 function workDocumentsForProfile(items,profile){const dept=String(profile?.dept||profile?.department||'').trim();return (items||[]).filter(item=>!item.manual||!item.depts||item.depts.includes(dept));}
 function filterWorkDocuments(items,query){const q=String(query||'').trim().toLocaleLowerCase();return (items||[]).filter(item=>!q||[item.title,item.description,item.category].some(value=>String(value||'').toLocaleLowerCase().includes(q)));}
@@ -1671,7 +1669,7 @@ async function deleteCalendarEvent(id){
 
 /* ── 온보딩 ── */
 /* onboarding-guide:test-start */
-const G_ONBOARDING_GUIDE_ITEMS=['병원 시설을 둘러보고 식당·출퇴근 기록 장치 등 기본 시설 사용법을 안내받는다.','조직도·호칭·기본 예절·업무 분장·근로계약과 복리후생 설명을 듣는다.','무전기를 지급받으면 담당자에게 사용법과 업무용 대화 범위를 확인한다.','소속 부서의 담당자·보고 라인·당일 교육 항목을 확인한다.','기본 도구와 오픈·마감 업무를 확인한다.','무전은 들었다는 뜻으로 최초 1회 응답한다.','진료실·데스크에서 큰 소리의 사담과 환자 앞 내부 판단 논의를 피한다.','환자 납부·비급여 차감 등 금액 관련 기록을 상담·데스크와 일치시킨다.','대기시간과 환자 동선을 안내한다.','컴플레인은 끝까지 듣고 담당자에게 즉시 보고하며 단독 확정 약속을 하지 않는다.','신환은 구강포토와 상담 차트를 준비하고 지정 위치에 기록·스캔한다.','임플란트 내원 주기(1차·3주 후·6주 후)를 확인하고 안내한다.','사용한 기구·재료를 정리하고 치료 후 후속 계획을 기록한다.'];
+const G_ONBOARDING_GUIDE_ITEMS=['병원 시설을 둘러보고 식당·출퇴근 기록 장치 등 기본 시설 사용법을 안내받는다.','조직도, 호칭, 기본 예절, 업무 분장, 근로계약과 복리후생 설명을 듣는다.','무전기를 지급받으면 담당자에게 사용법과 업무용 대화 범위를 확인한다.','소속 부서의 담당자, 보고 라인, 당일 교육 항목을 확인한다.','무전은 들었다는 뜻으로 최초 1회 응답한다.','진료실·데스크에서 큰 소리의 사담을 피하고, 환자 앞에서 치료계획 변경이나 내부 판단을 논의하지 않는다.','환자가 언제 어떻게 납부하기로 했는지, 비급여 차감 등 금액 관련 사항이 있으면 상담·데스크 기록을 일치시킨다.','대기시간과 환자 동선을 안내하고 접수 후 어디에서 기다리는지 분명히 설명한다.','컴플레인은 말을 끊지 않고 듣고, 담당자에게 즉시 보고한 뒤 단독으로 확정 약속하지 않는다.','신환은 구강포토와 상담 차트를 준비하고 지정 위치에 기록·스캔한다.','임플란트 식립 후 1차 내원은 s/o 또는 드레싱, 2차 내원은 3주 후, 3차 내원은 6주 후로 안내한다.','사용한 기구와 재료는 원래 위치에 정리하고 오픈·마감 시 정리 항목을 체크한다.','치료 후 다음 계획 또는 정기검진·불편 시 내원 등 후속 계획을 기록한다.'];
 function onboardingGuideItems(){return [...G_ONBOARDING_GUIDE_ITEMS];}
 function onboardingGuideVisibleForRole(role){return ['staff','manager','chief','owner'].includes(role);}
 function onboardingGuideCard(){return `<div class="card"><h2>🧭 신입 첫날 안내</h2><div class="hint">가입 직후 확인하는 공통 안내입니다. 실장·매니저도 신규 직원에게 같은 내용을 안내합니다.</div><ol>${onboardingGuideItems().map(item=>`<li>${esc(item)}</li>`).join('')}</ol></div>`;}
@@ -1727,7 +1725,7 @@ async function saveOnboardingEvidence(){const msg=$('#oeMsg'),row={user_id:ME.id
 /* fingerprint-registration:test-start */
 function fingerprintRequestStatus(status){return status==='완료'?'완료':status==='반려'?'반려':'매니저 승인 대기';}
 async function submitFingerprintRegistration(){const {error}=await sb.from('fingerprint_registration_requests').upsert({user_id:ME.id,status:'요청',requested_at:new Date().toISOString()},{onConflict:'user_id'});if(error){$('#fpMsg').textContent='지문 등록 보고 실패: '+error.message;return;}$('#fpMsg').textContent='매니저에게 보고했습니다. 승인 후 완료됩니다.';setStatus('saved');render();refreshBadges();}
-async function approveFingerprintRegistration(userId){const {error}=await sb.from('fingerprint_registration_requests').update({status:'완료',manager_id:ME.id,approved_at:new Date().toISOString()}).eq('user_id',userId).eq('status','요청');if(error){setStatus('error');return;}setStatus('saved');render();refreshBadges();}
+async function approveFingerprintRegistration(userId){if(String(userId)===String(ME.id)){setStatus('error');return;}const {error}=await sb.from('fingerprint_registration_requests').update({status:'완료',manager_id:ME.id,approved_at:new Date().toISOString()}).eq('user_id',userId).eq('status','요청');if(error){setStatus('error');return;}setStatus('saved');render();refreshBadges();}
 function fingerprintRegistrationCard(rows){const list=Array.isArray(rows)?rows:[],mine=list.find(row=>row.user_id===ME.id),managerRows=isMgr()?list.filter(row=>row.status==='요청'):[];return `<div class="card"><h2>🖐 지문 등록 확인</h2><div class="hint">직원이 등록을 보고하면 매니저가 확인·승인해야 완료됩니다.</div>${mine?`<div class="b ${mine.status==='완료'?'ok':mine.status==='반려'?'no':'wait'}">${fingerprintRequestStatus(mine.status)}</div>`:'<button class="mini stamp" onclick="submitFingerprintRegistration()">지문 등록 완료 보고</button>'}${isMgr()&&managerRows.length?`<div class="hint" id="fpManagerAlert">승인 대기 ${managerRows.length}건</div>${managerRows.map(row=>`<div class="rowflex"><span>${esc(nameOf(row.user_id))}</span><button class="mini stamp" onclick="approveFingerprintRegistration('${esc(row.user_id)}')">매니저 승인</button></div>`).join('')}`:''}<div class="msg" id="fpMsg"></div></div>`;}
 /* fingerprint-registration:test-end */
 function employeeSignatureVaultCard(rows,error){if(error)return '<div class="card"><h2>✍ 개인서명 보관함</h2><div class="cal-error">개인서명 보관함이 아직 연결되지 않았습니다.</div></div>';return `<div class="card"><h2>✍ 개인서명 보관함</h2><div class="hint">개인서명은 일반 직원서류와 분리된 비공개 보관함에 저장됩니다. 문서에 복사할 때는 문서별 명시적 확인과 감사기록이 필요합니다.</div>${rows.length?'<div class="hint">저장된 개인서명 '+rows.length+'개</div>':'<div class="empty">저장된 개인서명이 없습니다.</div>'}<div class="fld" style="margin-top:10px"><label>PNG 서명 파일</label><input type="file" id="signatureFile" accept="image/png"></div><button class="hbtn pri" style="margin-top:10px" onclick="uploadEmployeeSignature()">개인서명 보관</button><div class="msg" id="signatureMsg"></div></div>`;}
@@ -2257,11 +2255,9 @@ async function saveContractSignature(id){
   if(!slot.test(row.merged_html||'')){if(msg)msg.textContent='직원 서명 위치를 찾지 못했습니다. 원장에게 문의하세요.';return;}
   const signedHtml=String(row.merged_html).replace(slot,`<img src="${signature}" alt="직원 서명" style="height:60px;vertical-align:middle"> <span>${esc(contractLongDate())}</span>`);
   const slots=contractArray(row.sign_slots).map(s=>s&&s.who==='employee'?{...s,signed:true,signed_at:now}:s);
-  if(canvas.dataset.signatureId){const useResult=await sb.from('employee_signature_uses').insert(contractSignatureUsePayload(canvas.dataset.signatureId,now));if(useResult.error){if(msg)msg.textContent='보관 서명 사용 기록 실패: '+useResult.error.message;setStatus('error');return;}}
   setStatus('saving');if(msg)msg.textContent='서명 저장 중…';
-  const {data,error}=await sb.from('contracts').update({merged_html:signedHtml,sign_slots:slots,signed_at:now,status:'서명완료'})
-    .eq('id',id).eq('user_id',ME.id).eq('status','대기').select('id');
-  if(error||!(data||[]).length){if(msg)msg.textContent='서명 저장 실패: '+(error?error.message:'계약 상태가 변경되었습니다.');setStatus('error');return;}
+  const {data,error}=await sb.rpc('apply_employee_contract_signature',{p_contract_id:id,p_merged_html:signedHtml,p_sign_slots:slots,p_signed_at:now,p_signature_id:canvas.dataset.signatureId?Number(canvas.dataset.signatureId):null});
+  if(error||data===null||data===undefined){if(msg)msg.textContent='서명 저장 실패: '+(error?error.message:'계약 상태가 변경되었습니다.');setStatus('error');return;}
   setStatus('saved');render();
 }
 async function signContractPdf(id){
@@ -2275,7 +2271,7 @@ async function signContractPdf(id){
   const n=k=>Number(document.querySelector(`[data-pdf-${k}="${id}"]`)?.value),page=Number.isInteger(n('page'))?n('page'):1,x=n('x'),y=n('y'),width=n('width'),height=n('height');
   if(!Number.isInteger(page)||page<1||[x,y,width,height].some(v=>!Number.isFinite(v))||x<0||y<0||width<=0||height<=0){if(msg)msg.textContent='PDF 서명 위치 값을 확인하세요.';return;}
   setStatus('saving');if(msg)msg.textContent='완료 PDF 생성 중…';
-  const {data,error}=await sb.functions.invoke('contract-pdf-sign',{body:{contract_id:id,signature_png:canvas.toDataURL('image/png'),page_no:page,x,y,width,height}});
+  const {data,error}=await sb.functions.invoke('contract-pdf-sign',{body:{contract_id:id,signature_png:canvas.toDataURL('image/png'),signature_id:canvas.dataset.signatureId?Number(canvas.dataset.signatureId):null,page_no:page,x,y,width,height}});
   if(error||data?.error){if(msg)msg.textContent='PDF 서명 실패: '+(data?.error||error?.message||'함수 미배포');setStatus('error');return;}
   if(msg)msg.textContent='완료 PDF를 보관하고 서명 기록을 남겼습니다.';setStatus('saved');render();
 }
@@ -2296,7 +2292,7 @@ async function renderContractEmployee(m,options={}){
       ${r.source_pdf_path?`<div class="hint">이 계약의 기준 문서는 원본 PDF이며, HTML 계약 본문과 별도 보관됩니다.${signed&&r.signed_pdf_path?` <button class="mini" onclick="downloadContractPdf(${r.id})">완료 PDF 다운로드</button>`:''}</div>`:''}
       ${expired?'<div class="hint" style="color:var(--red)">서명 기간 만료, 원장에게 문의</div>':''}
       ${r.status==='대기'&&!expired?`<h3>직원 서명</h3>${r.source_pdf_path?`<div class="hint">원본 PDF를 먼저 확인하세요. 좌표 기준은 PDF 왼쪽 아래이며, 실제 페이지에 맞게 조정합니다.</div><div class="rowflex" style="margin:8px 0"><button class="mini" onclick="openContractPdfSource(${r.id})">원본 PDF 확인</button><label class="mini">페이지 <input class="mini" type="number" min="1" value="1" data-pdf-page="${r.id}" style="width:60px"></label><label class="mini">X <input class="mini" type="number" min="0" value="72" data-pdf-x="${r.id}" style="width:70px"></label><label class="mini">Y <input class="mini" type="number" min="0" value="72" data-pdf-y="${r.id}" style="width:70px"></label><label class="mini">가로 <input class="mini" type="number" min="1" value="150" data-pdf-width="${r.id}" style="width:70px"></label><label class="mini">세로 <input class="mini" type="number" min="1" value="50" data-pdf-height="${r.id}" style="width:70px"></label></div>`:''}<canvas class="contract-signature" width="720" height="180" data-contract-signature="${r.id}" data-dirty="false"></canvas>
-        <div class="rowflex" style="margin-top:8px"><button class="mini" onclick="clearContractSignature(${r.id})">지우기</button>${r.source_pdf_path?`<button class="hbtn pri" onclick="signContractPdf(${r.id})">원본 확인 후 PDF 서명</button>`:`<button class="mini" onclick="useStoredContractSignature(${r.id})">보관 서명 사용</button><button class="hbtn pri" onclick="saveContractSignature(${r.id})">원문 확인 후 서명 저장</button>`}</div><div class="msg" id="contractSignMsg-${r.id}"></div>`:''}
+        <div class="rowflex" style="margin-top:8px"><button class="mini" onclick="clearContractSignature(${r.id})">지우기</button><button class="mini" onclick="useStoredContractSignature(${r.id})">보관 서명 사용</button>${r.source_pdf_path?`<button class="hbtn pri" onclick="signContractPdf(${r.id})">원본 확인 후 PDF 서명</button>`:`<button class="hbtn pri" onclick="saveContractSignature(${r.id})">원문 확인 후 서명 저장</button>`}</div><div class="msg" id="contractSignMsg-${r.id}"></div>`:''}
       ${signed?'<div class="hint" style="color:var(--mint)">✓ 서명 완료</div>':''}</div>`;}).join('');
   if(append)m.insertAdjacentHTML('beforeend',html);else m.innerHTML=html;
   initContractSignatures();

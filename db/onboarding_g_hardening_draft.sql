@@ -14,7 +14,7 @@ create policy fingerprint_registration_select_self_or_manager on public.fingerpr
 drop policy if exists fingerprint_registration_insert_self on public.fingerprint_registration_requests;
 create policy fingerprint_registration_insert_self on public.fingerprint_registration_requests for insert to authenticated with check (user_id=auth.uid() and status='요청');
 drop policy if exists fingerprint_registration_update_manager on public.fingerprint_registration_requests;
-create policy fingerprint_registration_update_manager on public.fingerprint_registration_requests for update to authenticated using (public.my_role() in ('manager','chief','owner')) with check (public.my_role() in ('manager','chief','owner') and manager_id=auth.uid() and status in ('완료','반려'));
+create policy fingerprint_registration_update_manager on public.fingerprint_registration_requests for update to authenticated using (public.my_role() in ('manager','chief','owner') and user_id<>auth.uid()) with check (public.my_role() in ('manager','chief','owner') and user_id<>auth.uid() and manager_id=auth.uid() and status in ('완료','반려'));
 
 -- 원본 13항은 UI 안내로 항상 표시하고, 기존 onboarding_items 자유 편집값은 덮어쓰지 않는다.
 insert into public.onboarding_items(label,required,order_no,active)

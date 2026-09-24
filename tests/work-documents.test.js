@@ -30,9 +30,8 @@ test('검색은 제목·설명·종류를 대소문자 구분 없이 필터링�
   assert.equal(context.filterWorkDocuments(items, '').length, 2);
 });
 
-test('두 승인 링크와 새 창 noopener를 노출한다', () => {
+test('진료 매뉴얼 링크와 새 창 noopener를 노출한다', () => {
   assert.match(html, /https:\/\/app\.notion\.com\/p\/1f7ba489f082806e9761e748524994bc\?source=copy_link/);
-  assert.match(html, /https:\/\/app\.notion\.com\/p\/163ba489f082805c9db2e2949b98a2d2\?source=copy_link/);
   assert.match(render[1], /target="_blank"/);
   assert.match(render[1], /rel="noopener"/);
 });
