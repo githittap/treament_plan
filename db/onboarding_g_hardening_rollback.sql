@@ -1,6 +1,16 @@
 -- G장 로컬 rollback 초안: 실제 요청·확인 데이터가 있으면 중단한다.
 do $$
 begin
+  if exists(select 1 from public.onboarding_checks c join public.onboarding_items i on i.id=c.item_id
+    where i.label in ('기본 도구와 오픈·마감 절차를 확인한다.',
+      '상담 전 최신 수가표와 내부 설명 자료의 사용 범위를 담당자에게 확인한다.',
+      '환자 앞에서 필요한 설명과 양해를 먼저 제공한다.')) then
+    raise exception 'rollback blocked: onboarding seed rows exist';
+  end if;
+end;
+$$;
+do $$
+begin
   if to_regclass('public.fingerprint_registration_requests') is not null
      and exists(select 1 from public.fingerprint_registration_requests) then
     raise exception 'rollback blocked: fingerprint registration request data exists';
@@ -44,4 +54,9 @@ delete from public.onboarding_items where label in (
   '임플란트 식립 후 1차 내원은 s/o 또는 드레싱, 2차 내원은 3주 후, 3차 내원은 6주 후로 안내한다.',
   '사용한 기구와 재료는 원래 위치에 정리하고 오픈·마감 시 정리 항목을 체크한다.',
   '치료 후 다음 계획 또는 정기검진·불편 시 내원 등 후속 계획을 기록한다.'
+);
+delete from public.onboarding_items where label in (
+  '기본 도구와 오픈·마감 절차를 확인한다.',
+  '상담 전 최신 수가표와 내부 설명 자료의 사용 범위를 담당자에게 확인한다.',
+  '환자 앞에서 필요한 설명과 양해를 먼저 제공한다.'
 );

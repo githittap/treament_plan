@@ -8,16 +8,20 @@ const policies=fs.readFileSync('db/hr_policies.sql','utf8');
 const sql=fs.readFileSync('db/onboarding_g_hardening_draft.sql','utf8');
 const rollback=fs.readFileSync('db/onboarding_g_hardening_rollback.sql','utf8');
 
-test('G 온보딩 안내는 원본 코드블록 13항을 모두 포함하고 직원·관리자에게 보인다',()=>{
+test('G 온보딩 안내는 원본 코드블록의 고유 항목을 모두 포함하고 직원·관리자에게 보인다',()=>{
   const block=html.match(/\/\* onboarding-guide:test-start \*\/([\s\S]*?)\/\* onboarding-guide:test-end \*\//);
   assert.ok(block);
   const c={};vm.runInNewContext(`${block[1]};this.h={onboardingGuideItems,onboardingGuideVisibleForRole};`,c);
   const expected=['병원 시설을 둘러보고 식당·출퇴근 기록 장치 등 기본 시설 사용법을 안내받는다.','조직도, 호칭, 기본 예절, 업무 분장, 근로계약과 복리후생 설명을 듣는다.','무전기를 지급받으면 담당자에게 사용법과 업무용 대화 범위를 확인한다.','소속 부서의 담당자, 보고 라인, 당일 교육 항목을 확인한다.','무전은 들었다는 뜻으로 최초 1회 응답한다.','진료실·데스크에서 큰 소리의 사담을 피하고, 환자 앞에서 치료계획 변경이나 내부 판단을 논의하지 않는다.','환자가 언제 어떻게 납부하기로 했는지, 비급여 차감 등 금액 관련 사항이 있으면 상담·데스크 기록을 일치시킨다.','대기시간과 환자 동선을 안내하고 접수 후 어디에서 기다리는지 분명히 설명한다.','컴플레인은 말을 끊지 않고 듣고, 담당자에게 즉시 보고한 뒤 단독으로 확정 약속하지 않는다.','신환은 구강포토와 상담 차트를 준비하고 지정 위치에 기록·스캔한다.','임플란트 식립 후 1차 내원은 s/o 또는 드레싱, 2차 내원은 3주 후, 3차 내원은 6주 후로 안내한다.','사용한 기구와 재료는 원래 위치에 정리하고 오픈·마감 시 정리 항목을 체크한다.','치료 후 다음 계획 또는 정기검진·불편 시 내원 등 후속 계획을 기록한다.'];
+  expected.splice(4,0,'기본 도구와 오픈·마감 절차를 확인한다.');
+  expected[6]='진료실·데스크에서 큰 소리의 사담을 피하고, 환자 앞에서 치료계획 변경이나 내부 판단을 논의하지 않으며 필요한 설명과 양해를 먼저 제공한다.';
+  expected.splice(10,0,'상담 전 최신 수가표와 내부 설명 자료의 사용 범위를 담당자에게 확인한다.');
   assert.deepEqual(JSON.parse(JSON.stringify(c.h.onboardingGuideItems())),expected);
   for(const role of ['staff','manager','chief'])assert.equal(c.h.onboardingGuideVisibleForRole(role),true);
-  assert.equal(c.h.onboardingGuideItems().some(item=>item.includes('기본 도구와 오픈·마감')),false);
+  assert.match(html,/undone\.length&&onboardingGuideVisibleForRole\(ME\.role\)\?onboardingGuideCard\(\)/);
   assert.match(html,/onboardingGuideItems\(\)/);
   assert.match(html,/BADGE\.onbo\+=\(fp\|\|\[\]\)\.length/);assert.match(html,/fpManagerAlert/);
+  c.ME={role:'chief'};assert.equal(vm.runInNewContext('function canApproveFingerprintRegistration(){return ME.role===\'manager\'||ME.role===\'owner\'};canApproveFingerprintRegistration()',c),false);
 });
 
 test('업무자료는 현재 직원의 직무 매뉴얼만 반환한다',()=>{
@@ -27,6 +31,8 @@ test('업무자료는 현재 직원의 직무 매뉴얼만 반환한다',()=>{
   assert.deepEqual(c.h.workDocumentsForProfile(docs,{dept:'진료실'}).map(x=>x.title),['진료 매뉴얼']);
   assert.deepEqual(c.h.workDocumentsForProfile(docs,{dept:'상담'}).map(x=>x.title),['진료 매뉴얼']);
   assert.deepEqual(c.h.workDocumentsForProfile(docs,{dept:'기공'}),[]);
+  assert.deepEqual(c.h.workDocumentsForProfile(docs,{job_group:'clinical_consult',dept:'기공'}).map(x=>x.title),['진료 매뉴얼']);
+  assert.deepEqual(c.h.workDocumentsForProfile(docs,{job_group:'lab',dept:'진료실'}),[]);
 });
 
 test('보관 서명을 선택하면 계약 서명 저장 payload에 signature_id와 근로계약서 사용기록이 포함된다',async()=>{

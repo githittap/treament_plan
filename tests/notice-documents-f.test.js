@@ -7,8 +7,8 @@ const html=fs.readFileSync(path.join(__dirname,'..','hr.html'),'utf8');
 const noticeSql=fs.readFileSync(path.join(__dirname,'..','db','notice_attachments_deposit_access_draft.sql'),'utf8');
 const employeeSql=fs.readFileSync(path.join(__dirname,'..','db','employee_documents_onboarding_hardening_draft.sql'),'utf8');
 
-test('F장 공지 첨부와 서류 허용 형식이 xlsx·pptx·txt·hwpx를 포함한다',()=>{
-  assert.match(html,/\.xlsx/);assert.match(html,/\.pptx/);assert.match(html,/\.txt/);assert.match(html,/\.hwpx/);
+test('공지 파일 선택기는 일반 형식을 막지 않고 업로드 검증이 실제 허용 여부를 결정한다',()=>{
+  assert.match(html,/<input id="ntFiles" type="file" multiple accept="\*\/\*">/);
 });
 
 test('로컬 Storage 정책은 HWPX와 빈·브라우저 MIME를 확장자와 함께 허용하고 차단목록만 거부한다',()=>{
