@@ -2,6 +2,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
+const {edgeSigningAttempt}=require('./contract-pdf-sign-edge-helper.cjs');
 
 const html=fs.readFileSync('hr.html','utf8');
 const sql=fs.readFileSync('db/integrated_contract_three_signatures_draft.sql','utf8');
@@ -76,4 +77,24 @@ test('통합 계약 완료는 서버의 3건 원자적 기록과 PDF 세 위치�
   assert.match(html,/data-contract-confirm="\$\{row\.id\}-\$\{part\}"/);
   assert.match(edge,/for \(const entry of entries\)[\s\S]*page\.drawImage/);
   assert.match(edge,/record_integrated_contract_pdf_signatures/);
+});
+
+test('Edge는 세 구역 확인을 검증하고 실제 PDF 기록 RPC에 전달한다',async()=>{
+  const success=await edgeSigningAttempt();
+  assert.equal(success.status,200);
+  assert.deepEqual(success.rpcCalls.map(call=>call.name),['begin_contract_pdf_signing','record_integrated_contract_pdf_signatures']);
+  const signatures=success.rpcCalls[1].params.p_signatures;
+  assert.deepEqual(signatures.map(row=>row.part),['employment','medical','privacy']);
+  assert.deepEqual(signatures.map(row=>row.confirmed),[true,true,true]);
+  assert.ok(signatures.every(row=>/^[0-9a-f]{64}$/.test(row.signature_hash)));
+  for(const value of [false,undefined,'true']){
+    const attempt=await edgeSigningAttempt([true,value,true]);
+    assert.equal(attempt.status,400);
+    assert.match(attempt.response.error,/each contract part must be confirmed/);
+    assert.equal(attempt.rpcCalls.length,0);
+  }
+  const legacy=await edgeSigningAttempt([],false);
+  assert.equal(legacy.status,200);
+  assert.deepEqual(legacy.rpcCalls.map(call=>call.name),['begin_contract_pdf_signing','record_contract_pdf_signature_with_use']);
+  assert.equal(legacy.rpcCalls[1].params.p_signatures,undefined);
 });

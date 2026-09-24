@@ -49,17 +49,18 @@ export function createContractPdfSignHandler(deps: { createClient?: any; PDFDocu
     if (preflight.status === "서명완료" && preflight.signed_pdf_path && preflight.signed_pdf_sha256) return json({ contract_id: contractId, signed_pdf_path: preflight.signed_pdf_path, signed_pdf_sha256: preflight.signed_pdf_sha256, idempotent: true });
     if (preflight.status !== "대기" || preflight.signed_at || preflight.signed_pdf_path || !preflight.source_pdf_path || !preflight.source_pdf_sha256) throw new Error("contract is not signable");
     if (!preflight.source_pdf_confirmed_at || !preflight.sent_at || !preflight.source_pdf_version || !preflight.due_at || new Date(preflight.due_at).getTime() < Date.now()) throw new Error("employee must confirm the source PDF and final send first");
-    const integrated = ["employment", "medical", "privacy"].every((part) => String(preflight.merged_html || "").includes(`data-sign-slot="${part}"`));
+    const integrated = preflight.integrated_signature_required === true || ["employment", "medical", "privacy"].every((part) => String(preflight.merged_html || "").includes(`data-sign-slot="${part}"`));
     const parts = ["employment", "medical", "privacy"];
     if (integrated && (!Array.isArray(body.signatures) || body.signatures.length !== 3 || !Array.isArray(body.coordinates) || body.coordinates.length !== 3)) throw new Error("three independent signatures and coordinates required");
     const entries = integrated ? parts.map((part) => {
       const s = Array.isArray(body.signatures) ? body.signatures.find((item: any) => item?.part === part) : null;
       const c = Array.isArray(body.coordinates) ? body.coordinates.find((item: any) => item?.part === part) : null;
       if (!s || !c || body.signatures.filter((item: any) => item?.part === part).length !== 1 || body.coordinates.filter((item: any) => item?.part === part).length !== 1) throw new Error("three independent signatures and coordinates required");
-      return { part, signatureId: s.signature_id == null ? null : Number(s.signature_id), bytes: dataUrlBytes(s.signature_png), pageNo: Number(c.page_no), x: Number(c.x), y: Number(c.y), width: Number(c.width), height: Number(c.height) };
+      if (s.confirmed !== true) throw new Error("each contract part must be confirmed");
+      return { part, signatureId: s.signature_id == null ? null : Number(s.signature_id), confirmed: true, bytes: dataUrlBytes(s.signature_png), pageNo: Number(c.page_no), x: Number(c.x), y: Number(c.y), width: Number(c.width), height: Number(c.height) };
     }) : [{ part: "employment", signatureId: body.signature_id == null ? null : Number(body.signature_id), bytes: dataUrlBytes(body.signature_png), pageNo: Number(body.page_no), x: Number(body.x), y: Number(body.y), width: Number(body.width), height: Number(body.height) }];
     if (entries.some((e) => (e.signatureId !== null && (!Number.isInteger(e.signatureId) || e.signatureId < 1)) || !Number.isInteger(e.pageNo) || e.pageNo < 1 || [e.x, e.y, e.width, e.height].some((v) => !Number.isFinite(v) || v < 0) || e.width <= 0 || e.height <= 0 || e.width > 1200 || e.height > 800)) throw new Error("invalid PDF signature coordinates");
-    const partHashes = await Promise.all(entries.map(async (e) => ({ part: e.part, signature_id: e.signatureId, signature_hash: await sha256(e.bytes) })));
+    const partHashes = await Promise.all(entries.map(async (e) => ({ part: e.part, signature_id: e.signatureId, signature_hash: await sha256(e.bytes), ...(integrated ? { confirmed: true } : {}) })));
     const signatureHash = integrated ? await sha256(new TextEncoder().encode(JSON.stringify({ partHashes, coordinates: entries.map(({ part, pageNo, x, y, width, height }) => ({ part, pageNo, x, y, width, height })) }))) : partHashes[0].signature_hash;
     const signatureId = entries[0].signatureId;
     const { pageNo, x, y, width, height } = entries[0];

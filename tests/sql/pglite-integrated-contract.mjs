@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {createRequire} from 'node:module';
+const {edgeSigningAttempt}=createRequire(import.meta.url)('../contract-pdf-sign-edge-helper.cjs');
 
 const packageRoot=process.env.PGLITE_PACKAGE_ROOT;
 if(!packageRoot){console.log('PGLITE_INTEGRATED_CONTRACT_SKIP: package path missing');process.exit(2);}
@@ -73,7 +75,15 @@ try{
   await db.exec('reset role');
   error='';try{await query(`update public.contracts set status='서명완료' where id=4`);}catch(e){error=String(e);}assert.match(error,/three recorded signatures/);
   assert.equal((await query('select status from public.contracts where id=4'))[0].status,'대기');
-  const hashes=['employment','medical','privacy'].map(part=>({part,signature_id:null,signature_hash:'a'.repeat(64),confirmed:true}));
+  const edgeAttempt=await edgeSigningAttempt();
+  assert.equal(edgeAttempt.status,200);
+  const edgeRecord=edgeAttempt.rpcCalls.find(call=>call.name==='record_integrated_contract_pdf_signatures');
+  assert.ok(edgeRecord);
+  const hashes=edgeRecord.params.p_signatures;
+  assert.deepEqual(hashes.map(item=>item.confirmed),[true,true,true]);
+  const missingConfirmation=await edgeSigningAttempt([true,undefined,true]);
+  assert.equal(missingConfirmation.status,400);
+  assert.equal(missingConfirmation.rpcCalls.length,0);
   const record=parts=>`select public.record_integrated_contract_pdf_signatures(3,'${uid}','00000000-0000-0000-0000-000000000003','${'b'.repeat(64)}','contracts/3/signed.pdf','${'c'.repeat(64)}','${'d'.repeat(64)}',1,72,72,150,50,${qjson(parts)})`;
   await db.exec('set role service_role');
   error='';try{await query(record(hashes.slice(0,2)));}catch(e){error=String(e);}assert.match(error,/three signatures required/);
