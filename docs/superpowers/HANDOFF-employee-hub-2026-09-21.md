@@ -2,8 +2,8 @@
 
 ## 최신 인계 — 직원 직무 분류 2단계 로컬 검증 (2026-09-24)
 
-- 현재 worktree/branch: `codex/employee-hub-phase2-20260923`; HEAD `65fda68eccbb2639111890fa804c2be40be1a217`; base와 분기 상태 `ahead 47, behind 5`. 원본 main 작업트리·다른 worktree는 건드리지 않았다.
-- 직무 분류 Task1~4 로컬 구현 커밋은 `1094547`, `acc98b0`, `2295e85`, `8edc9ea`, `6a18c9f`, `bede4a6`, `ae07563`, `52c5852`다. Task5 PGlite rollback 보존 assertion과 기록 5종은 `65fda68`로 commit했고 worktree는 clean이다. 첫 일반 셸 commit 시 권한 오류가 있었으나 승인된 대상 파일만 재시도해 완료했다.
+- 현재 worktree/branch: `codex/employee-hub-phase2-20260923`; 원본 main 작업트리·다른 worktree는 건드리지 않았고 마지막 기록 변경 commit 후 `git status` clean을 확인했다.
+- 직무 분류 Task1~4 로컬 구현 커밋은 `1094547`, `acc98b0`, `2295e85`, `8edc9ea`, `6a18c9f`, `bede4a6`, `ae07563`, `52c5852`다. Task5 PGlite rollback 보존 assertion과 기록 5종은 `65fda68`로 commit했고, 인계 상태 정정은 `e4afb02`로 남겼다. 첫 일반 셸 commit 시 권한 오류가 있었으나 승인된 대상 파일만 재시도해 완료했다.
 - 로컬 시험: PGlite SQL 29/29, 관련 JS 76/76, 전체 JS 377/377, inline script 2개 구문 compile PASS, `git diff --check` PASS.
 - 보호: Dr. 명부·연결 profile은 네 그룹/backfill·편집 대상에서 제외, profile 분류를 연결 명부로 복제하지 않음, 원본 dept/department 보존, 계약 역할/스냅샷 불변. 운영 DB/Storage/Edge/Auth·main·push·배포 미실행.
 - 구현지시서/CSV 경로는 `Z:\09_claude-output\03_병원운영·전산\직원허브_T8검증\`이다. CSV 131개 요구 중 기존 판정 기준 미완료는 67개이며 직무 분류의 Z④-14~17, Z⑦-06~07만 이번 기능 커밋이 다룬다. 전체 요구는 결과 파일에서 코드·커밋·시험 증거를 구분하고 미해결을 숨기지 않는다.
