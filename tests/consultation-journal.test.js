@@ -121,6 +121,23 @@ test('다음 조치는 완료되지 않은 예정일만 오늘·기한 지남으
   ])assert.equal(timing(row,'2026-09-25'),'');
 });
 
+test('다음 조치 담당자 후보는 DB 가드처럼 active·approved가 명시적 true인 관리자만 보여준다',()=>{
+  const source=html.match(/^function consultationActionAssigneeOptions\(selected\)\{.*\}$/m)?.[0];
+  assert.ok(source);
+  const profiles=[
+    {user_id:'eligible',name:'정상',role:'chief',active:true,approved:true,account_access_status:'활성'},
+    {user_id:'no-active',name:'누락',role:'chief',approved:true},
+    {user_id:'null-active',name:'널',role:'chief',active:null,approved:true},
+    {user_id:'no-approved',name:'미승인',role:'chief',active:true},
+    {user_id:'false-approved',name:'거부',role:'chief',active:true,approved:false}
+  ];
+  const context={PROFILES:profiles,esc:String,consultationCanAccess:role=>['manager','chief','owner'].includes(role)};
+  require('node:vm').runInNewContext(`${source}\nthis.options=consultationActionAssigneeOptions;`,context);
+  const options=context.options(null);
+  assert.match(options,/value="eligible"/);
+  for(const row of profiles.slice(1))assert.doesNotMatch(options,new RegExp(`value="${row.user_id}"`));
+});
+
 test('기존 상담일지 안에서 오늘·기한 지남 목록과 다음 조치 담당자·예정일·완료 체크를 연결한다',()=>{
   const feature=html.match(/\/\* ── 상담일지:[\s\S]*?\/\* ── 근로계약서/)?.[0]||'';
   for(const id of ['cjActionQueue','cjActionAssignee','cjActionDue','cjActionDone'])assert.match(feature,new RegExp(`id="${id}"`));
