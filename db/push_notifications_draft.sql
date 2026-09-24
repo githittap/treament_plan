@@ -3,8 +3,34 @@
 -- 여기서는 outbox(push_events/push_event_deliveries)와 발송기 전용 RPC만 추가한다.
 -- push_subscriptions은 RLS enable 후 service_role에는 아무 GRANT도 남지 않으므로(원장 승인 반영, 최소권한),
 -- 발송기는 반드시 아래 SECURITY DEFINER 함수를 통해서만 읽고/지운다(테이블 직접 권한 부여 없음).
+-- 선행: db/employment_status_access_block_phase_b.sql (profiles.account_access_status),
+-- db/employee_documents.sql, db/consultation_inbox.sql, db/consultation_access_widen.sql,
+-- db/payment_requests_draft.sql, db/notice_attachments_deposit_access_draft.sql
+-- (hr_schema.sql의 notices에 author_id 추가), db/push_subscriptions_draft.sql.
+-- leave_requests/profiles는 기존 허브 기본 스키마가 먼저 있어야 한다. 모든 선행 객체는 로컬 확인 후 적용한다.
 begin;
 do $$ begin
+  if to_regclass('public.profiles') is null or to_regclass('public.leave_requests') is null
+     or to_regclass('public.push_subscriptions') is null or to_regclass('public.payment_requests') is null
+     or to_regclass('public.notices') is null or to_regclass('public.employee_documents') is null
+     or to_regclass('public.consultation_inbox') is null then
+    raise exception 'push notification prerequisite table missing; preserve state and stop';
+  end if;
+  if exists(
+    select 1 from (values
+      ('profiles','user_id'),('profiles','role'),('profiles','active'),('profiles','approved'),('profiles','account_access_status'),
+      ('leave_requests','id'),('leave_requests','user_id'),('leave_requests','status'),
+      ('push_subscriptions','id'),('push_subscriptions','user_id'),('push_subscriptions','endpoint'),('push_subscriptions','subscription'),
+      ('payment_requests','id'),('payment_requests','status'),
+      ('notices','id'),('notices','author_id'),
+      ('employee_documents','id'),('employee_documents','user_id'),('employee_documents','checked_at'),
+      ('consultation_inbox','id')
+    ) required(table_name,column_name)
+    where not exists(select 1 from information_schema.columns c
+      where c.table_schema='public' and c.table_name=required.table_name and c.column_name=required.column_name)
+  ) then
+    raise exception 'push notification prerequisite column missing; preserve state and stop';
+  end if;
   if to_regclass('public.push_events') is not null
      or to_regclass('public.push_event_deliveries') is not null
      or to_regprocedure('public.enqueue_push_event(text,uuid,text,jsonb)') is not null

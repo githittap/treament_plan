@@ -8,6 +8,10 @@ import assert from 'node:assert/strict';import fs from 'node:fs';import path fro
 const root=process.env.PGLITE_PACKAGE_ROOT;if(!root)throw Error('PGLITE_PACKAGE_ROOT is required');
 const {PGlite}=await import(pathToFileURL(path.join(root,'dist/index.js')).href);
 const draft=fs.readFileSync('db/push_notifications_draft.sql','utf8'),rollback=fs.readFileSync('db/push_notifications_rollback.sql','utf8');
+const paymentSchema=fs.readFileSync('db/payment_requests_draft.sql','utf8').match(/create table if not exists public\.payment_requests \([\s\S]*?\n\);/i)?.[0];
+const noticeSchema=fs.readFileSync('db/hr_schema.sql','utf8').match(/create table if not exists public\.notices \([\s\S]*?\n\);/i)?.[0];
+const noticeAuthorColumn=fs.readFileSync('db/notice_attachments_deposit_access_draft.sql','utf8').match(/alter table public\.notices add column if not exists author_id [^;]+;/i)?.[0];
+assert.ok(paymentSchema&&noticeSchema&&noticeAuthorColumn,'실제 결재·공지 선행 SQL을 찾아야 한다');
 assert.match(draft,/references public\.profiles\(user_id\) on delete cascade/i);
 assert.match(draft,/role in \('chief','owner'\)/i);
 assert.doesNotMatch(draft,/set active=false/i,'live push_subscriptions has no active column; expiry must delete');
@@ -16,7 +20,7 @@ assert.doesNotMatch(draft,/grant select|grant insert|grant update|grant delete/i
 
 const staff='11111111-1111-1111-1111-111111111111',chief='22222222-2222-2222-2222-222222222222',owner='33333333-3333-3333-3333-333333333333',manager='44444444-4444-4444-4444-444444444444',inactiveChief='55555555-5555-5555-5555-555555555555';
 
-async function fresh(){
+async function fresh({applyDraft=true,noticeAuthorId=true}={}){
   const db=new PGlite(),q=s=>db.query(s).then(x=>x.rows);
   await db.exec(`
     create role anon;create role authenticated;create role service_role bypassrls;
@@ -25,15 +29,16 @@ async function fresh(){
     grant usage on schema auth to authenticated,service_role;grant execute on function auth.uid() to authenticated,service_role;
     create table public.profiles(user_id uuid primary key,role text not null default 'staff',active boolean not null default true,approved boolean not null default true,account_access_status text not null default '활성');
     create table public.leave_requests(id bigint generated always as identity primary key,user_id uuid not null references public.profiles(user_id),status text not null default '대기');
-    create table public.payment_requests(id bigint generated always as identity primary key,requester_id uuid not null references public.profiles(user_id),status text not null default 'chief_pending');
-    create table public.notices(id bigint generated always as identity primary key,author_id uuid not null references public.profiles(user_id),title text not null);
     create table public.employee_documents(id bigint generated always as identity primary key,user_id uuid not null references public.profiles(user_id),checked_at timestamptz);
     create table public.consultation_inbox(id uuid primary key,created_by uuid,contact text,message text not null);
     create table public.push_subscriptions(id uuid primary key,user_id uuid not null references public.profiles(user_id) on delete cascade,endpoint text not null,subscription jsonb not null,created_at timestamptz not null default now(),updated_at timestamptz not null default now(),unique(user_id,endpoint));
     grant select,insert,update,delete on public.profiles,public.leave_requests,public.push_subscriptions to authenticated;
     grant usage,select on all sequences in schema public to authenticated;
   `);
-  await db.exec(draft);
+  await db.exec(paymentSchema);
+  await db.exec(noticeSchema);
+  if(noticeAuthorId)await db.exec(noticeAuthorColumn);
+  if(applyDraft)await db.exec(draft);
   await q(`insert into public.profiles(user_id,role,active,approved) values
     ('${staff}','staff',true,true),
     ('${chief}','chief',true,true),
@@ -203,9 +208,16 @@ async function rollbackError(db){try{await db.exec(rollback);return null}catch(e
   assert.equal(await rollbackError(db),'push notification outbox tables missing; nothing to roll back or already rolled back');
 }finally{await db.close()}}
 
+// 실제 hr_schema.sql의 notices에는 author_id가 없다. 선행 보완 SQL이 빠지면 적용 전 멈춰야 한다.
+{const {db,q}=await fresh({applyDraft:false,noticeAuthorId:false});try{
+  await assert.rejects(db.exec(draft),/push notification prerequisite column missing; preserve state and stop/);
+  await db.exec('rollback');
+  assert.equal((await q("select to_regclass('public.push_events') r"))[0].r,null);
+}finally{await db.close()}}
+
 // 11) 결재는 실제 결재 단계가 열린 사람에게만 한 번씩 쌓인다. 반복 UPDATE는 중복되지 않는다.
 {const {db,q}=await fresh();try{
-  await q(`insert into public.payment_requests(requester_id) values ('${staff}')`);
+  await q(`insert into public.payment_requests(requester_id,payment_item,bank_name,account_holder,account_number,amount_krw) values ('${staff}','기밀 결재 사유','은행','예금주','123-456',500000)`);
   let events=await q("select event_type,recipient_id,payload from public.push_events where event_type='payment_pending'");
   assert.deepEqual(events.map(r=>r.recipient_id),[chief]);
   assert.deepEqual(events[0].payload,{});
