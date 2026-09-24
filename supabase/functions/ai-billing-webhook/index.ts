@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { parseNaverAdSms } from './naver_ads.mjs';
 
 // MacroDroid HTTP 요청(POST) 설정(원장 기존 계좌연동 매크로와 동일한 패턴):
 //   URL: .../ai-billing-webhook?platform=Claude  (플랫폼은 매크로마다 쿼리파라미터로 구분)
@@ -64,10 +65,10 @@ Deno.serve(async (req: Request) => {
   if (!raw_text) raw_text = bodyText; // 순수 문자(=SMS 원문)가 그대로 온 경우
 
   let usd_amount: number | null = null;
+  const naverAd = parseNaverAdSms(raw_text);
   if (amount_krw == null && raw_text) {
-    usd_amount = extractUsdAmount(raw_text);
-    if (usd_amount != null) amount_krw = await usdToKrw(usd_amount);
-    else amount_krw = extractKrwAmount(raw_text);
+    if (naverAd) amount_krw = naverAd.amount_krw;
+    else { usd_amount = extractUsdAmount(raw_text);if (usd_amount != null) amount_krw = await usdToKrw(usd_amount);else amount_krw = extractKrwAmount(raw_text); }
   }
 
   if (!token || !platform || amount_krw == null) {
@@ -84,7 +85,7 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
   }
 
-  const composedNote = [note, usd_amount != null ? `USD ${usd_amount} 자동환산` : null].filter(Boolean).join(' / ') || null;
+  const composedNote = [note, naverAd?.note, usd_amount != null ? `USD ${usd_amount} 자동환산` : null].filter(Boolean).join(' / ') || null;
 
   const { error: insertErr } = await client.from('ai_billing_events').insert({
     platform: String(platform),
