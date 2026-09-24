@@ -19,6 +19,7 @@
 .job-group-admin{border:1px solid var(--line);border-radius:10px;padding:12px;margin:12px 0;min-width:0;overflow:hidden}.job-group-doctors{display:flex;gap:8px;flex-wrap:wrap;padding:8px;background:var(--panel);border-radius:8px}.job-group-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}.job-group-summary-card{display:flex;justify-content:space-between;gap:6px;min-width:0;padding:9px;background:var(--panel);border-radius:7px;overflow-wrap:anywhere}.job-group-unassigned-warning{display:flex;flex-direction:column;gap:3px;margin-top:8px;padding:9px;border-left:4px solid var(--gold);background:var(--gold-bg);color:var(--ink);overflow-wrap:anywhere}.job-group-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(180px,.5fr);gap:10px;margin-top:10px}.job-group-form fieldset{min-width:0}.job-group-form label{display:flex;flex-direction:column;gap:6px}.job-group-people{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.job-group-person{display:flex;align-items:center;gap:8px;min-width:0;padding:6px;border:1px solid var(--line);border-radius:6px}.job-group-person span{overflow-wrap:anywhere}.job-group-person span:last-child{margin-left:auto;color:var(--gray)}.job-group-preview{width:100%;box-sizing:border-box;margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:8px;overflow-wrap:anywhere}.job-group-preview ul{margin:6px 0;padding-left:22px}.job-group-actions{position:sticky;bottom:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;background:var(--card);border-top:1px solid var(--line)}.job-group-actions #jobGroupMessage{min-width:0;overflow-wrap:anywhere}
 @media(max-width:640px){.job-group-form{grid-template-columns:1fr}.job-group-people{grid-template-columns:1fr}.job-group-summary{grid-template-columns:1fr}.job-group-preview{width:100%}.job-group-actions{position:sticky;bottom:0;flex-direction:column;align-items:stretch}.job-group-actions button{width:100%}.job-group-admin{max-width:100%;box-sizing:border-box}}
 @media print{ @page{size:A4;margin:10mm} body.leave-printing> *{display:none!important} body.leave-printing>#lvFormMask{display:block!important;position:static!important;background:#fff!important;padding:0!important} body.leave-printing #lvFormMask,body.leave-printing #lvFormMask *{visibility:visible!important} body.leave-printing #lvFormMask .modal{width:100%!important;max-width:none!important;max-height:none!important;overflow:visible!important;box-shadow:none!important;border:0!important;padding:0!important} body.leave-printing #lvFormMask h3{display:none!important} body.leave-printing #lvFormBody>div{padding:8mm!important;font-size:12px!important;line-height:1.45!important} body.leave-printing #lvFormBody table{font-size:12px!important} body.calendar-printing> *{display:none!important} body.calendar-printing>#app,body.calendar-printing>#app main{display:block!important} body.calendar-printing header,body.calendar-printing footer,body.calendar-printing .calendar-actions{display:none!important} body.calendar-printing main{max-width:none!important;padding:0!important} body.calendar-printing #calendarCard{border:0!important;padding:0!important} body.calendar-printing .calendar-layout{grid-template-columns:210px minmax(0,1fr)!important} body.calendar-printing .calendar-day-panel{position:static!important} body.payslip-printing> *{display:none!important} body.payslip-printing>#psMask{display:block!important;position:static!important;background:#fff!important;padding:0!important} body.payslip-printing #psMask,body.payslip-printing #psMask *{visibility:visible!important} body.payslip-printing #psMask .modal{width:100%!important;max-width:none!important;max-height:none!important;overflow:visible!important;box-shadow:none!important;border:0!important;padding:0!important} body.payslip-printing #psMask h3{display:none!important} body.payslip-printing .payslip-doc{padding:10mm!important} @page{margin:12mm} @page{ @top-right{content:counter(page) " / " counter(pages);font-size:9px;color:#556} } }
+@media print{body.certificate-printing>*{display:none!important}body.certificate-printing>#certificateMask{display:block!important;position:static!important;background:#fff!important;padding:0!important}body.certificate-printing #certificateMask .modal{width:100%!important;max-width:none!important;max-height:none!important;overflow:visible!important;box-shadow:none!important;border:0!important}body.certificate-printing #certificateMask h3{display:none!important}}
 :root{
   --bg:#0d1715; --card:#14201d; --panel:#182823; --ink:#e6f2ef; --gray:#8fa5a0; --line:#24332f;
   --mint:#2fd9c4; --mint-dk:#0e2b27; --gold:#e3b341; --gold-bg:#2a2312; --red:#ff7b76; --red-bg:#2b1512;
@@ -275,7 +276,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
     <div class="fld w2"><label>제목</label><input id="apTitle"></div>
     <div class="fld w4"><label>내용</label><textarea id="apBody"></textarea></div>
   </div>
-  <div class="hint">결재선: 나 → 실장 → 원장 (각 단계 도장). 재직증명서는 결재 요청만 기록되며, 현재 자동 발급·다운로드 기능은 연결되지 않았습니다.</div>
+  <div class="hint">결재선: 나 → 실장 → 원장 (각 단계 도장). 재직증명서는 최종 승인 시 재직 정보를 확인해 발급되며, 필수 정보가 없으면 발급되지 않습니다.</div>
   <button class="hbtn pri" style="margin-top:10px" onclick="submitApproval()">올리기</button>
   <div class="msg" id="apMsg"></div>
 </div></div>
@@ -292,6 +293,11 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
   </div>
   <button class="hbtn pri" style="margin-top:10px" onclick="submitNotice()">게시</button>
   <div class="msg" id="ntMsg"></div>
+</div></div>
+
+<div class="mask" id="certificateMask"><div class="modal wide">
+  <h3>📄 재직증명서 <button class="hbtn mini" onclick="printEmploymentCertificate()">🖨️ 인쇄·PDF 저장</button><button class="x" onclick="hide('certificateMask')">✕</button></h3>
+  <div id="certificateBody"></div>
 </div></div>
 <div class="mask" id="noticePreviewMask"><div class="modal wide"><h3>📎 첨부 미리보기<button class="x" onclick="hide('noticePreviewMask')">✕</button></h3><div id="noticePreviewBody"></div></div></div>
 
@@ -1295,7 +1301,7 @@ async function renderLeave(m){
     <input id="gvDays" class="mini" type="number" step="0.5" placeholder="일수" style="width:80px">
     <input id="gvNote" class="mini" placeholder="메모(예: 2026년 정기부여)">
     <button class="mini stamp" onclick="grantLeave()">저장</button></div>
-    <div class="hint">‘부여’는 추가 기록, ‘조정’은 목표 잔액으로 맞추는 절대 설정입니다. 아래 자동 적립과 수기 부여가 겹치지 않도록 장부를 확인하세요. 15일 적립은 입사 365일 경과 다음 날 별도로 발생합니다.</div></div>`:'';
+    <div class="hint">정기 부여는 아래 발생일별 미리보기에서 개근·재직을 확인한 뒤 적용합니다. 이 화면의 ‘부여’는 해당 확인 화면으로 이동합니다. ‘조정’은 목표 잔액을 설정합니다.</div></div>`:'';
   const accrualHtml=ME.role==='owner'?`<div class="card"><h2>📆 자동 연차 적립 확인 <span class="sub">(원장)</span></h2><div class="hint">먼저 발생 예정 내역을 확인하고, 각 기간의 개근·재직을 원장이 확인한 뒤 적용합니다. 기존 수기 지급분은 중복 지급하지 않도록 반영됩니다.</div><div class="rowflex" style="margin-top:8px"><label>기준일 <input id="laAsOf" class="mini" type="date" value="${esc(LEAVE_ACCRUAL_AS_OF||today())}" max="${today()}"></label><button class="mini" onclick="previewLeaveAccrual()">미리보기</button><button id="laApply" class="mini stamp" onclick="applyLeaveAccrual()" disabled>확인한 항목 적용</button></div><div id="laMsg" class="hint" style="margin-top:8px">적용 전 미리보기가 필요합니다.</div><div id="laRows"></div></div>`:'';
   m.innerHTML=`
   <div class="card"><h2>📅 내 연차</h2>
@@ -1392,8 +1398,15 @@ async function cancelApprovedLeave(id){
 }
 async function grantLeave(){
   const uid=$('#gvUser').value,kind=$('#gvKind').value,days=parseFloat($('#gvDays').value);
+  if(kind==='부여'){
+    $('#laAsOf').value=today();
+    await previewLeaveAccrual();
+    $('#laRows').scrollIntoView?.({block:'nearest'});
+    $('#laMsg').textContent='해당 직원·발생일을 확인해 선택하세요. 이미 수기로 준 일수는 미리보기에서 상계됩니다.';
+    return;
+  }
   if(Number.isNaN(days)||days<0){alert('일수는 0 이상으로 입력하세요. 0일도 절대 잔액 조정값으로 기록할 수 있습니다.');return;}
-  const result=await sb.rpc(kind==='조정'?'set_leave_balance':'grant_leave_entry',kind==='조정'?{p_user_id:uid,p_target:days,p_note:$('#gvNote').value||`절대 잔액 설정: ${days}일`}:{p_user_id:uid,p_kind:kind,p_days:days,p_note:$('#gvNote').value||null});
+  const result=await sb.rpc('set_leave_balance',{p_user_id:uid,p_target:days,p_note:$('#gvNote').value||`절대 잔액 설정: ${days}일`});
   if(result.error){alert('연차 기록 실패: '+result.error.message);return;}
   if(!result.data||!result.data.length){alert('잔액 설정 결과를 확인하지 못했습니다.');return;}
   setStatus('saved');render();
@@ -1431,6 +1444,8 @@ async function applyLeaveAccrual(){
 /* ── 결재함 ── */
 async function renderAppr(m){
   const {data:mine}=await sb.from('approval_docs').select('*').eq('author',ME.id).order('created_at',{ascending:false}).limit(20);
+  const {data:issued}=await sb.from('employment_certificates').select('id,approval_doc_id');
+  const issuedByDoc=new Map((issued||[]).map(row=>[row.approval_doc_id,row.id]));
   let inbox='';
   let archive='';
   if(isLead()){
@@ -1438,21 +1453,22 @@ async function renderAppr(m){
     const ids=[...new Set((steps||[]).map(s=>s.doc_id))];
     let docs=[];
     if(ids.length){const {data:d}=await sb.from('approval_docs').select('*').in('id',ids).eq('status','진행');docs=d||[];}
-    inbox=`<div class="card"><h2>📥 내 결재 대기</h2>${docs.length?docs.map(d=>docCard(d,true)).join(''):'<div class="empty">대기 없음</div>'}</div>`;
+    inbox=`<div class="card"><h2>📥 내 결재 대기</h2>${docs.length?docs.map(d=>docCard(d,true,issuedByDoc)).join(''):'<div class="empty">대기 없음</div>'}</div>`;
     const {data:completed}=await sb.from('approval_docs').select('*').in('status',['완결','취소']).order('created_at',{ascending:false}).limit(50);
-    archive=`<div class="card"><h2>🗂 완결된 결재 문서</h2>${(completed||[]).length?(completed||[]).map(d=>`<div>${docCard(d,false)}${d.status==='완결'?`<div style="margin:-4px 0 10px"><button class="mini rej" onclick="cancelApprovalDoc(${d.id})">취소</button></div>`:''}</div>`).join(''):'<div class="empty">없음</div>'}</div>`;
+    archive=`<div class="card"><h2>🗂 완결된 결재 문서</h2>${(completed||[]).length?(completed||[]).map(d=>`<div>${docCard(d,false,issuedByDoc)}${d.status==='완결'&&!issuedByDoc.has(d.id)?`<div style="margin:-4px 0 10px"><button class="mini rej" onclick="cancelApprovalDoc(${d.id})">취소</button></div>`:''}</div>`).join(''):'<div class="empty">없음</div>'}</div>`;
   }
   m.innerHTML=`<div class="card"><h2>🖊 결재</h2><button class="hbtn pri" onclick="show('apMask');$('#apMsg').textContent='';">결재 올리기</button></div>
   ${inbox}
   ${archive}
-  <div class="card"><h2>📄 내가 올린 문서</h2>${(mine||[]).length?(mine||[]).map(d=>docCard(d,false)).join(''):'<div class="empty">없음</div>'}</div>`;
+  <div class="card"><h2>📄 내가 올린 문서</h2>${(mine||[]).length?(mine||[]).map(d=>docCard(d,false,issuedByDoc)).join(''):'<div class="empty">없음</div>'}</div>`;
 }
-function docCard(d,actable){
+function docCard(d,actable,issuedByDoc=new Map()){
   const st=d.status==='완결'?'ok':(['반려','취소'].includes(d.status)?'no':'wait');
   return `<div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px">
     <b>[${esc(d.kind)}] ${esc(d.title)}</b> <span class="b ${st}">${esc(d.status)}</span> <span class="sub">${md(d.created_at)} · ${esc(nameOf(d.author))}</span>
     <div class="sub" style="margin:4px 0;white-space:pre-wrap">${esc(d.body||'')}</div>
     <div id="steps-${d.id}" class="sub">…</div>
+    ${issuedByDoc.has(d.id)?`<button class="mini" onclick="openEmploymentCertificate(${issuedByDoc.get(d.id)})">발급본 열기</button>`:''}
     ${actable?`<div style="margin-top:6px"><button class="mini stamp" onclick="apprAct(${d.id},'ok')">🔴 도장(승인)</button> <button class="mini rej" onclick="apprAct(${d.id},'rej')">반려</button></div>`:''}
   </div>`;
 }
@@ -1471,6 +1487,13 @@ async function loadSteps(){
   });
 }
 async function apprAct(docId,act){
+  const {data:requested,error:requestError}=await sb.from('approval_docs').select('kind,title,body').eq('id',docId).maybeSingle();
+  if(requestError||!requested){alert('결재 요청을 확인하지 못했습니다.');return;}
+  if(act==='ok'&&ME.role==='owner'&&isEmploymentCertificateRequest(requested)){
+    const {error}=await sb.rpc('issue_employment_certificate',{p_doc_id:docId});
+    if(error){alert('재직증명서 발급 실패: '+error.message);return;}
+    setStatus('saved');render();refreshBadges();return;
+  }
   const {data:steps}=await sb.from('approval_steps').select('*').eq('doc_id',docId).order('seq');
   const cur=(steps||[]).find(s=>s.status==='대기'&&s.approver_role===ME.role);
   if(!cur){alert('현재 단계가 아닙니다.');return;}
@@ -1497,6 +1520,14 @@ const APPROVAL_KIND_VALUES={'연차 신청':'연차','사직서':'사직서','�
 function approvalKindValue(label){return APPROVAL_KIND_VALUES[label]||'기타';}
 function approvalRequestTitle(label,title){return label==='재직증명서 발급'?'[재직증명서 발급] '+title:title;}
 function approvalRequestBody(label,body){return label==='재직증명서 발급'?'[재직증명서 발급 요청]\n'+(body||''):body||'';}
+function isEmploymentCertificateRequest(doc){return doc?.kind==='기타'&&doc.title?.startsWith('[재직증명서 발급] ')&&doc.body?.startsWith('[재직증명서 발급 요청]');}
+async function openEmploymentCertificate(id){
+  const {data:r,error}=await sb.from('employment_certificates').select('*').eq('id',id).maybeSingle();
+  if(error||!r){alert('발급본을 열 수 없습니다.');return;}
+  $('#certificateBody').innerHTML=`<div style="background:#fff;color:#111;padding:18mm;min-height:240mm;line-height:1.8"><h1 style="text-align:center;margin:12mm 0 24mm">재 직 증 명 서</h1><table style="width:100%;border-collapse:collapse"><tr><th style="border:1px solid #111;padding:8px;width:25%">성명</th><td style="border:1px solid #111;padding:8px">${esc(r.employee_name)}</td></tr><tr><th style="border:1px solid #111;padding:8px">소속</th><td style="border:1px solid #111;padding:8px">${esc(r.department||'확인된 정보 없음')}</td></tr><tr><th style="border:1px solid #111;padding:8px">입사일</th><td style="border:1px solid #111;padding:8px">${esc(r.hire_date)}</td></tr><tr><th style="border:1px solid #111;padding:8px">재직 확인일</th><td style="border:1px solid #111;padding:8px">${esc(stampDate(r.issued_at))}</td></tr></table><p style="margin-top:24mm;text-align:center">위 사람은 발급일 현재 재직 중임을 확인합니다.</p><p style="margin-top:22mm;text-align:center">${esc(stampDate(r.issued_at))}</p><p style="margin-top:14mm;text-align:right">${esc(r.issuer_name)}</p><p style="margin-top:20mm;font-size:11px">발급번호 ${esc(r.id)} · 결재문서 ${esc(r.approval_doc_id)}</p></div>`;
+  show('certificateMask');
+}
+function printEmploymentCertificate(){document.body.classList.add('certificate-printing');const done=()=>{document.body.classList.remove('certificate-printing');window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);window.print();}
 /* approval-request:test-end */
 /* ── 공지 ── */
 let NOTICE_INLINE_OBJECT_URLS=[];
@@ -1917,8 +1948,9 @@ async function renderOnbo(m){
     isMgr()?sb.from('fingerprint_registration_requests').select('*').order('requested_at',{ascending:false}):sb.from('fingerprint_registration_requests').select('*').eq('user_id',ME.id)
   ]);
   const contractRows=signedContractRows(contracts||[],isMgr(),ME.id,contractTitle);
+  const {data:certificates}=await sb.from('employment_certificates').select('id,approval_doc_id');
   const cmap={};(checks||[]).forEach(c=>cmap[c.item_id]=c);
-  m.innerHTML=`${employeeDocumentsCard(docs||[],docsError,contractRows,contractsError,leaveDocs||[],leaveDocsError,leaveRequests||[],approvalDocs||[],approvalDocsError,paymentRequests||[],paymentRequestsError,paymentReceipts||[],paymentReceiptsError)}<div class="card"><h2>📋 내 입사 제출물</h2>
+  m.innerHTML=`${employeeDocumentsCard(docs||[],docsError,contractRows,contractsError,leaveDocs||[],leaveDocsError,leaveRequests||[],approvalDocs||[],approvalDocsError,paymentRequests||[],paymentRequestsError,paymentReceipts||[],paymentReceiptsError,certificates||[])}<div class="card"><h2>📋 내 입사 제출물</h2>
     <table><tr><th>항목</th><th>상태</th><th></th></tr>
     ${(items||[]).map(it=>{const c=cmap[it.id];const s=c?c.status:'미제출';
       return `<tr><td>${esc(it.label)}${it.required?' <span class="sub">(필수)</span>':''}</td>
@@ -1980,7 +2012,7 @@ function validateEmployeeDocument(file,documentType){
   return '';
 }
 /* employee-documents:test-end */
-function employeeDocumentsCard(docs,error,contractRows,contractError,leaveDocs,leaveError,leaveRequests,approvalDocs,approvalError,paymentRequests,paymentError,paymentReceipts,paymentReceiptsError){
+function employeeDocumentsCard(docs,error,contractRows,contractError,leaveDocs,leaveError,leaveRequests,approvalDocs,approvalError,paymentRequests,paymentError,paymentReceipts,paymentReceiptsError,certificates=[]){
   const lead=isMgr(),staff=PROFILES.filter(p=>p.active!==false&&p.approved!==false);
   const allRows=mergeEmployeeDocumentRows(docs,contractRows);EMPLOYEE_CONTRACT_PREVIEWS={};(contractRows||[]).forEach(r=>{EMPLOYEE_CONTRACT_PREVIEWS[r.id]=r;});
   const errors=employeeDocumentsErrorMessages(error,contractError);
@@ -1988,7 +2020,8 @@ function employeeDocumentsCard(docs,error,contractRows,contractError,leaveDocs,l
   const who=d=>lead?'<td>'+esc(nameOf(d.user_id||d.author))+'</td>':'';
   const docRows=allRows.map(d=>'<tr data-doc-filter="직원서류">'+who(d)+'<td>'+esc(d.document_type||'근로계약서')+'</td><td>'+esc(d.original_name)+'</td><td>'+contractDate(d.created_at)+'</td><td>'+ (d._kind==='contract'?'<button class="mini" onclick="previewEmployeeContract('+d.id+')">열기</button>':'<button class="mini" onclick="downloadEmployeeDocument('+d.id+')">열기</button>')+'</td></tr>').join('');
   const leaveRows=(leaveDocs||[]).map(d=>'<tr data-doc-filter="연차증빙">'+who(d)+'<td>연차증빙</td><td>'+esc(d.original_name)+'</td><td>'+md(d.created_at)+'</td><td><button class="mini" onclick="downloadLeaveApplicationDocument('+d.id+')">열기</button></td></tr>').join('');
-  const approvalRows=(approvalDocs||[]).map(d=>'<tr data-doc-filter="결재 요청">'+who(d)+'<td>결재 요청 · '+esc(d.kind)+'</td><td>'+esc(d.title)+'</td><td>'+md(d.created_at)+'</td><td><span class="b '+(d.status==='완결'?'ok':d.status==='반려'?'no':'wait')+'">'+esc(d.status)+'</span></td></tr>').join('');
+  const issuedByDoc=new Map(certificates.map(r=>[r.approval_doc_id,r.id]));
+  const approvalRows=(approvalDocs||[]).map(d=>'<tr data-doc-filter="결재 요청">'+who(d)+'<td>결재 요청 · '+esc(d.kind)+'</td><td>'+esc(d.title)+'</td><td>'+md(d.created_at)+'</td><td><span class="b '+(d.status==='완결'?'ok':d.status==='반려'?'no':'wait')+'">'+esc(d.status)+'</span>'+ (issuedByDoc.has(d.id)?' <button class="mini" onclick="openEmploymentCertificate('+issuedByDoc.get(d.id)+')">발급본 열기</button>':'')+'</td></tr>').join('');
   const allCount=allRows.length+(leaveDocs||[]).length+(approvalDocs||[]).length;
   const rows=docRows+leaveRows+approvalRows;
   const list=allCount?'<div class="tblwrap"><table><thead><tr>'+(lead?'<th>직원</th>':'')+'<th>종류</th><th>문서</th><th>날짜</th><th>상태·열기</th></tr></thead><tbody id="employeeDocumentRows">'+rows+'<tr id="employeeDocumentEmpty" style="display:none"><td colspan="'+(lead?5:4)+'" class="empty">해당 종류의 문서가 없습니다.</td></tr></tbody></table></div>':'<div class="empty">올린 서류가 없습니다.</div>';

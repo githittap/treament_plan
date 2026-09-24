@@ -95,9 +95,10 @@ test('작성자 표시와 approval_docs 권한 경계가 실제 필드·정책�
   assert.doesNotMatch(policies, /public\.my_role\(\) in \('staff', 'manager', 'chief', 'owner'\)/);
 });
 
-test('재직증명서는 자동 발급 완료로 가장하지 않고 신청·결재 요청 상태로 안내한다', () => {
-  assert.match(html, /재직증명서는 결재 요청만 기록되며/);
-  assert.doesNotMatch(html, /재직증명서.*발급 완료/);
+test('재직증명서는 최종 승인 후 보관된 발급본을 열도록 안내한다', () => {
+  assert.match(html, /재직증명서는 최종 승인 시 재직 정보를 확인해 발급되며/);
+  assert.match(html, /issue_employment_certificate/);
+  assert.match(html, /openEmploymentCertificate/);
 });
 
 test('계정·Notion 체크는 통합 서류함 뒤쪽에 렌더링된다', () => {

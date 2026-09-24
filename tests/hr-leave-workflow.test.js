@@ -10,7 +10,9 @@ test('연차 처리는 원자적 RPC를 사용한다', () => {
   assert.match(html, /rpc\('process_leave_request'/);
   assert.match(html, /rpc\('replace_pending_leave_request'/);
   assert.match(html, /'set_leave_balance'/);
-  assert.match(html, /rpc\(kind==='조정'\?'set_leave_balance':'grant_leave_entry'/);
+  assert.match(html, /if\(kind==='부여'\)\{[\s\S]*?await previewLeaveAccrual\(\)/);
+  assert.match(html, /sb\.rpc\('set_leave_balance'/);
+  assert.doesNotMatch(html, /sb\.rpc\('grant_leave_entry'/);
   assert.match(sql, /select \* into r[\s\S]+for update/);
   assert.match(sql, /not exists\(select 1 from public\.leave_ledger as ll where ll\.ref=p_id and ll\.kind='사용'\)/);
   assert.match(sql, /pg_advisory_xact_lock\(hashtextextended\(r\.user_id::text,0\)\)/);
