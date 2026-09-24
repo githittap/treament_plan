@@ -1694,7 +1694,7 @@ function employeeDocumentsCard(docs,error,contractRows,contractError){
   return `<div class="card"><h2>📎 직원 서류함 <span class="sub">(PDF·JPG·PNG·DOC·DOCX·HWP, 최대 10MB)</span></h2>${errorText}${list}<div id="employeeContractPreview" class="contract-doc" style="display:none;margin-top:10px"></div>
     <div class="grid" style="margin-top:10px">
       ${lead?`<div class="fld"><label>직원</label><select id="edUser">${staff.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select></div>`:''}
-      <div class="fld"><label>서류 종류</label><select id="edType"><option>잠복결핵 검사서</option><option>자격증</option><option>면허증</option><option>신분증 사본</option><option>기타</option></select></div>
+      <div class="fld"><label>서류 종류</label><select id="edType"><option>잠복결핵 검사서</option><option>자격증</option><option>보안서약서</option><option>면허증</option><option>신분증 사본</option><option>기타</option></select></div>
       <div class="fld"><label>파일</label><input type="file" id="edFile" accept="application/pdf,image/jpeg,image/png,.doc,.docx,.hwp"></div>
     </div><button class="hbtn pri" style="margin-top:10px" onclick="uploadEmployeeDocument()">서류 올리기</button><div class="msg" id="edMsg"></div>
   </div>`;

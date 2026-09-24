@@ -32,4 +32,7 @@ if (block) {
     assert.match(html, /await sb\.storage\.from\('hr-docs'\)\.remove\(\[path\]\)/);
     assert.doesNotMatch(html.match(/id="edFile"[^>]+/)[0], /\.hwpx/);
   });
+  test('보안서약서를 기존 직원 서류함에서 선택해 올릴 수 있다', () => {
+    assert.match(html, /<select id="edType"><option>잠복결핵 검사서<\/option><option>자격증<\/option><option>보안서약서<\/option>/);
+  });
 }
