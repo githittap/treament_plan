@@ -7,8 +7,8 @@ const packageRoot = process.env.PGLITE_PACKAGE_ROOT;
 if (!packageRoot) throw new Error('PGLITE_PACKAGE_ROOT is required');
 const { PGlite } = await import(pathToFileURL(path.join(packageRoot, 'dist/index.js')).href);
 const db = new PGlite();
-const query = sql => db.query(sql).then(result => result.rows);
-const draft = fs.readFileSync(path.resolve('db/employee_documents.sql'), 'utf8')+'\n'+fs.readFileSync(path.resolve('db/employee_documents_onboarding_hardening_draft.sql'), 'utf8')+'\n'+fs.readFileSync(path.resolve('db/onboarding_evidence_requirements_draft.sql'), 'utf8');
+const query = (sql,params) => db.query(sql,params).then(result => result.rows);
+const draft = fs.readFileSync(path.resolve('db/employee_documents.sql'), 'utf8')+'\n'+fs.readFileSync(path.resolve('db/employee_documents_onboarding_hardening_draft.sql'), 'utf8')+'\n'+fs.readFileSync(path.resolve('db/employee_documents_latent_tb_guard_draft.sql'), 'utf8')+'\n'+fs.readFileSync(path.resolve('db/onboarding_evidence_requirements_draft.sql'), 'utf8');
 const staff='11111111-1111-1111-1111-111111111111',manager='22222222-2222-2222-2222-222222222222',chief='33333333-3333-3333-3333-333333333333',other='44444444-4444-4444-4444-444444444444',inactiveManager='55555555-5555-5555-5555-555555555555';
 const prelude = `
 create role anon; create role authenticated; create schema auth; create schema storage;
@@ -41,7 +41,28 @@ try {
     await query(`insert into storage.objects(bucket_id,name,owner_id,metadata) values ('hr-docs','${filePath}','${staff}',jsonb_build_object('mimetype','${mime}','size',100))`);
     await query(`insert into public.employee_documents(user_id,document_type,original_name,storage_path,mime_type,size_bytes) values ('${staff}','기타','${name}','${filePath}','${mime}',100)`);
   }
-  assert.equal((await query(`select count(*)::int n from public.employee_documents where user_id='${staff}'`))[0].n,ordinaryDocuments.length);
+  const latentType='잠복결핵 검사서';
+  const latentCases=[['result.pdf','application/pdf'],['scan.png','image/png'],['scan.jpg','image/jpeg'],['scan.jpeg','image/jpeg'],['scan.gif','image/gif']];
+  const insertObject=async (user,name,mime,size=100,bucket='hr-docs')=>query(`insert into storage.objects(bucket_id,name,owner_id,metadata) values ($1,$2,$3,jsonb_build_object('mimetype',$4::text,'size',$5::int))`,[bucket,`${user}/${name}`,user,mime,size]);
+  const insertDocument=async (user,name,mime,size=100,documentType=latentType,filePath=`${user}/${name}`)=>db.query(`insert into public.employee_documents(user_id,document_type,original_name,storage_path,mime_type,size_bytes) values ($1,$2,$3,$4,$5,$6)`,[user,documentType,name,filePath,mime,size]);
+  const rejected=async (action,pattern=/check constraint|latent TB|row-level security|permission denied/i)=>{let error='';try{await action();}catch(caught){error=String(caught);}assert.match(error,pattern);};
+  for(const [name,mime] of latentCases){await insertObject(staff,name,mime);await insertDocument(staff,name,mime);}
+  await insertObject(staff,'disguised.txt','application/pdf');
+  await rejected(()=>insertDocument(staff,'disguised.txt','application/pdf'));
+  await rejected(()=>insertDocument(staff,'missing.pdf','application/pdf'));
+  await insertObject(staff,'wrong-mime.pdf','text/plain');
+  await rejected(()=>insertDocument(staff,'wrong-mime.pdf','application/pdf'));
+  await insertObject(staff,'wrong-size.pdf','application/pdf',101);
+  await rejected(()=>insertDocument(staff,'wrong-size.pdf','application/pdf'));
+  await db.exec('reset role');
+  await insertObject(staff,'wrong-bucket.pdf','application/pdf',100,'other-bucket');
+  await insertObject(other,'wrong-folder.pdf','application/pdf');
+  await db.exec('set role authenticated');
+  await rejected(()=>insertDocument(staff,'wrong-bucket.pdf','application/pdf'));
+  await rejected(()=>insertDocument(staff,'wrong-folder.pdf','application/pdf',100,latentType,`${other}/wrong-folder.pdf`));
+  await rejected(()=>insertDocument(staff,'nonexistent.pdf','application/pdf',100,latentType,`${staff}/nested/nonexistent.pdf`));
+  await rejected(()=>insertDocument(other,'wrong-folder.pdf','application/pdf'),/row-level security|permission denied/i);
+  assert.equal((await query(`select count(*)::int n from public.employee_documents where user_id='${staff}'`))[0].n,ordinaryDocuments.length+latentCases.length);
   assert.equal((await query(`select count(*)::int n from storage.objects where bucket_id='hr-docs' and name like '${staff}/documents/%'`))[0].n,ordinaryDocuments.length);
   let blockedDocument='';
   try { await query(`insert into public.employee_documents(user_id,document_type,original_name,storage_path,mime_type,size_bytes) values ('${staff}','기타','차단.exe','${staff}/documents/blocked.exe','application/pdf',100)`); } catch(error) { blockedDocument=String(error); }
@@ -52,12 +73,19 @@ try {
   assert.equal((await query(`select * from public.onboarding_evidence where user_id='${other}'`)).length,0);
   let otherDocument=''; try { await query(`insert into public.employee_documents(user_id,document_type,original_name,storage_path,mime_type,size_bytes) values ('${other}','자격증','x.pdf','${other}/x.pdf','application/pdf',1)`); } catch (error) { otherDocument=String(error); } assert.match(otherDocument,/row-level security|permission denied/);
   await query(`select set_config('app.test_uid','${manager}',false)`); assert.equal((await query(`select * from public.onboarding_evidence`)).length,0); assert.equal((await query(`select * from public.onboarding_evidence_completion where user_id='${staff}'`))[0].bank_complete,true);
+  await rejected(()=>db.query(`update public.employee_documents set document_type=$1 where user_id=$2 and original_name=$3`,[latentType,staff,'메모.txt']));
+  await insertDocument(other,'wrong-folder.pdf','application/pdf');
   await query(`select set_config('app.test_uid','${inactiveManager}',false)`); assert.equal((await query(`select * from public.onboarding_evidence_completion`)).length,0);
   await db.exec('reset role');
   assert.equal((await query(`select has_table_privilege('anon','public.employee_documents','select') allowed`))[0].allowed,false);
   assert.equal((await query(`select has_table_privilege('anon','public.onboarding_evidence','select') allowed`))[0].allowed,false);
   assert.equal((await query(`select count(*)::int n from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='onboarding_evidence_completion'`))[0].n,0);
   assert.equal((await query(`select has_function_privilege('authenticated','employee_private.sync_onboarding_evidence_completion()','execute') allowed`))[0].allowed,false);
-  await query(`select set_config('app.test_uid','${chief}',false)`); assert.equal((await query(`select count(*)::int n from public.employee_documents where user_id='${staff}'`))[0].n,ordinaryDocuments.length);
-  console.log('PGLITE_EMPLOYEE_HARDENING_PASS: 본인·관리자 문서/증빙 범위와 MIME·크기 제한');
+  assert.equal((await query(`select has_function_privilege('authenticated','employee_private.validate_latent_tb_document()','execute') allowed`))[0].allowed,false);
+  await query(`select set_config('app.test_uid','${chief}',false)`); assert.equal((await query(`select count(*)::int n from public.employee_documents where user_id='${staff}'`))[0].n,ordinaryDocuments.length+latentCases.length);
+  const keptBeforeRollback=(await query(`select count(*)::int n from public.employee_documents`))[0].n;
+  await db.exec('drop trigger if exists employee_documents_latent_tb_guard on public.employee_documents; drop function if exists employee_private.validate_latent_tb_document(); alter table public.employee_documents drop constraint if exists employee_documents_latent_tb_mime_name_check;');
+  assert.equal((await query(`select count(*)::int n from public.employee_documents`))[0].n,keptBeforeRollback);
+  assert.equal((await query(`select count(*)::int n from pg_trigger where tgname='employee_documents_latent_tb_guard'`))[0].n,0);
+  console.log('PGLITE_EMPLOYEE_HARDENING_PASS: 권한·일반 서류 및 잠복결핵 MIME/확장자/Storage 정합');
 } finally { await db.close(); }
