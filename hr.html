@@ -170,6 +170,19 @@ tr.new td{background:var(--mint-dk)}
 footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px;color:#4a5f5a;padding:4px;background:var(--bg);border-top:1px solid var(--line);z-index:20}
 @media(max-width:640px){.nav button{padding:5px 8px;font-size:12px} main{padding:12px 10px 66px}}
 </style>
+<style>
+@media print{
+  @page{size:A4 landscape;margin:8mm}
+  body.schedule-printing> *{display:none!important}
+  body.schedule-printing>#app,body.schedule-printing>#app main{display:block!important}
+  body.schedule-printing header,body.schedule-printing footer,body.schedule-printing .schedule-actions,body.schedule-printing .nav,body.schedule-printing .nav2,body.schedule-printing .hint,body.schedule-printing .schedule-roster-admin{display:none!important}
+  body.schedule-printing main{max-width:none!important;padding:0!important}
+  body.schedule-printing .card{border:0!important;box-shadow:none!important;margin:0!important;padding:0!important}
+  body.schedule-printing .tblwrap{max-height:none!important;overflow:visible!important}
+  body.schedule-printing .schedule-week-block{break-inside:avoid;page-break-inside:avoid}
+  body.schedule-printing .schedule-role-table{min-width:0!important;font-size:9px!important}
+}
+</style>
 </head>
 <body>
 
@@ -499,7 +512,7 @@ function employmentTermAlertRows(terms,contracts){
   return PROFILES.filter(p=>p.active!==false&&p.approved!==false).map(p=>{const t=byUser.get(p.user_id);if(t)return {user_id:p.user_id,status:'서명완료',created_at:t.updated_at,fields:{계약종료:t.is_indefinite?'기간의 정함 없음':t.end_date||''}};return latest.get(p.user_id)||{user_id:p.user_id,status:'서명완료',fields:{}};});
 }
 /* menu-restructure:test-start */
-function tabVisible(t){return ME.role==='owner'
+function tabVisible(t){if(ME.role==='deputy')return t.key==='contract';return ME.role==='owner'
     ?t.roles.includes('owner')&&(!t.needsConfid||ME.confidAccess)
     :(()=>{const ov=(TAB_OVERRIDES[ME.id]||{})[t.key],base=(TAB_ROLES[t.key]||t.roles).includes(ME.role),shown=ov===true?true:ov===false?false:base;return t.key!=='owner'&&shown&&(!t.needsConfid||ME.confidAccess);})();}
 function visibleTabKeys(){return new Set(TABS.filter(tabVisible).map(t=>t.key));}
@@ -852,7 +865,7 @@ async function renderScheduleMonth(m){
   const loadError=scheduleError||weekError||leaveError;if(loadError){m.innerHTML='<div class="card"><h2>🗓 근무표</h2><div class="cal-error">월간 근무표를 불러오지 못했습니다: '+esc(loadError.message||'알 수 없는 오류')+'</div></div>';return;}
   const leaveByUser={};for(const r of lv||[]){for(let ds=r.date_from<first?first:r.date_from;ds<=(r.date_to>last?last:r.date_to);ds=addDays(ds,1)){const p=(SCHEDULE_PEOPLE||[]).find(x=>x.profile_user_id===r.user_id);if(p)leaveByUser[r.user_id+'|'+p.id+'|'+ds]={date:ds,label:leaveDisplayText(r.type,r.type_note)};}}
   const roles=['Dr.','진료실','데스크','기공·행정','상담','야간','OFF','연차·반차'];
-  let html='<div class="card"><h2>🗓 근무표</h2><div class="rowflex"><button class="mini" onclick="SCHED_VIEW=\'week\';render()">주간 편집</button><button class="mini stamp" onclick="SCHED_VIEW=\'month\';render()">월간 직무표</button><label>대상 월 <input class="mini" type="month" value="'+esc(SCHED_MONTH)+'" onchange="SCHED_MONTH=this.value;render()"></label></div>';
+  let html='<div class="card"><h2>🗓 근무표</h2><div class="rowflex schedule-actions"><button class="mini" onclick="SCHED_VIEW=\'week\';render()">주간 편집</button><button class="mini stamp" onclick="SCHED_VIEW=\'month\';render()">월간 직무표</button><button class="mini" onclick="printSchedule(\'pdf\')">PDF 저장</button><button class="mini" onclick="printSchedule(\'print\')">인쇄</button><label>대상 월 <input class="mini" type="month" value="'+esc(SCHED_MONTH)+'" onchange="SCHED_MONTH=this.value;render()"></label></div>';
   for(const ws of weeks){const status=(weekRows||[]).find(w=>w.week_start===ws)?.status||'초안';const canEdit=status!=='공표'||isLead();const dates=Array.from({length:7},(_,i)=>addDays(ws,i));html+='<section class="schedule-week-block"><h3>'+md(ws)+' ~ '+md(addDays(ws,6))+' <span class="b '+(status==='공표'?'ok':'wait')+'">'+(status==='공표'?'확정':'작성 중')+'</span></h3><div class="tblwrap"><table class="schedule-role-table"><tr><th>직무·상태</th>'+dates.map(ds=>'<th>'+['월','화','수','목','금','토','일'][scheduleDayForDate(ds)-1<0?6:scheduleDayForDate(ds)-1]+'<br><span class="sub">'+md(ds)+'</span></th>').join('')+'</tr>';
     for(const role of roles){html+='<tr><th class="schedule-role-label">'+role+'</th>'+dates.map(ds=>'<td>'+scheduleRoleCell(role,ws,ds,SCHEDULE_PEOPLE,rows||[],leaveByUser,canEdit)+'</td>').join('')+'</tr>';}
     html+='</table></div></section>';}
@@ -879,10 +892,11 @@ async function renderSched(m){
   for(const role of roles){grid+='<tr><th class="schedule-role-label">'+role+'</th>'+dates.map(ds=>'<td>'+scheduleRoleCell(role,ws,ds,SCHEDULE_PEOPLE,rows||[],leaveByUser,canEdit)+'</td>').join('')+'</tr>';}
   grid+='</table></div>';
   m.innerHTML=`<div class="card"><h2>🗓 근무표 <span class="b ${published?'ok':'wait'}">${published?'공표됨':'초안'}</span></h2>
-    <div class="rowflex" style="align-items:center;margin-bottom:8px;gap:8px">
+    <div class="rowflex schedule-actions" style="align-items:center;margin-bottom:8px;gap:8px">
       <button class="mini ${SCHED_VIEW==='week'?'stamp':''}" onclick="SCHED_VIEW='week';render()">주간 편집</button><button class="mini ${SCHED_VIEW==='month'?'stamp':''}" onclick="SCHED_VIEW='month';SCHED_MONTH='${ws.slice(0,7)}';render()">월간 편집</button><button class="mini" onclick="navWeek(-7)">◀ 지난주</button>
       <b>${md(ws)} ~ ${md(addDays(ws,6))}</b>
       <button class="mini" onclick="navWeek(7)">다음주 ▶</button>
+      <button class="mini" onclick="printSchedule('pdf')">PDF 저장</button><button class="mini" onclick="printSchedule('print')">인쇄</button>
       ${canEdit?`<button class="mini" onclick="copyPrevWeek('${ws}')">지난주 복사</button>`:''}
       ${isLead()?`<button class="mini stamp" onclick="publishSched('${ws}')">공표(확정)</button>`:''}
     </div>
@@ -902,7 +916,7 @@ function scheduleRosterAdminCard(){
       <td><label><input type="checkbox" ${person.included_in_schedule!==false?'checked':''} onchange="setSchedulePersonIncluded('${person.id}',this.checked)"> 포함</label></td>
       <td><span class="b ${person.active===true?'ok':'no'}">${person.active===true?'재직':'비활성'}</span> <button class="mini ${person.active===true?'rej':'stamp'}" onclick="setSchedulePersonActive('${person.id}',${person.active===true?'false':'true'})">${person.active===true?'비활성화':'재활성화'}</button></td></tr>`;
   }).join('');
-  return `<details class="card"><summary style="cursor:pointer;font-weight:800">👥 근무명부 관리</summary>
+  return `<details class="card schedule-roster-admin"><summary style="cursor:pointer;font-weight:800">👥 근무명부 관리</summary>
     <div class="hint">로그인 계정과 비로그인 명부를 함께 관리합니다. 근무표·집계 포함 여부는 계정 로그인·승인과 별개입니다.</div>
     <div class="rowflex" style="margin:10px 0"><input class="mini" id="rosterName" placeholder="이름"><select class="mini" id="rosterDepartment"><option value="">근무부서 선택</option>${departmentOptions('')}</select><button class="mini stamp" onclick="saveSchedulePerson()">비로그인 근무자 추가</button></div>
     <div class="msg" id="rosterMsg"></div>
@@ -1445,9 +1459,13 @@ async function saveCalendarPng(){
   }catch(error){alert('PNG 저장을 준비하지 못했습니다. 브라우저에서 다시 시도하세요.');}
   finally{URL.revokeObjectURL(url);}
 }
-function printCalendar(){
-  document.body.classList.add('calendar-printing');const done=()=>{document.body.classList.remove('calendar-printing');window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);window.print();
+/* schedule-print:test-start */
+function printWithClass(className){
+  document.body.classList.add(className);const done=()=>{document.body.classList.remove(className);window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);window.print();
 }
+function printCalendar(){printWithClass('calendar-printing');}
+function printSchedule(){printWithClass('schedule-printing');}
+/* schedule-print:test-end */
 function toggleCalendarDay(cell,event){
   if(event&&event.target&&event.target.closest&&event.target.closest('a,button,input,select'))return;
   if(event&&event.type==='keydown'){
@@ -2716,7 +2734,7 @@ function printPayslip(){document.body.classList.add('payslip-printing');const do
 
 /* ── 원장 ── */
 /* account-filling:test-start */
-const BULK_ROLE_ALLOWED_ROLES=['staff','manager','chief'];
+const BULK_ROLE_ALLOWED_ROLES=['staff','manager','chief','deputy'];
 function accountFillingLists(people,profiles){
   return {
     unlinkedRoster:(people||[]).filter(p=>!p.profile_user_id),
@@ -2762,7 +2780,7 @@ async function renderOwner(m){
   const accessSet=new Set((accessRows||[]).map(r=>r.user_id));
   m.innerHTML=`<div class="card"><h2>🛡️ 계정·권한 관리</h2>
     <div class="rowflex">
-      <div class="stat"><div class="sub">직원 명부</div><div>${PROFILES.length}명 · owner ${PROFILES.filter(p=>p.role==='owner').length}·chief ${PROFILES.filter(p=>p.role==='chief').length}·manager ${PROFILES.filter(p=>p.role==='manager').length}·staff ${PROFILES.filter(p=>p.role==='staff').length}</div></div>
+      <div class="stat"><div class="sub">직원 명부</div><div>${PROFILES.length}명 · owner ${PROFILES.filter(p=>p.role==='owner').length}·chief ${PROFILES.filter(p=>p.role==='chief').length}·manager ${PROFILES.filter(p=>p.role==='manager').length}·deputy ${PROFILES.filter(p=>p.role==='deputy').length}·staff ${PROFILES.filter(p=>p.role==='staff').length}</div></div>
     </div>
     ${(unlinkedRoster.length||pendingApproval.length)?`<h3>🧩 미가입자·승인 대기</h3>
     <div class="hint">근무명부에는 있지만 계정이 없는 사람과, 가입 후 원장 승인을 기다리는 사람을 모았습니다.</div>
@@ -2782,7 +2800,7 @@ async function renderOwner(m){
       <td>${roster?`<input type="checkbox" ${roster.included_in_schedule!==false?'checked':''} onchange="setSchedulePersonIncluded('${roster.id}',this.checked)">`:'—'}</td>
       <td>${roster?`<span class="b ${roster.active===true?'ok':'no'}">${roster.active===true?'재직':'비활성'}</span> <button class="mini ${roster.active===true?'rej':'stamp'}" onclick="setSchedulePersonActive('${roster.id}',${roster.active===true?'false':'true'})">${roster.active===true?'비활성화':'재활성화'}</button>`:'—'}</td>
       <td><select id="employment-${p.user_id}-status" class="mini" ${blocked?'disabled':''}><option value="재직" ${(p.employment_status||'재직')==='재직'?'selected':''}>재직</option><option value="자진퇴사" ${p.employment_status==='자진퇴사'?'selected':''}>자진퇴사</option><option value="계약만료" ${p.employment_status==='계약만료'?'selected':''}>계약기간만료</option><option value="권고사직" ${p.employment_status==='권고사직'?'selected':''}>권고사직</option></select><br><input id="employment-${p.user_id}-effective" class="mini" type="date" value="${p.employment_effective_date||today()}" aria-label="재직 상태 유효일" ${blocked?'disabled':''}><br><input id="employment-${p.user_id}-reason" class="mini" value="${esc(p.employment_reason||'')}" placeholder="사유" aria-label="재직 상태 사유" ${blocked?'disabled':''}><br><button class="mini stamp" onclick="setEmploymentStatus('${p.user_id}')" ${blocked?'disabled':''}>상태 저장</button>${p.user_id!==ME.id&&!blocked?` <button class="mini rej" onclick="disableEmployeeAccountPreserveRecords('${p.user_id}')">접속 영구 차단(인사기록 보존)</button>`:''}${acctState.show==='blocked-deletable'?`<div class="sub">계정 차단됨</div> <button class="mini rej" onclick="hardDeleteAccountPreserveRecords('${p.user_id}')">로그인 계정 영구 삭제</button>`:acctState.show==='deleted'?`<div class="sub">로그인 계정 삭제됨(${md(acctState.authDeletedAt)})</div>`:acctState.show==='blocked'?'<div class="sub">계정 차단됨</div>':''}</td><td>${p.hire_date||''}</td>
-      <td><select class="mini" onchange="setRole('${p.user_id}',this.value)">${['staff','manager','chief','owner'].map(r=>`<option ${p.role===r?'selected':''}>${r}</option>`).join('')}</select></td>
+      <td><select class="mini" onchange="setRole('${p.user_id}',this.value)">${['staff','manager','chief','owner','deputy'].map(r=>`<option ${p.role===r?'selected':''}>${r}</option>`).join('')}</select></td>
       <td><span class="b ${p.approved!==false?'ok':'wait'}">${p.approved!==false?'승인됨':'대기'}</span>${p.approved!==false&&p.user_id!==ME.id?` <button class="mini rej" onclick="revokeApproval('${p.user_id}')">승인취소</button>`:''}</td></tr>`}).join('')}</table></div>
     <div class="rowflex" style="margin-top:6px">
       <select id="bulkRoleSelect" class="mini">${BULK_ROLE_ALLOWED_ROLES.map(r=>`<option value="${r}">${r}</option>`).join('')}</select>
@@ -2953,6 +2971,7 @@ async function onAuthed(session){
         p=PROFILES.find(x=>x.user_id===ME.id);
       }
       ME.name=p?p.name:ME.email.split('@')[0];ME.role=p?p.role:'staff';ME.department=p?.dept||'';ME.stamp=p?p.stamp:null;
+      if(ME.role==='deputy')TAB='contract';
       ME.approved=p?p.approved===true:false; // 프로필이 없거나 approved가 참이 아니면 승인 대기 — fail closed
       if(!ME.approved){showPendingGate(profileError);_inited=rosterLoaded;return;}
       try{
