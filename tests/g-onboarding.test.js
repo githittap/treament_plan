@@ -34,6 +34,56 @@ test('보관 서명을 선택하면 계약 서명 저장 payload에 signature_id
   const c={};vm.runInNewContext(`${block[1]};this.h={contractSignatureUsePayload};`,c);assert.deepEqual(JSON.parse(JSON.stringify(c.h.contractSignatureUsePayload(3,'2026-09-24T00:00:00Z'))),{signature_id:3,document_kind:'근로계약서',confirmed_at:'2026-09-24T00:00:00Z'});assert.match(html,/apply_employee_contract_signature/);assert.match(html,/signature_id:canvas\.dataset\.signatureId\?Number\(canvas\.dataset\.signatureId\):null/);assert.match(html,/contract-pdf-sign.*signature_id/s);
 });
 
+test('대기 계약 캔버스만 저장 서명 자동 불러오기를 시작한다',async()=>{
+  const block=html.match(/\/\* contract-signature:test-start \*\/([\s\S]*?)\/\* contract-signature:test-end \*\//);assert.ok(block);
+  const c={};vm.runInNewContext(`${block[1]};this.h={autoLoadStoredContractSignatures};`,c);
+  const calls=[];c.useStoredContractSignature=async(id,options)=>calls.push([id,options]);
+  c.h.autoLoadStoredContractSignatures([{id:11,status:'대기'},{id:12,status:'서명완료'},{id:13,status:'취소'}]);
+  await Promise.resolve();
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)),[[11,{automatic:true}]]);
+  const render=html.slice(html.indexOf('async function renderContractEmployee'),html.indexOf('async function renderContract(m)'));
+  assert.match(render,/initContractSignatures\(\);\s*autoLoadStoredContractSignatures\(ownRows\)/);
+});
+
+test('자동 불러온 서명은 원문 확인·명시적 저장 전에는 저장되지 않고 id가 캔버스에 붙는다',async()=>{
+  const block=html.match(/\/\* contract-signature:test-start \*\/([\s\S]*?)\/\* contract-signature:test-end \*\//);assert.ok(block);
+  const drawn=[];const canvas={width:720,height:180,dataset:{dirty:'false'},getContext:()=>({clearRect:(...args)=>drawn.push(['clear',...args]),drawImage:(...args)=>drawn.push(['draw',...args])})};
+  const msg={textContent:''},calls=[];let imageUrl='';
+  class TestImage{set src(value){imageUrl=value;this.onload();}}
+  const c={ME:{id:'staff-1'},document:{querySelector:()=>canvas},$:()=>msg,
+    sb:{from(table){assert.equal(table,'employee_signature_vault');return {select(columns){assert.equal(columns,'id,storage_path');return this;},eq(column,value){calls.push(['eq',column,value]);return this;},is(column,value){calls.push(['is',column,value]);return this;},order(column,options){calls.push(['order',column,options]);return this;},limit(value){assert.equal(value,1);return this;},maybeSingle:async()=>({data:{id:21,storage_path:'staff-1/signature.png'},error:null})};},storage:{from(bucket){assert.equal(bucket,'employee-signatures');return {download:async path=>{assert.equal(path,'staff-1/signature.png');return {data:{image:true},error:null};}};}}},
+    URL:{createObjectURL:()=> 'blob:signature',revokeObjectURL:url=>assert.equal(url,'blob:signature')},Image:TestImage};
+  vm.runInNewContext(`${block[1]};this.h={useStoredContractSignature};`,c);
+  await c.h.useStoredContractSignature(77,{automatic:true});
+  assert.equal(imageUrl,'blob:signature');assert.deepEqual(drawn[0],['clear',0,0,720,180]);assert.equal(drawn[1][0],'draw');
+  assert.equal(canvas.dataset.signatureId,'21');assert.equal(canvas.dataset.dirty,'true');
+  assert.match(msg.textContent,/원문 확인 후 저장/);
+  assert.equal(calls.some(call=>call[0]==='order'&&call[1]==='created_at'&&call[2].ascending===false),true);
+  assert.match(html,/if\(!confirm\('원본 PDF를 확인했고/);
+  assert.match(html,/onclick="saveContractSignature\(/);
+  assert.match(html,/onclick="signContractPdf\(/);
+  assert.match(html,/canvas\.dataset\.signatureId\?Number\(canvas\.dataset\.signatureId\):null/);
+});
+
+test('활성 보관 서명이 없거나 취소되면 저장하지 않고 수기 서명 캔버스를 유지한다',async()=>{
+  const block=html.match(/\/\* contract-signature:test-start \*\/([\s\S]*?)\/\* contract-signature:test-end \*\//);assert.ok(block);
+  const canvas={dataset:{dirty:'false'}},msg={textContent:''};
+  const c={ME:{id:'staff-1'},document:{querySelector:()=>canvas},$:()=>msg,
+    sb:{from:()=>({select(){return this;},eq(){return this;},is(column,value){assert.equal(column,'revoked_at');assert.equal(value,null);return this;},order(){return this;},limit(){return this;},maybeSingle:async()=>({data:null,error:null})})}};
+  vm.runInNewContext(`${block[1]};this.h={useStoredContractSignature};`,c);
+  await c.h.useStoredContractSignature(77,{automatic:true});
+  assert.equal(canvas.dataset.dirty,'false');assert.match(msg.textContent,/사용할 보관 서명이 없습니다/);
+  assert.match(html,/data-contract-signature="\$\{r\.id\}"/);assert.match(html,/onclick="saveContractSignature\(/);
+});
+
+test('지우기와 직원 수기 서명은 저장 보관서명의 id를 해제한다',()=>{
+  const start=html.indexOf('function clearContractSignature'),end=html.indexOf('async function saveContractSignature',start);assert.ok(start>=0&&end>start);
+  const canvas={width:720,height:180,dataset:{dirty:'true',signatureId:'21'},getContext:()=>({clearRect(){}})},c={document:{querySelector:()=>canvas}};
+  vm.runInNewContext(html.slice(start,end)+';this.clearContractSignature=clearContractSignature;',c);c.clearContractSignature(77);
+  assert.equal(canvas.dataset.dirty,'false');assert.equal(canvas.dataset.signatureId,undefined);
+  assert.match(html,/canvas\.dataset\.dirty='true';delete canvas\.dataset\.signatureId/);
+});
+
 test('서명 migration은 중복 재시도와 사용기록 존재 시 rollback 차단을 선언한다',()=>{
   const signatureSql=fs.readFileSync('db/employee_signature_vault_draft.sql','utf8');
   const signatureRollback=fs.readFileSync('db/employee_signature_contract_rpc_rollback.sql','utf8');

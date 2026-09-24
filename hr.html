@@ -2449,17 +2449,28 @@ function initContractSignatures(){
     const ctx=canvas.getContext('2d');ctx.lineWidth=2.4;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#111';let drawing=false;
     const point=e=>{const r=canvas.getBoundingClientRect();return {x:(e.clientX-r.left)*canvas.width/r.width,y:(e.clientY-r.top)*canvas.height/r.height};};
     canvas.addEventListener('pointerdown',e=>{e.preventDefault();drawing=true;canvas.setPointerCapture(e.pointerId);const p=point(e);ctx.beginPath();ctx.moveTo(p.x,p.y);});
-    canvas.addEventListener('pointermove',e=>{if(!drawing)return;e.preventDefault();const p=point(e);ctx.lineTo(p.x,p.y);ctx.stroke();canvas.dataset.dirty='true';});
+    canvas.addEventListener('pointermove',e=>{if(!drawing)return;e.preventDefault();const p=point(e);ctx.lineTo(p.x,p.y);ctx.stroke();canvas.dataset.dirty='true';delete canvas.dataset.signatureId;});
     const stop=e=>{if(!drawing)return;drawing=false;e.preventDefault();};canvas.addEventListener('pointerup',stop);canvas.addEventListener('pointercancel',stop);
   });
 }
 /* contract-signature:test-start */
 function contractSignatureUsePayload(signatureId,confirmedAt){return {signature_id:Number(signatureId),document_kind:'근로계약서',confirmed_at:confirmedAt};}
-async function useStoredContractSignature(id){const canvas=document.querySelector(`canvas[data-contract-signature="${id}"]`),msg=$(`#contractSignMsg-${id}`);if(!canvas)return;const {data:vault,error}=await sb.from('employee_signature_vault').select('id,storage_path').eq('user_id',ME.id).is('revoked_at',null).order('created_at',{ascending:false}).limit(1).maybeSingle();if(error||!vault){if(msg)msg.textContent='사용할 보관 서명이 없습니다.';return;}const {data,error:downloadError}=await sb.storage.from('employee-signatures').download(vault.storage_path);if(downloadError||!data){if(msg)msg.textContent='보관 서명을 불러오지 못했습니다.';return;}const url=URL.createObjectURL(data),img=new Image();img.onload=()=>{const ctx=canvas.getContext('2d');ctx.clearRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);canvas.dataset.signatureId=String(vault.id);canvas.dataset.dirty='true';URL.revokeObjectURL(url);if(msg)msg.textContent='보관 서명을 불러왔습니다. 원문 확인 후 저장하세요.';};img.src=url;}
+async function useStoredContractSignature(id,options={}){
+  const canvas=document.querySelector(`canvas[data-contract-signature="${id}"]`),msg=$(`#contractSignMsg-${id}`);if(!canvas)return;
+  if(options.automatic&&canvas.dataset.dirty==='true')return;
+  const {data:vault,error}=await sb.from('employee_signature_vault').select('id,storage_path').eq('user_id',ME.id).is('revoked_at',null).order('created_at',{ascending:false}).limit(1).maybeSingle();
+  if(error||!vault){if(msg)msg.textContent='사용할 보관 서명이 없습니다.';return;}
+  const {data,error:downloadError}=await sb.storage.from('employee-signatures').download(vault.storage_path);if(downloadError||!data){if(msg)msg.textContent='보관 서명을 불러오지 못했습니다.';return;}
+  const url=URL.createObjectURL(data),img=new Image();img.onload=()=>{
+    if(options.automatic&&canvas.dataset.dirty==='true'){URL.revokeObjectURL(url);return;}
+    const ctx=canvas.getContext('2d');ctx.clearRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);canvas.dataset.signatureId=String(vault.id);canvas.dataset.dirty='true';URL.revokeObjectURL(url);if(msg)msg.textContent='보관 서명을 불러왔습니다. 원문 확인 후 저장하세요.';
+  };img.src=url;
+}
+function autoLoadStoredContractSignatures(rows){(rows||[]).filter(r=>r.status==='대기').forEach(r=>{void useStoredContractSignature(r.id,{automatic:true});});}
 /* contract-signature:test-end */
 function clearContractSignature(id){
   const canvas=document.querySelector(`canvas[data-contract-signature="${id}"]`);if(!canvas)return;
-  canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);canvas.dataset.dirty='false';
+  canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);canvas.dataset.dirty='false';delete canvas.dataset.signatureId;
 }
 async function saveContractSignature(id){
   const row=CONTRACT_ROWS.find(r=>Number(r.id)===Number(id)),canvas=document.querySelector(`canvas[data-contract-signature="${id}"]`),msg=$(`#contractSignMsg-${id}`);
@@ -2511,7 +2522,7 @@ async function renderContractEmployee(m,options={}){
         <div class="rowflex" style="margin-top:8px"><button class="mini" onclick="clearContractSignature(${r.id})">지우기</button><button class="mini" onclick="useStoredContractSignature(${r.id})">보관 서명 사용</button>${r.source_pdf_path?`<button class="hbtn pri" onclick="signContractPdf(${r.id})">원본 확인 후 PDF 서명</button>`:`<button class="hbtn pri" onclick="saveContractSignature(${r.id})">원문 확인 후 서명 저장</button>`}</div><div class="msg" id="contractSignMsg-${r.id}"></div>`:''}
       ${signed?'<div class="hint" style="color:var(--mint)">✓ 서명 완료</div>':''}</div>`;}).join('');
   if(append)m.insertAdjacentHTML('beforeend',html);else m.innerHTML=html;
-  initContractSignatures();
+  initContractSignatures();autoLoadStoredContractSignatures(ownRows);
 }
 async function renderContract(m){
   const isLead=['owner','chief','manager'].includes(ME.role);
