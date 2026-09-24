@@ -751,7 +751,7 @@ test('캘린더 렌더 순서는 공휴일과 이벤트, 부서, 야간, 연차,
   const markers = [
     'cal-tag hol', 'cal-tag ev',
     "calendarRosterTag('Dr.'", 'EMPLOYEE_JOB_GROUPS.map(group=>calendarRosterTag(group.label', "calendarRosterTag('미지정'",
-    "calendarRosterTag('야간'", "calendarRosterTag('연차'", "calendarRosterTag('OFF'", "calendarRosterTag('기타'", 'cal-tag status'
+    "calendarRosterTag('야간'", "calendarLeaveTags(leaveByDate[c.ds]||[])", "calendarRosterTag('OFF'", "calendarRosterTag('기타'", 'cal-tag status'
   ];
   let previous = -1;
   for (const marker of markers) {
@@ -770,7 +770,7 @@ test('캘린더는 전체·근무·연차 3단 전환과 상담·행정 직무�
   assert.match(source, />근무</);
   assert.match(source, />연차</);
   assert.match(source, /CAL_VIEW==='work'/);
-  assert.match(source, /CAL_VIEW==='all'\?calendarRosterTag\('연차'/);
+  assert.match(source, /CAL_VIEW==='all'\?calendarLeaveTags\(leaveByDate\[c\.ds\]\|\|\[\]\)/);
 });
 
 test('캘린더 날짜 셀은 선택 날짜 패널·키보드·삭제 링크 전파 차단을 제공한다', () => {
@@ -970,6 +970,54 @@ test('owner 직원 권한 표는 연결 명부 상태를 보여 주고 승인 �
   assert.match(approve[0], /upsert\(\{profile_user_id:uid,name:p\.name,department:'미지정',included_in_schedule:true,active:true\}/);
   assert.match(approve[0], /onConflict:'profile_user_id',ignoreDuplicates:true/);
   assert.match(approve[0], /if\(rosterError\).*setStatus\('error'\)/s);
+});
+
+test('월간 캘린더 상세 팝업은 근무·OFF·연차·반차를 구분하고 접근 가능한 닫기를 제공한다', () => {
+  const source = calendarBlock[1];
+  assert.match(source, /from\('leave_requests'\)\.select\('user_id,type,type_note,date_from,date_to'\)/);
+  assert.match(source, /calendarLeaveIndex\(lv\|\|\[\],SCHEDULE_PEOPLE,from,to,nameOf,true\)/);
+  assert.match(source, /renderCalendarDayDetail\(/);
+  assert.match(source, /calendar-day-detail/);
+  assert.match(source, /aria-modal="true"/);
+  assert.match(source, /aria-labelledby="calendarDayTitle"/);
+  assert.match(source, /id="calendarDayClose"[^>]*autofocus/);
+  assert.match(source, /event\.key==='Escape'/);
+  assert.match(source, /event\.key==='Tab'/);
+  assert.match(source, /leaveDisplayText\(item\.type,item\.type_note\)/);
+  assert.match(source, /names\.push\(item\.label\)/);
+  assert.match(source, /\['Dr\.',departments\['Dr\.'\]/);
+  assert.match(source, /calendarRosterTag\('OFF'/);
+  assert.match(source, /calendarLeaveTags\(leaveByDate\[c\.ds\]\|\|\[\]\)/);
+  assert.match(source, /calendarLeaveTags\(leaveNames\)/);
+  assert.match(source, /class="cal-tag lv cal-roster"/);
+  assert.match(source, /calendar-day-panel/);
+  assert.match(html, /@media\(max-width:640px\)[\s\S]*?\.calendar-day-detail/);
+});
+
+test('상세 캘린더는 반차 시각과 직원명을 escape하고 연차·반차를 독립된 줄로 출력한다', () => {
+  const context = { EMPLOYEE_JOB_GROUPS: [{ label: '진료실' }], esc: value => String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'), leaveDisplayText: (type,note) => note ? `${type} · ${note}` : type };
+  vm.createContext(context);
+  context.render = () => {};
+  vm.runInContext(`${calendarBlock[1]};this.renderCalendarDayDetail=renderCalendarDayDetail;this.calendarLeaveTags=calendarLeaveTags;this.selectCalendarDay=selectCalendarDay;this.closeCalendarDayDetail=closeCalendarDayDetail;this.readCalendarState=()=>[CAL_SELECTED_DATE,CAL_DETAIL_DATE];`, context);
+  const roster = { departments: { 'Dr.': ['원장 <A>'], 진료실: ['직원 B'] }, evening: [], off: ['직원 C'], etc: [] };
+  const leaves = [{ label: '직원 D', type: '연차', type_note: null }, { label: '직원 E', type: '반차', type_note: '오전 09:00~13:00' }];
+  const tags = JSON.parse(JSON.stringify(context.calendarLeaveTags(leaves)));
+  assert.equal(tags.length, 2);
+  assert.match(tags[0], /연차/);
+  assert.match(tags[1], /반차 · 오전 09:00~13:00/);
+  assert.match(tags[1], /직원 E/);
+  assert.match(tags[0], /연차:<\/span><span class="cal-names"[^>]*>직원 D/);
+  assert.match(tags[1], /반차 · 오전 09:00~13:00:<\/span><span class="cal-names"[^>]*>직원 E/);
+  const detail = context.renderCalendarDayDetail('2026-09-24', roster, leaves);
+  assert.match(detail, /<h4>Dr\.<\/h4>/);
+  assert.match(detail, /원장 &lt;A&gt;/);
+  assert.match(detail, /<h4>OFF<\/h4>[\s\S]*직원 C/);
+  assert.match(detail, /<h4>연차<\/h4>[\s\S]*직원 D/);
+  assert.match(detail, /<h4>반차 · 오전 09:00~13:00<\/h4>[\s\S]*직원 E/);
+  context.selectCalendarDay('2026-09-24');
+  assert.deepEqual(JSON.parse(JSON.stringify(context.readCalendarState())), ['2026-09-24','2026-09-24']);
+  context.closeCalendarDayDetail();
+  assert.equal(context.readCalendarState()[1], null);
 });
 
 test('관리자 직무 분류 화면은 순서·Dr 분리·저장 조건·모바일 1열을 제공한다', () => {
