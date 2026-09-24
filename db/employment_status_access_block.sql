@@ -137,6 +137,7 @@ select public._install_employee_hub_access_gate(to_regclass('public.employee_sig
 select public._install_employee_hub_access_gate(to_regclass('public.leave_application_documents'));
 select public._install_employee_hub_access_gate(to_regclass('public.leave_application_document_events'));
 select public._install_employee_hub_access_gate(to_regclass('public.push_subscriptions'));
+select public._install_employee_hub_access_gate(to_regclass('public.app_settings'));
 drop function public._install_employee_hub_access_gate(regclass);
 
 -- self-only push 구독 helper도 access gate를 직접 확인한다. 나머지 관련

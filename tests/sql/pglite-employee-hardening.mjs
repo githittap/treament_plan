@@ -13,7 +13,7 @@ const staff='11111111-1111-1111-1111-111111111111',manager='22222222-2222-2222-2
 const prelude = `
 create role anon; create role authenticated; create schema auth; create schema storage;
 create or replace function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('app.test_uid',true),'')::uuid $$;
-create or replace function storage.foldername(value text) returns text[] language sql immutable as $$ select string_to_array(value,'/') $$;
+create or replace function storage.foldername(value text) returns text[] language sql immutable as $$ select case when strpos(value,'/')=0 then array[]::text[] else string_to_array(regexp_replace(value,'/[^/]*$',''),'/') end $$;
 create table public.profiles(user_id uuid primary key,role text,active boolean default true,approved boolean default true);
 create or replace function public.my_role() returns text language sql stable security definer set search_path=public as $$ select coalesce((select role from public.profiles where user_id=auth.uid()),'staff') $$;
 create table storage.buckets(id text primary key,name text unique,public boolean not null default false);
@@ -23,6 +23,8 @@ grant usage on schema auth,storage to authenticated; grant execute on function a
 `;
 try {
   await db.exec(prelude + draft);
+  assert.deepEqual((await query(`select storage.foldername('${staff}') folders`))[0].folders,[]);
+  assert.deepEqual((await query(`select storage.foldername('${staff}/documents/file.pdf') folders`))[0].folders,[staff,'documents']);
   await query(`insert into public.profiles values ('${staff}','staff',true,true),('${manager}','manager',true,true),('${chief}','chief',true,true),('${other}','staff',true,true),('${inactiveManager}','manager',false,true)`);
   await db.exec('set role authenticated'); await query(`select set_config('app.test_uid','${staff}',false)`);
   await query(`insert into public.onboarding_evidence(user_id,bank_name,account_number) values ('${staff}','국민','123')`);

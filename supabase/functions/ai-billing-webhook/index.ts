@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { parseNaverAdSms } from './naver_ads.mjs';
+import { sameHex, sha256Hex } from '../navertalk-webhook/payload.mjs';
 
 // MacroDroid HTTP 요청(POST) 설정(원장 기존 계좌연동 매크로와 동일한 패턴):
 //   URL: .../ai-billing-webhook?platform=Claude  (플랫폼은 매크로마다 쿼리파라미터로 구분)
@@ -81,7 +82,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: secretRow, error: secretErr } = await client
     .from('webhook_secrets').select('value').eq('name', 'ai_billing_webhook').single();
-  if (secretErr || !secretRow || secretRow.value !== token) {
+  if (secretErr || !secretRow?.value || !sameHex(await sha256Hex(String(secretRow.value)), await sha256Hex(token))) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
   }
 

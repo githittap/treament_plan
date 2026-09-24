@@ -16,7 +16,7 @@ const staff='11111111-1111-1111-1111-111111111111',manager='22222222-2222-2222-2
 const prelude = `
 create role anon; create role authenticated; create role service_role bypassrls; create schema auth; create schema storage;
 create or replace function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('app.test_uid',true),'')::uuid $$;
-create or replace function storage.foldername(value text) returns text[] language sql immutable as $$ select string_to_array(value,'/') $$;
+create or replace function storage.foldername(value text) returns text[] language sql immutable as $$ select case when strpos(value,'/')=0 then array[]::text[] else string_to_array(regexp_replace(value,'/[^/]*$',''),'/') end $$;
 create table public.profiles(user_id uuid primary key,role text,active boolean default true,approved boolean default true);
 create table public.contracts(id bigint primary key,user_id uuid not null,merged_html text,sign_slots jsonb default '{}'::jsonb,status text not null default '대기',signed_at timestamptz,signed_pdf_path text,signed_pdf_sha256 text);
 create table public.contract_pdf_signature_audits(id bigint generated always as identity primary key,contract_id bigint,user_id uuid,action text);
@@ -31,6 +31,8 @@ grant usage on schema public,auth,storage to service_role;
 `;
 try {
   await db.exec(prelude + draft + pdfDraft); await db.exec(`grant select on public.contracts,public.employee_signature_uses,public.employee_signature_audit,public.contract_pdf_signature_audits to service_role; create trigger test_fail_signature_use_trigger before insert on public.employee_signature_uses for each row execute function public.test_fail_signature_use()`); await db.exec('set role postgres'); await query(`insert into public.profiles values ('${staff}','staff',true,true),('${manager}','manager',true,true),('${chief}','chief',true,true)`); await query(`insert into public.contracts(id,user_id,merged_html,status) values (10,'${staff}','old','대기'),(11,'${manager}','old','대기'),(20,'${staff}','old','대기'),(21,'${staff}','old','대기')`); await db.exec('set role authenticated'); await query(`select set_config('app.test_uid','${staff}',false)`);
+  assert.deepEqual((await query(`select storage.foldername('${staff}') folders`))[0].folders,[]);
+  assert.deepEqual((await query(`select storage.foldername('${staff}/signature.png') folders`))[0].folders,[staff]);
   const signatureId=(await query(`insert into public.employee_signature_vault(user_id,storage_path,mime_type,size_bytes) values ('${staff}','${staff}/signature.png','image/png',100) returning id`))[0].id;
   const recordPdfSignatureWithUse = contractId => query(`select public.record_contract_pdf_signature_with_use(p_contract_id => ${contractId},p_user_id => '${staff}',p_attempt_id => '00000000-0000-0000-0000-0000000000${contractId}',p_source_sha256 => 'a',p_signed_path => 'contracts/${contractId}/signed.pdf',p_signed_sha256 => 'b',p_signature_sha256 => 'c',p_page_no => 1,p_x => 1,p_y => 1,p_width => 10,p_height => 10,p_signature_id => ${signatureId}::bigint)`);
   await query(`insert into storage.objects(bucket_id,name,metadata,owner_id) values ('employee-signatures','${staff}/signature.png','{"mimetype":"image/png","size":100}','${staff}')`);
