@@ -129,7 +129,8 @@ begin
       'monthly'::text as milestone_kind,
       n as milestone_months,
       (p.profile_hire_date + make_interval(months => n))::date as milestone_due_date,
-      n::numeric as milestone_target_days
+      n::numeric as milestone_target_days,
+      n::numeric as milestone_cumulative_due_days
     from profile_base p
     cross join lateral generate_series(1,11) as series(n)
   ), annual_milestones as (
@@ -141,8 +142,9 @@ begin
       p.profile_employment_effective_date,
       'annual'::text as milestone_kind,
       12 as milestone_months,
-      (p.profile_hire_date + 365)::date as milestone_due_date,
-      15::numeric as milestone_target_days
+      (p.profile_hire_date + interval '1 year' + interval '1 day')::date as milestone_due_date,
+      15::numeric as milestone_target_days,
+      26::numeric as milestone_cumulative_due_days
     from profile_base p
   ), eligible_milestones as (
     select * from monthly_milestones
@@ -170,9 +172,9 @@ begin
     select
       m.*,
       c.credit_days,
-      lag(m.milestone_target_days,1,0::numeric) over (
+      lag(m.milestone_cumulative_due_days,1,0::numeric) over (
         partition by m.profile_user_id order by m.milestone_due_date,m.milestone_months
-      ) as previous_target_days
+      ) as previous_cumulative_due_days
     from due_milestones m
     join ledger_credits c on c.profile_user_id=m.profile_user_id
   )
@@ -187,7 +189,7 @@ begin
     o.credit_days,
     case
       when r.id is not null then 0::numeric
-      else greatest(0::numeric,o.milestone_target_days-greatest(o.credit_days,o.previous_target_days))
+      else greatest(0::numeric,o.milestone_cumulative_due_days-greatest(o.credit_days,o.previous_cumulative_due_days))
     end,
     r.id is not null,
     r.id is null
@@ -226,7 +228,8 @@ language plpgsql security invoker set search_path=public as $$
 declare
   candidate record;
   current_credit numeric;
-  previous_target numeric;
+  candidate_cumulative_due numeric;
+  previous_cumulative_due numeric;
   actual_grant numeric;
   new_ledger_id bigint;
   new_run_id bigint;
@@ -334,14 +337,21 @@ begin
     from public.leave_ledger ll
     where ll.user_id=candidate.user_id;
 
-    select coalesce(max(r.target_days),0)::numeric
-    into previous_target
+    candidate_cumulative_due:=case
+      when candidate.accrual_kind='annual' then 11+candidate.target_days
+      else candidate.target_days
+    end;
+
+    select coalesce(max(
+      case when r.accrual_kind='annual' then 11+r.target_days else r.target_days end
+    ),0)::numeric
+    into previous_cumulative_due
     from public.leave_accrual_runs r
     where r.user_id=candidate.user_id and r.due_date<candidate.due_date;
 
     actual_grant:=greatest(
       0::numeric,
-      candidate.target_days-greatest(current_credit,previous_target)
+      candidate_cumulative_due-greatest(current_credit,previous_cumulative_due)
     );
     new_ledger_id:=null;
     if actual_grant>0 then
@@ -351,8 +361,8 @@ begin
         '부여',
         actual_grant,
         format(
-          '자동 연차 발생: %s · 누적 목표 %s일',
-          case when candidate.accrual_kind='annual' then '입사 365일' else candidate.months_completed||'개월' end,
+          '자동 연차 발생: %s · 해당 단계 %s일',
+          case when candidate.accrual_kind='annual' then '입사 1주년 다음 날' else candidate.months_completed||'개월' end,
           candidate.target_days
         )
       )
