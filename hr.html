@@ -1268,14 +1268,22 @@ async function apprAct(docId,act){
   setStatus('saved');render();refreshBadges();
 }
 async function submitApproval(){
-  const kind=$('#apKind').value,title=$('#apTitle').value.trim();
+  const label=$('#apKind').value,title=$('#apTitle').value.trim();
   if(!title){$('#apMsg').textContent='제목을 입력하세요.';return;}
-  const {data:doc,error}=await sb.from('approval_docs').insert({kind,title,body:$('#apBody').value,author:ME.id}).select().single();
+  if(label==='연차 신청'){hide('apMask');openLeave();return;}
+  const kind=approvalKindValue(label),storedTitle=approvalRequestTitle(label,title),storedBody=approvalRequestBody(label,$('#apBody').value);
+  const {data:doc,error}=await sb.from('approval_docs').insert({kind,title:storedTitle,body:storedBody,author:ME.id}).select().single();
   if(error){$('#apMsg').textContent='실패: '+error.message;return;}
   await sb.from('approval_steps').insert([{doc_id:doc.id,seq:1,approver_role:'chief'},{doc_id:doc.id,seq:2,approver_role:'owner'}]);
   hide('apMask');$('#apTitle').value='';$('#apBody').value='';setStatus('saved');render();
 }
 
+/* approval-request:test-start */
+const APPROVAL_KIND_VALUES={'연차 신청':'연차','사직서':'사직서','재직증명서 발급':'기타','보고':'보고','소명':'소명','기타':'기타'};
+function approvalKindValue(label){return APPROVAL_KIND_VALUES[label]||'기타';}
+function approvalRequestTitle(label,title){return label==='재직증명서 발급'?'[재직증명서 발급] '+title:title;}
+function approvalRequestBody(label,body){return label==='재직증명서 발급'?'[재직증명서 발급 요청]\n'+(body||''):body||'';}
+/* approval-request:test-end */
 /* ── 공지 ── */
 async function renderNotice(m){
   const {data:list}=await sb.from('notices').select('*').order('pinned',{ascending:false}).order('created_at',{ascending:false});
@@ -1689,13 +1697,13 @@ function employeeDocumentsCard(docs,error,contractRows,contractError,leaveDocs,l
   const allRows=mergeEmployeeDocumentRows(docs,contractRows);EMPLOYEE_CONTRACT_PREVIEWS={};(contractRows||[]).forEach(r=>{EMPLOYEE_CONTRACT_PREVIEWS[r.id]=r;});
   const errors=employeeDocumentsErrorMessages(error,contractError);
   const errorText=(errors.documents?'<div class="hint" style="color:var(--red)">서류함을 불러오지 못했습니다: '+esc(errors.documents)+'</div>':'')+(errors.contracts?'<div class="hint" style="color:var(--red)">체결된 근로계약서를 불러오지 못했습니다: '+esc(errors.contracts)+'</div>':'')+(leaveError?'<div class="hint" style="color:var(--red)">연차 증빙을 불러오지 못했습니다: '+esc(leaveError.message||leaveError)+'</div>':'')+(approvalError?'<div class="hint" style="color:var(--red)">결재 요청을 불러오지 못했습니다: '+esc(approvalError.message||approvalError)+'</div>':'');
-  const who=d=>lead?'<td>'+esc(nameOf(d.user_id))+'</td>':'';
+  const who=d=>lead?'<td>'+esc(nameOf(d.user_id||d.author))+'</td>':'';
   const docRows=allRows.map(d=>'<tr data-doc-filter="직원서류">'+who(d)+'<td>'+esc(d.document_type||'근로계약서')+'</td><td>'+esc(d.original_name)+'</td><td>'+contractDate(d.created_at)+'</td><td>'+ (d._kind==='contract'?'<button class="mini" onclick="previewEmployeeContract('+d.id+')">열기</button>':'<button class="mini" onclick="downloadEmployeeDocument('+d.id+')">열기</button>')+'</td></tr>').join('');
   const leaveRows=(leaveDocs||[]).map(d=>'<tr data-doc-filter="연차증빙">'+who(d)+'<td>연차증빙</td><td>'+esc(d.original_name)+'</td><td>'+md(d.created_at)+'</td><td><button class="mini" onclick="downloadLeaveApplicationDocument('+d.id+')">열기</button></td></tr>').join('');
   const approvalRows=(approvalDocs||[]).map(d=>'<tr data-doc-filter="결재 요청">'+who(d)+'<td>결재 요청 · '+esc(d.kind)+'</td><td>'+esc(d.title)+'</td><td>'+md(d.created_at)+'</td><td><span class="b '+(d.status==='완결'?'ok':d.status==='반려'?'no':'wait')+'">'+esc(d.status)+'</span></td></tr>').join('');
   const allCount=allRows.length+(leaveDocs||[]).length+(approvalDocs||[]).length;
   const rows=docRows+leaveRows+approvalRows;
-  const list=allCount?'<div class="tblwrap"><table><tr>'+(lead?'<th>직원</th>':'')+'<th>종류</th><th>문서</th><th>날짜</th><th>상태·열기</th></tr>'+rows+'</table></div>':'<div class="empty">올린 서류가 없습니다.</div>';
+  const list=allCount?'<div class="tblwrap"><table><thead><tr>'+(lead?'<th>직원</th>':'')+'<th>종류</th><th>문서</th><th>날짜</th><th>상태·열기</th></tr></thead><tbody id="employeeDocumentRows">'+rows+'<tr id="employeeDocumentEmpty" style="display:none"><td colspan="'+(lead?5:4)+'" class="empty">해당 종류의 문서가 없습니다.</td></tr></tbody></table></div>':'<div class="empty">올린 서류가 없습니다.</div>';
   return `<div class="card" id="employeeDocumentBox"><h2>📎 서류함</h2><div class="hint">어떤 서류든 여기로 올리시면 됩니다. 직원서류와 연차증빙, 결재 요청을 종류별로 한 화면에서 확인합니다.</div>
     <div class="rowflex" role="group" aria-label="서류함 필터" style="margin:10px 0"><button class="mini stamp" data-doc-filter-button="전체 문서" onclick="filterEmployeeDocuments('전체 문서')">전체 문서</button><button class="mini" data-doc-filter-button="직원서류" onclick="filterEmployeeDocuments('직원서류')">직원서류</button><button class="mini" data-doc-filter-button="연차증빙" onclick="filterEmployeeDocuments('연차증빙')">연차증빙</button><button class="mini" data-doc-filter-button="결재 요청" onclick="filterEmployeeDocuments('결재 요청')">결재 요청</button></div>
     <div class="rowflex" style="margin-bottom:10px"><button class="hbtn pri" onclick="openLeave()">연차 신청</button><button class="hbtn" onclick="show('apMask');$('#apMsg').textContent='';">결재 올리기</button></div>${errorText}${list}<div id="employeeContractPreview" class="contract-doc" style="display:none;margin-top:10px"></div>
@@ -1708,7 +1716,9 @@ function employeeDocumentsCard(docs,error,contractRows,contractError,leaveDocs,l
 }
 function filterEmployeeDocuments(kind){
   const box=$('#employeeDocumentBox');if(!box)return;
-  box.querySelectorAll('[data-doc-filter]').forEach(row=>{row.style.display=kind==='전체 문서'||row.dataset.docFilter===kind?'':'none';});
+  const rows=[...box.querySelectorAll('[data-doc-filter]')];let visible=0;
+  rows.forEach(row=>{const show=kind==='전체 문서'||row.dataset.docFilter===kind;row.style.display=show?'':'none';if(show)visible++;});
+  const empty=$('#employeeDocumentEmpty');if(empty)empty.style.display=visible?'none':'';
   box.querySelectorAll('[data-doc-filter-button]').forEach(btn=>btn.classList.toggle('stamp',btn.dataset.docFilterButton===kind));
 }
 function previewEmployeeContract(id){
