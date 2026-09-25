@@ -10,14 +10,15 @@ Deno.serve(async req => {
   if (!url || !serviceKey) return new Response('{"ok":false}', { status: 500, headers: { 'content-type': 'application/json' } });
   const sb = createClient(url, serviceKey, { auth: { persistSession: false }, global: { headers: { Authorization: `Bearer ${serviceKey}` } } });
   const deps: NotificationDeps = {
-    verifyToken: async token => {
-      const { data, error } = await sb.from('webhook_secrets').select('value').eq('name', 'consultation_notification_sha256').maybeSingle();
+    verifyToken: async (token, source) => {
+      const secretName = source === 'homepage' ? 'homepage_online_sha256' : 'consultation_notification_sha256';
+      const { data, error } = await sb.from('webhook_secrets').select('value').eq('name', secretName).maybeSingle();
       return !error && !!data?.value && sameHex(await sha256Hex(token), String(data.value));
     },
-    ingest: async ({ source, eventId, message }) => {
+    ingest: async ({ source, eventId, message, senderName, contact, subject, receivedAt }) => {
       const { error } = await sb.rpc('consultation_inbox_ingest_service', {
-        p_source: source, p_event_id: eventId, p_received_at: null, p_sender_name: null,
-        p_contact: null, p_subject: null, p_message: message,
+        p_source: source, p_event_id: eventId, p_received_at: receivedAt ?? null, p_sender_name: senderName ?? null,
+        p_contact: contact ?? null, p_subject: subject ?? null, p_message: message,
       });
       return !error;
     },
