@@ -43,6 +43,10 @@ const formerStaff='66666666-6666-6666-6666-666666666666';
 const coveredAnnualStaff='88888888-8888-8888-8888-888888888888';
 const leapBoundaryStaff='99999999-9999-9999-9999-999999999999';
 const applyStaff='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+const multiYearAnnualStaff='bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+const anniversaryExitStaff='cccccccc-cccc-cccc-cccc-cccccccccccc';
+const oldLeaveStaff='dddddddd-dddd-dddd-dddd-dddddddddddd';
+const leapHireStaff='eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
 const iso = value => new Date(value).toISOString().slice(0,10);
 const confirmationJson = rows => JSON.stringify(rows.map(row => ({
   user_id: row.user_id,
@@ -62,7 +66,11 @@ try {
     ('${formerStaff}','중도퇴사직원','2026-01-15','staff',false,false,'자진퇴사','2026-03-10'),
     ('${coveredAnnualStaff}','수기충족직원','2025-09-24','staff',true,true,'재직',null),
     ('${leapBoundaryStaff}','윤년경계직원','2023-03-01','staff',true,true,'재직',null),
-    ('${applyStaff}','적용시험직원','2026-07-18','staff',true,true,'재직',null)`);
+    ('${applyStaff}','적용시험직원','2026-07-18','staff',true,true,'재직',null),
+    ('${multiYearAnnualStaff}','다년연차직원','2024-03-10','staff',true,true,'재직',null),
+    ('${anniversaryExitStaff}','기념일퇴사직원','2026-03-15','staff',false,false,'자진퇴사','2026-09-15'),
+    ('${oldLeaveStaff}','기존잔액직원','2022-03-01','staff',true,true,'재직',null),
+    ('${leapHireStaff}','윤일입사직원','2024-02-29','staff',true,true,'재직',null)`);
 
   const asUser=async userId=>{await query('set role authenticated');await query(`select set_config('app.test_uid','${userId}',false)`);};
   const directRun=(dueDate,confirmedBy)=>`insert into public.leave_accrual_runs(user_id,due_date,accrual_kind,months_completed,target_days,days,attendance_confirmed_by,attendance_confirmed_at) values('${staff}','${dueDate}','monthly',1,1,0,'${confirmedBy}',now())`;
@@ -94,15 +102,35 @@ try {
 
   const former = (await query("select * from public.preview_monthly_leave_accruals('2026-04-15')")).filter(row=>row.user_id===formerStaff);
   assert.deepEqual(former.map(row=>iso(row.due_date)),['2026-02-15']);
+  const anniversaryExit=(await query("select * from public.preview_monthly_leave_accruals('2026-09-15')")).filter(row=>row.user_id===anniversaryExitStaff);
+  assert.deepEqual(anniversaryExit.map(row=>iso(row.due_date)),['2026-04-15','2026-05-15','2026-06-15','2026-07-15','2026-08-15']);
 
-  const anniversaryPreview=(await query("select * from public.preview_monthly_leave_accruals('2026-09-24')")).filter(row=>row.user_id===annualStaff);
+  const anniversaryPreview=(await query("select * from public.preview_monthly_leave_accruals('2026-09-23')")).filter(row=>row.user_id===annualStaff);
   assert.equal(anniversaryPreview.length,11); assert.equal(anniversaryPreview.some(row=>row.accrual_kind==='annual'),false);
-  const annualPreview = (await query("select * from public.preview_monthly_leave_accruals('2026-09-25')")).filter(row=>row.user_id===annualStaff);
-  assert.equal(annualPreview.length,12); assert.equal(annualPreview.at(-1).accrual_kind,'annual'); assert.equal(annualPreview.at(-1).months_completed,12); assert.equal(iso(annualPreview.at(-1).due_date),'2026-09-25'); assert.equal(Number(annualPreview.at(-1).target_days),15); assert.equal(Number(annualPreview.at(-1).grant_days),15);
+  const annualPreview = (await query("select * from public.preview_monthly_leave_accruals('2026-09-24')")).filter(row=>row.user_id===annualStaff);
+  assert.equal(annualPreview.length,12); assert.equal(annualPreview.at(-1).accrual_kind,'annual'); assert.equal(annualPreview.at(-1).months_completed,12); assert.equal(iso(annualPreview.at(-1).due_date),'2026-09-24'); assert.equal(Number(annualPreview.at(-1).target_days),15); assert.equal(Number(annualPreview.at(-1).grant_days),15);
+  assert.equal(annualPreview.at(-1).past,false);
   const leapBefore=(await query("select * from public.preview_monthly_leave_accruals('2024-02-29')")).filter(row=>row.user_id===leapBoundaryStaff);
   assert.equal(leapBefore.some(row=>row.accrual_kind==='annual'),false);
   const leapAfter=(await query("select * from public.preview_monthly_leave_accruals('2024-03-01')")).filter(row=>row.user_id===leapBoundaryStaff);
   assert.equal(iso(leapAfter.at(-1).due_date),'2024-03-01'); assert.equal(leapAfter.at(-1).accrual_kind,'annual');
+
+  const multiYearAnnual=(await query("select * from public.preview_monthly_leave_accruals('2026-09-26')")).filter(row=>row.user_id===multiYearAnnualStaff&&row.accrual_kind==='annual');
+  assert.deepEqual(multiYearAnnual.map(row=>iso(row.due_date)),['2025-03-10','2026-03-10']);
+  assert.deepEqual(multiYearAnnual.map(row=>Number(row.target_days)),[15,15]);
+  assert.deepEqual(multiYearAnnual.map(row=>Number(row.grant_days)),[15,15]);
+  assert.deepEqual(multiYearAnnual.map(row=>row.past),[true,true]);
+
+  await query(`insert into public.leave_ledger(user_id,kind,days,note) values('${oldLeaveStaff}','부여',16,'기존 수기 잔액')`);
+  const oldLeaveAnnual=(await query("select * from public.preview_monthly_leave_accruals('2026-09-26')")).filter(row=>row.user_id===oldLeaveStaff&&row.accrual_kind==='annual');
+  assert.deepEqual(oldLeaveAnnual.map(row=>iso(row.due_date)),['2023-03-01','2024-03-01','2025-03-01','2026-03-01']);
+  assert.deepEqual(oldLeaveAnnual.map(row=>Number(row.grant_days)),[10,15,15,15]);
+  assert.equal(oldLeaveAnnual.reduce((sum,row)=>sum+Number(row.grant_days),0),55);
+  assert.equal(71-16,oldLeaveAnnual.reduce((sum,row)=>sum+Number(row.grant_days),0));
+
+  const leapHireAnnual=(await query("select * from public.preview_monthly_leave_accruals('2026-02-28')")).filter(row=>row.user_id===leapHireStaff&&row.accrual_kind==='annual');
+  assert.deepEqual(leapHireAnnual.map(row=>iso(row.due_date)),['2025-02-28','2026-02-28']);
+  assert.deepEqual(leapHireAnnual.map(row=>row.past),[true,false]);
 
   await query(`insert into public.leave_ledger(user_id,kind,days,note) values('${coveredAnnualStaff}','부여',26,'기존 수기 전체 충족')`);
   const coveredAnnualPreview=(await query("select * from public.preview_monthly_leave_accruals('2026-09-25')")).filter(row=>row.user_id===coveredAnnualStaff);
@@ -127,27 +155,27 @@ try {
   assert.deepEqual(applied.map(row=>({days:Number(row.granted_days),runs:row.created_runs})),[{days:0,runs:1}]);
   assert.equal((await query(`select count(*)::int n from public.leave_ledger where user_id='${applyStaff}'`))[0].n,2);
 
-  applied=await query(`select * from public.apply_monthly_leave_accruals('2026-09-25',${sqlJson(confirmationJson(annualPreview))},true)`);
+  applied=await query(`select * from public.apply_monthly_leave_accruals('2026-09-24',${sqlJson(confirmationJson(annualPreview))},true)`);
   assert.deepEqual(applied.map(row=>({user_id:row.user_id,days:Number(row.granted_days),runs:row.created_runs})),[{user_id:annualStaff,days:26,runs:12}]);
   assert.equal(Number((await query(`select coalesce(sum(days),0) total from public.leave_ledger where user_id='${annualStaff}' and kind in('부여','조정')`))[0].total),26);
   assert.equal(Number((await query(`select days from public.leave_accrual_runs where user_id='${annualStaff}' and accrual_kind='annual'`))[0].days),15);
 
-  applied=await query(`select * from public.apply_monthly_leave_accruals('2026-09-25',${sqlJson(confirmationJson(coveredAnnualPreview))},true)`);
+  applied=await query(`select * from public.apply_monthly_leave_accruals('2026-09-24',${sqlJson(confirmationJson(coveredAnnualPreview))},true)`);
   assert.deepEqual(applied.map(row=>({user_id:row.user_id,days:Number(row.granted_days),runs:row.created_runs})),[{user_id:coveredAnnualStaff,days:0,runs:12}]);
   assert.equal((await query(`select count(*)::int n from public.leave_ledger where user_id='${coveredAnnualStaff}'`))[0].n,1);
 
-  preview = (await query("select * from public.preview_monthly_leave_accruals('2027-09-18')")).filter(row=>row.user_id===staff);
+  preview = (await query("select * from public.preview_monthly_leave_accruals('2027-09-17')")).filter(row=>row.user_id===staff);
   assert.equal(preview.length,11); assert.equal(preview.some(row=>row.accrual_kind==='annual'),false);
-  preview = (await query("select * from public.preview_monthly_leave_accruals('2027-09-19')")).filter(row=>row.user_id===staff);
-  assert.equal(preview.length,12); assert.equal(preview.at(-1).accrual_kind,'annual'); assert.equal(iso(preview.at(-1).due_date),'2027-09-19'); assert.equal(Number(preview.at(-1).target_days),15); assert.equal(Number(preview.at(-1).grant_days),15);
+  preview = (await query("select * from public.preview_monthly_leave_accruals('2027-09-18')")).filter(row=>row.user_id===staff);
+  assert.equal(preview.length,12); assert.equal(preview.at(-1).accrual_kind,'annual'); assert.equal(iso(preview.at(-1).due_date),'2027-09-18'); assert.equal(Number(preview.at(-1).target_days),15); assert.equal(Number(preview.at(-1).grant_days),15);
   await asUser(manager); let denied=''; try { await query("select * from public.apply_monthly_leave_accruals('2026-12-18')"); } catch(error) { denied=String(error); } assert.match(denied,/owner execution required/);
   await asUser(owner);
   const beforeRollback=(await query(`select count(*)::int n from public.leave_accrual_runs where user_id='${annualStaff}'`))[0].n;
   await query('reset role');
   await db.exec(fs.readFileSync(path.resolve('db/monthly_leave_accrual_safe_rollback.sql'),'utf8'));
   await asUser(owner);
-  await assert.rejects(query(`select * from public.apply_monthly_leave_accruals('2026-09-25',${sqlJson(confirmationJson(annualPreview))},true)`),/automatic leave accrual paused; preview only/);
+  await assert.rejects(query(`select * from public.apply_monthly_leave_accruals('2026-09-24',${sqlJson(confirmationJson(annualPreview))},true)`),/automatic leave accrual paused; preview only/);
   assert.equal((await query(`select count(*)::int n from public.leave_accrual_runs where user_id='${annualStaff}'`))[0].n,beforeRollback);
   assert.equal(Number((await query(`select coalesce(sum(days),0) total from public.leave_ledger where user_id='${annualStaff}' and kind in('부여','조정')`))[0].total),26);
-  console.log('PGLITE_MONTHLY_LEAVE_PASS: 월말·퇴사·1주년 다음 날 별도 15일·수기상계·4역할 RLS·명시 개근확인 적용');
+  console.log('PGLITE_MONTHLY_LEAVE_PASS: 월말·퇴사·입사 기념일별 연 15일·과거분 구분·수기상계·4역할 RLS·명시 개근확인 적용');
 } finally { await db.close(); }

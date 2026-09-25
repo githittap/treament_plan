@@ -88,6 +88,7 @@ returns table(
   target_days numeric,
   existing_credit_days numeric,
   grant_days numeric,
+  past boolean,
   already_recorded boolean,
   attendance_confirmation_required boolean
 )
@@ -142,10 +143,14 @@ begin
       p.profile_employment_effective_date,
       'annual'::text as milestone_kind,
       12 as milestone_months,
-      (p.profile_hire_date + interval '366 days')::date as milestone_due_date,
+      (p.profile_hire_date + make_interval(years => n))::date as milestone_due_date,
       15::numeric as milestone_target_days,
-      26::numeric as milestone_cumulative_due_days
+      (11 + 15*n)::numeric as milestone_cumulative_due_days
     from profile_base p
+    cross join lateral generate_series(
+      1,
+      extract(year from p_as_of)::integer-extract(year from p.profile_hire_date)::integer
+    ) as series(n)
   ), eligible_milestones as (
     select * from monthly_milestones
     union all
@@ -158,7 +163,7 @@ begin
         m.profile_employment_status='재직'
         or (
           m.profile_employment_effective_date is not null
-          and m.milestone_due_date<=m.profile_employment_effective_date
+          and m.milestone_due_date<m.profile_employment_effective_date
         )
       )
   ), ledger_credits as (
@@ -191,6 +196,7 @@ begin
       when r.id is not null then 0::numeric
       else greatest(0::numeric,o.milestone_cumulative_due_days-greatest(o.credit_days,o.previous_cumulative_due_days))
     end,
+    o.milestone_due_date<p_as_of,
     r.id is not null,
     r.id is null
   from ordered o
@@ -341,15 +347,16 @@ begin
     where ll.user_id=candidate.user_id;
 
     candidate_cumulative_due:=case
-      when candidate.accrual_kind='annual' then 11+candidate.target_days
+      when candidate.accrual_kind='annual' then 11+15*(extract(year from candidate.due_date)::integer-extract(year from candidate.hire_date)::integer)
       else candidate.target_days
     end;
 
     select coalesce(max(
-      case when r.accrual_kind='annual' then 11+r.target_days else r.target_days end
+      case when r.accrual_kind='annual' then 11+15*(extract(year from r.due_date)::integer-extract(year from p.hire_date)::integer) else r.target_days end
     ),0)::numeric
     into previous_cumulative_due
     from public.leave_accrual_runs r
+    join public.profiles p on p.user_id=r.user_id
     where r.user_id=candidate.user_id and r.due_date<candidate.due_date;
 
     actual_grant:=greatest(
@@ -365,7 +372,7 @@ begin
         actual_grant,
         format(
           '자동 연차 발생: %s · 해당 단계 %s일',
-          case when candidate.accrual_kind='annual' then '입사 1주년 다음 날' else candidate.months_completed||'개월' end,
+          case when candidate.accrual_kind='annual' then (extract(year from candidate.due_date)::integer-extract(year from candidate.hire_date)::integer)||'주년 기념일' else candidate.months_completed||'개월' end,
           candidate.target_days
         )
       )
