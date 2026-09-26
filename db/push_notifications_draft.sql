@@ -18,14 +18,14 @@ do $$ begin
   end if;
   if exists(
     select 1 from (values
-      ('profiles','user_id'),('profiles','role'),('profiles','active'),('profiles','approved'),('profiles','account_access_status'),
+      ('profiles','user_id'),('profiles','role'),('profiles','dept'),('profiles','active'),('profiles','approved'),('profiles','account_access_status'),
       ('leave_requests','id'),('leave_requests','user_id'),('leave_requests','status'),
       ('push_subscriptions','id'),('push_subscriptions','user_id'),('push_subscriptions','endpoint'),('push_subscriptions','subscription'),
       ('payment_requests','id'),('payment_requests','status'),
       ('approval_steps','id'),('approval_steps','doc_id'),('approval_steps','seq'),('approval_steps','status'),
       ('notices','id'),('notices','author_id'),
       ('employee_documents','id'),('employee_documents','user_id'),('employee_documents','checked_at'),
-      ('consultation_inbox','id')
+      ('consultation_inbox','id'),('consultation_inbox','created_via')
     ) required(table_name,column_name)
     where not exists(select 1 from information_schema.columns c
       where c.table_schema='public' and c.table_name=required.table_name and c.column_name=required.column_name)
@@ -179,10 +179,21 @@ create function public.queue_consultation_push_event()
 returns trigger language plpgsql security definer set search_path=public as $$
 declare recipient record;
 begin
+  -- 외부에서 들어온 문의만 알린다. 직원이 직접 적은 문의는 알리지 않는다.
+  if new.created_via is distinct from 'service_ingest' then
+    return new;
+  end if;
+  begin
+    -- 받는 사람: 실장·매니저·데스크 + 통역 Bakirova. dept 변경으로 다른 권한이 붙지 않게 직접 지정한다.
   for recipient in select user_id from public.profiles
-    where role in ('manager','chief','owner') and active=true and approved=true and account_access_status='활성' loop
+    where active=true and approved=true
+      and (role in ('chief','manager') or dept='데스크' or user_id='212cef7e-8aab-4f72-b78d-4dfca59581e0'::uuid) loop
     perform public.enqueue_push_event(format('consultation:%s:%s',new.id,recipient.user_id),recipient.user_id,'consultation_received','{}'::jsonb);
   end loop;
+  exception when others then
+    -- 알림 적재가 실패해도 문의 저장은 막지 않는다.
+    raise warning 'consultation push enqueue failed: %', sqlerrm;
+  end;
   return new;
 end; $$;
 revoke all on function public.queue_consultation_push_event() from public,anon,authenticated,service_role;

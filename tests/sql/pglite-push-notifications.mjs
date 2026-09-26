@@ -18,7 +18,7 @@ assert.doesNotMatch(draft,/set active=false/i,'live push_subscriptions has no ac
 assert.match(draft,/grant execute on function public\.claim_push_events\(uuid,integer\) to service_role/i);
 assert.doesNotMatch(draft,/grant select|grant insert|grant update|grant delete/i,'dispatcher must reach tables only through SECURITY DEFINER RPCs, not raw grants');
 
-const staff='11111111-1111-1111-1111-111111111111',chief='22222222-2222-2222-2222-222222222222',owner='33333333-3333-3333-3333-333333333333',manager='44444444-4444-4444-4444-444444444444',inactiveChief='55555555-5555-5555-5555-555555555555';
+const staff='11111111-1111-1111-1111-111111111111',chief='22222222-2222-2222-2222-222222222222',owner='33333333-3333-3333-3333-333333333333',manager='44444444-4444-4444-4444-444444444444',inactiveChief='55555555-5555-5555-5555-555555555555',desk='66666666-6666-6666-6666-666666666666',bakirova='212cef7e-8aab-4f72-b78d-4dfca59581e0';
 
 async function fresh({applyDraft=true,noticeAuthorId=true}={}){
   const db=new PGlite(),q=s=>db.query(s).then(x=>x.rows);
@@ -27,11 +27,11 @@ async function fresh({applyDraft=true,noticeAuthorId=true}={}){
     create schema auth;
     create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('app.test_uid',true),'')::uuid $$;
     grant usage on schema auth to authenticated,service_role;grant execute on function auth.uid() to authenticated,service_role;
-    create table public.profiles(user_id uuid primary key,role text not null default 'staff',active boolean not null default true,approved boolean not null default true,account_access_status text not null default '활성');
+    create table public.profiles(user_id uuid primary key,role text not null default 'staff',dept text,active boolean not null default true,approved boolean not null default true,account_access_status text not null default '활성');
     create table public.leave_requests(id bigint generated always as identity primary key,user_id uuid not null references public.profiles(user_id),status text not null default '대기');
     create table public.employee_documents(id bigint generated always as identity primary key,user_id uuid not null references public.profiles(user_id),checked_at timestamptz);
     create table public.approval_steps(id bigint generated always as identity primary key,doc_id bigint not null,seq integer not null,approver_role text not null,status text not null default '대기');
-    create table public.consultation_inbox(id uuid primary key,created_by uuid,contact text,message text not null);
+    create table public.consultation_inbox(id uuid primary key,created_by uuid,created_via text not null default 'manual',contact text,message text not null);
     create table public.push_subscriptions(id uuid primary key,user_id uuid not null references public.profiles(user_id) on delete cascade,endpoint text not null,subscription jsonb not null,created_at timestamptz not null default now(),updated_at timestamptz not null default now(),unique(user_id,endpoint));
     grant select,insert,update,delete on public.profiles,public.leave_requests,public.push_subscriptions to authenticated;
     grant usage,select on all sequences in schema public to authenticated;
@@ -40,12 +40,14 @@ async function fresh({applyDraft=true,noticeAuthorId=true}={}){
   await db.exec(noticeSchema);
   if(noticeAuthorId)await db.exec(noticeAuthorColumn);
   if(applyDraft)await db.exec(draft);
-  await q(`insert into public.profiles(user_id,role,active,approved) values
+  await q(`insert into public.profiles(user_id,role,active,approved,dept) values
     ('${staff}','staff',true,true),
     ('${chief}','chief',true,true),
     ('${owner}','owner',true,true),
     ('${manager}','manager',true,true),
-    ('${inactiveChief}','chief',false,true)`);
+    ('${inactiveChief}','chief',false,true),
+    ('${desk}','staff',true,true,'데스크'),
+    ('${bakirova}','staff',true,true,null)`);
   return {db,q};
 }
 const sub=(endpoint,p256dh='p',auth='a')=>`'${JSON.stringify({endpoint,keys:{p256dh,auth}})}'::jsonb`;
@@ -258,11 +260,13 @@ async function rollbackError(db){try{await db.exec(rollback);return null}catch(e
   assert.equal(events.length,1);assert.equal(events[0].recipient_id,staff);assert.deepEqual(events[0].payload,{});
 }finally{await db.close()}}
 
-// 14) 문의는 실제 처리 권한이 있는 manager/chief/owner만 받으며 원문은 적재하지 않는다.
+// 14) 외부 문의만 실장·매니저·데스크·지정 통역에게 쌓고 직원 입력은 알리지 않는다.
 {const {db,q}=await fresh();try{
   await q("insert into public.consultation_inbox(id,contact,message) values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','010-1234-5678','환자 문의 원문')");
+  assert.equal((await q("select count(*)::int n from public.push_events where event_type='consultation_received'")).at(0).n,0,'직원 수기 문의는 알림 제외');
+  await q("insert into public.consultation_inbox(id,created_via,contact,message) values ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','service_ingest','010-1234-5678','외부 문의 원문')");
   const events=await q("select recipient_id,payload from public.push_events where event_type='consultation_received' order by recipient_id");
-  assert.deepEqual(events.map(r=>r.recipient_id).sort(),[manager,chief,owner].sort());
+  assert.deepEqual(events.map(r=>r.recipient_id).sort(),[manager,chief,desk,bakirova].sort());
   assert.ok(events.every(r=>JSON.stringify(r.payload)==='{}'));
   await q('set role authenticated');
   await assert.rejects(q('select public.queue_consultation_push_event()'),/permission denied|trigger functions can only be called as triggers/i);

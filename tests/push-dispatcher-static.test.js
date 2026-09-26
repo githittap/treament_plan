@@ -69,6 +69,16 @@ test('Leave-request outbox targets chief+owner on submit and the requester on st
   assert.doesNotMatch(draft, /new\.reason|new\.special_reason|new\.contact/i, '연차 사유 등 개인정보는 payload에 담지 않는다');
 });
 
+test('Consultation push matches the live external-only recipients and does not alter the one-shot guard', () => {
+  const fn = draft.match(/create function public\.queue_consultation_push_event\(\)[\s\S]*?end; \$\$;/i)?.[0];
+  assert.ok(fn, '문의 push trigger function이 있어야 한다');
+  assert.match(fn, /new\.created_via is distinct from 'service_ingest'/);
+  assert.match(fn, /role in \('chief','manager'\) or dept='데스크'/);
+  assert.match(fn, /212cef7e-8aab-4f72-b78d-4dfca59581e0/);
+  assert.match(fn, /exception when others then[\s\S]*raise warning/);
+  assert.match(draft, /migration object collision; preserve state and stop/);
+});
+
 test('Migration is fail-closed on both apply and rollback', () => {
   assert.match(draft, /migration object collision; preserve state and stop/);
   assert.match(rollback, /preserve data and stop rollback/);
