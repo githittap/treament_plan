@@ -74,6 +74,48 @@ test('missing afterprint falls back on focus after the print dialog closes', () 
   assert.deepEqual(h.scheduleDetails.map(detail => detail.open), [false, true]);
 });
 
+test('beforeprint syncs selected print labels from the live checkbox state', () => {
+  const labels = [true, false].map(checked => {
+    const classes = new Set();
+    return { checked, classes, classList: { toggle: (name, on) => on ? classes.add(name) : classes.delete(name) }, querySelector: () => ({ checked }) };
+  });
+  const detail = { open: false, querySelectorAll: selector => { assert.equal(selector, '.schedule-check'); return labels; } };
+  const h = schedulePrintHarness([detail]);
+  h.dispatch('beforeprint');
+  assert.equal(labels[0].classes.has('schedule-selected'), true);
+  assert.equal(labels[1].classes.has('schedule-selected'), false);
+});
+
+test('schedule cells mark selected names and keep empty and leave summaries', () => {
+  const start = hr.indexOf('function scheduleRoleCell(');
+  const end = hr.indexOf('\nasync function toggleScheduleRoleMember', start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const context = {
+    scheduleDayForDate: () => 1,
+    scheduleRolePeople: (_role, people) => people,
+    scheduleRoleColor: () => 'role-dr',
+    schedulePersonLabel: person => person.name,
+    esc: value => String(value),
+    leaveDisplayText: value => value
+  };
+  vm.runInNewContext(`${hr.slice(start, end)};this.render=scheduleRoleCell;`, context);
+  const people = [
+    { id: 1, name: '가상 Dr 정원장', department: 'Dr.', active: true, included_in_schedule: true },
+    { id: 2, name: '가상 미선택 Dr', department: 'Dr.', active: true, included_in_schedule: true }
+  ];
+  const rows = [{ person_id: 1, week_start: '2026-09-21', day: 1, shift: 'work' }];
+  const markup = context.render('Dr.', '2026-09-21', '2026-09-21', people, rows, {}, true);
+  assert.match(markup, /schedule-check role-dr schedule-selected/);
+  assert.match(markup, /가상 Dr 정원장/);
+  assert.match(markup, /가상 미선택 Dr/);
+  assert.match(markup, /Dr\. · 1명/);
+  const empty = context.render('Dr.', '2026-09-21', '2026-09-21', people, [], {}, true);
+  assert.match(empty, /Dr\. · 0명/);
+  assert.doesNotMatch(empty, /schedule-selected/);
+  assert.match(context.render('연차·반차', '2026-09-21', '2026-09-21', [], [], { fixture: { date: '2026-09-21', label: '연차' } }, true), /schedule-leave-list">연차/);
+});
+
 test('calendar printing does not expand schedule details', () => {
   const h = schedulePrintHarness();
   h.api.printCalendar();
@@ -107,6 +149,9 @@ test('monthly and weekly schedule renders expose PDF and print actions with whol
   assert.match(hr, /schedule-actions[\s\S]*printSchedule\('print'\)/);
   assert.match(hr, /schedule-printing[\s\S]*overflow:\s*visible/);
   assert.match(hr, /schedule-week-block[\s\S]*page-break-inside:\s*avoid/);
+  assert.match(hr, /schedule-check:not\(\.schedule-selected\)\{display:none!important\}/);
+  assert.match(hr, /schedule-check input\{display:none!important\}/);
+  assert.match(hr, /schedule-check-list\{display:contents!important/);
   assert.match(hr, /@page\s*\{[^}]*size:\s*A4\s+landscape/);
   assert.doesNotMatch(hr.slice(0, hr.indexOf('</head>')), /@page\s*\{[^}]*size:\s*A4\s+landscape/);
   assert.match(hr, /schedule-printing[\s\S]*createElement\(['"]style['"]\)/);
