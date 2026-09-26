@@ -103,6 +103,16 @@ test('재직증명서는 최종 승인 후 보관된 발급본을 열도록 안�
   assert.match(html, /downloadEmploymentCertificate\(\)/);
 });
 
+test('재직증명서는 흰 단일 A4 인쇄용 여백을 적용하고 기존 직인 참조를 재사용한다', () => {
+  assert.match(html, /@page employment-certificate\{size:A4 portrait;margin:12mm\}/);
+  assert.match(html, /body\.certificate-printing\{background:#fff!important;color:#111!important\}/);
+  assert.match(html, /#certificateBody>div\{padding:0!important;min-height:0!important;line-height:1\.5!important/);
+  assert.match(html, /#certificateBody>div p:nth-of-type\(5\)\{margin-top:8mm!important\}/);
+  assert.equal((html.match(/const CLINIC_SEAL=/g)||[]).length, 1);
+  assert.match(html, /body\.certificate-printing #certificateBody>div img\{max-width:96px!important/);
+  assert.match(html, /function printEmploymentCertificate\(\)\{document\.body\.classList\.add\('certificate-printing'\)/);
+});
+
 test('계정·Notion 체크는 통합 서류함 뒤쪽에 렌더링된다', () => {
   const onbo = html.match(/async function renderOnbo\(m\)\{([\s\S]*?)\r?\n}\r?\nfunction onboardingChecklistCard/);
   assert.ok(onbo);

@@ -7,9 +7,13 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'hr.html'), 'utf8');
 const schedule = html.match(/\/\* ── 근무표\(M2\) ── \*\/[\s\S]*?\/\* 엑셀 파싱 \*\//)?.[0] || '';
 
 test('ZIP 근무표는 개인별 날짜 select가 아니라 직무 행·셀 체크박스 구조다', () => {
-  for (const role of ['Dr.', '진료실', '데스크', '기공·행정', '상담', '야간', 'OFF', '연차·반차']) {
+  for (const role of ['Dr.', '야간', 'OFF', '연차·반차']) {
     assert.match(schedule, new RegExp(role.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
+  for (const label of ['진료·상담', '소독·행정', '기공', '데스크']) {
+    assert.match(html, new RegExp(`label: '${label}'`));
+  }
+  assert.match(schedule, /EMPLOYEE_JOB_GROUPS\.map\(group=>group\.label\)/);
   assert.match(schedule, /scheduleRoleCell/);
   assert.match(schedule, /type="checkbox"/);
   assert.doesNotMatch(schedule, /data-person-id=.*<select/);

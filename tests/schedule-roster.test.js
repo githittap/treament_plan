@@ -499,12 +499,12 @@ test('근무표 연차 조회 오류는 대상과 escape된 메시지만 표시�
 function scheduleMonthRenderHarness({ role = 'staff', leaveRows = [] } = {}) {
   const source = html.match(/async function renderScheduleMonth\([\s\S]*?\r?\n\}\r?\nasync function applyScheduleShift/);
   assert.ok(source, 'renderScheduleMonth 함수를 찾을 수 없습니다.');
-  const helpers = [html.match(/function scheduleMonthWeeks[\s\S]*?\n\}/)?.[0], html.match(/function scheduleShiftOptions[\s\S]*?\n\}/)?.[0], html.match(/function syncScheduleCellValues[\s\S]*?\n\}/)?.[0], html.match(/function scheduleRolePeople[\s\S]*?\n\}/)?.[0], html.match(/function scheduleRoleColor[\s\S]*?\n\}/)?.[0], html.match(/function scheduleRoleCell[\s\S]*?\n\}/)?.[0], html.match(/async function toggleScheduleRoleMember[\s\S]*?\n\}/)?.[0], html.match(/function scheduleMobileRoleDays[\s\S]*?\n\}/)?.[0]].filter(Boolean).join('\n');
+  const helpers = [html.match(/const EMPLOYEE_JOB_GROUPS = \[[\s\S]*?\n\];/)?.[0], html.match(/function employeeJobGroupModel\([\s\S]*?\n\}/)?.[0], html.match(/function scheduleRoleGroupModel\([\s\S]*?\n\}/)?.[0], html.match(/function scheduleHasUnassignedRole\([\s\S]*?\n\}/)?.[0], html.match(/function scheduleMonthWeeks[\s\S]*?\n\}/)?.[0], html.match(/function scheduleShiftOptions[\s\S]*?\n\}/)?.[0], html.match(/function syncScheduleCellValues[\s\S]*?\n\}/)?.[0], html.match(/function scheduleRolePeople[\s\S]*?\n\}/)?.[0], html.match(/function scheduleRoleColor[\s\S]*?\n\}/)?.[0], html.match(/function scheduleRoleCell[\s\S]*?\n\}/)?.[0], html.match(/async function toggleScheduleRoleMember[\s\S]*?\n\}/)?.[0], html.match(/function scheduleMobileRoleDays[\s\S]*?\n\}/)?.[0]].filter(Boolean).join('\n');
   const m = { innerHTML: '' };
   const rows = [{ person_id: 'person-1', user_id: 'user-1', week_start: '2028-01-31', day: 2, shift: 'evening' }, { person_id: 'evening-1', user_id: 'user-2', week_start: '2028-01-31', day: 2, shift: 'evening' }, { person_id: 'work-1', user_id: 'user-3', week_start: '2028-01-31', day: 2, shift: 'work' }, { person_id: 'guest-1', user_id: null, week_start: '2028-02-21', day: 4, shift: 'evening' }, { person_id: 'old-1', user_id: null, week_start: '2028-01-31', day: 2, shift: 'evening' }];
   const weekRows = [{ week_start: '2028-01-31', status: '초안' }, { week_start: '2028-02-07', status: '공표' }, { week_start: '2028-02-14', status: '초안' }, { week_start: '2028-02-21', status: '공표' }, { week_start: '2028-02-28', status: '초안' }];
   const context = {
-    SCHED_MONTH: '2028-02', SCHED_VIEW: 'month', SCHEDULE_STATUS_OVERRIDES: {}, SCHEDULE_WRITE_SEQ: {}, SCHEDULE_WRITE_TAIL: {}, SCHEDULE_CELL_VALUES: {}, SCHEDULE_ROLE_WRITE_SEQ: {}, SCHEDULE_ROLE_WRITE_TAIL: {}, SCHEDULE_PEOPLE: [{ id: 'person-1', profile_user_id: 'user-1', name: '직원', department: '진료실', active: true, included_in_schedule: true }, { id: 'evening-1', profile_user_id: 'user-2', name: '저녁 직원', department: '진료실', active: true, included_in_schedule: true }, { id: 'work-1', profile_user_id: 'user-3', name: '주간 직원', department: '데스크', active: true, included_in_schedule: true }, { id: 'guest-1', profile_user_id: null, name: 'Dr 비로그인', department: 'Dr.', active: true, included_in_schedule: true }, { id: 'old-1', profile_user_id: null, name: '과거 직원', department: '진료실', active: false, included_in_schedule: false }],
+    SCHED_MONTH: '2028-02', SCHED_VIEW: 'month', EMPLOYEE_JOB_GROUPS: null, PROFILES: [{ user_id: 'user-1', job_group: 'clinical_consult' }, { user_id: 'user-2', job_group: 'clinical_consult' }, { user_id: 'user-3', job_group: 'desk' }], SCHEDULE_STATUS_OVERRIDES: {}, SCHEDULE_WRITE_SEQ: {}, SCHEDULE_WRITE_TAIL: {}, SCHEDULE_CELL_VALUES: {}, SCHEDULE_ROLE_WRITE_SEQ: {}, SCHEDULE_ROLE_WRITE_TAIL: {}, SCHEDULE_PEOPLE: [{ id: 'person-1', profile_user_id: 'user-1', name: '직원', department: '진료실', active: true, included_in_schedule: true }, { id: 'evening-1', profile_user_id: 'user-2', name: '저녁 직원', department: '진료실', active: true, included_in_schedule: true }, { id: 'work-1', profile_user_id: 'user-3', name: '주간 직원', department: '데스크', active: true, included_in_schedule: true }, { id: 'guest-1', profile_user_id: null, name: 'Dr 비로그인', department: 'Dr.', active: true, included_in_schedule: true }, { id: 'old-1', profile_user_id: null, name: '과거 직원', department: '진료실', active: false, included_in_schedule: false }],
     SHIFTS: { work: { l: '근무' }, off: { l: 'off' }, evening: { l: '야간' }, etc: { l: '기타' } },
     today: () => '2028-02-15', md: value => value.slice(5), mondayStr: value => { const d = new Date(value+'T00:00:00'); const g=d.getDay(); d.setDate(d.getDate()+(g===0?-6:1-g)); return d.toISOString().slice(0,10); },
     addDays: (value,n) => { const d=new Date(value+'T00:00:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); },
@@ -515,7 +515,7 @@ function scheduleMonthRenderHarness({ role = 'staff', leaveRows = [] } = {}) {
     sb: { from(table) { const result = table==='schedules'?{data:rows,error:null}:table==='schedule_weeks'?{data:weekRows,error:null}:{data:leaveRows,error:null}; const builder={select(){return builder;},in(){return builder;},eq(){return builder;},lte(){return builder;},gte(){return builder;},then(resolve){return Promise.resolve(resolve(result));}}; return builder; } }
   };
   vm.createContext(context);
-  vm.runInContext(`${helpers}\n${source[0].replace(/\nasync function applyScheduleShift$/, '')};this.renderScheduleMonth=renderScheduleMonth;this.syncScheduleCellValues=syncScheduleCellValues;this.scheduleRoleCell=scheduleRoleCell;this.toggleScheduleRoleMember=toggleScheduleRoleMember;`, context);
+  vm.runInContext(`${helpers}\n${source[0].replace(/\nasync function applyScheduleShift$/, '')};this.renderScheduleMonth=renderScheduleMonth;this.syncScheduleCellValues=syncScheduleCellValues;this.scheduleRoleCell=scheduleRoleCell;this.scheduleRolePeople=scheduleRolePeople;this.scheduleRoleGroupModel=scheduleRoleGroupModel;this.toggleScheduleRoleMember=toggleScheduleRoleMember;`, context);
   return { context, m };
 }
 
@@ -527,7 +527,9 @@ test('월간 렌더는 윤년 월경계·비로그인 Dr 저장키와 혼합 공
   assert.match(m.innerHTML, /2028-02/);
   assert.match(m.innerHTML, /schedule-role-table/);
   assert.match(m.innerHTML, /schedule-mobile-days/);
-  assert.match(m.innerHTML, /Dr\.|진료실|야간|연차·반차/);
+  assert.match(m.innerHTML, /Dr\.|진료·상담|소독·행정|기공|데스크|야간|연차·반차/);
+  const roleLabels = [...m.innerHTML.matchAll(/<th class="schedule-role-label">([^<]+)<\/th>/g)].map(match => match[1]);
+  assert.deepEqual(roleLabels.slice(0, 5), ['Dr.', '진료·상담', '소독·행정', '기공', '데스크']);
   assert.match(m.innerHTML, /type="checkbox"/);
   assert.match(m.innerHTML, /2028-02/);
   context.syncScheduleCellValues(context.serverRows, ['2028-01-31']);
@@ -541,9 +543,9 @@ test('월간 렌더는 윤년 월경계·비로그인 Dr 저장키와 혼합 공
 test('직무 셀은 다일 연차를 날짜별로 잠그고 evening을 원직무와 야간에 함께 표시한다', () => {
   const { context } = scheduleMonthRenderHarness();
   const leave = { 'user-1|person-1|2028-02-01': { date: '2028-02-01', label: '연차' }, 'user-1|person-1|2028-02-02': { date: '2028-02-02', label: '연차' } };
-  const leaveCell = context.scheduleRoleCell('진료실', '2028-01-31', '2028-02-01', context.SCHEDULE_PEOPLE, context.serverRows, leave, true);
-  const workCell = context.scheduleRoleCell('진료실', '2028-01-31', '2028-02-03', context.SCHEDULE_PEOPLE, context.serverRows, leave, true);
-  const normalCell = context.scheduleRoleCell('진료실', '2028-01-31', '2028-02-01', context.SCHEDULE_PEOPLE, context.serverRows, leave, true);
+  const leaveCell = context.scheduleRoleCell('진료·상담', '2028-01-31', '2028-02-01', context.SCHEDULE_PEOPLE, context.serverRows, leave, true);
+  const workCell = context.scheduleRoleCell('진료·상담', '2028-01-31', '2028-02-03', context.SCHEDULE_PEOPLE, context.serverRows, leave, true);
+  const normalCell = context.scheduleRoleCell('진료·상담', '2028-01-31', '2028-02-01', context.SCHEDULE_PEOPLE, context.serverRows, leave, true);
   const nightCell = context.scheduleRoleCell('야간', '2028-01-31', '2028-02-01', context.SCHEDULE_PEOPLE, context.serverRows, leave, true);
   assert.match(leaveCell, /<input type="checkbox" checked disabled [^>]*><span>직원/);
   assert.doesNotMatch(workCell, /disabled/);
@@ -554,6 +556,18 @@ test('직무 셀은 다일 연차를 날짜별로 잠그고 evening을 원직무
   assert.match(nightCell, /<input type="checkbox" checked disabled [^>]*><span>과거 직원/);
 });
 
+test('근무표 역할은 프로필 확정 분류를 우선하고 명확한 옛 부서만 호환 매핑한다', () => {
+  const { context } = scheduleMonthRenderHarness();
+  const people = [
+    { id: 'profile-wins', profile_user_id: 'user-3', name: '프로필우선', department: '진료실', active: true },
+    { id: 'legacy-consult', profile_user_id: null, name: '상담기존', department: '상담', active: true },
+    { id: 'unknown', profile_user_id: null, name: '미분류', department: '기타', active: true }
+  ];
+  assert.equal(context.scheduleRolePeople('데스크', people, [], '2028-01-31', 1)[0].id, 'profile-wins');
+  assert.equal(context.scheduleRolePeople('진료·상담', people, [], '2028-01-31', 1)[0].id, 'legacy-consult');
+  assert.equal(context.scheduleRolePeople('미지정', people, [], '2028-01-31', 1)[0].id, 'unknown');
+});
+
 test('직무 토글은 야간 해제 시 work를 보존하고 실패 복원·빠른 연속 선택을 보호한다', async () => {
   const { context } = scheduleMonthRenderHarness();
   const calls = [], statuses = []; let shouldFail = false, renders = 0;
@@ -562,7 +576,7 @@ test('직무 토글은 야간 해제 시 work를 보존하고 실패 복원·빠
   await context.toggleScheduleRoleMember('야간', 'person-1', 'user-1', '2028-02-01', false, { checked: true });
   assert.equal(calls[0][4], 'work');
   shouldFail = true; const input = { checked: false };
-  const failure = await context.toggleScheduleRoleMember('진료실', 'person-1', 'user-1', '2028-02-03', false, input);
+  const failure = await context.toggleScheduleRoleMember('진료·상담', 'person-1', 'user-1', '2028-02-03', false, input);
   assert.equal(failure, false); assert.equal(input.checked, true); assert.equal(statuses.at(-1), 'error');
   shouldFail = false; calls.length = 0; renders = 0;
   await Promise.all([
