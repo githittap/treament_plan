@@ -36,7 +36,9 @@ try {
       ('${id(203)}','비로그인 행정','행정'), ('${id(204)}','비로그인 기공실','기공실'),
       ('${id(205)}','비로그인 데스크','데스크'), ('${id(206)}','비로그인 Dr','Dr.'),
       ('${id(207)}','비로그인 미등록','기타'), ('${id(208)}','비로그인 미지정','미지정'),
-      ('${id(209)}','김수연','미지정');
+      ('${id(209)}','김수연','미지정'),
+      ('${id(210)}','김지윤','진료실'), ('${id(211)}','유혜민','기공실'),
+      ('${id(212)}','bakirova',NULL), ('${id(213)}','마주옥',''), ('${id(214)}','임은숙','미지정');
     CREATE TABLE public.schedules(person_id uuid,week_start date,day integer,shift text);
     INSERT INTO public.schedules VALUES ('${id(101)}','2026-09-21',1,'work');
   `);
@@ -51,7 +53,8 @@ try {
   assert.deepEqual(scheduleGroups.map(row => row.job_group), [
     null, null, null, null,
     'clinical_consult', 'clinical_consult', 'sterilization_admin', 'lab',
-    'desk', null, null, null, null,
+    'desk', null, null, null, null, null, null, 'desk',
+    'clinical_consult', 'clinical_consult',
   ]);
   assert.deepEqual(await query(`SELECT name,job_group FROM public.profiles WHERE user_id IN ('${id(1)}','${id(2)}','${id(3)}','${id(4)}','${id(5)}','${id(6)}') ORDER BY user_id`), [
     { name: '권은영', job_group: 'clinical_consult' },
@@ -65,13 +68,20 @@ try {
     { name: 'bakirova', profile_user_id: null, job_group: 'desk' },
     { name: '김나현', profile_user_id: null, job_group: 'lab' },
     { name: '김수연', profile_user_id: id(3), job_group: null },
-    { name: '김지윤', profile_user_id: id(4), job_group: null },
+    { name: '김지윤', profile_user_id: null, job_group: null },
     { name: '마주옥', profile_user_id: null, job_group: 'clinical_consult' },
     { name: '오진주', profile_user_id: null, job_group: 'clinical_consult' },
-    { name: '유혜민', profile_user_id: null, job_group: 'desk' },
+    { name: '유혜민', profile_user_id: null, job_group: null },
     { name: '이소연', profile_user_id: null, job_group: 'sterilization_admin' },
     { name: '임은숙', profile_user_id: null, job_group: 'clinical_consult' },
   ], 'the fixed roster includes unlinked names without creating profiles and reuses a unique matching profile');
+  assert.deepEqual(await query(`SELECT id::text,name,department,profile_user_id::text,job_group FROM public.schedule_people WHERE id IN ('${id(210)}','${id(211)}','${id(212)}','${id(213)}','${id(214)}') ORDER BY id`), [
+    { id: id(210), name: '김지윤', department: '진료실', profile_user_id: null, job_group: null },
+    { id: id(211), name: '유혜민', department: '기공실', profile_user_id: null, job_group: null },
+    { id: id(212), name: 'bakirova', department: null, profile_user_id: null, job_group: 'desk' },
+    { id: id(213), name: '마주옥', department: '', profile_user_id: null, job_group: 'clinical_consult' },
+    { id: id(214), name: '임은숙', department: '미지정', profile_user_id: null, job_group: 'clinical_consult' },
+  ], 'manual department classifications stay unlinked while null, blank, and unspecified rows receive the confirmed group');
   assert.equal((await query(`SELECT count(*)::int n FROM public.schedule_people WHERE name='김수란'`))[0].n, 2,
     'ambiguous duplicate profiles do not create a third same-name roster row');
   assert.deepEqual(await query(`SELECT person_id::text,week_start::text,day,shift FROM public.schedules`), [
@@ -109,6 +119,14 @@ try {
     'a later confirmed-name seed does not overwrite a previously changed unlinked group');
   assert.equal((await query(`SELECT count(*)::int n FROM public.schedule_people WHERE name='김지윤'`))[0].n, 1,
     'a rerun does not duplicate a canonical roster name');
+  assert.deepEqual(await query(`SELECT id::text,name,department,profile_user_id::text,job_group FROM public.schedule_people WHERE id IN ('${id(210)}','${id(211)}') ORDER BY id`), [
+    { id: id(210), name: '김지윤', department: '진료실', profile_user_id: null, job_group: null },
+    { id: id(211), name: '유혜민', department: '기공실', profile_user_id: null, job_group: null },
+  ], 'a rerun preserves the source classifications and unlinked state of existing manual rows');
+  assert.deepEqual(await query(`SELECT name,count(*)::int AS count FROM public.schedule_people WHERE name IN ('김지윤','유혜민') GROUP BY name ORDER BY name`), [
+    { name: '김지윤', count: 1 },
+    { name: '유혜민', count: 1 },
+  ], 'a rerun does not add same-name rows beside existing manual classifications');
   assert.deepEqual(await query(`SELECT person_id::text,week_start::text,day,shift FROM public.schedules`), [
     { person_id: id(101), week_start: '2026-09-21', day: 1, shift: 'work' },
   ], 'a rerun preserves historical schedule rows');

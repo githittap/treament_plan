@@ -122,7 +122,13 @@ BEGIN
         INTO v_roster_id, v_roster_profile, v_roster_group
         FROM public.schedule_people sp WHERE sp.name = v_name;
 
-        IF v_roster_profile IS NULL AND (v_roster_group IS NULL OR v_roster_group = v_group) THEN
+        IF v_roster_profile IS NULL
+          AND (v_roster_group IS NULL OR v_roster_group = v_group)
+          AND (EXISTS (
+            SELECT 1 FROM public.schedule_people sp
+            WHERE sp.id = v_roster_id
+              AND (sp.department IS NULL OR btrim(sp.department) = '' OR sp.department = '미지정')
+          )) THEN
           UPDATE public.schedule_people sp
           SET profile_user_id = v_profile_id, job_group = NULL
           WHERE sp.id = v_roster_id AND sp.profile_user_id IS NULL;
@@ -138,7 +144,12 @@ BEGIN
         INTO v_roster_id, v_roster_profile, v_roster_group
         FROM public.schedule_people sp WHERE sp.name = v_name;
 
-        IF v_roster_profile IS NULL AND v_roster_group IS NULL THEN
+        IF v_roster_profile IS NULL AND v_roster_group IS NULL
+          AND EXISTS (
+            SELECT 1 FROM public.schedule_people sp
+            WHERE sp.id = v_roster_id
+              AND (sp.department IS NULL OR btrim(sp.department) = '' OR sp.department = '미지정')
+          ) THEN
           UPDATE public.schedule_people sp
           SET job_group = v_group
           WHERE sp.id = v_roster_id AND sp.profile_user_id IS NULL AND sp.job_group IS NULL;
