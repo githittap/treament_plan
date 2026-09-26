@@ -12,6 +12,7 @@ const owner='33333333-3333-3333-3333-333333333333';
 const chief='77777777-7777-7777-7777-777777777777';
 const staff='11111111-1111-1111-1111-111111111111';
 const other='22222222-2222-2222-2222-222222222222';
+const syntheticSeal='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jVRcAAAAASUVORK5CYII=';
 const as=async id=>{await q('set role authenticated');await q(`select set_config('app.test_uid','${id}',false)`);};
 try{
   await db.exec(`create role anon;create role authenticated;create schema auth;
@@ -34,7 +35,25 @@ try{
   await db.exec(fs.readFileSync('db/employment_certificate_draft.sql','utf8'));
   assert.equal((await q(`select public.employment_certificate_escape('<script>&"') value`))[0].value,'&lt;script&gt;&amp;&quot;');
   await as(staff);
+  await assert.rejects(q('select seal_key from employee_hub_private.employment_certificate_seals'),/permission denied/);
   await assert.rejects(q('select * from public.issue_employment_certificate(1)'),/owner approval required/);
+  await as(owner);
+  await assert.rejects(q('select * from public.issue_employment_certificate(1)'),/employment certificate seal not configured/);
+  assert.equal((await q('select status from public.approval_docs where id=1'))[0].status,'진행');
+  assert.equal((await q("select status from public.approval_steps where doc_id=1 and approver_role='owner'"))[0].status,'대기');
+  assert.equal((await q('select count(*)::int n from public.employment_certificates'))[0].n,0);
+  await q('reset role');
+  await q(`insert into employee_hub_private.employment_certificate_seals(seal_key,image_png)
+    values('official',decode('${syntheticSeal}','base64'))`);
+  await assert.rejects(q(`insert into employee_hub_private.employment_certificate_seals(seal_key,image_png)
+    values('invalid',decode('${syntheticSeal}','base64'))`),/check constraint/);
+  await q(`update employee_hub_private.employment_certificate_seals
+    set image_png=decode('89504e470d0a1a0a'||repeat('00',204792),'hex') where seal_key='official'`);
+  assert.equal((await q('select octet_length(image_png)::int n from employee_hub_private.employment_certificate_seals'))[0].n,204800);
+  await assert.rejects(q(`update employee_hub_private.employment_certificate_seals
+    set image_png=decode('89504e470d0a1a0a'||repeat('00',204793),'hex') where seal_key='official'`),/check constraint/);
+  await q(`update employee_hub_private.employment_certificate_seals
+    set image_png=decode('${syntheticSeal}','base64') where seal_key='official'`);
   await as(owner);
   let row=(await q('select * from public.issue_employment_certificate(1)'))[0];
   assert.equal(row.employee_name,'합성직원');assert.equal(row.department,'진료');
@@ -44,8 +63,11 @@ try{
   assert.match(row.issued_html,/2024-01-05/);
   assert.match(row.issued_html,/대표자[：:]?\s*정용태/);
   assert.match(row.issued_html,/충청남도 아산시 온천대로 1065, 이안빌딩 4층 401~403호/);
-  assert.doesNotMatch(row.issued_html,/<img|data:image|storage|C:\\Users/i,
-    'the public SQL draft does not embed seal bytes, a storage object path, or a local filesystem path');
+  const sealUri=row.issued_html.match(/src="(data:image\/png;base64,[^"]+)"/)?.[1];
+  assert.equal(sealUri,`data:image/png;base64,${syntheticSeal}`);
+  assert.doesNotMatch(sealUri,/\s/,'embedded data URI must not contain PostgreSQL base64 line breaks');
+  assert.doesNotMatch(row.issued_html,/C:\\Users|도장_정용태\.png/i,
+    'the public SQL draft does not contain a local asset path');
   const originalHtml=row.issued_html;
   assert.equal((await q('select status from public.approval_docs where id=1'))[0].status,'완결');
   assert.equal((await q('select count(*)::int n from public.employment_certificates'))[0].n,1);
@@ -53,6 +75,12 @@ try{
   assert.equal((await q('select count(*)::int n from public.employment_certificates'))[0].n,1);
   assert.equal((await q('select issued_html from public.employment_certificates'))[0].issued_html,originalHtml);
   await q('reset role');
+  await q("delete from employee_hub_private.employment_certificate_seals where seal_key='official'");
+  await as(owner);
+  assert.equal((await q('select issued_html from public.issue_employment_certificate(1)'))[0].issued_html,originalHtml);
+  await q('reset role');
+  await q(`insert into employee_hub_private.employment_certificate_seals(seal_key,image_png)
+    values('official',decode('${syntheticSeal}','base64'))`);
   await q("update public.profiles set name='변경된이름',hire_date='2025-01-01' where user_id='"+staff+"'");
   await as(staff);
   assert.equal((await q('select employee_name from public.employment_certificates'))[0].employee_name,'합성직원');
@@ -69,5 +97,5 @@ try{
   await as(owner);
   await assert.rejects(q('select * from public.issue_employment_certificate(2)'),/verified current employment data required/);
   assert.equal((await q('select status from public.approval_docs where id=2'))[0].status,'진행');
-  console.log('PGLITE_EMPLOYMENT_CERTIFICATE_PASS: 승인·스냅샷·멱등·누락·열람권한');
+  console.log('PGLITE_EMPLOYMENT_CERTIFICATE_PASS: 승인·스냅샷·직인 내장·누락 무변경·멱등·불변·자산 권한·열람권한');
 }finally{await db.close();}

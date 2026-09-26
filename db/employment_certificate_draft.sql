@@ -1,5 +1,19 @@
 -- 로컬 초안. 운영 적용 전 승인·프로필 스키마를 확인한다.
 -- 발급본은 결재 완료 시점의 확인된 프로필 필드만 보관한다.
+create schema if not exists employee_hub_private;
+revoke all on schema employee_hub_private from public,anon,authenticated;
+create table if not exists employee_hub_private.employment_certificate_seals (
+  seal_key text primary key check (seal_key='official'),
+  image_png bytea not null,
+  updated_at timestamptz not null default now(),
+  constraint employment_certificate_seals_png_size_check
+    check (octet_length(image_png) between 8 and 204800),
+  constraint employment_certificate_seals_png_signature_check
+    check (substring(image_png from 1 for 8)=decode('89504e470d0a1a0a','hex'))
+);
+alter table employee_hub_private.employment_certificate_seals enable row level security;
+revoke all on employee_hub_private.employment_certificate_seals from public,anon,authenticated;
+
 create table if not exists public.employment_certificates (
   id bigint generated always as identity primary key,
   approval_doc_id bigint not null unique references public.approval_docs(id),
@@ -37,6 +51,7 @@ declare
   p public.profiles%rowtype;
   certificate public.employment_certificates%rowtype;
   owner_step_id bigint;
+  seal_png bytea;
   issued_date date;
   issued_html text;
 begin
@@ -71,16 +86,25 @@ begin
      or p.hire_date is null or p.hire_date>(now() at time zone 'Asia/Seoul')::date then
     raise exception 'verified current employment data required';
   end if;
+  select image_png into seal_png
+    from employee_hub_private.employment_certificate_seals where seal_key='official';
+  if not found or seal_png is null
+     or octet_length(seal_png) not between 8 and 204800
+     or substring(seal_png from 1 for 8)<>decode('89504e470d0a1a0a','hex') then
+    raise exception 'employment certificate seal not configured';
+  end if;
   update public.approval_steps set status='승인',approver_id=auth.uid(),
     stamp=(select name from public.profiles where user_id=auth.uid()),acted_at=now()
     where id=owner_step_id;
   update public.approval_docs set status='완결' where id=p_doc_id;
   issued_date:=(now() at time zone 'Asia/Seoul')::date;
   issued_html:=pg_catalog.format(
-    '<div style="background:#fff;color:#111;padding:18mm;min-height:240mm;line-height:1.8"><h1 style="text-align:center;margin:12mm 0 24mm">재 직 증 명 서</h1><table style="width:100%%;border-collapse:collapse"><tr><th style="border:1px solid #111;padding:8px;width:25%%">성명</th><td style="border:1px solid #111;padding:8px">%s</td></tr><tr><th style="border:1px solid #111;padding:8px">소속</th><td style="border:1px solid #111;padding:8px">%s</td></tr><tr><th style="border:1px solid #111;padding:8px">입사일</th><td style="border:1px solid #111;padding:8px">%s</td></tr><tr><th style="border:1px solid #111;padding:8px">재직 확인일</th><td style="border:1px solid #111;padding:8px">%s</td></tr></table><p style="margin-top:24mm;text-align:center">위 사람은 발급일 현재 재직 중임을 확인합니다.</p><p style="margin-top:22mm;text-align:center">대표자: 정용태</p><p style="margin-top:8mm;text-align:center">충청남도 아산시 온천대로 1065, 이안빌딩 4층 401~403호</p><p style="margin-top:14mm;text-align:right">아산정플란트치과의원</p><p style="margin-top:20mm;font-size:11px">결재문서 %s</p></div>',
+    '<div style="background:#fff;color:#111;padding:18mm;min-height:240mm;line-height:1.8"><h1 style="text-align:center;margin:12mm 0 24mm">재 직 증 명 서</h1><table style="width:100%%;border-collapse:collapse"><tr><th style="border:1px solid #111;padding:8px;width:25%%">성명</th><td style="border:1px solid #111;padding:8px">%s</td></tr><tr><th style="border:1px solid #111;padding:8px">소속</th><td style="border:1px solid #111;padding:8px">%s</td></tr><tr><th style="border:1px solid #111;padding:8px">입사일</th><td style="border:1px solid #111;padding:8px">%s</td></tr><tr><th style="border:1px solid #111;padding:8px">재직 확인일</th><td style="border:1px solid #111;padding:8px">%s</td></tr></table><p style="margin-top:24mm;text-align:center">위 사람은 발급일 현재 재직 중임을 확인합니다.</p><p style="margin-top:22mm;text-align:center">대표자: 정용태</p><p style="text-align:center"><img alt="아산정플란트치과 직인" src="data:image/png;base64,%s" style="width:96px;height:auto;object-fit:contain"></p><p style="margin-top:8mm;text-align:center">충청남도 아산시 온천대로 1065, 이안빌딩 4층 401~403호</p><p style="margin-top:14mm;text-align:right">아산정플란트치과의원</p><p style="margin-top:20mm;font-size:11px">결재문서 %s</p></div>',
     public.employment_certificate_escape(p.name),
     public.employment_certificate_escape(coalesce(nullif(pg_catalog.btrim(p.dept),''),'확인된 정보 없음')),
-    p.hire_date::text,issued_date::text,issued_date::text,p_doc_id::text
+    p.hire_date::text,issued_date::text,
+    pg_catalog.replace(pg_catalog.replace(pg_catalog.encode(seal_png,'base64'),E'\n',''),E'\r',''),
+    p_doc_id::text
   );
   insert into public.employment_certificates
     (approval_doc_id,employee_id,employee_name,department,hire_date,issued_html,issued_by)
