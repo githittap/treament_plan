@@ -137,6 +137,9 @@ if (block) {
     assert.deepEqual(JSON.parse(JSON.stringify(context.EMPLOYEE_JOB_GROUPS.map(group => group.code))), [
       'clinical_consult', 'sterilization_admin', 'lab', 'desk'
     ]);
+    assert.deepEqual(JSON.parse(JSON.stringify(context.EMPLOYEE_JOB_GROUPS.map(group => group.label))), [
+      '진료·상담', '소독·행정', '기공', '데스크'
+    ]);
     const profiles = new Map([
       ['profile-1', { job_group: 'clinical_consult' }],
       ['profile-dr', { job_group: 'desk' }]

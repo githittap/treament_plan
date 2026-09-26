@@ -42,7 +42,10 @@ try{
   assert.match(row.issued_html,/재 직 증 명 서/);
   assert.match(row.issued_html,/합성직원/);
   assert.match(row.issued_html,/2024-01-05/);
-  assert.doesNotMatch(row.issued_html,/대표자|직인|병원 주소/);
+  assert.match(row.issued_html,/대표자[：:]?\s*정용태/);
+  assert.match(row.issued_html,/충청남도 아산시 온천대로 1065, 이안빌딩 4층 401~403호/);
+  assert.doesNotMatch(row.issued_html,/<img|data:image|storage|C:\\Users/i,
+    'the public SQL draft does not embed seal bytes, a storage object path, or a local filesystem path');
   const originalHtml=row.issued_html;
   assert.equal((await q('select status from public.approval_docs where id=1'))[0].status,'완결');
   assert.equal((await q('select count(*)::int n from public.employment_certificates'))[0].n,1);
