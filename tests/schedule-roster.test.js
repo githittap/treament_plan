@@ -248,6 +248,7 @@ function authHarness({ rosterResults = [{ data: [], error: null }], settingsResu
     renderNav: () => { calls.nav++; },
     render: async () => { calls.render++; },
     refreshBadges: async () => { calls.badges++; },
+    applyInboxFirst: () => false, applyTabFromUrl: () => {}, // 2026-09-26 문의함 맨 앞(tests/inbox-first.test.js에서 따로 시험)
     loadSteps: () => {},
     setTimeout: () => 0,
     document: { addEventListener: () => { calls.listeners++; } },

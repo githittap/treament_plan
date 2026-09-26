@@ -525,6 +525,27 @@ function renderNav(){
 }
 /* menu-restructure:test-end */
 function go(k){if(k==='leavestatus'){k='calendar';CAL_VIEW='leave';}TAB=k;renderNav();render();}
+/* inbox-first:test-start */
+/* 원장 지시 2026-09-26: 데스크·실장·매니저는 허브 맨 앞에 문의함 — 위줄 첫 칸 📥 문의함 + 처음 화면 문의함.
+   데스크 = dept '데스크' + 통역 Bakirova(원장 결정 09-26 「통역은 데스크로」 — dept는 입금 열람 권한과 묶여 있어 바꾸지 않고 여기서만 더함).
+   문의 알림을 받는 사람(운영 DB 트리거 queue_consultation_push_event)과 같은 기준이다.
+   알림을 눌러 ?tab=○○ 으로 열면 그 탭을 먼저 연다(볼 수 있는 탭일 때만, 한 번 쓰고 주소에서 지움). */
+const INBOX_FIRST_EXTRA_IDS=['212cef7e-8aab-4f72-b78d-4dfca59581e0'];
+function isInboxFirstUser(){return ['chief','manager'].includes(ME.role)||ME.department==='데스크'||INBOX_FIRST_EXTRA_IDS.includes(ME.id);}
+function applyInboxFirst(){
+  const inbox=TABS.find(t=>t.key==='inbox');
+  if(!isInboxFirstUser()||!inbox||!tabVisible(inbox)||MENU.some(e=>e.kind==='tab'&&e.key==='inbox'))return false;
+  MENU.forEach(e=>{if(e.kind==='group')e.children=e.children.filter(k=>k!=='inbox');});
+  MENU.unshift({kind:'tab',key:'inbox',children:[]});
+  TAB='inbox';
+  return true;
+}
+function applyTabFromUrl(){
+  const u=new URL(location.href),k=u.searchParams.get('tab');if(!k)return;
+  const t=TABS.find(x=>x.key===k);if(t&&tabVisible(t))TAB=k;
+  u.searchParams.delete('tab');history.replaceState(null,'',u.pathname+u.search+u.hash);
+}
+/* inbox-first:test-end */
 
 /* ── 데이터 로드 ── */
 async function loadProfiles(){
@@ -2870,6 +2891,7 @@ async function onAuthed(session){
         ME.confidAccess=!!ca||ME.role==='owner';
       }catch(e){ME.confidAccess=false;} // 조회 실패 시 fail closed — 탭을 숨기는 쪽으로
       $('#meName').textContent=ME.name;$('#meRole').textContent=ME.role;
+      applyInboxFirst();applyTabFromUrl();
       renderNav();await render();await refreshBadges();
       // 결재선 표시(비동기)
       if(!_stepsClickBound){document.addEventListener('click',()=>setTimeout(loadSteps,300));_stepsClickBound=true;}
