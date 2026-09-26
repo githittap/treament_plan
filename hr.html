@@ -1766,11 +1766,27 @@ async function saveCalendarPng(){
   finally{URL.revokeObjectURL(url);}
 }
 /* schedule-print:test-start */
+let SCHEDULE_PRINT_DETAIL_STATES=null;
+function prepareSchedulePrintDetails(){
+  const bodyClasses=document.body?.classList,otherPrintModes=['calendar-printing','leave-printing','payslip-printing','certificate-printing','contract-printing'];
+  if(otherPrintModes.some(name=>bodyClasses?.contains?.(name)))return;
+  if(SCHEDULE_PRINT_DETAIL_STATES){SCHEDULE_PRINT_DETAIL_STATES.forEach(state=>{state.element.open=true;});return;}
+  const details=document.querySelectorAll?.('#main details.schedule-role-cell');if(!details?.length)return;
+  SCHEDULE_PRINT_DETAIL_STATES=[...details].map(element=>({element,open:element.open===true}));
+  SCHEDULE_PRINT_DETAIL_STATES.forEach(state=>{state.element.open=true;});
+}
+function restoreSchedulePrintDetails(){
+  if(!SCHEDULE_PRINT_DETAIL_STATES)return;
+  const states=SCHEDULE_PRINT_DETAIL_STATES;SCHEDULE_PRINT_DETAIL_STATES=null;
+  states.forEach(state=>{state.element.open=state.open;});
+}
+if(typeof window!=='undefined'&&window.addEventListener){window.addEventListener('beforeprint',prepareSchedulePrintDetails);window.addEventListener('afterprint',restoreSchedulePrintDetails);window.addEventListener('focus',restoreSchedulePrintDetails);}
 function printWithClass(className){
   document.body.classList.add(className);
   const printStyle=className==='schedule-printing'?document.createElement('style'):null;
   if(printStyle){printStyle.textContent='@media print{@page{size:A4 landscape;margin:8mm}body.schedule-printing> *{display:none!important}body.schedule-printing>#app,body.schedule-printing>#app main{display:block!important}body.schedule-printing header,body.schedule-printing footer,body.schedule-printing .schedule-actions,body.schedule-printing .nav,body.schedule-printing .nav2,body.schedule-printing .hint,body.schedule-printing .schedule-roster-admin{display:none!important}body.schedule-printing main{max-width:none!important;padding:0!important}body.schedule-printing .card{border:0!important;box-shadow:none!important;margin:0!important;padding:0!important}body.schedule-printing .tblwrap{max-height:none!important;overflow:visible!important}body.schedule-printing .schedule-week-block{break-inside:avoid;page-break-inside:avoid}body.schedule-printing .schedule-role-table{min-width:0!important;font-size:9px!important}}';(document.head||document.documentElement).appendChild(printStyle);}
-  const done=()=>{document.body.classList.remove(className);if(printStyle)printStyle.remove();window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);window.print();
+  let finished=false;const done=()=>{if(finished)return;finished=true;if(className==='schedule-printing')restoreSchedulePrintDetails();document.body.classList.remove(className);if(printStyle)printStyle.remove();window.removeEventListener('afterprint',done);if(className==='schedule-printing')window.removeEventListener('focus',done);};window.addEventListener('afterprint',done);if(className==='schedule-printing')window.addEventListener('focus',done);
+  try{window.print();}catch(error){done();throw error;}
 }
 function emptyCalendarRoster(){return {departments:Object.fromEntries([['Dr.',[]],...EMPLOYEE_JOB_GROUPS.map(group=>[group.label,[]]),['미지정',[]]]),evening:[],off:[],etc:[]};}
 function printCalendar(){printWithClass('calendar-printing');}

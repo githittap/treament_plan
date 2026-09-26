@@ -13,27 +13,93 @@ function block(start, end) {
   return hr.slice(a + start.length, b);
 }
 
-test('schedule print reuses the print lifecycle and clears its class after printing', () => {
-  const events = {};
+function schedulePrintHarness(details = [{ open: false }, { open: true }, { open: false, unrelated: true }]) {
+  const events = new Map();
   let printed = 0;
   const classes = new Set();
   const styles = [];
+  const scheduleDetails = details.filter(item => !item.unrelated);
   const context = {
-    document: { body: { classList: { add: c => classes.add(c), remove: c => classes.delete(c) } }, createElement: () => ({remove: () => styles.pop(), textContent: ''}), head: {appendChild: style => styles.push(style)} },
-    window: { addEventListener: (n, f) => { events[n] = f; }, removeEventListener: n => { delete events[n]; }, print: () => { printed++; } },
+    document: {
+      body: { classList: { add: c => classes.add(c), remove: c => classes.delete(c), contains: c => classes.has(c) } },
+      querySelectorAll: selector => {
+        assert.equal(selector, '#main details.schedule-role-cell');
+        return scheduleDetails;
+      },
+      createElement: () => ({remove: () => styles.pop(), textContent: ''}),
+      head: {appendChild: style => styles.push(style)}
+    },
+    window: {
+      addEventListener: (name, fn) => { const list = events.get(name) || []; list.push(fn); events.set(name, list); },
+      removeEventListener: (name, fn) => events.set(name, (events.get(name) || []).filter(handler => handler !== fn)),
+      print: () => { printed++; dispatch('beforeprint'); }
+    },
   };
+  function dispatch(name) { for (const handler of [...(events.get(name) || [])]) handler(); }
   vm.runInNewContext(`${block('/* schedule-print:test-start */', '/* schedule-print:test-end */')};this.api={printCalendar,printSchedule};`, context);
-  context.api.printSchedule();
-  assert.equal(printed, 1);
-  assert.equal(classes.has('schedule-printing'), true);
-  assert.equal(styles.length, 1);
-  events.afterprint();
-  assert.equal(classes.has('schedule-printing'), false);
-  assert.equal(styles.length, 0);
-  context.api.printCalendar();
-  assert.equal(classes.has('calendar-printing'), true);
-  events.afterprint();
-  assert.equal(classes.has('calendar-printing'), false);
+  return { context, api: context.api, classes, details, scheduleDetails, styles, events, dispatch, get printed() { return printed; } };
+}
+
+test('schedule print expands role details and restores mixed original states after printing', () => {
+  const h = schedulePrintHarness();
+  h.api.printSchedule();
+  assert.equal(h.printed, 1);
+  assert.equal(h.classes.has('schedule-printing'), true);
+  assert.equal(h.styles.length, 1);
+  assert.deepEqual(h.scheduleDetails.map(detail => detail.open), [true, true]);
+  assert.equal(h.details[2].open, false, 'unrelated details must remain untouched');
+  h.dispatch('afterprint');
+  assert.deepEqual(h.scheduleDetails.map(detail => detail.open), [false, true]);
+  assert.equal(h.classes.has('schedule-printing'), false);
+  assert.equal(h.styles.length, 0);
+});
+
+test('Ctrl+P beforeprint reentry preserves the first snapshot and duplicate afterprint is harmless', () => {
+  const h = schedulePrintHarness();
+  h.dispatch('beforeprint');
+  assert.deepEqual(h.scheduleDetails.map(detail => detail.open), [true, true]);
+  h.dispatch('beforeprint');
+  assert.deepEqual(h.scheduleDetails.map(detail => detail.open), [true, true]);
+  h.dispatch('afterprint');
+  h.dispatch('afterprint');
+  assert.deepEqual(h.scheduleDetails.map(detail => detail.open), [false, true]);
+  assert.equal(h.classes.has('schedule-printing'), false, 'browser menu print does not need the app print class');
+});
+
+test('missing afterprint falls back on focus after the print dialog closes', () => {
+  const h = schedulePrintHarness();
+  h.dispatch('beforeprint');
+  assert.deepEqual(h.scheduleDetails.map(detail => detail.open), [true, true]);
+  h.dispatch('focus');
+  assert.deepEqual(h.scheduleDetails.map(detail => detail.open), [false, true]);
+});
+
+test('calendar printing does not expand schedule details', () => {
+  const h = schedulePrintHarness();
+  h.api.printCalendar();
+  assert.deepEqual(h.scheduleDetails.map(detail => detail.open), [false, true]);
+  h.dispatch('afterprint');
+  assert.equal(h.classes.has('calendar-printing'), false);
+});
+
+test('schedule print lifecycle cleans up if window.print throws', () => {
+  const h = schedulePrintHarness();
+  h.context.window.print = () => { h.dispatch('beforeprint'); throw new Error('print unavailable'); };
+  assert.throws(() => h.api.printSchedule(), /print unavailable/);
+  assert.deepEqual(h.scheduleDetails.map(detail => detail.open), [false, true]);
+  assert.equal(h.classes.has('schedule-printing'), false);
+  assert.equal(h.styles.length, 0);
+});
+
+test('schedule and calendar print lifecycles both clear their class after afterprint', () => {
+  const h = schedulePrintHarness();
+  h.api.printSchedule();
+  h.dispatch('afterprint');
+  assert.equal(h.classes.has('schedule-printing'), false);
+  assert.equal(h.styles.length, 0);
+  h.api.printCalendar();
+  h.dispatch('afterprint');
+  assert.equal(h.classes.has('calendar-printing'), false);
 });
 
 test('monthly and weekly schedule renders expose PDF and print actions with whole-month print CSS', () => {
