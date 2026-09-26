@@ -41,11 +41,11 @@ async function fresh({applyDraft=true,noticeAuthorId=true}={}){
   if(noticeAuthorId)await db.exec(noticeAuthorColumn);
   if(applyDraft)await db.exec(draft);
   await q(`insert into public.profiles(user_id,role,active,approved,dept) values
-    ('${staff}','staff',true,true),
-    ('${chief}','chief',true,true),
-    ('${owner}','owner',true,true),
-    ('${manager}','manager',true,true),
-    ('${inactiveChief}','chief',false,true),
+    ('${staff}','staff',true,true,null),
+    ('${chief}','chief',true,true,null),
+    ('${owner}','owner',true,true,null),
+    ('${manager}','manager',true,true,null),
+    ('${inactiveChief}','chief',false,true,null),
     ('${desk}','staff',true,true,'데스크'),
     ('${bakirova}','staff',true,true,null)`);
   return {db,q};
@@ -247,7 +247,7 @@ async function rollbackError(db){try{await db.exec(rollback);return null}catch(e
   await q(`update public.profiles set account_access_status='차단' where user_id='${manager}'`);
   await q(`insert into public.notices(author_id,title) values ('${chief}','민감한 공지 제목')`);
   const events=await q("select recipient_id,payload from public.push_events where event_type='notice_published' order by recipient_id");
-  assert.deepEqual(events.map(r=>r.recipient_id).sort(),[staff,owner].sort());
+  assert.deepEqual(events.map(r=>r.recipient_id).sort(),[staff,owner,desk,bakirova].sort());
   assert.ok(events.every(r=>JSON.stringify(r.payload)==='{}'));
 }finally{await db.close()}}
 
