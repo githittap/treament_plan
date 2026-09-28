@@ -532,6 +532,8 @@ function go(k){if(k==='leavestatus'){k='calendar';CAL_VIEW='leave';}TAB=k;render
    알림을 눌러 ?tab=○○ 으로 열면 그 탭을 먼저 연다(볼 수 있는 탭일 때만, 한 번 쓰고 주소에서 지움). */
 const INBOX_FIRST_EXTRA_IDS=['212cef7e-8aab-4f72-b78d-4dfca59581e0'];
 function isInboxFirstUser(){return ['chief','manager'].includes(ME.role)||ME.department==='데스크'||INBOX_FIRST_EXTRA_IDS.includes(ME.id);}
+function homeInboxCardEligible(me){return me.role==='owner'||['chief','manager'].includes(me.role)||me.department==='데스크'||INBOX_FIRST_EXTRA_IDS.includes(me.id);}
+function homeInboxRecentRows(rows){return (rows||[]).map(row=>({receivedAt:row.received_at,source:inboxSourceLabel(row.source),name:inboxDisplayName(row),message:row.message||''}));}
 function applyInboxFirst(){
   const inbox=TABS.find(t=>t.key==='inbox');
   if(!isInboxFirstUser()||!inbox||!tabVisible(inbox)||MENU.some(e=>e.kind==='tab'&&e.key==='inbox'))return false;
@@ -624,6 +626,19 @@ async function renderHome(m){
   const {data:oc}=await sb.from('onboarding_checks').select('*').eq('user_id',ME.id);
   const doneItems=new Set((oc||[]).filter(c=>c.status!=='미제출').map(c=>c.item_id));
   const undone=(oi||[]).filter(i=>!doneItems.has(i.id));
+  let homeInboxCard='';
+  if(homeInboxCardEligible(ME)){
+    let newCount=0,recentRows=[],inboxError='';
+    try{
+      const [{count,error:countError},{data:recent,error:recentError}]=await Promise.all([
+        sb.from('consultation_inbox').select('id',{count:'exact',head:true}).eq('status','new'),
+        sb.from('consultation_inbox').select('id,source,received_at,sender_name,message').order('received_at',{ascending:false}).limit(3)
+      ]);
+      if(countError||recentError)inboxError='문의함 요약을 불러오지 못했습니다.';
+      else{newCount=count||0;recentRows=homeInboxRecentRows(recent);}
+    }catch{inboxError='문의함 요약을 불러오지 못했습니다.';}
+    homeInboxCard=`<div class="card"><div class="rowflex" style="justify-content:space-between;align-items:center;gap:10px"><div><h2 style="margin:0">📥 문의함 <span class="big" style="font-size:20px">${inboxError?'—':newCount}</span></h2><div class="hint">${inboxError?'미처리 개수를 확인할 수 없습니다.':`미처리 문의 ${newCount}건`}</div></div><button class="mini" onclick="go('inbox')">문의함 열기</button></div>${inboxError?`<div class="hint" style="color:var(--gold)">${esc(inboxError)}</div>`:recentRows.length?`<div style="margin-top:8px">${recentRows.map(row=>`<div class="hint" style="padding:5px 0;border-top:1px dashed var(--line)">${esc(formatLeaveTimestamp(row.receivedAt)||'미상')} · ${esc(row.source)} · ${esc(row.name)}${row.message?` · ${esc(row.message)}`:''}</div>`).join('')}</div>`:'<div class="hint" style="margin-top:8px">최근 문의가 없습니다.</div>'}</div>`;
+  }
   m.innerHTML=`
   <div class="card"><h2>안녕하세요, ${esc(ME.name)}님</h2>
     <div class="rowflex">
@@ -634,6 +649,7 @@ async function renderHome(m){
     ${undone.length?`<div class="hint" style="color:var(--gold)">⚠ 미제출: ${undone.map(i=>esc(i.label)).join(', ')} — [내 서류함] 탭에서 제출하세요.</div>`:''}
   </div>
   ${MY_PAYSLIPS.length?`<div class="card"><h2>💰 내 명세서</h2>${MY_PAYSLIPS.map(s=>`<div class="rowflex" style="justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line)"><span>${esc(s.month)}</span><button class="mini" onclick="openMyPayslip(${s.id})">보기</button></div>`).join('')}</div>`:''}
+  ${homeInboxCard}
   ${canManageConsultation()?'<div class="card" style="padding:12px 14px"><div class="rowflex" style="justify-content:space-between;align-items:center;gap:10px"><div><h2 style="margin-bottom:3px">🗂 상담일지</h2><div class="hint">매니저·실장·원장만 상담 기록을 입력·조회·수정합니다.</div></div><button class="mini" onclick="go(\'consult\')">상담일지 열기</button></div></div>':''}`;
   refreshBadges();
 }
