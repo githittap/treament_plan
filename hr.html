@@ -1887,6 +1887,7 @@ async function saveConsultationJournal(){const msg=$('#cjMsg'),row=consultationD
 
 /* ── 근로계약서 ── */
 let CONTRACT_TEMPLATES=[],CONTRACT_ROWS=[],CONTRACT_TEMPLATE_ID=1,CONTRACT_EMPLOYEE_ID='',CONTRACT_EDIT_ID=null,CONTRACT_EDIT_FIELDS=null,CONTRACT_DRAFT_FIELDS=null,CONTRACT_DRAFT_TIMER=null,CONTRACT_DRAFT_PRESETS=[],CONTRACT_FLASH=null,CONTRACT_LOADED_PRESET=null;
+let CONTRACT_SHOW_CANCELLED=false;
 /* contract-expiry:test-start */
 function contractEndValue(row){
   let fields=row&&row.fields;
@@ -2006,6 +2007,10 @@ function contractLongDate(ds=today()){
 }
 function contractDate(s){return s?stampDate(s):'-';}
 function contractStatusClass(s){return s==='서명완료'?'ok':(s==='취소'?'no':'wait');}
+function contractIsRejected(row){return !!row&&row.status==='취소'&&!!row.reviewed_at&&!row.sent_at;}
+function contractDisplayStatus(row){return contractIsRejected(row)?'반려됨':(row&&row.status||'');}
+function contractVisibleRows(rows){return CONTRACT_SHOW_CANCELLED?(rows||[]):(rows||[]).filter(r=>r&&r.status!=='취소');}
+function setContractShowCancelled(checked){CONTRACT_SHOW_CANCELLED=!!checked;render();}
 function mergeContractHtml(template,values){
   const fields=values||{},seal=`<img src="${CLINIC_SEAL}" alt="원장 도장" style="height:70px;vertical-align:middle">`;
   return String((template&&template.body_html)||'').replace(/\{\{([^{}]+)\}\}/g,(all,raw)=>{
@@ -2098,6 +2103,13 @@ async function approveContractSend(id){
   const {error}=await sb.from('contracts').update({status:'대기',sent_at:new Date().toISOString(),archive_path:archivePath}).eq('id',row.id).eq('status','발송요청');
   if(error){alert('발송 실패: '+error.message);setStatus('error');return;}CONTRACT_FLASH='최종 발송을 완료했습니다.';setStatus('saved');render();
 }
+async function rejectContractSend(id){
+  const row=CONTRACT_ROWS.find(r=>Number(r.id)===Number(id));if(!row||ME.role!=='owner'||row.status!=='발송요청')return;
+  if(!confirm('이 발송 요청을 반려할까요? 직원에게 가지 않고 취소로 바뀝니다'))return;
+  setStatus('saving');const {data,error}=await sb.from('contracts').update({status:'취소',reviewed_by:ME.name,reviewed_at:new Date().toISOString()}).eq('id',row.id).eq('status','발송요청').select('id');
+  if(error||!(data||[]).length){alert(error?'반려하지 못했습니다: '+error.message:'이미 처리된 요청입니다.');setStatus('error');return;}
+  CONTRACT_FLASH='발송 요청을 반려했습니다.';setStatus('saved');render();
+}
 function contractPdfHash(bytes){return crypto.subtle.digest('SHA-256',bytes).then(buf=>Array.from(new Uint8Array(buf)).map(v=>v.toString(16).padStart(2,'0')).join(''));}
 async function uploadContractPdfSource(){
   const id=Number($('#contractPdfSourceId')?.value),file=$('#contractPdfSourceFile')?.files?.[0],version=String($('#contractPdfSourceVersion')?.value||'').trim(),msg=$('#contractPdfSourceMsg');
@@ -2142,7 +2154,7 @@ function viewContract(id){
   const fields=contractObject(row.request_fields||row.fields),needsScheduleReview=contractScheduleNeedsReview(fields['근무시간표']);
   const warning=needsScheduleReview?`<div class="hint" style="margin:8px 0;color:var(--bad)">이전 브라우저에서 저장된 요청이라 근무시간표 값을 다시 확인해야 합니다.${ME.role==='owner'&&row.status==='발송요청'?' 아래 ‘수정 후 최종 발송’으로 시간표를 입력하세요.':' 원장 최종 검토 후 시간표를 입력해야 합니다.'}</div>`:'';
   const body=needsScheduleReview?String(row.merged_html||'').replace('[object Object]','<strong>근무시간표 확인 필요</strong>'):(row.merged_html||'');
-  box.innerHTML=`<h3>${esc(contractTitle(row))} <span class="b ${contractStatusClass(row.status)}">${esc(row.status)}</span></h3>${warning}<div class="contract-doc">${body}</div>`;
+  box.innerHTML=`<h3>${esc(contractTitle(row))} <span class="b ${contractStatusClass(row.status)}">${esc(contractDisplayStatus(row))}</span></h3>${warning}<div class="contract-doc">${body}</div>`;
   box.scrollIntoView({behavior:'smooth',block:'start'});
 }
 let CONTRACT_END_ID=null;
@@ -2187,6 +2199,7 @@ async function renderContractOwner(m){
   if(!staff.some(p=>p.user_id===CONTRACT_EMPLOYEE_ID))CONTRACT_EMPLOYEE_ID=staff[0]?staff[0].user_id:'';
   const employee=staff.find(p=>p.user_id===CONTRACT_EMPLOYEE_ID),presets=Object.keys(contractObject(template&&template.presets));
   const savedContractPresets=contractStorageRead('Presets')||[],restored=contractDraftValue(CONTRACT_DRAFT_FIELDS,CONTRACT_TEMPLATE_ID);const contractFlash=CONTRACT_FLASH;CONTRACT_FLASH=null;
+  const visibleRows=contractVisibleRows(CONTRACT_ROWS);
   m.innerHTML=`<div class="card" id="contractDraftCard" oninput="queueContractDraft()" onchange="queueContractDraft()"><h2>📝 새 근로계약서</h2><div class="hint">✓ 작성 중인 내용은 이 PC에 자동 저장됨(주민번호·생년월일·주소 제외)</div><div class="rowflex"><button class="hbtn" onclick="clearContractDraft()">새로 쓰기</button><button class="hbtn" onclick="saveContractPreset()">설정값 저장</button><select id="contractSavedPreset" onchange="loadContractPreset(this.value)"><option value="">내 설정 불러오기</option>${savedContractPresets.map(p=>`<option value="${esc(p.name)}" ${p.name===CONTRACT_LOADED_PRESET?'selected':''}>${esc(p.name)}</option>`).join('')}</select><button class="hbtn" onclick="deleteContractPreset()">삭제</button></div>
   ${template?`<div class="grid">
       <div class="fld"><label>서식</label><select id="contractTemplate" onchange="selectContractTemplate(this.value)">${CONTRACT_TEMPLATES.map(t=>`<option value="${t.id}" ${Number(t.id)===Number(CONTRACT_TEMPLATE_ID)?'selected':''}>${esc(t.name||t.title||('서식 '+t.id))}</option>`).join('')}</select></div>
@@ -2199,11 +2212,11 @@ async function renderContractOwner(m){
     <div id="contractPreview" style="margin-top:12px"><div class="empty">미리보기 또는 계약 보기를 선택하세요.</div></div>`:'<div class="empty">활성 근로계약서 서식이 없습니다.</div>'}
   </div>
   ${['owner','chief','manager'].includes(ME.role)?`<div class="card"><h2>📄 원본 근로계약서 PDF 등록</h2><div class="hint">실제 직원을 위한 PDF를 임의로 선택하지 않습니다. 발송 요청 계약에 확인된 원본만 등록하고, 원본 파일은 변경하지 않은 채 별도 완료 PDF를 만듭니다.</div><div class="grid" style="margin-top:10px"><div class="fld"><label>발송 요청 계약</label><select id="contractPdfSourceId"><option value="">선택</option>${CONTRACT_ROWS.filter(r=>r.status==='발송요청').map(r=>`<option value="${r.id}">${esc(nameOf(r.user_id))} · ${esc(contractTitle(r))}</option>`).join('')}</select></div><div class="fld"><label>원본 버전</label><input id="contractPdfSourceVersion" placeholder="예: 2026-09-20 검토본"></div><div class="fld"><label>PDF 파일</label><input id="contractPdfSourceFile" type="file" accept="application/pdf"></div></div><button class="hbtn pri" style="margin-top:10px" onclick="uploadContractPdfSource()">원본 PDF 해시 등록</button><div class="msg" id="contractPdfSourceMsg"></div></div>`:''}
-  ${ME.role==='owner'?`<div class="card"><h2>🖋 원장 최종 발송 대기</h2>${CONTRACT_ROWS.filter(r=>r.status==='발송요청').length?`<div class="tblwrap"><table><tr><th>직원</th><th>작성자</th><th>서명기한</th><th></th></tr>${CONTRACT_ROWS.filter(r=>r.status==='발송요청').map(r=>`<tr><td>${esc(nameOf(r.user_id))}</td><td>${esc(r.created_by||'')}</td><td>${contractDate(r.due_at)}</td><td><button class="mini" onclick="viewContract(${r.id})">미리보기</button> <button class="mini" onclick="editContractRequest(${r.id})">수정</button> <button class="mini stamp" onclick="approveContractSend(${r.id})">확인 후 최종 발송</button></td></tr>`).join('')}</table></div>`:'<div class="empty">최종 발송 요청이 없습니다.</div>'}</div>`:''}
+  ${ME.role==='owner'?`<div class="card"><h2>🖋 원장 최종 발송 대기</h2>${CONTRACT_ROWS.filter(r=>r.status==='발송요청').length?`<div class="tblwrap"><table><tr><th>직원</th><th>작성자</th><th>서명기한</th><th></th></tr>${CONTRACT_ROWS.filter(r=>r.status==='발송요청').map(r=>`<tr><td>${esc(nameOf(r.user_id))}</td><td>${esc(r.created_by||'')}</td><td>${contractDate(r.due_at)}</td><td><button class="mini" onclick="viewContract(${r.id})">미리보기</button> <button class="mini" onclick="editContractRequest(${r.id})">수정</button> <button class="mini stamp" onclick="approveContractSend(${r.id})">확인 후 최종 발송</button> <button class="mini rej" onclick="rejectContractSend(${r.id})">반려</button></td></tr>`).join('')}</table></div>`:'<div class="empty">최종 발송 요청이 없습니다.</div>'}</div>`:''}
   ${employmentTermsCard()}
   ${contractAlertsCard(CONTRACT_ALERTS)}
-  <div class="card"><h2>📚 계약 목록</h2>${CONTRACT_ROWS.length?`<div class="tblwrap"><table><tr><th>직원</th><th>서식</th><th>상태</th><th>계약종료</th><th>발송일</th><th>서명일</th><th>서명기한</th><th></th></tr>
-    ${CONTRACT_ROWS.map(r=>`<tr><td>${esc(nameOf(r.user_id))}</td><td>${esc(contractTitle(r))}</td><td><span class="b ${contractStatusClass(r.status)}">${esc(r.status)}</span></td><td>${esc(contractEndValue(r)||'관리자 확인 필요')}</td><td>${contractDate(r.sent_at)}</td><td>${contractDate(r.signed_at)}</td><td>${contractDate(r.due_at)}</td><td><button class="mini" onclick="viewContract(${r.id})">보기</button> ${r.signed_pdf_path?`<button class="mini" onclick="downloadContractPdf(${r.id})">완료 PDF</button>`:''} <button class="mini" onclick="openContractEnd(${r.id})">종료일 설정</button>${r.status==='대기'?` <button class="mini rej" onclick="cancelContract(${r.id})">취소</button>`:''}</td></tr>`).join('')}</table></div>`:'<div class="empty">계약이 없습니다.</div>'}</div>`;
+  <div class="card"><h2>📚 계약 목록</h2><label class="sub"><input type="checkbox" ${CONTRACT_SHOW_CANCELLED?'checked':''} onchange="setContractShowCancelled(this.checked)"> 취소된 계약 보기</label>${visibleRows.length?`<div class="tblwrap"><table><tr><th>직원</th><th>서식</th><th>상태</th><th>계약종료</th><th>발송일</th><th>서명일</th><th>서명기한</th><th></th></tr>
+    ${visibleRows.map(r=>`<tr><td>${esc(nameOf(r.user_id))}</td><td>${esc(contractTitle(r))}</td><td><span class="b ${contractStatusClass(r.status)}">${esc(contractDisplayStatus(r))}</span></td><td>${esc(contractEndValue(r)||'관리자 확인 필요')}</td><td>${contractDate(r.sent_at)}</td><td>${contractDate(r.signed_at)}</td><td>${contractDate(r.due_at)}</td><td><button class="mini" onclick="viewContract(${r.id})">보기</button> ${r.signed_pdf_path?`<button class="mini" onclick="downloadContractPdf(${r.id})">완료 PDF</button>`:''} <button class="mini" onclick="openContractEnd(${r.id})">종료일 설정</button>${r.status==='대기'?` <button class="mini rej" onclick="cancelContract(${r.id})">취소</button>`:''}</td></tr>`).join('')}</table></div>`:CONTRACT_ROWS.length?'<div class="empty">취소된 계약은 숨겨져 있습니다.</div>':'<div class="empty">계약이 없습니다.</div>'}</div>`;
 }
 function employmentTermsCard(){
   const byUser=new Map(EMPLOYMENT_TERMS.map(t=>[t.user_id,t])),staff=PROFILES.filter(p=>p.active!==false&&p.approved!==false);
@@ -2264,10 +2277,11 @@ async function renderContractEmployee(m,options={}){
   ]);
   if(error){const html=`<div class="card"><div class="empty">내 계약서를 불러오지 못했습니다: ${esc(error.message)}</div></div>`;if(append)m.insertAdjacentHTML('beforeend',html);else m.innerHTML=html;return;}
   const ownRows=rows||[];if(onlyIfAny&&!ownRows.length)return;
+  const visibleRows=contractVisibleRows(ownRows);
   if(!append)CONTRACT_ROWS=ownRows;
   if(!CONTRACT_TEMPLATES.length)CONTRACT_TEMPLATES=templates||[];
-  const html=`<div class="card"><h2>📝 내 근로계약서</h2>${ownRows.length?'<div class="sub">계약 내용을 확인한 뒤 서명란에 직접 서명하세요.</div>':'<div class="empty">받은 근로계약서가 없습니다.</div>'}</div>`+
-    ownRows.map(r=>{const expired=r.status==='대기'&&contractExpired(r),signed=r.status==='서명완료';return `<div class="card"><h2>${esc(contractTitle(r))} <span class="b ${contractStatusClass(r.status)}">${esc(r.status)}</span></h2>
+  const html=`<div class="card"><h2>📝 내 근로계약서</h2><label class="sub"><input type="checkbox" ${CONTRACT_SHOW_CANCELLED?'checked':''} onchange="setContractShowCancelled(this.checked)"> 취소된 계약 보기</label>${visibleRows.length?'<div class="sub">계약 내용을 확인한 뒤 서명란에 직접 서명하세요.</div>':ownRows.length?'<div class="empty">취소된 계약은 숨겨져 있습니다.</div>':'<div class="empty">받은 근로계약서가 없습니다.</div>'}</div>`+
+    visibleRows.map(r=>{const expired=r.status==='대기'&&contractExpired(r),signed=r.status==='서명완료';return `<div class="card"><h2>${esc(contractTitle(r))} <span class="b ${contractStatusClass(r.status)}">${esc(contractDisplayStatus(r))}</span></h2>
       <div class="sub">발송 ${contractDate(r.sent_at)} · 서명기한 ${contractDate(r.due_at)}${r.signed_at?' · 서명 '+contractDate(r.signed_at):''}</div>
       ${(r.status==='대기'||signed)&&!r.source_pdf_path?`<div class="contract-doc" style="margin-top:10px">${r.merged_html||''}</div>`:''}
       ${r.source_pdf_path?`<div class="hint">이 계약의 기준 문서는 원본 PDF이며, HTML 계약 본문과 별도 보관됩니다.${signed&&r.signed_pdf_path?` <button class="mini" onclick="downloadContractPdf(${r.id})">완료 PDF 다운로드</button>`:''}</div>`:''}
