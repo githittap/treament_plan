@@ -2285,7 +2285,16 @@ async function renderContract(m){
 }
 
 /* ── AI 실제 청구액 ── */
-const AICOST_PLATFORMS=['Claude','Codex(OpenAI)','Kimi','기타'];
+/* aicost-platform:test-start */
+const AICOST_PLATFORMS=['Claude','Codex(OpenAI)','Kimi','DeepSeek','StepFun','기타'];
+/* 자동감지 이벤트의 platform 글자를 목록 값과 대소문자·앞뒤 공백 무시로 맞춘다. 목록에 없는 이름(빈 값 포함)은 '기타'로 모은다. */
+function aicostPlatformKey(p){
+  const n=String(p==null?'':p).trim().toLowerCase();
+  if(!n)return '기타';
+  const hit=AICOST_PLATFORMS.find(x=>x.toLowerCase()===n);
+  return hit||'기타';
+}
+/* aicost-platform:test-end */
 let AICOST_MONTH='';
 function setAicostMonth(v){AICOST_MONTH=v;render();}
 function aicostMoney(v){return Number(v||0).toLocaleString('ko-KR');}
@@ -2357,8 +2366,8 @@ async function renderAicost(m){
   ]);
   if(error||historyError||eventsError){setStatus('error');m.innerHTML=`<div class="card"><div class="empty">AI 비용을 불러오지 못했습니다: ${esc((error||historyError||eventsError).message)}</div></div>`;return;}
   const byPlatform={};(rows||[]).forEach(r=>byPlatform[r.platform]=r);
-  // 자동감지(문자 웹훅 등) — 선택한 달의 이벤트만 플랫폼별 합산
-  const autoByPlatform={};(events||[]).forEach(e=>{if(formatLeaveMonth(e.received_at)===AICOST_MONTH)autoByPlatform[e.platform]=(autoByPlatform[e.platform]||0)+Number(e.amount_krw||0);});
+  // 자동감지(문자 웹훅 등) — 선택한 달의 이벤트만 플랫폼별 합산(이름은 대소문자·앞뒤 공백 무시로 목록 값에 맞추고, 목록 밖은 기타로 모음)
+  const autoByPlatform={};(events||[]).forEach(e=>{if(formatLeaveMonth(e.received_at)===AICOST_MONTH){const k=aicostPlatformKey(e.platform);autoByPlatform[k]=(autoByPlatform[k]||0)+Number(e.amount_krw||0);}});
   const total=AICOST_PLATFORMS.reduce((sum,p)=>sum+Number((byPlatform[p]||{}).amount_krw||0)+Number(autoByPlatform[p]||0),0);
   const totals={};(history||[]).forEach(r=>totals[r.ym]=(totals[r.ym]||0)+Number(r.amount_krw||0));
   (events||[]).forEach(e=>{const ym=formatLeaveMonth(e.received_at);totals[ym]=(totals[ym]||0)+Number(e.amount_krw||0);});
