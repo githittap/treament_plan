@@ -34,3 +34,18 @@ test('화면에 자동 저장·설정 제어·저장소 오류 보호 코드가 
  assert.match(html,/catch\(_\)\{return null;\}/);
  assert.match(html,/새로 쓰기/);assert.match(html,/설정값 저장/);assert.match(html,/내 설정 불러오기/);
 });
+test('발송 성공 문구는 CONTRACT_FLASH로 렌더 직후 한 번만 보인다 (클로드 검토 보정)',()=>{
+ assert.ok(html.includes(',CONTRACT_FLASH=null,CONTRACT_LOADED_PRESET=null;'),'CONTRACT_FLASH·CONTRACT_LOADED_PRESET 전역이 선언되어야 함');
+ assert.ok(html.includes('const contractFlash=CONTRACT_FLASH;CONTRACT_FLASH=null;'),'렌더 직전에 플래시 메시지를 읽고 즉시 비워야 함(다음 렌더에서 다시 보이지 않게)');
+ assert.ok(html.includes('<div class="msg" id="contractMsg">${contractFlash?esc(contractFlash):\'\'}</div>'),'contractMsg가 플래시 메시지를 출력해야 함');
+ assert.ok(html.includes("CONTRACT_FLASH=finalSend?'발송했습니다.':'원장에게 최종 발송을 요청했습니다.';"),'sendContract 성공 시 CONTRACT_FLASH를 채워야 함(render가 msg를 지우기 전에 textContent에만 의존하지 않음)');
+ assert.ok(html.includes("CONTRACT_FLASH='수정 후 발송했습니다.';"),'수정 후 최종 발송(CONTRACT_EDIT_ID 길) 성공 시에도 CONTRACT_FLASH를 채워야 함');
+ assert.ok(html.includes("CONTRACT_FLASH='최종 발송을 완료했습니다.';"),'approveContractSend 성공 시에도 CONTRACT_FLASH를 채워야 함');
+});
+test('내 설정 불러오기 선택값은 렌더 후에도 유지되고, 삭제·새로 쓰기 뒤에는 비워진다 (클로드 검토 보정)',()=>{
+ assert.ok(html.includes('CONTRACT_LOADED_PRESET=name;render();}'),'loadContractPreset은 불러온 이름을 전역에 기억해야 함(다음 render에서 선택값 유지)');
+ assert.ok(html.includes("${p.name===CONTRACT_LOADED_PRESET?'selected':''}"),'내 설정 select 옵션 렌더에 selected 조건이 있어야 함');
+ assert.ok(html.includes("if(!confirm(`'${name}' 설정을 지울까요?`))return;"),'deleteContractPreset은 삭제 전 확인을 한 번 받아야 함');
+ assert.ok(html.includes("contractPresetList(contractStorageRead('Presets')||[],name,true));CONTRACT_LOADED_PRESET=null;render();}"),'삭제 뒤에는 기억해둔 선택값을 비워야 함');
+ assert.ok(html.includes("CONTRACT_EMPLOYEE_ID='';CONTRACT_LOADED_PRESET=null;render();}"),'clearContractDraft(새로 쓰기) 뒤에도 기억해둔 선택값을 비워야 함');
+});
