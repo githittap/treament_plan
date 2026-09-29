@@ -185,6 +185,7 @@ export const ERROR_MESSAGES_KO = {
   invalid_input: '메시지 형식이 올바르지 않아요.',
   rate_limited: '너무 자주 요청했어요. 잠깐 쉬었다가 다시 시도해 주세요.',
   provider_not_configured: '이 AI 회사 연결이 아직 준비되지 않았어요.',
+  provider_auth_failed: '이 AI 회사가 연결 키를 받아 주지 않아요. 원장에게 알려 주세요.',
   upstream_error: 'AI 응답을 받지 못했어요. 잠시 후 다시 시도해 주세요.',
   timeout: '응답이 너무 오래 걸려요. 잠시 후 다시 시도해 주세요.',
   unknown: '알 수 없는 오류가 발생했어요.',
@@ -206,6 +207,7 @@ export const HTTP_STATUS_FOR_ERROR = {
   invalid_input: 400,
   rate_limited: 429,
   provider_not_configured: 502,
+  provider_auth_failed: 502,
   upstream_error: 502,
   timeout: 504,
   unknown: 500,
@@ -213,4 +215,16 @@ export const HTTP_STATUS_FOR_ERROR = {
 
 export function httpStatusForError(errorKind) {
   return HTTP_STATUS_FOR_ERROR[errorKind] || 500;
+}
+
+/**
+ * 회사 호출 실패 이유(providers.ts의 reason)를 화면에 내보낼 error_kind로 바꾼다.
+ * 회사가 401·403을 주면 「로그인 만료」로 오해되지 않게 provider_auth_failed로, 그 밖의 모르는 이유는 upstream_error로 정리한다.
+ * (사용 기록 테이블에는 원래 reason을 그대로 남긴다.)
+ */
+export function publicErrorKind(reason) {
+  if (reason === 'unauthorized' || reason === 'forbidden') return 'provider_auth_failed';
+  if (reason === 'timeout' || reason === 'rate_limited' || reason === 'provider_not_configured' || reason === 'model_not_set') return reason;
+  if (Object.prototype.hasOwnProperty.call(ERROR_MESSAGES_KO, reason)) return reason;
+  return 'upstream_error'; // bad_request · server_error · network_error · refusal · empty_response 등
 }

@@ -7,6 +7,7 @@ import {
   estimateCostUsd,
   errorMessageFor,
   httpStatusForError,
+  publicErrorKind,
   shouldFallback,
   validateMessages,
 } from "./core.mjs";
@@ -70,7 +71,7 @@ export function createAiAssistantChatHandler(deps: { createClient?: any; env?: (
           const apiKey = apiKeyFor(provider, readEnv);
           const result = await doListModels(provider, apiKey, baseUrlFor(provider, readEnv));
           if (result.ok) providers[provider] = result.ids;
-          else errors[provider] = result.reason;
+          else errors[provider] = publicErrorKind(result.reason);
         }
         return json({ ok: true, providers, errors });
       }
@@ -95,7 +96,10 @@ export function createAiAssistantChatHandler(deps: { createClient?: any; env?: (
           timeoutMs: 20000,
         });
         const latencyMs = Date.now() - startedAt;
-        if (!result.ok) return json({ ok: false, latency_ms: latencyMs, error_kind: result.reason, message: errorMessageFor(result.reason) });
+        if (!result.ok) {
+          const kind = publicErrorKind(result.reason);
+          return json({ ok: false, latency_ms: latencyMs, error_kind: kind, message: errorMessageFor(kind) });
+        }
         return json({ ok: true, latency_ms: latencyMs, text: result.text });
       }
 
@@ -199,7 +203,10 @@ export function createAiAssistantChatHandler(deps: { createClient?: any; env?: (
         fallbackUsed = true;
       }
 
-      if (!result.ok) return json(fail(result.reason || "upstream_error"), httpStatusForError(result.reason || "upstream_error"));
+      if (!result.ok) {
+        const kind = publicErrorKind(result.reason || "upstream_error");
+        return json(fail(kind), httpStatusForError(kind));
+      }
 
       const est = estimateCostUsd({
         inputTokens: result.input_tokens,

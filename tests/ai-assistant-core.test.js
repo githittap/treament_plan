@@ -163,3 +163,15 @@ test('errorMessageFor·httpStatusForError는 정해진 오류 종류마다 쉬�
   assert.equal(httpStatusForError('알수없는거'), 500, '모르는 종류는 500');
   assert.equal(errorMessageFor('알수없는거'), errorMessageFor('unknown'));
 });
+
+test('publicErrorKind: 회사 401·403은 provider_auth_failed, 그 밖의 회사 쪽 실패는 upstream_error로 정리한다', async () => {
+  const { publicErrorKind, errorMessageFor, httpStatusForError } = await loadCore();
+  assert.equal(publicErrorKind('unauthorized'), 'provider_auth_failed');
+  assert.equal(publicErrorKind('forbidden'), 'provider_auth_failed');
+  for (const kind of ['timeout', 'rate_limited', 'provider_not_configured', 'model_not_set']) assert.equal(publicErrorKind(kind), kind);
+  for (const reason of ['bad_request', 'server_error', 'network_error', 'refusal', 'empty_response', '알수없는거']) {
+    assert.equal(publicErrorKind(reason), 'upstream_error', reason);
+  }
+  assert.notEqual(errorMessageFor('provider_auth_failed'), errorMessageFor('unknown'));
+  assert.equal(httpStatusForError('provider_auth_failed'), 502);
+});

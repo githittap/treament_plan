@@ -61,6 +61,8 @@ function aiAssistantFormErrors(form){
   const name=String(f.name==null?'':f.name).trim();
   if(!name)errs.push('이름을 입력하세요.');
   else if(name.length>40)errs.push('이름은 40자 이하로 입력하세요.');
+  if(String(f.description==null?'':f.description).length>200)errs.push('설명은 200자 이하로 입력하세요.');
+  if(String(f.instructions==null?'':f.instructions).length>20000)errs.push('지침서는 20,000자 이하로 입력하세요.');
   const knowledge=String(f.knowledge==null?'':f.knowledge);
   if(knowledge.length>60000)errs.push('참고자료는 60,000자 이하로 입력하세요.');
   const maxTok=f.max_output_tokens==null?4000:Number(f.max_output_tokens);
@@ -79,20 +81,49 @@ function aiChatInputError(text){
   return '';
 }
 
-// Edge 함수 error_kind → 쉬운 한국어 문장(설계서 4-2).
+// Edge 함수 error_kind → 쉬운 한국어 문장(설계서 3-1·4-2). 키는 백엔드 core.mjs ERROR_MESSAGES_KO와 같은 이름이다.
 const AI_ERROR_MESSAGES={
+  unauthenticated:'로그인이 만료됐어요. 다시 로그인해 주세요.',
+  hub_access_denied:'허브 접근 권한이 없어요.',
+  assistant_not_found:'이 도우미를 찾을 수 없어요.',
+  assistant_disabled:'지금은 쓸 수 없는 도우미예요.',
+  forbidden_role:'이 도우미는 내 역할에서 쓸 수 없어요.',
   model_not_set:'원장이 아직 이 도우미의 AI를 고르지 않았어요.',
   model_disabled:'이 도우미의 AI가 꺼져 있어요. 원장에게 알려 주세요.',
-  provider_not_configured:'이 AI 회사 연결이 아직 준비되지 않았어요.',
+  invalid_input:'요청 내용을 확인해 주세요.',
   rate_limited:'짧은 시간에 너무 많이 요청했어요. 잠시 후 다시 시도해 주세요.',
-  not_found:'이 도우미를 찾을 수 없어요.',
-  forbidden:'이 도우미를 쓸 권한이 없어요.',
-  unauthorized:'로그인이 만료됐어요. 다시 로그인해 주세요.',
-  bad_request:'요청 내용을 확인해 주세요.',
+  provider_not_configured:'이 AI 회사 연결이 아직 준비되지 않았어요.',
+  provider_auth_failed:'이 AI 회사가 연결 키를 받아 주지 않아요. 원장에게 알려 주세요.',
+  upstream_error:'AI 응답을 받지 못했어요. 잠시 후 다시 시도해 주세요.',
   timeout:'응답이 너무 오래 걸려요. 다시 시도해 주세요.',
   network_error:'인터넷 연결을 확인하고 다시 시도해 주세요.',
 };
 function aiErrorMessage(kind){return AI_ERROR_MESSAGES[kind]||'오류가 있었어요. 잠시 후 다시 시도해 주세요.';}
+
+// supabase-js functions.invoke는 2xx가 아니면 data가 비고 error(FunctionsHttpError)가 온다. 본문({ok:false,error_kind,...})은
+// error.context(Response)를 .json()으로 읽어야 나온다 — 여기서 그 본문을 꺼내 늘 {ok:false,error_kind,...} 모양으로 돌려준다.
+async function aiNormalizeInvokeError(error){
+  const name=(error&&error.name)||'';
+  const ctx=error&&error.context;
+  if(ctx&&typeof ctx.json==='function'){
+    let body=null;
+    try{body=await ctx.json();}catch(e){body=null;}
+    if(body&&typeof body==='object'&&body.error_kind)return Object.assign({ok:false},body);
+    const st=Number(ctx.status)||0;
+    const byStatus={401:'unauthenticated',403:'hub_access_denied',404:'assistant_not_found',429:'rate_limited',504:'timeout'};
+    return {ok:false,error_kind:byStatus[st]||(st>=500?'upstream_error':'unknown')};
+  }
+  if(name==='FunctionsFetchError')return {ok:false,error_kind:'network_error'};
+  if(name==='FunctionsRelayError')return {ok:false,error_kind:'upstream_error'};
+  return {ok:false,error_kind:(error&&error.error_kind)||'network_error'};
+}
+// invoke 결과({data,error})를 성공이면 data 그대로, 실패면 정규화한 {ok:false,error_kind}로 돌려준다.
+async function aiUnwrapInvoke(res){
+  if(res&&res.error)return aiNormalizeInvokeError(res.error);
+  const data=res&&res.data;
+  if(!data||typeof data!=='object')return {ok:false,error_kind:'unknown'};
+  return data;
+}
 
 // 도우미 준비 여부(관리 목록용 — RPC ready와 같은 규칙: model_ref 있고 그 모델이 켜져 있어야 함).
 function aiAdminAssistantReady(assistant,modelsById){
@@ -297,16 +328,14 @@ async function sendAiMessage(){
   AI_SENDING=true;
   renderActiveSection();
   try{
-    const res=await SB.functions.invoke('ai-assistant-chat',{body:{action:'chat',assistant_id:a.id,messages:AI_MESSAGES.map(function(m){return {role:m.role,content:m.content};})}});
-    if(res.error)throw res.error;
-    const data=res.data;
+    const data=await aiUnwrapInvoke(await SB.functions.invoke('ai-assistant-chat',{body:{action:'chat',assistant_id:a.id,messages:AI_MESSAGES.map(function(m){return {role:m.role,content:m.content};})}}));
     if(!data||data.ok===false){
       AI_MESSAGES.push({role:'assistant',content:aiErrorMessage(data&&data.error_kind),isError:true});
     }else{
       AI_MESSAGES.push({role:'assistant',content:data.text||'',modelLabel:data.model_label||data.model_id||'',fallbackUsed:!!data.fallback_used});
     }
   }catch(e){
-    AI_MESSAGES.push({role:'assistant',content:aiErrorMessage((e&&e.error_kind)||'network_error'),isError:true});
+    AI_MESSAGES.push({role:'assistant',content:aiErrorMessage('network_error'),isError:true});
   }
   AI_SENDING=false;
   renderActiveSection();
@@ -460,9 +489,7 @@ async function testAssistantForm(){
   if(!AI_EDIT_ASSISTANT||!AI_EDIT_ASSISTANT.id){if(area)area.innerHTML='<div class="hint">저장한 뒤 시험할 수 있습니다.</div>';return;}
   if(area)area.innerHTML='<div class="sub">시험 중…</div>';
   try{
-    const res=await SB.functions.invoke('ai-assistant-chat',{body:{action:'chat',assistant_id:AI_EDIT_ASSISTANT.id,messages:[{role:'user',content:'안녕하세요라고만 답하세요.'}]}});
-    if(res.error)throw res.error;
-    const data=res.data;
+    const data=await aiUnwrapInvoke(await SB.functions.invoke('ai-assistant-chat',{body:{action:'chat',assistant_id:AI_EDIT_ASSISTANT.id,messages:[{role:'user',content:'안녕하세요라고만 답하세요.'}]}}));
     if(!data||data.ok===false){if(area)area.innerHTML='<div class="hint">'+escAi(aiErrorMessage(data&&data.error_kind))+'</div>';return;}
     if(area)area.innerHTML='<div class="hint">✅ '+escAi(data.model_label||data.model_id||'')+': '+escAi(data.text||'')+'</div>';
   }catch(e){
@@ -613,9 +640,7 @@ async function testModel(id){
   const area=AI_ROOT.querySelector('#aiModelTestResult');
   if(area)area.innerHTML='<div class="sub">시험 중…</div>';
   try{
-    const res=await SB.functions.invoke('ai-assistant-chat',{body:{action:'test_model',model_ref:id}});
-    if(res.error)throw res.error;
-    const data=res.data;
+    const data=await aiUnwrapInvoke(await SB.functions.invoke('ai-assistant-chat',{body:{action:'test_model',model_ref:id}}));
     if(!data||data.ok===false){if(area)area.innerHTML='<div class="hint">'+escAi(aiErrorMessage(data&&data.error_kind))+'</div>';return;}
     if(area)area.innerHTML='<div class="hint">✅ '+(data.latency_ms||0)+'ms · '+escAi(data.text||'')+'</div>';
   }catch(e){
@@ -626,9 +651,7 @@ async function fetchModelLists(){
   const area=AI_ROOT.querySelector('#aiModelFetchResult');
   if(area)area.innerHTML='<div class="sub">불러오는 중…</div>';
   try{
-    const res=await SB.functions.invoke('ai-assistant-chat',{body:{action:'list_models'}});
-    if(res.error)throw res.error;
-    const data=res.data;
+    const data=await aiUnwrapInvoke(await SB.functions.invoke('ai-assistant-chat',{body:{action:'list_models'}}));
     if(!data||data.ok===false){if(area)area.innerHTML='<div class="hint">'+escAi(aiErrorMessage(data&&data.error_kind))+'</div>';return;}
     const known={};AI_ADMIN_MODELS.forEach(function(m){known[m.provider+'::'+m.model_id]=true;});
     const providers=data.providers||{};
@@ -641,7 +664,7 @@ async function fetchModelLists(){
       }).join(' ')||'<span class="sub">없음</span>')+'</div>';
     });
     const errors=data.errors||{};
-    Object.keys(errors).forEach(function(p){html+='<div class="hint">'+escAi(aiProviderLabel(p))+': '+escAi(errors[p])+'</div>';});
+    Object.keys(errors).forEach(function(p){html+='<div class="hint">'+escAi(aiProviderLabel(p))+': '+escAi(aiErrorMessage(errors[p]))+'</div>';});
     html+='</div>';
     if(area){
       area.innerHTML=html;

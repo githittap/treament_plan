@@ -6,7 +6,7 @@ function helpers(){
   assert.ok(block,'ai-assistants.js에 순수 helper 블록이 없습니다.');
   const c={};
   vm.createContext(c);
-  vm.runInContext(block+';this.h={aiRoleLabel,aiProviderLabel,aiWon,aiWonLabel,aiModelPriceLabel,aiGroupModelsByProvider,aiAssistantFormErrors,aiChatInputError,aiErrorMessage,aiAdminAssistantReady,aiUsageSummarize};',c);
+  vm.runInContext(block+';this.h={aiRoleLabel,aiProviderLabel,aiWon,aiWonLabel,aiModelPriceLabel,aiGroupModelsByProvider,aiAssistantFormErrors,aiChatInputError,aiErrorMessage,aiAdminAssistantReady,aiUsageSummarize,aiNormalizeInvokeError,aiUnwrapInvoke};',c);
   return c.h;
 }
 
@@ -128,4 +128,38 @@ test('hr.html 연결: TABS·MENU에 ai 탭이 있고 render()가 window.AIAssist
   assert.match(html,/\{kind:'tab',\s*key:'ai',\s*children:\[\]\}/);
   assert.match(html,/TAB==='ai'\)\{if\(window\.AIAssistants\)await window\.AIAssistants\.render\(m,\{sb,me:ME\}\)/);
   assert.match(html,/<script src="ai-assistants\.js\?v=\d+"><\/script>/);
+});
+
+test('functions.invoke 오류: 2xx가 아니면 error.context 본문에서 error_kind를 꺼내 한국어 문장으로 이어진다',async()=>{
+  const h=helpers();
+  const httpErr=(status,body)=>({name:'FunctionsHttpError',context:{status,json:async()=>{if(body===undefined)throw new Error('not json');return body;}}});
+  const a=await h.aiUnwrapInvoke({data:null,error:httpErr(409,{ok:false,error_kind:'model_not_set',message:'x'})});
+  assert.equal(a.ok,false);assert.equal(a.error_kind,'model_not_set');
+  assert.equal(h.aiErrorMessage(a.error_kind),'원장이 아직 이 도우미의 AI를 고르지 않았어요.');
+  const b=await h.aiUnwrapInvoke({data:null,error:httpErr(429,{ok:false,error_kind:'rate_limited'})});
+  assert.equal(b.error_kind,'rate_limited');
+  // 게이트웨이가 준 본문(error_kind 없음)은 HTTP 상태로 짐작한다
+  assert.equal((await h.aiUnwrapInvoke({data:null,error:httpErr(401,{code:401,message:'Invalid JWT'})})).error_kind,'unauthenticated');
+  assert.equal((await h.aiUnwrapInvoke({data:null,error:httpErr(502,undefined)})).error_kind,'upstream_error');
+  assert.equal((await h.aiUnwrapInvoke({data:null,error:{name:'FunctionsFetchError'}})).error_kind,'network_error');
+  assert.equal((await h.aiUnwrapInvoke({data:null,error:{name:'FunctionsRelayError'}})).error_kind,'upstream_error');
+  const ok=await h.aiUnwrapInvoke({data:{ok:true,text:'OK'},error:null});
+  assert.equal(ok.ok,true);assert.equal(ok.text,'OK');
+  assert.equal((await h.aiUnwrapInvoke({data:null,error:null})).error_kind,'unknown');
+});
+
+test('백엔드 error_kind 전부가 화면 문장표에 있다(core.mjs ERROR_MESSAGES_KO와 같은 키)',()=>{
+  const core=read('supabase/functions/ai-assistant-chat/core.mjs');
+  const block=core.match(/export const ERROR_MESSAGES_KO = \{([\s\S]*?)\r?\n\};/)[1];
+  const kinds=[...block.matchAll(/^\s+(\w+):/gm)].map(m=>m[1]).filter(k=>k!=='unknown');
+  assert.ok(kinds.length>=10);
+  const h=helpers();
+  const generic=h.aiErrorMessage('never_seen_before');
+  kinds.forEach(k=>assert.notEqual(h.aiErrorMessage(k),generic,k+' 문장이 화면에 없음'));
+});
+
+test('양식 검사: 설명 200자·지침서 20,000자 제한(DB check와 맞춤)',()=>{
+  const h=helpers();
+  assert.deepEqual([...h.aiAssistantFormErrors({name:'ok',description:'a'.repeat(201),visible_roles:['staff']})],['설명은 200자 이하로 입력하세요.']);
+  assert.deepEqual([...h.aiAssistantFormErrors({name:'ok',instructions:'a'.repeat(20001),visible_roles:['staff']})],['지침서는 20,000자 이하로 입력하세요.']);
 });
