@@ -157,6 +157,19 @@ function aiUsageSummarize(rows){
   return {totalCount:totalCount,totalInput:totalInput,totalOutput:totalOutput,totalCostUsd:totalCostUsd,totalCostWon:aiWon(totalCostUsd),
     byDate:byDate,byAssistant:toRows(groups.byAssistant),byUser:toRows(groups.byUser),byModel:toRows(groups.byModel)};
 }
+// 원장 화면 저장·삭제·토글 실패 알림(쉬운 한국어). what: '저장'|'삭제'|'켜기·끄기'|'복제' 등 동작 이름.
+function aiWriteErrorMessage(what,error){
+  const w=what||'저장';
+  const code=String((error&&error.code)||'');
+  const msg=String((error&&error.message)||'');
+  let why='';
+  if(code==='23505')why='같은 이름이 이미 있어요.';
+  else if(code==='23503')why='다른 곳에서 쓰고 있어서 처리할 수 없어요.';
+  else if(code==='23514'||code==='22001'||code==='22P02')why='입력한 값이 허용 범위를 벗어났어요.';
+  else if(code==='42501'||/row-level security|permission denied/i.test(msg))why='권한이 없어요.';
+  else if(/failed to fetch|network|load failed/i.test(msg))why='인터넷 연결을 확인해 주세요.';
+  return w+'하지 못했어요'+(why?(' — '+why):' — 다시 시도해 주세요.');
+}
 /* ai-assistants:test-end */
 
 /* ── 아래부터 DOM·네트워크 코드(시험 블록 밖) ── */
@@ -166,7 +179,12 @@ let SB=null,ME={},AI_ROOT=null,AI_SUBTAB='chat',AI_STYLE_INJECTED=false;
 let AI_ASSISTANTS=[],AI_ERROR='';
 let AI_ACTIVE_ASSISTANT=null,AI_MESSAGES=[],AI_SENDING=false;
 let AI_ADMIN_ASSISTANTS=[],AI_ADMIN_MODELS=[],AI_EDIT_ASSISTANT=null,AI_EDIT_ERRORS=[],AI_MODEL_EDIT=null;
-let AI_USAGE_ROWS=[];
+let AI_USAGE_ROWS=[],AI_NOTICE='';
+
+function aiNoticeHtml(){
+  const n=AI_NOTICE;AI_NOTICE='';
+  return n?('<div class="hint" style="color:var(--red);margin-bottom:8px" role="alert">'+escAi(n)+'</div>'):'';
+}
 
 function ensureStyle(){
   if(AI_STYLE_INJECTED)return;
@@ -366,7 +384,7 @@ async function renderManageSection(root){
 
 function drawManageSection(root){
   const modelsById={};AI_ADMIN_MODELS.forEach(function(m){modelsById[m.id]=m;});
-  root.innerHTML='<div class="card">'+
+  root.innerHTML='<div class="card">'+aiNoticeHtml()+
     '<div class="rowflex" style="justify-content:space-between;align-items:center"><h2>⚙️ 도우미 관리</h2><button class="mini stamp" data-ai-new-assistant>새 도우미</button></div>'+
     '<div class="tblwrap"><table><tr><th></th><th>이름</th><th>설명</th><th>모델</th><th>보이는 역할</th><th>켜짐</th><th></th></tr>'+
     (AI_ADMIN_ASSISTANTS.map(function(a){
@@ -480,7 +498,7 @@ async function saveAssistantForm(){
     AI_EDIT_ASSISTANT=null;
     await renderManageSection(AI_ROOT.querySelector('#aiSection'));
   }catch(e){
-    if(msgEl)msgEl.textContent='저장 실패: '+((e&&e.message)||'');
+    if(msgEl)msgEl.textContent=aiWriteErrorMessage('저장',e);
   }
 }
 
@@ -500,7 +518,7 @@ async function testAssistantForm(){
 async function toggleAssistantEnabled(id){
   const a=AI_ADMIN_ASSISTANTS.find(function(x){return x.id===id;});
   if(!a)return;
-  try{const res=await SB.from('ai_assistants').update({enabled:!a.enabled}).eq('id',id);if(res.error)throw res.error;}catch(e){}
+  try{const res=await SB.from('ai_assistants').update({enabled:!a.enabled}).eq('id',id);if(res.error)throw res.error;}catch(e){AI_NOTICE=aiWriteErrorMessage('켜기·끄기',e);}
   await renderManageSection(AI_ROOT.querySelector('#aiSection'));
 }
 async function duplicateAssistant(id){
@@ -509,12 +527,12 @@ async function duplicateAssistant(id){
   const copy=Object.assign({},a);
   delete copy.id;delete copy.created_at;delete copy.updated_at;
   copy.name=(copy.name||'')+' 복제';
-  try{const res=await SB.from('ai_assistants').insert(copy);if(res.error)throw res.error;}catch(e){}
+  try{const res=await SB.from('ai_assistants').insert(copy);if(res.error)throw res.error;}catch(e){AI_NOTICE=aiWriteErrorMessage('복제',e);}
   await renderManageSection(AI_ROOT.querySelector('#aiSection'));
 }
 async function deleteAssistant(id){
   if(!confirm('이 도우미를 삭제할까요? 되돌릴 수 없습니다.'))return;
-  try{const res=await SB.from('ai_assistants').delete().eq('id',id);if(res.error)throw res.error;}catch(e){}
+  try{const res=await SB.from('ai_assistants').delete().eq('id',id);if(res.error)throw res.error;}catch(e){AI_NOTICE=aiWriteErrorMessage('삭제',e);}
   await renderManageSection(AI_ROOT.querySelector('#aiSection'));
 }
 
@@ -536,7 +554,7 @@ async function renderModelsSection(root){
 
 function drawModelsSection(root){
   const groups=aiGroupModelsByProvider(AI_ADMIN_MODELS,{onlyEnabled:false});
-  root.innerHTML='<div class="card">'+
+  root.innerHTML='<div class="card">'+aiNoticeHtml()+
     '<div class="rowflex" style="justify-content:space-between;align-items:center"><h2>🧠 모델 목록</h2>'+
     '<div class="rowflex"><button class="mini" data-ai-new-model>모델 직접 추가</button><button class="mini" data-ai-fetch-models>회사별 목록 불러오기</button></div></div>'+
     (groups.map(function(g){
@@ -621,19 +639,19 @@ async function saveModelForm(){
     AI_MODEL_EDIT=null;
     await renderModelsSection(AI_ROOT.querySelector('#aiSection'));
   }catch(e){
-    if(msgEl)msgEl.textContent='저장 실패: '+((e&&e.message)||'');
+    if(msgEl)msgEl.textContent=aiWriteErrorMessage('저장',e);
   }
 }
 
 async function toggleModelEnabled(id){
   const m=AI_ADMIN_MODELS.find(function(x){return x.id===id;});
   if(!m)return;
-  try{const res=await SB.from('ai_models').update({enabled:!m.enabled}).eq('id',id);if(res.error)throw res.error;}catch(e){}
+  try{const res=await SB.from('ai_models').update({enabled:!m.enabled}).eq('id',id);if(res.error)throw res.error;}catch(e){AI_NOTICE=aiWriteErrorMessage('켜기·끄기',e);}
   await renderModelsSection(AI_ROOT.querySelector('#aiSection'));
 }
 async function deleteModel(id){
   if(!confirm('이 모델을 삭제할까요?'))return;
-  try{const res=await SB.from('ai_models').delete().eq('id',id);if(res.error)throw res.error;}catch(e){}
+  try{const res=await SB.from('ai_models').delete().eq('id',id);if(res.error)throw res.error;}catch(e){AI_NOTICE=aiWriteErrorMessage('삭제',e);}
   await renderModelsSection(AI_ROOT.querySelector('#aiSection'));
 }
 async function testModel(id){

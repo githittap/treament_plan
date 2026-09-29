@@ -6,7 +6,7 @@ function helpers(){
   assert.ok(block,'ai-assistants.js에 순수 helper 블록이 없습니다.');
   const c={};
   vm.createContext(c);
-  vm.runInContext(block+';this.h={aiRoleLabel,aiProviderLabel,aiWon,aiWonLabel,aiModelPriceLabel,aiGroupModelsByProvider,aiAssistantFormErrors,aiChatInputError,aiErrorMessage,aiAdminAssistantReady,aiUsageSummarize,aiNormalizeInvokeError,aiUnwrapInvoke};',c);
+  vm.runInContext(block+';this.h={aiRoleLabel,aiProviderLabel,aiWon,aiWonLabel,aiModelPriceLabel,aiGroupModelsByProvider,aiAssistantFormErrors,aiChatInputError,aiErrorMessage,aiAdminAssistantReady,aiUsageSummarize,aiNormalizeInvokeError,aiUnwrapInvoke,aiWriteErrorMessage};',c);
   return c.h;
 }
 
@@ -162,4 +162,23 @@ test('양식 검사: 설명 200자·지침서 20,000자 제한(DB check와 맞�
   const h=helpers();
   assert.deepEqual([...h.aiAssistantFormErrors({name:'ok',description:'a'.repeat(201),visible_roles:['staff']})],['설명은 200자 이하로 입력하세요.']);
   assert.deepEqual([...h.aiAssistantFormErrors({name:'ok',instructions:'a'.repeat(20001),visible_roles:['staff']})],['지침서는 20,000자 이하로 입력하세요.']);
+});
+
+test('저장·삭제·토글 실패 알림: 동작 이름과 이유를 짧은 한국어로 알려 준다',()=>{
+  const h=helpers();
+  assert.equal(h.aiWriteErrorMessage('저장',{code:'23505'}),'저장하지 못했어요 — 같은 이름이 이미 있어요.');
+  assert.equal(h.aiWriteErrorMessage('삭제',{code:'23503'}),'삭제하지 못했어요 — 다른 곳에서 쓰고 있어서 처리할 수 없어요.');
+  assert.equal(h.aiWriteErrorMessage('켜기·끄기',{code:'42501'}),'켜기·끄기하지 못했어요 — 권한이 없어요.');
+  assert.equal(h.aiWriteErrorMessage('복제',{message:'new row violates row-level security policy'}),'복제하지 못했어요 — 권한이 없어요.');
+  assert.equal(h.aiWriteErrorMessage('저장',{code:'23514'}),'저장하지 못했어요 — 입력한 값이 허용 범위를 벗어났어요.');
+  assert.equal(h.aiWriteErrorMessage('저장',{message:'TypeError: Failed to fetch'}),'저장하지 못했어요 — 인터넷 연결을 확인해 주세요.');
+  assert.equal(h.aiWriteErrorMessage('저장',null),'저장하지 못했어요 — 다시 시도해 주세요.');
+  assert.equal(h.aiWriteErrorMessage(undefined,{}),'저장하지 못했어요 — 다시 시도해 주세요.');
+});
+
+test('원장 화면의 저장·삭제·토글은 실패를 삼키지 않고 알림을 세운다',()=>{
+  assert.ok(!/catch\(e\)\{\}/.test(js),'빈 catch가 남아 있음');
+  const uses=(js.match(/AI_NOTICE=aiWriteErrorMessage\(/g)||[]).length;
+  assert.ok(uses>=5,'토글·복제·삭제 5곳에 알림 필요: '+uses);
+  assert.ok((js.match(/msgEl\.textContent=aiWriteErrorMessage\('저장',e\)/g)||[]).length>=2,'두 저장 양식도 알림 사용');
 });
