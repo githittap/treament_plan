@@ -142,25 +142,36 @@ create index if not exists ai_assistant_usage_user_created_idx on public.ai_assi
 -- 가격(달러/100만 토큰): anthropic 4곳은 claude-api 스킬 shared/model-migration.md
 -- (「Migrating to Claude Opus 5.5」·「Migrating to Claude Sonnet 5.5」 절)에 적힌 공식 가격.
 -- claude-haiku-4-5·claude-fable-5-1 가격은 설계서 2-4절 그대로(원장 승인 원문 기준).
--- openai·deepseek·stepfun·moonshot·google 5곳은 공식 가격 페이지에서 이 모델 이름(gpt-6-sol 등,
--- 설계서가 지정한 이름)을 찾지 못해 null로 둔다 — 원장이 허브 「모델 목록」에서 가격을 채우거나
--- 「회사별 목록 불러오기」로 실제 모델 이름을 확인한 뒤 다시 채운다.
+-- 나머지 5곳은 2026-09-29 웹 검색(WebSearch)으로 이름이 정확히 일치하고 단일가(변동·기간한정 없음)인
+-- 것만 채우고, 이름이 다르거나(딥시크) 변동·프로모션 가격(제미나이 플래시)인 것은 null로 남긴다.
+-- openai gpt-6-sol/luna/astra: OpenAI 공식 발표(openai.com/index/introducing-gpt-6-sol-and-luna)
+--   + benchlm.ai/openai/api-pricing(2026-09) 교차 확인. sol 2/10, luna 0.10/0.50, astra 10/50.
+-- deepseek: 공식 모델 이름이 「DeepSeek V4 Flash」로 설계서의 deepseek-flash와 다르고, 가격도
+--   피크/비피크 시간대에 따라 달라(비피크 pro 0.66/1.98, 피크 1.32/3.96 — deepseek.ai/pricing,
+--   benchlm.ai/deepseek/api-pricing) 단일가로 못 채움 -> null.
+-- stepfun step-5-preview: aireiter.com·runtimewire.com(2026-09, 「$1 per million input tokens」)
+--   확인, 1/2.70. step-3.7-flash는 가격 정보를 못 찾음 -> null.
+-- moonshot kimi-k3: benchlm.ai/moonshot/api-pricing·morphllm.com/kimi-api(둘 다 "$3/$15") 확인,
+--   3/15. kimi-k2.6: saygm.com(2026-09) 0.95/4.00 — 출처 1곳뿐이라 다소 낮은 확신.
+-- google gemini-3.1-pro-preview: 검색 결과 표시 이름은 「Gemini 3.1 Pro」(-preview 접미사 없음,
+--   설계서 model_id와 다를 수 있음) — 20만 토큰 이하 구간 기준 2/12(apidog.com 등). gemini-3.8-flash는
+--   2026-12-31까지 한정 프로모션가(0.75/3.75, 2027-01-01부터 1.50/7.50로 오름)라 단일가로 못 채움 -> null.
 insert into public.ai_models (provider, model_id, label, enabled, price_in_usd_per_mtok, price_out_usd_per_mtok, note, sort_order) values
   ('anthropic', 'claude-opus-5-5', 'Claude Opus 5.5', true, 4, 20, '', 10),
   ('anthropic', 'claude-sonnet-5-5', 'Claude Sonnet 5.5', true, 2, 10, '', 20),
   ('anthropic', 'claude-haiku-4-5', 'Claude Haiku 4.5', true, 1, 5, '', 30),
   ('anthropic', 'claude-fable-5-1', 'Claude Fable 5.1', true, 10, 50, '', 40),
-  ('openai', 'gpt-6-sol', 'GPT-6 Sol', true, null, null, '', 50),
-  ('openai', 'gpt-6-luna', 'GPT-6 Luna', true, null, null, '', 60),
-  ('openai', 'gpt-6-astra', 'GPT-6 Astra', true, null, null, '', 70),
-  ('deepseek', 'deepseek-flash', 'DeepSeek Flash', true, null, null, '', 80),
-  ('deepseek', 'deepseek-v4-pro', 'DeepSeek V4 Pro', true, null, null, '', 90),
-  ('stepfun', 'step-5-preview', 'Step 5 Preview', true, null, null, '', 100),
+  ('openai', 'gpt-6-sol', 'GPT-6 Sol', true, 2, 10, '', 50),
+  ('openai', 'gpt-6-luna', 'GPT-6 Luna', true, 0.10, 0.50, '', 60),
+  ('openai', 'gpt-6-astra', 'GPT-6 Astra', true, 10, 50, '', 70),
+  ('deepseek', 'deepseek-flash', 'DeepSeek Flash', true, null, null, '이름·가격 확인 필요(공식 이름은 DeepSeek V4 Flash로 보임, 피크/비피크 변동가)', 80),
+  ('deepseek', 'deepseek-v4-pro', 'DeepSeek V4 Pro', true, null, null, '피크/비피크 변동가라 단일가 미기재(비피크 0.66/1.98, 피크 1.32/3.96)', 90),
+  ('stepfun', 'step-5-preview', 'Step 5 Preview', true, 1, 2.70, '', 100),
   ('stepfun', 'step-3.7-flash', 'Step 3.7 Flash', true, null, null, '', 110),
-  ('moonshot', 'kimi-k3', 'Kimi K3', true, null, null, '', 120),
-  ('moonshot', 'kimi-k2.6', 'Kimi K2.6', true, null, null, '', 130),
-  ('google', 'gemini-3.1-pro-preview', 'Gemini 3.1 Pro', true, null, null, '', 140),
-  ('google', 'gemini-3.8-flash', 'Gemini 3.8 Flash', true, null, null, '', 150)
+  ('moonshot', 'kimi-k3', 'Kimi K3', true, 3, 15, '', 120),
+  ('moonshot', 'kimi-k2.6', 'Kimi K2.6', true, 0.95, 4.00, '출처 1곳뿐이라 확인 권장', 130),
+  ('google', 'gemini-3.1-pro-preview', 'Gemini 3.1 Pro', true, 2, 12, '20만 토큰 이하 구간 기준(그 이상은 다른 단가일 수 있음)', 140),
+  ('google', 'gemini-3.8-flash', 'Gemini 3.8 Flash', true, null, null, '2026-12-31까지 한정 프로모션가(0.75/3.75)라 미기재, 2027-01-01부터 1.50/7.50', 150)
 on conflict (provider, model_id) do nothing;
 
 -- 견본 도우미 1개(고정 id로 재실행해도 중복 삽입되지 않게 on conflict(id)) — model_ref는 원장이 허브에서 고름.
