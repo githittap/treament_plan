@@ -125,12 +125,46 @@ try{
   assert.equal((await q('select count(*)::int n from public.ai_assistant_usage'))[0].n,0,'staff는 사용 기록을 못 읽음');
   await reset();
 
+  // --- ai_usage_reserve: service_role만, 한도 경계, pending 행, 잠금 함수 사용 ---
+  const reserveAcl=(await q(`select
+    has_function_privilege('anon','public.ai_usage_reserve(uuid,uuid,text,text,text,int)','execute') anon_x,
+    has_function_privilege('authenticated','public.ai_usage_reserve(uuid,uuid,text,text,text,int)','execute') auth_x,
+    has_function_privilege('service_role','public.ai_usage_reserve(uuid,uuid,text,text,text,int)','execute') svc_x,
+    (select prosecdef from pg_proc where oid='public.ai_usage_reserve(uuid,uuid,text,text,text,int)'::regprocedure) secdef,
+    (select proconfig::text like '%search_path%' from pg_proc where oid='public.ai_usage_reserve(uuid,uuid,text,text,text,int)'::regprocedure) cfg,
+    (select prosrc like '%pg_advisory_xact_lock(hashtextextended(p_user::text%' from pg_proc where oid='public.ai_usage_reserve(uuid,uuid,text,text,text,int)'::regprocedure) locks,
+    has_table_privilege('service_role','public.ai_assistant_usage','update') svc_update,
+    has_table_privilege('authenticated','public.ai_assistant_usage','update') auth_update`))[0];
+  assert.deepEqual({...reserveAcl},{anon_x:false,auth_x:false,svc_x:true,secdef:true,cfg:true,locks:true,svc_update:true,auth_update:false});
+  await setUser(staff);
+  await assert.rejects(q(`select public.ai_usage_reserve('${staff}',null,'x','anthropic','m',120)`),/permission denied/,'직원은 예약 RPC를 직접 못 부름');await db.exec('rollback');
+  await reset();
+
+  const rUser='66666666-6666-6666-6666-666666666666',rSeed='00000000-0000-0000-0000-0000000000a1';
+  await asService();
+  await q(`insert into public.ai_assistant_usage(created_at,user_id,assistant_name,provider,model_id,status) values(now()-interval '2 hours','${rUser}','옛기록','anthropic','m','ok')`); // 1시간 밖 → 세지 않음
+  const ids=[];
+  for(let i=0;i<3;i++)ids.push((await q(`select public.ai_usage_reserve('${rUser}','${rSeed}','리뷰 답글','anthropic','claude-opus-5-5',3) id`))[0].id);
+  assert.equal(new Set(ids.map(String)).size,3,'예약마다 새 id');
+  assert.deepEqual(await q(`select status,count(*)::int n from public.ai_assistant_usage where user_id='${rUser}' and created_at>now()-interval '1 hour' group by status`),[{status:'pending',n:3}]);
+  await assert.rejects(q(`select public.ai_usage_reserve('${rUser}','${rSeed}','리뷰 답글','anthropic','claude-opus-5-5',3)`),e=>/rate_limited/.test(e.message)&&e.code==='P0001','한도(3) 다음은 rate_limited');
+  await reset();await asService();
+  assert.equal((await q(`select count(*)::int n from public.ai_assistant_usage where user_id='${rUser}' and created_at>now()-interval '1 hour'`))[0].n,3,'거절된 예약은 행을 만들지 않음');
+  // 다른 사용자는 영향 없음
+  assert.ok((await q(`select public.ai_usage_reserve('${manager}',null,'x','openai','m',3) id`))[0].id>0);
+  // 결과 update(service_role) + pending 포함 status check
+  await q(`update public.ai_assistant_usage set status='ok',input_tokens=5,output_tokens=6,est_cost_usd=0.001,latency_ms=12,fallback_used=true where id=${ids[0]}`);
+  assert.deepEqual(await q(`select status,fallback_used from public.ai_assistant_usage where id=${ids[0]}`),[{status:'ok',fallback_used:true}]);
+  await assert.rejects(q(`update public.ai_assistant_usage set status='bogus' where id=${ids[1]}`),/check constraint|violates/);await db.exec('rollback');
+  await reset();
+
   // --- 되돌리기 SQL이 깔끔히 되돌림 ---
   await db.exec(rollback);
   for(const name of ['ai_models','ai_assistants','ai_assistant_usage']){
     assert.equal((await q(`select to_regclass('public.${name}') n`))[0].n,null,`${name}이 롤백 뒤 남아있음`);
   }
   assert.equal((await q(`select to_regproc('public.ai_assistants_for_me') n`))[0].n,null);
+  assert.equal((await q(`select to_regproc('public.ai_usage_reserve') n`))[0].n,null,'예약 함수가 롤백 뒤 남아있음');
 
   console.log('PGLITE_AI_ASSISTANTS_PASS');
 }finally{

@@ -6,7 +6,7 @@ function helpers(){
   assert.ok(block,'ai-assistants.js에 순수 helper 블록이 없습니다.');
   const c={};
   vm.createContext(c);
-  vm.runInContext(block+';this.h={aiRoleLabel,aiProviderLabel,aiWon,aiWonLabel,aiModelPriceLabel,aiGroupModelsByProvider,aiAssistantFormErrors,aiChatInputError,aiErrorMessage,aiAdminAssistantReady,aiUsageSummarize,aiNormalizeInvokeError,aiUnwrapInvoke,aiWriteErrorMessage};',c);
+  vm.runInContext(block+';this.h={aiRoleLabel,aiProviderLabel,aiWon,aiWonLabel,aiModelPriceLabel,aiGroupModelsByProvider,aiAssistantFormErrors,aiChatInputError,aiErrorMessage,aiAdminAssistantReady,aiUsageSummarize,aiNormalizeInvokeError,aiUnwrapInvoke,aiWriteErrorMessage,aiIsStaleResponse,aiUserChanged,aiHistoryForRequest,aiConversationTooLong,aiCostSummaryLabel};',c);
   return c.h;
 }
 
@@ -181,4 +181,166 @@ test('원장 화면의 저장·삭제·토글은 실패를 삼키지 않고 알�
   const uses=(js.match(/AI_NOTICE=aiWriteErrorMessage\(/g)||[]).length;
   assert.ok(uses>=5,'토글·복제·삭제 5곳에 알림 필요: '+uses);
   assert.ok((js.match(/msgEl\.textContent=aiWriteErrorMessage\('저장',e\)/g)||[]).length>=2,'두 저장 양식도 알림 사용');
+});
+
+test('대화 섞임 방지 helper: 대화·요청 번호가 다르면 오래된 응답, 사용자가 바뀌면 초기화, 오류 문장은 서버로 안 보낸다',()=>{
+  const h=helpers();
+  assert.equal(h.aiIsStaleResponse({conv:1,req:2},{conv:1,req:2}),false);
+  assert.equal(h.aiIsStaleResponse({conv:1,req:2},{conv:2,req:2}),true);
+  assert.equal(h.aiIsStaleResponse({conv:1,req:2},{conv:1,req:3}),true);
+  assert.equal(h.aiIsStaleResponse(null,{conv:1,req:1}),true);
+  assert.equal(h.aiUserChanged(null,'u1'),false);
+  assert.equal(h.aiUserChanged('u1','u1'),false);
+  assert.equal(h.aiUserChanged('u1','u2'),true);
+  assert.equal(h.aiUserChanged('u1',undefined),true);
+  const hist=h.aiHistoryForRequest([{role:'user',content:'a'},{role:'assistant',content:'오류',isError:true,modelLabel:'x'},{role:'assistant',content:'b',modelLabel:'m'}]);
+  assert.deepEqual(JSON.parse(JSON.stringify(hist)),[{role:'user',content:'a'},{role:'assistant',content:'b'}]);
+});
+
+test('대화 길이 한도: 메시지 20개·개별 8,000자·합계 40,000자에 닿으면 새 대화가 필요하다',()=>{
+  const h=helpers();
+  const msg=(n,c='a')=>Array.from({length:n},(_,i)=>({role:i%2?'assistant':'user',content:c}));
+  assert.equal(h.aiConversationTooLong(msg(0)),false);
+  assert.equal(h.aiConversationTooLong(msg(19)),false);
+  assert.equal(h.aiConversationTooLong(msg(20)),true,'20개가 차면 다음 전송(21번째)이 막힘');
+  assert.equal(h.aiConversationTooLong([{role:'assistant',content:'a'.repeat(8001)}]),true,'긴 답 뒤엔 다음 전송이 막힘');
+  assert.equal(h.aiConversationTooLong([{role:'assistant',content:'a'.repeat(8000)}]),false);
+  assert.equal(h.aiConversationTooLong(msg(6,'a'.repeat(7000)),100),true,'합계 40,000자 초과');
+  assert.equal(h.aiConversationTooLong(msg(4,'a'.repeat(7000)),100),false);
+});
+
+test('사용 기록: 가격 미상(null)·기록 중(pending)은 0원으로 더하지 않고 미상 건수로 센다',()=>{
+  const h=helpers();
+  const s=h.aiUsageSummarize([
+    {status:'ok',provider:'a',model_id:'x',input_tokens:1,output_tokens:1,est_cost_usd:0.002,created_at:'2026-09-29T00:00:00Z'},
+    {status:'ok',provider:'a',model_id:'y',input_tokens:1,output_tokens:1,est_cost_usd:null,created_at:'2026-09-29T00:00:00Z'},
+    {status:'pending',provider:'a',model_id:'x',input_tokens:0,output_tokens:0,est_cost_usd:null,created_at:'2026-09-29T00:00:00Z'},
+    {status:'error',provider:'a',model_id:'x',input_tokens:0,output_tokens:0,est_cost_usd:null,created_at:'2026-09-29T00:00:00Z'},
+  ]);
+  assert.equal(s.totalUnknown,2);assert.equal(s.totalKnown,2);
+  assert.ok(Math.abs(s.totalCostUsd-0.002)<1e-12);
+  const byModel=Object.fromEntries([...s.byModel].map(r=>[r.key,r]));
+  assert.equal(byModel['a / y'].unknown,1);assert.equal(byModel['a / y'].known,0);
+  assert.equal(h.aiCostSummaryLabel(0.002,0,3),'₩3');
+  assert.equal(h.aiCostSummaryLabel(0.002,2,2),'확인된 금액 ₩3 · 미상 2건');
+  assert.equal(h.aiCostSummaryLabel(0,1,0),'금액 모름 · 미상 1건');
+});
+
+test('hr.html: 역할별·개인별 탭 설정 목록에 ai가 들어 있다(2곳)',()=>{
+  const html=read('hr.html');
+  const hits=html.match(/\['att','deposit','sched','leave','appr','notice','onbo','ai'\]/g)||[];
+  assert.equal(hits.length,2);
+});
+
+// ── 화면 전체를 가짜 DOM으로 돌려 보는 시험(대화 섞임·다시 조회) ──
+function harness(opts){
+  const handlers={},rpcCalls=[],invokes=[];
+  const registry={};
+  function attrs(html,name){const out=[];const re=new RegExp('data-'+name+'(?:="([^"]*)")?','g');let m;while((m=re.exec(html)))out.push(m[1]==null?'':m[1]);return out;}
+  function listAll(el,sel){
+    const m=sel.match(/^\[data-([\w-]+)\]$/);if(!m)return [];
+    return attrs(el.innerHTML,m[1]).map(function(v){return {addEventListener(t,f){handlers['['+m[1]+']='+v+'|'+t]=f;},getAttribute(){return v;}};});
+  }
+  function makeEl(key){
+    const el={innerHTML:'',value:'',textContent:'',scrollTop:0,scrollHeight:0,
+      addEventListener(t,f){handlers[key+'|'+t]=f;},
+      querySelector(sel){return getEl(sel);},
+      querySelectorAll(sel){return listAll(el,sel);},
+      getAttribute(){return '';}};
+    return el;
+  }
+  function getEl(sel){
+    if(sel[0]==='#'){registry[sel]=registry[sel]||makeEl(sel);return registry[sel];}
+    const k=sel.replace('[data-','[');return {addEventListener(t,f){handlers[k+'|'+t]=f;}};
+  }
+  const root=makeEl('root');
+  const section=getEl('#aiSection');
+  const assistants=(opts&&opts.assistants)||[{id:'A',name:'도우미A',icon:'A',description:'',ready:true,sort_order:1},{id:'B',name:'도우미B',icon:'B',description:'',ready:true,sort_order:2}];
+  const sb={
+    rpc:async function(name){rpcCalls.push(name);return {data:assistants,error:null};},
+    functions:{invoke:function(name,args){return new Promise(function(resolve){invokes.push({args:args,resolve:resolve});});}},
+  };
+  const ctx={window:{},document:{head:{appendChild(){}},createElement(){return {};}},confirm(){return true;},navigator:{},console};
+  vm.createContext(ctx);
+  vm.runInContext(js,ctx);
+  return {ctx,root,section,sb,rpcCalls,invokes,input:getEl('#aiInput'),
+    async click(key){return handlers[key+'|click']();},
+    async render(me){await ctx.window.AIAssistants.render(root,{sb:sb,me:me});}};
+}
+const tick=()=>new Promise(r=>setImmediate(r));
+
+test('화면 시험: A의 답을 기다리는 중 B를 열면 A의 늦은 답이 B 대화·다음 요청에 섞이지 않는다',async()=>{
+  const t=harness({});
+  await t.render({id:'u1',role:'staff'});
+  await t.click('[ai-open]=A');
+  t.input.value='A질문';
+  const p1=t.click('#aiSendBtn'); // 첫 전송(아직 응답 대기)
+  assert.equal(t.invokes.length,1);
+  await t.click('#aiSendBtn');   // 대기 중 재전송 → 무시
+  assert.equal(t.invokes.length,1,'보내는 중에는 두 번째 요청을 만들지 않음');
+  await t.click('[ai-back]');
+  await t.click('[ai-open]=B');
+  t.invokes[0].resolve({data:{ok:true,text:'A의 비공개 답',model_label:'m'},error:null}); // A의 답이 늦게 도착
+  await p1;await tick();
+  t.input.value='B후속';
+  t.click('#aiSendBtn'); // 응답을 기다리지 않는다(요청 본문만 확인)
+  assert.equal(t.invokes.length,2);
+  const body=t.invokes[1].args.body;
+  assert.equal(body.assistant_id,'B');
+  assert.deepEqual(JSON.parse(JSON.stringify(body.messages)),[{role:'user',content:'B후속'}],'A의 답이 B 요청에 실리면 안 됨');
+});
+
+test('화면 시험: 새 대화를 누르면 이전 요청의 늦은 답이 새 대화에 들어오지 않는다',async()=>{
+  const t=harness({});
+  await t.render({id:'u1',role:'staff'});
+  await t.click('[ai-open]=A');
+  t.input.value='첫 질문';
+  const p1=t.click('#aiSendBtn');
+  await t.click('[ai-new]');
+  t.invokes[0].resolve({data:{ok:true,text:'늦은 답'},error:null});
+  await p1;await tick();
+  t.input.value='새 질문';
+  t.click('#aiSendBtn'); // 응답을 기다리지 않는다(요청 본문만 확인)
+  assert.deepEqual(JSON.parse(JSON.stringify(t.invokes[1].args.body.messages)),[{role:'user',content:'새 질문'}]);
+});
+
+test('화면 시험: 로그인 사용자가 바뀐 채 render가 다시 불리면 이전 사람의 대화 상태를 비운다',async()=>{
+  const t=harness({});
+  await t.render({id:'u1',role:'staff'});
+  await t.click('[ai-open]=A');
+  t.input.value='질문';
+  const p=t.click('#aiSendBtn');
+  t.invokes[0].resolve({data:{ok:true,text:'답'},error:null});
+  await p;await tick();
+  assert.match(t.section.innerHTML,/ai-chat-card/);
+  await t.render({id:'u2',role:'staff'});
+  assert.doesNotMatch(t.section.innerHTML,/ai-chat-card/,'다른 사용자에게 이전 대화가 남으면 안 됨');
+  assert.match(t.section.innerHTML,/data-ai-open/);
+});
+
+test('화면 시험: 카드 목록으로 돌아갈 때·도우미 탭에 다시 들어갈 때 ai_assistants_for_me를 다시 조회한다',async()=>{
+  const t=harness({});
+  await t.render({id:'o1',role:'owner'});
+  assert.equal(t.rpcCalls.length,1);
+  await t.click('[ai-open]=A');
+  await t.click('[ai-back]');
+  assert.equal(t.rpcCalls.length,2,'← 목록');
+  await t.click('[ai-subtab]=manage');
+  await t.click('[ai-subtab]=chat');
+  assert.equal(t.rpcCalls.length,3,'도우미 탭 재진입');
+});
+
+test('화면 시험: 대화가 20개에 닿으면 「새 대화가 필요해요」가 보이고 보내기가 막힌다',async()=>{
+  const t=harness({});
+  await t.render({id:'u1',role:'staff'});
+  await t.click('[ai-open]=A');
+  for(let i=0;i<10;i++){
+    t.input.value='질문'+i;
+    const p=t.click('#aiSendBtn');
+    t.invokes[i].resolve({data:{ok:true,text:'답'+i},error:null});
+    await p;await tick();
+  }
+  assert.match(t.section.innerHTML,/대화가 길어져 새 대화가 필요해요/);
+  assert.match(t.section.innerHTML,/class="mini stamp" data-ai-new/);
+  assert.match(t.section.innerHTML,/id="aiSendBtn" disabled/);
 });

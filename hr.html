@@ -2804,7 +2804,7 @@ async function renderOwner(m){
         :`<button class="mini" onclick="grantConfid('${p.user_id}')">추가</button>`}</td></tr>`).join('')}</table></div>
     <h3>🧭 탭 노출 설정 <span class="sub">(역할별 · 즉시 반영)</span></h3>
     <div class="tblwrap"><table><tr><th>탭</th>${['staff','manager','chief','owner'].map(r=>`<th>${r}</th>`).join('')}</tr>
-    ${['att','deposit','sched','leave','appr','notice','onbo'].map(key=>{const t=TABS.find(x=>x.key===key),allowed=TAB_ROLES[key]||t.roles;return `<tr><td>${t.label}</td>${['staff','manager','chief','owner'].map(role=>`<td><input type="checkbox" ${allowed.includes(role)?'checked':''} ${role==='owner'?'disabled':''} onchange="toggleTabRole('${key}','${role}',this.checked)"></td>`).join('')}</tr>`;}).join('')}</table></div>
+    ${['att','deposit','sched','leave','appr','notice','onbo','ai'].map(key=>{const t=TABS.find(x=>x.key===key),allowed=TAB_ROLES[key]||t.roles;return `<tr><td>${t.label}</td>${['staff','manager','chief','owner'].map(role=>`<td><input type="checkbox" ${allowed.includes(role)?'checked':''} ${role==='owner'?'disabled':''} onchange="toggleTabRole('${key}','${role}',this.checked)"></td>`).join('')}</tr>`;}).join('')}</table></div>
     <h3>👤 사람별 탭 예외 <span class="sub">(역할 기본을 개인별로 덮어씀 · 즉시 반영)</span></h3>
     <select id="ovUser" onchange="renderOverrideRows()"><option value="">직원을 선택하세요</option>${PROFILES.filter(p=>p.approved!==false&&p.role!=='owner').map(p=>`<option value="${p.user_id}">${esc(p.name)} (${p.role})</option>`).join('')}</select>
     <div id="ovRows"></div>
@@ -2908,7 +2908,7 @@ async function toggleTabRole(key,role,on){
 }
 function renderOverrideRows(){
   const sel=$('#ovUser'),rows=$('#ovRows');if(!sel||!rows)return;
-  const uid=sel.value,keys=['att','deposit','sched','leave','appr','notice','onbo'];
+  const uid=sel.value,keys=['att','deposit','sched','leave','appr','notice','onbo','ai'];
   if(!uid){rows.innerHTML='<div class="sub">승인된 직원을 선택하세요.</div>';return;}
   const overrides=TAB_OVERRIDES[uid]||{};
   rows.innerHTML=`<div class="tblwrap"><table><tr><th>탭</th><th>개인 예외</th></tr>${keys.map(key=>{const t=TABS.find(x=>x.key===key),v=overrides[key]===true?'show':overrides[key]===false?'hide':'';return `<tr><td>${t.label}</td><td><select class="mini" onchange="setTabOverride('${uid}','${key}',this.value)"><option value="" ${v===''?'selected':''}>기본(역할규칙)</option><option value="show" ${v==='show'?'selected':''}>보이기(강제)</option><option value="hide" ${v==='hide'?'selected':''}>숨기기(강제)</option></select></td></tr>`;}).join('')}</table></div>`;

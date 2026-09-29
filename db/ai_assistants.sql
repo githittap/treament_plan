@@ -116,7 +116,7 @@ create table if not exists public.ai_assistant_usage (
   provider text not null,
   model_id text not null,
   fallback_used boolean not null default false,
-  status text not null check (status in ('ok','error')),
+  status text not null check (status in ('ok','error','pending')), -- pending = 호출 전 예약(아직 결과 없음)
   error_kind text null,
   input_tokens int not null default 0 check (input_tokens >= 0),
   output_tokens int not null default 0 check (output_tokens >= 0),
@@ -126,15 +126,45 @@ create table if not exists public.ai_assistant_usage (
 alter table public.ai_assistant_usage enable row level security;
 revoke all on table public.ai_assistant_usage from public, anon, authenticated;
 grant select on table public.ai_assistant_usage to authenticated;
-grant select, insert on table public.ai_assistant_usage to service_role;
+grant select, insert, update on table public.ai_assistant_usage to service_role; -- Edge 함수가 예약(insert) 뒤 결과를 update
 
 drop policy if exists ai_assistant_usage_owner_select on public.ai_assistant_usage;
 create policy ai_assistant_usage_owner_select on public.ai_assistant_usage for select to authenticated
   using ((select public.my_role()) = 'owner');
 -- insert·update·delete 정책 없음 = authenticated는 못 씀(Edge 함수가 service role로만 기록).
 
+-- 이미 status check가 옛 값(ok·error)으로 만들어진 DB에서도 재실행되게 제약을 다시 만든다.
+alter table public.ai_assistant_usage drop constraint if exists ai_assistant_usage_status_check;
+alter table public.ai_assistant_usage add constraint ai_assistant_usage_status_check check (status in ('ok','error','pending'));
+
 create index if not exists ai_assistant_usage_created_at_idx on public.ai_assistant_usage (created_at desc);
 create index if not exists ai_assistant_usage_user_created_idx on public.ai_assistant_usage (user_id, created_at desc);
+
+-- 호출 전 「예약」: 사용자별 잠금 아래에서 최근 1시간 건수(예약 포함)를 세어 한도를 넘으면 rate_limited 예외,
+-- 아니면 status='pending' 행을 넣고 id를 돌려준다. Edge 함수가 시도마다(1차·예비 각각) 이 함수를 먼저 부르고,
+-- 호출이 끝나면 같은 행을 ok/error·토큰·금액·지연으로 update한다. 동시 요청이 한도를 넘지 못하게 하는 유일한 관문이다.
+-- service_role만 실행(직원이 직접 부르면 남의 건수를 채울 수 있음).
+create or replace function public.ai_usage_reserve(
+  p_user uuid, p_assistant uuid, p_assistant_name text, p_provider text, p_model_id text, p_limit int default 120
+) returns bigint
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_count int;
+  v_id bigint;
+begin
+  perform pg_advisory_xact_lock(hashtextextended(p_user::text, 0));
+  select count(*) into v_count from public.ai_assistant_usage
+    where user_id = p_user and created_at >= now() - interval '1 hour';
+  if v_count >= p_limit then
+    raise exception using errcode = 'P0001', message = 'rate_limited';
+  end if;
+  insert into public.ai_assistant_usage (user_id, assistant_id, assistant_name, provider, model_id, status)
+    values (p_user, p_assistant, p_assistant_name, p_provider, p_model_id, 'pending')
+    returning id into v_id;
+  return v_id;
+end$$;
+revoke all on function public.ai_usage_reserve(uuid, uuid, text, text, text, int) from public, anon, authenticated;
+grant execute on function public.ai_usage_reserve(uuid, uuid, text, text, text, int) to service_role;
 
 -- =====================================================================================
 -- 2-4. 처음 넣을 자료

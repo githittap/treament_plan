@@ -6,6 +6,7 @@ drop trigger if exists ai_assistants_set_updated_at on public.ai_assistants;
 drop function if exists public.set_ai_assistants_updated_at();
 drop trigger if exists ai_models_set_updated_at on public.ai_models;
 drop function if exists public.set_ai_models_updated_at();
+drop function if exists public.ai_usage_reserve(uuid, uuid, text, text, text, int);
 drop table if exists public.ai_assistant_usage;
 drop table if exists public.ai_assistants;
 drop table if exists public.ai_models;

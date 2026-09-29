@@ -130,75 +130,92 @@ export function createAiAssistantChatHandler(deps: { createClient?: any; env?: (
         if (fm && fm.enabled) fallbackModel = fm;
       }
 
-      // --- 7. 과다 사용 막기 ---
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-      const { count: recentCount } = await admin
-        .from("ai_assistant_usage")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .gte("created_at", oneHourAgo);
-      if ((recentCount ?? 0) >= RATE_LIMIT_PER_HOUR) return json(fail("rate_limited"), 429);
-
       // --- 8. 시스템 프롬프트 ---
       const system = buildSystemPrompt(assistant.instructions, assistant.knowledge);
       const messages = validated.messages;
 
-      async function recordUsage(model: any, result: any, fallbackUsed: boolean, latencyMs: number) {
-        const est = result.ok
-          ? estimateCostUsd({
-              inputTokens: result.input_tokens,
-              outputTokens: result.output_tokens,
-              priceInUsdPerMtok: model.price_in_usd_per_mtok,
-              priceOutUsdPerMtok: model.price_out_usd_per_mtok,
-            })
-          : null;
-        await admin.from("ai_assistant_usage").insert({
-          user_id: user.id,
-          assistant_id: assistant.id,
-          assistant_name: assistant.name,
-          provider: model.provider,
-          model_id: model.model_id,
-          fallback_used: fallbackUsed,
-          status: result.ok ? "ok" : "error",
-          error_kind: result.ok ? null : result.reason,
-          input_tokens: result.ok ? result.input_tokens : 0,
-          output_tokens: result.ok ? result.output_tokens : 0,
-          est_cost_usd: est,
-          latency_ms: latencyMs,
+      // --- 7. 과다 사용 막기 + 사용 기록: 시도마다(1차·예비 각각) DB 예약 RPC로 「한도 확인 + pending 행」을 한 번에(사용자별 잠금)
+      //     하고, 호출이 끝나면 같은 행을 결과로 update한다. 예약이 실패하면 AI를 부르지 않는다(fail closed).
+      async function reserveUsage(model: any): Promise<{ ok: true; id: number } | { ok: false; kind: string }> {
+        const { data, error } = await admin.rpc("ai_usage_reserve", {
+          p_user: user.id,
+          p_assistant: assistant.id,
+          p_assistant_name: assistant.name,
+          p_provider: model.provider,
+          p_model_id: model.model_id,
+          p_limit: RATE_LIMIT_PER_HOUR,
         });
+        if (error) {
+          if (error.message === "rate_limited") return { ok: false, kind: "rate_limited" };
+          console.error("ai_usage_reserve failed", error.code, error.message);
+          return { ok: false, kind: "usage_unavailable" };
+        }
+        if (data === null || data === undefined) {
+          console.error("ai_usage_reserve returned no id");
+          return { ok: false, kind: "usage_unavailable" };
+        }
+        return { ok: true, id: Number(data) };
       }
 
-      // --- 9. 1차 호출 ---
-      const primaryStart = Date.now();
-      let result = await doCallModel({
-        provider: primaryModel.provider,
-        apiKey: apiKeyFor(primaryModel.provider, readEnv),
-        baseUrl: baseUrlFor(primaryModel.provider, readEnv),
-        modelId: primaryModel.model_id,
-        system,
-        messages,
-        maxOutputTokens: assistant.max_output_tokens,
-        effort: assistant.effort,
-        timeoutMs: 55000,
-      });
-      await recordUsage(primaryModel, result, false, Date.now() - primaryStart);
+      // 결과 기록 실패는 답을 막지 않는다(이미 호출이 끝났음). 서버 로그에만 남기고 행은 pending으로 남는다(건수에는 이미 포함).
+      async function finishUsage(usageId: number, model: any, result: any, fallbackUsed: boolean, latencyMs: number) {
+        try {
+          const est = result.ok
+            ? estimateCostUsd({
+                inputTokens: result.input_tokens,
+                outputTokens: result.output_tokens,
+                priceInUsdPerMtok: model.price_in_usd_per_mtok,
+                priceOutUsdPerMtok: model.price_out_usd_per_mtok,
+              })
+            : null;
+          const { error } = await admin
+            .from("ai_assistant_usage")
+            .update({
+              fallback_used: fallbackUsed,
+              status: result.ok ? "ok" : "error",
+              error_kind: result.ok ? null : result.reason,
+              input_tokens: result.ok ? result.input_tokens : 0,
+              output_tokens: result.ok ? result.output_tokens : 0,
+              est_cost_usd: est,
+              latency_ms: latencyMs,
+            })
+            .eq("id", usageId);
+          if (error) console.error("ai_assistant_usage update failed", usageId, error.code, error.message);
+        } catch (e) {
+          console.error("ai_assistant_usage update threw", usageId, e instanceof Error ? e.message : String(e));
+        }
+      }
 
-      let usedModel = primaryModel;
-      let fallbackUsed = false;
-      if (!result.ok && shouldFallback(result.reason) && fallbackModel) {
-        const fallbackStart = Date.now();
-        result = await doCallModel({
-          provider: fallbackModel.provider,
-          apiKey: apiKeyFor(fallbackModel.provider, readEnv),
-          baseUrl: baseUrlFor(fallbackModel.provider, readEnv),
-          modelId: fallbackModel.model_id,
+      const attempt = async (model: any, fallbackUsed: boolean) => {
+        const reserved = await reserveUsage(model);
+        if (!reserved.ok) return { blocked: reserved.kind as string };
+        const startedAt = Date.now();
+        const callResult = await doCallModel({
+          provider: model.provider,
+          apiKey: apiKeyFor(model.provider, readEnv),
+          baseUrl: baseUrlFor(model.provider, readEnv),
+          modelId: model.model_id,
           system,
           messages,
           maxOutputTokens: assistant.max_output_tokens,
           effort: assistant.effort,
           timeoutMs: 55000,
         });
-        await recordUsage(fallbackModel, result, true, Date.now() - fallbackStart);
+        await finishUsage(reserved.id, model, callResult, fallbackUsed, Date.now() - startedAt);
+        return { result: callResult };
+      };
+
+      // --- 9. 1차 호출 ---
+      const first = await attempt(primaryModel, false);
+      if ("blocked" in first) return json(fail(first.blocked!), httpStatusForError(first.blocked!));
+      let result = first.result;
+
+      let usedModel = primaryModel;
+      let fallbackUsed = false;
+      if (!result.ok && shouldFallback(result.reason) && fallbackModel) {
+        const second = await attempt(fallbackModel, true);
+        if ("blocked" in second) return json(fail(second.blocked!), httpStatusForError(second.blocked!));
+        result = second.result;
         usedModel = fallbackModel;
         fallbackUsed = true;
       }

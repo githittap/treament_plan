@@ -94,6 +94,7 @@ const AI_ERROR_MESSAGES={
   rate_limited:'짧은 시간에 너무 많이 요청했어요. 잠시 후 다시 시도해 주세요.',
   provider_not_configured:'이 AI 회사 연결이 아직 준비되지 않았어요.',
   provider_auth_failed:'이 AI 회사가 연결 키를 받아 주지 않아요. 원장에게 알려 주세요.',
+  usage_unavailable:'사용 기록을 확인할 수 없어 지금은 쓸 수 없어요. 잠시 후 다시 시도해 주세요.',
   upstream_error:'AI 응답을 받지 못했어요. 잠시 후 다시 시도해 주세요.',
   timeout:'응답이 너무 오래 걸려요. 다시 시도해 주세요.',
   network_error:'인터넷 연결을 확인하고 다시 시도해 주세요.',
@@ -133,28 +134,33 @@ function aiAdminAssistantReady(assistant,modelsById){
 }
 
 // 사용 기록(ai_assistant_usage) 합산 — 날짜별·도우미별·직원별·모델별(설계서 4-3-3).
+// 금액은 「확인된」 것만 더한다: est_cost_usd가 null인 성공 기록(가격 미상)과 status='pending'(결과 기록 전)은 0원으로 더하지 않고
+// unknown 건수로 센다. 실패(status='error')는 응답을 못 받아 청구 토큰이 없으므로 0원으로 확인된 것으로 본다.
 function aiUsageSummarize(rows){
   const groups={byDate:{},byAssistant:{},byUser:{},byModel:{}};
-  let totalCount=0,totalInput=0,totalOutput=0,totalCostUsd=0;
+  let totalCount=0,totalInput=0,totalOutput=0,totalCostUsd=0,totalUnknown=0,totalKnown=0;
   (rows||[]).forEach(r=>{
     if(!r)return;
     totalCount++;
     const inTok=Number(r.input_tokens||0),outTok=Number(r.output_tokens||0);
-    const cost=r.est_cost_usd==null?0:Number(r.est_cost_usd||0);
+    const unknown=r.status==='pending'||(r.status!=='error'&&r.est_cost_usd==null);
+    const cost=unknown?0:Number(r.est_cost_usd||0);
     totalInput+=inTok;totalOutput+=outTok;totalCostUsd+=cost;
+    if(unknown)totalUnknown++;else totalKnown++;
     const dateKey=String(r.created_at||'').slice(0,10)||'(모름)';
     const assistantKey=r.assistant_name||'(이름없음)';
     const userKey=r.user_name||r.user_id||'(모름)';
     const modelKey=(r.provider||'')+' / '+(r.model_id||'');
     [[groups.byDate,dateKey],[groups.byAssistant,assistantKey],[groups.byUser,userKey],[groups.byModel,modelKey]].forEach(function(pair){
       const map=pair[0],key=pair[1];
-      if(!map[key])map[key]={count:0,input_tokens:0,output_tokens:0,cost_usd:0};
+      if(!map[key])map[key]={count:0,input_tokens:0,output_tokens:0,cost_usd:0,unknown:0,known:0};
       map[key].count++;map[key].input_tokens+=inTok;map[key].output_tokens+=outTok;map[key].cost_usd+=cost;
+      if(unknown)map[key].unknown++;else map[key].known++;
     });
   });
   const toRows=function(map){return Object.keys(map).sort(function(a,b){return map[b].count-map[a].count;}).map(function(k){return Object.assign({key:k},map[k]);});};
   const byDate=toRows(groups.byDate).sort(function(a,b){return a.key<b.key?1:-1;});
-  return {totalCount:totalCount,totalInput:totalInput,totalOutput:totalOutput,totalCostUsd:totalCostUsd,totalCostWon:aiWon(totalCostUsd),
+  return {totalCount:totalCount,totalInput:totalInput,totalOutput:totalOutput,totalCostUsd:totalCostUsd,totalCostWon:aiWon(totalCostUsd),totalUnknown:totalUnknown,totalKnown:totalKnown,
     byDate:byDate,byAssistant:toRows(groups.byAssistant),byUser:toRows(groups.byUser),byModel:toRows(groups.byModel)};
 }
 // 원장 화면 저장·삭제·토글 실패 알림(쉬운 한국어). what: '저장'|'삭제'|'켜기·끄기'|'복제' 등 동작 이름.
@@ -170,6 +176,38 @@ function aiWriteErrorMessage(what,error){
   else if(/failed to fetch|network|load failed/i.test(msg))why='인터넷 연결을 확인해 주세요.';
   return w+'하지 못했어요'+(why?(' — '+why):' — 다시 시도해 주세요.');
 }
+// 대화 섞임 방지: 요청을 보낼 때의 (대화 번호, 요청 번호)가 응답 때의 현재 값과 다르면 그 응답은 버린다.
+function aiIsStaleResponse(sent,current){
+  return !sent||!current||sent.conv!==current.conv||sent.req!==current.req;
+}
+// 로그인 사용자가 바뀌었는지(이전 사용자가 있었고 지금과 다를 때만 true) — 바뀌면 대화 상태를 비운다.
+function aiUserChanged(prevId,nextId){
+  return prevId!=null&&prevId!==''&&String(prevId)!==String(nextId==null?'':nextId);
+}
+// 서버에 보낼 대화(오류 안내 문장은 빼고 role/content만).
+function aiHistoryForRequest(messages){
+  return (messages||[]).filter(function(m){return m&&!m.isError;}).map(function(m){return {role:m.role,content:m.content};});
+}
+// 서버 제한(메시지 20개·개별 8,000자·합계 40,000자)에 막혀 「다음 전송」이 안 되는 상태인지. nextLen = 다음에 보낼 말 길이(모르면 1).
+function aiConversationTooLong(history,nextLen){
+  const h=history||[];
+  const add=nextLen==null?1:Math.max(1,Number(nextLen)||1);
+  if(h.length+1>20)return true;
+  let total=add;
+  for(let i=0;i<h.length;i++){
+    const len=String((h[i]&&h[i].content)||'').length;
+    if(len>8000)return true;
+    total+=len;
+  }
+  return total>40000;
+}
+// 금액 표시: 가격 미상(null)·기록 중(pending)은 0원으로 더하지 않고 미상 건수로 따로 센다.
+function aiCostSummaryLabel(costUsd,unknownCount,knownCount){
+  const unk=Number(unknownCount)||0;
+  if(!unk)return aiWonLabel(costUsd);
+  if(!(Number(knownCount)>0))return '금액 모름 · 미상 '+unk+'건';
+  return '확인된 금액 '+aiWonLabel(costUsd)+' · 미상 '+unk+'건';
+}
 /* ai-assistants:test-end */
 
 /* ── 아래부터 DOM·네트워크 코드(시험 블록 밖) ── */
@@ -177,7 +215,7 @@ function escAi(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g
 
 let SB=null,ME={},AI_ROOT=null,AI_SUBTAB='chat',AI_STYLE_INJECTED=false;
 let AI_ASSISTANTS=[],AI_ERROR='';
-let AI_ACTIVE_ASSISTANT=null,AI_MESSAGES=[],AI_SENDING=false;
+let AI_ACTIVE_ASSISTANT=null,AI_MESSAGES=[],AI_SENDING=false,AI_CONV=0,AI_REQ=0,AI_UID=null;
 let AI_ADMIN_ASSISTANTS=[],AI_ADMIN_MODELS=[],AI_EDIT_ASSISTANT=null,AI_EDIT_ERRORS=[],AI_MODEL_EDIT=null;
 let AI_USAGE_ROWS=[],AI_NOTICE='';
 
@@ -220,13 +258,23 @@ async function renderAIAssistants(container,ctx){
   SB=(ctx&&ctx.sb)||null;
   ME=(ctx&&ctx.me)||{};
   AI_ROOT=container;
+  if(aiUserChanged(AI_UID,ME.id)){resetAiState();}
+  AI_UID=ME.id==null?null:ME.id;
   ensureStyle();
   if(!AI_ROOT)return;
   AI_ROOT.innerHTML='<div class="empty">불러오는 중…</div>';
   await loadAndRenderShell();
 }
 
-async function loadAndRenderShell(){
+// 로그인 사용자가 바뀌면 이전 사람의 대화·관리 화면 상태를 모두 비운다.
+function resetAiState(){
+  AI_CONV++;AI_REQ++;
+  AI_ACTIVE_ASSISTANT=null;AI_MESSAGES=[];AI_SENDING=false;AI_SUBTAB='chat';
+  AI_ASSISTANTS=[];AI_ERROR='';AI_ADMIN_ASSISTANTS=[];AI_ADMIN_MODELS=[];AI_EDIT_ASSISTANT=null;AI_EDIT_ERRORS=[];AI_MODEL_EDIT=null;AI_USAGE_ROWS=[];AI_NOTICE='';
+}
+
+// 직원용 RPC를 다시 읽어 카드 목록(ready 등)을 최신으로 맞춘다.
+async function reloadAssistants(){
   AI_ERROR='';
   try{
     if(!SB)throw new Error('연결 정보가 없습니다.');
@@ -237,6 +285,10 @@ async function loadAndRenderShell(){
     AI_ASSISTANTS=[];
     AI_ERROR=(e&&e.message)||'도우미 목록을 불러오지 못했습니다.';
   }
+}
+
+async function loadAndRenderShell(){
+  await reloadAssistants();
   renderShell();
 }
 
@@ -247,10 +299,10 @@ function renderShell(){
   const nav=tabs.length>1?('<div class="rowflex ai-subnav">'+tabs.map(function(t){return '<button class="mini'+(AI_SUBTAB===t.key?' on':'')+'" data-ai-subtab="'+t.key+'">'+t.label+'</button>';}).join('')+'</div>'):'';
   AI_ROOT.innerHTML='<div class="ai-wrap">'+nav+'<div id="aiSection"></div></div>';
   Array.prototype.forEach.call(AI_ROOT.querySelectorAll('[data-ai-subtab]'),function(btn){
-    btn.addEventListener('click',function(){
+    btn.addEventListener('click',async function(){
       AI_SUBTAB=btn.getAttribute('data-ai-subtab');
+      if(AI_SUBTAB==='chat')await reloadAssistants(); // 관리 화면에서 바꾼 모델·이름이 카드에 바로 보이게
       renderShell();
-      renderActiveSection();
     });
   });
   renderActiveSection();
@@ -290,12 +342,18 @@ function renderChatSection(root){
   });
 }
 
+// 대화가 바뀔 때마다(열기·새 대화·목록으로) 대화 번호를 올려 이전 대화의 늦은 응답이 섞이지 않게 한다.
+function startFreshConversation(){AI_CONV++;AI_REQ++;AI_MESSAGES=[];AI_SENDING=false;}
 function openAiChat(id){
   AI_ACTIVE_ASSISTANT=AI_ASSISTANTS.find(function(a){return a.id===id;})||null;
-  AI_MESSAGES=[];AI_SENDING=false;
+  startFreshConversation();
   renderActiveSection();
 }
-function closeAiChat(){AI_ACTIVE_ASSISTANT=null;AI_MESSAGES=[];renderActiveSection();}
+async function closeAiChat(){
+  AI_ACTIVE_ASSISTANT=null;startFreshConversation();
+  await reloadAssistants(); // 카드 목록에 들어갈 때마다 최신(모델 지정 여부 등)으로
+  renderActiveSection();
+}
 
 function aiMessageHtml(msg,idx){
   const who=msg.role==='user'?'나':'AI';
@@ -305,20 +363,22 @@ function aiMessageHtml(msg,idx){
 
 function renderChatPanel(root){
   const a=AI_ACTIVE_ASSISTANT;
+  const tooLong=aiConversationTooLong(aiHistoryForRequest(AI_MESSAGES));
   root.innerHTML='<div class="card ai-chat-card">'+
     '<div class="rowflex" style="justify-content:space-between;align-items:center">'+
     '<h2>'+escAi(a.icon||'🤖')+' '+escAi(a.name)+'</h2>'+
-    '<div class="rowflex"><button class="mini" data-ai-new>새 대화</button><button class="mini" data-ai-back>← 목록</button></div>'+
+    '<div class="rowflex"><button class="mini'+(tooLong?' stamp':'')+'" data-ai-new>새 대화</button><button class="mini" data-ai-back>← 목록</button></div>'+
     '</div>'+
     '<div class="sub">'+escAi(a.description||'')+'</div>'+
+    (tooLong?'<div class="hint" style="color:var(--red);font-weight:700" role="alert">대화가 길어져 새 대화가 필요해요. 「새 대화」를 눌러 주세요.</div>':'')+
     '<div class="ai-msgs" id="aiMsgs">'+(AI_MESSAGES.length?AI_MESSAGES.map(aiMessageHtml).join(''):'<div class="empty">메시지를 보내 대화를 시작하세요.</div>')+'</div>'+
     (AI_SENDING?'<div class="sub">생각 중…</div>':'')+
     '<textarea id="aiInput" placeholder="메시지를 입력하세요(Ctrl+Enter로 보내기)"></textarea>'+
-    '<div class="rowflex" style="justify-content:flex-end"><button class="mini stamp" id="aiSendBtn"'+(AI_SENDING?' disabled':'')+'>보내기</button></div>'+
+    '<div class="rowflex" style="justify-content:flex-end"><button class="mini stamp" id="aiSendBtn"'+((AI_SENDING||tooLong)?' disabled':'')+'>보내기</button></div>'+
     '<div class="hint" id="aiChatErr"></div>'+
     '</div>';
   root.querySelector('[data-ai-back]').addEventListener('click',closeAiChat);
-  root.querySelector('[data-ai-new]').addEventListener('click',function(){AI_MESSAGES=[];renderActiveSection();});
+  root.querySelector('[data-ai-new]').addEventListener('click',function(){startFreshConversation();renderActiveSection();});
   const input=root.querySelector('#aiInput');
   input.addEventListener('keydown',function(e){if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();sendAiMessage();}});
   root.querySelector('#aiSendBtn').addEventListener('click',sendAiMessage);
@@ -333,6 +393,7 @@ function renderChatPanel(root){
 }
 
 async function sendAiMessage(){
+  if(AI_SENDING)return; // 답을 기다리는 중 Ctrl+Enter 등으로 두 번 보내지 않는다
   const root=AI_ROOT.querySelector('#aiSection');
   const input=root&&root.querySelector('#aiInput');
   if(!input)return;
@@ -342,19 +403,32 @@ async function sendAiMessage(){
   if(err){if(errEl)errEl.textContent=err;return;}
   if(errEl)errEl.textContent='';
   const a=AI_ACTIVE_ASSISTANT;
+  if(!a)return;
+  const history=aiHistoryForRequest(AI_MESSAGES);
+  if(aiConversationTooLong(history,text.trim().length)){
+    // 서버 제한(20개·8,000자·40,000자)에 막힐 대화 — 일반 오류처럼 보이지 않게 새 대화 안내를 띄운다.
+    if(aiConversationTooLong(history))renderActiveSection();
+    else if(errEl)errEl.textContent='대화가 길어져 새 대화가 필요해요. 「새 대화」를 눌러 주세요.';
+    return;
+  }
+  const sent={conv:AI_CONV,req:++AI_REQ};
   AI_MESSAGES.push({role:'user',content:text.trim()});
   AI_SENDING=true;
   renderActiveSection();
+  let reply;
   try{
-    const data=await aiUnwrapInvoke(await SB.functions.invoke('ai-assistant-chat',{body:{action:'chat',assistant_id:a.id,messages:AI_MESSAGES.map(function(m){return {role:m.role,content:m.content};})}}));
+    const data=await aiUnwrapInvoke(await SB.functions.invoke('ai-assistant-chat',{body:{action:'chat',assistant_id:a.id,messages:aiHistoryForRequest(AI_MESSAGES)}}));
     if(!data||data.ok===false){
-      AI_MESSAGES.push({role:'assistant',content:aiErrorMessage(data&&data.error_kind),isError:true});
+      reply={role:'assistant',content:aiErrorMessage(data&&data.error_kind),isError:true};
     }else{
-      AI_MESSAGES.push({role:'assistant',content:data.text||'',modelLabel:data.model_label||data.model_id||'',fallbackUsed:!!data.fallback_used});
+      reply={role:'assistant',content:data.text||'',modelLabel:data.model_label||data.model_id||'',fallbackUsed:!!data.fallback_used};
     }
   }catch(e){
-    AI_MESSAGES.push({role:'assistant',content:aiErrorMessage('network_error'),isError:true});
+    reply={role:'assistant',content:aiErrorMessage('network_error'),isError:true};
   }
+  // 그 사이 다른 대화를 열었거나 새 대화·새 요청이 생겼으면 이 응답은 버린다(다른 도우미 대화에 섞이지 않게).
+  if(aiIsStaleResponse(sent,{conv:AI_CONV,req:AI_REQ}))return;
+  AI_MESSAGES.push(reply);
   AI_SENDING=false;
   renderActiveSection();
 }
@@ -496,6 +570,7 @@ async function saveAssistantForm(){
       if(res.error)throw res.error;
     }
     AI_EDIT_ASSISTANT=null;
+    await reloadAssistants(); // 직원 화면 카드(준비 여부·이름)도 최신으로
     await renderManageSection(AI_ROOT.querySelector('#aiSection'));
   }catch(e){
     if(msgEl)msgEl.textContent=aiWriteErrorMessage('저장',e);
@@ -518,7 +593,7 @@ async function testAssistantForm(){
 async function toggleAssistantEnabled(id){
   const a=AI_ADMIN_ASSISTANTS.find(function(x){return x.id===id;});
   if(!a)return;
-  try{const res=await SB.from('ai_assistants').update({enabled:!a.enabled}).eq('id',id);if(res.error)throw res.error;}catch(e){AI_NOTICE=aiWriteErrorMessage('켜기·끄기',e);}
+  try{const res=await SB.from('ai_assistants').update({enabled:!a.enabled}).eq('id',id);if(res.error)throw res.error;await reloadAssistants();}catch(e){AI_NOTICE=aiWriteErrorMessage('켜기·끄기',e);}
   await renderManageSection(AI_ROOT.querySelector('#aiSection'));
 }
 async function duplicateAssistant(id){
@@ -527,12 +602,12 @@ async function duplicateAssistant(id){
   const copy=Object.assign({},a);
   delete copy.id;delete copy.created_at;delete copy.updated_at;
   copy.name=(copy.name||'')+' 복제';
-  try{const res=await SB.from('ai_assistants').insert(copy);if(res.error)throw res.error;}catch(e){AI_NOTICE=aiWriteErrorMessage('복제',e);}
+  try{const res=await SB.from('ai_assistants').insert(copy);if(res.error)throw res.error;await reloadAssistants();}catch(e){AI_NOTICE=aiWriteErrorMessage('복제',e);}
   await renderManageSection(AI_ROOT.querySelector('#aiSection'));
 }
 async function deleteAssistant(id){
   if(!confirm('이 도우미를 삭제할까요? 되돌릴 수 없습니다.'))return;
-  try{const res=await SB.from('ai_assistants').delete().eq('id',id);if(res.error)throw res.error;}catch(e){AI_NOTICE=aiWriteErrorMessage('삭제',e);}
+  try{const res=await SB.from('ai_assistants').delete().eq('id',id);if(res.error)throw res.error;await reloadAssistants();}catch(e){AI_NOTICE=aiWriteErrorMessage('삭제',e);}
   await renderManageSection(AI_ROOT.querySelector('#aiSection'));
 }
 
@@ -637,6 +712,7 @@ async function saveModelForm(){
       if(res.error)throw res.error;
     }
     AI_MODEL_EDIT=null;
+    await reloadAssistants(); // 모델을 켜고 끄면 도우미 ready가 바뀜
     await renderModelsSection(AI_ROOT.querySelector('#aiSection'));
   }catch(e){
     if(msgEl)msgEl.textContent=aiWriteErrorMessage('저장',e);
@@ -646,12 +722,12 @@ async function saveModelForm(){
 async function toggleModelEnabled(id){
   const m=AI_ADMIN_MODELS.find(function(x){return x.id===id;});
   if(!m)return;
-  try{const res=await SB.from('ai_models').update({enabled:!m.enabled}).eq('id',id);if(res.error)throw res.error;}catch(e){AI_NOTICE=aiWriteErrorMessage('켜기·끄기',e);}
+  try{const res=await SB.from('ai_models').update({enabled:!m.enabled}).eq('id',id);if(res.error)throw res.error;await reloadAssistants();}catch(e){AI_NOTICE=aiWriteErrorMessage('켜기·끄기',e);}
   await renderModelsSection(AI_ROOT.querySelector('#aiSection'));
 }
 async function deleteModel(id){
   if(!confirm('이 모델을 삭제할까요?'))return;
-  try{const res=await SB.from('ai_models').delete().eq('id',id);if(res.error)throw res.error;}catch(e){AI_NOTICE=aiWriteErrorMessage('삭제',e);}
+  try{const res=await SB.from('ai_models').delete().eq('id',id);if(res.error)throw res.error;await reloadAssistants();}catch(e){AI_NOTICE=aiWriteErrorMessage('삭제',e);}
   await renderModelsSection(AI_ROOT.querySelector('#aiSection'));
 }
 async function testModel(id){
@@ -721,7 +797,7 @@ function drawUsageSection(root){
   const s=aiUsageSummarize(AI_USAGE_ROWS);
   const rowsHtml=function(rows,label){
     return rows.length?('<div class="tblwrap"><table><tr><th>'+label+'</th><th>건수</th><th>입력 토큰</th><th>출력 토큰</th><th>추정 금액</th></tr>'+
-      rows.map(function(r){return '<tr><td>'+escAi(r.key)+'</td><td>'+r.count+'</td><td>'+r.input_tokens.toLocaleString('ko-KR')+'</td><td>'+r.output_tokens.toLocaleString('ko-KR')+'</td><td>'+aiWonLabel(r.cost_usd)+'</td></tr>';}).join('')+
+      rows.map(function(r){return '<tr><td>'+escAi(r.key)+'</td><td>'+r.count+'</td><td>'+r.input_tokens.toLocaleString('ko-KR')+'</td><td>'+r.output_tokens.toLocaleString('ko-KR')+'</td><td>'+aiCostSummaryLabel(r.cost_usd,r.unknown,r.known)+'</td></tr>';}).join('')+
       '</table></div>'):'<div class="empty">기록이 없습니다.</div>';
   };
   root.innerHTML='<div class="card"><h2>📊 사용 기록 <span class="sub">(최근 30일)</span></h2>'+
@@ -729,7 +805,7 @@ function drawUsageSection(root){
     '<div class="stat"><div class="sub">전체 건수</div><div>'+s.totalCount+'건</div></div>'+
     '<div class="stat"><div class="sub">입력 토큰</div><div>'+s.totalInput.toLocaleString('ko-KR')+'</div></div>'+
     '<div class="stat"><div class="sub">출력 토큰</div><div>'+s.totalOutput.toLocaleString('ko-KR')+'</div></div>'+
-    '<div class="stat"><div class="sub">추정 금액</div><div>'+aiWonLabel(s.totalCostUsd)+'</div></div>'+
+    '<div class="stat"><div class="sub">추정 금액</div><div>'+aiCostSummaryLabel(s.totalCostUsd,s.totalUnknown,s.totalKnown)+'</div></div>'+
     '</div>'+
     '<h3>날짜별</h3>'+rowsHtml(s.byDate,'날짜')+
     '<h3>도우미별</h3>'+rowsHtml(s.byAssistant,'도우미')+
