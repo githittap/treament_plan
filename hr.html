@@ -445,6 +445,7 @@ function show(id){$('#'+id).classList.add('show');}function hide(id){$('#'+id).c
 /* ── 탭 정의 (role 노출) ── */
 const TABS=[
   {key:'home',  label:'홈',        roles:['staff','manager','chief','owner']},
+  {key:'ai',    label:'🤖 AI 도우미',roles:['staff','manager','chief','owner']},
   {key:'att',   label:'출퇴근',    roles:['staff','manager','chief','owner']},
   {key:'deposit',label:'입금',     roles:['staff','manager','chief','owner']},
   {key:'sched', label:'근무표',    roles:['staff','manager','chief','owner']},
@@ -471,6 +472,7 @@ const TABS=[
    · 묶음은 그 안에 볼 수 있는 탭이 하나라도 있을 때만 위줄에 나온다(권한 없는 사람에게 빈 묶음 금지). */
 const MENU=[
   {kind:'tab',  key:'home',                                children:['notice','suggestions']},
+  {kind:'tab',  key:'ai',                                   children:[]},
   {kind:'group',key:'g-work',  label:'🕘 근무',            children:['sched','calendar','att']},
   {kind:'group',key:'g-owner', label:'🔒 원장 전용',        children:['owner','aicost','pay']},
   {kind:'group',key:'g-care',  label:'🩺 환자관리·진료',    children:['confid','workdocs','inbox','consult']},
@@ -595,6 +597,7 @@ async function render(){
   const m=$('#main');m.innerHTML='<div class="empty">불러오는 중…</div>';
   try{
     if(TAB==='home')await renderHome(m);
+    else if(TAB==='ai'){if(window.AIAssistants)await window.AIAssistants.render(m,{sb,me:ME});else m.innerHTML='<div class="card"><div class="empty">AI 도우미를 불러오지 못했습니다. 새로고침해 주세요.</div></div>';}
     else if(TAB==='att')await renderAtt(m);
     else if(TAB==='deposit')await renderDeposit(m);
     else if(TAB==='sched')await renderSched(m);
@@ -3054,6 +3057,7 @@ async function boot(){
 boot();
 setInterval(loadSteps,1500);
 </script>
+<script src="ai-assistants.js?v=20260929"></script>
 <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}</script>
 </body>
 </html>
