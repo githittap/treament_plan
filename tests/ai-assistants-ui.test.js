@@ -6,7 +6,7 @@ function helpers(){
   assert.ok(block,'ai-assistants.js에 순수 helper 블록이 없습니다.');
   const c={};
   vm.createContext(c);
-  vm.runInContext(block+';this.h={aiRoleLabel,aiProviderLabel,aiWon,aiWonLabel,aiModelPriceLabel,aiGroupModelsByProvider,aiAssistantFormErrors,aiChatInputError,aiErrorMessage,aiAdminAssistantReady,aiUsageSummarize,aiNormalizeInvokeError,aiUnwrapInvoke,aiWriteErrorMessage,aiIsStaleResponse,aiUserChanged,aiHistoryForRequest,aiConversationTooLong,aiCostSummaryLabel};',c);
+  vm.runInContext(block+';this.h={aiRoleLabel,aiProviderLabel,aiWon,aiWonLabel,aiModelPriceLabel,aiGroupModelsByProvider,aiAssistantFormErrors,aiChatInputError,aiErrorMessage,aiAdminAssistantReady,aiUsageSummarize,aiNormalizeInvokeError,aiUnwrapInvoke,aiWriteErrorMessage,aiIsStaleResponse,aiUserChanged,aiHistoryForRequest,aiConversationTooLong,aiCostSummaryLabel,aiHelpSectionsFor,aiHelpErrorRows,AI_HELP_SECTIONS,AI_HELP_EXAMPLES,AI_ERROR_MESSAGES};',c);
   return c.h;
 }
 
@@ -345,4 +345,50 @@ test('화면 시험: 대화가 20개에 닿으면 「새 대화가 필요해요�
   assert.match(t.section.innerHTML,/대화가 길어져 새 대화가 필요해요/);
   assert.match(t.section.innerHTML,/class="mini stamp" data-ai-new/);
   assert.match(t.section.innerHTML,/id="aiSendBtn" disabled/);
+});
+
+test('사용법: 직원용은 모든 역할에, 원장용은 owner에게만 보인다',()=>{
+  const h=helpers();
+  const ids=r=>[...h.aiHelpSectionsFor(r)].map(s=>s.id);
+  assert.deepEqual(ids('staff'),['staff']);
+  assert.deepEqual(ids('manager'),['staff']);
+  assert.deepEqual(ids('chief'),['staff']);
+  assert.deepEqual(ids(undefined),['staff']);
+  assert.deepEqual(ids('owner'),['staff','owner']);
+});
+
+test('사용법: 직원용 8단계·원장용 7단계, 안내 문장은 실제 오류 문장표에서 가져오고 예시 도우미 3개는 DB 한도 안이다',()=>{
+  const h=helpers();
+  const secs=Object.fromEntries([...h.AI_HELP_SECTIONS].map(s=>[s.id,s]));
+  assert.equal(secs.staff.steps.length,8);
+  assert.equal(secs.owner.steps.length,7);
+  const rows=[...h.aiHelpErrorRows()];
+  assert.ok(rows.length>=6);
+  rows.forEach(r=>{assert.equal(r.message,h.AI_ERROR_MESSAGES[r.kind]);assert.ok(r.message&&r.means,r.kind);});
+  const ex=[...h.AI_HELP_EXAMPLES];
+  assert.equal(ex.length,3);
+  ex.forEach(e=>{assert.ok(e.instructions.length>50&&e.instructions.length<=20000);assert.ok(e.description.length<=200);assert.ok(e.name.length<=40);});
+});
+
+test('사용법: 글에 § 기호가 없고 개인정보·외부 AI 전송 같은 경고 문구를 넣지 않는다',()=>{
+  const h=helpers();
+  const all=JSON.stringify([h.AI_HELP_SECTIONS,h.AI_HELP_EXAMPLES]);
+  assert.ok(!all.includes('§'));
+  assert.ok(!/개인정보|외부 ?AI|유출|주의하세요/.test(all));
+  assert.ok(!js.includes('§'));
+});
+
+test('화면 시험: 「❓ 사용법」 패널이 직원에게는 직원용만, 원장에게는 직원용+원장용으로 만들어진다',async()=>{
+  const staff=harness({});
+  await staff.render({id:'u1',role:'staff'});
+  assert.match(staff.root.innerHTML,/data-ai-help-toggle/);
+  assert.match(staff.root.innerHTML,/id="aiHelpPanel" hidden/);
+  assert.match(staff.root.innerHTML,/직원용 — 이렇게 쓰세요/);
+  assert.doesNotMatch(staff.root.innerHTML,/원장용 — 도우미 만들고 관리하기/);
+  assert.doesNotMatch(staff.root.innerHTML,/data-ai-help-copy/);
+  const owner=harness({});
+  await owner.render({id:'o1',role:'owner'});
+  assert.match(owner.root.innerHTML,/직원용 — 이렇게 쓰세요/);
+  assert.match(owner.root.innerHTML,/원장용 — 도우미 만들고 관리하기/);
+  assert.equal((owner.root.innerHTML.match(/data-ai-help-copy=/g)||[]).length,3);
 });

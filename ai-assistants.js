@@ -208,6 +208,90 @@ function aiCostSummaryLabel(costUsd,unknownCount,knownCount){
   if(!(Number(knownCount)>0))return '금액 모름 · 미상 '+unk+'건';
   return '확인된 금액 '+aiWonLabel(costUsd)+' · 미상 '+unk+'건';
 }
+// ── 「❓ 사용법」 안내 글(순수 자료) ──
+// 직원용 섹션은 모든 역할에, 원장용 섹션은 owner에게만 추가로 보인다. 글은 짧고 쉬운 존댓말로 쓴다.
+const AI_HELP_NUMS=['①','②','③','④','⑤','⑥','⑦','⑧','⑨'];
+// 실제 화면에 뜨는 안내 문장(AI_ERROR_MESSAGES)과 그 뜻·할 일
+const AI_HELP_ERROR_ROWS=[
+  {kind:'model_not_set',means:'원장이 아직 이 도우미의 AI를 고르지 않았어요. 원장이 고르면 쓸 수 있어요.'},
+  {kind:'model_disabled',means:'이 도우미가 쓰는 AI가 꺼져 있어요. 원장에게 알려 주세요.'},
+  {kind:'assistant_disabled',means:'원장이 이 도우미를 잠시 꺼 두었어요.'},
+  {kind:'rate_limited',means:'한 시간에 쓸 수 있는 횟수(120번)를 다 썼거나 잠깐 몰렸어요. 조금 뒤에 다시 보내세요.'},
+  {kind:'timeout',means:'AI가 답을 쓰는 데 너무 오래 걸렸어요. 다시 한 번 보내 보세요.'},
+  {kind:'upstream_error',means:'AI 쪽에서 답이 오지 않았어요. 잠시 뒤에 다시 보내 보세요.'},
+  {kind:'provider_not_configured',means:'이 AI 회사와의 연결이 아직 준비되지 않았어요. 원장에게 알려 주세요.'},
+  {kind:'usage_unavailable',means:'사용 기록을 확인하지 못해 잠시 쓸 수 없어요. 조금 뒤에 다시 시도하세요.'},
+];
+const AI_HELP_STAFF_STEPS=[
+  {title:'도우미 고르기',text:'「🤖 AI 도우미」 화면에 도우미 카드가 나옵니다. 하려는 일에 맞는 카드를 누르면 대화 창이 열려요. 카드 아래 한 줄 설명을 보면 어떤 일을 돕는 도우미인지 알 수 있어요.'},
+  {title:'물어보기',text:'아래 입력칸에 부탁할 내용을 적고 「보내기」를 누르세요. 키보드에서는 Ctrl+Enter로도 보낼 수 있어요. 답이 오기까지 몇 초에서 십여 초 걸리고, 그동안 「생각 중…」이 보여요.'},
+  {title:'답 복사해서 쓰기',text:'답 아래의 「복사」를 누르면 그 글이 복사돼요. 카톡이나 게시판 등 필요한 곳에 붙여 넣어 쓰세요.'},
+  {title:'고쳐 달라고 하기',text:'마음에 안 들면 같은 창에서 「더 짧게」 「더 부드럽게」 「존댓말로 바꿔 줘」처럼 이어서 말하면 그에 맞춰 다시 써 줘요. 앞 대화를 기억하고 있어서 처음부터 다시 설명하지 않아도 돼요.'},
+  {title:'새 대화 시작하기',text:'이야기 주제가 완전히 바뀌었거나 대화가 길어졌을 때는 「새 대화」를 누르세요. 메시지가 20개가 되거나 글이 너무 길어지면 「대화가 길어져 새 대화가 필요해요」가 뜨는데, 그때도 「새 대화」를 누르면 됩니다.'},
+  {title:'「준비 중」 카드',text:'카드에 「준비 중」이 보이면 원장이 아직 그 도우미가 쓸 AI를 고르지 않은 것이에요. 원장이 고르면 카드가 열려요.'},
+  {title:'자주 보는 안내 문장',text:'화면에 이런 문장이 뜨면 이렇게 하세요.',errors:true},
+  {title:'알아 둘 것',list:[
+    '답은 초안이에요. 읽어 보고 고쳐서 쓰세요.',
+    '대화는 저장되지 않아요. 새로고침하거나 화면을 닫으면 사라지니 필요한 답은 그 전에 복사해 두세요.',
+    '누가 언제 어느 도우미를 썼는지는 사용 기록으로 남고, 원장이 볼 수 있어요.',
+    '한 시간에 120번까지 보낼 수 있어요.',
+    '모든 직원이 함께 쓰는 도우미예요. 쓰다가 불편한 점은 원장에게 알려 주세요.']},
+];
+const AI_HELP_FIELD_ROWS=[
+  ['이름','직원 카드에 보이는 이름이에요(40자까지).'],
+  ['아이콘','이름 앞에 붙는 그림 글자예요. 이모지 하나면 충분해요.'],
+  ['설명','직원 카드 아래에 보이는 한 줄 설명이에요(200자까지).'],
+  ['지침서','AI에게 주는 역할과 규칙이에요. 직원에게는 보이지 않아요(20,000자까지).'],
+  ['참고자료','AI가 답할 때 참고할 글이에요. 글을 붙여 넣으면 되고, 직원에게는 보이지 않아요(60,000자까지).'],
+  ['모델','답을 써 줄 AI예요. 고르지 않으면 직원 카드에 「준비 중」으로 보여요.'],
+  ['예비 모델','첫 번째 AI가 막히거나 오래 걸릴 때 대신 답하는 AI예요. 없어도 돼요.'],
+  ['생각 깊이','낮음·보통·높음 중에서 골라요. Claude 5.x 계열에만 적용되고, 높을수록 깊이 생각하지만 느리고 비용이 늘어요. 잘 모르겠으면 「기본」으로 두세요.'],
+  ['답 최대 길이','AI가 한 번에 쓸 수 있는 답의 길이예요(256~32,000, 기본 4,000).'],
+  ['보이는 역할','직원·매니저·실장·원장 중 누가 이 도우미를 볼지 골라요.'],
+  ['켜짐','끄면 직원 목록에서 사라져요. 지우지 않고 잠시 숨길 때 쓰세요.'],
+];
+const AI_HELP_EXAMPLES=[
+  {name:'공지·카톡 문구 다듬기',icon:'📣',description:'직원 공지나 카톡 안내 문구를 읽기 쉽게 다듬어 줌',
+   instructions:'당신은 아산정플란트치과 직원이 직원 공지나 카톡 안내 문구를 쓸 때 돕는 도우미입니다.\n직원이 초안이나 전하고 싶은 내용을 적으면 읽기 쉽게 다듬어 줍니다.\n\n말투: 해요체 부탁형(~해주세요, ~부탁드려요)으로 정중하고 친근하게 씁니다.\n길이: 핵심부터 짧게. 한 문장은 한 줄 안팎으로 씁니다.\n형식: 할 일이 여러 개면 번호를 붙이고, 날짜·시간·장소는 빠뜨리지 않고 맨 위에 둡니다.\n내용에 없는 사실(날짜, 이름 등)은 지어내지 않고 [확인 필요]로 표시합니다.\n\n답 형식:\n[다듬은 문구]\n(공지 본문)\n\n[고친 점]\n(한두 줄)\n\n직원이 「더 짧게」「더 부드럽게」처럼 요청하면 그에 맞춰 다시 씁니다.',
+   note:'참고자료는 비워 두어도 돼요. 생각 깊이는 「낮음」, 모델은 빠르고 값싼 것을 고르면 충분해요.'},
+  {name:'환자 안내 문자 초안',icon:'📱',description:'예약·주의사항 등 환자 안내 문자 초안을 만들어 줌',
+   instructions:'당신은 아산정플란트치과 직원이 환자에게 보낼 안내 문자 초안을 쓸 때 돕는 도우미입니다.\n직원이 안내할 상황(예약 안내, 치료 후 주의사항 안내, 다음 내원 안내 등)과 필요한 정보를 적으면 문자 초안을 만듭니다.\n\n말투: 정중한 존댓말, 따뜻하고 간단명료하게.\n길이: 문자 한 통에 들어갈 분량(3~6문장).\n첫머리에 병원 이름(아산정플란트치과)을 밝히고, 마지막에 문의 안내 한 줄을 넣습니다.\n직원이 준 정보에 없는 날짜·시간·금액·전화번호는 쓰지 않고 [확인 필요]로 비워 둡니다.\n\n답 형식:\n[문자 초안]\n(본문)\n\n직원이 「더 짧게」「더 정중하게」처럼 요청하면 그에 맞춰 다시 씁니다.',
+   note:'자주 쓰는 안내 문구가 있으면 참고자료에 붙여 넣어 두면 말투가 더 잘 맞아요.'},
+  {name:'업무 매뉴얼 묻고 답하기',icon:'📘',description:'병원 업무 매뉴얼을 바탕으로 방법을 알려 줌',
+   instructions:'당신은 아산정플란트치과 직원이 업무 방법을 물을 때 답하는 도우미입니다.\n아래 「참고자료」에 붙여 넣은 업무 매뉴얼을 바탕으로 답합니다.\n\n답하는 방법: 질문에 맞는 부분을 찾아 순서대로 짧게 알려 줍니다. 단계가 있으면 번호를 붙입니다.\n참고자료에 없는 내용은 아는 척하지 않고 「매뉴얼에 나와 있지 않아요. 실장님께 확인해 주세요」라고 답합니다.\n말투: 친절한 존댓말, 짧고 쉽게.',
+   note:'「참고자료」 칸에 업무 매뉴얼 글을 붙여 넣으세요(60,000자까지). 매뉴얼이 바뀌면 참고자료 글도 새로 붙여 넣어 주세요.'},
+];
+const AI_HELP_OWNER_STEPS=[
+  {title:'새 도우미 만들기',text:'「⚙️ 도우미 관리」 탭에서 「새 도우미」를 누르고 칸을 채운 뒤 「저장」하세요. 칸마다 뜻은 이래요.',fields:true},
+  {title:'지침서 잘 쓰는 요령',list:[
+    '역할부터 한 줄로: 「당신은 ○○ 할 때 돕는 도우미입니다.」',
+    '말투를 정해 주세요: 존댓말인지, 해요체인지, 딱딱한지 부드러운지.',
+    '길이를 정해 주세요: 「3~5문장」처럼 숫자로 쓰면 잘 지켜요.',
+    '답 형식을 보여 주세요: 「[짧은 답글] … [조금 긴 답글] …」처럼 틀을 적어 두세요.',
+    '예시 한두 개를 넣으면 더 정확해요. 마지막에 「고쳐 달라고 하면 그에 맞춰 다시 씁니다」를 적어 두면 좋아요.']},
+  {title:'「미리 시험」',text:'도우미를 저장한 뒤 고치기 화면의 「미리 시험」을 누르면 「안녕하세요라고만 답하세요」를 보내서 AI가 제대로 답하는지 확인해요. 직원에게 열기 전에 꼭 한 번 눌러 보세요.'},
+  {title:'모델 목록',list:[
+    '「🧠 모델 목록」 탭에서 쓸 수 있는 AI를 회사별로 봐요. 가격은 100만 토큰당 원화(1달러=1,500원)로 보여요.',
+    '「켜기·끄기」: 끄면 도우미의 모델 고르기 목록에서 숨겨요.',
+    '「모델 직접 추가」: 회사와 모델 이름(API 이름 그대로)을 넣어 새로 등록해요.',
+    '「회사별 목록 불러오기」: 각 회사가 지금 제공하는 모델 이름을 가져와요. 마음에 드는 것을 눌러 추가하세요.',
+    '「시험」: 그 모델에 짧은 인사를 보내 연결이 되는지와 걸린 시간을 봐요.']},
+  {title:'사용 기록 보기',text:'「📊 사용 기록」 탭에서 최근 30일의 사용 건수·토큰·추정 금액을 날짜별·도우미별·직원별·모델별로 볼 수 있어요. 가격을 모르는 모델은 금액을 더하지 않고 「미상 N건」으로 따로 세어 보여 줘요.'},
+  {title:'특정 직원에게 AI 탭 숨기기',text:'설정의 「탭 노출 설정」(역할별)이나 「사람별 탭 예외」(개인별)에서 「🤖 AI 도우미」를 끄면 그 사람에게는 탭이 보이지 않아요.'},
+  {title:'바로 만들어 쓸 만한 도우미 예시 3개',text:'아래 지침서를 복사해서 「새 도우미」의 지침서 칸에 붙여 넣으세요.',examples:true},
+];
+const AI_HELP_SECTIONS=[
+  {id:'staff',title:'직원용 — 이렇게 쓰세요',steps:AI_HELP_STAFF_STEPS},
+  {id:'owner',title:'원장용 — 도우미 만들고 관리하기',steps:AI_HELP_OWNER_STEPS},
+];
+// 역할에 보일 섹션 고르기: 직원용은 모두에게, 원장용은 owner에게만 추가
+function aiHelpSectionsFor(role){
+  return AI_HELP_SECTIONS.filter(function(sec){return sec.id==='staff'||(sec.id==='owner'&&role==='owner');});
+}
+// 안내 글의 「자주 보는 안내 문장」 표: 실제 오류 문장표에서 문장을 가져온다.
+function aiHelpErrorRows(){
+  return AI_HELP_ERROR_ROWS.map(function(r){return {kind:r.kind,message:AI_ERROR_MESSAGES[r.kind]||'',means:r.means};});
+}
 /* ai-assistants:test-end */
 
 /* ── 아래부터 DOM·네트워크 코드(시험 블록 밖) ── */
@@ -217,7 +301,7 @@ let SB=null,ME={},AI_ROOT=null,AI_SUBTAB='chat',AI_STYLE_INJECTED=false;
 let AI_ASSISTANTS=[],AI_ERROR='';
 let AI_ACTIVE_ASSISTANT=null,AI_MESSAGES=[],AI_SENDING=false,AI_CONV=0,AI_REQ=0,AI_UID=null;
 let AI_ADMIN_ASSISTANTS=[],AI_ADMIN_MODELS=[],AI_EDIT_ASSISTANT=null,AI_EDIT_ERRORS=[],AI_MODEL_EDIT=null;
-let AI_USAGE_ROWS=[],AI_NOTICE='';
+let AI_USAGE_ROWS=[],AI_NOTICE='',AI_HELP_OPEN=false;
 
 function aiNoticeHtml(){
   const n=AI_NOTICE;AI_NOTICE='';
@@ -229,6 +313,16 @@ function ensureStyle(){
   AI_STYLE_INJECTED=true;
   const css=
     '.ai-wrap{max-width:100%}'+
+    '.ai-helpbar{margin-bottom:8px}'+
+    '.ai-help{margin-bottom:10px;max-width:100%}'+
+    '.ai-help[hidden]{display:none}'+
+    '.ai-help details{border:1px solid var(--line);border-radius:10px;margin:8px 0;padding:8px 10px}'+
+    '.ai-help summary{font-weight:700;cursor:pointer;font-size:14px}'+
+    '.ai-help h4{margin:10px 0 3px;font-size:13.5px}'+
+    '.ai-help p,.ai-help li{font-size:13px;line-height:1.65;overflow-wrap:anywhere}'+
+    '.ai-help ul{margin:4px 0 4px 18px;padding:0}'+
+    '.ai-help pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.55;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;max-width:100%;margin:6px 0;font-family:inherit}'+
+    '.ai-help .ai-help-msg{font-weight:700}'+
     '.ai-subnav{margin-bottom:10px}'+
     '.ai-subnav .mini.on{background:var(--mint-dk);border-color:var(--mint);color:var(--mint)}'+
     '.ai-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}'+
@@ -292,12 +386,47 @@ async function loadAndRenderShell(){
   renderShell();
 }
 
+function aiHelpStepHtml(step,idx,sec){
+  let h='<h4>'+AI_HELP_NUMS[idx]+' '+escAi(step.title)+'</h4>';
+  if(step.text)h+='<p>'+escAi(step.text)+'</p>';
+  if(step.list)h+='<ul>'+step.list.map(function(t){return '<li>'+escAi(t)+'</li>';}).join('')+'</ul>';
+  if(step.errors)h+='<ul>'+aiHelpErrorRows().map(function(r){return '<li><span class="ai-help-msg">「'+escAi(r.message)+'」</span><br>→ '+escAi(r.means)+'</li>';}).join('')+'</ul>';
+  if(step.fields)h+='<ul>'+AI_HELP_FIELD_ROWS.map(function(r){return '<li><b>'+escAi(r[0])+'</b> — '+escAi(r[1])+'</li>';}).join('')+'</ul>';
+  if(step.examples)h+=AI_HELP_EXAMPLES.map(function(ex,i){
+    return '<p><b>'+escAi(ex.icon)+' '+escAi(ex.name)+'</b> <span class="sub">— 설명 칸에 「'+escAi(ex.description)+'」</span></p>'+
+      '<pre>'+escAi(ex.instructions)+'</pre>'+
+      '<p class="sub">'+escAi(ex.note)+' <button class="mini" data-ai-help-copy="'+i+'">지침서 복사</button></p>';
+  }).join('');
+  return h;
+}
+function aiHelpHtml(role){
+  return aiHelpSectionsFor(role).map(function(sec,si){
+    return '<details class="ai-help-sec"'+(si===0?' open':'')+'><summary>'+escAi(sec.title)+'</summary>'+
+      sec.steps.map(function(st,i){return aiHelpStepHtml(st,i,sec);}).join('')+'</details>';
+  }).join('');
+}
+
 function renderShell(){
   const isOwner=ME.role==='owner';
   const tabs=[{key:'chat',label:'🤖 도우미'}];
   if(isOwner)tabs.push({key:'manage',label:'⚙️ 도우미 관리'},{key:'models',label:'🧠 모델 목록'},{key:'usage',label:'📊 사용 기록'});
   const nav=tabs.length>1?('<div class="rowflex ai-subnav">'+tabs.map(function(t){return '<button class="mini'+(AI_SUBTAB===t.key?' on':'')+'" data-ai-subtab="'+t.key+'">'+t.label+'</button>';}).join('')+'</div>'):'';
-  AI_ROOT.innerHTML='<div class="ai-wrap">'+nav+'<div id="aiSection"></div></div>';
+  const helpBar='<div class="rowflex ai-helpbar"><button class="mini" data-ai-help-toggle>'+(AI_HELP_OPEN?'❓ 사용법 닫기':'❓ 사용법')+'</button></div>'+
+    '<div class="card ai-help" id="aiHelpPanel"'+(AI_HELP_OPEN?'':' hidden')+'>'+aiHelpHtml(ME.role)+'</div>';
+  AI_ROOT.innerHTML='<div class="ai-wrap">'+helpBar+nav+'<div id="aiSection"></div></div>';
+  const helpBtn=AI_ROOT.querySelector('[data-ai-help-toggle]');
+  if(helpBtn)helpBtn.addEventListener('click',function(){
+    AI_HELP_OPEN=!AI_HELP_OPEN;
+    const panel=AI_ROOT.querySelector('#aiHelpPanel');
+    if(panel)panel.hidden=!AI_HELP_OPEN;
+    helpBtn.textContent=AI_HELP_OPEN?'❓ 사용법 닫기':'❓ 사용법';
+  });
+  Array.prototype.forEach.call(AI_ROOT.querySelectorAll('[data-ai-help-copy]'),function(btn){
+    btn.addEventListener('click',function(){
+      const ex=AI_HELP_EXAMPLES[Number(btn.getAttribute('data-ai-help-copy'))];
+      if(ex&&navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(ex.instructions).then(function(){btn.textContent='복사됨';}).catch(function(){});
+    });
+  });
   Array.prototype.forEach.call(AI_ROOT.querySelectorAll('[data-ai-subtab]'),function(btn){
     btn.addEventListener('click',async function(){
       AI_SUBTAB=btn.getAttribute('data-ai-subtab');
