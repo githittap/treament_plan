@@ -113,6 +113,8 @@ tr.new td{background:var(--mint-dk)}
 .mini.stamp{background:var(--gold-bg);border-color:var(--gold);color:var(--gold)}
 .mini.rej{background:var(--red-bg);border-color:#5c2420;color:var(--red)}
 .empty{color:var(--gray);font-size:12.5px;padding:10px 2px}
+.owner-board-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px;margin-top:10px;min-width:0}.owner-board-card{display:flex;flex-direction:column;align-items:flex-start;gap:5px;width:100%;min-width:0;box-sizing:border-box;text-align:left;cursor:pointer;color:var(--ink)}.owner-board-card>span,.owner-board-card>small{max-width:100%;overflow-wrap:anywhere}.owner-board-card>span{color:var(--gray)}.owner-board-card>small{font-size:11px;color:var(--gray)}.owner-board-view-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:14px 0 8px;min-width:0}.owner-board-view-head>div{min-width:0;overflow-wrap:anywhere}.owner-board-frame-slot{width:100%;max-width:100%;min-width:0;overflow:hidden}.owner-board-frame-slot iframe{display:block;box-sizing:border-box}
+@media(max-width:640px){.owner-board-grid{grid-template-columns:minmax(0,1fr)}.owner-board-view-head{align-items:flex-start}}
 #saveTag{font-size:11.5px;color:var(--gray)} #saveTag.err{color:var(--red)}
 .hint{font-size:11.5px;color:var(--gray);margin-top:6px}
 .stub{border:1px dashed var(--line);border-radius:10px;padding:22px;text-align:center;color:var(--gray);font-size:13px}
@@ -823,6 +825,7 @@ async function render(){
     else if(TAB==='contract')await renderContract(m);
     else if(TAB==='pay')await renderPay(m);
     else if(TAB==='aicost')await renderAicost(m);
+    else if(TAB==='ownerboards')await renderOwnerBoards(m);
     else if(TAB==='owner')await renderOwner(m);
     if(SCHEDULE_PEOPLE_ERROR&&m.insertAdjacentHTML)m.insertAdjacentHTML('afterbegin',`<div class="cal-error">${esc(SCHEDULE_PEOPLE_ERROR)} · 잠시 후 다시 로그인하거나 새로고침해 주세요.</div>`);
   }catch(e){console.error(e);m.innerHTML='<div class="card"><div class="empty">오류: '+esc(e.message)+'</div></div>';}
@@ -2960,6 +2963,46 @@ function aiUsagePanelHtml({summary,start,end,error,cost,costError,sessions,sessi
   return `<div class="card" id="aiUsagePanel"><h2>📊 AI 사용량 현황판 <span class="sub">원장 전용 · PC가 모아 올린 값</span></h2>${aiUsageModelSection({summary,start,end,error})}${aiCostSectionHtml({cost,error:costError})}${aiSessionSectionHtml({sessions,error:sessionsError})}</div>`;
 }
 /* ai-usage:test-end */
+/* ── 원장 보기판: PC가 올린 완결 HTML을 격리 iframe으로만 표시 ── */
+/* owner-boards:test-start */
+const OWNER_BOARD_TAB={key:'ownerboards',label:'📒 원장 보기판',roles:['owner']};
+function installOwnerBoardsTab(tabs,menu){
+  const tabAt=tabs.findIndex(tab=>tab.key==='aicost');if(tabAt<0||tabs.some(tab=>tab.key==='ownerboards'))return;
+  tabs.splice(tabAt+1,0,OWNER_BOARD_TAB);
+  const group=menu.find(item=>item.key==='g-owner');if(!group)return;
+  const costAt=group.children.indexOf('aicost');if(costAt>=0&&!group.children.includes('ownerboards'))group.children.splice(costAt+1,0,'ownerboards');
+}
+if(typeof TABS!=='undefined'&&typeof MENU!=='undefined')installOwnerBoardsTab(TABS,MENU);const OWNER_BOARDS=[
+  {slug:'busd_ledger',title:'📒 뻐스디 장부',description:'AI 일 장부'},
+  {slug:'pin_board',title:'📌 명심판',description:'AI가 지킬 약속'},
+  {slug:'wordbook',title:'📖 박제 단어장',description:'원장이 알아 둘 말'}
+];
+function ownerBoardsTimestamp(value){if(!value)return '';const d=new Date(value),p=n=>String(n).padStart(2,'0');return Number.isNaN(d.getTime())?String(value):`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;}
+function ownerBoardsMissing(error){return !!error&&(error.code==='42P01'||error.code==='PGRST205'||Number(error.status)===404);}
+function ownerBoardsPanelHtml(rows,error){
+  const bySlug=new Map((rows||[]).map(row=>[row.slug,row]));
+  const cards=OWNER_BOARDS.map(board=>{const row=bySlug.get(board.slug),synced=row&&row.synced_at?`마지막으로 올라온 때 ${esc(ownerBoardsTimestamp(row.synced_at))}`:'아직 PC에서 올라오지 않음';return `<button type="button" class="card owner-board-card" data-owner-board="${board.slug}" onclick="openOwnerBoard('${board.slug}')"><strong>${board.title}</strong><span>${board.description}</span><small>${synced}</small></button>`;}).join('');
+  const notice=error?(ownerBoardsMissing(error)?'<div class="hint">원장 보기판이 준비 중입니다.</div>':`<div class="cal-error">원장 보기판 목록을 불러오지 못했습니다: ${esc(error.message||'조회 오류')}</div>`):'';
+  return `<section class="card" id="ownerBoardsPanel"><h2>📒 원장 보기판 <span class="sub">원장 전용</span></h2>${notice}<div class="owner-board-grid">${cards}</div><div id="ownerBoardViewer" hidden></div></section>`;
+}
+async function renderOwnerBoards(m){
+  if(ME.role!=='owner'){m.innerHTML='<div class="card"><div class="empty">원장 전용입니다.</div></div>';return;}
+  const {data,error}=await sb.from('owner_boards').select('slug,sha256,synced_at');
+  m.innerHTML=ownerBoardsPanelHtml(data,error);
+}
+function closeOwnerBoard(){const viewer=document.getElementById('ownerBoardViewer');if(viewer){viewer.replaceChildren();viewer.hidden=true;}}
+async function openOwnerBoard(slug){
+  if(ME.role!=='owner')return;
+  const board=OWNER_BOARDS.find(item=>item.slug===slug);if(!board)return;
+  const viewer=document.getElementById('ownerBoardViewer');if(!viewer)return;
+  viewer.hidden=false;viewer.innerHTML='<div class="empty">판을 불러오는 중…</div>';
+  const {data,error}=await sb.from('owner_boards').select('html,synced_at').eq('slug',board.slug).maybeSingle();
+  if(error||!data){viewer.innerHTML=ownerBoardsMissing(error)?'<div class="hint">원장 보기판이 준비 중입니다.</div>':`<div class="cal-error">판을 불러오지 못했습니다: ${esc(error?.message||'아직 PC에서 올라오지 않음')}</div>`;return;}
+  viewer.innerHTML=`<div class="owner-board-view-head"><div><strong>${board.title}</strong><div class="sub">마지막으로 올라온 때 ${esc(data.synced_at?ownerBoardsTimestamp(data.synced_at):'확인되지 않음')}</div></div><button type="button" class="mini" onclick="closeOwnerBoard()">닫기</button></div><div class="owner-board-frame-slot"></div>`;
+  const frame=document.createElement('iframe');frame.setAttribute('sandbox','allow-scripts allow-downloads allow-modals');frame.setAttribute('referrerpolicy','no-referrer');frame.setAttribute('title',board.title+' 보기');frame.style.width='100%';frame.style.maxWidth='100%';frame.style.height='max(480px, calc(100vh - 140px))';frame.style.border='1px solid var(--line)';frame.style.borderRadius='8px';frame.style.background='#fff';frame.srcdoc=String(data.html||'');
+  viewer.querySelector('.owner-board-frame-slot').appendChild(frame);
+}
+/* owner-boards:test-end */
 async function saveAicost(i){
   if(ME.role!=='owner'||!AICOST_PLATFORMS[i])return;
   const amount=Number($('#aiAmount-'+i).value)||0,note=$('#aiNote-'+i).value.trim()||null;
