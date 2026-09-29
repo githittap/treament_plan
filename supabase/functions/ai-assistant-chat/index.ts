@@ -160,7 +160,9 @@ export function createAiAssistantChatHandler(deps: { createClient?: any; env?: (
       // 결과 기록 실패는 답을 막지 않는다(이미 호출이 끝났음). 서버 로그에만 남기고 행은 pending으로 남는다(건수에는 이미 포함).
       async function finishUsage(usageId: number, model: any, result: any, fallbackUsed: boolean, latencyMs: number) {
         try {
-          const est = result.ok
+          // 성공은 물론, 실패여도 회사 응답에 토큰 수가 있으면(거절·빈 답 등) 같은 식으로 금액을 계산해 남긴다. 토큰을 모르면 null(=미상).
+          const hasTokens = typeof result.input_tokens === "number" && typeof result.output_tokens === "number";
+          const est = hasTokens
             ? estimateCostUsd({
                 inputTokens: result.input_tokens,
                 outputTokens: result.output_tokens,
@@ -174,8 +176,8 @@ export function createAiAssistantChatHandler(deps: { createClient?: any; env?: (
               fallback_used: fallbackUsed,
               status: result.ok ? "ok" : "error",
               error_kind: result.ok ? null : result.reason,
-              input_tokens: result.ok ? result.input_tokens : 0,
-              output_tokens: result.ok ? result.output_tokens : 0,
+              input_tokens: hasTokens ? result.input_tokens : 0,
+              output_tokens: hasTokens ? result.output_tokens : 0,
               est_cost_usd: est,
               latency_ms: latencyMs,
             })

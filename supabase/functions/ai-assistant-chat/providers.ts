@@ -13,7 +13,7 @@ type Message = { role: string; content: string };
 type ReadEnv = (name: string) => string | undefined;
 type CallResult =
   | { ok: true; text: string; input_tokens: number; output_tokens: number }
-  | { ok: false; reason: string; httpStatus?: number };
+  | { ok: false; reason: string; httpStatus?: number; input_tokens?: number; output_tokens?: number }; // 실패여도 회사가 토큰 수를 알려 줬으면 싣는다(금액 기록용)
 type ListModelsResult = { ok: true; ids: string[] } | { ok: false; reason: string; httpStatus?: number };
 
 const DEFAULT_TIMEOUT_MS = 55000;
@@ -77,8 +77,8 @@ export async function callAnthropic(args: {
       ? await client.beta.messages.create({ ...(req.params as object), betas: req.betas, fallbacks: req.fallbacks } as Anthropic.Beta.Messages.MessageCreateParamsNonStreaming)
       : await client.messages.create(req.params as Anthropic.MessageCreateParamsNonStreaming);
     const parsed = parseAnthropicResponse(response);
-    if (parsed.refusal) return { ok: false, reason: "refusal" };
-    if (!parsed.text) return { ok: false, reason: "empty_response" };
+    if (parsed.refusal) return { ok: false, reason: "refusal", input_tokens: parsed.input_tokens, output_tokens: parsed.output_tokens };
+    if (!parsed.text) return { ok: false, reason: "empty_response", input_tokens: parsed.input_tokens, output_tokens: parsed.output_tokens };
     return { ok: true, text: parsed.text, input_tokens: parsed.input_tokens, output_tokens: parsed.output_tokens };
   } catch (error) {
     return { ok: false, ...classifyThrown(error) };
@@ -115,7 +115,7 @@ export async function callOpenAICompat(args: {
     }
     const json = await res.json();
     const parsed = parseOpenAICompatResponse(json);
-    if (!parsed.text) return { ok: false, reason: "empty_response" };
+    if (!parsed.text) return { ok: false, reason: "empty_response", input_tokens: parsed.input_tokens, output_tokens: parsed.output_tokens };
     return { ok: true, text: parsed.text, input_tokens: parsed.input_tokens, output_tokens: parsed.output_tokens };
   } catch (error) {
     return { ok: false, ...classifyThrown(error) };

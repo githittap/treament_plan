@@ -177,3 +177,18 @@ Deno.test("예비 모델 예약이 한도에 걸리면 429로 멈추고 예비 A
   assertEquals(calls, 1, "1차만 호출");
   assertEquals(db.rows[119].status, "error");
 });
+
+Deno.test("실패해도 회사가 토큰 수를 알려 주면 금액을 계산해 기록하고, 토큰을 모르면 null(미상)", async () => {
+  const db = makeDb();
+  const res = await makeHandler(db, (a) =>
+    Promise.resolve(a.modelId === "claude-opus-5-5" ? { ok: false, reason: "refusal", input_tokens: 100, output_tokens: 50 } : { ok: false, reason: "timeout" })
+  )(chatReq());
+  await res.json();
+  assertEquals(db.rows.length, 2);
+  assertEquals(db.rows[0].status, "error");
+  assertEquals(db.rows[0].input_tokens, 100);
+  assertEquals(db.rows[0].est_cost_usd, (100 * 4 + 50 * 20) / 1e6, "opus 가격으로 계산");
+  assertEquals(db.rows[1].status, "error");
+  assertEquals(db.rows[1].est_cost_usd, null, "토큰을 모르면 미상");
+  assertEquals(db.rows[1].input_tokens, 0);
+});

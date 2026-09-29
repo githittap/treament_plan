@@ -216,9 +216,11 @@ test('사용 기록: 가격 미상(null)·기록 중(pending)은 0원으로 더�
     {status:'ok',provider:'a',model_id:'y',input_tokens:1,output_tokens:1,est_cost_usd:null,created_at:'2026-09-29T00:00:00Z'},
     {status:'pending',provider:'a',model_id:'x',input_tokens:0,output_tokens:0,est_cost_usd:null,created_at:'2026-09-29T00:00:00Z'},
     {status:'error',provider:'a',model_id:'x',input_tokens:0,output_tokens:0,est_cost_usd:null,created_at:'2026-09-29T00:00:00Z'},
+    {status:'error',provider:'a',model_id:'x',input_tokens:100,output_tokens:50,est_cost_usd:0.001,created_at:'2026-09-29T00:00:00Z'},
   ]);
-  assert.equal(s.totalUnknown,2);assert.equal(s.totalKnown,2);
-  assert.ok(Math.abs(s.totalCostUsd-0.002)<1e-12);
+  // 상태와 무관: 금액이 null이거나 pending이면 미상(오류+토큰 없음 포함), 숫자인 것만 확인된 금액(오류+토큰 있음 → 계산된 금액)
+  assert.equal(s.totalUnknown,3);assert.equal(s.totalKnown,2);
+  assert.ok(Math.abs(s.totalCostUsd-0.003)<1e-12);
   const byModel=Object.fromEntries([...s.byModel].map(r=>[r.key,r]));
   assert.equal(byModel['a / y'].unknown,1);assert.equal(byModel['a / y'].known,0);
   assert.equal(h.aiCostSummaryLabel(0.002,0,3),'₩3');

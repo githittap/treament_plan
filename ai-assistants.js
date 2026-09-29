@@ -135,7 +135,7 @@ function aiAdminAssistantReady(assistant,modelsById){
 
 // 사용 기록(ai_assistant_usage) 합산 — 날짜별·도우미별·직원별·모델별(설계서 4-3-3).
 // 금액은 「확인된」 것만 더한다: est_cost_usd가 null인 성공 기록(가격 미상)과 status='pending'(결과 기록 전)은 0원으로 더하지 않고
-// unknown 건수로 센다. 실패(status='error')는 응답을 못 받아 청구 토큰이 없으므로 0원으로 확인된 것으로 본다.
+// unknown 건수로 센다(상태와 무관). 실패 기록도 서버가 토큰을 알아 금액을 계산해 두었으면 확인된 금액에 더한다.
 function aiUsageSummarize(rows){
   const groups={byDate:{},byAssistant:{},byUser:{},byModel:{}};
   let totalCount=0,totalInput=0,totalOutput=0,totalCostUsd=0,totalUnknown=0,totalKnown=0;
@@ -143,7 +143,7 @@ function aiUsageSummarize(rows){
     if(!r)return;
     totalCount++;
     const inTok=Number(r.input_tokens||0),outTok=Number(r.output_tokens||0);
-    const unknown=r.status==='pending'||(r.status!=='error'&&r.est_cost_usd==null);
+    const unknown=r.status==='pending'||r.est_cost_usd==null; // 상태와 무관: 금액이 숫자(0 포함)인 것만 확인된 금액
     const cost=unknown?0:Number(r.est_cost_usd||0);
     totalInput+=inTok;totalOutput+=outTok;totalCostUsd+=cost;
     if(unknown)totalUnknown++;else totalKnown++;
