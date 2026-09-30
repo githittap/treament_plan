@@ -186,3 +186,12 @@ test('publicErrorKind: 회사 401·403은 provider_auth_failed, 그 밖의 회�
   assert.notEqual(errorMessageFor('provider_auth_failed'), errorMessageFor('unknown'));
   assert.equal(httpStatusForError('provider_auth_failed'), 502);
 });
+
+test('provider_disabled(원장이 회사를 끔): 분명한 한국어 안내·502·예비 모델로 넘김', async () => {
+  const { publicErrorKind, errorMessageFor, httpStatusForError, shouldFallback } = await loadCore();
+  assert.equal(publicErrorKind('provider_disabled'), 'provider_disabled');
+  assert.match(errorMessageFor('provider_disabled'), /꺼져/);
+  assert.notEqual(errorMessageFor('provider_disabled'), errorMessageFor('unknown'));
+  assert.equal(httpStatusForError('provider_disabled'), 502);
+  assert.equal(shouldFallback('provider_disabled'), true);
+});

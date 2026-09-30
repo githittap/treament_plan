@@ -150,6 +150,7 @@ const FALLBACK_REASONS = new Set([
   'timeout',
   'network_error',
   'provider_not_configured',
+  'provider_disabled', // 원장이 그 회사를 껐으면 예비 모델(다른 회사일 수 있음)로 넘긴다
   'refusal',
   'empty_response',
   'rate_limited', // 429
@@ -200,6 +201,7 @@ export const ERROR_MESSAGES_KO = {
   image_not_supported: '이 AI는 사진을 읽지 못해요. 사진을 읽을 수 있는 모델을 지정해 주세요.',
   rate_limited: '너무 자주 요청했어요. 잠깐 쉬었다가 다시 시도해 주세요.',
   provider_not_configured: '이 AI 회사 연결이 아직 준비되지 않았어요.',
+  provider_disabled: '이 AI 회사가 꺼져 있어요. 원장에게 알려 주세요.',
   provider_auth_failed: '이 AI 회사가 연결 키를 받아 주지 않아요. 원장에게 알려 주세요.',
   usage_unavailable: '사용 기록을 확인할 수 없어 지금은 쓸 수 없어요. 잠시 후 다시 시도해 주세요.',
   upstream_error: 'AI 응답을 받지 못했어요. 잠시 후 다시 시도해 주세요.',
@@ -223,6 +225,7 @@ export const HTTP_STATUS_FOR_ERROR = {
   invalid_input: 400,
   rate_limited: 429,
   provider_not_configured: 502,
+  provider_disabled: 502,
   image_not_supported: 400,
   provider_auth_failed: 502,
   usage_unavailable: 503,
@@ -242,7 +245,7 @@ export function httpStatusForError(errorKind) {
  */
 export function publicErrorKind(reason) {
   if (reason === 'unauthorized' || reason === 'forbidden') return 'provider_auth_failed';
-  if (reason === 'timeout' || reason === 'rate_limited' || reason === 'provider_not_configured' || reason === 'model_not_set') return reason;
+  if (reason === 'timeout' || reason === 'rate_limited' || reason === 'provider_not_configured' || reason === 'provider_disabled' || reason === 'model_not_set') return reason;
   if (Object.prototype.hasOwnProperty.call(ERROR_MESSAGES_KO, reason)) return reason;
   return 'upstream_error'; // bad_request · server_error · network_error · refusal · empty_response 등
 }

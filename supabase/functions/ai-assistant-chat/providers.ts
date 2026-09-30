@@ -132,11 +132,73 @@ export async function callOpenAICompat(args: {
   }
 }
 
-/** 도우미가 배정한 모델 정보로 한 번 호출(anthropic/openai 호환 갈래를 나눈다). */
-async function callOpenAIResponses(args: {apiKey:string;modelId:string;system:string;messages:Message[];maxOutputTokens:number;timeoutMs:number}): Promise<CallResult> {
- const input=[{role:"system",content:[{type:"input_text",text:args.system}]},...args.messages.map((m:any)=>({role:m.role,content:typeof m.content==="string"?[{type:"input_text",text:m.content}]:m.content.map((p:any)=>p.type==="text"?{type:"input_text",text:p.text}:{type:"input_image",image_url:p.image_url?.url||p.source?.url})}))];
- const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),args.timeoutMs);
- try{const res=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${args.apiKey}`},body:JSON.stringify({model:args.modelId,input,tools:[{type:"web_search"}],max_output_tokens:args.maxOutputTokens}),signal:controller.signal});if(!res.ok)return {ok:false,reason:reasonFromHttpStatus(res.status)||"server_error",httpStatus:res.status};const json:any=await res.json();const output=json.output||[];const text=output.flatMap((o:any)=>o.content||[]).filter((c:any)=>c.type==="output_text").map((c:any)=>c.text||"").join("");const sources=output.flatMap((o:any)=>o.content||[]).flatMap((c:any)=>c.annotations||[]).filter((a:any)=>a.type==="url_citation"&&a.url).map((a:any)=>({title:a.title||a.url,url:a.url})).slice(0,5);if(!text)return {ok:false,reason:"empty_response"};return {ok:true,text,input_tokens:Number(json.usage?.input_tokens)||0,output_tokens:Number(json.usage?.output_tokens)||0,web_search_used:output.some((o:any)=>o.type==="web_search_call"),sources};}catch(e){return {ok:false,...classifyThrown(e)}}finally{clearTimeout(timer)}
+/**
+ * OpenAI Responses API 입력 만들기(웹검색을 켠 OpenAI 호출용).
+ * Responses API는 역할마다 받는 칸이 다르다: 직원(user)은 input_text·input_image, 이전 AI 답(assistant)은 output_text만 받는다.
+ * 이전 AI 답을 input_text로 보내면 두 번째 메시지부터 400 오류가 난다.
+ */
+export function buildOpenAIResponsesInput(system: string, messages: Message[]): any[] {
+  const input: any[] = [{ role: "system", content: [{ type: "input_text", text: system }] }];
+  for (const message of messages) {
+    if (message.role === "assistant") {
+      const text = typeof message.content === "string"
+        ? message.content
+        : message.content.filter((part: any) => part.type === "text").map((part: any) => part.text || "").join("\n");
+      input.push({ role: "assistant", content: [{ type: "output_text", text }] });
+      continue;
+    }
+    if (typeof message.content === "string") {
+      input.push({ role: "user", content: [{ type: "input_text", text: message.content }] });
+      continue;
+    }
+    input.push({
+      role: "user",
+      content: message.content.map((part: any) =>
+        part.type === "text"
+          ? { type: "input_text", text: part.text }
+          : { type: "input_image", image_url: part.image_url?.url || part.source?.url }
+      ),
+    });
+  }
+  return input;
+}
+
+/** 웹검색을 켠 OpenAI 호출 — Responses API의 web_search 도구를 쓴다. */
+async function callOpenAIResponses(args: { apiKey: string; modelId: string; system: string; messages: Message[]; maxOutputTokens: number; timeoutMs: number }): Promise<CallResult> {
+  const input = buildOpenAIResponsesInput(args.system, args.messages);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), args.timeoutMs);
+  try {
+    const res = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${args.apiKey}` },
+      body: JSON.stringify({ model: args.modelId, input, tools: [{ type: "web_search" }], max_output_tokens: args.maxOutputTokens }),
+      signal: controller.signal,
+    });
+    if (!res.ok) return { ok: false, reason: reasonFromHttpStatus(res.status) || "server_error", httpStatus: res.status };
+    const json: any = await res.json();
+    const output = json.output || [];
+    const contents = output.flatMap((o: any) => o.content || []);
+    const text = contents.filter((c: any) => c.type === "output_text").map((c: any) => c.text || "").join("");
+    const sources = contents
+      .flatMap((c: any) => c.annotations || [])
+      .filter((a: any) => a.type === "url_citation" && a.url)
+      .map((a: any) => ({ title: a.title || a.url, url: a.url }))
+      .slice(0, 5);
+    if (!text) return { ok: false, reason: "empty_response" };
+    return {
+      ok: true,
+      text,
+      input_tokens: Number(json.usage?.input_tokens) || 0,
+      output_tokens: Number(json.usage?.output_tokens) || 0,
+      web_search_used: output.some((o: any) => o.type === "web_search_call"),
+      sources,
+    };
+  } catch (e) {
+    return { ok: false, ...classifyThrown(e) };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 async function callGeminiNative(args:{apiKey:string;modelId:string;system:string;messages:Message[];maxOutputTokens:number;timeoutMs:number}):Promise<CallResult>{
  const input=args.messages.map((m:any)=>({type:m.role==="assistant"?"model_output":"user_input",content:typeof m.content==="string"?[{type:"text",text:m.content}]:m.content.map((p:any)=>p.type==="text"?{type:"text",text:p.text}:{type:"image",mime_type:(p.image_url?.url||"").match(/^data:(image\/[^;]+);/)?.[1]||"image/jpeg",data:(p.image_url?.url||"").split(",")[1]})}));const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),args.timeoutMs);

@@ -33,12 +33,25 @@ export function createAiAssistantChatHandler(deps: { createClient?: any; env?: (
   const readEnv = deps.env ?? ((name: string) => Deno.env.get(name));
   const doCallModel = deps.callModel ?? callModel;
   const doListModels = deps.listModelsFor ?? listModelsFor;
-  async function providerConfig(admin: any, provider: string) {
+  /**
+   * 회사 설정 찾기. 결과는 세 가지다.
+   * - row: 표(ai_providers)에 켜진 행이 있음 → 그 주소·열쇠 이름을 쓴다.
+   * - disabled: 표에 행이 있고 꺼져 있음(원장이 끔) → 그 회사는 호출하지 않는다.
+   * - builtin: 표를 못 읽었거나(2단계 DB 적용 전·일시 오류) 행이 없음 → 내장 6곳 값을 쓴다.
+   */
+  async function providerLookup(admin: any, provider: string): Promise<{ state: "row"; cfg: any } | { state: "disabled" } | { state: "builtin" }> {
     try {
-      const { data } = await admin.from("ai_providers").select("*").eq("id", provider).maybeSingle();
-      if (data && data.enabled && data.kind && /^https:\/\/[^\s]+$/.test(data.base_url || "") && /^[A-Z][A-Z0-9_]{1,60}_API_KEY$/.test(data.key_env || "") && !String(data.key_env).startsWith("SUPABASE")) return data;
-    } catch { /* Pre-v2 DB: retain the known provider map until migration. */ }
-    return null;
+      const { data, error } = await admin.from("ai_providers").select("*").eq("id", provider).maybeSingle();
+      if (error || !data) return { state: "builtin" };
+      if (!data.enabled) return { state: "disabled" };
+      const valid = data.kind &&
+        /^https:\/\/[^\s]+$/.test(data.base_url || "") &&
+        /^[A-Z][A-Z0-9_]{1,60}_API_KEY$/.test(data.key_env || "") &&
+        !String(data.key_env).startsWith("SUPABASE");
+      return valid ? { state: "row", cfg: data } : { state: "builtin" };
+    } catch {
+      return { state: "builtin" };
+    }
   }
 
   return async (req: Request) => {
@@ -77,7 +90,8 @@ export function createAiAssistantChatHandler(deps: { createClient?: any; env?: (
         const providers: Record<string, string[]> = {};
         const errors: Record<string, string> = {};
         for (const provider of wanted) {
-          const cfg = await providerConfig(admin, provider);
+          const lookup = await providerLookup(admin, provider);
+          const cfg = lookup.state === "row" ? lookup.cfg : null;
           const apiKey = apiKeyFor(provider, readEnv, cfg?.key_env);
           const result = await doListModels(provider, apiKey, cfg?.base_url || baseUrlFor(provider, readEnv));
           if (result.ok) providers[provider] = result.ids;
@@ -86,13 +100,27 @@ export function createAiAssistantChatHandler(deps: { createClient?: any; env?: (
         return json({ ok: true, providers, errors });
       }
 
+      if (action === "provider_status") {
+        // 원장 전용. 회사마다 「서버에 열쇠가 등록돼 있는지」만 돌려준다(열쇠 값·길이·앞글자는 절대 주지 않음).
+        if (!isOwner) return json(fail("forbidden_role"), 403);
+        let rows: Array<{ id: string; key_env?: string }> = [];
+        try {
+          const pr = await admin.from("ai_providers").select("id,key_env").order("sort_order");
+          if (!pr.error && Array.isArray(pr.data) && pr.data.length) rows = pr.data;
+        } catch { /* 2단계 DB 적용 전이면 내장 회사 목록으로 */ }
+        if (!rows.length) rows = DEFAULT_PROVIDERS.map((id) => ({ id }));
+        return json({ ok: true, providers: rows.map((r) => ({ id: r.id, configured: !!apiKeyFor(r.id, readEnv, r.key_env) })) });
+      }
+
       if (action === "test_model") {
         if (!isOwner) return json(fail("forbidden_role"), 403);
         const modelRef = body?.model_ref;
         if (!modelRef) return json(fail("invalid_input"), 400);
         const { data: model, error: modelError } = await admin.from("ai_models").select("*").eq("id", modelRef).maybeSingle();
         if (modelError || !model) return json(fail("model_not_set"), 404);
-        const cfg = await providerConfig(admin, model.provider);
+        const lookup = await providerLookup(admin, model.provider);
+        if (lookup.state === "disabled") return json({ ok: false, latency_ms: 0, error_kind: "provider_disabled", message: errorMessageFor("provider_disabled") });
+        const cfg = lookup.state === "row" ? lookup.cfg : null;
         const apiKey = apiKeyFor(model.provider, readEnv, cfg?.key_env);
         const startedAt = Date.now();
         const result = await doCallModel({
@@ -120,8 +148,11 @@ export function createAiAssistantChatHandler(deps: { createClient?: any; env?: (
       const validated = validateMessages(body?.messages);
       if (!validated.ok) return json(fail(validated.error_kind), httpStatusForError(validated.error_kind));
       const assistantId = body?.assistant_id;
-      const conversationId = body?.conversation_id;
-      if (!assistantId || !/^[0-9a-f-]{36}$/i.test(String(conversationId || ""))) return json(fail("invalid_input"), 400);
+      // 대화 번호는 2단계 화면이 보낸다. 옛 화면(번호 없음)도 정상으로 답하되 대화 저장만 건너뛴다. 번호가 왔는데 모양이 틀리면 거절한다.
+      const rawConversationId = body?.conversation_id;
+      const hasConversationId = rawConversationId !== undefined && rawConversationId !== null && rawConversationId !== "";
+      if (!assistantId || (hasConversationId && !/^[0-9a-f-]{36}$/i.test(String(rawConversationId)))) return json(fail("invalid_input"), 400);
+      const conversationId: string | null = hasConversationId ? String(rawConversationId) : null;
 
       // --- 5. 도우미 읽기 ---
       const { data: assistant, error: assistantError } = await admin.from("ai_assistants").select("*").eq("id", assistantId).maybeSingle();
@@ -148,10 +179,13 @@ export function createAiAssistantChatHandler(deps: { createClient?: any; env?: (
       const userMessage = messages[messages.length - 1];
       const userText = typeof userMessage.content === "string" ? userMessage.content : userMessage.content.filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n");
       const imageCount = Array.isArray(userMessage.content) ? userMessage.content.filter((p: any) => p.type === "image_url" || p.type === "image").length : 0;
-      const prior = await admin.from("ai_assistant_conversations").select("user_id,assistant_id").eq("id", conversationId).maybeSingle();
-      if (prior.error) return json(fail("usage_unavailable"), 503);
-      if (prior.data && (prior.data.user_id !== user.id || prior.data.assistant_id !== assistant.id)) return json(fail("forbidden_role"), 403);
+      if (conversationId) {
+        const prior = await admin.from("ai_assistant_conversations").select("user_id,assistant_id").eq("id", conversationId).maybeSingle();
+        if (prior.error) return json(fail("usage_unavailable"), 503);
+        if (prior.data && (prior.data.user_id !== user.id || prior.data.assistant_id !== assistant.id)) return json(fail("forbidden_role"), 403);
+      }
       async function saveConversation(reply: string, status: "ok" | "error", model: any = null, fallback: boolean = false, usageId: number | null = null) {
+        if (!conversationId) return; // 옛 화면: 대화 번호가 없으면 저장하지 않는다.
         try {
           const now = new Date().toISOString();
           const { error: convError } = await admin.from("ai_assistant_conversations").upsert({ id: conversationId, user_id: user.id, assistant_id: assistant.id, assistant_name: assistant.name, last_at: now }, { onConflict: "id" });
@@ -220,9 +254,11 @@ export function createAiAssistantChatHandler(deps: { createClient?: any; env?: (
 
       const attempt = async (model: any, fallbackUsed: boolean) => {
         if (imageCount && !model.supports_images) return { result: { ok: false, reason: "unsupported_image" } };
+        const lookup = await providerLookup(admin, model.provider);
+        if (lookup.state === "disabled") return { result: { ok: false, reason: "provider_disabled" } };
         const reserved = await reserveUsage(model);
         if (!reserved.ok) return { blocked: reserved.kind as string };
-        const cfg = await providerConfig(admin, model.provider);
+        const cfg = lookup.state === "row" ? lookup.cfg : null;
         const canSearch = ["openai", "anthropic", "google"].includes(model.provider);
         const startedAt = Date.now();
         const callResult = await doCallModel({
@@ -254,6 +290,7 @@ export function createAiAssistantChatHandler(deps: { createClient?: any; env?: (
         if ("blocked" in second) { await saveConversation("[" + second.blocked + "] " + errorMessageFor(second.blocked!), "error", fallbackModel, true); return json(fail(second.blocked!), httpStatusForError(second.blocked!)); }
         result = second.result;
         usedModel = fallbackModel;
+        usedUsageId = second.usageId ?? null; // 예비로 답했으면 대화 기록은 예비(성공) 사용 기록 행을 가리킨다.
         fallbackUsed = true;
       }
 
