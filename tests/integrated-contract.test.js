@@ -102,15 +102,15 @@ test('Edge는 세 구역 확인을 검증하고 실제 PDF 기록 RPC에 전달�
 test('employee sees signed integrated HTML read-only while pending and legacy contract views stay intact',async()=>{
   const render=html.match(/async function renderContractEmployee\(m,options=\{\}\)\{[\s\S]*?(?=async function renderContract\(m\))/)?.[0];assert.ok(render);
   const rows=[
-    {id:'signed-integrated',status:'\uC11C\uBA85\uC644\uB8CC',merged_html:'<article>signed body <img alt="signature" src="sig.png"></article>'},
+    {id:'signed-integrated',status:'\uC11C\uBA85\uC644\uB8CC',integrated_signature_required:true,merged_html:'<article><section data-contract-part="employment">signed body<img alt="employment signature" src="employment.png"></section><section data-contract-part="medical">medical terms<img alt="medical signature" src="medical.png"></section><section data-contract-part="privacy">privacy terms<img alt="privacy signature" src="privacy.png"></section></article>'},
     {id:'pending-integrated',status:'\uB300\uAE30',merged_html:'<span data-sign-slot="employment"></span><span data-sign-slot="medical"></span><span data-sign-slot="privacy"></span>'},
     {id:'signed-legacy',status:'\uC11C\uBA85\uC644\uB8CC',merged_html:'<article>legacy signed body</article>'},
     {id:'pending-legacy',status:'\uB300\uAE30',merged_html:'<article>legacy pending body</article>'}
   ];
   const makeQuery=table=>{const result=table==='contracts'?{data:rows,error:null}:{data:[],error:null};const q={select(){return q;},eq(){return q;},order(){return q;},then(resolve,reject){return Promise.resolve(result).then(resolve,reject);}};return q;};
   const c={sb:{from:makeQuery},ME:{id:'staff'},CONTRACT_ROWS:[],CONTRACT_TEMPLATES:[],CONTRACT_SHOW_CANCELLED:false,esc:v=>String(v??''),contractVisibleRows:r=>r,contractExpired:()=>false,contractTitle:r=>r.id,contractStatusClass:()=>'',contractDisplayStatus:r=>r.status,contractDate:()=>'',integratedContractPage:()=>'<canvas data-contract-signature="pending"></canvas><button id="contractComplete-pending">sign</button>',initContractSignatures(){},autoLoadStoredContractSignatures(){}};
-  vm.createContext(c);vm.runInContext(block[1]+';'+render+';this.render=renderContractEmployee;',c);const target={innerHTML:''};await c.render(target);
+  vm.createContext(c);vm.runInContext(block[1]+';'+render+';this.render=renderContractEmployee;this.isIntegrated=integratedContract;',c);assert.equal(c.isIntegrated(rows[0]),true);const target={innerHTML:''};await c.render(target);
   const signedStart=target.innerHTML.indexOf('id="integratedContract-signed-integrated"'),pendingStart=target.innerHTML.indexOf('id="integratedContract-pending-integrated"',signedStart),signedIntegrated=target.innerHTML.slice(signedStart,pendingStart);
-  assert.ok(signedStart>=0&&pendingStart>signedStart);assert.match(signedIntegrated,/<div class="contract-doc"[\s\S]*signed body[\s\S]*signature/);assert.doesNotMatch(signedIntegrated,/data-contract-signature|contractComplete-|saveContractSignature/);
+  assert.ok(signedStart>=0&&pendingStart>signedStart);assert.match(signedIntegrated,/<div class="contract-doc"[\s\S]*signed body[\s\S]*signature/);for(const part of ['employment','medical','privacy'])assert.match(signedIntegrated,new RegExp(`data-contract-part="${part}"`));assert.doesNotMatch(signedIntegrated,/data-contract-signature|contractComplete-|saveContractSignature/);
   assert.match(target.innerHTML,/id="integratedContract-pending-integrated"[\s\S]*data-contract-signature/);assert.match(target.innerHTML,/id="integratedContract-signed-legacy"[\s\S]*legacy signed body/);assert.match(target.innerHTML,/id="integratedContract-pending-legacy"[\s\S]*legacy pending body[\s\S]*data-contract-signature/);
 });
