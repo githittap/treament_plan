@@ -1,6 +1,6 @@
-﻿/* ai-assistants.js — 직원허브 「🤖 AI 도우미」 화면(1단계)
+/* ai-assistants.js — 직원허브 「🤖 AI 도우미」 화면(1단계)
    설계서: Z:\09_claude-output\03_병원운영·전산\직원AI도우미\설계서_1단계.md (4장)
-   hr.html은 이 파일을 <script src="ai-assistants.js?v=20260929"> 로 불러 window.AIAssistants.render(container,{sb,me}) 만 부른다.
+   hr.html은 이 파일을 <script src="ai-assistants.js?v=20261001"> 로 불러 window.AIAssistants.render(container,{sb,me}) 만 부른다.
    © 2026 Jung · 아산정플란트치과 */
 (function(){
 'use strict';
@@ -93,6 +93,7 @@ const AI_ERROR_MESSAGES={
   invalid_input:'요청 내용을 확인해 주세요.',
   rate_limited:'짧은 시간에 너무 많이 요청했어요. 잠시 후 다시 시도해 주세요.',
   provider_not_configured:'이 AI 회사 연결이 아직 준비되지 않았어요.',
+  provider_disabled:'이 AI 회사가 꺼져 있어요. 원장에게 알려 주세요.',
   image_not_supported:'이 도우미는 사진을 처리하지 못해요. 내용은 글로 적어 주세요.',
   provider_auth_failed:'이 AI 회사가 연결 키를 받아 주지 않아요. 원장에게 알려 주세요.',
   usage_unavailable:'사용 기록을 확인할 수 없어 지금은 쓸 수 없어요. 잠시 후 다시 시도해 주세요.',
@@ -190,7 +191,6 @@ function aiHistoryForRequest(messages){
   return (messages||[]).filter(function(m){return m&&!m.isError;}).map(function(m){return {role:m.role,content:m.content};});
 }
 function aiTextLength(content){return typeof content==='string'?content.length:Array.isArray(content)?content.filter(p=>p.type==='text').reduce((n,p)=>n+String(p.text||'').length,0):0;}
-function aiCsvBlocks(text){const out=[];const re=/```csv\s*\r?\n([\s\S]*?)```/gi;let m;while((m=re.exec(String(text||'')))!==null)out.push(m[1]);return out;}
 // 서버 제한(메시지 20개·개별 8,000자·합계 40,000자)에 막혀 「다음 전송」이 안 되는 상태인지. nextLen = 다음에 보낼 말 길이(모르면 1).
 function aiConversationTooLong(history,nextLen){
   const h=history||[];
@@ -294,6 +294,33 @@ function aiHelpSectionsFor(role){
 function aiHelpErrorRows(){
   return AI_HELP_ERROR_ROWS.map(function(r){return {kind:r.kind,message:AI_ERROR_MESSAGES[r.kind]||'',means:r.means};});
 }
+// CSV 파일 이름: <도우미이름>_<YYYYMMDD-HHmm>.csv — 이 컴퓨터(한국) 현지 시각 기준이고, 파일 이름에 못 쓰는 글자는 _로 바꾼다.
+function aiCsvFileName(name,date){
+  const d=date||new Date();
+  const pad=function(n){return String(n).padStart(2,'0');};
+  const stamp=d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'-'+pad(d.getHours())+pad(d.getMinutes());
+  const safe=String(name||'').replace(/[\\/:*?"<>|\u0000-\u001f]/g,'_').replace(/\s+/g,' ').trim().replace(/^\.+/,'')||'assistant';
+  return safe+'_'+stamp+'.csv';
+}
+// AI 답 안의 csv 코드 칸들의 본문을 차례로 뽑는다.
+function aiCsvBlocks(text){
+  const out=[];
+  const re=/```csv\s*\r?\n([\s\S]*?)```/gi;
+  let m;
+  while((m=re.exec(String(text||'')))!==null)out.push(m[1]);
+  return out;
+}
+// 📎 옆 안내(설계서 F3): 기본 모델이 사진을 못 읽을 때만 보인다. 카드 목록에 images_ok가 없으면(옛 화면·옛 DB) 안내하지 않는다.
+function aiPhotoNotice(a){
+  if(!a||a.images_ok!==false)return '';
+  if(a.fallback_images_ok===true)return '이 AI는 사진을 못 읽어요. 사진을 보내면 예비 AI가 대신 읽어요.';
+  return '이 AI는 사진을 못 읽어요. 내용은 글로 적어 주세요.';
+}
+// 회사 목록의 열쇠 등록 표시: 서버가 돌려준 true/false만 쓴다(모르면 표시 없음).
+function aiProviderKeyBadge(status,id){
+  if(!status||typeof status[id]!=='boolean')return '';
+  return status[id]?'<span class="b ok">열쇠 등록됨</span>':'<span class="b no">열쇠 등록 필요</span>';
+}
 /* ai-assistants:test-end */
 
 /* ── 아래부터 DOM·네트워크 코드(시험 블록 밖) ── */
@@ -302,7 +329,7 @@ function escAi(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g
 let SB=null,ME={},AI_ROOT=null,AI_SUBTAB='chat',AI_STYLE_INJECTED=false;
 let AI_ASSISTANTS=[],AI_ERROR='';
 let AI_ACTIVE_ASSISTANT=null,AI_MESSAGES=[],AI_SENDING=false,AI_CONV=0,AI_REQ=0,AI_UID=null,AI_CONVERSATION_ID=null,AI_IMAGES=[];
-let AI_ADMIN_ASSISTANTS=[],AI_ADMIN_MODELS=[],AI_PROVIDER_ROWS=[],AI_EDIT_ASSISTANT=null,AI_EDIT_ERRORS=[],AI_MODEL_EDIT=null;
+let AI_ADMIN_ASSISTANTS=[],AI_ADMIN_MODELS=[],AI_PROVIDER_ROWS=[],AI_PROVIDER_KEYS=null,AI_EDIT_ASSISTANT=null,AI_EDIT_ERRORS=[],AI_MODEL_EDIT=null;
 let AI_USAGE_ROWS=[],AI_NOTICE='',AI_HELP_OPEN=false;
 let AI_TRANSCRIPTS=[],AI_TRANSCRIPT_OFFSET=0;
 
@@ -504,7 +531,7 @@ function renderChatPanel(root){
  (tooLong?'<div class="hint" role="alert">\uB300\uD654\uAC00 \uAE38\uC5B4\uC838 \uC0C8 \uB300\uD654\uAC00 \uD544\uC694\uD574\uC694. \u300C\uC0C8 \uB300\uD654\u300D\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694.</div>':'')+
  '<div class="ai-msgs" id="aiMsgs">'+(AI_MESSAGES.length?AI_MESSAGES.map(aiMessageHtml).join(''):'<div class="empty">\uBA54\uC2DC\uC9C0\uB97C \uBCF4\uB0B4 \uB300\uD654\uB97C \uC2DC\uC791\uD558\uC138\uC694.</div>')+'</div>'+
  (!AI_MESSAGES.length&&Array.isArray(a.starters)&&a.starters.length?'<div class="rowflex">'+a.starters.slice(0,4).map((v,i)=>'<button class="mini" data-ai-starter="'+i+'">'+escAi(v)+'</button>').join('')+'</div>':'')+
- '<label class="mini" for="aiPhotos">📎 \uC0AC\uC9C4 (\uCD5C\uB300 4\uC7A5)</label><input id="aiPhotos" type="file" accept="image/jpeg,image/png,image/webp" multiple><div class="sub" id="aiPhotoStatus"></div>'+
+ '<label class="mini" for="aiPhotos">📎 \uC0AC\uC9C4 (\uCD5C\uB300 4\uC7A5)</label><input id="aiPhotos" type="file" accept="image/jpeg,image/png,image/webp" multiple>'+(aiPhotoNotice(a)?'<div class="sub" id="aiPhotoNotice" role="note">'+escAi(aiPhotoNotice(a))+'</div>':'')+'<div class="sub" id="aiPhotoStatus"></div>'+
  (AI_SENDING?'<div class="sub">\uC0DD\uAC01 \uC911...</div>':'')+'<textarea id="aiInput" placeholder="\uBA54\uC2DC\uC9C0\uB97C \uC785\uB825\uD558\uC138\uC694(Ctrl+Enter\uB85C \uBCF4\uB0B4\uAE30)"></textarea><div class="rowflex" style="justify-content:flex-end"><button class="mini stamp" id="aiSendBtn"'+((AI_SENDING||tooLong)?' disabled':'')+'>\uBCF4\uB0B4\uAE30</button></div><div class="hint" id="aiChatErr"></div></div>';
  root.querySelector('[data-ai-back]').addEventListener('click',closeAiChat);root.querySelector('[data-ai-new]').addEventListener('click',function(){startFreshConversation();renderActiveSection();});
  const input=root.querySelector('#aiInput');input.addEventListener('keydown',function(e){if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();sendAiMessage();}});
@@ -512,7 +539,7 @@ function renderChatPanel(root){
  root.querySelectorAll('[data-ai-starter]').forEach(b=>b.addEventListener('click',()=>{input.value=(a.starters||[])[Number(b.getAttribute('data-ai-starter'))]||'';input.focus();}));root.querySelector('#aiSendBtn').addEventListener('click',sendAiMessage);
  const msgs=root.querySelector('#aiMsgs');if(msgs)msgs.scrollTop=msgs.scrollHeight;
  root.querySelectorAll('[data-ai-copy]').forEach(b=>b.addEventListener('click',()=>{const m=AI_MESSAGES[Number(b.getAttribute('data-ai-copy'))];if(m&&navigator.clipboard)navigator.clipboard.writeText(aiDisplayContent(m.content)).catch(()=>{});}));
- root.querySelectorAll('[data-ai-csv]').forEach(b=>b.addEventListener('click',()=>{const ids=b.getAttribute('data-ai-csv').split('::'),m=AI_MESSAGES[Number(ids[0])],csv=aiCsvBlocks(aiDisplayContent(m&&m.content))[Number(ids[1])];if(!csv)return;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download=(AI_ACTIVE_ASSISTANT.name||'assistant')+'_'+new Date().toISOString().slice(0,16).replace(/[-:T]/g,'')+'.csv';a.click();URL.revokeObjectURL(a.href);}));
+ root.querySelectorAll('[data-ai-csv]').forEach(b=>b.addEventListener('click',()=>{const ids=b.getAttribute('data-ai-csv').split('::'),m=AI_MESSAGES[Number(ids[0])],csv=aiCsvBlocks(aiDisplayContent(m&&m.content))[Number(ids[1])];if(!csv)return;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download=aiCsvFileName(AI_ACTIVE_ASSISTANT.name);a.click();URL.revokeObjectURL(a.href);}));
 }
 
 async function sendAiMessage(){
@@ -651,8 +678,8 @@ function drawAssistantForm(){
     '<option value="high"'+(a.effort==='high'?' selected':'')+'>높음</option>'+
     '</select></div>'+
     '<div class="fld"><label>답 최대 길이</label><input id="aiFMaxTok" type="number" min="256" max="32000" value="'+(a.max_output_tokens||4000)+'"></div>'+
-    '<div class="fld"><label>Web search</label><input type="checkbox" id="aiFWebSearch"'+(a.web_search?' checked':'')+'></div>'+
-    '<div class="fld w4"><label>Conversation starters (max 4; 120 chars each)</label><div class="grid">'+[0,1,2,3].map(function(i){return '<input data-ai-starter-input="'+i+'" maxlength="120" value="'+escAi((a.starters||[])[i]||'')+'" placeholder="Starter '+(i+1)+'">';}).join('')+'</div></div>'+
+    '<div class="fld"><label>🔎 웹검색</label><input type="checkbox" id="aiFWebSearch"'+(a.web_search?' checked':'')+'></div>'+
+    '<div class="fld w4"><label>💬 대화 시작 문장 (최대 4개, 각 120자)</label><div class="grid">'+[0,1,2,3].map(function(i){return '<input data-ai-starter-input="'+i+'" maxlength="120" value="'+escAi((a.starters||[])[i]||'')+'" placeholder="시작 문장 '+(i+1)+'">';}).join('')+'</div></div>'+
     '<div class="fld w4"><label>보이는 역할</label><div class="chips">'+roles.map(function(r){return '<label class="sub"><input type="checkbox" data-ai-role="'+r+'"'+((a.visible_roles||[]).indexOf(r)!==-1?' checked':'')+'> '+aiRoleLabel(r)+'</label>';}).join(' ')+'</div></div>'+
     '<div class="fld"><label>켜짐</label><input type="checkbox" id="aiFEnabled"'+(a.enabled!==false?' checked':'')+'></div>'+
     '</div>'+
@@ -741,7 +768,7 @@ async function deleteAssistant(id){
 }
 
 /* ── 원장 화면 2: 모델 목록(설계서 4-3-2) ── */
-function blankModel(){return {id:null,provider:'anthropic',model_id:'',label:'',enabled:true,price_in_usd_per_mtok:null,price_out_usd_per_mtok:null,note:'',sort_order:0};}
+function blankModel(){return {id:null,provider:'anthropic',model_id:'',label:'',enabled:true,supports_images:false,price_in_usd_per_mtok:null,price_out_usd_per_mtok:null,note:'',sort_order:0};}
 
 async function renderModelsSection(root){
   root.innerHTML='<div class="empty">불러오는 중…</div>';
@@ -754,6 +781,20 @@ async function renderModelsSection(root){
     return;
   }
   drawModelsSection(root);
+  loadProviderKeyStatus(root);
+}
+// 회사마다 서버에 열쇠가 등록돼 있는지(true/false만)를 원장 전용 Edge 동작에서 받아 회사 목록에 표시한다. 못 받으면 표시만 생략한다.
+async function loadProviderKeyStatus(root){
+  try{
+    const data=await aiUnwrapInvoke(await SB.functions.invoke('ai-assistant-chat',{body:{action:'provider_status'}}));
+    if(!data||data.ok===false||!Array.isArray(data.providers))return;
+    AI_PROVIDER_KEYS={};
+    data.providers.forEach(function(p){if(p&&typeof p.configured==='boolean')AI_PROVIDER_KEYS[p.id]=p.configured;});
+    if(AI_ROOT&&AI_ROOT.querySelector('#aiSection')===root)drawProviderKeyBadges(root);
+  }catch(e){/* 표시만 생략 */}
+}
+function drawProviderKeyBadges(root){
+  Array.prototype.forEach.call(root.querySelectorAll('[data-ai-provider-badge]'),function(el){el.innerHTML=aiProviderKeyBadge(AI_PROVIDER_KEYS,el.getAttribute('data-ai-provider-badge'));});
 }
 
 function drawModelsSection(root){
@@ -762,15 +803,17 @@ function drawModelsSection(root){
     '<div class="rowflex" style="justify-content:space-between;align-items:center"><h2>🧠 모델 목록</h2>'+
     '<div class="rowflex"><button class="mini" data-ai-new-model>모델 직접 추가</button><button class="mini" data-ai-fetch-models>회사별 목록 불러오기</button></div></div>'+
     (groups.map(function(g){
-      return '<h3>'+escAi(g.label)+'</h3><div class="tblwrap"><table><tr><th>표시 이름</th><th>모델 이름</th><th>켜짐</th><th>가격(100만 토큰당)</th><th>메모</th><th></th></tr>'+
+      return '<h3>'+escAi(g.label)+'</h3><div class="tblwrap"><table><tr><th>표시 이름</th><th>모델 이름</th><th>켜짐</th><th>📷 사진</th><th>가격(100만 토큰당)</th><th>메모</th><th></th></tr>'+
         g.models.map(function(m){
           return '<tr><td>'+escAi(m.label)+'</td><td class="sub">'+escAi(m.model_id)+'</td>'+
             '<td><span class="b '+(m.enabled?'ok':'no')+'">'+(m.enabled?'켜짐':'꺼짐')+'</span></td>'+
+            '<td><span class="b '+(m.supports_images?'ok':'no')+'">'+(m.supports_images?'읽음':'못 읽음')+'</span></td>'+
             '<td class="sub">'+escAi(aiModelPriceLabel(m))+'</td>'+
             '<td class="sub">'+escAi(m.note||'')+'</td>'+
             '<td class="rowflex">'+
             '<button class="mini" data-ai-edit-model="'+m.id+'">고치기</button>'+
             '<button class="mini" data-ai-toggle-model="'+m.id+'">'+(m.enabled?'끄기':'켜기')+'</button>'+
+            '<button class="mini" data-ai-toggle-images="'+m.id+'">'+(m.supports_images?'사진 끄기':'사진 켜기')+'</button>'+
             '<button class="mini" data-ai-test-model="'+m.id+'">시험</button>'+
             '<button class="mini rej" data-ai-del-model="'+m.id+'">삭제</button>'+
             '</td></tr>';
@@ -778,13 +821,14 @@ function drawModelsSection(root){
     }).join('')||'<div class="empty">아직 등록된 모델이 없습니다.</div>')+
     '<div id="aiModelTestResult"></div></div>'+
     '<div id="aiModelFormWrap"></div><div id="aiModelFetchResult"></div>';
-  root.insertAdjacentHTML('beforeend','<div class="card"><h3>회사 목록</h3>'+AI_PROVIDER_ROWS.map(p=>'<div class="rowflex"><span>'+escAi(p.label)+' · '+escAi(p.id)+' · '+escAi(p.base_url)+' · '+escAi(p.key_env)+'</span><button class="mini" data-ai-provider-toggle="'+escAi(p.id)+'">'+(p.enabled?'끄기':'켜기')+'</button></div>').join('')+'<h4>OpenAI 호환 회사 추가</h4><div class="grid"><input id="aiProviderId" placeholder="회사 ID"><input id="aiProviderLabel" placeholder="화면 이름"><input id="aiProviderUrl" placeholder="https://API 주소/v1"><input id="aiProviderKey" placeholder="MYAI_API_KEY (이름만)"></div><button class="mini stamp" data-ai-provider-save>회사 추가</button><div class="hint" id="aiProviderMsg"></div></div>');
+  root.insertAdjacentHTML('beforeend','<div class="card"><h3>회사 목록</h3>'+AI_PROVIDER_ROWS.map(p=>'<div class="rowflex"><span>'+escAi(p.label)+' · '+escAi(p.id)+' · '+escAi(p.base_url)+' · '+escAi(p.key_env)+'</span><span data-ai-provider-badge="'+escAi(p.id)+'">'+aiProviderKeyBadge(AI_PROVIDER_KEYS,p.id)+'</span><button class="mini" data-ai-provider-toggle="'+escAi(p.id)+'">'+(p.enabled?'끄기':'켜기')+'</button></div>').join('')+'<h4>OpenAI 호환 회사 추가</h4><div class="grid"><input id="aiProviderId" placeholder="회사 ID"><input id="aiProviderLabel" placeholder="화면 이름"><input id="aiProviderUrl" placeholder="https://API 주소/v1"><input id="aiProviderKey" placeholder="MYAI_API_KEY (이름만)"></div><button class="mini stamp" data-ai-provider-save>회사 추가</button><div class="hint" id="aiProviderMsg"></div></div>');
   root.querySelectorAll('[data-ai-provider-toggle]').forEach(b=>b.addEventListener('click',async()=>{const p=AI_PROVIDER_ROWS.find(x=>x.id===b.getAttribute('data-ai-provider-toggle'));if(p){const r=await SB.from('ai_providers').update({enabled:!p.enabled}).eq('id',p.id);if(r.error)AI_NOTICE=aiWriteErrorMessage('회사 켜기·끄기',r.error);await renderModelsSection(AI_ROOT.querySelector('#aiSection'));}}));
   const providerSave=root.querySelector('[data-ai-provider-save]');if(providerSave)providerSave.addEventListener('click',saveProvider);
   root.querySelector('[data-ai-new-model]').addEventListener('click',function(){openModelForm(null);});
   root.querySelector('[data-ai-fetch-models]').addEventListener('click',fetchModelLists);
   Array.prototype.forEach.call(root.querySelectorAll('[data-ai-edit-model]'),function(b){b.addEventListener('click',function(){openModelForm(b.getAttribute('data-ai-edit-model'));});});
   Array.prototype.forEach.call(root.querySelectorAll('[data-ai-toggle-model]'),function(b){b.addEventListener('click',function(){toggleModelEnabled(b.getAttribute('data-ai-toggle-model'));});});
+  Array.prototype.forEach.call(root.querySelectorAll('[data-ai-toggle-images]'),function(b){b.addEventListener('click',function(){toggleModelImages(b.getAttribute('data-ai-toggle-images'));});});
   Array.prototype.forEach.call(root.querySelectorAll('[data-ai-test-model]'),function(b){b.addEventListener('click',function(){testModel(b.getAttribute('data-ai-test-model'));});});
   Array.prototype.forEach.call(root.querySelectorAll('[data-ai-del-model]'),function(b){b.addEventListener('click',function(){deleteModel(b.getAttribute('data-ai-del-model'));});});
   if(AI_MODEL_EDIT)drawModelForm();
@@ -808,7 +852,7 @@ function drawModelForm(){
   wrap.innerHTML='<div class="card"><h2>'+(m.id?'모델 고치기':'모델 직접 추가')+'</h2><div class="grid">'+
     '<div class="fld"><label>회사</label><select id="aiMProvider">'+providers.map(function(p){return '<option value="'+p+'"'+(m.provider===p?' selected':'')+'>'+escAi(aiProviderLabel(p))+'</option>';}).join('')+'</select></div>'+
     '<div class="fld"><label>모델 이름(API 이름 그대로)</label><input id="aiMModelId" value="'+escAi(m.model_id)+'"></div>'+
-    '<div class="fld"><label>사진 읽기 지원 확인됨</label><input type="checkbox" id="aiMImages"'+(m.supports_images?' checked':'')+'></div>'+
+    '<div class="fld"><label>📷 사진 읽기 (확인된 모델만 켜기)</label><input type="checkbox" id="aiMImages"'+(m.supports_images?' checked':'')+'></div>'+
     '<div class="fld"><label>화면 표시 이름</label><input id="aiMLabel" value="'+escAi(m.label)+'"></div>'+
     '<div class="fld"><label>켜짐</label><input type="checkbox" id="aiMEnabled"'+(m.enabled!==false?' checked':'')+'></div>'+
     '<div class="fld"><label>입력 가격(달러/100만 토큰, 모르면 비움)</label><input id="aiMPriceIn" type="number" step="0.01" value="'+(m.price_in_usd_per_mtok==null?'':m.price_in_usd_per_mtok)+'"></div>'+
@@ -829,7 +873,6 @@ async function saveModelForm(){
     model_id:wrap.querySelector('#aiMModelId').value.trim(),
     label:wrap.querySelector('#aiMLabel').value.trim(),
     enabled:wrap.querySelector('#aiMEnabled').checked,
-    supports_images:wrap.querySelector('#aiMImages').checked,
     supports_images:wrap.querySelector('#aiMImages').checked,
     price_in_usd_per_mtok:priceIn===''?null:Number(priceIn),
     price_out_usd_per_mtok:priceOut===''?null:Number(priceOut),
@@ -858,6 +901,12 @@ async function toggleModelEnabled(id){
   const m=AI_ADMIN_MODELS.find(function(x){return x.id===id;});
   if(!m)return;
   try{const res=await SB.from('ai_models').update({enabled:!m.enabled}).eq('id',id);if(res.error)throw res.error;await reloadAssistants();}catch(e){AI_NOTICE=aiWriteErrorMessage('켜기·끄기',e);}
+  await renderModelsSection(AI_ROOT.querySelector('#aiSection'));
+}
+async function toggleModelImages(id){
+  const m=AI_ADMIN_MODELS.find(function(x){return x.id===id;});
+  if(!m)return;
+  try{const res=await SB.from('ai_models').update({supports_images:!m.supports_images}).eq('id',id);if(res.error)throw res.error;await reloadAssistants();}catch(e){AI_NOTICE=aiWriteErrorMessage('사진 켜기·끄기',e);}
   await renderModelsSection(AI_ROOT.querySelector('#aiSection'));
 }
 async function deleteModel(id){

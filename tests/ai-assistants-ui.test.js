@@ -6,7 +6,7 @@ function helpers(){
   assert.ok(block,'ai-assistants.js에 순수 helper 블록이 없습니다.');
   const c={};
   vm.createContext(c);
-  vm.runInContext(block+';this.h={aiRoleLabel,aiProviderLabel,aiWon,aiWonLabel,aiModelPriceLabel,aiGroupModelsByProvider,aiAssistantFormErrors,aiChatInputError,aiErrorMessage,aiAdminAssistantReady,aiUsageSummarize,aiNormalizeInvokeError,aiUnwrapInvoke,aiWriteErrorMessage,aiIsStaleResponse,aiUserChanged,aiHistoryForRequest,aiConversationTooLong,aiCostSummaryLabel,aiHelpSectionsFor,aiHelpErrorRows,AI_HELP_SECTIONS,AI_HELP_EXAMPLES,AI_ERROR_MESSAGES};',c);
+  vm.runInContext(block+';this.h={aiRoleLabel,aiProviderLabel,aiWon,aiWonLabel,aiModelPriceLabel,aiGroupModelsByProvider,aiAssistantFormErrors,aiChatInputError,aiErrorMessage,aiAdminAssistantReady,aiUsageSummarize,aiNormalizeInvokeError,aiUnwrapInvoke,aiWriteErrorMessage,aiIsStaleResponse,aiUserChanged,aiHistoryForRequest,aiConversationTooLong,aiCostSummaryLabel,aiHelpSectionsFor,aiHelpErrorRows,AI_HELP_SECTIONS,AI_HELP_EXAMPLES,AI_ERROR_MESSAGES,aiCsvFileName,aiCsvBlocks,aiPhotoNotice,aiProviderKeyBadge};',c);
   return c.h;
 }
 
@@ -255,7 +255,7 @@ function harness(opts){
     return attrs(el.innerHTML,m[1]).map(function(v){return {addEventListener(t,f){handlers['['+m[1]+']='+v+'|'+t]=f;},getAttribute(){return v;}};});
   }
   function makeEl(key){
-    const el={innerHTML:'',value:'',textContent:'',scrollTop:0,scrollHeight:0,
+    const el={innerHTML:'',value:'',textContent:'',scrollTop:0,scrollHeight:0,focus(){},
       addEventListener(t,f){handlers[key+'|'+t]=f;},
       querySelector(sel){return getEl(sel);},
       querySelectorAll(sel){return listAll(el,sel);},
@@ -402,4 +402,68 @@ test('화면 시험: 「❓ 사용법」 패널이 직원에게는 직원용만,
   assert.match(owner.root.innerHTML,/직원용 — 이렇게 쓰세요/);
   assert.match(owner.root.innerHTML,/원장용 — 도우미 만들고 관리하기/);
   assert.equal((owner.root.innerHTML.match(/data-ai-help-copy=/g)||[]).length,3);
+});
+
+// ── 5차 고침(10-01) 시험 ──
+test('CSV 파일 이름: <도우미이름>_<YYYYMMDD-HHmm>.csv — 현지 시각(UTC 아님)이고 못 쓰는 글자는 _로 바뀐다',()=>{
+  const h=helpers();
+  assert.equal(h.aiCsvFileName('리뷰 답글',new Date(2026,9,1,0,30)),'리뷰 답글_20261001-0030.csv','한국 시간 10월 1일 00:30이 전날로 찍히면 안 됨');
+  assert.equal(h.aiCsvFileName('유튜브 대본 → 블로그 글',new Date(2026,0,5,9,7)),'유튜브 대본 → 블로그 글_20260105-0907.csv');
+  assert.equal(h.aiCsvFileName('A/B:C*D?"E"<F>|G\\H',new Date(2026,11,31,23,59)),'A_B_C_D__E__F__G_H_20261231-2359.csv');
+  assert.equal(h.aiCsvFileName('',new Date(2026,5,1,1,2)),'assistant_20260601-0102.csv');
+  assert.equal(h.aiCsvFileName('..숨김',new Date(2026,5,1,1,2)),'숨김_20260601-0102.csv');
+});
+
+test('CSV 칸 뽑기: csv 코드 칸이 여러 개면 차례로 다 뽑고, 다른 코드 칸은 무시한다',()=>{
+  const h=helpers();
+  const fence='```';
+  const text='앞글\n'+fence+'csv\n이름,나이\n가,1\n'+fence+'\n중간\n'+fence+'js\nx=1\n'+fence+'\n'+fence+'CSV\r\n다,2\n'+fence+'\n';
+  assert.deepEqual(Array.from(h.aiCsvBlocks(text)),['이름,나이\n가,1\n','다,2\n']);
+  assert.deepEqual(Array.from(h.aiCsvBlocks('csv 없음')),[]);
+});
+
+test('사진 안내: 기본 모델이 못 읽을 때만 보이고, 예비가 읽으면 그렇게 알려 준다',()=>{
+  const h=helpers();
+  assert.equal(h.aiPhotoNotice({images_ok:true}),'');
+  assert.equal(h.aiPhotoNotice({}),'','옛 카드 목록(칸 없음)은 안내하지 않음');
+  assert.match(h.aiPhotoNotice({images_ok:false,fallback_images_ok:null}),/이 AI는 사진을 못 읽어요/);
+  assert.match(h.aiPhotoNotice({images_ok:false,fallback_images_ok:false}),/글로 적어/);
+  assert.match(h.aiPhotoNotice({images_ok:false,fallback_images_ok:true}),/예비 AI가 대신 읽어요/);
+});
+
+test('열쇠 등록 표시: 서버가 준 true/false만 쓰고, 모르면 아무것도 안 그린다',()=>{
+  const h=helpers();
+  assert.match(h.aiProviderKeyBadge({xai:false},'xai'),/열쇠 등록 필요/);
+  assert.match(h.aiProviderKeyBadge({openai:true},'openai'),/열쇠 등록됨/);
+  assert.equal(h.aiProviderKeyBadge(null,'openai'),'');
+  assert.equal(h.aiProviderKeyBadge({openai:true},'xai'),'');
+});
+
+test('v2 화면 글: 영어 안내가 없고 한국어 라벨이며, 파일 맨 앞에 BOM이 없고 hr.html 주소 번호가 올라갔다',()=>{
+  assert.doesNotMatch(js,/Web search|Conversation starters|placeholder="Starter/);
+  assert.match(js,/🔎 웹검색/);
+  assert.match(js,/💬 대화 시작 문장/);
+  assert.notEqual(fs.readFileSync(path.join(root,'ai-assistants.js'))[0],0xEF,'맨 앞 BOM 없음');
+  assert.match(read('hr.html'),/<script src="ai-assistants\.js\?v=20261001"><\/script>/);
+  assert.doesNotMatch(read('hr.html'),/ai-assistants\.js\?v=20260929/);
+  assert.match(js,/data-ai-toggle-images/,'모델마다 사진 읽기 켜고 끄기');
+  assert.match(js,/action:'provider_status'/,'회사 목록이 서버에 열쇠 등록 여부를 물음');
+});
+
+test('화면 시험: 카드 목록에 시작 문장·사진 읽기 칸이 있으면 빈 대화에 시작 문장 단추와 「사진을 못 읽어요」 안내가 뜬다',async()=>{
+  const t=harness({assistants:[
+    {id:'A',name:'도우미A',icon:'A',description:'',ready:true,sort_order:1,starters:['첫 문장','둘째 문장'],web_search:false,images_ok:false,fallback_images_ok:null},
+    {id:'B',name:'도우미B',icon:'B',description:'',ready:true,sort_order:2,starters:[],web_search:false,images_ok:true,fallback_images_ok:null}]});
+  await t.render({id:'u1',role:'staff'});
+  await t.click('[ai-open]=A');
+  assert.match(t.section.innerHTML,/data-ai-starter="0"[^>]*>첫 문장</);
+  assert.match(t.section.innerHTML,/data-ai-starter="1"[^>]*>둘째 문장</);
+  assert.match(t.section.innerHTML,/id="aiPhotoNotice"[^>]*>이 AI는 사진을 못 읽어요/);
+  await t.click('[ai-starter]=1');
+  assert.equal(t.input.value,'둘째 문장','단추를 누르면 입력칸에 들어감(바로 보내지 않음)');
+  assert.equal(t.invokes.length,0);
+  await t.click('[ai-back]');
+  await t.click('[ai-open]=B');
+  assert.doesNotMatch(t.section.innerHTML,/data-ai-starter=/);
+  assert.doesNotMatch(t.section.innerHTML,/aiPhotoNotice/,'사진 읽는 모델이면 안내 없음');
 });
