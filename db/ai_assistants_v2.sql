@@ -27,7 +27,10 @@ insert into public.ai_providers(id,label,kind,base_url,key_env,sort_order) value
 on conflict(id) do update set label=excluded.label,kind=excluded.kind,base_url=excluded.base_url,key_env=excluded.key_env,sort_order=excluded.sort_order;
 
 alter table public.ai_models add column if not exists supports_images boolean;
-update public.ai_models set supports_images = provider in ('anthropic','openai','google') where supports_images is null;
+-- 사진 읽기 씨앗은 모델별로 「읽는 것이 확인된 모델」만 true다(근거는 허브AI2_구현보고.md 「supports_images 근거」 표).
+-- 2026-10-01 작은 사진(96x96 빨간 네모)을 실제로 읽어 「Red」라고 답한 13개만 true — DeepSeek 2개는 답이 비어 미확인이라 false.
+-- 이 목록에 없는 모델·앞으로 추가하는 모델은 false로 시작하고, 원장이 🧠 모델 목록에서 켜고 끈다.
+update public.ai_models set supports_images = (provider, model_id) in (('anthropic','claude-fable-5-1'),('anthropic','claude-haiku-4-5'),('anthropic','claude-opus-5-5'),('anthropic','claude-sonnet-5-5'),('google','gemini-3.1-pro-preview'),('google','gemini-3.8-flash'),('moonshot','kimi-k2.6'),('moonshot','kimi-k3'),('openai','gpt-6-astra'),('openai','gpt-6-luna'),('openai','gpt-6-sol'),('stepfun','step-3.7-flash'),('stepfun','step-5-preview')) where supports_images is null;
 alter table public.ai_models alter column supports_images set default false;
 alter table public.ai_models alter column supports_images set not null;
 alter table public.ai_models drop constraint if exists ai_models_provider_check;
@@ -84,3 +87,29 @@ create policy ai_assistant_messages_owner_select on public.ai_assistant_messages
 alter table public.ai_providers drop constraint if exists ai_providers_safe_config_check;
 alter table public.ai_providers add constraint ai_providers_safe_config_check
   check (key_env ~ '^[A-Z][A-Z0-9_]{1,60}_API_KEY$' and key_env !~ '^SUPABASE' and base_url ~ '^https://[^[:space:]]+$');
+
+-- 직원 화면이 쓰는 도우미 카드 목록. 시작 문장·웹검색·사진 읽기 가능 여부를 더해 다시 만든다(반환 칼럼이 달라져 create or replace로는 안 됨).
+-- 지침서(instructions)·참고자료(knowledge)·모델 배정 id는 여전히 돌려주지 않는다.
+-- images_ok: 기본 모델이 켜져 있고 사진을 읽으면 true. fallback_images_ok: 켜진 예비 모델이 있을 때만 그 모델의 사진 지원(예비가 없으면 null).
+drop function if exists public.ai_assistants_for_me();
+create function public.ai_assistants_for_me()
+returns table (id uuid, name text, icon text, description text, ready boolean, sort_order int,
+  starters text[], web_search boolean, images_ok boolean, fallback_images_ok boolean)
+language sql stable security definer set search_path = '' as $$
+  select a.id, a.name, a.icon, a.description,
+    (a.model_ref is not null and coalesce(m.enabled, false)) as ready,
+    a.sort_order,
+    a.starters,
+    a.web_search,
+    (coalesce(m.enabled, false) and coalesce(m.supports_images, false)) as images_ok,
+    case when fm.id is null or not fm.enabled then null else fm.supports_images end as fallback_images_ok
+  from public.ai_assistants a
+  left join public.ai_models m on m.id = a.model_ref
+  left join public.ai_models fm on fm.id = a.fallback_model_ref
+  where public.employee_hub_access_allowed()
+    and a.enabled
+    and ((select public.my_role()) = 'owner' or (select public.my_role()) = any(a.visible_roles))
+  order by a.sort_order, a.name;
+$$;
+revoke all on function public.ai_assistants_for_me() from public, anon;
+grant execute on function public.ai_assistants_for_me() to authenticated;
