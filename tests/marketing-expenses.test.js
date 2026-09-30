@@ -20,18 +20,23 @@ test('yearless dates crossing the year boundary use the nearest past KST year',(
   assert.equal(result.transactionAt,'2025-12-31T14:59:00.000Z');
 });
 
-test('rejected, points, and cancellations are excluded without becoming failed rows',()=>{
+test('rejected and points are ignored while a parseable cancellation retains its amount and merchant',()=>{
   for(const [message,reason] of [
     ['신한체크해외거절 이름(0000) 유효기간경과사용불가 09/30 18:02 INR 129.00 (US)Google','rejected'],
     ['신한카드P사용 이름 100포인트 결제시차감청구 상점','points'],
-    ['승인취소 09/30 상점','cancellation'],
   ])assert.deepEqual(parseMarketingSms(message,'2026-10-01T00:00:00+09:00'),{status:'ignored',reason});
+  const cancellation=parseMarketingSms('[Web발신] 삼성0000승인취소 가*림 / 1,000원 일시불 / 09/30 17:58 Google1234 / 누적14,532,777원','2026-10-01T00:00:00+09:00');
+  assert.deepEqual(cancellation,{status:'cancellation',transactionAt:'2026-09-30T08:58:00.000Z',currency:'KRW',amount:1000,amountKrw:1000,merchant:'Google',merchantKey:'google'});
+  assert.doesNotMatch(JSON.stringify(cancellation),/가\*림|0000|14,532,777/);
+  assert.deepEqual(parseMarketingSms('승인취소 09/30 상점','2026-10-01T00:00:00+09:00'),{status:'failed',failureCode:'unreadable_fields'});
 });
 
 test('unsupported shapes retain only a safe failure code and merchant ids are stripped',()=>{
   const failed=parseMarketingSms('삼성해외승인 이름(0000) USD 4.00 상점','2026-10-01T00:00:00+09:00');
   assert.deepEqual(failed,{status:'failed',failureCode:'unsupported_shape'});
   assert.equal(merchantKey('Google Ads 2410390'),'googleads');
+  const google=parseMarketingSms('[Web발신] 삼성1234승인 이름 / 500원 일시불 / 09/30 17:58 Google1234 / 누적2,000원','2026-10-01T00:00:00+09:00');
+  assert.equal(google.status,'recorded');assert.equal(google.merchant,'Google');assert.equal(google.merchantKey,'google');
   const sanitized=parseMarketingSms('[Web발신] 삼성1234승인 이름 / 1,000원 일시불 / 09/30 17:58 매장 2410390 / 누적2,000원','2026-10-01T00:00:00+09:00');
   assert.equal(sanitized.merchant,'매장');
 });

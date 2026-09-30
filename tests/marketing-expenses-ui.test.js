@@ -1,6 +1,6 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const html=fs.readFileSync('hr.html','utf8');
-function helpers(){const block=html.match(/\/\* marketing-expenses:test-start \*\/[\s\S]*?\/\* marketing-expenses:test-end \*\//)?.[0];assert.ok(block,'마케팅비 집계 helper가 없습니다.');const context={Intl,Date,Number,String,Set,Map};vm.createContext(context);vm.runInContext(block+';this.h={marketingMonthAt,marketingCategoryFor,marketingMonthSummary};',context);return context.h;}
+function helpers(){const block=html.match(/\/\* marketing-expenses:test-start \*\/[\s\S]*?\/\* marketing-expenses:test-end \*\//)?.[0];assert.ok(block,'마케팅비 집계 helper가 없습니다.');const context={Intl,Date,Number,String,Set,Map};vm.createContext(context);vm.runInContext(block+';this.h={marketingMonthAt,marketingCategoryFor,marketingMonthSummary,marketingKrwLinkCandidates};',context);return context.h;}
 
 test('marketing category gives a single event override precedence and longest merchant rule precedence',()=>{
   const h=helpers(),rules=[{merchant_key:'google',category:'meta'},{merchant_key:'googleads',category:'google'}];
@@ -19,8 +19,28 @@ test('monthly totals include only KRW channel events and linked foreign events a
   assert.equal(summary.totalKrw,301200);assert.deepEqual(JSON.parse(JSON.stringify(summary.channels)),[['daangn',{amount:300000,count:1,rows:[events[0]]}],['google',{amount:1200,count:1,rows:[events[2]]}]]);
 });
 
+test('foreign charge candidates include KRW purchases from another month',()=>{
+  const h=helpers(),events=[
+    {id:'sep-krw',parse_status:'recorded',event_kind:'purchase',transaction_at:'2026-09-30T15:00:00Z',currency:'KRW',amount_krw:12900},
+    {id:'oct-foreign',parse_status:'recorded',event_kind:'purchase',transaction_at:'2026-10-01T01:00:00Z',currency:'INR',amount_native:129},
+    {id:'failed-krw',parse_status:'failed',event_kind:'purchase',currency:'KRW',amount_krw:null},
+    {id:'reversal-krw',parse_status:'recorded',event_kind:'cancellation',currency:'KRW',amount_krw:-12900},
+  ];
+  assert.deepEqual(JSON.parse(JSON.stringify(h.marketingKrwLinkCandidates(events).map(row=>row.id))),['sep-krw']);
+  const markup=html.match(/async function renderMarketingExpensePanel\(\){[\s\S]*?\n\}\n/)?.[0];
+  assert.match(markup,/marketingKrwLinkCandidates\(all\)/,'link options must use all fetched months');
+});
+
+test('matched cancellations keep the monthly net at zero and render as refunds',()=>{
+  const h=helpers(),purchase={id:'purchase',event_kind:'purchase',parse_status:'recorded',transaction_at:'2026-10-01T00:00:00Z',currency:'KRW',amount_krw:1000,merchant_key:'google'},cancellation={...purchase,id:'cancel',event_kind:'cancellation',amount_krw:-1000};
+  const summary=h.marketingMonthSummary([purchase,cancellation],[{merchant_key:'google',category:'google'}],[],'2026-10');
+  assert.equal(summary.totalKrw,0);assert.equal(summary.channels[0][1].amount,0);assert.equal(summary.channels[0][1].count,2);
+  assert.match(html,/row\.event_kind==='cancellation'\?' · 취소'/,'cancellation rows should be identifiable');
+  assert.match(html,/value\.amount\|\|!value\.rows\.some\(row=>row\.currency!=='KRW'\)/,'zero domestic net must render as ₩0');
+});
+
 test('marketing panel has month, budget, channel details, foreign and exclusions, and no raw SMS selection',()=>{
   const body=html.match(/async function renderMarketingExpensePanel\(\)\{[\s\S]*?\n\}\n/)?.[0];assert.ok(body,'마케팅비 화면 함수를 찾지 못했습니다.');
-  for(const marker of ['월 예산','미분류','마케팅 아님','외화','가맹점 기본 분류 수정','지난달 내역에도 반영됨','marketing_expense_events'])assert.ok(body.includes(marker),`화면에 ${marker}가 있어야 합니다.`);
+  for(const marker of ['월 예산','미분류','마케팅 아님','외화','취소 검토','가맹점 기본 분류 수정','지난달 내역에도 반영됨','marketing_expense_events'])assert.ok(body.includes(marker),`화면에 ${marker}가 있어야 합니다.`);
   assert.ok(!body.includes('select(\'*\')')&&!body.includes('raw_text'),'마케팅 화면은 승인 원문을 읽지 않아야 합니다.');
 });

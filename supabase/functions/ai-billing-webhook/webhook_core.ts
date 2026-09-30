@@ -63,18 +63,41 @@ export function createWebhookHandler(
       const parsed = parseMarketingSms(rawText, new Date().toISOString());
       if (parsed.status === 'ignored') return json({ ok: true, ignored: true }, 200);
       const eventHash = await marketingSmsDigest(rawText, String(secretRow.value));
+      let cancellationLink: { id: string } | null = null;
+      let cancellationFailure: 'unmatched_cancellation' | 'ambiguous_cancellation' | null = null;
+      if (parsed.status === 'cancellation') {
+        const { data: candidates, error: candidateErr } = await client.from('marketing_expense_events')
+          .select('id').eq('event_kind', 'purchase').eq('parse_status', 'recorded')
+          .eq('currency', parsed.currency).eq('amount_krw', parsed.amountKrw)
+          .eq('merchant_key', parsed.merchantKey).is('reversed_event_id', null)
+          .lte('transaction_at', parsed.transactionAt).limit(2);
+        if (candidateErr) return json({ error: '취소 대상을 확인하지 못했습니다.' }, 500);
+        if (candidates?.length === 1) cancellationLink = candidates[0];
+        else cancellationFailure = candidates?.length ? 'ambiguous_cancellation' : 'unmatched_cancellation';
+      }
+      const receivedAt = new Date().toISOString();
       const row = parsed.status === 'recorded' ? {
-        event_hash: eventHash, received_at: new Date().toISOString(), transaction_at: parsed.transactionAt,
+        event_hash: eventHash, received_at: receivedAt, transaction_at: parsed.transactionAt,
         event_kind: parsed.eventKind, parse_status: 'recorded', currency: parsed.currency,
         amount_native: parsed.amount, amount_krw: parsed.amountKrw,
         merchant: parsed.merchant, merchant_key: parsed.merchantKey,
+      } : parsed.status === 'cancellation' && cancellationLink ? {
+        event_hash: eventHash, received_at: receivedAt, transaction_at: parsed.transactionAt,
+        event_kind: 'cancellation', parse_status: 'recorded', currency: parsed.currency,
+        amount_native: -parsed.amount, amount_krw: -parsed.amountKrw,
+        merchant: parsed.merchant, merchant_key: parsed.merchantKey, reversed_event_id: cancellationLink.id,
+      } : parsed.status === 'cancellation' ? {
+        event_hash: eventHash, received_at: receivedAt, transaction_at: parsed.transactionAt,
+        event_kind: 'cancellation', parse_status: 'failed', failure_code: cancellationFailure || 'unmatched_cancellation',
+        currency: parsed.currency, amount_native: parsed.amount, amount_krw: parsed.amountKrw,
+        merchant: parsed.merchant, merchant_key: parsed.merchantKey,
       } : {
-        event_hash: eventHash, received_at: new Date().toISOString(), event_kind: 'purchase',
+        event_hash: eventHash, received_at: receivedAt, event_kind: /취소|승인취소/i.test(rawText) ? 'cancellation' : 'purchase',
         parse_status: 'failed', failure_code: parsed.failureCode,
       };
       const { error: marketingErr } = await client.from('marketing_expense_events').upsert(row, { onConflict: 'event_hash', ignoreDuplicates: true });
       if (marketingErr) return json({ error: '이벤트 저장 실패' }, 500);
-      return json({ ok: true, recorded: parsed.status === 'recorded' }, 200);
+      return json({ ok: true, recorded: parsed.status === 'recorded' || (parsed.status === 'cancellation' && !!cancellationLink), review: !!cancellationFailure || /취소|승인취소/i.test(rawText) }, 200);
     }
 
     const composedNote = naverAd?.note || [note, usdAmount != null ? `USD ${usdAmount} 자동환산` : null].filter(Boolean).join(' / ') || null;

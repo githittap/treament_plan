@@ -1,12 +1,16 @@
 import { createWebhookHandler } from './webhook_core.ts';
 
 const SECRET='local-test-only';
-function fixture(){
+function fixture(cancellationCandidates: {id:string}[]=[]){
   const inserts: Record<string, unknown>[]=[];const marketingWrites:{row:Record<string,unknown>,options:Record<string,unknown>}[]=[];let secretLookupName='';
   const createClient=()=>({from(table: string): any {
     if(table==='webhook_secrets')return{select(){return this},eq(_column: string,value: string){secretLookupName=value;return this},async single(){return{data:{value:SECRET},error:null}}};
     if(table==='ai_billing_events')return{async insert(row: Record<string, unknown>){inserts.push(row);return{error:null}}};
-    if(table==='marketing_expense_events')return{async upsert(row:Record<string,unknown>,options:Record<string,unknown>){marketingWrites.push({row,options});return{error:null}}};
+    if(table==='marketing_expense_events')return{
+      select(){return this},eq(){return this},is(){return this},lte(){return this},
+      async limit(){return{data:cancellationCandidates,error:null}},
+      async upsert(row:Record<string,unknown>,options:Record<string,unknown>){marketingWrites.push({row,options});return{error:null}},
+    };
     throw new Error(`unexpected table ${table}`);
   }});
   const handler=createWebhookHandler(createClient,name=>name==='SUPABASE_URL'?'https://db.test':name==='SUPABASE_SERVICE_ROLE_KEY'?'not-a-real-key':undefined);
@@ -56,4 +60,15 @@ Deno.test('Marketing branch excludes point/rejected messages and stores only a f
  if(r.status!==200||f.marketingWrites.length)throw new Error('points must be excluded');
  r=await f.handler(req({raw_text:'삼성해외승인 이름(0000) USD 4.00 상점'},'marketing'));
  const row=f.marketingWrites[0]?.row;if(r.status!==200||row?.parse_status!=='failed'||row.failure_code!=='unsupported_shape'||row.merchant||row.raw_text)throw new Error('unreadable message should retain only a safe failure code');
+});
+Deno.test('Matched cancellation is stored as a negative linked event',async()=>{
+ const f=fixture([{id:'prior-approval'}]);const r=await f.handler(req({raw_text:'[Web발신] 삼성0000승인취소 가*림 / 1,000원 일시불 / 09/30 17:58 Google1234 / 누적14,532,777원'},'marketing'));
+ const body=await json(r),row=f.marketingWrites[0]?.row;
+ if(r.status!==200||body.recorded!==true||row?.event_kind!=='cancellation'||row?.amount_native!==-1000||row?.amount_krw!==-1000||row?.reversed_event_id!=='prior-approval')throw new Error('matched cancellation did not offset its prior approval');
+ if(row?.merchant!=='Google'||row?.merchant_key!=='google'||JSON.stringify(row).match(/가\*림|0000|14,532,777/))throw new Error('cancellation row retained sensitive or invalid merchant data');
+});
+Deno.test('Unmatched cancellation is preserved for review and never reported as recorded',async()=>{
+ const f=fixture();const r=await f.handler(req({raw_text:'[Web발신] 삼성0000승인취소 가*림 / 1,000원 일시불 / 09/30 17:58 Google1234'},'marketing'));
+ const body=await json(r),row=f.marketingWrites[0]?.row;
+ if(r.status!==200||body.recorded!==false||body.review!==true||row?.event_kind!=='cancellation'||row?.parse_status!=='failed'||row?.failure_code!=='unmatched_cancellation'||row?.amount_native!==1000||row?.amount_krw!==1000||row?.merchant!=='Google'||row?.merchant_key!=='google')throw new Error('unmatched cancellation was not safely retained for review');
 });

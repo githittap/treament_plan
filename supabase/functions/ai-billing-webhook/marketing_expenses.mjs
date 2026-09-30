@@ -1,8 +1,9 @@
 /**
  * @typedef {{status:'recorded',eventKind:'purchase',transactionAt:string,currency:string,amount:number,amountKrw:number|null,merchant:string,merchantKey:string}} MarketingRecorded
- * @typedef {{status:'failed',failureCode:'empty'|'unsupported_shape'|'unreadable_fields'}} MarketingFailed
- * @typedef {{status:'ignored',reason:'rejected'|'points'|'cancellation'}} MarketingIgnored
- * @typedef {MarketingRecorded|MarketingFailed|MarketingIgnored} MarketingParseResult
+ * @typedef {{status:'cancellation',transactionAt:string,currency:'KRW',amount:number,amountKrw:number,merchant:string,merchantKey:string}} MarketingCancellation
+ * @typedef {{status:'failed',failureCode:'empty'|'unsupported_shape'|'unreadable_fields'|'unmatched_cancellation'|'ambiguous_cancellation'}} MarketingFailed
+ * @typedef {{status:'ignored',reason:'rejected'|'points'}} MarketingIgnored
+ * @typedef {MarketingRecorded|MarketingCancellation|MarketingFailed|MarketingIgnored} MarketingParseResult
  */
 /** @returns {MarketingParseResult} */
 export function parseMarketingSms(rawText, receivedAt = new Date().toISOString()) {
@@ -10,7 +11,8 @@ export function parseMarketingSms(rawText, receivedAt = new Date().toISOString()
   if (!text) return { status: 'failed', failureCode: 'empty' };
   if (/거절|승인거절|사용불가/i.test(text)) return { status: 'ignored', reason: 'rejected' };
   if (/P사용|포인트\s*결제시차감청구/i.test(text)) return { status: 'ignored', reason: 'points' };
-  if (/취소|승인취소/i.test(text)) return { status: 'ignored', reason: 'cancellation' };
+  const cancellation = parseSamsungCancellation(text, receivedAt);
+  if (/취소|승인취소/i.test(text)) return cancellation || { status: 'failed', failureCode: 'unreadable_fields' };
 
   let match;
   if ((match = text.match(/삼성\d{4}승인[\s\S]*?([\d,]+)원\s*일시불\s*\/\s*(\d{2}\/\d{2}\s+\d{2}:\d{2})\s+(.+?)\s*\/\s*누적[\d,]+원/i))) {
@@ -24,6 +26,16 @@ export function parseMarketingSms(rawText, receivedAt = new Date().toISOString()
     return parsedPurchase({ currency: match[2].toUpperCase(), amount: Number(match[3].replace(/,/g, '')), date: match[1], merchant: match[4], receivedAt });
   }
   return { status: 'failed', failureCode: 'unsupported_shape' };
+}
+
+function parseSamsungCancellation(text, receivedAt) {
+  const match = text.match(/삼성\d{4}승인취소[\s\S]*?([\d,]+)원\s*일시불\s*\/\s*(\d{2}\/\d{2}\s+\d{2}:\d{2})\s+(.+?)(?:\s*\/\s*누적[\d,]+원)?$/i);
+  if (!match) return null;
+  const merchant = sanitizeMerchant(match[3]);
+  const transactionAt = transactionTimestamp(match[2], receivedAt);
+  const amount = Number(match[1].replace(/,/g, ''));
+  if (!merchant || !transactionAt || !Number.isFinite(amount) || amount <= 0) return { status: 'failed', failureCode: 'unreadable_fields' };
+  return { status: 'cancellation', transactionAt, currency: 'KRW', amount, amountKrw: Math.round(amount), merchant, merchantKey: merchantKey(merchant) };
 }
 
 /** @returns {MarketingParseResult} */
@@ -42,7 +54,7 @@ function parsedPurchase({ currency, amount, date, merchant, receivedAt }) {
 
 function sanitizeMerchant(value) {
   const safe = String(value || '')
-    .replace(/\b\d{4,}\b/g, '')
+    .replace(/\d{4,}/g, '')
     .replace(/[^\p{L}\p{N} .&()_\/-]/gu, ' ')
     .replace(/\s+/g, ' ').trim().slice(0, 80);
   return safe || null;
