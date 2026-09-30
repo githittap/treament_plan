@@ -117,6 +117,8 @@ tr.new td{background:var(--mint-dk)}
 @media(max-width:640px){.owner-board-grid{grid-template-columns:minmax(0,1fr)}.owner-board-view-head{align-items:flex-start}}
 #saveTag{font-size:11.5px;color:var(--gray)} #saveTag.err{color:var(--red)}
 .hint{font-size:11.5px;color:var(--gray);margin-top:6px}
+.onboarding-guide-summary{cursor:pointer;overflow-wrap:anywhere;font-size:16px;font-weight:700;line-height:1.5;color:var(--ink)}
+.onboarding-guide-items{display:grid;gap:8px;margin:10px 0 0;padding-left:24px;line-height:1.5}
 .stub{border:1px dashed var(--line);border-radius:10px;padding:22px;text-align:center;color:var(--gray);font-size:13px}
 .contract-doc{background:#fff;color:#111;border-radius:8px;padding:24px;overflow:auto;line-height:1.7}
 .contract-signature{display:block;width:100%;max-width:720px;height:180px;background:#fff;border:1px solid var(--line);border-radius:8px;touch-action:none}
@@ -863,9 +865,9 @@ async function renderHome(m){
       <div class="stat"><div class="sub">안 읽은 공지</div><div class="big">${BADGE.notice||0}</div></div>
       <div class="stat"><div class="sub">미제출 서류</div><div class="big" style="color:${undone.length?'var(--gold)':'var(--mint)'}">${undone.length}</div></div>
     </div>
-    ${undone.length?`<div class="hint" style="color:var(--gold)">⚠ 미제출: ${undone.map(i=>esc(i.label)).join(', ')} — [내 서류함] 탭에서 제출하세요.</div>`:''}
+    ${undone.length?`<div class="hint" style="color:var(--gold)">⚠ 미제출 서류 ${undone.length}개 — [내 서류함] 탭에서 제출하세요.</div>`:''}
   </div>
-  ${undone.length&&onboardingGuideVisibleForRole(ME.role)?onboardingGuideCard():''}
+  ${undone.length&&onboardingGuideVisibleForRole(ME.role)?onboardingGuideCard({collapsed:true}):''}
   ${MY_PAYSLIPS.length?`<div class="card"><h2>💰 내 명세서</h2>${MY_PAYSLIPS.map(s=>`<div class="rowflex" style="justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line)"><span>${esc(s.month)}</span><button class="mini" onclick="openMyPayslip(${s.id})">보기</button></div>`).join('')}</div>`:''}
   ${homeInboxCard}
   ${canManageConsultation()?'<div class="card" style="padding:12px 14px"><div class="rowflex" style="justify-content:space-between;align-items:center;gap:10px"><div><h2 style="margin-bottom:3px">🗂 상담일지</h2><div class="hint">매니저·실장·원장만 상담 기록을 입력·조회·수정합니다.</div></div><button class="mini" onclick="go(\'consult\')">상담일지 열기</button></div></div>':''}`;
@@ -2061,7 +2063,7 @@ async function deleteCalendarEvent(id){
 const G_ONBOARDING_GUIDE_ITEMS=['병원 시설을 둘러보고 식당·출퇴근 기록 장치 등 기본 시설 사용법을 안내받는다.','조직도, 호칭, 기본 예절, 업무 분장, 근로계약과 복리후생 설명을 듣는다.','무전기를 지급받으면 담당자에게 사용법과 업무용 대화 범위를 확인한다.','소속 부서의 담당자, 보고 라인, 당일 교육 항목을 확인한다.','기본 도구와 오픈·마감 절차를 확인한다.','무전은 들었다는 뜻으로 최초 1회 응답한다.','진료실·데스크에서 큰 소리의 사담을 피하고, 환자 앞에서 치료계획 변경이나 내부 판단을 논의하지 않으며 필요한 설명과 양해를 먼저 제공한다.','환자가 언제 어떻게 납부하기로 했는지, 비급여 차감 등 금액 관련 사항이 있으면 상담·데스크 기록을 일치시킨다.','대기시간과 환자 동선을 안내하고 접수 후 어디에서 기다리는지 분명히 설명한다.','컴플레인은 말을 끊지 않고 듣고, 담당자에게 즉시 보고한 뒤 단독으로 확정 약속하지 않는다.','상담 전 최신 수가표와 내부 설명 자료의 사용 범위를 담당자에게 확인한다.','신환은 구강포토와 상담 차트를 준비하고 지정 위치에 기록·스캔한다.','임플란트 식립 후 1차 내원은 s/o 또는 드레싱, 2차 내원은 3주 후, 3차 내원은 6주 후로 안내한다.','사용한 기구와 재료는 원래 위치에 정리하고 오픈·마감 시 정리 항목을 체크한다.','치료 후 다음 계획 또는 정기검진·불편 시 내원 등 후속 계획을 기록한다.'];
 function onboardingGuideItems(){return [...G_ONBOARDING_GUIDE_ITEMS];}
 function onboardingGuideVisibleForRole(role){return ['staff','manager','chief','owner'].includes(role);}
-function onboardingGuideCard(){return `<div class="card"><h2>🧭 신입 첫날 안내</h2><div class="hint">가입 직후 확인하는 공통 안내입니다. 실장·매니저도 신규 직원에게 같은 내용을 안내합니다.</div><ol>${onboardingGuideItems().map(item=>`<li>${esc(item)}</li>`).join('')}</ol></div>`;}
+function onboardingGuideCard({collapsed=false}={}){const items=onboardingGuideItems();return `<details class="card onboarding-guide-card"${collapsed?'':' open'}><summary class="onboarding-guide-summary">🧭 신입 첫날 안내 (${items.length}개) — 눌러서 보기</summary><div class="hint">가입 직후 확인하는 공통 안내입니다. 실장·매니저도 신규 직원에게 같은 내용을 안내합니다.</div><ol class="onboarding-guide-items">${items.map(item=>`<li>${esc(item)}</li>`).join('')}</ol></details>`;}
 /* onboarding-guide:test-end */
 /* onboarding-evidence:test-start */
 function isAllowedLatentTuberculosisEvidenceMime(mime){return ['application/pdf','image/png','image/jpeg','image/gif'].includes(String(mime||'').trim().toLowerCase());}
