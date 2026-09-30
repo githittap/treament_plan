@@ -212,6 +212,12 @@ Claude 가 공개 저장소(`githittap/treament_plan`, jung-plant.com 으로 배
 - [ ] (선택) 후속 2건은 추천 작업 칩으로 띄워 둠: ① 원래 실패하던 PGlite 시험 3건 정리(Task 7 지문 2건은 윈도우 줄바꿈 원인, Task 8 패치 1건) ② codex-bridge가 새 Codex 대화 대신 다른 진행 중 대화에 연결된 문제 조사. 둘 다 운영 영향 없음.
 - 되돌리기: 프런트는 `63372e8` 재배포(이후 변경 없을 때), DB는 `db/ai_usage_snapshots_rollback.sql` → `db/ai_model_usage_daily_rollback.sql`(파생 데이터라 보존 게이트 없음), 예약 작업은 `Unregister-ScheduledTask -TaskName 직원허브_AI사용량_업로드`.
 
+### 외부 AI(딥시크·스텝5 등) 구역 추가 (2026-09-30, 원장 승인 「허브로 넣고 갱신 자동화」)
+
+- [x] AI비용 탭 '📊 AI 사용량 현황판'에 '🛰️ 외부 AI' 구역(AI별 카드 + 날짜별 표, 09-30 이전은 '금액 기록 전') 추가. 커밋 `a8c4976` → main(Pages 배포, 공개 hr.html 해시가 커밋과 동일).
+- [x] 운영 DB: migration `ai_usage_snapshots_external_ai_20260930`(kind 허용 목록에 `external_ai` 추가) · Edge `ai-usage-sync` v4(`validateExternalAi`: 최신 60일·ai 8개·64KB). 되돌리기 `db/ai_usage_snapshots_external_ai_rollback.sql`(external_ai 한 줄만 삭제 + 허용 목록 원복) → Edge는 v3 소스로 재배포.
+- [x] PC: 업로더 `hr_ai_usage_uploader.py`에 external_ai 추가(백업 `.bak-20260930-external`), 예약 작업 `AI외부사용량_집계`(6시간마다 `external_ai_usage.py` → 업로더 `--log`). 시험: 통합 18·패널 11·PGlite 스냅샷(확장 포함) 통과.
+
 ## 상담문의 일원화 1차
 
 - [x] 운영 반영·독립 검증: migration `employee_hub_consultation_inbox_20260922`, Edge `consultation-ingest` v1 ACTIVE·`verify_jwt=true`, 동일 외부 이벤트의 DB 트랜잭션 idempotency/rollback, 권한·RLS·고정 search_path postflight, no-auth/위조 JWT 401, 공개 smoke와 독립 검증 PASS.
