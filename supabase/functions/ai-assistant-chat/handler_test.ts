@@ -25,6 +25,8 @@ function makeDb(opts: { existing?: number; limit?: number; reserveError?: { code
   for (let i = 0; i < (opts.existing ?? 0); i++) rows.push({ id: i + 1, user_id: "u1", status: "ok" });
   let nextId = rows.length + 1;
   const reserveCalls: unknown[] = [];
+  const savedConversations: any[] = [];
+  const savedMessages: any[] = [];
   const admin = {
     rpc(name: string, args: any) {
       assert(name === "ai_usage_reserve", "예약 RPC 이름");
@@ -42,6 +44,8 @@ function makeDb(opts: { existing?: number; limit?: number; reserveError?: { code
       let patch: Record<string, unknown> | null = null;
       const api: any = {
         select() { return api; },
+        insert(rows: any) { if (table === "ai_assistant_messages") savedMessages.push(...(Array.isArray(rows) ? rows : [rows])); return Promise.resolve({ error: null }); },
+        upsert(row: any) { if (table === "ai_assistant_conversations") savedConversations.push(row); return Promise.resolve({ error: null }); },
         update(p: Record<string, unknown>) { patch = p; return api; },
         eq(col: string, val: unknown) {
           filters[col] = val;
@@ -68,7 +72,7 @@ function makeDb(opts: { existing?: number; limit?: number; reserveError?: { code
     auth: { getUser: () => Promise.resolve({ data: { user: { id: "u1" } }, error: null }) },
     rpc: () => Promise.resolve({ data: true, error: null }),
   };
-  return { rows, reserveCalls, admin, user };
+  return { rows, reserveCalls, savedConversations, savedMessages, admin, user };
 }
 
 function makeHandler(db: ReturnType<typeof makeDb>, callModel: (a: any) => Promise<any>) {
@@ -82,7 +86,7 @@ const chatReq = () =>
   new Request("http://local/ai-assistant-chat", {
     method: "POST",
     headers: { Authorization: "Bearer x", "content-type": "application/json" },
-    body: JSON.stringify({ action: "chat", assistant_id: "a-1", messages: [{ role: "user", content: "안녕" }] }),
+    body: JSON.stringify({ action: "chat", assistant_id: "a-1", conversation_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", messages: [{ role: "user", content: "안녕" }] }),
   });
 const okResult = { ok: true, text: "답", input_tokens: 10, output_tokens: 20 };
 
@@ -100,6 +104,10 @@ Deno.test("정상: 호출 전 1번 예약하고 같은 행을 ok·토큰·금액
   assertEquals(db.rows[0].input_tokens, 10);
   assertEquals(db.rows[0].est_cost_usd, (10 * 4 + 20 * 20) / 1e6);
   assertEquals(db.rows[0].fallback_used, false);
+  assertEquals(db.savedConversations.length, 1);
+  assertEquals(db.savedMessages.length, 2);
+  assertEquals(db.savedMessages[0].role, "user");
+  assertEquals(db.savedMessages[1].role, "assistant");
 });
 
 Deno.test("예비 모델: 1차·예비 각각 예약하고, 1차 행은 error·예비 행은 ok+fallback_used", async () => {

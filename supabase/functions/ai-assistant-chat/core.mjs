@@ -28,10 +28,23 @@ export function validateMessages(messages) {
     if (!m || typeof m !== 'object' || (m.role !== 'user' && m.role !== 'assistant')) {
       return { ok: false, error_kind: 'invalid_input', message: '메시지 역할은 user 또는 assistant여야 해요.' };
     }
-    if (typeof m.content !== 'string' || m.content.length < 1 || m.content.length > MAX_CONTENT_CHARS) {
+    const parts = Array.isArray(m.content) ? m.content : null;
+    const textLength = parts
+      ? parts.reduce((n, p) => n + (p?.type === 'text' && typeof p.text === 'string' ? p.text.length : 0), 0)
+      : typeof m.content === 'string' ? m.content.length : -1;
+    const images = parts ? parts.filter((p) => p?.type === 'image_url' || p?.type === 'image') : [];
+    const invalidPart = parts && parts.some((p) => {
+      if (p?.type === 'text') return typeof p.text !== 'string';
+      if (p?.type !== 'image_url' && p?.type !== 'image') return true;
+      const url = p.image_url?.url;
+      const mediaType = p.source?.media_type || String(url || '').match(/^data:(image\/(?:jpeg|png|webp));base64,/)?.[1];
+      const data = p.source?.data || (typeof url === 'string' ? url.split(',')[1] : '');
+      return !['image/jpeg', 'image/png', 'image/webp'].includes(mediaType) || !data || data.length > 2_100_000;
+    });
+    if ((textLength < 1 && images.length === 0) || textLength > MAX_CONTENT_CHARS || images.length > 4 || invalidPart) {
       return { ok: false, error_kind: 'invalid_input', message: '메시지 한 개는 1~8,000자여야 해요.' };
     }
-    total += m.content.length;
+    total += textLength;
   }
   if (total > MAX_TOTAL_CHARS) {
     return { ok: false, error_kind: 'invalid_input', message: '메시지 전체 길이가 40,000자를 넘었어요.' };
@@ -72,7 +85,7 @@ export function buildAnthropicRequest({ modelId, system, messages, maxOutputToke
     model: modelId,
     max_tokens: maxOutputTokens,
     system,
-    messages: messages.map((m) => ({ role: m.role, content: m.content })),
+    messages: messages.map((m) => ({ role: m.role, content: Array.isArray(m.content) ? m.content.map((part) => part.type === 'text' ? { type: 'text', text: part.text } : { type: 'image', source: { type: 'base64', media_type: part.source?.media_type || String(part.image_url?.url || '').match(/^data:(image\/(?:jpeg|png|webp));/)?.[1] || 'image/jpeg', data: part.source?.data || String(part.image_url?.url || '').split(',')[1] } }) : m.content })),
   };
   if (cls === 'effort_family') {
     if (effort) params.output_config = { effort };
@@ -88,13 +101,14 @@ const OPENAI_COMPAT_MAX_TOKENS_FIELD = { openai: 'max_completion_tokens' };
  * OpenAI 호환 5곳(openai·deepseek·stepfun·moonshot·google) 요청 본문.
  * @returns {object} fetch body(JSON.stringify 대상)
  */
-export function buildOpenAICompatRequest({ provider, modelId, system, messages, maxOutputTokens }) {
+export function buildOpenAICompatRequest({ provider, modelId, system, messages, maxOutputTokens, webSearch = false }) {
   const tokensField = OPENAI_COMPAT_MAX_TOKENS_FIELD[provider] || 'max_tokens';
   const body = {
     model: modelId,
     messages: [{ role: 'system', content: system }, ...messages.map((m) => ({ role: m.role, content: m.content }))],
   };
   body[tokensField] = maxOutputTokens;
+  if (webSearch && provider === 'openai') body.tools = [{ type: 'web_search' }];
   return body;
 }
 
@@ -208,6 +222,7 @@ export const HTTP_STATUS_FOR_ERROR = {
   invalid_input: 400,
   rate_limited: 429,
   provider_not_configured: 502,
+  image_not_supported: 400,
   provider_auth_failed: 502,
   usage_unavailable: 503,
   upstream_error: 502,

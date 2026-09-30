@@ -20,7 +20,7 @@ const cors = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
-const ALL_PROVIDERS = ["anthropic", "openai", "deepseek", "stepfun", "moonshot", "google"];
+const DEFAULT_PROVIDERS = ["anthropic", "openai", "deepseek", "stepfun", "moonshot", "google", "xai"];
 const RATE_LIMIT_PER_HOUR = 120;
 const TEST_MODEL_MESSAGE = "안녕하세요라고만 답하세요";
 
@@ -33,6 +33,13 @@ export function createAiAssistantChatHandler(deps: { createClient?: any; env?: (
   const readEnv = deps.env ?? ((name: string) => Deno.env.get(name));
   const doCallModel = deps.callModel ?? callModel;
   const doListModels = deps.listModelsFor ?? listModelsFor;
+  async function providerConfig(admin: any, provider: string) {
+    try {
+      const { data } = await admin.from("ai_providers").select("*").eq("id", provider).maybeSingle();
+      if (data && data.enabled && data.kind && /^https:\/\/[^\s]+$/.test(data.base_url || "") && /^[A-Z][A-Z0-9_]{1,60}_API_KEY$/.test(data.key_env || "") && !String(data.key_env).startsWith("SUPABASE")) return data;
+    } catch { /* Pre-v2 DB: retain the known provider map until migration. */ }
+    return null;
+  }
 
   return async (req: Request) => {
     if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -64,12 +71,15 @@ export function createAiAssistantChatHandler(deps: { createClient?: any; env?: (
 
       if (action === "list_models") {
         if (!isOwner) return json(fail("forbidden_role"), 403);
-        const wanted = body?.provider && ALL_PROVIDERS.includes(body.provider) ? [body.provider] : ALL_PROVIDERS;
+        let providersList = DEFAULT_PROVIDERS;
+        try { const pr = await admin.from("ai_providers").select("id,key_env,base_url,enabled,sort_order").eq("enabled", true).order("sort_order"); if (pr.data?.length) providersList = pr.data.map((x: any) => x.id); } catch { /* legacy fallback */ }
+        const wanted = body?.provider && providersList.includes(body.provider) ? [body.provider] : providersList;
         const providers: Record<string, string[]> = {};
         const errors: Record<string, string> = {};
         for (const provider of wanted) {
-          const apiKey = apiKeyFor(provider, readEnv);
-          const result = await doListModels(provider, apiKey, baseUrlFor(provider, readEnv));
+          const cfg = await providerConfig(admin, provider);
+          const apiKey = apiKeyFor(provider, readEnv, cfg?.key_env);
+          const result = await doListModels(provider, apiKey, cfg?.base_url || baseUrlFor(provider, readEnv));
           if (result.ok) providers[provider] = result.ids;
           else errors[provider] = publicErrorKind(result.reason);
         }
@@ -82,12 +92,13 @@ export function createAiAssistantChatHandler(deps: { createClient?: any; env?: (
         if (!modelRef) return json(fail("invalid_input"), 400);
         const { data: model, error: modelError } = await admin.from("ai_models").select("*").eq("id", modelRef).maybeSingle();
         if (modelError || !model) return json(fail("model_not_set"), 404);
-        const apiKey = apiKeyFor(model.provider, readEnv);
+        const cfg = await providerConfig(admin, model.provider);
+        const apiKey = apiKeyFor(model.provider, readEnv, cfg?.key_env);
         const startedAt = Date.now();
         const result = await doCallModel({
           provider: model.provider,
           apiKey,
-          baseUrl: baseUrlFor(model.provider, readEnv),
+          baseUrl: cfg?.base_url || baseUrlFor(model.provider, readEnv),
           modelId: model.model_id,
           system: "간단히 답하는 시험 호출입니다.",
           messages: [{ role: "user", content: TEST_MODEL_MESSAGE }],
@@ -109,7 +120,8 @@ export function createAiAssistantChatHandler(deps: { createClient?: any; env?: (
       const validated = validateMessages(body?.messages);
       if (!validated.ok) return json(fail(validated.error_kind), httpStatusForError(validated.error_kind));
       const assistantId = body?.assistant_id;
-      if (!assistantId) return json(fail("invalid_input"), 400);
+      const conversationId = body?.conversation_id;
+      if (!assistantId || !/^[0-9a-f-]{36}$/i.test(String(conversationId || ""))) return json(fail("invalid_input"), 400);
 
       // --- 5. 도우미 읽기 ---
       const { data: assistant, error: assistantError } = await admin.from("ai_assistants").select("*").eq("id", assistantId).maybeSingle();
@@ -133,6 +145,24 @@ export function createAiAssistantChatHandler(deps: { createClient?: any; env?: (
       // --- 8. 시스템 프롬프트 ---
       const system = buildSystemPrompt(assistant.instructions, assistant.knowledge);
       const messages = validated.messages;
+      const userMessage = messages[messages.length - 1];
+      const userText = typeof userMessage.content === "string" ? userMessage.content : userMessage.content.filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n");
+      const imageCount = Array.isArray(userMessage.content) ? userMessage.content.filter((p: any) => p.type === "image_url" || p.type === "image").length : 0;
+      const prior = await admin.from("ai_assistant_conversations").select("user_id,assistant_id").eq("id", conversationId).maybeSingle();
+      if (prior.error) return json(fail("usage_unavailable"), 503);
+      if (prior.data && (prior.data.user_id !== user.id || prior.data.assistant_id !== assistant.id)) return json(fail("forbidden_role"), 403);
+      async function saveConversation(reply: string, status: "ok" | "error", model: any = null, fallback: boolean = false, usageId: number | null = null) {
+        try {
+          const now = new Date().toISOString();
+          const { error: convError } = await admin.from("ai_assistant_conversations").upsert({ id: conversationId, user_id: user.id, assistant_id: assistant.id, assistant_name: assistant.name, last_at: now }, { onConflict: "id" });
+          if (convError) throw convError;
+          const { error } = await admin.from("ai_assistant_messages").insert([
+            { conversation_id: conversationId, role: "user", content: userText, image_count: imageCount, status: "ok" },
+            { conversation_id: conversationId, role: "assistant", content: reply, provider: model?.provider || null, model_id: model?.model_id || null, fallback_used: fallback, status, usage_id: usageId },
+          ]);
+          if (error) throw error;
+        } catch (e) { console.error("ai_assistant_conversation save failed", e instanceof Error ? e.message : "unknown"); }
+      }
 
       // --- 7. 과다 사용 막기 + 사용 기록: 시도마다(1차·예비 각각) DB 예약 RPC로 「한도 확인 + pending 행」을 한 번에(사용자별 잠금)
       //     하고, 호출이 끝나면 같은 행을 결과로 update한다. 예약이 실패하면 AI를 부르지 않는다(fail closed).
@@ -189,41 +219,47 @@ export function createAiAssistantChatHandler(deps: { createClient?: any; env?: (
       }
 
       const attempt = async (model: any, fallbackUsed: boolean) => {
+        if (imageCount && !model.supports_images) return { result: { ok: false, reason: "unsupported_image" } };
         const reserved = await reserveUsage(model);
         if (!reserved.ok) return { blocked: reserved.kind as string };
+        const cfg = await providerConfig(admin, model.provider);
+        const canSearch = ["openai", "anthropic", "google"].includes(model.provider);
         const startedAt = Date.now();
         const callResult = await doCallModel({
           provider: model.provider,
-          apiKey: apiKeyFor(model.provider, readEnv),
-          baseUrl: baseUrlFor(model.provider, readEnv),
+          apiKey: apiKeyFor(model.provider, readEnv, cfg?.key_env),
+          baseUrl: cfg?.base_url || baseUrlFor(model.provider, readEnv),
           modelId: model.model_id,
           system,
           messages,
           maxOutputTokens: assistant.max_output_tokens,
           effort: assistant.effort,
+          webSearch: !!assistant.web_search && canSearch,
           timeoutMs: 55000,
         });
         await finishUsage(reserved.id, model, callResult, fallbackUsed, Date.now() - startedAt);
-        return { result: callResult };
+        return { result: callResult, usageId: reserved.id };
       };
 
       // --- 9. 1차 호출 ---
       const first = await attempt(primaryModel, false);
-      if ("blocked" in first) return json(fail(first.blocked!), httpStatusForError(first.blocked!));
+      if ("blocked" in first) { await saveConversation("[" + first.blocked + "] " + errorMessageFor(first.blocked!), "error", primaryModel); return json(fail(first.blocked!), httpStatusForError(first.blocked!)); }
       let result = first.result;
 
       let usedModel = primaryModel;
+      let usedUsageId = first.usageId ?? null;
       let fallbackUsed = false;
-      if (!result.ok && shouldFallback(result.reason) && fallbackModel) {
+      if (!result.ok && fallbackModel && (shouldFallback(result.reason) || (result.reason === "unsupported_image" && fallbackModel.supports_images))) {
         const second = await attempt(fallbackModel, true);
-        if ("blocked" in second) return json(fail(second.blocked!), httpStatusForError(second.blocked!));
+        if ("blocked" in second) { await saveConversation("[" + second.blocked + "] " + errorMessageFor(second.blocked!), "error", fallbackModel, true); return json(fail(second.blocked!), httpStatusForError(second.blocked!)); }
         result = second.result;
         usedModel = fallbackModel;
         fallbackUsed = true;
       }
 
       if (!result.ok) {
-        const kind = publicErrorKind(result.reason || "upstream_error");
+        const kind = result.reason === "unsupported_image" ? "image_not_supported" : publicErrorKind(result.reason || "upstream_error");
+        await saveConversation("[" + kind + "] " + errorMessageFor(kind), "error", usedModel, fallbackUsed, usedUsageId);
         return json(fail(kind), httpStatusForError(kind));
       }
 
@@ -234,6 +270,7 @@ export function createAiAssistantChatHandler(deps: { createClient?: any; env?: (
         priceOutUsdPerMtok: usedModel.price_out_usd_per_mtok,
       });
 
+      await saveConversation(result.text, "ok", usedModel, fallbackUsed, usedUsageId);
       return json({
         ok: true,
         text: result.text,
@@ -241,6 +278,10 @@ export function createAiAssistantChatHandler(deps: { createClient?: any; env?: (
         model_id: usedModel.model_id,
         model_label: usedModel.label,
         fallback_used: fallbackUsed,
+        web_search_used: !!result.web_search_used,
+        web_search_unsupported: !!assistant.web_search && !["openai", "anthropic", "google"].includes(usedModel.provider),
+        sources: result.sources || [],
+        images: [],
         usage: { input_tokens: result.input_tokens, output_tokens: result.output_tokens, est_cost_usd: est },
       });
     } catch (error) {

@@ -188,6 +188,8 @@ function aiUserChanged(prevId,nextId){
 function aiHistoryForRequest(messages){
   return (messages||[]).filter(function(m){return m&&!m.isError;}).map(function(m){return {role:m.role,content:m.content};});
 }
+function aiTextLength(content){return typeof content==='string'?content.length:Array.isArray(content)?content.filter(p=>p.type==='text').reduce((n,p)=>n+String(p.text||'').length,0):0;}
+function aiCsvBlocks(text){const out=[];const re=/```csv\s*\r?\n([\s\S]*?)```/gi;let m;while((m=re.exec(String(text||'')))!==null)out.push(m[1]);return out;}
 // 서버 제한(메시지 20개·개별 8,000자·합계 40,000자)에 막혀 「다음 전송」이 안 되는 상태인지. nextLen = 다음에 보낼 말 길이(모르면 1).
 function aiConversationTooLong(history,nextLen){
   const h=history||[];
@@ -195,7 +197,7 @@ function aiConversationTooLong(history,nextLen){
   if(h.length+1>20)return true;
   let total=add;
   for(let i=0;i<h.length;i++){
-    const len=String((h[i]&&h[i].content)||'').length;
+    const len=aiTextLength(h[i]&&h[i].content);
     if(len>8000)return true;
     total+=len;
   }
@@ -299,9 +301,10 @@ function escAi(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g
 
 let SB=null,ME={},AI_ROOT=null,AI_SUBTAB='chat',AI_STYLE_INJECTED=false;
 let AI_ASSISTANTS=[],AI_ERROR='';
-let AI_ACTIVE_ASSISTANT=null,AI_MESSAGES=[],AI_SENDING=false,AI_CONV=0,AI_REQ=0,AI_UID=null;
-let AI_ADMIN_ASSISTANTS=[],AI_ADMIN_MODELS=[],AI_EDIT_ASSISTANT=null,AI_EDIT_ERRORS=[],AI_MODEL_EDIT=null;
+let AI_ACTIVE_ASSISTANT=null,AI_MESSAGES=[],AI_SENDING=false,AI_CONV=0,AI_REQ=0,AI_UID=null,AI_CONVERSATION_ID=null,AI_IMAGES=[];
+let AI_ADMIN_ASSISTANTS=[],AI_ADMIN_MODELS=[],AI_PROVIDER_ROWS=[],AI_EDIT_ASSISTANT=null,AI_EDIT_ERRORS=[],AI_MODEL_EDIT=null;
 let AI_USAGE_ROWS=[],AI_NOTICE='',AI_HELP_OPEN=false;
+let AI_TRANSCRIPTS=[],AI_TRANSCRIPT_OFFSET=0;
 
 function aiNoticeHtml(){
   const n=AI_NOTICE;AI_NOTICE='';
@@ -363,7 +366,7 @@ async function renderAIAssistants(container,ctx){
 // 로그인 사용자가 바뀌면 이전 사람의 대화·관리 화면 상태를 모두 비운다.
 function resetAiState(){
   AI_CONV++;AI_REQ++;
-  AI_ACTIVE_ASSISTANT=null;AI_MESSAGES=[];AI_SENDING=false;AI_SUBTAB='chat';
+  AI_ACTIVE_ASSISTANT=null;AI_MESSAGES=[];AI_SENDING=false;AI_IMAGES=[];AI_SUBTAB='chat';
   AI_ASSISTANTS=[];AI_ERROR='';AI_ADMIN_ASSISTANTS=[];AI_ADMIN_MODELS=[];AI_EDIT_ASSISTANT=null;AI_EDIT_ERRORS=[];AI_MODEL_EDIT=null;AI_USAGE_ROWS=[];AI_NOTICE='';
 }
 
@@ -409,7 +412,7 @@ function aiHelpHtml(role){
 function renderShell(){
   const isOwner=ME.role==='owner';
   const tabs=[{key:'chat',label:'🤖 도우미'}];
-  if(isOwner)tabs.push({key:'manage',label:'⚙️ 도우미 관리'},{key:'models',label:'🧠 모델 목록'},{key:'usage',label:'📊 사용 기록'});
+  if(isOwner)tabs.push({key:'transcripts',label:'\uD83D\uDDC2\uFE0F \uB300\uD654\uB85D'},{key:'manage',label:'⚙️ 도우미 관리'},{key:'models',label:'🧠 모델 목록'},{key:'usage',label:'📊 사용 기록'});
   const nav=tabs.length>1?('<div class="rowflex ai-subnav">'+tabs.map(function(t){return '<button class="mini'+(AI_SUBTAB===t.key?' on':'')+'" data-ai-subtab="'+t.key+'">'+t.label+'</button>';}).join('')+'</div>'):'';
   const helpBar='<div class="rowflex ai-helpbar"><button class="mini" data-ai-help-toggle>'+(AI_HELP_OPEN?'❓ 사용법 닫기':'❓ 사용법')+'</button></div>'+
     '<div class="card ai-help" id="aiHelpPanel"'+(AI_HELP_OPEN?'':' hidden')+'>'+aiHelpHtml(ME.role)+'</div>';
@@ -443,6 +446,7 @@ function renderActiveSection(){
   if(AI_SUBTAB==='manage'&&ME.role==='owner')renderManageSection(sec);
   else if(AI_SUBTAB==='models'&&ME.role==='owner')renderModelsSection(sec);
   else if(AI_SUBTAB==='usage'&&ME.role==='owner')renderUsageSection(sec);
+  else if(AI_SUBTAB==='transcripts'&&ME.role==='owner')renderTranscriptsSection(sec);
   else renderChatSection(sec);
 }
 
@@ -472,7 +476,7 @@ function renderChatSection(root){
 }
 
 // 대화가 바뀔 때마다(열기·새 대화·목록으로) 대화 번호를 올려 이전 대화의 늦은 응답이 섞이지 않게 한다.
-function startFreshConversation(){AI_CONV++;AI_REQ++;AI_MESSAGES=[];AI_SENDING=false;}
+function startFreshConversation(){AI_CONV++;AI_REQ++;AI_MESSAGES=[];AI_SENDING=false;AI_IMAGES=[];AI_CONVERSATION_ID=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c==='x'?r:(r&3|8)).toString(16);}));}
 function openAiChat(id){
   AI_ACTIVE_ASSISTANT=AI_ASSISTANTS.find(function(a){return a.id===id;})||null;
   startFreshConversation();
@@ -484,41 +488,32 @@ async function closeAiChat(){
   renderActiveSection();
 }
 
+function aiDisplayContent(content){return typeof content==='string'?content:Array.isArray(content)?content.filter(p=>p.type==='text').map(p=>p.text||'').join(' '):String(content||'');}
+function aiCsvBlocks(text){const out=[];const re=/```csv\s*\r?\n([\s\S]*?)```/gi;let m;while((m=re.exec(String(text||'')))!==null)out.push(m[1]);return out;}
+async function aiCompressImage(file){const bitmap=await createImageBitmap(file);const scale=Math.min(1,1600/Math.max(bitmap.width,bitmap.height));const canvas=document.createElement('canvas');canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale);canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close();return canvas.toDataURL('image/jpeg',0.82);}
 function aiMessageHtml(msg,idx){
-  const who=msg.role==='user'?'나':'AI';
-  const metaLine=(msg.role==='assistant'&&!msg.isError)?('<div class="sub">'+escAi(msg.modelLabel||'')+(msg.fallbackUsed?' · 예비 모델로 답함':'')+' <button class="mini" data-ai-copy="'+idx+'">복사</button></div>'):'';
-  return '<div class="ai-msg ai-msg-'+msg.role+'"><div class="ai-msg-who">'+who+'</div><div class="ai-msg-body">'+escAi(msg.content)+'</div>'+metaLine+'</div>';
+ const who=msg.role==='user'?'\uB098':'AI',text=aiDisplayContent(msg.content);
+ const meta=msg.role==='assistant'&&!msg.isError?'<div class="sub">'+escAi(msg.modelLabel||'')+(msg.fallbackUsed?' ? \uC608\uBE44 \uBAA8\uB378\uB85C \uB2F5\uD568':'')+(msg.webSearchUsed?' ? ?? \uC6F9 \uAC80\uC0C9\uD568':msg.webSearchUnsupported?' ? \uC774 AI\uB294 \uC6F9\uAC80\uC0C9\uC744 \uBABB \uD574\uC11C \uAC80\uC0C9 \uC5C6\uC774 \uB2F5\uD588\uC5B4\uC694':'')+' <button class="mini" data-ai-copy="'+idx+'">\uBCF5\uC0AC</button></div>':'';
+ const sources=(msg.sources||[]).slice(0,5).filter(x=>/^https:\/\//i.test(x.url||'')).map(x=>'<a href="'+escAi(x.url)+'" target="_blank" rel="noopener">'+escAi(x.title||x.url)+'</a>').join(' ? ');
+ const csv=aiCsvBlocks(text).map((v,i)=>'<button class="mini" data-ai-csv="'+idx+'::'+i+'">&#11015; CSV\uB85C \uBC1B\uAE30</button>').join(' ');
+ return '<div class="ai-msg ai-msg-'+msg.role+'"><div class="ai-msg-who">'+who+'</div><div class="ai-msg-body">'+escAi(text)+'</div>'+meta+(sources?'<div class="sub">\uCD9C\uCC98: '+sources+'</div>':'')+(csv?'<div class="rowflex">'+csv+'</div>':'')+'</div>';
 }
-
 function renderChatPanel(root){
-  const a=AI_ACTIVE_ASSISTANT;
-  const tooLong=aiConversationTooLong(aiHistoryForRequest(AI_MESSAGES));
-  root.innerHTML='<div class="card ai-chat-card">'+
-    '<div class="rowflex" style="justify-content:space-between;align-items:center">'+
-    '<h2>'+escAi(a.icon||'🤖')+' '+escAi(a.name)+'</h2>'+
-    '<div class="rowflex"><button class="mini'+(tooLong?' stamp':'')+'" data-ai-new>새 대화</button><button class="mini" data-ai-back>← 목록</button></div>'+
-    '</div>'+
-    '<div class="sub">'+escAi(a.description||'')+'</div>'+
-    (tooLong?'<div class="hint" style="color:var(--red);font-weight:700" role="alert">대화가 길어져 새 대화가 필요해요. 「새 대화」를 눌러 주세요.</div>':'')+
-    '<div class="ai-msgs" id="aiMsgs">'+(AI_MESSAGES.length?AI_MESSAGES.map(aiMessageHtml).join(''):'<div class="empty">메시지를 보내 대화를 시작하세요.</div>')+'</div>'+
-    (AI_SENDING?'<div class="sub">생각 중…</div>':'')+
-    '<textarea id="aiInput" placeholder="메시지를 입력하세요(Ctrl+Enter로 보내기)"></textarea>'+
-    '<div class="rowflex" style="justify-content:flex-end"><button class="mini stamp" id="aiSendBtn"'+((AI_SENDING||tooLong)?' disabled':'')+'>보내기</button></div>'+
-    '<div class="hint" id="aiChatErr"></div>'+
-    '</div>';
-  root.querySelector('[data-ai-back]').addEventListener('click',closeAiChat);
-  root.querySelector('[data-ai-new]').addEventListener('click',function(){startFreshConversation();renderActiveSection();});
-  const input=root.querySelector('#aiInput');
-  input.addEventListener('keydown',function(e){if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();sendAiMessage();}});
-  root.querySelector('#aiSendBtn').addEventListener('click',sendAiMessage);
-  const msgsEl=root.querySelector('#aiMsgs');
-  if(msgsEl)msgsEl.scrollTop=msgsEl.scrollHeight;
-  Array.prototype.forEach.call(root.querySelectorAll('[data-ai-copy]'),function(btn){
-    btn.addEventListener('click',function(){
-      const idx=Number(btn.getAttribute('data-ai-copy')),msg=AI_MESSAGES[idx];
-      if(msg&&navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(msg.content).catch(function(){});
-    });
-  });
+ const a=AI_ACTIVE_ASSISTANT,tooLong=aiConversationTooLong(aiHistoryForRequest(AI_MESSAGES));
+ root.innerHTML='<div class="card ai-chat-card"><div class="rowflex" style="justify-content:space-between;align-items:center"><h2>'+escAi(a.icon||'\uD83E\uDD16')+' '+escAi(a.name)+'</h2><div class="rowflex"><button class="mini'+(tooLong?' stamp':'')+'" data-ai-new>\uC0C8 \uB300\uD654</button><button class="mini" data-ai-back>\u2190 \uBAA9\uB85D</button></div></div><div class="sub">'+escAi(a.description||'')+'</div>'+
+ (tooLong?'<div class="hint" role="alert">\uB300\uD654\uAC00 \uAE38\uC5B4\uC838 \uC0C8 \uB300\uD654\uAC00 \uD544\uC694\uD574\uC694. \u300C\uC0C8 \uB300\uD654\u300D\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694.</div>':'')+
+ '<div class="ai-msgs" id="aiMsgs">'+(AI_MESSAGES.length?AI_MESSAGES.map(aiMessageHtml).join(''):'<div class="empty">\uBA54\uC2DC\uC9C0\uB97C \uBCF4\uB0B4 \uB300\uD654\uB97C \uC2DC\uC791\uD558\uC138\uC694.</div>')+'</div>'+
+ (!AI_MESSAGES.length&&Array.isArray(a.starters)&&a.starters.length?'<div class="rowflex">'+a.starters.slice(0,4).map((v,i)=>'<button class="mini" data-ai-starter="'+i+'">'+escAi(v)+'</button>').join('')+'</div>':'')+
+ (AI_MESSAGES.length?'':'<p class="sub">\uB300\uD654 \uB0B4\uC6A9\uC740 \uC5C5\uBB34 \uD655\uC778\uC744 \uC704\uD574 \uC800\uC7A5\uB418\uBA70 \uC6D0\uC7A5\uB9CC \uBCFC \uC218 \uC788\uC5B4\uC694.</p>')+
+ '<label class="mini" for="aiPhotos">?? \uC0AC\uC9C4 (\uCD5C\uB300 4\uC7A5)</label><input id="aiPhotos" type="file" accept="image/jpeg,image/png,image/webp" multiple><div class="sub" id="aiPhotoStatus"></div>'+
+ (AI_SENDING?'<div class="sub">\uC0DD\uAC01 \uC911...</div>':'')+'<textarea id="aiInput" placeholder="\uBA54\uC2DC\uC9C0\uB97C \uC785\uB825\uD558\uC138\uC694(Ctrl+Enter\uB85C \uBCF4\uB0B4\uAE30)"></textarea><div class="rowflex" style="justify-content:flex-end"><button class="mini stamp" id="aiSendBtn"'+((AI_SENDING||tooLong)?' disabled':'')+'>\uBCF4\uB0B4\uAE30</button></div><div class="hint" id="aiChatErr"></div></div>';
+ root.querySelector('[data-ai-back]').addEventListener('click',closeAiChat);root.querySelector('[data-ai-new]').addEventListener('click',function(){startFreshConversation();renderActiveSection();});
+ const input=root.querySelector('#aiInput');input.addEventListener('keydown',function(e){if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();sendAiMessage();}});
+ root.querySelector('#aiPhotos').addEventListener('change',async function(e){AI_IMAGES=[];for(const file of Array.from(e.target.files||[]).slice(0,4)){if(['image/jpeg','image/png','image/webp'].includes(file.type)){try{AI_IMAGES.push(await aiCompressImage(file));}catch(_){}}}root.querySelector('#aiPhotoStatus').textContent=AI_IMAGES.length?AI_IMAGES.length+' \uC120\uD0DD \uC644\uB8CC':'';});
+ root.querySelectorAll('[data-ai-starter]').forEach(b=>b.addEventListener('click',()=>{input.value=(a.starters||[])[Number(b.getAttribute('data-ai-starter'))]||'';input.focus();}));root.querySelector('#aiSendBtn').addEventListener('click',sendAiMessage);
+ const msgs=root.querySelector('#aiMsgs');if(msgs)msgs.scrollTop=msgs.scrollHeight;
+ root.querySelectorAll('[data-ai-copy]').forEach(b=>b.addEventListener('click',()=>{const m=AI_MESSAGES[Number(b.getAttribute('data-ai-copy'))];if(m&&navigator.clipboard)navigator.clipboard.writeText(aiDisplayContent(m.content)).catch(()=>{});}));
+ root.querySelectorAll('[data-ai-csv]').forEach(b=>b.addEventListener('click',()=>{const ids=b.getAttribute('data-ai-csv').split('::'),m=AI_MESSAGES[Number(ids[0])],csv=aiCsvBlocks(aiDisplayContent(m&&m.content))[Number(ids[1])];if(!csv)return;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download=(AI_ACTIVE_ASSISTANT.name||'assistant')+'_'+new Date().toISOString().slice(0,16).replace(/[-:T]/g,'')+'.csv';a.click();URL.revokeObjectURL(a.href);}));
 }
 
 async function sendAiMessage(){
@@ -541,22 +536,24 @@ async function sendAiMessage(){
     return;
   }
   const sent={conv:AI_CONV,req:++AI_REQ};
-  AI_MESSAGES.push({role:'user',content:text.trim()});
+  const userContent=AI_IMAGES.length?[{type:'text',text:text.trim()},...AI_IMAGES.map(url=>({type:'image_url',image_url:{url}}))]:text.trim();
+  AI_MESSAGES.push({role:'user',content:userContent});
   AI_SENDING=true;
   renderActiveSection();
   let reply;
   try{
-    const data=await aiUnwrapInvoke(await SB.functions.invoke('ai-assistant-chat',{body:{action:'chat',assistant_id:a.id,messages:aiHistoryForRequest(AI_MESSAGES)}}));
+    const data=await aiUnwrapInvoke(await SB.functions.invoke('ai-assistant-chat',{body:{action:'chat',assistant_id:a.id,conversation_id:AI_CONVERSATION_ID,messages:aiHistoryForRequest(AI_MESSAGES)}}));
     if(!data||data.ok===false){
       reply={role:'assistant',content:aiErrorMessage(data&&data.error_kind),isError:true};
     }else{
-      reply={role:'assistant',content:data.text||'',modelLabel:data.model_label||data.model_id||'',fallbackUsed:!!data.fallback_used};
+      reply={role:'assistant',content:data.text||'',modelLabel:data.model_label||data.model_id||'',fallbackUsed:!!data.fallback_used,webSearchUsed:!!data.web_search_used,webSearchUnsupported:!!data.web_search_unsupported,sources:data.sources||[],images:data.images||[]};
     }
   }catch(e){
     reply={role:'assistant',content:aiErrorMessage('network_error'),isError:true};
   }
   // 그 사이 다른 대화를 열었거나 새 대화·새 요청이 생겼으면 이 응답은 버린다(다른 도우미 대화에 섞이지 않게).
   if(aiIsStaleResponse(sent,{conv:AI_CONV,req:AI_REQ}))return;
+  AI_IMAGES=[];
   AI_MESSAGES.push(reply);
   AI_SENDING=false;
   renderActiveSection();
@@ -564,7 +561,7 @@ async function sendAiMessage(){
 
 /* ── 원장 화면 1: 도우미 관리(설계서 4-3-1) ── */
 function blankAssistant(){
-  return {id:null,name:'',icon:'🤖',description:'',instructions:'',knowledge:'',model_ref:null,fallback_model_ref:null,effort:'',max_output_tokens:4000,visible_roles:['staff','manager','chief','owner'],enabled:true};
+  return {id:null,name:'',icon:'🤖',description:'',instructions:'',knowledge:'',model_ref:null,fallback_model_ref:null,effort:'',max_output_tokens:4000,visible_roles:['staff','manager','chief','owner'],enabled:true,web_search:false,starters:[]};
 }
 
 async function renderManageSection(root){
@@ -655,6 +652,8 @@ function drawAssistantForm(){
     '<option value="high"'+(a.effort==='high'?' selected':'')+'>높음</option>'+
     '</select></div>'+
     '<div class="fld"><label>답 최대 길이</label><input id="aiFMaxTok" type="number" min="256" max="32000" value="'+(a.max_output_tokens||4000)+'"></div>'+
+    '<div class="fld"><label>Web search</label><input type="checkbox" id="aiFWebSearch"'+(a.web_search?' checked':'')+'></div>'+
+    '<div class="fld w4"><label>Conversation starters (max 4; 120 chars each)</label><div class="grid">'+[0,1,2,3].map(function(i){return '<input data-ai-starter-input="'+i+'" maxlength="120" value="'+escAi((a.starters||[])[i]||'')+'" placeholder="Starter '+(i+1)+'">';}).join('')+'</div></div>'+
     '<div class="fld w4"><label>보이는 역할</label><div class="chips">'+roles.map(function(r){return '<label class="sub"><input type="checkbox" data-ai-role="'+r+'"'+((a.visible_roles||[]).indexOf(r)!==-1?' checked':'')+'> '+aiRoleLabel(r)+'</label>';}).join(' ')+'</div></div>'+
     '<div class="fld"><label>켜짐</label><input type="checkbox" id="aiFEnabled"'+(a.enabled!==false?' checked':'')+'></div>'+
     '</div>'+
@@ -681,6 +680,8 @@ function readAssistantForm(){
     max_output_tokens:Number(wrap.querySelector('#aiFMaxTok').value||4000),
     visible_roles:roles,
     enabled:wrap.querySelector('#aiFEnabled').checked,
+    web_search:wrap.querySelector('#aiFWebSearch').checked,
+    starters:Array.from(wrap.querySelectorAll('[data-ai-starter-input]')).map(el=>el.value.trim()).filter(Boolean),
   };
 }
 
@@ -746,9 +747,9 @@ function blankModel(){return {id:null,provider:'anthropic',model_id:'',label:'',
 async function renderModelsSection(root){
   root.innerHTML='<div class="empty">불러오는 중…</div>';
   try{
-    const res=await SB.from('ai_models').select('*').order('sort_order',{ascending:true});
+    const [res,prs]=await Promise.all([SB.from('ai_models').select('*').order('sort_order',{ascending:true}),SB.from('ai_providers').select('*').order('sort_order',{ascending:true})]);
     if(res.error)throw res.error;
-    AI_ADMIN_MODELS=res.data||[];
+    AI_ADMIN_MODELS=res.data||[];AI_PROVIDER_ROWS=prs.error?[]:(prs.data||[]);AI_PROVIDER_ROWS.forEach(p=>AI_PROVIDER_LABELS[p.id]=p.label);
   }catch(e){
     root.innerHTML='<div class="card"><div class="empty">불러오지 못했습니다: '+escAi((e&&e.message)||'')+'</div></div>';
     return;
@@ -778,6 +779,9 @@ function drawModelsSection(root){
     }).join('')||'<div class="empty">아직 등록된 모델이 없습니다.</div>')+
     '<div id="aiModelTestResult"></div></div>'+
     '<div id="aiModelFormWrap"></div><div id="aiModelFetchResult"></div>';
+  root.insertAdjacentHTML('beforeend','<div class="card"><h3>회사 목록</h3>'+AI_PROVIDER_ROWS.map(p=>'<div class="rowflex"><span>'+escAi(p.label)+' · '+escAi(p.id)+' · '+escAi(p.base_url)+' · '+escAi(p.key_env)+'</span><button class="mini" data-ai-provider-toggle="'+escAi(p.id)+'">'+(p.enabled?'끄기':'켜기')+'</button></div>').join('')+'<h4>OpenAI 호환 회사 추가</h4><div class="grid"><input id="aiProviderId" placeholder="회사 ID"><input id="aiProviderLabel" placeholder="화면 이름"><input id="aiProviderUrl" placeholder="https://API 주소/v1"><input id="aiProviderKey" placeholder="MYAI_API_KEY (이름만)"></div><button class="mini stamp" data-ai-provider-save>회사 추가</button><div class="hint" id="aiProviderMsg"></div></div>');
+  root.querySelectorAll('[data-ai-provider-toggle]').forEach(b=>b.addEventListener('click',async()=>{const p=AI_PROVIDER_ROWS.find(x=>x.id===b.getAttribute('data-ai-provider-toggle'));if(p){const r=await SB.from('ai_providers').update({enabled:!p.enabled}).eq('id',p.id);if(r.error)AI_NOTICE=aiWriteErrorMessage('회사 켜기·끄기',r.error);await renderModelsSection(AI_ROOT.querySelector('#aiSection'));}}));
+  const providerSave=root.querySelector('[data-ai-provider-save]');if(providerSave)providerSave.addEventListener('click',saveProvider);
   root.querySelector('[data-ai-new-model]').addEventListener('click',function(){openModelForm(null);});
   root.querySelector('[data-ai-fetch-models]').addEventListener('click',fetchModelLists);
   Array.prototype.forEach.call(root.querySelectorAll('[data-ai-edit-model]'),function(b){b.addEventListener('click',function(){openModelForm(b.getAttribute('data-ai-edit-model'));});});
@@ -801,10 +805,11 @@ function drawModelForm(){
   const wrap=AI_ROOT.querySelector('#aiModelFormWrap');
   if(!wrap)return;
   const m=AI_MODEL_EDIT;
-  const providers=Object.keys(AI_PROVIDER_LABELS);
+  const providers=Array.from(new Set([...Object.keys(AI_PROVIDER_LABELS),...AI_PROVIDER_ROWS.map(x=>x.id)]));
   wrap.innerHTML='<div class="card"><h2>'+(m.id?'모델 고치기':'모델 직접 추가')+'</h2><div class="grid">'+
     '<div class="fld"><label>회사</label><select id="aiMProvider">'+providers.map(function(p){return '<option value="'+p+'"'+(m.provider===p?' selected':'')+'>'+escAi(aiProviderLabel(p))+'</option>';}).join('')+'</select></div>'+
     '<div class="fld"><label>모델 이름(API 이름 그대로)</label><input id="aiMModelId" value="'+escAi(m.model_id)+'"></div>'+
+    '<div class="fld"><label>사진 읽기 지원 확인됨</label><input type="checkbox" id="aiMImages"'+(m.supports_images?' checked':'')+'></div>'+
     '<div class="fld"><label>화면 표시 이름</label><input id="aiMLabel" value="'+escAi(m.label)+'"></div>'+
     '<div class="fld"><label>켜짐</label><input type="checkbox" id="aiMEnabled"'+(m.enabled!==false?' checked':'')+'></div>'+
     '<div class="fld"><label>입력 가격(달러/100만 토큰, 모르면 비움)</label><input id="aiMPriceIn" type="number" step="0.01" value="'+(m.price_in_usd_per_mtok==null?'':m.price_in_usd_per_mtok)+'"></div>'+
@@ -825,6 +830,8 @@ async function saveModelForm(){
     model_id:wrap.querySelector('#aiMModelId').value.trim(),
     label:wrap.querySelector('#aiMLabel').value.trim(),
     enabled:wrap.querySelector('#aiMEnabled').checked,
+    supports_images:wrap.querySelector('#aiMImages').checked,
+    supports_images:wrap.querySelector('#aiMImages').checked,
     price_in_usd_per_mtok:priceIn===''?null:Number(priceIn),
     price_out_usd_per_mtok:priceOut===''?null:Number(priceOut),
     note:wrap.querySelector('#aiMNote').value,
@@ -870,7 +877,11 @@ async function testModel(id){
     if(area)area.innerHTML='<div class="hint">시험 실패: '+escAi((e&&e.message)||'')+'</div>';
   }
 }
-async function fetchModelLists(){
+async function saveProvider(){
+ const box=AI_ROOT.querySelector('#aiSection'),id=box.querySelector('#aiProviderId').value.trim(),label=box.querySelector('#aiProviderLabel').value.trim(),base_url=box.querySelector('#aiProviderUrl').value.trim(),key_env=box.querySelector('#aiProviderKey').value.trim(),msg=box.querySelector('#aiProviderMsg');
+ if(!/^[a-z][a-z0-9_-]{1,30}$/.test(id)||!label||!/^https:\/\/[^\s]+$/.test(base_url)||!/^[A-Z][A-Z0-9_]{1,60}_API_KEY$/.test(key_env)||key_env.startsWith('SUPABASE')){msg.textContent='회사 ID·이름·https 주소·열쇠 이름을 확인하세요.';return;}
+ try{const res=await SB.from('ai_providers').insert({id,label,kind:'openai_compat',base_url,key_env,enabled:true,sort_order:100});if(res.error)throw res.error;await renderModelsSection(box);}catch(e){msg.textContent=aiWriteErrorMessage('회사 저장',e);}
+}async function fetchModelLists(){
   const area=AI_ROOT.querySelector('#aiModelFetchResult');
   if(area)area.innerHTML='<div class="sub">불러오는 중…</div>';
   try{
@@ -904,6 +915,26 @@ function addFetchedModel(key){
 }
 
 /* ── 원장 화면 3: 사용 기록(설계서 4-3-3) ── */
+async function renderTranscriptsSection(root){
+ root.innerHTML='<div class="empty">불러오는 중…</div>';
+ try{
+  const [pr,as]=await Promise.all([SB.from('profiles').select('user_id,name'),SB.from('ai_assistants').select('id,name').order('name')]);
+  const names={};(pr.data||[]).forEach(x=>names[x.user_id]=x.name||x.user_id);
+  const filters='<div class="rowflex"><label>직원 <select id="aiTranscriptUser"><option value="">전체</option>'+Object.entries(names).map(([id,n])=>'<option value="'+escAi(id)+'">'+escAi(n)+'</option>').join('')+'</select></label><label>도우미 <select id="aiTranscriptAssistant"><option value="">전체</option>'+((as.data||[]).map(x=>'<option value="'+escAi(x.name)+'">'+escAi(x.name)+'</option>').join(''))+'</select></label><label>시작일 <input id="aiTranscriptFrom" type="date"></label><label>종료일 <input id="aiTranscriptTo" type="date"></label><button class="mini" id="aiTranscriptFilter">거르기</button></div>';
+  root.innerHTML='<div class="card"><h2>🗂️ 대화록</h2>'+filters+'<div id="aiTranscriptRows" class="sub">불러오는 중…</div><div class="rowflex"><button class="mini" id="aiTranscriptPrev">이전</button><span id="aiTranscriptPage"></span><button class="mini" id="aiTranscriptNext">다음 50개</button></div><div id="aiTranscriptDetail"></div></div>';
+  const load=async()=>{
+   const user=root.querySelector('#aiTranscriptUser').value,assistant=root.querySelector('#aiTranscriptAssistant').value,from=root.querySelector('#aiTranscriptFrom').value,to=root.querySelector('#aiTranscriptTo').value;
+   let q=SB.from('ai_assistant_conversations').select('id,user_id,assistant_name,started_at,last_at').order('last_at',{ascending:false}).range(AI_TRANSCRIPT_OFFSET,AI_TRANSCRIPT_OFFSET+49);
+   if(user)q=q.eq('user_id',user);if(assistant)q=q.eq('assistant_name',assistant);if(from)q=q.gte('last_at',new Date(from+'T00:00:00').toISOString());if(to)q=q.lte('last_at',new Date(to+'T23:59:59.999').toISOString());
+   const c=await q;if(c.error)throw c.error;const rows=c.data||[],ids=rows.map(x=>x.id);let grouped={};
+   if(ids.length){const mr=await SB.from('ai_assistant_messages').select('conversation_id,role,content').in('conversation_id',ids).order('created_at',{ascending:true});if(mr.error)throw mr.error;(mr.data||[]).forEach(m=>(grouped[m.conversation_id]||(grouped[m.conversation_id]=[])).push(m));}
+   root.querySelector('#aiTranscriptRows').innerHTML=rows.map(x=>{const ms=grouped[x.id]||[],first=ms.find(m=>m.role==='user')?.content||'';return '<div class="rowflex"><span>'+escAi(new Date(x.last_at).toLocaleString('ko-KR'))+'</span><span>'+escAi(names[x.user_id]||x.user_id)+'</span><span>'+escAi(x.assistant_name)+'</span><span>'+escAi(String(first).slice(0,40))+'</span><span>'+ms.filter(m=>m.role==='user').length+'회 대화</span><button class="mini" data-ai-transcript="'+escAi(x.id)+'">열기</button></div>';}).join('')||'<p class="empty">대화가 없습니다.</p>';
+   root.querySelector('#aiTranscriptPage').textContent=''+(Math.floor(AI_TRANSCRIPT_OFFSET/50)+1)+'쪽';root.querySelector('#aiTranscriptPrev').disabled=AI_TRANSCRIPT_OFFSET===0;root.querySelector('#aiTranscriptNext').disabled=rows.length<50;
+   root.querySelectorAll('[data-ai-transcript]').forEach(btn=>btn.addEventListener('click',async()=>{const d=await SB.from('ai_assistant_messages').select('*').eq('conversation_id',btn.getAttribute('data-ai-transcript')).order('created_at',{ascending:true}),box=root.querySelector('#aiTranscriptDetail');if(d.error){box.textContent='대화 내용을 불러오지 못했습니다.';return;}box.innerHTML=(d.data||[]).map(m=>'<div class="ai-msg ai-msg-'+m.role+'"><div class="ai-msg-who">'+(m.role==='user'?'직원':'AI')+'</div><div class="ai-msg-body">'+escAi(m.content)+'</div>'+(m.image_count?'<div class="sub">사진 '+m.image_count+'장</div>':'')+'</div>').join('')||'<p class="empty">내용이 없습니다.</p>'; }));
+  };
+  root.querySelector('#aiTranscriptFilter').addEventListener('click',()=>{AI_TRANSCRIPT_OFFSET=0;load().catch(()=>{});});root.querySelector('#aiTranscriptPrev').addEventListener('click',()=>{AI_TRANSCRIPT_OFFSET=Math.max(0,AI_TRANSCRIPT_OFFSET-50);load().catch(()=>{});});root.querySelector('#aiTranscriptNext').addEventListener('click',()=>{AI_TRANSCRIPT_OFFSET+=50;load().catch(()=>{});});await load();
+ }catch(_){root.innerHTML='<div class="card"><div class="empty">대화록을 불러오지 못했습니다.</div></div>';}
+}
 async function renderUsageSection(root){
   root.innerHTML='<div class="empty">불러오는 중…</div>';
   const since=new Date(Date.now()-30*24*3600*1000).toISOString();

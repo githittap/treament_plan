@@ -9,10 +9,10 @@ import {
   reasonFromHttpStatus,
 } from "./core.mjs";
 
-type Message = { role: string; content: string };
+type Message = { role: string; content: string | any[] };
 type ReadEnv = (name: string) => string | undefined;
 type CallResult =
-  | { ok: true; text: string; input_tokens: number; output_tokens: number }
+  | { ok: true; text: string; input_tokens: number; output_tokens: number; web_search_used?: boolean; web_search_unsupported?: boolean; sources?: Array<{title:string;url:string}> }
   | { ok: false; reason: string; httpStatus?: number; input_tokens?: number; output_tokens?: number }; // 실패여도 회사가 토큰 수를 알려 줬으면 싣는다(금액 기록용)
 type ListModelsResult = { ok: true; ids: string[] } | { ok: false; reason: string; httpStatus?: number };
 
@@ -41,8 +41,9 @@ const API_KEY_ENV: Record<string, string> = {
   google: "GEMINI_API_KEY",
 };
 
-export function apiKeyFor(provider: string, readEnv: ReadEnv): string | undefined {
-  const envName = API_KEY_ENV[provider];
+export function apiKeyFor(provider: string, readEnv: ReadEnv, configuredEnv?: string): string | undefined {
+  const envName = configuredEnv || API_KEY_ENV[provider];
+  if (envName && (!/^[A-Z][A-Z0-9_]{1,60}_API_KEY$/.test(envName) || envName.startsWith("SUPABASE"))) return undefined;
   return envName ? readEnv(envName) : undefined;
 }
 
@@ -66,20 +67,24 @@ export async function callAnthropic(args: {
   maxOutputTokens: number;
   effort?: string | null;
   timeoutMs?: number;
+  webSearch?: boolean;
 }): Promise<CallResult> {
-  const { apiKey, modelId, system, messages, maxOutputTokens, effort, timeoutMs = DEFAULT_TIMEOUT_MS } = args;
+  const { apiKey, modelId, system, messages, maxOutputTokens, effort, timeoutMs = DEFAULT_TIMEOUT_MS, webSearch = false } = args;
   if (!apiKey) return { ok: false, reason: "provider_not_configured" };
   const client = new Anthropic({ apiKey, timeout: timeoutMs, maxRetries: 0 });
   const req = buildAnthropicRequest({ modelId, system, messages, maxOutputTokens, effort });
   try {
     // core.mjs는 순수 JS라 params 타입이 SDK 파라미터 타입까지 좁혀지지 않는다 — 여기 경계에서만 캐스팅한다.
+    const params: any = { ...req.params };
+    if (webSearch) params.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }];
     const response = req.useBeta
-      ? await client.beta.messages.create({ ...(req.params as object), betas: req.betas, fallbacks: req.fallbacks } as Anthropic.Beta.Messages.MessageCreateParamsNonStreaming)
-      : await client.messages.create(req.params as Anthropic.MessageCreateParamsNonStreaming);
+      ? await client.beta.messages.create({ ...params, betas: [...(req.betas || []), ...(webSearch ? ["web-search-2025-03-05"] : [])], fallbacks: req.fallbacks } as Anthropic.Beta.Messages.MessageCreateParamsNonStreaming)
+      : await client.messages.create(params as Anthropic.MessageCreateParamsNonStreaming);
     const parsed = parseAnthropicResponse(response);
     if (parsed.refusal) return { ok: false, reason: "refusal", input_tokens: parsed.input_tokens, output_tokens: parsed.output_tokens };
     if (!parsed.text) return { ok: false, reason: "empty_response", input_tokens: parsed.input_tokens, output_tokens: parsed.output_tokens };
-    return { ok: true, text: parsed.text, input_tokens: parsed.input_tokens, output_tokens: parsed.output_tokens };
+    const sources = (response.content || []).filter((b: any) => b.type === "web_search_tool_result").flatMap((b: any) => b.content || []).filter((x: any) => x.url).map((x: any) => ({ title: x.title || x.url, url: x.url })).slice(0,5);
+    return { ok: true, text: parsed.text, input_tokens: parsed.input_tokens, output_tokens: parsed.output_tokens, web_search_used: webSearch && sources.length > 0, sources };
   } catch (error) {
     return { ok: false, ...classifyThrown(error) };
   }
@@ -97,9 +102,12 @@ export async function callOpenAICompat(args: {
   messages: Message[];
   maxOutputTokens: number;
   timeoutMs?: number;
+  webSearch?: boolean;
 }): Promise<CallResult> {
-  const { provider, apiKey, baseUrl, modelId, system, messages, maxOutputTokens, timeoutMs = DEFAULT_TIMEOUT_MS } = args;
+  const { provider, apiKey, baseUrl, modelId, system, messages, maxOutputTokens, timeoutMs = DEFAULT_TIMEOUT_MS, webSearch = false } = args;
   if (!apiKey || !baseUrl) return { ok: false, reason: "provider_not_configured" };
+  if (webSearch && provider === "openai") return callOpenAIResponses({apiKey,modelId,system,messages,maxOutputTokens,timeoutMs});
+  if (webSearch && provider === "google") return callGeminiNative({apiKey,modelId,system,messages,maxOutputTokens,timeoutMs});
   const body = buildOpenAICompatRequest({ provider, modelId, system, messages, maxOutputTokens });
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -125,6 +133,16 @@ export async function callOpenAICompat(args: {
 }
 
 /** 도우미가 배정한 모델 정보로 한 번 호출(anthropic/openai 호환 갈래를 나눈다). */
+async function callOpenAIResponses(args: {apiKey:string;modelId:string;system:string;messages:Message[];maxOutputTokens:number;timeoutMs:number}): Promise<CallResult> {
+ const input=[{role:"system",content:[{type:"input_text",text:args.system}]},...args.messages.map((m:any)=>({role:m.role,content:typeof m.content==="string"?[{type:"input_text",text:m.content}]:m.content.map((p:any)=>p.type==="text"?{type:"input_text",text:p.text}:{type:"input_image",image_url:p.image_url?.url||p.source?.url})}))];
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),args.timeoutMs);
+ try{const res=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${args.apiKey}`},body:JSON.stringify({model:args.modelId,input,tools:[{type:"web_search"}],max_output_tokens:args.maxOutputTokens}),signal:controller.signal});if(!res.ok)return {ok:false,reason:reasonFromHttpStatus(res.status)||"server_error",httpStatus:res.status};const json:any=await res.json();const text=(json.output||[]).flatMap((o:any)=>o.content||[]).filter((c:any)=>c.type==="output_text").map((c:any)=>c.text||"").join("");const sources=(json.output||[]).flatMap((o:any)=>o.content||[]).flatMap((c:any)=>c.annotations||[]).filter((a:any)=>a.type==="url_citation"&&a.url).map((a:any)=>({title:a.title||a.url,url:a.url})).slice(0,5);if(!text)return {ok:false,reason:"empty_response"};return {ok:true,text,input_tokens:Number(json.usage?.input_tokens)||0,output_tokens:Number(json.usage?.output_tokens)||0,web_search_used:true,sources};}catch(e){return {ok:false,...classifyThrown(e)}}finally{clearTimeout(timer)}
+}
+async function callGeminiNative(args:{apiKey:string;modelId:string;system:string;messages:Message[];maxOutputTokens:number;timeoutMs:number}):Promise<CallResult>{
+ const contents=args.messages.map((m:any)=>({role:m.role==="assistant"?"model":"user",parts:typeof m.content==="string"?[{text:m.content}]:m.content.map((p:any)=>p.type==="text"?{text:p.text}:{inline_data:{mime_type:(p.image_url?.url||"").match(/^data:(image\/[^;]+);/)?.[1]||"image/jpeg",data:(p.image_url?.url||"").split(",")[1]}})}));const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),args.timeoutMs);
+ try{const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(args.modelId)}:generateContent`,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":args.apiKey},body:JSON.stringify({system_instruction:{parts:[{text:args.system}]},contents,tools:[{google_search:{}}],generationConfig:{maxOutputTokens:args.maxOutputTokens}}),signal:controller.signal});if(!res.ok)return {ok:false,reason:reasonFromHttpStatus(res.status)||"server_error",httpStatus:res.status};const json:any=await res.json();const text=(json.candidates?.[0]?.content?.parts||[]).map((p:any)=>p.text||"").join("");const sources=(json.candidates?.[0]?.groundingMetadata?.groundingChunks||[]).map((x:any)=>x.web).filter((x:any)=>x?.uri).map((x:any)=>({title:x.title||x.uri,url:x.uri})).slice(0,5);if(!text)return {ok:false,reason:"empty_response"};return {ok:true,text,input_tokens:Number(json.usageMetadata?.promptTokenCount)||0,output_tokens:Number(json.usageMetadata?.candidatesTokenCount)||0,web_search_used:sources.length>0,sources};}catch(e){return {ok:false,...classifyThrown(e)}}finally{clearTimeout(timer)}
+}
+
 export async function callModel(args: {
   provider: string;
   apiKey?: string;
@@ -135,11 +153,14 @@ export async function callModel(args: {
   maxOutputTokens: number;
   effort?: string | null;
   timeoutMs?: number;
+  webSearch?: boolean;
 }): Promise<CallResult> {
   const { provider, apiKey, baseUrl, modelId, system, messages, maxOutputTokens, effort, timeoutMs } = args;
+  const webSearch = !!(args as any).webSearch;
   if (provider === "anthropic") {
-    return callAnthropic({ apiKey, modelId, system, messages, maxOutputTokens, effort, timeoutMs });
+    return callAnthropic({ apiKey, modelId, system, messages, maxOutputTokens, effort, timeoutMs, webSearch });
   }
+  if (provider === "openai" || provider === "google") return callOpenAICompat({ provider, apiKey, baseUrl, modelId, system, messages, maxOutputTokens, timeoutMs, webSearch });
   return callOpenAICompat({ provider, apiKey, baseUrl, modelId, system, messages, maxOutputTokens, timeoutMs });
 }
 
