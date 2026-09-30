@@ -26,6 +26,14 @@ as $$
 begin
   if new.dentweb_entered_at is distinct from old.dentweb_entered_at
      or new.dentweb_entered_by is distinct from old.dentweb_entered_by then
+    -- Column-level UPDATE grants are also available to authenticated users, so
+    -- enforce the booking boundary here as well as in the RPC predicate.
+    if new.source is distinct from 'kakao'
+       or new.external_event_id is null
+       or new.external_event_id not like 'kbook-%'
+       or new.journal_id is not null then
+      raise exception 'kakao booking only';
+    end if;
     if new.dentweb_entered_at is null and new.dentweb_entered_by is null then
       null;
     else

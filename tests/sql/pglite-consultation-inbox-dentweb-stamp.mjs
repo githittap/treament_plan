@@ -24,6 +24,8 @@ try{
   await setUser(manager);const stamp=(await q(`select * from public.consultation_inbox_set_dentweb_entered('${booking.id}'::uuid,true)`))[0];assert.equal(stamp.dentweb_entered_by,manager);assert.ok(stamp.dentweb_entered_at);
   const persisted=(await q(`select dentweb_entered_at,dentweb_entered_by from public.consultation_inbox where id='${booking.id}'`))[0];assert.equal(persisted.dentweb_entered_by,manager);assert.equal(new Date(persisted.dentweb_entered_at).getTime(),new Date(stamp.dentweb_entered_at).getTime());
   await assert.rejects(q(`update public.consultation_inbox set message='변조' where id='${booking.id}'`),/permission denied/);await db.exec('rollback');await setUser(manager);
+  await assert.rejects(q(`update public.consultation_inbox set dentweb_entered_at=now(),dentweb_entered_by='${manager}' where id='${generic.id}'`),/kakao booking only/);await db.exec('rollback');await setUser(manager);
+  const genericStatus=(await q(`update public.consultation_inbox set status='in_progress' where id='${generic.id}' returning status`))[0];assert.equal(genericStatus.status,'in_progress');await db.exec('rollback');await setUser(manager);
   await assert.rejects(q(`select * from public.consultation_inbox_set_dentweb_entered('${generic.id}'::uuid,true)`),/not found or not editable/);await db.exec('rollback');await setUser(manager);
   const rollback=fs.readFileSync(path.join(root,'db/consultation_inbox_dentweb_stamp_rollback.sql'),'utf8');await db.exec('reset role;');await assert.rejects(db.exec(rollback),/contains data/);await db.exec('rollback');
   await setUser(manager);await q(`select * from public.consultation_inbox_set_dentweb_entered('${booking.id}'::uuid,false)`);await db.exec('reset role;');await db.exec(rollback);
