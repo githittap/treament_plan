@@ -1,6 +1,6 @@
 /* ai-assistants.js — 직원허브 「🤖 AI 도우미」 화면(1단계)
    설계서: Z:\09_claude-output\03_병원운영·전산\직원AI도우미\설계서_1단계.md (4장)
-   hr.html은 이 파일을 <script src="ai-assistants.js?v=20261001"> 로 불러 window.AIAssistants.render(container,{sb,me}) 만 부른다.
+   hr.html은 이 파일을 <script src="ai-assistants.js?v=2026100106"> 로 불러 window.AIAssistants.render(container,{sb,me}) 만 부른다.
    © 2026 Jung · 아산정플란트치과 */
 (function(){
 'use strict';
@@ -81,7 +81,35 @@ function aiChatInputError(text){
   return '';
 }
 
+// ── 원장이 고치는 안내 문구(표 ai_ui_texts) ──
+// 코드에 있는 문구는 「기본값」이고, 표에 같은 키의 행이 있으면 그 글이 기본값을 덮어쓴다(탭을 열 때 한 번 읽음).
+// 읽기에 실패하면 덮어쓰기 없이 기본값만 쓴다. 키 목록·「어디에 보이는지」 설명은 아래 aiTextDefs()가 기본값에서 만든다.
+let AI_TEXT_OVERRIDES={};
+function aiTextSetOverrides(rows){
+  const next={};
+  (Array.isArray(rows)?rows:[]).forEach(function(r){
+    if(r&&typeof r.key==='string'&&typeof r.value==='string'&&r.value.trim()!=='')next[r.key]=r.value;
+  });
+  AI_TEXT_OVERRIDES=next;
+}
+function aiTextOverride(key){
+  const has=Object.prototype.hasOwnProperty.call(AI_TEXT_OVERRIDES,key);
+  const v=has?AI_TEXT_OVERRIDES[key]:null;
+  return (typeof v==='string'&&v.trim()!=='')?v:null;
+}
+function aiTextPutOverride(key,value){const next=Object.assign({},AI_TEXT_OVERRIDES);next[key]=value;AI_TEXT_OVERRIDES=next;}
+function aiTextDropOverride(key){const next=Object.assign({},AI_TEXT_OVERRIDES);delete next[key];AI_TEXT_OVERRIDES=next;}
+function aiText(key,def){const v=aiTextOverride(key);return v==null?def:v;}
+// 목록형 문구: 한 키에 줄바꿈으로 여러 줄(빈 줄은 버린다). 덮어쓴 글에 줄이 하나도 없으면 기본값.
+function aiTextLines(key,defLines){
+  const v=aiTextOverride(key);
+  if(v==null)return defLines;
+  const lines=v.split(/\r?\n/).map(function(t){return t.trim();}).filter(Boolean);
+  return lines.length?lines:defLines;
+}
+
 // Edge 함수 error_kind → 쉬운 한국어 문장(설계서 3-1·4-2). 키는 백엔드 core.mjs ERROR_MESSAGES_KO와 같은 이름이다.
+// 화면은 Edge가 보낸 message 글이 아니라 error_kind로 이 표(또는 원장이 고친 값 err.<kind>)를 골라 쓴다 — Edge 글은 쓰지 않는다.
 const AI_ERROR_MESSAGES={
   unauthenticated:'로그인이 만료됐어요. 다시 로그인해 주세요.',
   hub_access_denied:'허브 접근 권한이 없어요.',
@@ -101,7 +129,30 @@ const AI_ERROR_MESSAGES={
   timeout:'응답이 너무 오래 걸려요. 다시 시도해 주세요.',
   network_error:'인터넷 연결을 확인하고 다시 시도해 주세요.',
 };
-function aiErrorMessage(kind){return AI_ERROR_MESSAGES[kind]||'오류가 있었어요. 잠시 후 다시 시도해 주세요.';}
+const AI_ERROR_DEFAULT='오류가 있었어요. 잠시 후 다시 시도해 주세요.';
+function aiErrorMessage(kind){
+  if(Object.prototype.hasOwnProperty.call(AI_ERROR_MESSAGES,kind))return aiText('err.'+kind,AI_ERROR_MESSAGES[kind]);
+  return aiText('err.default',AI_ERROR_DEFAULT);
+}
+// 오류 종류별 「언제 뜨는지」(안내 문구 탭 설명용)
+const AI_ERROR_WHEN={
+  unauthenticated:'로그인이 끊겼을 때',hub_access_denied:'허브 접근 권한이 없을 때',assistant_not_found:'도우미를 찾을 수 없을 때',
+  assistant_disabled:'꺼 둔 도우미를 열었을 때',forbidden_role:'내 역할로는 쓸 수 없는 도우미일 때',model_not_set:'도우미에 AI를 아직 안 골랐을 때',
+  model_disabled:'도우미의 AI가 꺼져 있을 때',invalid_input:'보낸 내용 형식이 안 맞을 때',rate_limited:'짧은 시간에 너무 많이 보냈을 때',
+  provider_not_configured:'AI 회사 연결이 아직 준비되지 않았을 때',provider_disabled:'AI 회사가 꺼져 있을 때',image_not_supported:'사진을 못 읽는 AI에 사진을 보냈을 때',
+  provider_auth_failed:'AI 회사가 연결 열쇠를 받아 주지 않을 때',usage_unavailable:'사용량을 확인하지 못해 잠시 못 쓸 때',upstream_error:'AI 쪽에서 답이 오지 않았을 때',
+  timeout:'답이 너무 오래 걸렸을 때',network_error:'인터넷 연결이 안 될 때'};
+// 도우미 화면에 직접 뜨는 그 밖의 안내 글(키는 ui.<이름>)
+const AI_UI_TEXT_DEFAULTS={
+  empty_cards:{where:'도우미 카드 화면 — 쓸 수 있는 도우미가 하나도 없을 때 가운데 글',def:'아직 쓸 수 있는 도우미가 없습니다. 원장에게 문의하세요.'},
+  card_not_ready:{where:'도우미 카드 — 원장이 AI를 아직 안 골라 열 수 없는 카드 아래 작은 글',def:'준비 중(원장이 모델을 고르면 열림)'},
+  chat_empty:{where:'대화 창 — 아직 메시지가 없을 때 가운데 글',def:'메시지를 보내 대화를 시작하세요.'},
+  too_long:{where:'대화 창 — 대화가 길어져 더 못 보낼 때 나오는 안내',def:'대화가 길어져 새 대화가 필요해요. 「새 대화」를 눌러 주세요.'},
+  thinking:{where:'대화 창 — 답을 기다리는 동안 보이는 글',def:'생각 중...'},
+  photo_fallback:{where:'대화 창 📎 사진 옆 — 이 AI는 사진을 못 읽지만 예비 AI가 읽을 때',def:'이 AI는 사진을 못 읽어요. 사진을 보내면 예비 AI가 대신 읽어요.'},
+  photo_none:{where:'대화 창 📎 사진 옆 — 이 AI도 예비 AI도 사진을 못 읽을 때',def:'이 AI는 사진을 못 읽어요. 내용은 글로 적어 주세요.'},
+};
+function aiUiText(name){return aiText('ui.'+name,AI_UI_TEXT_DEFAULTS[name].def);}
 
 // supabase-js functions.invoke는 2xx가 아니면 data가 비고 error(FunctionsHttpError)가 온다. 본문({ok:false,error_kind,...})은
 // error.context(Response)를 .json()으로 읽어야 나온다 — 여기서 그 본문을 꺼내 늘 {ok:false,error_kind,...} 모양으로 돌려준다.
@@ -226,30 +277,30 @@ const AI_HELP_ERROR_ROWS=[
   {kind:'usage_unavailable',means:'사용 기록을 확인하지 못해 잠시 쓸 수 없어요. 조금 뒤에 다시 시도하세요.'},
 ];
 const AI_HELP_STAFF_STEPS=[
-  {title:'도우미 고르기',text:'「🤖 AI 도우미」 화면에 도우미 카드가 나옵니다. 하려는 일에 맞는 카드를 누르면 대화 창이 열려요. 카드 아래 한 줄 설명을 보면 어떤 일을 돕는 도우미인지 알 수 있어요.'},
-  {title:'물어보기',text:'아래 입력칸에 부탁할 내용을 적고 「보내기」를 누르세요. 키보드에서는 Ctrl+Enter로도 보낼 수 있어요. 답이 오기까지 몇 초에서 십여 초 걸리고, 그동안 「생각 중…」이 보여요.'},
-  {title:'답 복사해서 쓰기',text:'답 아래의 「복사」를 누르면 그 글이 복사돼요. 카톡이나 게시판 등 필요한 곳에 붙여 넣어 쓰세요.'},
-  {title:'고쳐 달라고 하기',text:'마음에 안 들면 같은 창에서 「더 짧게」 「더 부드럽게」 「존댓말로 바꿔 줘」처럼 이어서 말하면 그에 맞춰 다시 써 줘요. 앞 대화를 기억하고 있어서 처음부터 다시 설명하지 않아도 돼요.'},
-  {title:'새 대화 시작하기',text:'이야기 주제가 완전히 바뀌었거나 대화가 길어졌을 때는 「새 대화」를 누르세요. 메시지가 20개가 되거나 글이 너무 길어지면 「대화가 길어져 새 대화가 필요해요」가 뜨는데, 그때도 「새 대화」를 누르면 됩니다.'},
-  {title:'「준비 중」 카드',text:'카드에 「준비 중」이 보이면 원장이 아직 그 도우미가 쓸 AI를 고르지 않은 것이에요. 원장이 고르면 카드가 열려요.'},
-  {title:'자주 보는 안내 문장',text:'화면에 이런 문장이 뜨면 이렇게 하세요.',errors:true},
-  {title:'알아 둘 것',list:[
+  {id:'pick',title:'도우미 고르기',text:'「🤖 AI 도우미」 화면에 도우미 카드가 나옵니다. 하려는 일에 맞는 카드를 누르면 대화 창이 열려요. 카드 아래 한 줄 설명을 보면 어떤 일을 돕는 도우미인지 알 수 있어요.'},
+  {id:'ask',title:'물어보기',text:'아래 입력칸에 부탁할 내용을 적고 「보내기」를 누르세요. 키보드에서는 Ctrl+Enter로도 보낼 수 있어요. 답이 오기까지 몇 초에서 십여 초 걸리고, 그동안 「생각 중…」이 보여요.'},
+  {id:'copy',title:'답 복사해서 쓰기',text:'답 아래의 「복사」를 누르면 그 글이 복사돼요. 카톡이나 게시판 등 필요한 곳에 붙여 넣어 쓰세요.'},
+  {id:'revise',title:'고쳐 달라고 하기',text:'마음에 안 들면 같은 창에서 「더 짧게」 「더 부드럽게」 「존댓말로 바꿔 줘」처럼 이어서 말하면 그에 맞춰 다시 써 줘요. 앞 대화를 기억하고 있어서 처음부터 다시 설명하지 않아도 돼요.'},
+  {id:'newchat',title:'새 대화 시작하기',text:'이야기 주제가 완전히 바뀌었거나 대화가 길어졌을 때는 「새 대화」를 누르세요. 메시지가 20개가 되거나 글이 너무 길어지면 「대화가 길어져 새 대화가 필요해요」가 뜨는데, 그때도 「새 대화」를 누르면 됩니다.'},
+  {id:'notready',title:'「준비 중」 카드',text:'카드에 「준비 중」이 보이면 원장이 아직 그 도우미가 쓸 AI를 고르지 않은 것이에요. 원장이 고르면 카드가 열려요.'},
+  {id:'errors',title:'자주 보는 안내 문장',text:'화면에 이런 문장이 뜨면 이렇게 하세요.',errors:true},
+  {id:'notes',title:'알아 둘 것',list:[
     '답은 초안이에요. 읽어 보고 고쳐서 쓰세요.',
     '한 시간에 120번까지 보낼 수 있어요.',
     '모든 직원이 함께 쓰는 도우미예요. 쓰다가 불편한 점은 원장에게 알려 주세요.']},
 ];
 const AI_HELP_FIELD_ROWS=[
-  ['이름','직원 카드에 보이는 이름이에요(40자까지).'],
-  ['아이콘','이름 앞에 붙는 그림 글자예요. 이모지 하나면 충분해요.'],
-  ['설명','직원 카드 아래에 보이는 한 줄 설명이에요(200자까지).'],
-  ['지침서','AI에게 주는 역할과 규칙이에요. 직원에게는 보이지 않아요(20,000자까지).'],
-  ['참고자료','AI가 답할 때 참고할 글이에요. 글을 붙여 넣으면 되고, 직원에게는 보이지 않아요(60,000자까지).'],
-  ['모델','답을 써 줄 AI예요. 고르지 않으면 직원 카드에 「준비 중」으로 보여요.'],
-  ['예비 모델','첫 번째 AI가 막히거나 오래 걸릴 때 대신 답하는 AI예요. 없어도 돼요.'],
-  ['생각 깊이','낮음·보통·높음 중에서 골라요. Claude 5.x 계열에만 적용되고, 높을수록 깊이 생각하지만 느리고 비용이 늘어요. 잘 모르겠으면 「기본」으로 두세요.'],
-  ['답 최대 길이','AI가 한 번에 쓸 수 있는 답의 길이예요(256~32,000, 기본 4,000).'],
-  ['보이는 역할','직원·매니저·실장·원장 중 누가 이 도우미를 볼지 골라요.'],
-  ['켜짐','끄면 직원 목록에서 사라져요. 지우지 않고 잠시 숨길 때 쓰세요.'],
+  ['이름','직원 카드에 보이는 이름이에요(40자까지).','name'],
+  ['아이콘','이름 앞에 붙는 그림 글자예요. 이모지 하나면 충분해요.','icon'],
+  ['설명','직원 카드 아래에 보이는 한 줄 설명이에요(200자까지).','desc'],
+  ['지침서','AI에게 주는 역할과 규칙이에요. 직원에게는 보이지 않아요(20,000자까지).','instr'],
+  ['참고자료','AI가 답할 때 참고할 글이에요. 글을 붙여 넣으면 되고, 직원에게는 보이지 않아요(60,000자까지).','knowledge'],
+  ['모델','답을 써 줄 AI예요. 고르지 않으면 직원 카드에 「준비 중」으로 보여요.','model'],
+  ['예비 모델','첫 번째 AI가 막히거나 오래 걸릴 때 대신 답하는 AI예요. 없어도 돼요.','fallback'],
+  ['생각 깊이','낮음·보통·높음 중에서 골라요. Claude 5.x 계열에만 적용되고, 높을수록 깊이 생각하지만 느리고 비용이 늘어요. 잘 모르겠으면 「기본」으로 두세요.','effort'],
+  ['답 최대 길이','AI가 한 번에 쓸 수 있는 답의 길이예요(256~32,000, 기본 4,000).','maxtok'],
+  ['보이는 역할','직원·매니저·실장·원장 중 누가 이 도우미를 볼지 골라요.','roles'],
+  ['켜짐','끄면 직원 목록에서 사라져요. 지우지 않고 잠시 숨길 때 쓰세요.','enabled'],
 ];
 const AI_HELP_EXAMPLES=[
   {name:'공지·카톡 문구 다듬기',icon:'📣',description:'직원 공지나 카톡 안내 문구를 읽기 쉽게 다듬어 줌',
@@ -263,35 +314,134 @@ const AI_HELP_EXAMPLES=[
    note:'「참고자료」 칸에 업무 매뉴얼 글을 붙여 넣으세요(60,000자까지). 매뉴얼이 바뀌면 참고자료 글도 새로 붙여 넣어 주세요.'},
 ];
 const AI_HELP_OWNER_STEPS=[
-  {title:'새 도우미 만들기',text:'「⚙️ 도우미 관리」 탭에서 「새 도우미」를 누르고 칸을 채운 뒤 「저장」하세요. 칸마다 뜻은 이래요.',fields:true},
-  {title:'지침서 잘 쓰는 요령',list:[
+  {id:'create',title:'새 도우미 만들기',text:'「⚙️ 도우미 관리」 탭에서 「새 도우미」를 누르고 칸을 채운 뒤 「저장」하세요. 칸마다 뜻은 이래요.',fields:true},
+  {id:'tips',title:'지침서 잘 쓰는 요령',list:[
     '역할부터 한 줄로: 「당신은 ○○ 할 때 돕는 도우미입니다.」',
     '말투를 정해 주세요: 존댓말인지, 해요체인지, 딱딱한지 부드러운지.',
     '길이를 정해 주세요: 「3~5문장」처럼 숫자로 쓰면 잘 지켜요.',
     '답 형식을 보여 주세요: 「[짧은 답글] … [조금 긴 답글] …」처럼 틀을 적어 두세요.',
     '예시 한두 개를 넣으면 더 정확해요. 마지막에 「고쳐 달라고 하면 그에 맞춰 다시 씁니다」를 적어 두면 좋아요.']},
-  {title:'「미리 시험」',text:'도우미를 저장한 뒤 고치기 화면의 「미리 시험」을 누르면 「안녕하세요라고만 답하세요」를 보내서 AI가 제대로 답하는지 확인해요. 직원에게 열기 전에 꼭 한 번 눌러 보세요.'},
-  {title:'모델 목록',list:[
+  {id:'test',title:'「미리 시험」',text:'도우미를 저장한 뒤 고치기 화면의 「미리 시험」을 누르면 「안녕하세요라고만 답하세요」를 보내서 AI가 제대로 답하는지 확인해요. 직원에게 열기 전에 꼭 한 번 눌러 보세요.'},
+  {id:'models',title:'모델 목록',list:[
     '「🧠 모델 목록」 탭에서 쓸 수 있는 AI를 회사별로 봐요. 가격은 100만 토큰당 원화(1달러=1,500원)로 보여요.',
     '「켜기·끄기」: 끄면 도우미의 모델 고르기 목록에서 숨겨요.',
     '「모델 직접 추가」: 회사와 모델 이름(API 이름 그대로)을 넣어 새로 등록해요.',
     '「회사별 목록 불러오기」: 각 회사가 지금 제공하는 모델 이름을 가져와요. 마음에 드는 것을 눌러 추가하세요.',
     '「시험」: 그 모델에 짧은 인사를 보내 연결이 되는지와 걸린 시간을 봐요.']},
-  {title:'사용 기록 보기',text:'「📊 사용 기록」 탭에서 최근 30일의 사용 건수·토큰·추정 금액을 날짜별·도우미별·직원별·모델별로 볼 수 있어요. 가격을 모르는 모델은 금액을 더하지 않고 「미상 N건」으로 따로 세어 보여 줘요.'},
-  {title:'특정 직원에게 AI 탭 숨기기',text:'설정의 「탭 노출 설정」(역할별)이나 「사람별 탭 예외」(개인별)에서 「🤖 AI 도우미」를 끄면 그 사람에게는 탭이 보이지 않아요.'},
-  {title:'바로 만들어 쓸 만한 도우미 예시 3개',text:'아래 지침서를 복사해서 「새 도우미」의 지침서 칸에 붙여 넣으세요.',examples:true},
+  {id:'usage',title:'사용 기록 보기',text:'「📊 사용 기록」 탭에서 최근 30일의 사용 건수·토큰·추정 금액을 날짜별·도우미별·직원별·모델별로 볼 수 있어요. 가격을 모르는 모델은 금액을 더하지 않고 「미상 N건」으로 따로 세어 보여 줘요.'},
+  {id:'hidetab',title:'특정 직원에게 AI 탭 숨기기',text:'설정의 「탭 노출 설정」(역할별)이나 「사람별 탭 예외」(개인별)에서 「🤖 AI 도우미」를 끄면 그 사람에게는 탭이 보이지 않아요.'},
+  {id:'examples',title:'바로 만들어 쓸 만한 도우미 예시 3개',text:'아래 지침서를 복사해서 「새 도우미」의 지침서 칸에 붙여 넣으세요.',examples:true},
 ];
 const AI_HELP_SECTIONS=[
   {id:'staff',title:'직원용 — 이렇게 쓰세요',steps:AI_HELP_STAFF_STEPS},
   {id:'owner',title:'원장용 — 도우미 만들고 관리하기',steps:AI_HELP_OWNER_STEPS},
 ];
-// 역할에 보일 섹션 고르기: 직원용은 모두에게, 원장용은 owner에게만 추가
+// 역할에 보일 섹션 고르기: 직원용은 모두에게, 원장용은 owner에게만 추가. 원장이 고친 문구(help.<섹션>.<단계>…)가 있으면 기본 글 대신 쓴다.
 function aiHelpSectionsFor(role){
-  return AI_HELP_SECTIONS.filter(function(sec){return sec.id==='staff'||(sec.id==='owner'&&role==='owner');});
+  return AI_HELP_SECTIONS.filter(function(sec){return sec.id==='staff'||(sec.id==='owner'&&role==='owner');}).map(function(sec){
+    return {id:sec.id,title:aiText('help.'+sec.id+'.title',sec.title),steps:sec.steps.map(function(st){
+      const base='help.'+sec.id+'.'+st.id;
+      const out=Object.assign({},st,{title:aiText(base+'.title',st.title)});
+      if(st.list)out.list=aiTextLines(base,st.list);
+      else if(st.text!=null)out.text=aiText(base,st.text);
+      return out;
+    })};
+  });
 }
-// 안내 글의 「자주 보는 안내 문장」 표: 실제 오류 문장표에서 문장을 가져온다.
+// 안내 글의 「자주 보는 안내 문장」 표: 실제 오류 문장표(원장이 고친 값 포함)에서 문장을 가져온다.
 function aiHelpErrorRows(){
-  return AI_HELP_ERROR_ROWS.map(function(r){return {kind:r.kind,message:AI_ERROR_MESSAGES[r.kind]||'',means:r.means};});
+  return AI_HELP_ERROR_ROWS.map(function(r){return {kind:r.kind,message:AI_ERROR_MESSAGES[r.kind]?aiErrorMessage(r.kind):'',means:aiText('help.error.'+r.kind,r.means)};});
+}
+// 원장용 「칸마다 뜻」 목록과 예시 도우미 3개(원장이 고친 문구 반영)
+function aiHelpFieldRows(){
+  return AI_HELP_FIELD_ROWS.map(function(r){return [r[0],aiText('help.field.'+r[2],r[1])];});
+}
+function aiHelpExamples(){
+  return AI_HELP_EXAMPLES.map(function(ex,i){
+    const k='help.example.'+(i+1)+'.';
+    return {name:aiText(k+'name',ex.name),icon:ex.icon,description:aiText(k+'description',ex.description),instructions:aiText(k+'instructions',ex.instructions),note:aiText(k+'note',ex.note)};
+  });
+}
+
+// ── 「📝 안내 문구」 탭(원장 전용)이 보여 줄 문구 목록: 키·어디에 보이는지·기본 문구 ──
+// 코드에 있는 기본 문구에서 만든다(기본값은 코드가 정본). multi=목록형(한 줄에 하나씩).
+let AI_TEXT_DEFS_CACHE=null;
+function aiTextDefs(){
+  if(AI_TEXT_DEFS_CACHE)return AI_TEXT_DEFS_CACHE;
+  const defs=[];
+  const add=function(key,group,where,def){defs.push({key:key,group:group,where:where,def:Array.isArray(def)?def.join('\n'):String(def),multi:Array.isArray(def)});};
+  Object.keys(AI_ERROR_MESSAGES).forEach(function(k){add('err.'+k,'오류 안내 문장','채팅 창 오류 문장 — '+(AI_ERROR_WHEN[k]||k),AI_ERROR_MESSAGES[k]);});
+  add('err.default','오류 안내 문장','채팅 창 오류 문장 — 위에 없는 그 밖의 오류일 때',AI_ERROR_DEFAULT);
+  Object.keys(AI_UI_TEXT_DEFAULTS).forEach(function(k){add('ui.'+k,'도우미 화면 글',AI_UI_TEXT_DEFAULTS[k].where,AI_UI_TEXT_DEFAULTS[k].def);});
+  AI_HELP_SECTIONS.forEach(function(sec){
+    const who=sec.id==='staff'?'직원용':'원장용';
+    const group='❓ 사용법 · '+who;
+    add('help.'+sec.id+'.title',group,'❓ 사용법 › '+who+' 묶음의 큰 제목',sec.title);
+    sec.steps.forEach(function(st,i){
+      const at='❓ 사용법 › '+who+' › '+AI_HELP_NUMS[i]+' '+st.title;
+      add('help.'+sec.id+'.'+st.id+'.title',group,at+' — 소제목',st.title);
+      add('help.'+sec.id+'.'+st.id,group,at+(st.list?' — 목록(한 줄에 하나씩)':' — 설명 글'),st.list||st.text);
+    });
+  });
+  AI_HELP_ERROR_ROWS.forEach(function(r){add('help.error.'+r.kind,'❓ 사용법 · 안내 문장 뜻','❓ 사용법 › 직원용 › 자주 보는 안내 문장 — 「'+AI_ERROR_MESSAGES[r.kind]+'」 아래 「→」 뒤의 뜻',r.means);});
+  AI_HELP_FIELD_ROWS.forEach(function(r){add('help.field.'+r[2],'❓ 사용법 · 칸마다 뜻','❓ 사용법 › 원장용 › 새 도우미 만들기 — 「'+r[0]+'」 칸 설명',r[1]);});
+  AI_HELP_EXAMPLES.forEach(function(ex,i){
+    const k='help.example.'+(i+1)+'.',at='❓ 사용법 › 원장용 › 예시 도우미 '+(i+1)+'번('+ex.name+')';
+    add(k+'name','❓ 사용법 · 예시 도우미',at+' — 이름',ex.name);
+    add(k+'description','❓ 사용법 · 예시 도우미',at+' — 설명 칸에 넣을 글',ex.description);
+    add(k+'instructions','❓ 사용법 · 예시 도우미',at+' — 지침서(「지침서 복사」 단추로 복사되는 글)',ex.instructions);
+    add(k+'note','❓ 사용법 · 예시 도우미',at+' — 아래 작은 안내',ex.note);
+  });
+  AI_TEXT_DEFS_CACHE=defs;
+  return defs;
+}
+function aiTextDefByKey(key){
+  const defs=aiTextDefs();
+  for(let i=0;i<defs.length;i++)if(defs[i].key===key)return defs[i];
+  return null;
+}
+// 표 읽기: 행 목록을 돌려주고 실패하면 던진다.
+async function aiTextsFetch(sb){
+  if(!sb||typeof sb.from!=='function')throw new Error('연결 정보가 없습니다.');
+  const res=await sb.from('ai_ui_texts').select('key,value');
+  if(res.error)throw res.error;
+  return res.data||[];
+}
+// 탭을 열 때: 있는 키는 덮어쓰고, 읽기에 실패하면 덮어쓰기 없이 기본값으로 조용히 쓴다.
+async function aiTextsLoadInto(sb){
+  try{aiTextSetOverrides(await aiTextsFetch(sb));return true;}
+  catch(e){aiTextSetOverrides([]);return false;}
+}
+// 줄 단위로 공백·빈 줄을 정리한 글(목록형 비교용)
+function aiTextNormLines(v){return String(v==null?'':v).split(/\r?\n/).map(function(t){return t.trim();}).filter(Boolean).join('\n');}
+// 저장 1건. 빈 글이거나 기본 문구와 같으면 행을 지워 기본으로 돌리고, 다르면 저장한다. 결과 {ok,action:'saved'|'reset'} 또는 {ok:false,reason,error}.
+async function aiTextsSave(sb,key,value){
+  const def=aiTextDefByKey(key);
+  if(!def)return {ok:false,reason:'unknown_key',error:null};
+  const v=String(value==null?'':value).replace(/\r\n/g,'\n');
+  if(v.length>20000)return {ok:false,reason:'too_long',error:null};
+  const same=v.trim()===''||(def.multi?aiTextNormLines(v)===aiTextNormLines(def.def):v.trim()===def.def.trim());
+  try{
+    if(same){
+      const r=await sb.from('ai_ui_texts').delete().eq('key',key);
+      if(r&&r.error)throw r.error;
+      aiTextDropOverride(key);
+      return {ok:true,action:'reset'};
+    }
+    const r=await sb.from('ai_ui_texts').upsert({key:key,value:v},{onConflict:'key'});
+    if(r&&r.error)throw r.error;
+    aiTextPutOverride(key,v);
+    return {ok:true,action:'saved'};
+  }catch(e){return {ok:false,reason:'write_failed',error:e};}
+}
+async function aiTextsReset(sb,key){
+  if(!aiTextDefByKey(key))return {ok:false,reason:'unknown_key',error:null};
+  try{
+    const r=await sb.from('ai_ui_texts').delete().eq('key',key);
+    if(r&&r.error)throw r.error;
+    aiTextDropOverride(key);
+    return {ok:true,action:'reset'};
+  }catch(e){return {ok:false,reason:'write_failed',error:e};}
 }
 // CSV 파일 이름: <도우미이름>_<YYYYMMDD-HHmm>.csv — 이 컴퓨터(한국) 현지 시각 기준이고, 파일 이름에 못 쓰는 글자는 _로 바꾼다.
 function aiCsvFileName(name,date){
@@ -312,8 +462,8 @@ function aiCsvBlocks(text){
 // 📎 옆 안내(설계서 F3): 기본 모델이 사진을 못 읽을 때만 보인다. 카드 목록에 images_ok가 없으면(옛 화면·옛 DB) 안내하지 않는다.
 function aiPhotoNotice(a){
   if(!a||a.images_ok!==false)return '';
-  if(a.fallback_images_ok===true)return '이 AI는 사진을 못 읽어요. 사진을 보내면 예비 AI가 대신 읽어요.';
-  return '이 AI는 사진을 못 읽어요. 내용은 글로 적어 주세요.';
+  if(a.fallback_images_ok===true)return aiUiText('photo_fallback');
+  return aiUiText('photo_none');
 }
 // 회사 목록의 열쇠 등록 표시: 서버가 돌려준 true/false만 쓴다(모르면 표시 없음).
 function aiProviderKeyBadge(status,id){
@@ -369,6 +519,12 @@ function ensureStyle(){
     '.ai-msg-assistant{align-self:flex-start;background:var(--panel);border:1px solid var(--line)}'+
     '.ai-msg-who{font-size:10.5px;color:var(--gray);margin-bottom:2px}'+
     '#aiInput{width:100%;min-height:70px;box-sizing:border-box}'+
+    '.ai-txt-group{border:1px solid var(--line);border-radius:10px;margin:8px 0;padding:8px 10px}'+
+    '.ai-txt-group>summary{font-weight:700;cursor:pointer;font-size:14px}'+
+    '.ai-txt-row{border-top:1px solid var(--line);margin-top:10px;padding-top:10px}'+
+    '.ai-txt-where{font-size:13px;line-height:1.5}'+
+    '.ai-txt-def{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.55;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;margin:4px 0;font-family:inherit;max-width:100%}'+
+    '.ai-txt-row textarea{width:100%;box-sizing:border-box;min-height:48px;font-size:13px;line-height:1.55}'+
     '.ai-wrap .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}'+
     '@media(max-width:480px){.ai-cards{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}.ai-wrap .grid{grid-template-columns:1fr}}';
   const style=document.createElement('style');
@@ -393,7 +549,7 @@ async function renderAIAssistants(container,ctx){
 function resetAiState(){
   AI_CONV++;AI_REQ++;
   AI_ACTIVE_ASSISTANT=null;AI_MESSAGES=[];AI_SENDING=false;AI_IMAGES=[];AI_SUBTAB='chat';
-  AI_ASSISTANTS=[];AI_ERROR='';AI_ADMIN_ASSISTANTS=[];AI_ADMIN_MODELS=[];AI_EDIT_ASSISTANT=null;AI_EDIT_ERRORS=[];AI_MODEL_EDIT=null;AI_USAGE_ROWS=[];AI_NOTICE='';
+  aiTextSetOverrides([]);AI_ASSISTANTS=[];AI_ERROR='';AI_ADMIN_ASSISTANTS=[];AI_ADMIN_MODELS=[];AI_EDIT_ASSISTANT=null;AI_EDIT_ERRORS=[];AI_MODEL_EDIT=null;AI_USAGE_ROWS=[];AI_NOTICE='';
 }
 
 // 직원용 RPC를 다시 읽어 카드 목록(ready 등)을 최신으로 맞춘다.
@@ -411,7 +567,8 @@ async function reloadAssistants(){
 }
 
 async function loadAndRenderShell(){
-  await reloadAssistants();
+  // 탭을 열 때 카드 목록과 원장이 고친 안내 문구(ai_ui_texts)를 함께 읽는다. 문구 읽기가 실패하면 조용히 기본 문구를 쓴다.
+  await Promise.all([reloadAssistants(),aiTextsLoadInto(SB)]);
   renderShell();
 }
 
@@ -420,8 +577,8 @@ function aiHelpStepHtml(step,idx,sec){
   if(step.text)h+='<p>'+escAi(step.text)+'</p>';
   if(step.list)h+='<ul>'+step.list.map(function(t){return '<li>'+escAi(t)+'</li>';}).join('')+'</ul>';
   if(step.errors)h+='<ul>'+aiHelpErrorRows().map(function(r){return '<li><span class="ai-help-msg">「'+escAi(r.message)+'」</span><br>→ '+escAi(r.means)+'</li>';}).join('')+'</ul>';
-  if(step.fields)h+='<ul>'+AI_HELP_FIELD_ROWS.map(function(r){return '<li><b>'+escAi(r[0])+'</b> — '+escAi(r[1])+'</li>';}).join('')+'</ul>';
-  if(step.examples)h+=AI_HELP_EXAMPLES.map(function(ex,i){
+  if(step.fields)h+='<ul>'+aiHelpFieldRows().map(function(r){return '<li><b>'+escAi(r[0])+'</b> — '+escAi(r[1])+'</li>';}).join('')+'</ul>';
+  if(step.examples)h+=aiHelpExamples().map(function(ex,i){
     return '<p><b>'+escAi(ex.icon)+' '+escAi(ex.name)+'</b> <span class="sub">— 설명 칸에 「'+escAi(ex.description)+'」</span></p>'+
       '<pre>'+escAi(ex.instructions)+'</pre>'+
       '<p class="sub">'+escAi(ex.note)+' <button class="mini" data-ai-help-copy="'+i+'">지침서 복사</button></p>';
@@ -435,10 +592,27 @@ function aiHelpHtml(role){
   }).join('');
 }
 
+// 예시 도우미의 「지침서 복사」 단추(원장이 고친 문구가 있으면 그 글이 복사됨)
+function bindHelpCopyButtons(){
+  Array.prototype.forEach.call(AI_ROOT.querySelectorAll('[data-ai-help-copy]'),function(btn){
+    btn.addEventListener('click',function(){
+      const ex=aiHelpExamples()[Number(btn.getAttribute('data-ai-help-copy'))];
+      if(ex&&navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(ex.instructions).then(function(){btn.textContent='복사됨';}).catch(function(){});
+    });
+  });
+}
+// 원장이 안내 문구를 저장한 직후: 이미 그려 둔 「❓ 사용법」 패널만 새 문구로 다시 그린다.
+function refreshHelpPanel(){
+  const panel=AI_ROOT&&AI_ROOT.querySelector('#aiHelpPanel');
+  if(!panel)return;
+  panel.innerHTML=aiHelpHtml(ME.role);
+  bindHelpCopyButtons();
+}
+
 function renderShell(){
   const isOwner=ME.role==='owner';
   const tabs=[{key:'chat',label:'🤖 도우미'}];
-  if(isOwner)tabs.push({key:'transcripts',label:'\uD83D\uDDC2\uFE0F \uB300\uD654\uB85D'},{key:'manage',label:'⚙️ 도우미 관리'},{key:'models',label:'🧠 모델 목록'},{key:'usage',label:'📊 사용 기록'});
+  if(isOwner)tabs.push({key:'transcripts',label:'\uD83D\uDDC2\uFE0F \uB300\uD654\uB85D'},{key:'manage',label:'⚙️ 도우미 관리'},{key:'models',label:'🧠 모델 목록'},{key:'usage',label:'📊 사용 기록'},{key:'texts',label:'📝 안내 문구'});
   const nav=tabs.length>1?('<div class="rowflex ai-subnav">'+tabs.map(function(t){return '<button class="mini'+(AI_SUBTAB===t.key?' on':'')+'" data-ai-subtab="'+t.key+'">'+t.label+'</button>';}).join('')+'</div>'):'';
   const helpBar='<div class="rowflex ai-helpbar"><button class="mini" data-ai-help-toggle>'+(AI_HELP_OPEN?'❓ 사용법 닫기':'❓ 사용법')+'</button></div>'+
     '<div class="card ai-help" id="aiHelpPanel"'+(AI_HELP_OPEN?'':' hidden')+'>'+aiHelpHtml(ME.role)+'</div>';
@@ -450,12 +624,7 @@ function renderShell(){
     if(panel)panel.hidden=!AI_HELP_OPEN;
     helpBtn.textContent=AI_HELP_OPEN?'❓ 사용법 닫기':'❓ 사용법';
   });
-  Array.prototype.forEach.call(AI_ROOT.querySelectorAll('[data-ai-help-copy]'),function(btn){
-    btn.addEventListener('click',function(){
-      const ex=AI_HELP_EXAMPLES[Number(btn.getAttribute('data-ai-help-copy'))];
-      if(ex&&navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(ex.instructions).then(function(){btn.textContent='복사됨';}).catch(function(){});
-    });
-  });
+  bindHelpCopyButtons();
   Array.prototype.forEach.call(AI_ROOT.querySelectorAll('[data-ai-subtab]'),function(btn){
     btn.addEventListener('click',async function(){
       AI_SUBTAB=btn.getAttribute('data-ai-subtab');
@@ -473,6 +642,7 @@ function renderActiveSection(){
   else if(AI_SUBTAB==='models'&&ME.role==='owner')renderModelsSection(sec);
   else if(AI_SUBTAB==='usage'&&ME.role==='owner')renderUsageSection(sec);
   else if(AI_SUBTAB==='transcripts'&&ME.role==='owner')renderTranscriptsSection(sec);
+  else if(AI_SUBTAB==='texts'&&ME.role==='owner')renderTextsSection(sec);
   else renderChatSection(sec);
 }
 
@@ -484,7 +654,7 @@ function renderChatSection(root){
   }
   if(AI_ACTIVE_ASSISTANT){renderChatPanel(root);return;}
   if(!AI_ASSISTANTS.length){
-    root.innerHTML='<div class="card"><div class="empty">아직 쓸 수 있는 도우미가 없습니다. 원장에게 문의하세요.</div></div>';
+    root.innerHTML='<div class="card"><div class="empty">'+escAi(aiUiText('empty_cards'))+'</div></div>';
     return;
   }
   root.innerHTML='<div class="card"><h2>🤖 AI 도우미</h2><div class="ai-cards">'+
@@ -493,7 +663,7 @@ function renderChatSection(root){
         '<div class="ai-card-icon">'+escAi(a.icon||'🤖')+'</div>'+
         '<div class="ai-card-name">'+escAi(a.name)+'</div>'+
         '<div class="ai-card-desc">'+escAi(a.description||'')+'</div>'+
-        (a.ready?'':'<div class="ai-card-badge">준비 중(원장이 모델을 고르면 열림)</div>')+
+        (a.ready?'':'<div class="ai-card-badge">'+escAi(aiUiText('card_not_ready'))+'</div>')+
         '</button>';
     }).join('')+'</div></div>';
   Array.prototype.forEach.call(root.querySelectorAll('[data-ai-open]'),function(btn){
@@ -527,11 +697,11 @@ function aiMessageHtml(msg,idx){
 function renderChatPanel(root){
  const a=AI_ACTIVE_ASSISTANT,tooLong=aiConversationTooLong(aiHistoryForRequest(AI_MESSAGES));
  root.innerHTML='<div class="card ai-chat-card"><div class="rowflex" style="justify-content:space-between;align-items:center"><h2>'+escAi(a.icon||'\uD83E\uDD16')+' '+escAi(a.name)+'</h2><div class="rowflex"><button class="mini'+(tooLong?' stamp':'')+'" data-ai-new>\uC0C8 \uB300\uD654</button><button class="mini" data-ai-back>\u2190 \uBAA9\uB85D</button></div></div><div class="sub">'+escAi(a.description||'')+'</div>'+
- (tooLong?'<div class="hint" role="alert">\uB300\uD654\uAC00 \uAE38\uC5B4\uC838 \uC0C8 \uB300\uD654\uAC00 \uD544\uC694\uD574\uC694. \u300C\uC0C8 \uB300\uD654\u300D\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694.</div>':'')+
- '<div class="ai-msgs" id="aiMsgs">'+(AI_MESSAGES.length?AI_MESSAGES.map(aiMessageHtml).join(''):'<div class="empty">\uBA54\uC2DC\uC9C0\uB97C \uBCF4\uB0B4 \uB300\uD654\uB97C \uC2DC\uC791\uD558\uC138\uC694.</div>')+'</div>'+
+ (tooLong?'<div class="hint" role="alert">'+escAi(aiUiText('too_long'))+'</div>':'')+
+ '<div class="ai-msgs" id="aiMsgs">'+(AI_MESSAGES.length?AI_MESSAGES.map(aiMessageHtml).join(''):'<div class="empty">'+escAi(aiUiText('chat_empty'))+'</div>')+'</div>'+
  (!AI_MESSAGES.length&&Array.isArray(a.starters)&&a.starters.length?'<div class="rowflex">'+a.starters.slice(0,4).map((v,i)=>'<button class="mini" data-ai-starter="'+i+'">'+escAi(v)+'</button>').join('')+'</div>':'')+
  '<label class="mini" for="aiPhotos">📎 \uC0AC\uC9C4 (\uCD5C\uB300 4\uC7A5)</label><input id="aiPhotos" type="file" accept="image/jpeg,image/png,image/webp" multiple>'+(aiPhotoNotice(a)?'<div class="sub" id="aiPhotoNotice" role="note">'+escAi(aiPhotoNotice(a))+'</div>':'')+'<div class="sub" id="aiPhotoStatus"></div>'+
- (AI_SENDING?'<div class="sub">\uC0DD\uAC01 \uC911...</div>':'')+'<textarea id="aiInput" placeholder="\uBA54\uC2DC\uC9C0\uB97C \uC785\uB825\uD558\uC138\uC694(Ctrl+Enter\uB85C \uBCF4\uB0B4\uAE30)"></textarea><div class="rowflex" style="justify-content:flex-end"><button class="mini stamp" id="aiSendBtn"'+((AI_SENDING||tooLong)?' disabled':'')+'>\uBCF4\uB0B4\uAE30</button></div><div class="hint" id="aiChatErr"></div></div>';
+ (AI_SENDING?'<div class="sub">'+escAi(aiUiText('thinking'))+'</div>':'')+'<textarea id="aiInput" placeholder="\uBA54\uC2DC\uC9C0\uB97C \uC785\uB825\uD558\uC138\uC694(Ctrl+Enter\uB85C \uBCF4\uB0B4\uAE30)"></textarea><div class="rowflex" style="justify-content:flex-end"><button class="mini stamp" id="aiSendBtn"'+((AI_SENDING||tooLong)?' disabled':'')+'>\uBCF4\uB0B4\uAE30</button></div><div class="hint" id="aiChatErr"></div></div>';
  root.querySelector('[data-ai-back]').addEventListener('click',closeAiChat);root.querySelector('[data-ai-new]').addEventListener('click',function(){startFreshConversation();renderActiveSection();});
  const input=root.querySelector('#aiInput');input.addEventListener('keydown',function(e){if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();sendAiMessage();}});
  root.querySelector('#aiPhotos').addEventListener('change',async function(e){AI_IMAGES=[];for(const file of Array.from(e.target.files||[]).slice(0,4)){if(['image/jpeg','image/png','image/webp'].includes(file.type)){try{AI_IMAGES.push(await aiCompressImage(file));}catch(_){}}}root.querySelector('#aiPhotoStatus').textContent=AI_IMAGES.length?AI_IMAGES.length+' \uC120\uD0DD \uC644\uB8CC':'';});
@@ -557,7 +727,7 @@ async function sendAiMessage(){
   if(aiConversationTooLong(history,text.trim().length)){
     // 서버 제한(20개·8,000자·40,000자)에 막힐 대화 — 일반 오류처럼 보이지 않게 새 대화 안내를 띄운다.
     if(aiConversationTooLong(history))renderActiveSection();
-    else if(errEl)errEl.textContent='대화가 길어져 새 대화가 필요해요. 「새 대화」를 눌러 주세요.';
+    else if(errEl)errEl.textContent=aiUiText('too_long');
     return;
   }
   const sent={conv:AI_CONV,req:++AI_REQ};
@@ -959,6 +1129,75 @@ function addFetchedModel(key){
   const idx=key.indexOf('::'),provider=key.slice(0,idx),modelId=key.slice(idx+2);
   AI_MODEL_EDIT=Object.assign(blankModel(),{provider:provider,model_id:modelId,label:modelId});
   drawModelsSection(AI_ROOT.querySelector('#aiSection'));
+}
+
+/* ── 원장 화면 4: 안내 문구 고치기(📝 안내 문구 탭 · 원장 전용) ──
+   문구마다: 어디에 보이는지 · 기본 문구 · 지금 문구(여기서 고침) · 저장 · 기본으로 되돌리기.
+   저장은 표 ai_ui_texts에 행을 넣고(upsert), 되돌리기는 행을 지운다. 권한은 DB(원장만 쓰기)가 지킨다. */
+async function renderTextsSection(root){
+  root.innerHTML='<div class="empty">불러오는 중…</div>';
+  try{
+    aiTextSetOverrides(await aiTextsFetch(SB)); // 탭을 열 때마다 최신 값으로
+  }catch(e){
+    root.innerHTML='<div class="card"><div class="empty">불러오지 못했습니다: '+escAi((e&&e.message)||'')+'</div></div>';
+    return;
+  }
+  drawTextsSection(root);
+}
+function aiTextBadgeHtml(key){return aiTextOverride(key)==null?'':'<span class="b ok">고침</span>';}
+function aiTextRowsFor(def){return Math.min(14,Math.max(2,String(def.def).split('\n').length+1));}
+function drawTextsSection(root){
+  const defs=aiTextDefs();
+  const groups=[];
+  defs.forEach(function(d,i){
+    let g=groups.find(function(x){return x.name===d.group;});
+    if(!g){g={name:d.group,items:[]};groups.push(g);}
+    g.items.push({d:d,i:i});
+  });
+  root.innerHTML='<div class="card"><h2>📝 안내 문구</h2>'+
+    '<div class="sub">직원 화면에 뜨는 안내 글을 여기서 직접 고쳐요. 칸을 고치고 「저장」을 누르면 직원이 다음에 「🤖 AI 도우미」 탭을 열 때부터 바뀐 글이 보여요. 「기본으로 되돌리기」를 누르면 처음 글로 돌아가요.</div>'+
+    groups.map(function(g){
+      const edited=g.items.filter(function(x){return aiTextOverride(x.d.key)!=null;}).length;
+      return '<details class="ai-txt-group"><summary>'+escAi(g.name)+' <span class="sub">('+g.items.length+'개'+(edited?' · 고친 것 '+edited+'개':'')+')</span></summary>'+
+        g.items.map(function(x){
+          const d=x.d,i=x.i,cur=aiText(d.key,d.def);
+          return '<div class="ai-txt-row" data-ai-text-row="'+i+'">'+
+            '<div class="ai-txt-where"><b>'+escAi(d.where)+'</b> <span id="aiTxtBadge_'+i+'">'+aiTextBadgeHtml(d.key)+'</span></div>'+
+            '<div class="sub">이름표: '+escAi(d.key)+(d.multi?' · 한 줄에 하나씩 적어요':'')+'</div>'+
+            '<div class="sub">기본 문구</div><pre class="ai-txt-def">'+escAi(d.def)+'</pre>'+
+            '<label class="sub" for="aiTxtIn_'+i+'">지금 문구 (여기서 고쳐요)</label>'+
+            '<textarea id="aiTxtIn_'+i+'" rows="'+aiTextRowsFor(d)+'">'+escAi(cur)+'</textarea>'+
+            '<div class="rowflex"><button class="mini stamp" data-ai-text-save="'+i+'">저장</button><button class="mini" data-ai-text-reset="'+i+'">기본으로 되돌리기</button><span class="hint" id="aiTxtMsg_'+i+'"></span></div>'+
+            '</div>';
+        }).join('')+'</details>';
+    }).join('')+'</div>';
+  Array.prototype.forEach.call(root.querySelectorAll('[data-ai-text-save]'),function(b){b.addEventListener('click',function(){return saveTextRow(root,Number(b.getAttribute('data-ai-text-save')));});});
+  Array.prototype.forEach.call(root.querySelectorAll('[data-ai-text-reset]'),function(b){b.addEventListener('click',function(){return resetTextRow(root,Number(b.getAttribute('data-ai-text-reset')));});});
+}
+function afterTextWrite(root,i,r,okMsg){
+  const d=aiTextDefs()[i];
+  const msg=root.querySelector('#aiTxtMsg_'+i),inp=root.querySelector('#aiTxtIn_'+i),badge=root.querySelector('#aiTxtBadge_'+i);
+  if(!r.ok){
+    if(msg)msg.textContent=r.reason==='too_long'?'저장하지 못했어요 — 20,000자 이하로 적어 주세요.':aiWriteErrorMessage('저장',r.error);
+    return;
+  }
+  if(inp)inp.value=aiText(d.key,d.def); // 저장이면 저장한 글, 되돌리기면 기본 문구
+  if(badge)badge.innerHTML=aiTextBadgeHtml(d.key);
+  if(msg)msg.textContent=okMsg||(r.action==='reset'?'기본 문구로 돌렸어요.':'저장했어요.');
+  refreshHelpPanel(); // 위쪽 「❓ 사용법」 글도 바로 새 문구로
+}
+async function saveTextRow(root,i){
+  const d=aiTextDefs()[i];
+  const inp=root.querySelector('#aiTxtIn_'+i);
+  if(!d||!inp)return;
+  const r=await aiTextsSave(SB,d.key,inp.value);
+  afterTextWrite(root,i,r,r.ok&&r.action==='reset'?'기본 문구와 같거나 비어 있어서 기본 문구로 돌렸어요.':'');
+}
+async function resetTextRow(root,i){
+  const d=aiTextDefs()[i];
+  if(!d)return;
+  const r=await aiTextsReset(SB,d.key);
+  afterTextWrite(root,i,r,'');
 }
 
 /* ── 원장 화면 3: 사용 기록(설계서 4-3-3) ── */
