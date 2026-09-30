@@ -1,3 +1,6 @@
+begin;
+lock table public.consultation_inbox in share row exclusive mode;
+
 do $$
 begin
   if exists (
@@ -17,3 +20,5 @@ alter table public.consultation_inbox
   drop constraint if exists consultation_inbox_dentweb_stamp_pair_check,
   drop column if exists dentweb_entered_by,
   drop column if exists dentweb_entered_at;
+
+commit;
