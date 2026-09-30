@@ -6,7 +6,7 @@ function panel({role='owner',listResult={data:[],error:null},oneResult={data:nul
   const document={getElementById(id){assert.equal(id,'ownerBoardViewer');return viewer;},createElement(tag){assert.equal(tag,'iframe');return {attrs:{},style:{},setAttribute(key,value){this.attrs[key]=value;}};}};
   const sb={from(table){calls.push({table});return {select(columns){calls[calls.length-1].select=columns;if(columns==='slug,sha256,synced_at')return Promise.resolve(listResult);return {eq(column,value){calls[calls.length-1].eq=[column,value];return {maybeSingle(){return Promise.resolve(oneResult);}};}};}};}};
   const block=html.match(/\/\* owner-boards:test-start \*\/[\s\S]*?\/\* owner-boards:test-end \*\//)?.[0];assert.ok(block,'원장 보기판 시험 구간이 없습니다.');
-  const context={esc,ME:{role},sb,document,TABS:[{key:'aicost',label:'💰 AI비용',roles:['owner']},{key:'owner',label:'원장',roles:['owner']}],MENU:[{kind:'group',key:'g-owner',children:['owner','aicost','pay']}]};vm.createContext(context);vm.runInContext(block+';this.api={OWNER_BOARDS,OWNER_BOARD_TAB,installOwnerBoardsTab,ownerBoardsTimestamp,ownerBoardsMissing,ownerBoardsPanelHtml,renderOwnerBoards,openOwnerBoard,closeOwnerBoard};',context);
+  const context={esc,ME:{role},sb,document,TABS:[{key:'aicost',label:'💰 AI비용',roles:['owner']},{key:'owner',label:'원장',roles:['owner']}],MENU:[{kind:'group',key:'g-owner',children:['owner','aicost','pay']}]};vm.createContext(context);vm.runInContext(block+';this.api={OWNER_BOARDS,OWNER_BOARD_TAB,installOwnerBoardsTab,ownerBoardSrcdoc,ownerBoardsTimestamp,ownerBoardsMissing,ownerBoardsPanelHtml,renderOwnerBoards,openOwnerBoard,closeOwnerBoard};',context);
   return {api:context.api,calls,viewer,slot,tabs:context.TABS,menu:context.MENU};
 }
 
@@ -16,6 +16,19 @@ test('원장 보기판 탭은 원장 역할만 가지며 원장 전용 묶음에
   assert.deepEqual(JSON.parse(JSON.stringify(h.tabs.find(t=>t.key==='ownerboards').roles)),['owner']);
   assert.deepEqual(JSON.parse(JSON.stringify(h.menu[0].children)),['owner','aicost','ownerboards','pay']);
   assert.match(html,/else if\(TAB==='ownerboards'\)await renderOwnerBoards\(m\)/);
+});
+
+test('tabVisible은 개인 설정으로 원장 보기판을 켜도 원장 역할만 보이며 다른 탭 설정은 유지한다',()=>{
+  const match=html.match(/function tabVisible\(t\)\{[\s\S]*?\nfunction visibleTabKeys/);assert.ok(match,'tabVisible 함수를 찾지 못했습니다.');
+  const source=match[0].replace(/\nfunction visibleTabKeys$/,'');
+  const TAB_ROLES={ownerboards:['staff','manager','chief'],aicost:['staff'],pay:['staff'],contract:['deputy']};
+  for(const role of ['staff','manager','chief']){
+    const context={ME:{id:'u1',role},TAB_OVERRIDES:{u1:{ownerboards:true,aicost:true,pay:true}},TAB_ROLES};vm.createContext(context);vm.runInContext(source+';this.check=tabVisible;',context);
+    assert.equal(context.check({key:'ownerboards',roles:['owner']}),false,role+'는 원장 보기판을 보면 안 됩니다.');
+    if(role==='staff'){assert.equal(context.check({key:'aicost',roles:['owner']}),true);assert.equal(context.check({key:'pay',roles:['owner']}),true);}
+  }
+  const owner={ME:{id:'u1',role:'owner'},TAB_OVERRIDES:{},TAB_ROLES};vm.createContext(owner);vm.runInContext(source+';this.check=tabVisible;',owner);assert.equal(owner.check({key:'ownerboards',roles:['owner']}),true);
+  const deputy={ME:{id:'u1',role:'deputy'},TAB_OVERRIDES:{},TAB_ROLES};vm.createContext(deputy);vm.runInContext(source+';this.check=tabVisible;',deputy);assert.equal(deputy.check({key:'ownerboards',roles:['owner']}),false);
 });
 
 test('원장이 아니면 원장 전용 문구만 보이고 표를 조회하지 않는다',async()=>{
@@ -39,9 +52,20 @@ test('owner_boards 표가 없으면 준비 중 안내로 처리한다',()=>{
 
 test('판 HTML은 정확한 격리 sandbox의 iframe srcdoc 속성으로만 보여 준다',async()=>{
   const htmlValue='<script>parent.secret="x"</script><p>판 본문</p>',h=panel({oneResult:{data:{html:htmlValue,synced_at:'2026-09-30T01:02:00Z'},error:null}});
-  await h.api.openOwnerBoard('busd_ledger');const frame=h.slot.children[0];assert.ok(frame);assert.equal(frame.attrs.sandbox,'allow-scripts allow-downloads allow-modals');assert.equal(frame.attrs.referrerpolicy,'no-referrer');assert.equal(frame.attrs.title,'📒 뻐스디 장부 보기');assert.equal(frame.srcdoc,htmlValue);assert.equal(h.calls[0].select,'html,synced_at');assert.deepEqual(h.calls[0].eq,['slug','busd_ledger']);
+  await h.api.openOwnerBoard('busd_ledger');const frame=h.slot.children[0];assert.ok(frame);assert.equal(frame.attrs.sandbox,'allow-scripts allow-downloads allow-modals');assert.equal(frame.attrs.referrerpolicy,'no-referrer');assert.equal(frame.attrs.title,'📒 뻐스디 장부 보기');assert.equal(frame.srcdoc,'<style>#btn-png{display:none!important}</style>'+htmlValue);assert.match(h.viewer.innerHTML,/PNG 저장은 PC 판에서만 됨 · 허브에서는 PDF 저장을 쓰세요/);assert.equal(h.calls[0].select,'html,synced_at');assert.deepEqual(h.calls[0].eq,['slug','busd_ledger']);
   assert.doesNotMatch(frame.attrs.sandbox,/allow-same-origin|allow-top-navigation|allow-popups-to-escape-sandbox/);
   assert.doesNotMatch(html.match(/\/\* owner-boards:test-start \*\/[\s\S]*?\/\* owner-boards:test-end \*\//)[0],/localStorage|sessionStorage/);
+});
+
+test('PNG 숨김 style은 head·body·doctype 구조를 보존하며 한 번만 끼운다',()=>{
+  const {api}=panel(),style='<style>#btn-png{display:none!important}</style>';
+  const withHead='<!doctype html><html><head><title>x</title></head><body>내용</body></html>';
+  assert.equal(api.ownerBoardSrcdoc(withHead),'<!doctype html><html><head><title>x</title>'+style+'</head><body>내용</body></html>');
+  const withBody='<html><body class="x">내용</body></html>';
+  assert.equal(api.ownerBoardSrcdoc(withBody),'<html><body class="x">'+style+'내용</body></html>');
+  const doctype='<!doctype html><p>내용</p>';
+  assert.equal(api.ownerBoardSrcdoc(doctype),'<!doctype html>'+style+'<p>내용</p>');
+  const noTags='내용';assert.equal(api.ownerBoardSrcdoc(noTags),style+noTags);
 });
 
 test('표가 없거나 판 행이 없으면 조회 실패 없이 준비·미등록 안내를 보인다',async()=>{

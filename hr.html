@@ -704,7 +704,7 @@ function employmentTermAlertRows(terms,contracts){
 /* menu-restructure:test-start */
 function tabVisible(t){if(ME.role==='deputy')return t.key==='contract';return ME.role==='owner'
     ?t.roles.includes('owner')&&(!t.needsConfid||ME.confidAccess)
-    :(()=>{const ov=(TAB_OVERRIDES[ME.id]||{})[t.key],base=(TAB_ROLES[t.key]||t.roles).includes(ME.role),shown=ov===true?true:ov===false?false:base;return t.key!=='owner'&&shown&&(!t.needsConfid||ME.confidAccess);})();}
+    :(()=>{const ov=(TAB_OVERRIDES[ME.id]||{})[t.key],base=(TAB_ROLES[t.key]||t.roles).includes(ME.role),shown=ov===true?true:ov===false?false:base;return t.key!=='owner'&&t.key!=='ownerboards'&&shown&&(!t.needsConfid||ME.confidAccess);})();}
 function visibleTabKeys(){return new Set(TABS.filter(tabVisible).map(t=>t.key));}
 function tabLabel(k){const t=TABS.find(x=>x.key===k);return t?t.label:k;}
 function menuChildKeys(e,vis){return e.children.filter(k=>vis.has(k));}
@@ -2966,6 +2966,13 @@ function aiUsagePanelHtml({summary,start,end,error,cost,costError,sessions,sessi
 /* ── 원장 보기판: PC가 올린 완결 HTML을 격리 iframe으로만 표시 ── */
 /* owner-boards:test-start */
 const OWNER_BOARD_TAB={key:'ownerboards',label:'📒 원장 보기판',roles:['owner']};
+function ownerBoardSrcdoc(html){
+  const source=String(html||''),style='<style>#btn-png{display:none!important}</style>';
+  if(/<\/head\s*>/i.test(source))return source.replace(/<\/head\s*>/i,style+'$&');
+  if(/<body(?:\s[^>]*)?>/i.test(source))return source.replace(/<body(?:\s[^>]*)?>/i,tag=>tag+style);
+  if(/^\s*<!doctype html\b[^>]*>/i.test(source))return source.replace(/^(\s*<!doctype html\b[^>]*>)/i,tag=>tag+style);
+  return style+source;
+}
 function installOwnerBoardsTab(tabs,menu){
   const tabAt=tabs.findIndex(tab=>tab.key==='aicost');if(tabAt<0||tabs.some(tab=>tab.key==='ownerboards'))return;
   tabs.splice(tabAt+1,0,OWNER_BOARD_TAB);
@@ -2998,8 +3005,8 @@ async function openOwnerBoard(slug){
   viewer.hidden=false;viewer.innerHTML='<div class="empty">판을 불러오는 중…</div>';
   const {data,error}=await sb.from('owner_boards').select('html,synced_at').eq('slug',board.slug).maybeSingle();
   if(error||!data){viewer.innerHTML=ownerBoardsMissing(error)?'<div class="hint">원장 보기판이 준비 중입니다.</div>':`<div class="cal-error">판을 불러오지 못했습니다: ${esc(error?.message||'아직 PC에서 올라오지 않음')}</div>`;return;}
-  viewer.innerHTML=`<div class="owner-board-view-head"><div><strong>${board.title}</strong><div class="sub">마지막으로 올라온 때 ${esc(data.synced_at?ownerBoardsTimestamp(data.synced_at):'확인되지 않음')}</div></div><button type="button" class="mini" onclick="closeOwnerBoard()">닫기</button></div><div class="owner-board-frame-slot"></div>`;
-  const frame=document.createElement('iframe');frame.setAttribute('sandbox','allow-scripts allow-downloads allow-modals');frame.setAttribute('referrerpolicy','no-referrer');frame.setAttribute('title',board.title+' 보기');frame.style.width='100%';frame.style.maxWidth='100%';frame.style.height='max(480px, calc(100vh - 140px))';frame.style.border='1px solid var(--line)';frame.style.borderRadius='8px';frame.style.background='#fff';frame.srcdoc=String(data.html||'');
+  viewer.innerHTML=`<div class="owner-board-view-head"><div><strong>${board.title}</strong><div class="sub">마지막으로 올라온 때 ${esc(data.synced_at?ownerBoardsTimestamp(data.synced_at):'확인되지 않음')}</div><div class="sub">PNG 저장은 PC 판에서만 됨 · 허브에서는 PDF 저장을 쓰세요</div></div><button type="button" class="mini" onclick="closeOwnerBoard()">닫기</button></div><div class="owner-board-frame-slot"></div>`;
+  const frame=document.createElement('iframe');frame.setAttribute('sandbox','allow-scripts allow-downloads allow-modals');frame.setAttribute('referrerpolicy','no-referrer');frame.setAttribute('title',board.title+' 보기');frame.style.width='100%';frame.style.maxWidth='100%';frame.style.height='max(480px, calc(100vh - 140px))';frame.style.border='1px solid var(--line)';frame.style.borderRadius='8px';frame.style.background='#fff';frame.srcdoc=ownerBoardSrcdoc(data.html);
   viewer.querySelector('.owner-board-frame-slot').appendChild(frame);
 }
 /* owner-boards:test-end */

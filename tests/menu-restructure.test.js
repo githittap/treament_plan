@@ -42,7 +42,7 @@ const TAB_ROLE_RULES = {
 /* 재편 전 renderNav 의 노출 판정식 — 글자 하나도 바꾸지 않는다(공백만 무시해 비교). */
 const VISIBILITY_RULE = `ME.role==='owner'
     ?t.roles.includes('owner')&&(!t.needsConfid||ME.confidAccess)
-    :(()=>{const ov=(TAB_OVERRIDES[ME.id]||{})[t.key],base=(TAB_ROLES[t.key]||t.roles).includes(ME.role),shown=ov===true?true:ov===false?false:base;return t.key!=='owner'&&shown&&(!t.needsConfid||ME.confidAccess);})()`;
+    :(()=>{const ov=(TAB_OVERRIDES[ME.id]||{})[t.key],base=(TAB_ROLES[t.key]||t.roles).includes(ME.role),shown=ov===true?true:ov===false?false:base;return t.key!=='owner'&&t.key!=='ownerboards'&&shown&&(!t.needsConfid||ME.confidAccess);})()`;
 
 /* ── 정본: 조직도 보드 orgchart_final/boards/hub.json ── */
 const HUB = [
@@ -130,7 +130,7 @@ test('③ 그 기능의 원래 자리는 그대로 남는다', () => {
   assert.match(hr, /notice_reads/);                      // 공지 탭의 읽음 처리
 });
 
-test('④ 각 탭의 역할 규칙과 노출 판정식이 재편 전과 동일하다', () => {
+test('④ 각 탭의 역할 규칙과 노출 판정식은 새 원장 전용 탭 외에는 유지된다', () => {
   const { ctx } = harness();
   assert.deepEqual(Object.fromEntries(plain(ctx.TABS).map(t => [t.key, t.roles])), TAB_ROLE_RULES);
   assert.deepEqual(plain(ctx.TABS).filter(t => t.needsConfid).map(t => t.key), ['confid']);
