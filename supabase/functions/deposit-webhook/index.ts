@@ -3,6 +3,7 @@
 // SUPABASE_SERVICE_ROLE_KEY are auto-provided. Never commit secrets.
 
 import { createClient } from "npm:@supabase/supabase-js@2.110.9";
+import { sameHex, sha256Hex as tokenSha256Hex } from "../navertalk-webhook/payload.mjs";
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const MAX_EVENT_AGE_MS = 3 * 24 * 60 * 60 * 1000;
@@ -249,7 +250,8 @@ export async function handleRequest(req: Request): Promise<Response> {
     return jsonResponse({ error: "server-config" }, 500);
   }
 
-  if (req.headers.get("X-Webhook-Token") !== webhookToken) {
+  const suppliedToken = req.headers.get("X-Webhook-Token") || "";
+  if (!suppliedToken || !sameHex(await tokenSha256Hex(suppliedToken), await tokenSha256Hex(webhookToken))) {
     return jsonResponse({ error: "unauthorized" }, 401);
   }
 

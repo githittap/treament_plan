@@ -43,16 +43,27 @@ export function createContractPdfSignHandler(deps: { createClient?: any; PDFDocu
     if (userError || !user) throw new Error("authenticated employee required");
     const body = await req.json();
     const contractId = Number(body.contract_id);
-    const pageNo = Number(body.page_no);
-    const x = Number(body.x), y = Number(body.y), width = Number(body.width), height = Number(body.height);
-    if (!Number.isInteger(contractId) || !Number.isInteger(pageNo) || pageNo < 1 || [x, y, width, height].some((v) => !Number.isFinite(v) || v < 0) || width <= 0 || height <= 0 || width > 1200 || height > 800) throw new Error("invalid PDF signature coordinates");
-    const signatureBytes = dataUrlBytes(body.signature_png);
-    const signatureHash = await sha256(signatureBytes);
+    if (!Number.isInteger(contractId) || contractId < 1) throw new Error("invalid contract id");
     const { data: preflight, error: preflightError } = await userClient.from("contracts").select("*").eq("id", contractId).maybeSingle();
     if (preflightError || !preflight || preflight.user_id !== user.id) throw new Error(preflightError?.message || "contract access denied");
     if (preflight.status === "서명완료" && preflight.signed_pdf_path && preflight.signed_pdf_sha256) return json({ contract_id: contractId, signed_pdf_path: preflight.signed_pdf_path, signed_pdf_sha256: preflight.signed_pdf_sha256, idempotent: true });
     if (preflight.status !== "대기" || preflight.signed_at || preflight.signed_pdf_path || !preflight.source_pdf_path || !preflight.source_pdf_sha256) throw new Error("contract is not signable");
     if (!preflight.source_pdf_confirmed_at || !preflight.sent_at || !preflight.source_pdf_version || !preflight.due_at || new Date(preflight.due_at).getTime() < Date.now()) throw new Error("employee must confirm the source PDF and final send first");
+    const integrated = preflight.integrated_signature_required === true || ["employment", "medical", "privacy"].every((part) => String(preflight.merged_html || "").includes(`data-sign-slot="${part}"`));
+    const parts = ["employment", "medical", "privacy"];
+    if (integrated && (!Array.isArray(body.signatures) || body.signatures.length !== 3 || !Array.isArray(body.coordinates) || body.coordinates.length !== 3)) throw new Error("three independent signatures and coordinates required");
+    const entries = integrated ? parts.map((part) => {
+      const s = Array.isArray(body.signatures) ? body.signatures.find((item: any) => item?.part === part) : null;
+      const c = Array.isArray(body.coordinates) ? body.coordinates.find((item: any) => item?.part === part) : null;
+      if (!s || !c || body.signatures.filter((item: any) => item?.part === part).length !== 1 || body.coordinates.filter((item: any) => item?.part === part).length !== 1) throw new Error("three independent signatures and coordinates required");
+      if (s.confirmed !== true) throw new Error("each contract part must be confirmed");
+      return { part, signatureId: s.signature_id == null ? null : Number(s.signature_id), confirmed: true, bytes: dataUrlBytes(s.signature_png), pageNo: Number(c.page_no), x: Number(c.x), y: Number(c.y), width: Number(c.width), height: Number(c.height) };
+    }) : [{ part: "employment", signatureId: body.signature_id == null ? null : Number(body.signature_id), bytes: dataUrlBytes(body.signature_png), pageNo: Number(body.page_no), x: Number(body.x), y: Number(body.y), width: Number(body.width), height: Number(body.height) }];
+    if (entries.some((e) => (e.signatureId !== null && (!Number.isInteger(e.signatureId) || e.signatureId < 1)) || !Number.isInteger(e.pageNo) || e.pageNo < 1 || [e.x, e.y, e.width, e.height].some((v) => !Number.isFinite(v) || v < 0) || e.width <= 0 || e.height <= 0 || e.width > 1200 || e.height > 800)) throw new Error("invalid PDF signature coordinates");
+    const partHashes = await Promise.all(entries.map(async (e) => ({ part: e.part, signature_id: e.signatureId, signature_hash: await sha256(e.bytes), ...(integrated ? { confirmed: true } : {}) })));
+    const signatureHash = integrated ? await sha256(new TextEncoder().encode(JSON.stringify({ partHashes, coordinates: entries.map(({ part, pageNo, x, y, width, height }) => ({ part, pageNo, x, y, width, height })) }))) : partHashes[0].signature_hash;
+    const signatureId = entries[0].signatureId;
+    const { pageNo, x, y, width, height } = entries[0];
     const sourcePath = `contracts/${contractId}/source.pdf`, signedPath = `contracts/${contractId}/signed.pdf`;
     if (preflight.source_pdf_path !== sourcePath) throw new Error("invalid source PDF path");
     const { data: source, error: downloadError } = await admin.storage.from("hr-docs").download(sourcePath);
@@ -62,13 +73,16 @@ export function createContractPdfSignHandler(deps: { createClient?: any; PDFDocu
     const sourceHash = await sha256(sourceBytes);
     if (sourceHash !== preflight.source_pdf_sha256) throw new Error("source PDF hash mismatch");
     const pdf = await PdfDocument.load(sourceBytes, { updateMetadata: false });
-    if (pdf.getPageCount() > 100 || pageNo > pdf.getPageCount()) throw new Error("PDF page number is out of range");
-    const page = pdf.getPage(pageNo - 1);
-    if (page.getRotation().angle !== 0) throw new Error("rotated PDF pages require manual review");
-    const pageWidth = page.getWidth(), pageHeight = page.getHeight();
-    if (![pageWidth, pageHeight].every((v) => Number.isFinite(v) && v > 0) || x + width > pageWidth || y + height > pageHeight || width > pageWidth * 0.8 || height > pageHeight * 0.5) throw new Error("signature rectangle is outside the PDF page");
-    const signature = await pdf.embedPng(signatureBytes);
-    page.drawImage(signature, { x, y, width, height });
+    if (pdf.getPageCount() > 100) throw new Error("PDF page count is out of range");
+    for (const entry of entries) {
+      if (entry.pageNo > pdf.getPageCount()) throw new Error("PDF page number is out of range");
+      const page = pdf.getPage(entry.pageNo - 1);
+      if (page.getRotation().angle !== 0) throw new Error("rotated PDF pages require manual review");
+      const pageWidth = page.getWidth(), pageHeight = page.getHeight();
+      if (![pageWidth, pageHeight].every((v) => Number.isFinite(v) && v > 0) || entry.x + entry.width > pageWidth || entry.y + entry.height > pageHeight || entry.width > pageWidth * 0.8 || entry.height > pageHeight * 0.5) throw new Error("signature rectangle is outside the PDF page");
+      const signature = await pdf.embedPng(entry.bytes);
+      page.drawImage(signature, { x: entry.x, y: entry.y, width: entry.width, height: entry.height });
+    }
     const signedBytes = await pdf.save();
     if (signedBytes.length > 30 * 1024 * 1024) throw new Error("signed PDF is too large");
     const signedHash = await sha256(signedBytes);
@@ -86,10 +100,10 @@ export function createContractPdfSignHandler(deps: { createClient?: any; PDFDocu
       if (await sha256(finalSignedBytes) !== signedHash) throw new Error("existing signed PDF differs from this attempt");
     }
     const finalSignedHash = await sha256(finalSignedBytes);
-    const { error: recordError } = await admin.rpc("record_contract_pdf_signature", {
+    const { error: recordError } = await admin.rpc(integrated ? "record_integrated_contract_pdf_signatures" : "record_contract_pdf_signature_with_use", {
       p_contract_id: contractId, p_user_id: user.id, p_attempt_id: contract.pdf_signing_attempt_id, p_source_sha256: sourceHash, p_signed_path: signedPath,
-      p_signed_sha256: finalSignedHash, p_signature_sha256: await sha256(signatureBytes), p_page_no: pageNo,
-      p_x: x, p_y: y, p_width: width, p_height: height,
+      p_signed_sha256: finalSignedHash, p_signature_sha256: signatureHash, p_page_no: pageNo,
+      p_x: x, p_y: y, p_width: width, p_height: height, ...(integrated ? { p_signatures: partHashes } : { p_signature_id: signatureId }),
     });
     if (recordError) throw new Error(`contract signature record failed: ${recordError.message}`);
     return json({ contract_id: contractId, signed_pdf_path: signedPath, signed_pdf_sha256: finalSignedHash });

@@ -11,6 +11,7 @@ create table if not exists public.consultation_journals (
   quoted_amount numeric(14,2) check (quoted_amount is null or quoted_amount >= 0),
   instruction_note text check (instruction_note is null or char_length(trim(instruction_note)) <= 1000),
   special_note text check (special_note is null or char_length(trim(special_note)) <= 1000),
+  source_fields jsonb not null default '{}'::jsonb check (jsonb_typeof(source_fields)='object'),
   author_id uuid not null default auth.uid() references auth.users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

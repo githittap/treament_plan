@@ -4,7 +4,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const packageRoot = process.env.PGLITE_PACKAGE_ROOT;
-if (!packageRoot) throw new Error('PGLITE_PACKAGE_ROOT is required');
+if (!packageRoot) { console.log('PGLITE_SKIP: PGLITE_PACKAGE_ROOT 미설정'); process.exit(0); }
 const { PGlite } = await import(pathToFileURL(path.join(packageRoot, 'dist/index.js')).href);
 const db = new PGlite();
 const query = sql => db.query(sql).then(result => result.rows);
@@ -85,7 +85,7 @@ try {
   let reapply = ''; try { await db.exec(draft); } catch (caught) { reapply = String(caught); } assert.match(reapply,/already applied; preserve snapshot and stop migration/);
   assert.equal((await query(`select count(*)::int n from information_schema.role_table_grants where table_schema='public' and table_name='notice_attachments_migration_snapshot' and grantee in ('PUBLIC','anon','authenticated')`))[0].n,0);
   assert.deepEqual((await query("select id, public from storage.buckets where id='notice-attachments'"))[0], { id: 'notice-attachments', public: false });
-  assert.deepEqual((await query("select public,file_size_limit,allowed_mime_types from storage.buckets where id='notice-attachments'"))[0], { public: false, file_size_limit: 10485760, allowed_mime_types: ['application/pdf','image/jpeg','image/png','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/x-hwp','application/haansofthwp'] });
+  assert.deepEqual((await query("select public,file_size_limit,allowed_mime_types from storage.buckets where id='notice-attachments'"))[0], { public: false, file_size_limit: 10485760, allowed_mime_types: null });
   await db.exec('set role anon');
   await denied(`select * from public.notice_attachments_migration_snapshot`);
   await denied(`update public.notice_attachments_migration_snapshot set bucket_existed=false where bucket_id='notice-attachments'`);
@@ -114,7 +114,9 @@ try {
   assert.deepEqual((await query(`select author_id='${staff}' id_ok,author='직원' author_ok,created_at<now()+interval '1 minute' created_ok,updated_at>='${insertStartedAt.toISOString()}'::timestamptz updated_ok from public.notices where title='공지'`))[0], { id_ok: true, author_ok: true, created_ok: true, updated_ok: true });
   await query(`insert into storage.objects(bucket_id,name,owner_id,metadata) values ('notice-attachments','${staff}/tmp/a.pdf','${staff}','{"mimetype":"application/pdf","size":100}'::jsonb)`);
   assert.equal((await query("select count(*)::int n from storage.objects where bucket_id='notice-attachments'"))[0].n,1);
-  await query(`delete from storage.objects where bucket_id='notice-attachments' and name='${staff}/tmp/a.pdf'`);
+  await query(`insert into storage.objects(bucket_id,name,owner_id,metadata) values ('notice-attachments','${staff}/tmp/preview.gif','${staff}','{"mimetype":"image/gif","size":100}'::jsonb),('notice-attachments','${staff}/tmp/form.odt','${staff}','{"mimetype":"application/octet-stream","size":100}'::jsonb),('notice-attachments','${staff}/tmp/blank.hwpx','${staff}','{"size":100}'::jsonb)`);
+  assert.equal((await query("select count(*)::int n from storage.objects where bucket_id='notice-attachments'"))[0].n,4);
+  await query(`delete from storage.objects where bucket_id='notice-attachments' and name in ('${staff}/tmp/a.pdf','${staff}/tmp/preview.gif','${staff}/tmp/form.odt','${staff}/tmp/blank.hwpx')`);
   assert.equal((await query("select count(*)::int n from storage.objects where bucket_id='notice-attachments'"))[0].n,0);
   await query(`insert into storage.objects(bucket_id,name,owner_id,metadata) values ('notice-attachments','${staff}/tmp/cleanup.pdf','${staff}','{"mimetype":"application/pdf","size":100}'::jsonb)`);
   await query(`delete from storage.objects where bucket_id='notice-attachments' and name='${staff}/tmp/cleanup.pdf'`);

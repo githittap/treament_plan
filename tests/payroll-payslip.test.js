@@ -6,7 +6,7 @@ function ctx(){
   assert.ok(block,'급여명세서 검산 순수 helper 블록이 없습니다.');
   const c={};vm.createContext(c);
   vm.runInContext(block+';this.h={floorTo10,clampNum,payslipTaxBase,calcHealthIns,calcLongTermCare,calcEmploymentIns,calcLocalIncomeTax,'
-    +'PAYSLIP_LEDGER_ONLY_KEYS,payslipCrossCheck,timeToMin,overlapMinutes,aggregateAttendanceForPayslip,minutesToHours,PAYSLIP_RATES_2026};',c);
+    +'PAYSLIP_LEDGER_ONLY_KEYS,payslipCrossCheck,timeToMin,overlapMinutes,payslipAttendanceRows,aggregateAttendanceForPayslip,minutesToHours,PAYSLIP_RATES_2026};',c);
   return c.h;
 }
 
@@ -75,6 +75,77 @@ test('출퇴근 기록이 없는 달은 전부 0으로 집계되고(허위 근�
   const h=ctx();
   assert.deepEqual(JSON.parse(JSON.stringify(h.aggregateAttendanceForPayslip([]))),{workedDays:0,totalWorkMinutes:0,overtimeMinutes:0,nightMinutes:0,holidayMinutes:0});
   assert.deepEqual(JSON.parse(JSON.stringify(h.aggregateAttendanceForPayslip([{clock_in:'09:00',clock_out:null,overtime_min:0}]))),{workedDays:0,totalWorkMinutes:0,overtimeMinutes:0,nightMinutes:0,holidayMinutes:0});
+  assert.deepEqual(JSON.parse(JSON.stringify(h.aggregateAttendanceForPayslip([{clock_in:'18:00',clock_out:'09:00',overtime_min:0,evening_overtime_min:30}]))),{workedDays:0,totalWorkMinutes:0,overtimeMinutes:0,nightMinutes:0,holidayMinutes:0});
+});
+
+test('원장확정 저녁 추가근무만 날짜별 한 번 연장시간에 더하고 총근로시간은 출퇴근 시각 차이로 유지한다',()=>{
+  const h=ctx(),att=[
+    {work_date:'2026-09-01',source:'manual',clock_in:'09:00',clock_out:'18:00',overtime_min:30},
+    {work_date:'2026-09-02',source:'manual',clock_in:'09:00',clock_out:'18:00',overtime_min:20}
+  ],manual=[
+    {id:1,work_date:'2026-09-01',status:'대체',clock_in:'09:00',clock_out:'18:00',overtime_min:30,evening_overtime_min:90},
+    {id:2,work_date:'2026-09-01',status:'원장확정',clock_in:'09:00',clock_out:'18:00',overtime_min:30,evening_overtime_min:40},
+    {id:3,work_date:'2026-09-01',status:'원장확정',clock_in:'09:00',clock_out:'18:00',overtime_min:30,evening_overtime_min:50},
+    {id:4,work_date:'2026-09-02',status:'실장승인',evening_overtime_min:80},
+    {id:5,work_date:'2026-09-02',status:'반려',evening_overtime_min:60}
+  ];
+  const effective=h.payslipAttendanceRows(att,manual,[]),sum=h.aggregateAttendanceForPayslip(effective);
+  assert.deepEqual(JSON.parse(JSON.stringify(sum)),{workedDays:2,totalWorkMinutes:1080,overtimeMinutes:100,nightMinutes:0,holidayMinutes:0});
+  assert.equal(att[0].overtime_min,30,'근태 원본을 수정하지 않음');
+});
+
+test('지문 원본은 보존하고 승인 보정값과 확정 저녁 분만 집계하며 보정 없는 지문에는 저녁 분을 붙이지 않는다',()=>{
+  const h=ctx(),att=[
+    {work_date:'2026-09-03',source:'fp',clock_in:'09:00',clock_out:'18:00',overtime_min:10},
+    {work_date:'2026-09-04',source:'fp',clock_in:'09:00',clock_out:'18:00',overtime_min:15}
+  ],manual=[
+    {id:6,work_date:'2026-09-03',status:'원장확정',clock_in:'10:00',clock_out:'19:00',overtime_min:20,evening_overtime_min:30},
+    {id:7,work_date:'2026-09-04',status:'원장확정',clock_in:'09:00',clock_out:'18:00',overtime_min:15,evening_overtime_min:45}
+  ],resolutions=[{work_date:'2026-09-03',source:'issue_adjustment',approved_at:'2026-09-05T00:00:00Z',clock_in:'10:00',clock_out:'19:00',overtime_min:20}];
+  const effective=h.payslipAttendanceRows(att,manual,resolutions),sum=h.aggregateAttendanceForPayslip(effective);
+  assert.deepEqual(JSON.parse(JSON.stringify(sum)),{workedDays:2,totalWorkMinutes:1080,overtimeMinutes:65,nightMinutes:0,holidayMinutes:0});
+  assert.equal(att[0].overtime_min,10,'지문 원본의 연장시간을 덮어쓰지 않음');
+  assert.equal(att[0].clock_in,'09:00','지문 원본의 출근시각을 덮어쓰지 않음');
+});
+
+test('확정 수기와 실제 근태 또는 승인 보정의 출퇴근·기본 연장시간이 다르면 저녁 분을 더하지 않는다',()=>{
+  const h=ctx(),rows=[
+    {work_date:'2026-09-06',source:'manual',clock_in:'09:00',clock_out:'18:00',overtime_min:20},
+    {work_date:'2026-09-07',source:'fp',clock_in:'09:00',clock_out:'18:00',overtime_min:10}
+  ],manual=[
+    {id:8,work_date:'2026-09-06',status:'원장확정',clock_in:'10:00',clock_out:'18:00',overtime_min:20,evening_overtime_min:30},
+    {id:9,work_date:'2026-09-07',status:'원장확정',clock_in:'09:00',clock_out:'18:00',overtime_min:30,evening_overtime_min:40}
+  ],resolutions=[{work_date:'2026-09-07',source:'issue_adjustment',approved_at:'2026-09-08T00:00:00Z',clock_in:'09:00',clock_out:'18:00',overtime_min:25}];
+  const sum=h.aggregateAttendanceForPayslip(h.payslipAttendanceRows(rows,manual,resolutions));
+  assert.equal(sum.overtimeMinutes,45,'저녁 30+40분은 다른 근태에 붙이지 않음');
+});
+
+test('원장확정 수기만 있고 attendance 원본이 없는 날짜는 근로시간을 임의 생성하지 않는다',()=>{
+  const h=ctx(),manual=[{id:10,work_date:'2026-09-09',status:'원장확정',clock_in:'09:00',clock_out:'18:00',overtime_min:20,evening_overtime_min:30}];
+  assert.deepEqual(JSON.parse(JSON.stringify(h.aggregateAttendanceForPayslip(h.payslipAttendanceRows([],manual,[])))),{workedDays:0,totalWorkMinutes:0,overtimeMinutes:0,nightMinutes:0,holidayMinutes:0});
+});
+
+test('명세서는 같은 직원·월의 확정 수기와 승인 보정만 조회하며 금액 입력값을 집계함수에 넘기지 않는다',()=>{
+  const block=html.match(/async function renderPaySlip\(m\)\{[\s\S]*?\r?\n\}\r?\nfunction setPaySlipMonth/)?.[0]||'';
+  assert.match(block,/from\('attendance_manual_entries'\).*?eq\('status','원장확정'\)/s);
+  assert.match(block,/from\('attendance_issue_resolutions'\)/);
+  assert.match(block,/payslipAttendanceRows\(att\|\|\[\],manualRows\|\|\[\],issueResolutions\|\|\[\]\)/);
+  assert.match(block,/const items=prow\.items\|\|\{\}/);
+  assert.doesNotMatch(block,/from\('payroll_rows'\)\.(?:update|upsert|delete)\(/,'시간 집계가 대장 금액을 쓰지 않음');
+});
+
+test('저녁 시간 집계가 달라져도 명세서 지급·공제·실지급액은 대장 값 그대로다',()=>{
+  const source=html.match(/const payWon=aicostMoney;[\s\S]*?(?=async function renderPaySlip)/)?.[0];
+  assert.ok(source,'명세서 출력 함수를 찾지 못함');
+  const c={aicostMoney:v=>String(v),esc:v=>String(v),appStamp:()=>'',stampDate:()=>'',minutesToHours:ctx().minutesToHours};
+  vm.createContext(c);vm.runInContext(source+';this.build=buildPayslipHtml;',c);
+  const items={base_pay:3000000,extra_ot_pay:200000,income_tax:50000,gross_total:3200000,deduct_total:50000,net_pay:3150000};
+  const base={employee:{name:'직원',dept:'진료'},month:'2026-09',items,issued:false};
+  const before=c.build({...base,workSummary:{workedDays:1,totalWorkMinutes:540,overtimeMinutes:20,nightMinutes:0,holidayMinutes:0}});
+  const after=c.build({...base,workSummary:{workedDays:1,totalWorkMinutes:540,overtimeMinutes:50,nightMinutes:0,holidayMinutes:0}});
+  assert.notEqual(before,after,'연장시간 표시는 실제로 달라져야 함');
+  assert.equal(before.slice(before.indexOf('<div style="display:flex')),after.slice(after.indexOf('<div style="display:flex')),'금액 영역은 시간 변경과 무관해야 함');
+  assert.equal(items.net_pay,3150000);
 });
 
 test('명세서 화면은 병원색·3열 표·근로기준법 필수 항목·발행 잠금·인쇄 CSS를 모두 갖춘다',()=>{

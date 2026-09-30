@@ -11,11 +11,51 @@ const htmlPath = path.join(root, 'hr.html');
 const sql = fs.existsSync(sqlPath) ? fs.readFileSync(sqlPath, 'utf8') : '';
 const html = fs.readFileSync(htmlPath, 'utf8');
 
+test('원본 상담일지 6종의 시트별 칸은 공통 필드와 분리해 저장·재열람한다', () => {
+  const source = html.match(/const CONSULTATION_SOURCE_FIELDS=([\s\S]*?);\r?\nconst CONSULTATION_STATUSES=/);
+  assert.ok(source, '시트별 원본 칸 정의가 있어야 함');
+  const context = {};
+  require('node:vm').runInNewContext(`this.fields=${source[1]}`, context);
+  const fields = context.fields;
+  assert.deepEqual(Object.keys(fields), ['교정','확정','미확정 및 부분확정','홈페이지','카카오,네이버예약,당근','원본']);
+  for (const sheet of Object.keys(fields)) {
+    const keys=fields[sheet].map(row=>row[0]);
+    assert.equal(new Set(keys).size,keys.length,`${sheet}의 저장 키 중복`);
+    for (const label of ['상담시 사용한 소구법'])assert.ok(fields[sheet].some(row=>row[1]===label));
+  }
+  assert.ok(fields['교정'].some(row=>row[1]==='발치여부'));
+  assert.ok(fields['확정'].some(row=>row[1]==='4차리콜'));
+  assert.ok(fields['미확정 및 부분확정'].some(row=>row[1]==='계획된 진료'));
+  assert.ok(fields['홈페이지'].some(row=>row[1]==='통화'));
+  assert.equal(fields['카카오,네이버예약,당근'].filter(row=>row[1].startsWith('주호소')).length,2);
+  assert.ok(fields['원본'].some(row=>row[1]==='내원경로'));
+  assert.ok(fields['확정'].some(row=>row[1]==='11열'));
+  assert.ok(fields['미확정 및 부분확정'].some(row=>row[1]==='4열'));
+  assert.match(html,/source_fields:consultationSourceFieldValues\(\)/);
+  assert.match(html,/special_note,source_fields'\)/);
+  const migration=fs.readFileSync(path.join(root,'db','consultation_journal_source_fields_draft.sql'),'utf8');
+  assert.match(migration,/add column if not exists source_fields jsonb not null default '\{\}'::jsonb/);
+});
+
+test('시트별 추가 칸은 입력값을 다시 표시하고 시트 변경에도 저장값을 유지한다', () => {
+  const source=html.match(/const CONSULTATION_SOURCE_FIELDS=([\s\S]*?);\r?\nconst CONSULTATION_STATUSES=/);
+  const functions=html.match(/function consultationRenderSourceFields\([\s\S]*?\r?\nfunction consultationDraftFromForm/);
+  assert.ok(source&&functions);
+  const box={innerHTML:'',querySelectorAll:()=>[{dataset:{sourceKey:'recall_1'},value:'전화 예정'}]};
+  const sheet={value:'확정'};
+  const context={$:id=>id==='#cjSourceFields'?box:sheet,esc:s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;'),console};
+  require('node:vm').runInNewContext(`const CONSULTATION_SOURCE_FIELDS=${source[1]};let CONSULTATION_SOURCE_SAVED_FIELDS={old_note:'보존'};${functions[0].replace(/\nfunction consultationDraftFromForm$/,'')}\nthis.render=consultationRenderSourceFields;this.values=consultationSourceFieldValues;`,context);
+  context.render({recall_1:'<표시>'});
+  assert.match(box.innerHTML,/1차리콜/);
+  assert.match(box.innerHTML,/&lt;표시>/);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.values())),{old_note:'보존',recall_1:'전화 예정'});
+});
+
 function loadConsultationHelpers() {
   const match = html.match(/\/\* consultation-journal:test-start \*\/([\s\S]*?)\/\* consultation-journal:test-end \*\//);
   assert.ok(match, '상담일지 테스트용 순수 함수 블록이 있어야 합니다.');
   const context = {};
-  require('node:vm').runInNewContext(`${match[1]}\nthis.helpers={consultationCanAccess,consultationMaskPhone,consultationSafeSearch,consultationPageRange,consultationRequestError,consultationApplyFilterState,consultationServerQueryPlan};`, context);
+  require('node:vm').runInNewContext(`${match[1]}\nthis.helpers={consultationCanAccess,consultationMaskPhone,consultationSafeSearch,consultationPageRange,consultationRequestError,consultationApplyFilterState,consultationServerQueryPlan,consultationActionTiming};`, context);
   return context.helpers;
 }
 
@@ -95,6 +135,8 @@ test('익명 하네스는 권한·짧은 연락처 마스킹·검색 정화·페
   assert.equal(helpers.consultationCanAccess('anon'), false);
   assert.equal(helpers.consultationCanAccess('staff'), false);
   assert.equal(helpers.consultationCanAccess('manager'), true);
+  assert.equal(helpers.consultationCanAccess('chief'), true);
+  assert.equal(helpers.consultationCanAccess('deputy'), false);
   assert.equal(helpers.consultationMaskPhone('12345'), '12•45');
   assert.equal(helpers.consultationMaskPhone('1234567'), '12•••67');
   assert.equal(helpers.consultationMaskPhone('1234'), '');
@@ -105,6 +147,43 @@ test('익명 하네스는 권한·짧은 연락처 마스킹·검색 정화·페
   assert.equal(helpers.consultationRequestError('create', { message: 'denied' }), '상담일지 저장 실패: denied');
   assert.equal(helpers.consultationRequestError('update', { message: 'denied' }), '상담일지 수정 실패: denied');
   assert.equal(helpers.consultationRequestError('list', { message: 'denied' }), '상담일지 불러오기 실패: denied');
+});
+
+test('다음 조치는 완료되지 않은 예정일만 오늘·기한 지남으로 분류한다', () => {
+  const {consultationActionTiming:timing}=loadConsultationHelpers();
+  assert.equal(timing({next_action:'전화',action_due_on:'2026-09-24',action_done:false},'2026-09-25'),'overdue');
+  assert.equal(timing({next_action:'전화',action_due_on:'2026-09-25',action_done:false},'2026-09-25'),'today');
+  for(const row of [
+    {next_action:'전화',action_due_on:'2026-09-26',action_done:false},
+    {next_action:'전화',action_due_on:'2026-09-24',action_done:true},
+    {next_action:'',action_due_on:'2026-09-24',action_done:false},
+    {next_action:'전화',action_due_on:null,action_done:false}
+  ])assert.equal(timing(row,'2026-09-25'),'');
+});
+
+test('다음 조치 담당자 후보는 DB 가드처럼 active·approved가 명시적 true인 관리자만 보여준다',()=>{
+  const source=html.match(/^function consultationActionAssigneeOptions\(selected\)\{.*\}$/m)?.[0];
+  assert.ok(source);
+  const profiles=[
+    {user_id:'eligible',name:'정상',role:'chief',active:true,approved:true,account_access_status:'활성'},
+    {user_id:'no-active',name:'누락',role:'chief',approved:true},
+    {user_id:'null-active',name:'널',role:'chief',active:null,approved:true},
+    {user_id:'no-approved',name:'미승인',role:'chief',active:true},
+    {user_id:'false-approved',name:'거부',role:'chief',active:true,approved:false}
+  ];
+  const context={PROFILES:profiles,esc:String,consultationCanAccess:role=>['manager','chief','owner'].includes(role)};
+  require('node:vm').runInNewContext(`${source}\nthis.options=consultationActionAssigneeOptions;`,context);
+  const options=context.options(null);
+  assert.match(options,/value="eligible"/);
+  for(const row of profiles.slice(1))assert.doesNotMatch(options,new RegExp(`value="${row.user_id}"`));
+});
+
+test('기존 상담일지 안에서 오늘·기한 지남 목록과 다음 조치 담당자·예정일·완료 체크를 연결한다',()=>{
+  const feature=html.match(/\/\* ── 상담일지:[\s\S]*?\/\* ── 근로계약서/)?.[0]||'';
+  for(const id of ['cjActionQueue','cjActionAssignee','cjActionDue','cjActionDone'])assert.match(feature,new RegExp(`id="${id}"`));
+  assert.match(feature,/from\('consultation_journals'\)[\s\S]*?eq\('action_done',false\)[\s\S]*?lte\('action_due_on',today\(\)\)/);
+  assert.match(feature,/action_assignee_id:|action_assignee_id,action_due_on,action_done/);
+  assert.doesNotMatch(feature,/go\('action'\)|key:'action'/,'새 업무 탭은 만들지 않음');
 });
 
 test('server_search_filter_survives_render: 버튼 입력은 렌더 전 상태에 저장되고 서버 쿼리 계획까지 보존된다', () => {
