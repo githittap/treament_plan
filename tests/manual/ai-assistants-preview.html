@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<!-- ai-assistants.js 눈으로 보는 미리보기(설계서_1단계.md 5장) — 운영 Supabase에 연결하지 않고 가짜 sb 객체만 쓴다.
+     주소 뒤 ?as=staff 또는 ?as=owner 로 역할을 바꿔서 연다. 기본은 staff. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 도우미 미리보기</title>
+<style>
+:root{
+  --bg:#0d1715; --card:#14201d; --panel:#182823; --ink:#e6f2ef; --gray:#8fa5a0; --line:#24332f;
+  --mint:#2fd9c4; --mint-dk:#0e2b27; --gold:#e3b341; --gold-bg:#2a2312; --red:#ff7b76; --red-bg:#2b1512;
+  --blue:#6fb2ff; --blue-bg:#13202e; --purple:#a98ef0; --purple-bg:#211a35; --brand:#156f72;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;font-size:14px}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:13.5px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 9px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:rgba(47,217,196,.55)}
+textarea{resize:vertical;min-height:60px}
+h2{font-size:17px;margin-bottom:8px}
+h3{font-size:14px;margin:14px 0 6px;color:var(--gray)}
+h4{font-size:13px;margin:8px 0 4px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:14px}
+.sub{font-size:12px;color:var(--gray)}
+.rowflex{display:flex;flex-wrap:wrap;gap:10px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.mini{background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:7px;padding:3px 9px;font-size:12px;font-weight:700}
+.mini:hover{border-color:var(--mint);color:var(--mint)}
+.mini.stamp{background:var(--gold-bg);border-color:var(--gold);color:var(--gold)}
+.mini.rej{background:var(--red-bg);border-color:#5c2420;color:var(--red)}
+.b{display:inline-block;border-radius:5px;padding:1px 7px;font-size:11px;font-weight:700}
+.b.wait{background:var(--gold-bg);color:var(--gold)} .b.ok{background:var(--mint-dk);color:var(--mint)}
+.b.no{background:var(--red-bg);color:var(--red)} .b.mid{background:var(--blue-bg);color:var(--blue)}
+.empty{color:var(--gray);font-size:12.5px;padding:10px 2px}
+.hint{font-size:11.5px;color:var(--gray);margin-top:6px}
+.fld{display:flex;flex-direction:column;gap:3px}.fld.w2{grid-column:span 2}.fld.w4{grid-column:1/-1}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.tblwrap{max-height:60vh;overflow:auto;border-radius:8px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.stat{flex:1;min-width:120px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:9px 14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+header .ttl{font-weight:800;font-size:15px}
+header a{color:var(--blue);text-decoration:none;font-size:12.5px;margin-left:auto}
+main{max-width:900px;margin:14px auto;padding:0 14px}
+</style>
+</head>
+<body>
+<header>
+  <span class="ttl">🤖 AI 도우미 미리보기</span>
+  <span class="b mid" id="roleBadge"></span>
+  <a href="?as=staff">직원(staff)으로 보기</a>
+  <a href="?as=owner">원장(owner)으로 보기</a>
+</header>
+<main id="main"><div class="empty">불러오는 중…</div></main>
+
+<script>
+/* ── 가짜 자료(설계서 2장 칼럼과 같은 모양) ── */
+const NOW=Date.now();
+const iso=daysAgo=>new Date(NOW-daysAgo*86400000).toISOString();
+const uid=(function(){let n=0;return p=>p+'-'+(++n);})();
+
+const STORE={
+  ai_models:[
+    {id:'mdl-opus',provider:'anthropic',model_id:'claude-opus-5-5',label:'Claude Opus 5.5',enabled:true,price_in_usd_per_mtok:4,price_out_usd_per_mtok:20,note:'',sort_order:1},
+    {id:'mdl-sonnet',provider:'anthropic',model_id:'claude-sonnet-5-5',label:'Claude Sonnet 5.5',enabled:true,price_in_usd_per_mtok:2,price_out_usd_per_mtok:10,note:'',sort_order:2},
+    {id:'mdl-haiku',provider:'anthropic',model_id:'claude-haiku-4-5',label:'Claude Haiku 4.5',enabled:true,price_in_usd_per_mtok:1,price_out_usd_per_mtok:5,note:'',sort_order:3},
+    {id:'mdl-fable',provider:'anthropic',model_id:'claude-fable-5-1',label:'Claude Fable 5.1',enabled:false,price_in_usd_per_mtok:10,price_out_usd_per_mtok:50,note:'창작 전용 — 지금은 꺼둠',sort_order:4},
+    {id:'mdl-sol',provider:'openai',model_id:'gpt-6-sol',label:'GPT-6 Sol',enabled:true,price_in_usd_per_mtok:null,price_out_usd_per_mtok:null,note:'',sort_order:5},
+    {id:'mdl-luna',provider:'openai',model_id:'gpt-6-luna',label:'GPT-6 Luna',enabled:true,price_in_usd_per_mtok:null,price_out_usd_per_mtok:null,note:'',sort_order:6},
+    {id:'mdl-flash',provider:'deepseek',model_id:'deepseek-flash',label:'DeepSeek Flash',enabled:true,price_in_usd_per_mtok:0.3,price_out_usd_per_mtok:1.2,note:'',sort_order:7},
+    {id:'mdl-kimi',provider:'moonshot',model_id:'kimi-k3',label:'Kimi K3',enabled:true,price_in_usd_per_mtok:0.6,price_out_usd_per_mtok:2.5,note:'',sort_order:8},
+    {id:'mdl-gemini',provider:'google',model_id:'gemini-3.1-pro-preview',label:'Gemini 3.1 Pro',enabled:true,price_in_usd_per_mtok:1.5,price_out_usd_per_mtok:6,note:'',sort_order:9},
+  ],
+  ai_assistants:[
+    {id:'asst-review',name:'리뷰 답글',icon:'💬',description:'네이버·구글 등 환자 리뷰에 달 답글 초안을 만들어 줌',instructions:'당신은 아산정플란트치과 직원이 환자 리뷰에 답글을 달 때 돕는 도우미입니다.',knowledge:'',model_ref:'mdl-sonnet',fallback_model_ref:'mdl-flash',effort:'low',max_output_tokens:4000,visible_roles:['staff','manager','chief','owner'],enabled:true,sort_order:1},
+    {id:'asst-notice',name:'공지 요약',icon:'📢',description:'긴 공지 글을 세 줄로 요약해 줌',instructions:'공지 글을 받으면 세 줄로 요약합니다.',knowledge:'',model_ref:null,fallback_model_ref:null,effort:'',max_output_tokens:2000,visible_roles:['staff','manager','chief','owner'],enabled:true,sort_order:2},
+    {id:'asst-owner-memo',name:'원장 메모 정리',icon:'🗒️',description:'원장 전용 — 진료 메모를 정리해 줌',instructions:'원장의 진료 메모를 정리합니다.',knowledge:'',model_ref:'mdl-opus',fallback_model_ref:null,effort:'medium',max_output_tokens:6000,visible_roles:['owner'],enabled:true,sort_order:3},
+  ],
+  profiles:[
+    {user_id:'u-staff',name:'김직원'},{user_id:'u-manager',name:'박매니저'},{user_id:'u-owner',name:'정원장'},
+  ],
+  ai_assistant_usage:[
+    {id:1,created_at:iso(0),user_id:'u-staff',assistant_id:'asst-review',assistant_name:'리뷰 답글',provider:'anthropic',model_id:'claude-sonnet-5-5',fallback_used:false,status:'ok',input_tokens:820,output_tokens:410,est_cost_usd:0.0058},
+    {id:2,created_at:iso(0),user_id:'u-manager',assistant_id:'asst-review',assistant_name:'리뷰 답글',provider:'anthropic',model_id:'claude-sonnet-5-5',fallback_used:false,status:'ok',input_tokens:600,output_tokens:300,est_cost_usd:0.0042},
+    {id:3,created_at:iso(1),user_id:'u-staff',assistant_id:'asst-review',assistant_name:'리뷰 답글',provider:'deepseek',model_id:'deepseek-flash',fallback_used:true,status:'ok',input_tokens:900,output_tokens:500,est_cost_usd:0.0009},
+    {id:4,created_at:iso(3),user_id:'u-owner',assistant_id:'asst-owner-memo',assistant_name:'원장 메모 정리',provider:'anthropic',model_id:'claude-opus-5-5',fallback_used:false,status:'ok',input_tokens:1500,output_tokens:900,est_cost_usd:0.024},
+  ],
+};
+
+/* ── 가짜 sb 쿼리 빌더 — .from().select().eq().order() 등을 흉내 낸다 ── */
+function applyFilters(rows,filters){
+  return rows.filter(r=>filters.every(f=>{
+    if(f.op==='eq')return r[f.col]===f.val;
+    if(f.op==='gte')return String(r[f.col]||'')>=String(f.val);
+    return true;
+  }));
+}
+function makeFrom(table){
+  return function(){
+    const state={op:'select',filters:[],data:null};
+    const api={
+      select(){state.op=state.op==='select'?'select':state.op;return api;},
+      insert(data){state.op='insert';state.data=Array.isArray(data)?data:[data];return api;},
+      update(data){state.op='update';state.data=data;return api;},
+      delete(){state.op='delete';return api;},
+      eq(col,val){state.filters.push({col,op:'eq',val});return api;},
+      gte(col,val){state.filters.push({col,op:'gte',val});return api;},
+      order(){return api;},
+      maybeSingle(){state.single=true;return api;},
+      then(resolve,reject){
+        try{
+          const rows=STORE[table]||(STORE[table]=[]);
+          if(state.op==='select'){
+            const out=applyFilters(rows,state.filters).map(r=>Object.assign({},r));
+            resolve({data:out,error:null});
+          }else if(state.op==='insert'){
+            state.data.forEach(row=>{const copy=Object.assign({},row);if(!copy.id)copy.id=uid(table);copy.created_at=copy.created_at||new Date().toISOString();copy.updated_at=new Date().toISOString();rows.push(copy);});
+            resolve({data:null,error:null});
+          }else if(state.op==='update'){
+            applyFilters(rows,state.filters).forEach(r=>{Object.assign(r,state.data);r.updated_at=new Date().toISOString();});
+            resolve({data:null,error:null});
+          }else if(state.op==='delete'){
+            const keep=rows.filter(r=>!applyFilters([r],state.filters).length);
+            STORE[table]=keep;
+            resolve({data:null,error:null});
+          }else resolve({data:null,error:null});
+        }catch(e){reject?reject(e):resolve({data:null,error:e});}
+      },
+    };
+    return api;
+  }();
+}
+
+function rpcAssistantsForMe(me){
+  const modelsById={};STORE.ai_models.forEach(m=>{modelsById[m.id]=m;});
+  const rows=STORE.ai_assistants.filter(a=>a.enabled&&(me.role==='owner'||(a.visible_roles||[]).includes(me.role)))
+    .map(a=>({id:a.id,name:a.name,icon:a.icon,description:a.description,
+      ready:!!(a.model_ref&&modelsById[a.model_ref]&&modelsById[a.model_ref].enabled!==false),
+      sort_order:a.sort_order||0}));
+  return {data:rows,error:null};
+}
+
+function fakeChatReply(assistantId){
+  const a=STORE.ai_assistants.find(x=>x.id===assistantId);
+  if(!a||!a.model_ref)return {ok:false,error_kind:'model_not_set'};
+  const m=STORE.ai_models.find(x=>x.id===a.model_ref);
+  if(!m||m.enabled===false)return {ok:false,error_kind:'model_disabled'};
+  return {ok:true,text:'(미리보기 가짜 답) 「'+a.name+'」 도우미가 받은 말을 확인했습니다. 실제 배포 뒤에는 진짜 AI가 답합니다.',
+    provider:m.provider,model_id:m.model_id,model_label:m.label,fallback_used:false,
+    usage:{input_tokens:120,output_tokens:60,est_cost_usd:0.001}};
+}
+
+function makeFakeSb(me){
+  return {
+    rpc(name){
+      if(name==='ai_assistants_for_me')return Promise.resolve(rpcAssistantsForMe(me));
+      return Promise.resolve({data:null,error:{message:'모르는 RPC: '+name}});
+    },
+    from(table){return makeFrom(table);},
+    functions:{
+      invoke(name,opts){
+        if(name!=='ai-assistant-chat')return Promise.resolve({data:null,error:{message:'모르는 함수'}});
+        const body=(opts&&opts.body)||{};
+        if(body.action==='chat')return Promise.resolve({data:fakeChatReply(body.assistant_id),error:null});
+        if(body.action==='test_model'){
+          const m=STORE.ai_models.find(x=>x.id===body.model_ref);
+          if(!m)return Promise.resolve({data:{ok:false,error_kind:'not_found'},error:null});
+          if(!m.enabled)return Promise.resolve({data:{ok:false,error_kind:'model_disabled'},error:null});
+          return Promise.resolve({data:{ok:true,latency_ms:420,text:'안녕하세요'},error:null});
+        }
+        if(body.action==='list_models'){
+          return Promise.resolve({data:{ok:true,providers:{
+            anthropic:['claude-opus-5-5','claude-sonnet-5-5','claude-haiku-4-5','claude-fable-5-1','claude-opus-5-6-preview'],
+            openai:['gpt-6-sol','gpt-6-luna','gpt-6-astra'],
+          },errors:{stepfun:'provider_not_configured'}},error:null});
+        }
+        return Promise.resolve({data:{ok:false,error_kind:'bad_request'},error:null});
+      },
+    },
+  };
+}
+
+/* ── 실행: ?as=staff / ?as=owner ── */
+const params=new URLSearchParams(location.search);
+const role=params.get('as')==='owner'?'owner':'staff';
+const ME=role==='owner'
+  ?{id:'u-owner',role:'owner',name:'정원장'}
+  :{id:'u-staff',role:'staff',name:'김직원'};
+document.getElementById('roleBadge').textContent=role==='owner'?'원장(owner)으로 보는 중':'직원(staff)으로 보는 중';
+const SB=makeFakeSb(ME);
+</script>
+<script src="../../ai-assistants.js?v=preview"></script>
+<script>
+window.AIAssistants.render(document.getElementById('main'),{sb:SB,me:ME});
+</script>
+</body>
+</html>

@@ -22,6 +22,8 @@ const plain = v => JSON.parse(JSON.stringify(v));   // vm 안에서 만든 배�
    라벨은 보드의 icon + label 을 합친 화면 표기다(예: icon '💡' + label '건의함' → '💡 건의함'). */
 const BOARD = [
   { kind: 'tab', key: 'home', label: '홈', children: [['notice', '공지'], ['suggestions', '💡 건의함']] },
+  /* 직원AI도우미 1단계(2026-09-29, 원장 승인): 허브 전체 도구라 홈 옆 최상위 탭으로 둔다. */
+  { kind: 'tab', key: 'ai', label: '🤖 AI 도우미', children: [] },
   { kind: 'group', key: 'g-work', label: '🕘 근무', children: [['sched', '근무표'], ['calendar', '📅 캘린더'], ['att', '출퇴근']] },
   { kind: 'group', key: 'g-owner', label: '🔒 원장 전용', children: [['owner', '🛡️ 계정·권한 관리'], ['aicost', '💰 AI비용'], ['pay', '💰 급여']] },
   { kind: 'group', key: 'g-care', label: '🩺 환자관리·진료', children: [['confid', '진료기록'], ['workdocs', '📚 업무자료'], ['inbox', '📥 문의함'], ['consult', '🗂 상담일지']] },
@@ -32,7 +34,7 @@ const BOARD = [
 /* ── 권한 불변 기준선: 이번 재편 전(origin/main) TABS의 역할 규칙 그대로 ── */
 const ALL = ['staff', 'manager', 'chief', 'owner'];
 const TAB_ROLE_RULES = {
-  home: ALL, att: ALL, deposit: ALL, sched: ALL, leave: ALL, appr: ALL, notice: ALL,
+  home: ALL, ai: ALL, att: ALL, deposit: ALL, sched: ALL, leave: ALL, appr: ALL, notice: ALL,
   workdocs: ALL, calendar: ALL, suggestions: ALL, onbo: ALL, confid: ALL, contract: ALL,
   pay: ['owner'], aicost: ['owner'], owner: ['owner'],
   /* 원장 승인 2026-09-23(노션 댓글 "승인한다."): 통합 문의함을 메뉴로 꿄내면서
@@ -178,10 +180,10 @@ test('권한 없는 탭은 어느 줄에도 나오지 않는다 (staff·manager�
 test('역할별 위줄 묶음 구성이 보드 순서대로 나온다', () => {
   const staff = harness({ role: 'staff' });
   staff.ctx.renderNav();
-  assert.deepEqual(labelsOf(staff.nav.innerHTML), ['홈', '🕘 근무', '🩺 환자관리·진료', '🏖 연차·결재·서류', '입금']);
+  assert.deepEqual(labelsOf(staff.nav.innerHTML), ['홈', '🤖 AI 도우미', '🕘 근무', '🩺 환자관리·진료', '🏖 연차·결재·서류', '입금']);
   const owner = harness({ role: 'owner' });
   owner.ctx.renderNav();
-  assert.deepEqual(labelsOf(owner.nav.innerHTML), ['홈', '🕘 근무', '🔒 원장 전용', '🩺 환자관리·진료', '🏖 연차·결재·서류', '입금']);
+  assert.deepEqual(labelsOf(owner.nav.innerHTML), ['홈', '🤖 AI 도우미', '🕘 근무', '🔒 원장 전용', '🩺 환자관리·진료', '🏖 연차·결재·서류', '입금']);
 });
 
 test('아래줄은 고른 묶음의 탭들이고, 자식 있는 탭은 자기 자신이 첫 항목이다', () => {
@@ -211,7 +213,7 @@ test('옛 탭 id·딥링크는 그대로이고, 상담 화면 2개가 메뉴에 
   assert.equal(h.ctx.menuEntryOf('inbox').key, 'g-care');
   assert.deepEqual(keysOf(h.nav2.innerHTML), ['workdocs', 'inbox', 'consult'], '진료기록은 접근 명단이 없으면 빠진다');
   assert.equal(onKeyOf(h.nav2.innerHTML), 'consult');
-  assert.equal(labelsOf(h.nav.innerHTML).length, 6);
+  assert.equal(labelsOf(h.nav.innerHTML).length, 7);
   /* 원장 지시 2026-09-23: 문의함은 모두 보고, 상담일지는 매니저·실장·원장만 본다. */
   const staff = harness({ role: 'staff' });
   assert.equal(staff.ctx.visibleTabKeys().has('inbox'), true);

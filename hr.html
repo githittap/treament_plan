@@ -657,6 +657,7 @@ function show(id){$('#'+id).classList.add('show');}function hide(id){$('#'+id).c
 /* ── 탭 정의 (role 노출) ── */
 const TABS=[
   {key:'home',  label:'홈',        roles:['staff','manager','chief','owner']},
+  {key:'ai',    label:'🤖 AI 도우미',roles:['staff','manager','chief','owner']},
   {key:'att',   label:'출퇴근',    roles:['staff','manager','chief','owner']},
   {key:'deposit',label:'입금',     roles:['staff','manager','chief','owner']},
   {key:'sched', label:'근무표',    roles:['staff','manager','chief','owner']},
@@ -683,6 +684,7 @@ const TABS=[
    · 묶음은 그 안에 볼 수 있는 탭이 하나라도 있을 때만 위줄에 나온다(권한 없는 사람에게 빈 묶음 금지). */
 const MENU=[
   {kind:'tab',  key:'home',                                children:['notice','suggestions']},
+  {kind:'tab',  key:'ai',                                   children:[]},
   {kind:'group',key:'g-work',  label:'🕘 근무',            children:['sched','calendar','att']},
   {kind:'group',key:'g-owner', label:'🔒 원장 전용',        children:['owner','aicost','pay']},
   {kind:'group',key:'g-care',  label:'🩺 환자관리·진료',    children:['confid','workdocs','inbox','consult']},
@@ -808,6 +810,7 @@ async function render(){
   const m=$('#main');m.innerHTML='<div class="empty">불러오는 중…</div>';
   try{
     if(TAB==='home')await renderHome(m);
+    else if(TAB==='ai'){if(window.AIAssistants)await window.AIAssistants.render(m,{sb,me:ME});else m.innerHTML='<div class="card"><div class="empty">AI 도우미를 불러오지 못했습니다. 새로고침해 주세요.</div></div>';}
     else if(TAB==='att')await renderAtt(m);
     else if(TAB==='deposit')await renderDeposit(m);
     else if(TAB==='sched')await renderSched(m);
@@ -3530,7 +3533,7 @@ async function renderOwner(m){
         :`<button class="mini" onclick="grantConfid('${p.user_id}')">추가</button>`}</td></tr>`).join('')}</table></div>
     <h3>🧭 탭 노출 설정 <span class="sub">(역할별 · 즉시 반영)</span></h3>
     <div class="tblwrap"><table><tr><th>탭</th>${['staff','manager','chief','owner'].map(r=>`<th>${r}</th>`).join('')}</tr>
-    ${['att','deposit','sched','leave','appr','notice','onbo'].map(key=>{const t=TABS.find(x=>x.key===key),allowed=TAB_ROLES[key]||t.roles;return `<tr><td>${t.label}</td>${['staff','manager','chief','owner'].map(role=>`<td><input type="checkbox" ${allowed.includes(role)?'checked':''} ${role==='owner'?'disabled':''} onchange="toggleTabRole('${key}','${role}',this.checked)"></td>`).join('')}</tr>`;}).join('')}</table></div>
+    ${['att','deposit','sched','leave','appr','notice','onbo','ai'].map(key=>{const t=TABS.find(x=>x.key===key),allowed=TAB_ROLES[key]||t.roles;return `<tr><td>${t.label}</td>${['staff','manager','chief','owner'].map(role=>`<td><input type="checkbox" ${allowed.includes(role)?'checked':''} ${role==='owner'?'disabled':''} onchange="toggleTabRole('${key}','${role}',this.checked)"></td>`).join('')}</tr>`;}).join('')}</table></div>
     <h3>👤 사람별 탭 예외 <span class="sub">(역할 기본을 개인별로 덮어씀 · 즉시 반영)</span></h3>
     <select id="ovUser" onchange="renderOverrideRows()"><option value="">직원을 선택하세요</option>${PROFILES.filter(p=>p.approved!==false&&p.role!=='owner').map(p=>`<option value="${p.user_id}">${esc(p.name)} (${p.role})</option>`).join('')}</select>
     <div id="ovRows"></div>
@@ -3635,7 +3638,7 @@ async function toggleTabRole(key,role,on){
 }
 function renderOverrideRows(){
   const sel=$('#ovUser'),rows=$('#ovRows');if(!sel||!rows)return;
-  const uid=sel.value,keys=['att','deposit','sched','leave','appr','notice','onbo'];
+  const uid=sel.value,keys=['att','deposit','sched','leave','appr','notice','onbo','ai'];
   if(!uid){rows.innerHTML='<div class="sub">승인된 직원을 선택하세요.</div>';return;}
   const overrides=TAB_OVERRIDES[uid]||{};
   rows.innerHTML=`<div class="tblwrap"><table><tr><th>탭</th><th>개인 예외</th></tr>${keys.map(key=>{const t=TABS.find(x=>x.key===key),v=overrides[key]===true?'show':overrides[key]===false?'hide':'';return `<tr><td>${t.label}</td><td><select class="mini" onchange="setTabOverride('${uid}','${key}',this.value)"><option value="" ${v===''?'selected':''}>기본(역할규칙)</option><option value="show" ${v==='show'?'selected':''}>보이기(강제)</option><option value="hide" ${v==='hide'?'selected':''}>숨기기(강제)</option></select></td></tr>`;}).join('')}</table></div>`;
@@ -3805,6 +3808,7 @@ enhanceFileDrops();
 boot();
 setInterval(loadSteps,1500);
 </script>
+<script src="ai-assistants.js?v=20260929"></script>
 <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}</script>
 </body>
 </html>
