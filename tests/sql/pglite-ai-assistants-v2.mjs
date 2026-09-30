@@ -17,13 +17,13 @@ try {
  grant execute on function public.employee_hub_access_allowed(),public.my_role() to authenticated;
  insert into public.profiles(user_id,role,account_access_status) values('${owner}','owner','활성'),('${staff}','staff','활성'),('${manager}','manager','활성'),('${chief}','chief','활성'),('${blocked}','staff','차단');`);
  await db.exec(fs.readFileSync(path.join(root,'db/ai_assistants.sql'),'utf8'));
- await db.exec(`insert into public.ai_models(id,provider,model_id,label) values ('da643856-b453-46b3-ac14-ff1dc924f11d','openai','gpt-6-luna-x','GPT Luna'),('cae790c5-580c-4f90-96df-415218f21813','deepseek','deepseek-flash-x','DeepSeek'),('2c64225a-8913-4bc1-a258-96d09a2e1f4e','google','gemini-3.8-flash-x','Gemini')`);
+ await db.exec(`insert into public.ai_models(id,provider,model_id,label) values ('da643856-b453-46b3-ac14-ff1dc924f11d','openai','gpt-6-luna-x','GPT Luna'),('cae790c5-580c-4f13-90ee-96df41521813','deepseek','deepseek-flash-x','DeepSeek'),('2c64225a-8913-4bc1-a258-96d09a2e1f4e','google','gemini-3.8-flash-x','Gemini')`);
  const seed='Z:/09_claude-output/03_병원운영·전산/직원AI도우미/_자료/도우미10/out/assistants_batch1.sql';
  await db.exec(fs.readFileSync(seed,'utf8'));
  const sql=fs.readFileSync(path.join(root,'db/ai_assistants_v2.sql'),'utf8'); await db.exec(sql); await db.exec(sql);
  assert.equal((await q(`select count(*)::int n from public.ai_providers`))[0].n,7);
  assert.equal((await q(`select count(*)::int n from public.ai_assistants`))[0].n,10);
- assert.equal((await q(`select count(*)::int n from public.ai_models where provider='openai' and supports_images`))[0].n,3);
+ assert.equal((await q(`select count(*)::int n from public.ai_models where provider='openai' and supports_images`))[0].n,4);
  assert.equal((await q(`select count(*)::int n from public.ai_assistant_conversations`))[0].n,0);
  await setUser(owner);
  await assert.rejects(q(`insert into public.ai_providers(id,label,kind,base_url,key_env) values('bad','Bad','openai_compat','http://bad','SUPABASE_SERVICE_ROLE_KEY')`),/check constraint|violates/); await db.exec('rollback');
@@ -32,7 +32,7 @@ try {
  await setUser(owner);
  await assert.rejects(q(`insert into public.ai_providers(id,label,kind,base_url,key_env) values('bad','Bad','openai_compat','https://api.example.com/v1','SUPABASE_SERVICE_ROLE_KEY')`),/check constraint|violates/); await db.exec('rollback');
  for(const uid of [staff,manager,chief,blocked]) { await setUser(uid); assert.equal((await q(`select count(*)::int n from public.ai_assistant_conversations`))[0].n,0,`${uid} transcript select`);assert.equal((await q(`select count(*)::int n from public.ai_assistant_messages`))[0].n,0,`${uid} messages select`); await assert.rejects(q(`insert into public.ai_assistant_conversations(id,user_id,assistant_name) values(gen_random_uuid(),'${uid}','x')`),/permission denied/);await db.exec('rollback'); }
- await setUser(owner); const conv='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'; await q(`insert into public.ai_assistant_conversations(id,user_id,assistant_name) values('${conv}','${staff}','test')`); await reset(); await service(); await q(`insert into public.ai_assistant_messages(conversation_id,role,content) values('${conv}','user','hello')`); await reset(); await setUser(owner); assert.equal((await q(`select count(*)::int n from public.ai_assistant_conversations`))[0].n,1);
- const fk=await q(`select count(*)::int n from public.ai_models m join public.ai_providers p on p.id=m.provider`); assert.equal(fk[0].n,15);
+ const conv='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'; await reset(); await service(); await q(`insert into public.ai_assistant_conversations(id,user_id,assistant_name) values('${conv}','${staff}','test')`); await q(`insert into public.ai_assistant_messages(conversation_id,role,content) values('${conv}','user','hello')`); await reset(); await setUser(owner); assert.equal((await q(`select count(*)::int n from public.ai_assistant_conversations`))[0].n,1);
+ const fk=await q(`select count(*)::int n from public.ai_models m join public.ai_providers p on p.id=m.provider`); assert.equal(fk[0].n,18);
  console.log('PGLITE_AI_ASSISTANTS_V2_PASS');
 } finally { await db.close(); }

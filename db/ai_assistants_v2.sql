@@ -40,6 +40,7 @@ language sql immutable set search_path = '' as $$
   select coalesce(cardinality(p_starters),0) <= 4 and coalesce((select bool_and(char_length(x) <= 120) from unnest(p_starters) x),true);
 $$;
 revoke all on function public.ai_assistant_starters_valid(text[]) from public, anon, authenticated;
+grant execute on function public.ai_assistant_starters_valid(text[]) to authenticated, service_role;
 alter table public.ai_assistants drop constraint if exists ai_assistants_starters_check;
 alter table public.ai_assistants add constraint ai_assistants_starters_check check (public.ai_assistant_starters_valid(starters));
 
