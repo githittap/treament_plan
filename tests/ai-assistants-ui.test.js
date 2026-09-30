@@ -19,6 +19,7 @@ test('v2 화면은 대화록·웹검색·사진·시작 문장·회사 관리·C
   assert.match(js,/data-ai-csv/);
   assert.doesNotMatch(js,/대화는 저장되지 않아요|대화 내용은 업무 확인을 위해 저장되며 원장만 볼 수 있어요/);
   assert.doesNotMatch(js,/업무 확인을 위해 저장되며 원장만 볼 수 있어요/);
+  assert.doesNotMatch(js,/사용 기록으로 남고|원장이 볼 수 있어요/); // 원장 지시 10-01 — 직원 화면에 기록·열람 안내 문구 없음
 });
 
 test('역할 이름 바꾸기: 4개 역할을 한국어로, 모르는 값은 그대로 돌려준다',()=>{
