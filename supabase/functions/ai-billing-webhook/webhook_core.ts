@@ -64,16 +64,24 @@ export function createWebhookHandler(
       if (parsed.status === 'ignored') return json({ ok: true, ignored: true }, 200);
       const eventHash = await marketingSmsDigest(rawText, String(secretRow.value));
       let cancellationLink: { id: string } | null = null;
-      let cancellationFailure: 'unmatched_cancellation' | 'ambiguous_cancellation' | null = null;
+      let cancellationFailure: 'unmatched_cancellation' | 'ambiguous_cancellation' | 'duplicate_cancellation' | null = null;
       if (parsed.status === 'cancellation') {
-        const { data: candidates, error: candidateErr } = await client.from('marketing_expense_events')
+        const { data: priorCancellations, error: priorErr } = await client.from('marketing_expense_events')
+          .select('reversed_event_id').eq('event_kind', 'cancellation').eq('parse_status', 'recorded')
+          .eq('currency', parsed.currency).eq('amount_krw', -parsed.amountKrw)
+          .eq('merchant_key', parsed.merchantKey).not('reversed_event_id', 'is', null)
+          .lte('transaction_at', parsed.transactionAt).limit(1000);
+        if (priorErr) return json({ error: '취소 대상을 확인하지 못했습니다.' }, 500);
+        const alreadyReversedIds = [...new Set((priorCancellations || []).map((row: { reversed_event_id: string }) => row.reversed_event_id))];
+        let candidateQuery = client.from('marketing_expense_events')
           .select('id').eq('event_kind', 'purchase').eq('parse_status', 'recorded')
           .eq('currency', parsed.currency).eq('amount_krw', parsed.amountKrw)
-          .eq('merchant_key', parsed.merchantKey).is('reversed_event_id', null)
-          .lte('transaction_at', parsed.transactionAt).limit(2);
+          .eq('merchant_key', parsed.merchantKey).lte('transaction_at', parsed.transactionAt);
+        if (alreadyReversedIds.length) candidateQuery = candidateQuery.not('id', 'in', `(${alreadyReversedIds.join(',')})`);
+        const { data: candidates, error: candidateErr } = await candidateQuery.limit(2);
         if (candidateErr) return json({ error: '취소 대상을 확인하지 못했습니다.' }, 500);
         if (candidates?.length === 1) cancellationLink = candidates[0];
-        else cancellationFailure = candidates?.length ? 'ambiguous_cancellation' : 'unmatched_cancellation';
+        else cancellationFailure = candidates?.length ? 'ambiguous_cancellation' : alreadyReversedIds.length ? 'duplicate_cancellation' : 'unmatched_cancellation';
       }
       const receivedAt = new Date().toISOString();
       const row = parsed.status === 'recorded' ? {
@@ -96,6 +104,17 @@ export function createWebhookHandler(
         parse_status: 'failed', failure_code: parsed.failureCode,
       };
       const { error: marketingErr } = await client.from('marketing_expense_events').upsert(row, { onConflict: 'event_hash', ignoreDuplicates: true });
+      if (marketingErr && parsed.status === 'cancellation' && cancellationLink && marketingErr.code === '23505') {
+        const duplicateRow = {
+          event_hash: eventHash, received_at: receivedAt, transaction_at: parsed.transactionAt,
+          event_kind: 'cancellation', parse_status: 'failed', failure_code: 'duplicate_cancellation',
+          currency: parsed.currency, amount_native: parsed.amount, amount_krw: parsed.amountKrw,
+          merchant: parsed.merchant, merchant_key: parsed.merchantKey,
+        };
+        const { error: fallbackErr } = await client.from('marketing_expense_events').upsert(duplicateRow, { onConflict: 'event_hash', ignoreDuplicates: true });
+        if (fallbackErr) return json({ error: '이벤트 저장 실패' }, 500);
+        return json({ ok: true, recorded: false, review: true }, 200);
+      }
       if (marketingErr) return json({ error: '이벤트 저장 실패' }, 500);
       return json({ ok: true, recorded: parsed.status === 'recorded' || (parsed.status === 'cancellation' && !!cancellationLink), review: !!cancellationFailure || /취소|승인취소/i.test(rawText) }, 200);
     }

@@ -1,16 +1,23 @@
 import { createWebhookHandler } from './webhook_core.ts';
 
 const SECRET='local-test-only';
-function fixture(cancellationCandidates: {id:string}[]=[]){
+function fixture(cancellationCandidates: {id:string}[]=[],alreadyReversedIds:string[]=[],simulateUniqueReversalCollision=false){
   const inserts: Record<string, unknown>[]=[];const marketingWrites:{row:Record<string,unknown>,options:Record<string,unknown>}[]=[];let secretLookupName='';
   const createClient=()=>({from(table: string): any {
     if(table==='webhook_secrets')return{select(){return this},eq(_column: string,value: string){secretLookupName=value;return this},async single(){return{data:{value:SECRET},error:null}}};
     if(table==='ai_billing_events')return{async insert(row: Record<string, unknown>){inserts.push(row);return{error:null}}};
-    if(table==='marketing_expense_events')return{
-      select(){return this},eq(){return this},is(){return this},lte(){return this},
-      async limit(){return{data:cancellationCandidates,error:null}},
-      async upsert(row:Record<string,unknown>,options:Record<string,unknown>){marketingWrites.push({row,options});return{error:null}},
-    };
+    if(table==='marketing_expense_events'){
+      const filters:Record<string,unknown>={},excludedIds:string[]=[];
+      return{
+        select(){return this},eq(column:string,value:unknown){filters[column]=value;return this},is(){return this},lte(){return this},
+        not(column:string,operator:string,value:string){if(column==='id'&&operator==='in')excludedIds.push(...value.replace(/^\(|\)$/g,'').split(',').filter(Boolean));return this},
+        async limit(){return filters.event_kind==='cancellation'?{data:alreadyReversedIds.map(id=>({reversed_event_id:id})),error:null}:{data:cancellationCandidates.filter(item=>!alreadyReversedIds.includes(item.id)&&!excludedIds.includes(item.id)),error:null}},
+        async upsert(row:Record<string,unknown>,options:Record<string,unknown>){
+          if(row.reversed_event_id&&simulateUniqueReversalCollision){simulateUniqueReversalCollision=false;return{error:{code:'23505'}};}
+          marketingWrites.push({row,options});if(row.reversed_event_id)alreadyReversedIds.push(String(row.reversed_event_id));return{error:null};
+        },
+      };
+    }
     throw new Error(`unexpected table ${table}`);
   }});
   const handler=createWebhookHandler(createClient,name=>name==='SUPABASE_URL'?'https://db.test':name==='SUPABASE_SERVICE_ROLE_KEY'?'not-a-real-key':undefined);
@@ -71,4 +78,16 @@ Deno.test('Unmatched cancellation is preserved for review and never reported as 
  const f=fixture();const r=await f.handler(req({raw_text:'[Web발신] 삼성0000승인취소 가*림 / 1,000원 일시불 / 09/30 17:58 Google1234'},'marketing'));
  const body=await json(r),row=f.marketingWrites[0]?.row;
  if(r.status!==200||body.recorded!==false||body.review!==true||row?.event_kind!=='cancellation'||row?.parse_status!=='failed'||row?.failure_code!=='unmatched_cancellation'||row?.amount_native!==1000||row?.amount_krw!==1000||row?.merchant!=='Google'||row?.merchant_key!=='google')throw new Error('unmatched cancellation was not safely retained for review');
+});
+Deno.test('Second distinct cancellation for the same approval is preserved as duplicate review, not a unique-key 500',async()=>{
+ const f=fixture([{id:'prior-approval'}]);
+ const first=await f.handler(req({raw_text:'[Web발신] 삼성0000승인취소 가*림 / 1,000원 일시불 / 09/30 17:58 Google1234 / 누적14,532,777원'},'marketing'));
+ const second=await f.handler(req({raw_text:'[Web발신] 삼성0000승인취소 가*림 / 1,000원 일시불 / 09/30 17:58 Google1234 / 누적14,532,778원'},'marketing'));
+ const body=await json(second),row=f.marketingWrites[1]?.row;
+ if(first.status!==200||second.status!==200||body.recorded!==false||body.review!==true||row?.parse_status!=='failed'||row.failure_code!=='duplicate_cancellation'||row.reversed_event_id)throw new Error('second cancellation must remain safely reviewable instead of reusing the approval');
+});
+Deno.test('A concurrent reversed_event_id unique-key collision falls back to a duplicate review row',async()=>{
+ const f=fixture([{id:'prior-approval'}],[],true),r=await f.handler(req({raw_text:'[Web발신] 삼성0000승인취소 가*림 / 1,000원 일시불 / 09/30 17:58 Google1234'},'marketing'));
+ const body=await json(r),row=f.marketingWrites[0]?.row;
+ if(r.status!==200||body.recorded!==false||body.review!==true||row?.failure_code!=='duplicate_cancellation'||row?.reversed_event_id)throw new Error('unique cancellation race was not converted to a review row');
 });

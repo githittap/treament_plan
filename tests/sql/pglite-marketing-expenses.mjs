@@ -8,7 +8,7 @@ const {PGlite}=await import(pathToFileURL(path.join(pkg,'dist/index.js')).href);
 const draft=fs.readFileSync('db/marketing_expenses_draft.sql','utf8');
 const rollback=fs.readFileSync('db/marketing_expenses_rollback.sql','utf8');
 const ids={owner:'11111111-1111-1111-1111-111111111111',manager:'22222222-2222-2222-2222-222222222222',staff:'33333333-3333-3333-3333-333333333333'};
-const hashes={krw:'a'.repeat(64),foreign:'b'.repeat(64),failed:'c'.repeat(64),cancellation:'d'.repeat(64),unmatched:'e'.repeat(64)};
+const hashes={krw:'a'.repeat(64),foreign:'b'.repeat(64),failed:'c'.repeat(64),cancellation:'d'.repeat(64),unmatched:'e'.repeat(64),duplicate:'2'.repeat(64)};
 const db=new PGlite(),q=sql=>db.query(sql).then(result=>result.rows);
 await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;
  create schema auth;create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('app.test_uid',true),'')::uuid$$;
@@ -37,17 +37,22 @@ try{
       select '${hashes.cancellation}',transaction_at,'cancellation','recorded','KRW',-1000,-1000,'Google Ads','googleads',id from public.marketing_expense_events where event_hash='${hashes.krw}';
     insert into public.marketing_expense_events(event_hash,received_at,transaction_at,event_kind,parse_status,failure_code,currency,amount_native,amount_krw,merchant,merchant_key)
       values ('${hashes.unmatched}',now(),now(),'cancellation','failed','unmatched_cancellation','KRW',1000,1000,'Google Ads','googleads');
+    insert into public.marketing_expense_events(event_hash,received_at,transaction_at,event_kind,parse_status,failure_code,currency,amount_native,amount_krw,merchant,merchant_key)
+      values ('${hashes.duplicate}',now(),now(),'cancellation','failed','duplicate_cancellation','KRW',1000,1000,'Google Ads','googleads');
     `);
   await assert.rejects(db.exec(`insert into public.marketing_expense_events(event_hash,transaction_at,event_kind,parse_status,currency,amount_native,amount_krw,merchant,merchant_key)
     values ('${'f'.repeat(64)}',now(),'cancellation','recorded','KRW',1000,1000,'Google Ads','googleads')`),/violates check constraint/i,'cancellations must be negative and reference an approval');
+  await assert.rejects(db.exec(`insert into public.marketing_expense_events(event_hash,transaction_at,event_kind,parse_status,currency,amount_native,amount_krw,merchant,merchant_key,reversed_event_id)
+    select '${'9'.repeat(64)}',now(),'cancellation','recorded','KRW',-1000,-1000,'Google Ads','googleads',id from public.marketing_expense_events where event_hash='${hashes.krw}'`),/duplicate key value violates unique constraint/i,'an approval can only have one recorded cancellation');
   await assert.rejects(db.exec(`insert into public.marketing_expense_events(event_hash,transaction_at,event_kind,parse_status,currency,amount_native,amount_krw,merchant,merchant_key)
     values ('${'1'.repeat(64)}',now(),'purchase','recorded','KRW',-1000,-1000,'Google Ads','googleads')`),/violates check constraint/i,'purchases must remain positive');
   await db.exec(`
     reset role;`);
   await asUser(ids.owner);
-  assert.equal((await q(`select count(*)::int as n from public.marketing_expense_events`))[0].n,5,'owner reads purchases, cancellations, and review rows');
+  assert.equal((await q(`select count(*)::int as n from public.marketing_expense_events`))[0].n,6,'owner reads purchases, cancellations, and review rows');
   assert.equal((await q(`select sum(amount_krw)::int as n from public.marketing_expense_events where currency='KRW' and parse_status='recorded'`))[0].n,0,'a matched 1,000 KRW cancellation offsets its approval');
   assert.equal((await q(`select count(*)::int as n from public.marketing_expense_events where event_hash='${hashes.unmatched}' and parse_status='failed' and amount_krw=1000 and merchant='Google Ads'`))[0].n,1,'unmatched cancellations retain safe amount and merchant details for review');
+  assert.equal((await q(`select count(*)::int as n from public.marketing_expense_events where event_hash='${hashes.duplicate}' and parse_status='failed' and failure_code='duplicate_cancellation' and amount_krw=1000`))[0].n,1,'duplicate cancellations retain an explicit review row');
   await q(`update public.marketing_expense_events set category_override='naver' where event_hash='${hashes.krw}'`);
   await q(`insert into public.marketing_month_budgets(month,amount_krw) values ('2026-10-01',500000)`);
   await q(`insert into public.marketing_foreign_charge_links(foreign_event_id,krw_event_id,created_by)

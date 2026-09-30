@@ -14,7 +14,7 @@ create table if not exists public.marketing_expense_events (
   transaction_at timestamptz,
   event_kind text not null check (event_kind in ('purchase','cancellation')),
   parse_status text not null check (parse_status in ('recorded','failed')),
-  failure_code text check (failure_code in ('empty','unsupported_shape','unreadable_fields','unmatched_cancellation','ambiguous_cancellation')),
+  failure_code text check (failure_code in ('empty','unsupported_shape','unreadable_fields','unmatched_cancellation','ambiguous_cancellation','duplicate_cancellation')),
   currency text check (currency is null or currency ~ '^[A-Z]{3}$'),
   amount_native numeric(14,4) check (amount_native is null or amount_native <> 0),
   amount_krw bigint check (amount_krw is null or amount_krw <> 0),
@@ -25,12 +25,12 @@ create table if not exists public.marketing_expense_events (
   constraint marketing_expense_parse_fields check (
     (parse_status='recorded' and transaction_at is not null and currency is not null and amount_native is not null and merchant is not null and merchant_key is not null and failure_code is null
       and ((event_kind='purchase' and amount_native>0 and reversed_event_id is null) or (event_kind='cancellation' and amount_native<0 and reversed_event_id is not null)))
-    or (parse_status='failed' and event_kind='cancellation' and failure_code in ('unmatched_cancellation','ambiguous_cancellation') and transaction_at is not null and currency='KRW' and amount_native>0 and merchant is not null and merchant_key is not null and category_override is null and reversed_event_id is null)
+    or (parse_status='failed' and event_kind='cancellation' and failure_code in ('unmatched_cancellation','ambiguous_cancellation','duplicate_cancellation') and transaction_at is not null and currency='KRW' and amount_native>0 and merchant is not null and merchant_key is not null and category_override is null and reversed_event_id is null)
     or (parse_status='failed' and transaction_at is null and currency is null and amount_native is null and amount_krw is null and merchant is null and merchant_key is null and category_override is null and reversed_event_id is null and failure_code is not null)
   ),
   constraint marketing_expense_krw_fields check (
     (parse_status='failed' and currency is null and amount_krw is null)
-    or (parse_status='failed' and event_kind='cancellation' and failure_code in ('unmatched_cancellation','ambiguous_cancellation') and currency='KRW' and amount_krw>0)
+    or (parse_status='failed' and event_kind='cancellation' and failure_code in ('unmatched_cancellation','ambiguous_cancellation','duplicate_cancellation') and currency='KRW' and amount_krw>0)
     or (currency='KRW' and amount_krw is not null and ((event_kind='purchase' and amount_krw>0) or (event_kind='cancellation' and amount_krw<0)))
     or (currency is distinct from 'KRW' and amount_krw is null and event_kind='purchase')
   )
