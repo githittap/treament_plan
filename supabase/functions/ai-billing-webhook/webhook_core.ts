@@ -26,6 +26,7 @@ export function createWebhookHandler(
       if (typeof parsedJson.amount_krw === 'number' && Number.isFinite(parsedJson.amount_krw)) suppliedAmount = parsedJson.amount_krw;
     }
     if (!rawText) rawText = bodyText;
+    if (!token) return json({ error: 'Unauthorized' }, 401);
 
     let amountKrw = null;
     let usdAmount = null;

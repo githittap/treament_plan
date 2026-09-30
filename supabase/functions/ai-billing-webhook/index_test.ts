@@ -48,6 +48,14 @@ Deno.test('Invalid secret and foreign-platform marker do not write events',async
  r=await f.handler(req({raw_text:'USD 2.12',note:'NAVER_AD_CHARGE',amount_krw:1},'StepFun'));
  if(r.status!==400||f.inserts.length)throw new Error('Naver marker must be rejected on another platform');
 });
+Deno.test('Missing token returns 401 before platform parsing or writes',async()=>{
+ const f=fixture();
+ for(const platform of ['marketing','naver_ads','Claude']){
+  const r=await f.handler(new Request(`https://fn.test/ai-billing-webhook?platform=${platform}`,{method:'POST',body:JSON.stringify({raw_text:'safe probe'})}));
+  if(r.status!==401)throw new Error(`${platform} without token must return 401`);
+ }
+ if(f.inserts.length||f.marketingWrites.length)throw new Error('unauthorized requests must not write events');
+});
 Deno.test('Regular platform continues to honor its existing amount field',async()=>{
  const f=fixture();const r=await f.handler(req({raw_text:'삼성카드 해외승인',amount_krw:3180},'StepFun'));
  if(r.status!==200||f.inserts[0]?.platform!=='StepFun'||f.inserts[0]?.amount_krw!==3180)throw new Error('legacy platform path changed');
