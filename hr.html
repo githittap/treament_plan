@@ -2988,6 +2988,82 @@ function aicostPlatformKey(p){
 let AICOST_MONTH='';
 function setAicostMonth(v){AICOST_MONTH=v;render();}
 function aicostMoney(v){return Number(v||0).toLocaleString('ko-KR');}
+/* marketing-expenses:test-start */
+const MARKETING_CHANNELS=[['daangn','당근'],['kakao','카카오'],['google','구글'],['naver','네이버'],['meta','메타']];
+const MARKETING_CATEGORIES=[...MARKETING_CHANNELS,['not_marketing','마케팅 아님']];
+function marketingMonthAt(value){const d=new Date(value);return Number.isNaN(d.getTime())?'':new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit'}).format(d);}
+function shiftMarketingMonth(value,delta){const [year,month]=value.split('-').map(Number),d=new Date(year,month-1+delta,1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
+function marketingCategoryFor(row,rules){
+  if(row.category_override)return row.category_override;
+  const key=String(row.merchant_key||'');
+  const hits=(rules||[]).filter(rule=>key===rule.merchant_key||key.includes(rule.merchant_key)).sort((a,b)=>b.merchant_key.length-a.merchant_key.length);
+  return hits[0]?.category||null;
+}
+function marketingMonthSummary(events,rules,links,month){
+  const linked=new Set((links||[]).map(link=>link.foreign_event_id)),channels={};let totalKrw=0;
+  for(const row of events||[]){if(row.parse_status!=='recorded'||marketingMonthAt(row.transaction_at)!==month||linked.has(row.id))continue;
+    const category=marketingCategoryFor(row,rules);if(!MARKETING_CHANNELS.some(item=>item[0]===category))continue;
+    channels[category]||={amount:0,count:0,rows:[]};channels[category].count++;channels[category].rows.push(row);
+    if(row.currency==='KRW'){const amount=Number(row.amount_krw||0);totalKrw+=amount;channels[category].amount+=amount;}
+  }
+  return {totalKrw,channels:Object.entries(channels).sort((a,b)=>b[1].amount-a[1].amount)};
+}
+function marketingCategoryOptions(value,includeDefault=false){return `${includeDefault?'<option value="">기본 분류 사용</option>':''}${MARKETING_CATEGORIES.map(([key,label])=>`<option value="${key}" ${value===key?'selected':''}>${label}</option>`).join('')}`;}
+/* marketing-expenses:test-end */
+async function saveMarketingBudget(){
+  if(ME.role!=='owner')return;const value=Number($('#marketingBudget').value);if(!Number.isSafeInteger(value)||value<0){alert('예산은 0원 이상의 정수로 입력해 주세요.');return;}
+  const {error}=await sb.from('marketing_month_budgets').upsert({month:AICOST_MONTH+'-01',amount_krw:value,updated_at:new Date().toISOString()},{onConflict:'month'});
+  if(error){setStatus('error');return;}setStatus('saved');render();
+}
+async function saveMarketingMerchantRule(key,label,index){
+  if(ME.role!=='owner')return;const category=$(`#marketingRule-${index}`).value;if(!MARKETING_CATEGORIES.some(item=>item[0]===category))return;
+  const {error}=await sb.from('marketing_merchant_rules').upsert({merchant_key:key,merchant_label:label,category,updated_at:new Date().toISOString()},{onConflict:'merchant_key'});
+  if(error){setStatus('error');return;}setStatus('saved');render();
+}
+async function saveMarketingEventOverride(id){
+  if(ME.role!=='owner')return;const value=$(`#marketingOverride-${id}`).value||null;
+  const {error}=await sb.from('marketing_expense_events').update({category_override:value}).eq('id',id);
+  if(error){setStatus('error');return;}setStatus('saved');render();
+}
+async function saveMarketingForeignLink(foreignId){
+  if(ME.role!=='owner')return;const krwId=$(`#marketingLink-${foreignId}`).value;
+  const query=sb.from('marketing_foreign_charge_links');
+  const result=krwId?await query.upsert({foreign_event_id:foreignId,krw_event_id:krwId,created_by:ME.id},{onConflict:'foreign_event_id'}):await query.delete().eq('foreign_event_id',foreignId);
+  if(result.error){setStatus('error');return;}setStatus('saved');render();
+}
+async function renderMarketingExpensePanel(){
+  if(ME.role!=='owner')return '<div class="card"><div class="empty">원장 전용입니다.</div></div>';
+  try{
+    const [{data:events,error:e1},{data:budgets,error:e2},{data:rules,error:e3},{data:links,error:e4}]=await Promise.all([
+      sb.from('marketing_expense_events').select('id,received_at,transaction_at,event_kind,parse_status,failure_code,currency,amount_native,amount_krw,merchant,merchant_key,category_override').order('transaction_at',{ascending:false}).limit(1500),
+      sb.from('marketing_month_budgets').select('month,amount_krw').eq('month',AICOST_MONTH+'-01').maybeSingle(),
+      sb.from('marketing_merchant_rules').select('merchant_key,merchant_label,category').order('merchant_label'),
+      sb.from('marketing_foreign_charge_links').select('foreign_event_id,krw_event_id')
+    ]);
+    if(e1||e2||e3||e4)return '<section class="card" id="marketingExpenses"><h2>📣 마케팅비 <span class="sub">(원장 전용)</span></h2><div class="hint">마케팅비 저장 공간을 아직 불러오지 못했습니다.</div></section>';
+    const all=events||[],month=AICOST_MONTH,recorded=all.filter(row=>row.parse_status==='recorded'&&marketingMonthAt(row.transaction_at)===month),failed=all.filter(row=>row.parse_status==='failed'&&marketingMonthAt(row.received_at)===month),summary=marketingMonthSummary(all,rules,links,month),budget=budgets?.amount_krw;
+    const linked=new Set((links||[]).map(link=>link.foreign_event_id));
+    const foreign=recorded.filter(row=>row.currency!=='KRW'&&!linked.has(row.id)&&MARKETING_CHANNELS.some(item=>item[0]===marketingCategoryFor(row,rules)));const foreignTotals={};foreign.forEach(row=>{foreignTotals[row.currency]||={amount:0,count:0};foreignTotals[row.currency].amount+=Number(row.amount_native||0);foreignTotals[row.currency].count++;});
+    const noMarketing=recorded.filter(row=>marketingCategoryFor(row,rules)==='not_marketing');const unclassified=recorded.filter(row=>!marketingCategoryFor(row,rules));
+    const krwRows=recorded.filter(row=>row.currency==='KRW');
+    const ruleRows=[...new Map(recorded.map(row=>[row.merchant_key,row])).values()];
+    const categoryLabel=key=>MARKETING_CATEGORIES.find(item=>item[0]===key)?.[1]||'미분류';
+    const eventRow=(row,allowLink=false)=>`<div class="rowflex" style="justify-content:space-between;align-items:flex-start;gap:8px;border-top:1px solid var(--line);padding:8px 0;min-width:0"><div style="min-width:0;overflow-wrap:anywhere"><b>${esc(row.merchant||'가맹점 미확인')}</b><div class="sub">${esc(formatLeaveTimestamp(row.transaction_at)||'시간 미확인')} · ${esc(categoryLabel(marketingCategoryFor(row,rules)))}</div></div><div style="text-align:right;flex:none"><b>${row.currency==='KRW'?'₩'+aicostMoney(row.amount_krw):esc(row.currency)+' '+Number(row.amount_native).toLocaleString('ko-KR',{maximumFractionDigits:4})}</b><div style="display:flex;justify-content:flex-end;gap:4px;margin-top:4px"><select class="mini" id="marketingOverride-${row.id}" aria-label="개별 분류" style="max-width:145px">${marketingCategoryOptions(row.category_override,true)}</select><button class="mini" onclick="saveMarketingEventOverride('${row.id}')">적용</button></div></div>${allowLink?`<div style="display:flex;gap:4px;max-width:100%"><select class="mini" id="marketingLink-${row.id}" aria-label="원화 청구 연결" style="max-width:190px"><option value="">원화 청구 연결 안 함</option>${krwRows.map(item=>`<option value="${item.id}" ${(links||[]).some(link=>link.foreign_event_id===row.id&&link.krw_event_id===item.id)?'selected':''}>${esc(formatLeaveTimestamp(item.transaction_at)||'')} · ${esc(item.merchant||'')} · ₩${aicostMoney(item.amount_krw)}</option>`).join('')}</select><button class="mini" onclick="saveMarketingForeignLink('${row.id}')">연결</button></div>`:''}</div>`;
+    const details=(label,rows,options={})=>`<details style="margin-top:8px"><summary style="cursor:pointer">${label} ${rows.length}건</summary><div style="margin-top:6px">${rows.length?rows.map(row=>eventRow(row,options.allowLink)).join(''):'<div class="empty">해당 내역 없음</div>'}</div></details>`;
+    const channelRows=summary.channels.map(([key,value])=>`<details style="margin-top:6px"><summary style="display:flex;justify-content:space-between;gap:8px;cursor:pointer"><span>${categoryLabel(key)} · ${value.count}건</span><b>${value.amount?'₩'+aicostMoney(value.amount):'외화 포함'}</b></summary><div style="margin-top:6px">${value.rows.map(row=>eventRow(row)).join('')}</div></details>`).join('');
+    const rulesHtml=ruleRows.map((row,index)=>{const current=marketingCategoryFor(row,rules)||'';return `<div class="rowflex" style="justify-content:space-between;gap:8px;margin:6px 0;min-width:0"><span style="overflow-wrap:anywhere">${esc(row.merchant)}</span><div style="display:flex;gap:4px;flex:none"><select class="mini" id="marketingRule-${index}" style="max-width:135px">${marketingCategoryOptions(current)}</select><button class="mini" onclick="saveMarketingMerchantRule('${esc(row.merchant_key)}','${esc(row.merchant)}',${index})">가맹점 기본값</button></div></div>`;}).join('');
+    return `<section class="card" id="marketingExpenses"><h2>📣 마케팅비 <span class="sub">(원장 전용)</span></h2>
+      <div class="rowflex" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><label>조회 월 <input class="mini" type="month" value="${esc(month)}" onchange="setAicostMonth(this.value)"></label><div style="display:flex;gap:6px"><button class="mini" onclick="setAicostMonth('${shiftMarketingMonth(month,-1)}')">◀</button><button class="mini" onclick="setAicostMonth('${shiftMarketingMonth(month,1)}')">▶</button></div></div>
+      <div class="sub" style="margin-top:14px">이번 달 원화 합계</div><div style="font-size:28px;font-weight:800;color:var(--mint);text-align:right">₩${aicostMoney(summary.totalKrw)}</div>
+      <div class="rowflex" style="justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:8px"><label>월 예산 <input id="marketingBudget" class="mini" type="number" min="0" step="1" inputmode="numeric" placeholder="입력 안 함" value="${budget==null?'':Number(budget)}" style="max-width:150px"> 원</label><button class="mini stamp" onclick="saveMarketingBudget()">예산 저장</button></div>
+      ${budget==null?'':Number(budget)>0?`<div class="hint">예산 ${aicostMoney(budget)}원 중 ${Math.round(summary.totalKrw/Number(budget)*100)}% 사용</div><div style="height:8px;background:var(--line);border-radius:4px;margin:6px 0 10px"><div style="height:100%;width:${Math.min(100,Math.round(summary.totalKrw/Number(budget)*100))}%;background:var(--mint);border-radius:4px"></div></div>`:'<div class="hint">예산이 0원이라 사용 비율을 계산하지 않음</div>'}
+      <div style="margin-top:12px">${channelRows||'<div class="empty">이번 달 집계가 없습니다.</div>'}</div>
+      ${Object.entries(foreignTotals).length?`<div class="hint" style="margin-top:10px"><b>외화</b>${Object.entries(foreignTotals).map(([currency,value])=>`<div class="rowflex" style="justify-content:space-between"><span>${esc(currency)} · ${value.count}건</span><b>${value.amount.toLocaleString('ko-KR',{maximumFractionDigits:4})}</b></div>`).join('')}</div>${details('외화 결제',foreign,{allowLink:true})}`:''}
+      ${details('미분류',unclassified)}${details('마케팅 아님',noMarketing)}<div class="hint" style="margin-top:8px">읽지 못한 문자 ${failed.length}건</div>
+      ${ruleRows.length?`<details style="margin-top:8px"><summary style="cursor:pointer">가맹점 기본 분류 수정</summary>${rulesHtml}<div class="sub">기본 분류를 바꾸면 같은 가맹점의 지난달 내역에도 반영됨. 개별 분류가 우선 적용됨.</div></details>`:''}
+    </section>`;
+  }catch{return '<section class="card" id="marketingExpenses"><h2>📣 마케팅비 <span class="sub">(원장 전용)</span></h2><div class="hint">마케팅비를 불러오지 못했습니다.</div></section>';}
+}
 /* ── AI 사용량 현황판: PC가 올린 Codex 모델별 토큰(ai_model_usage_daily)과 PC 상황판 스냅샷(ai_usage_snapshots: 정가 환산 비용·대화 점검), 원장만 읽기 ── */
 /* ai-usage:test-start */
 function aiUsageWindow(todayStr,days){const end=String(todayStr).slice(0,10),[y,mo,d]=end.split('-').map(Number);return {start:new Date(Date.UTC(y,mo-1,d-(days-1))).toISOString().slice(0,10),end};}
@@ -3134,6 +3210,7 @@ async function renderAicost(m){
   const snap={};(snapshots||[]).forEach(s=>snap[s.kind]=s.payload);
   const usageHtml=aiUsagePanelHtml({summary:aiUsageSummary(usageRows,usageWin.start,usageWin.end),start:usageWin.start,end:usageWin.end,error:usageError?usageError.message:'',
     cost:snap.platform_cost||null,costError:snapshotError?snapshotError.message:'',external:snap.external_ai||null,externalError:snapshotError?snapshotError.message:'',sessions:snap.codex_sessions||null,sessionsError:snapshotError?snapshotError.message:''});
+  const marketingHtml=await renderMarketingExpensePanel();
   m.innerHTML=`<div class="card"><h2>💰 AI비용 <span class="sub">(원장 전용)</span></h2>
     <div class="fld" style="max-width:220px"><label>조회 월</label><input type="month" value="${esc(AICOST_MONTH)}" onchange="setAicostMonth(this.value)"></div>
     <div style="font-size:13px;color:var(--gray);margin-top:16px">이번 달 실제 청구액 (직접 입력 + 자동감지 문자 합계)</div>
@@ -3145,7 +3222,8 @@ async function renderAicost(m){
       <td><input class="mini" id="aiNote-${i}" value="${esc(r.note||'')}" placeholder="선택 입력" style="min-width:200px"></td>
       <td><button class="mini stamp" onclick="saveAicost(${i})">저장</button></td></tr>`;}).join('')}</table></div>
     <div class="hint">"직접 입력"은 원장이 넣는 값, "자동감지(문자)"는 결제 문자를 MacroDroid가 자동으로 전송해 쌓인 값(수정 불가·자동 집계). 합계가 위 총액에 함께 반영됩니다.</div></div>
-  ${usageHtml}
+    ${usageHtml}
+    ${marketingHtml}
   <div class="card"><h2>최근 6개월 실제 청구액</h2>${recent.length?recent.map(([ym,sum])=>`<div style="margin:10px 0"><div class="rowflex" style="justify-content:space-between"><span>${esc(ym)}</span><b>₩${aicostMoney(sum)}</b></div><div style="height:8px;background:var(--line);border-radius:4px;margin-top:5px"><div style="height:100%;width:${Math.round(sum/max*100)}%;background:var(--mint);border-radius:4px"></div></div></div>`).join(''):'<div class="empty">저장된 청구 내역이 없습니다.</div>'}</div>
   <div class="card"><h2>📩 자동감지 내역 <span class="sub">(최근 20건, 문자 웹훅)</span></h2>${recentEvents.length?`<div class="tblwrap"><table><tr><th>수신</th><th>플랫폼</th><th>금액</th><th>원문</th></tr>
     ${recentEvents.map(e=>`<tr><td>${esc(formatLeaveTimestamp(e.received_at)||'미상')}</td><td>${esc(e.platform)}</td><td>₩${aicostMoney(e.amount_krw)}</td><td class="sub" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.raw_text||'')}">${esc(e.raw_text||e.note||'')}</td></tr>`).join('')}</table></div>`:'<div class="empty">아직 자동감지된 결제 문자가 없습니다. MacroDroid 연동 후 결제 문자가 오면 여기 쌓입니다.</div>'}</div>`;

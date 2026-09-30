@@ -1,4 +1,5 @@
 import { parseNaverAdSms } from './naver_ads.mjs';
+import { marketingSmsDigest, parseMarketingSms } from './marketing_expenses.mjs';
 import { sameHex, sha256Hex } from '../navertalk-webhook/payload.mjs';
 
 export function createWebhookHandler(
@@ -44,7 +45,7 @@ export function createWebhookHandler(
         else amountKrw = extractKrwAmount(rawText);
       }
     }
-    if (!token || !platform || amountKrw == null) return json({ error: 'token, platform, 금액 또는 인식 가능한 문자 본문이 필요합니다.' }, 400);
+    if (!token || !platform || (platform !== 'marketing' && amountKrw == null)) return json({ error: 'token, platform, 금액 또는 인식 가능한 문자 본문이 필요합니다.' }, 400);
 
     const supabaseUrl = env('SUPABASE_URL');
     const serviceRoleKey = env('SUPABASE_SERVICE_ROLE_KEY');
@@ -56,6 +57,24 @@ export function createWebhookHandler(
       .from('webhook_secrets').select('value').eq('name', 'ai_billing_webhook').single();
     if (secretErr || !secretRow?.value || !sameHex(await sha256Hex(String(secretRow.value)), await sha256Hex(token))) {
       return json({ error: 'Unauthorized' }, 401);
+    }
+
+    if (platform === 'marketing') {
+      const parsed = parseMarketingSms(rawText, new Date().toISOString());
+      if (parsed.status === 'ignored') return json({ ok: true, ignored: true }, 200);
+      const eventHash = await marketingSmsDigest(rawText, String(secretRow.value));
+      const row = parsed.status === 'recorded' ? {
+        event_hash: eventHash, received_at: new Date().toISOString(), transaction_at: parsed.transactionAt,
+        event_kind: parsed.eventKind, parse_status: 'recorded', currency: parsed.currency,
+        amount_native: parsed.amount, amount_krw: parsed.amountKrw,
+        merchant: parsed.merchant, merchant_key: parsed.merchantKey,
+      } : {
+        event_hash: eventHash, received_at: new Date().toISOString(), event_kind: 'purchase',
+        parse_status: 'failed', failure_code: parsed.failureCode,
+      };
+      const { error: marketingErr } = await client.from('marketing_expense_events').upsert(row, { onConflict: 'event_hash', ignoreDuplicates: true });
+      if (marketingErr) return json({ error: '이벤트 저장 실패' }, 500);
+      return json({ ok: true, recorded: parsed.status === 'recorded' }, 200);
     }
 
     const composedNote = naverAd?.note || [note, usdAmount != null ? `USD ${usdAmount} 자동환산` : null].filter(Boolean).join(' / ') || null;

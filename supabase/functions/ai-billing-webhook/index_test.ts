@@ -2,14 +2,15 @@ import { createWebhookHandler } from './webhook_core.ts';
 
 const SECRET='local-test-only';
 function fixture(){
-  const inserts: Record<string, unknown>[]=[];let secretLookupName='';
+  const inserts: Record<string, unknown>[]=[];const marketingWrites:{row:Record<string,unknown>,options:Record<string,unknown>}[]=[];let secretLookupName='';
   const createClient=()=>({from(table: string): any {
     if(table==='webhook_secrets')return{select(){return this},eq(_column: string,value: string){secretLookupName=value;return this},async single(){return{data:{value:SECRET},error:null}}};
     if(table==='ai_billing_events')return{async insert(row: Record<string, unknown>){inserts.push(row);return{error:null}}};
+    if(table==='marketing_expense_events')return{async upsert(row:Record<string,unknown>,options:Record<string,unknown>){marketingWrites.push({row,options});return{error:null}}};
     throw new Error(`unexpected table ${table}`);
   }});
   const handler=createWebhookHandler(createClient,name=>name==='SUPABASE_URL'?'https://db.test':name==='SUPABASE_SERVICE_ROLE_KEY'?'not-a-real-key':undefined);
-  return{handler,inserts,get secretLookupName(){return secretLookupName}};
+  return{handler,inserts,marketingWrites,get secretLookupName(){return secretLookupName}};
 }
 const json=async (response: Response)=>await response.json();
 const req=(body: Record<string, unknown>,platform='naver_ads',token=SECRET)=>new Request(`https://fn.test/ai-billing-webhook?platform=${platform}`,{method:'POST',headers:{'x-webhook-token':token},body:JSON.stringify(body)});
@@ -39,4 +40,20 @@ Deno.test('Invalid secret and foreign-platform marker do not write events',async
 Deno.test('Regular platform continues to honor its existing amount field',async()=>{
  const f=fixture();const r=await f.handler(req({raw_text:'삼성카드 해외승인',amount_krw:3180},'StepFun'));
  if(r.status!==200||f.inserts[0]?.platform!=='StepFun'||f.inserts[0]?.amount_krw!==3180)throw new Error('legacy platform path changed');
+});
+Deno.test('Marketing branch stores a privacy-safe Samsung event and deduplicates by HMAC key',async()=>{
+ const f=fixture(),raw='[Web발신] 삼성1234승인 홍*길 / 23,900원 일시불 / 09/30 17:58 쿠팡 / 누적14,532,777원';
+ const r=await f.handler(req({raw_text:raw},'marketing'));const body=await json(r);
+ if(r.status!==200||body.recorded!==true||f.marketingWrites.length!==1||f.inserts.length)throw new Error('marketing SMS did not use the isolated event table');
+ const {row,options}=f.marketingWrites[0];
+ if(row.amount_krw!==23900||row.currency!=='KRW'||row.merchant!=='쿠팡'||row.parse_status!=='recorded'||row.raw_text||row.cardholder||row.card_last4||options.ignoreDuplicates!==true||options.onConflict!=='event_hash')throw new Error('marketing event is not private/idempotent');
+ if(JSON.stringify(body).includes('홍*길')||JSON.stringify(row).includes('홍*길')||JSON.stringify(row).includes('14,532,777'))throw new Error('sensitive message fields escaped into a response or row');
+ await f.handler(req({raw_text:raw},'marketing'));
+ if(f.marketingWrites[1]?.row.event_hash!==row.event_hash)throw new Error('identical retry did not reuse its HMAC digest');
+});
+Deno.test('Marketing branch excludes point/rejected messages and stores only a failure code for unreadable messages',async()=>{
+ const f=fixture();let r=await f.handler(req({raw_text:'신한카드P사용 이름 100포인트 결제시차감청구 상점'},'marketing'));
+ if(r.status!==200||f.marketingWrites.length)throw new Error('points must be excluded');
+ r=await f.handler(req({raw_text:'삼성해외승인 이름(0000) USD 4.00 상점'},'marketing'));
+ const row=f.marketingWrites[0]?.row;if(r.status!==200||row?.parse_status!=='failed'||row.failure_code!=='unsupported_shape'||row.merchant||row.raw_text)throw new Error('unreadable message should retain only a safe failure code');
 });
