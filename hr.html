@@ -2346,6 +2346,27 @@ function aiCostSectionHtml({cost,error}){
     ${bars?`<div style="margin-top:12px"><b style="font-size:13px">월별 합계(전 플랫폼)</b>${bars}</div>`:''}
     <div class="hint">쓴 토큰을 API 정가로 환산한 <b>사용 가치</b>입니다. Claude·Codex는 구독제라 실제 결제는 이보다 훨씬 적습니다. 실제 청구액은 맨 위 표를 보세요.</div></div>`;
 }
+const AI_EXTERNAL_LABELS={deepseek:'딥시크',step5:'스텝5',kimi:'키미',luna:'루나','?':'이름 모름'},AI_EXTERNAL_COST_SINCE='2026-09-30';
+function aiExternalLabel(k){return Object.hasOwn(AI_EXTERNAL_LABELS,k)?AI_EXTERNAL_LABELS[k]:k;}
+function aiExternalCount(v){return (Number(v)||0).toLocaleString('ko-KR');}
+function aiExternalMoney(e,day){
+  const calls=Number(e.calls)||0,costed=Number(e.costed_calls)||0;
+  if(day&&day<AI_EXTERNAL_COST_SINCE)return '<span class="sub">금액 기록 전</span>';
+  if(!costed)return day?`<span class="sub">금액 미집계(0/${aiExternalCount(calls)}건)</span>`:'<span class="sub">금액 기록 전</span>';
+  return `<b>₩${Math.round(Number(e.krw)||0).toLocaleString('ko-KR')}</b>${costed<calls?` <span class="sub">(${aiExternalCount(costed)}/${aiExternalCount(calls)}건 기록)</span>`:''}`;
+}
+function aiExternalSectionHtml({external,error}){
+  const head='<div data-ai-external-section style="margin-top:22px"><h3>🛰️ 외부 AI(딥시크·스텝5 등) <span class="sub">PC에서 부른 횟수 · 정가 환산</span></h3>';
+  if(error)return head+`<div class="empty">외부 AI 기록을 불러오지 못했습니다: ${esc(error)}</div></div>`;
+  if(!external||!external.days||typeof external.days!=='object')return head+'<div class="empty">아직 올라온 외부 AI 기록이 없습니다. PC 집계가 갱신된 뒤 올리면 여기에 보입니다.</div></div>';
+  const totals=Object.entries(external.totals||{}).sort((a,b)=>(Number(b[1].calls)||0)-(Number(a[1].calls)||0)||a[0].localeCompare(b[0])),days=Object.entries(external.days).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,14);
+  const cards=totals.map(([k,e])=>`<div data-ai-external-ai="${esc(k)}" style="flex:1 1 150px;min-width:140px;border:1px solid var(--line);border-radius:8px;padding:10px 12px"><div style="font-size:13px;color:var(--gray)">${esc(aiExternalLabel(k))}</div><div style="font-size:22px;font-weight:800;color:var(--mint);margin:2px 0">${aiExternalCount(e.calls)}건</div><div class="sub">성공 ${aiExternalCount(e.ok)} · 실패 ${aiExternalCount(e.fail)}</div><div style="margin-top:4px">${aiExternalMoney(e)}</div></div>`).join('');
+  const rows=days.map(([day,ais])=>Object.entries(ais||{}).sort((a,b)=>(Number(b[1].calls)||0)-(Number(a[1].calls)||0)||a[0].localeCompare(b[0])).map(([k,e])=>`<tr data-ai-external-day="${esc(day)}" data-ai-external-row="${esc(k)}"><td style="white-space:nowrap">${esc(day)}</td><td>${esc(aiExternalLabel(k))}</td><td style="white-space:nowrap">${aiExternalCount(e.calls)}건</td><td style="white-space:nowrap">${aiExternalCount(e.ok)} / ${aiExternalCount(e.fail)}</td><td style="white-space:nowrap">${aiExternalMoney(e,day)}</td></tr>`).join('')).join('');
+  return head+`<div class="hint">기준 ${esc(external.generated)} · 환율 US$1 = ₩${Math.round(Number(external.fx)||0).toLocaleString('ko-KR')}(고정) · 누적은 전체 기간, 날짜별 표는 최근 14일</div>
+    ${cards?`<div class="rowflex" style="gap:10px;flex-wrap:wrap;margin:10px 0">${cards}</div>`:''}
+    ${rows?`<div class="tblwrap"><table><tr><th>날짜</th><th>AI</th><th>건수</th><th>성공 / 실패</th><th>금액</th></tr>${rows}</table></div>`:'<div class="empty">날짜별 기록이 없습니다.</div>'}
+    <div class="hint">금액은 ${AI_EXTERNAL_COST_SINCE}부터 기록합니다(그 전 날짜는 금액 기록 전). 청구액이 아니라 쓴 토큰을 정가로 환산한 값입니다.</div></div>`;
+}
 function aiSessionSectionHtml({sessions,error}){
   const head='<div data-ai-session-section style="margin-top:22px"><h3>🩺 Codex 대화 효율 점검 <span class="sub">오늘 · 돈이 새는 대화</span></h3>';
   if(error)return head+`<div class="empty">점검 기록을 불러오지 못했습니다: ${esc(error)}</div></div>`;
@@ -2354,8 +2375,8 @@ function aiSessionSectionHtml({sessions,error}){
   if(!sessions.flagged.length)return head+meta+'<div class="empty">지금 돈이 새는 대화 없음</div></div>';
   return head+meta+sessions.flagged.slice(0,8).map(f=>`<div data-ai-session="${esc(f.thread||'')}" style="border-top:1px solid var(--line);padding:6px 0"><div class="rowflex" style="justify-content:space-between;gap:8px;flex-wrap:nowrap"><span>${f.sev==='red'?'🔴':'🟠'} ${esc(f.name||f.thread||'')} <span class="sub">(${f.active?'활성':'멈춤'})</span></span><b style="white-space:nowrap">약 ₩${Math.round(Number(f.won_today)||0).toLocaleString('ko-KR')}</b></div><div class="sub">${esc((f.reasons||[]).join(' · '))}</div></div>`).join('')+'</div>';
 }
-function aiUsagePanelHtml({summary,start,end,error,cost,costError,sessions,sessionsError}){
-  return `<div class="card" id="aiUsagePanel"><h2>📊 AI 사용량 현황판 <span class="sub">원장 전용 · PC가 모아 올린 값</span></h2>${aiUsageModelSection({summary,start,end,error})}${aiCostSectionHtml({cost,error:costError})}${aiSessionSectionHtml({sessions,error:sessionsError})}</div>`;
+function aiUsagePanelHtml({summary,start,end,error,cost,costError,external,externalError,sessions,sessionsError}){
+  return `<div class="card" id="aiUsagePanel"><h2>📊 AI 사용량 현황판 <span class="sub">원장 전용 · PC가 모아 올린 값</span></h2>${aiUsageModelSection({summary,start,end,error})}${aiCostSectionHtml({cost,error:costError})}${aiExternalSectionHtml({external,error:externalError})}${aiSessionSectionHtml({sessions,error:sessionsError})}</div>`;
 }
 /* ai-usage:test-end */
 async function saveAicost(i){
@@ -2376,7 +2397,7 @@ async function renderAicost(m){
     sb.from('ai_billing').select('ym,amount_krw').order('ym',{ascending:false}),
     sb.from('ai_billing_events').select('platform,amount_krw,source,note,raw_text,received_at').order('received_at',{ascending:false}).limit(300),
     sb.from('ai_model_usage_daily').select('usage_date,model,tokens,turns,synced_at').gte('usage_date',usageWin.start).order('usage_date',{ascending:false}).limit(2000),
-    sb.from('ai_usage_snapshots').select('kind,payload,synced_at').in('kind',['platform_cost','codex_sessions'])
+    sb.from('ai_usage_snapshots').select('kind,payload,synced_at').in('kind',['platform_cost','codex_sessions','external_ai'])
   ]);
   if(error||historyError||eventsError){setStatus('error');m.innerHTML=`<div class="card"><div class="empty">AI 비용을 불러오지 못했습니다: ${esc((error||historyError||eventsError).message)}</div></div>`;return;}
   const byPlatform={};(rows||[]).forEach(r=>byPlatform[r.platform]=r);
@@ -2389,7 +2410,7 @@ async function renderAicost(m){
   const recentEvents=(events||[]).slice(0,20);
   const snap={};(snapshots||[]).forEach(s=>snap[s.kind]=s.payload);
   const usageHtml=aiUsagePanelHtml({summary:aiUsageSummary(usageRows,usageWin.start,usageWin.end),start:usageWin.start,end:usageWin.end,error:usageError?usageError.message:'',
-    cost:snap.platform_cost||null,costError:snapshotError?snapshotError.message:'',sessions:snap.codex_sessions||null,sessionsError:snapshotError?snapshotError.message:''});
+    cost:snap.platform_cost||null,costError:snapshotError?snapshotError.message:'',external:snap.external_ai||null,externalError:snapshotError?snapshotError.message:'',sessions:snap.codex_sessions||null,sessionsError:snapshotError?snapshotError.message:''});
   m.innerHTML=`<div class="card"><h2>💰 AI비용 <span class="sub">(원장 전용)</span></h2>
     <div class="fld" style="max-width:220px"><label>조회 월</label><input type="month" value="${esc(AICOST_MONTH)}" onchange="setAicostMonth(this.value)"></div>
     <div style="font-size:13px;color:var(--gray);margin-top:16px">이번 달 실제 청구액 (직접 입력 + 자동감지 문자 합계)</div>

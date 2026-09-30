@@ -77,6 +77,35 @@ try{
   await setUser(blockedOwner);assert.equal((await q('select * from public.ai_usage_snapshots')).length,0);
   await db.exec('reset role;set role anon;');await assert.rejects(q('select * from public.ai_usage_snapshots'),/permission denied/);await db.exec('rollback');
 
+  // 외부 AI(external_ai): 확장 마이그레이션 전에는 거절, 적용 뒤에는 Edge 검사를 통과한 값을 DB가 저장하고, 되돌리면 그 한 줄만 지워진다.
+  const {validateExternalAi}=await import(pathToFileURL(path.join(root,'supabase/functions/ai-usage-sync/payload.mjs')).href);
+  const extMigration=fs.readFileSync(path.join(root,'db/ai_usage_snapshots_external_ai.sql'),'utf8'),extRollback=fs.readFileSync(path.join(root,'db/ai_usage_snapshots_external_ai_rollback.sql'),'utf8');
+  const extDay=(d,ai)=>({calls:d,ok:d,fail:0,sec:1.5,tin:8241,tout:88,krw:4,costed_calls:1,...ai});
+  const extRaw=[
+    {generated:'2026-09-30 13:20',fx:1500,days:{'2026-09-30':{deepseek:extDay(4),'?':extDay(1)}},totals:{deepseek:extDay(40),'?':extDay(2)}},
+    {generated:'g'+C(0)+C(0xd800),fx:1500,days:Object.fromEntries(Array.from({length:60},(_,i)=>[new Date(Date.UTC(2026,6,1+i)).toISOString().slice(0,10),Object.fromEntries(Array.from({length:8},(_,j)=>['ai'+j,{...extDay(1),sec:5e-324,krw:1e-300}]))])),totals:{}},
+    JSON.parse('{"fx":1500,"generated":"g","days":{"2026-09-30":{"__proto__":{"calls":1,"ok":1,"fail":0,"sec":0,"tin":0,"tout":0,"krw":0,"costed_calls":0}}},"totals":{}}')
+  ];
+  await db.exec('reset role;set role service_role;');
+  await assert.rejects(q(`select public.ai_usage_snapshot_put('external_ai',${lit({fx:1})})`),/check constraint|violates/i,'확장 전에는 external_ai를 거절해야 합니다.');await db.exec('rollback');
+  await db.exec('reset role;');await db.exec(extMigration);await db.exec(extMigration);
+  for(const [i,raw] of extRaw.entries()){
+    const r=validateExternalAi(raw);assert.equal(r.ok,true,`external_ai#${i}: Edge 검사에서 거절됨(${r.error})`);
+    await db.exec('set role service_role;');
+    try{await q(`select public.ai_usage_snapshot_put('external_ai','${JSON.stringify(r.value).replace(/'/g,"''")}'::jsonb)`);}
+    catch(e){await db.exec('rollback');assert.fail(`external_ai#${i}: Edge는 통과했는데 DB가 거절함 — ${e.message}`);}
+  }
+  await db.exec('reset role;');
+  await q(`select public.ai_usage_snapshot_put('external_ai',${lit(validateExternalAi(extRaw[0]).value)})`);
+  assert.equal((await snapshot('external_ai')).payload.totals.deepseek.calls,40);
+  await db.exec('set role service_role;');
+  await assert.rejects(q(`select public.ai_usage_snapshot_put('other',${lit({a:1})})`),undefined,'확장 뒤에도 모르는 kind는 거절해야 합니다.');await db.exec('rollback');
+  await setUser(owner);assert.deepEqual((await q('select kind from public.ai_usage_snapshots order by kind')).map(r=>r.kind),['codex_sessions','external_ai','platform_cost']);
+  await assert.rejects(q(`insert into public.ai_usage_snapshots(kind,payload) values('external_ai','{}')`),/permission denied/);await db.exec('rollback');await setUser(staff);assert.equal((await q('select * from public.ai_usage_snapshots')).length,0);
+  await db.exec('reset role;');await db.exec(extRollback);await db.exec(extRollback);
+  assert.deepEqual((await q('select kind from public.ai_usage_snapshots order by kind')).map(r=>r.kind),['codex_sessions','platform_cost'],'되돌리면 external_ai 한 줄만 지워져야 합니다.');
+  await db.exec('set role service_role;');await assert.rejects(q(`select public.ai_usage_snapshot_put('external_ai',${lit({fx:1})})`),/check constraint|violates/i,'되돌린 뒤에는 다시 거절해야 합니다.');await db.exec('rollback');
+  await db.exec('reset role;');await db.exec(extMigration);
   await db.exec('reset role;');
   await db.exec(fs.readFileSync(path.join(root,'db/ai_usage_snapshots_rollback.sql'),'utf8'));
   assert.equal((await q("select to_regclass('public.ai_usage_snapshots') is null gone"))[0].gone,true);

@@ -1,10 +1,10 @@
 // Deploy only with verify_jwt:true (supabase/config.toml). The only caller is the PC uploader ~/.claude/scripts/hr_ai_usage_uploader.py (its own scheduled task).
 // X-Sync-Token is checked by SHA-256 against webhook_secrets(name='ai_usage_sync_sha256'); the token and request body are never stored or logged.
-// ?kind=model_usage(default) replaces ai_model_usage_daily rows; ?kind=platform_cost|codex_sessions stores one sanitized snapshot per kind.
+// ?kind=model_usage(default) replaces ai_model_usage_daily rows; ?kind=platform_cost|codex_sessions|external_ai stores one sanitized snapshot per kind.
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { MAX_BODY_BYTES,kstToday,sameHex,sha256Hex,validatePlatformCost,validateSessionHealth,validateUsagePayload } from "./payload.mjs";
+import { MAX_BODY_BYTES,kstToday,sameHex,sha256Hex,validateExternalAi,validatePlatformCost,validateSessionHealth,validateUsagePayload } from "./payload.mjs";
 type Snapshot={ok:boolean;error?:string;value?:Record<string,unknown>};
-const SNAPSHOT_KINDS=new Map<string,(body:unknown)=>Snapshot>([['platform_cost',validatePlatformCost],['codex_sessions',validateSessionHealth]]);
+const SNAPSHOT_KINDS=new Map<string,(body:unknown)=>Snapshot>([['platform_cost',validatePlatformCost],['codex_sessions',validateSessionHealth],['external_ai',validateExternalAi]]);
 function response(status:number,extra:Record<string,unknown>={}){return new Response(JSON.stringify({ok:status<400,...extra}),{status,headers:{'content-type':'application/json'}});}
 // Content-Length가 없어도 한도를 넘는 순간 읽기를 멈춘다(본문 전체를 메모리에 올리지 않음).
 async function readLimited(req:Request,max:number):Promise<string|null>{

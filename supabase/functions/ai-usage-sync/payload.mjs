@@ -63,4 +63,23 @@ export function validateSessionHealth(b){
     reasons:(Array.isArray(f.reasons)?f.reasons:[]).filter(r=>typeof r==='string').slice(0,6).map(r=>text(r,200))}));
   return sized({generated:text(b.generated,32),won_today_total:amount(b.won_today_total,1e12),tok_today_total:count(b.tok_today_total,MAX_TOKENS),flagged});
 }
+// 외부 AI(딥시크·스텝5 등) 사용 집계: PC external_ai_usage.json({generated,fx,days:{날짜:{ai:{...}}},totals:{ai:{...}}}). 아는 필드만 받는다.
+// ai 이름은 ^[a-z0-9_?-]{1,32}$(모름은 '?'), 날짜는 최신 60일·하루 ai 8개·totals ai 8개까지. 정리 후 JSON이 64KB를 넘으면 거절한다.
+export const MAX_EXT_DAYS=60,MAX_EXT_AIS=8;
+const EXT_AI=/^[a-z0-9_?-]{1,32}$/;
+const extEntry=(a,withSec)=>{const o={calls:count(a.calls,1e9),ok:count(a.ok,1e9),fail:count(a.fail,1e9),tin:count(a.tin,MAX_TOKENS),tout:count(a.tout,MAX_TOKENS),krw:amount(a.krw,1e12),costed_calls:count(a.costed_calls,1e9)};if(withSec)o.sec=amount(a.sec,1e9);return o;};
+export function validateExternalAi(b){
+  if(!plain(b)||typeof b.fx!=='number'||!Number.isFinite(b.fx)||b.fx<=0||b.fx>100_000||typeof b.generated!=='string'||!plain(b.days))return bad('invalid_external');
+  const days=Object.create(null);
+  for(const d of Object.keys(b.days).filter(k=>dayNumber(k)!==null).sort().reverse().slice(0,MAX_EXT_DAYS)){
+    if(!plain(b.days[d]))continue;
+    const day=Object.create(null);
+    for(const [k,a] of Object.entries(b.days[d]).slice(0,MAX_EXT_AIS))if(EXT_AI.test(k)&&plain(a))day[k]=extEntry(a,true);
+    if(Object.keys(day).length)days[d]=day;
+  }
+  const totals=Object.create(null);
+  if(plain(b.totals))for(const [k,a] of Object.entries(b.totals).slice(0,MAX_EXT_AIS))if(EXT_AI.test(k)&&plain(a))totals[k]=extEntry(a,false);
+  if(!Object.keys(days).length&&!Object.keys(totals).length)return bad('invalid_external');
+  return sized({generated:text(b.generated,32),fx:Math.round(b.fx*1e6)/1e6,days,totals});
+}
 export function sameHex(a,b){a=String(a||'').toLowerCase();b=String(b||'').toLowerCase();if(!a||a.length!==b.length||!HEX.test(a)||!HEX.test(b))return false;let diff=0;for(let i=0;i<a.length;i++)diff|=a.charCodeAt(i)^b.charCodeAt(i);return diff===0;}
