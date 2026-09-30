@@ -33,6 +33,17 @@ test('validateMessages 합계 40,000자 경계(정확히 40000은 통과, 40001�
   assert.equal(validateMessages(overTotal).ok, false, '총 40001자는 거절');
 });
 
+test('validateMessages는 jpeg/png/webp data URL 이미지를 최대 4장 허용하고 다른 형식·5장은 거절한다', async () => {
+  const { validateMessages } = await loadCore();
+  const photo = (mime = 'image/jpeg') => ({ type: 'image_url', image_url: { url: `data:${mime};base64,AA==` } });
+  const msg = (parts) => [{ role: 'user', content: [{ type: 'text', text: '확인' }, ...parts] }];
+  assert.equal(validateMessages(msg([photo()])).ok, true);
+  assert.equal(validateMessages(msg([photo('image/png'), photo('image/webp')])).ok, true);
+  assert.equal(validateMessages(msg([photo(), photo(), photo(), photo()])).ok, true);
+  assert.equal(validateMessages(msg([photo(), photo(), photo(), photo(), photo()])).ok, false);
+  assert.equal(validateMessages(msg([photo('image/gif')])).ok, false);
+});
+
 // --- 시스템 프롬프트 조립 ---
 test('buildSystemPrompt는 지침서가 비면 기본 문구를 쓰고, 참고자료가 있으면 이어붙인다', async () => {
   const { buildSystemPrompt, DEFAULT_SYSTEM_PROMPT } = await loadCore();

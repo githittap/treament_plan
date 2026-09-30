@@ -197,6 +197,7 @@ export const ERROR_MESSAGES_KO = {
   model_not_set: '원장이 아직 이 도우미의 AI를 고르지 않았어요.',
   model_disabled: '이 도우미가 쓰는 AI가 꺼져 있어요.',
   invalid_input: '메시지 형식이 올바르지 않아요.',
+  image_not_supported: '이 AI는 사진을 읽지 못해요. 사진을 읽을 수 있는 모델을 지정해 주세요.',
   rate_limited: '너무 자주 요청했어요. 잠깐 쉬었다가 다시 시도해 주세요.',
   provider_not_configured: '이 AI 회사 연결이 아직 준비되지 않았어요.',
   provider_auth_failed: '이 AI 회사가 연결 키를 받아 주지 않아요. 원장에게 알려 주세요.',

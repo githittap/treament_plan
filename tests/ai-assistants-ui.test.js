@@ -10,6 +10,17 @@ function helpers(){
   return c.h;
 }
 
+test('v2 화면은 대화록·웹검색·사진·시작 문장·회사 관리·CSV를 제공하고 저장 안내를 표시하지 않는다',()=>{
+  assert.match(js,/key:'transcripts',label:/);
+  assert.match(js,/id="aiFWebSearch"/);
+  assert.match(js,/id="aiPhotos"/);
+  assert.match(js,/data-ai-starter-input/);
+  assert.match(js,/회사 목록/);
+  assert.match(js,/data-ai-csv/);
+  assert.doesNotMatch(js,/대화는 저장되지 않아요|대화 내용은 업무 확인을 위해 저장되며 원장만 볼 수 있어요/);
+  assert.doesNotMatch(js,/업무 확인을 위해 저장되며 원장만 볼 수 있어요/);
+});
+
 test('역할 이름 바꾸기: 4개 역할을 한국어로, 모르는 값은 그대로 돌려준다',()=>{
   const h=helpers();
   assert.equal(h.aiRoleLabel('staff'),'직원');

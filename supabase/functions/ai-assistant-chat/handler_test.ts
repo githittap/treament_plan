@@ -2,6 +2,7 @@
 // 실행: deno test --node-modules-dir=none supabase/functions/ai-assistant-chat/handler_test.ts
 // DB·AI 회사는 가짜 의존성으로 주입한다(실제 호출 없음).
 import { createAiAssistantChatHandler } from "./index.ts";
+import { apiKeyFor, callModel } from "./providers.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -12,8 +13,8 @@ function assertEquals(actual: unknown, expected: unknown, message = "") {
   }
 }
 
-const opus = { id: "m-opus", provider: "anthropic", model_id: "claude-opus-5-5", label: "Claude Opus 5.5", enabled: true, price_in_usd_per_mtok: 4, price_out_usd_per_mtok: 20 };
-const haiku = { id: "m-haiku", provider: "anthropic", model_id: "claude-haiku-4-5", label: "Claude Haiku 4.5", enabled: true, price_in_usd_per_mtok: 1, price_out_usd_per_mtok: 5 };
+const opus = { id: "m-opus", provider: "anthropic", model_id: "claude-opus-5-5", label: "Claude Opus 5.5", enabled: true, supports_images: true, price_in_usd_per_mtok: 4, price_out_usd_per_mtok: 20 };
+const haiku = { id: "m-haiku", provider: "anthropic", model_id: "claude-haiku-4-5", label: "Claude Haiku 4.5", enabled: true, supports_images: true, price_in_usd_per_mtok: 1, price_out_usd_per_mtok: 5 };
 const assistant = { id: "a-1", name: "리뷰 답글", instructions: "", knowledge: "", model_ref: "m-opus", fallback_model_ref: "m-haiku", effort: "low", max_output_tokens: 4000, visible_roles: ["staff", "owner"], enabled: true };
 const baseEnv: Record<string, string> = { SUPABASE_URL: "http://x", SUPABASE_SERVICE_ROLE_KEY: "svc", SUPABASE_ANON_KEY: "anon" };
 
@@ -82,12 +83,59 @@ function makeHandler(db: ReturnType<typeof makeDb>, callModel: (a: any) => Promi
     callModel,
   });
 }
-const chatReq = () =>
+const chatReq = (messages: any[] = [{ role: "user", content: "안녕" }]) =>
   new Request("http://local/ai-assistant-chat", {
     method: "POST",
     headers: { Authorization: "Bearer x", "content-type": "application/json" },
-    body: JSON.stringify({ action: "chat", assistant_id: "a-1", conversation_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", messages: [{ role: "user", content: "안녕" }] }),
+    body: JSON.stringify({ action: "chat", assistant_id: "a-1", conversation_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", messages }),
   });
+
+Deno.test("API key 이름 검증은 Supabase 비밀 이름과 잘못된 이름을 거절한다", () => {
+  assertEquals(apiKeyFor("xai", () => "dummy", "XAI_API_KEY"), "dummy");
+  assertEquals(apiKeyFor("xai", () => "dummy", "SUPABASE_SERVICE_ROLE_KEY"), undefined);
+  assertEquals(apiKeyFor("xai", () => "dummy", "bad-name"), undefined);
+});
+
+Deno.test("Gemini Interactions 검색 결과와 총 토큰을 사용량·출처로 변환한다", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() => Promise.resolve(new Response(JSON.stringify({
+    steps: [
+      { type: "google_search_call", arguments: { queries: ["official docs"] } },
+      { type: "google_search_result", result: [{ title: "Official docs", url: "https://ai.google.dev/api/interactions-api" }] },
+      { type: "model_output", content: [{ type: "text", text: "The endpoint is /v1/interactions." }] },
+    ],
+    usage: { total_input_tokens: 19, total_output_tokens: 7 },
+  }), { status: 200, headers: { "Content-Type": "application/json" } }))) as typeof fetch;
+  try {
+    const result = await callModel({ provider: "google", apiKey: "test-key", baseUrl: "https://generativelanguage.googleapis.com/v1beta", modelId: "gemini-3.8-flash", system: "", messages: [{ role: "user", content: "search" }], maxOutputTokens: 80, webSearch: true });
+    assert(result.ok, "Google Search 응답 성공");
+    if (result.ok) {
+      assertEquals(result.input_tokens, 19, "입력 토큰");
+      assertEquals(result.output_tokens, 7, "출력 토큰");
+      assertEquals(result.web_search_used, true, "검색 사용 여부");
+      assertEquals(result.sources, [{ title: "Official docs", url: "https://ai.google.dev/api/interactions-api" }], "검색 출처");
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("웹검색 설정과 사진 data URL을 모델 호출 및 기록으로 전달한다", async () => {
+  const db = makeDb();
+  const original = (assistant as any).web_search;
+  (assistant as any).web_search = true;
+  let request: any;
+  try {
+    const image = "data:image/jpeg;base64,AA==";
+    const res = await makeHandler(db, (a) => { request = a; return Promise.resolve(okResult); })(chatReq([{ role: "user", content: [{ type: "text", text: "사진 설명" }, { type: "image_url", image_url: { url: image } }] }]));
+    assertEquals(res.status, 200, JSON.stringify(await res.json()));
+    assertEquals(request.webSearch, true);
+    assertEquals(request.messages[0].content[1].image_url.url, image);
+    assertEquals(db.savedMessages[0].image_count, 1);
+  } finally {
+    (assistant as any).web_search = original;
+  }
+});
 const okResult = { ok: true, text: "답", input_tokens: 10, output_tokens: 20 };
 
 Deno.test("정상: 호출 전 1번 예약하고 같은 행을 ok·토큰·금액으로 갱신한다", async () => {

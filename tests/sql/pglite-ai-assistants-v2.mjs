@@ -28,6 +28,8 @@ try {
  await setUser(owner);
  await assert.rejects(q(`insert into public.ai_providers(id,label,kind,base_url,key_env) values('bad','Bad','openai_compat','http://bad','SUPABASE_SERVICE_ROLE_KEY')`),/check constraint|violates/); await db.exec('rollback');
  await setUser(owner);
+ await assert.rejects(q(`insert into public.ai_providers(id,label,kind,base_url,key_env) values('bad-url','Bad URL','openai_compat','http://api.example.com/v1','EXAMPLE_API_KEY')`),/check constraint|violates/); await db.exec('rollback');
+ await setUser(owner);
  await assert.rejects(q(`insert into public.ai_assistants(name,starters) values('bad',array['${'x'.repeat(121)}'])`),/check constraint|violates/); await db.exec('rollback');
  await setUser(owner);
  await assert.rejects(q(`insert into public.ai_providers(id,label,kind,base_url,key_env) values('bad','Bad','openai_compat','https://api.example.com/v1','SUPABASE_SERVICE_ROLE_KEY')`),/check constraint|violates/); await db.exec('rollback');

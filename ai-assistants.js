@@ -1,4 +1,4 @@
-/* ai-assistants.js — 직원허브 「🤖 AI 도우미」 화면(1단계)
+﻿/* ai-assistants.js — 직원허브 「🤖 AI 도우미」 화면(1단계)
    설계서: Z:\09_claude-output\03_병원운영·전산\직원AI도우미\설계서_1단계.md (4장)
    hr.html은 이 파일을 <script src="ai-assistants.js?v=20260929"> 로 불러 window.AIAssistants.render(container,{sb,me}) 만 부른다.
    © 2026 Jung · 아산정플란트치과 */
@@ -93,6 +93,7 @@ const AI_ERROR_MESSAGES={
   invalid_input:'요청 내용을 확인해 주세요.',
   rate_limited:'짧은 시간에 너무 많이 요청했어요. 잠시 후 다시 시도해 주세요.',
   provider_not_configured:'이 AI 회사 연결이 아직 준비되지 않았어요.',
+  image_not_supported:'이 도우미는 사진을 처리하지 못해요. 내용은 글로 적어 주세요.',
   provider_auth_failed:'이 AI 회사가 연결 키를 받아 주지 않아요. 원장에게 알려 주세요.',
   usage_unavailable:'사용 기록을 확인할 수 없어 지금은 쓸 수 없어요. 잠시 후 다시 시도해 주세요.',
   upstream_error:'AI 응답을 받지 못했어요. 잠시 후 다시 시도해 주세요.',
@@ -234,7 +235,6 @@ const AI_HELP_STAFF_STEPS=[
   {title:'자주 보는 안내 문장',text:'화면에 이런 문장이 뜨면 이렇게 하세요.',errors:true},
   {title:'알아 둘 것',list:[
     '답은 초안이에요. 읽어 보고 고쳐서 쓰세요.',
-    '대화는 저장되지 않아요. 새로고침하거나 화면을 닫으면 사라지니 필요한 답은 그 전에 복사해 두세요.',
     '누가 언제 어느 도우미를 썼는지는 사용 기록으로 남고, 원장이 볼 수 있어요.',
     '한 시간에 120번까지 보낼 수 있어요.',
     '모든 직원이 함께 쓰는 도우미예요. 쓰다가 불편한 점은 원장에게 알려 주세요.']},
@@ -493,8 +493,8 @@ function aiCsvBlocks(text){const out=[];const re=/```csv\s*\r?\n([\s\S]*?)```/gi
 async function aiCompressImage(file){const bitmap=await createImageBitmap(file);const scale=Math.min(1,1600/Math.max(bitmap.width,bitmap.height));const canvas=document.createElement('canvas');canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale);canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close();return canvas.toDataURL('image/jpeg',0.82);}
 function aiMessageHtml(msg,idx){
  const who=msg.role==='user'?'\uB098':'AI',text=aiDisplayContent(msg.content);
- const meta=msg.role==='assistant'&&!msg.isError?'<div class="sub">'+escAi(msg.modelLabel||'')+(msg.fallbackUsed?' ? \uC608\uBE44 \uBAA8\uB378\uB85C \uB2F5\uD568':'')+(msg.webSearchUsed?' ? ?? \uC6F9 \uAC80\uC0C9\uD568':msg.webSearchUnsupported?' ? \uC774 AI\uB294 \uC6F9\uAC80\uC0C9\uC744 \uBABB \uD574\uC11C \uAC80\uC0C9 \uC5C6\uC774 \uB2F5\uD588\uC5B4\uC694':'')+' <button class="mini" data-ai-copy="'+idx+'">\uBCF5\uC0AC</button></div>':'';
- const sources=(msg.sources||[]).slice(0,5).filter(x=>/^https:\/\//i.test(x.url||'')).map(x=>'<a href="'+escAi(x.url)+'" target="_blank" rel="noopener">'+escAi(x.title||x.url)+'</a>').join(' ? ');
+ const meta=msg.role==='assistant'&&!msg.isError?'<div class="sub">'+escAi(msg.modelLabel||'')+(msg.fallbackUsed?' · \uC608\uBE44 \uBAA8\uB378\uB85C \uB2F5\uD568':'')+(msg.webSearchUsed?' · 🔎 \uC6F9 \uAC80\uC0C9\uD568':msg.webSearchUnsupported?' · \uC774 AI\uB294 \uC6F9\uAC80\uC0C9\uC744 \uBABB \uD574\uC11C \uAC80\uC0C9 \uC5C6\uC774 \uB2F5\uD588\uC5B4\uC694':'')+' <button class="mini" data-ai-copy="'+idx+'">\uBCF5\uC0AC</button></div>':'';
+ const sources=(msg.sources||[]).slice(0,5).filter(x=>/^https:\/\//i.test(x.url||'')).map(x=>'<a href="'+escAi(x.url)+'" target="_blank" rel="noopener">'+escAi(x.title||x.url)+'</a>').join(' · ');
  const csv=aiCsvBlocks(text).map((v,i)=>'<button class="mini" data-ai-csv="'+idx+'::'+i+'">&#11015; CSV\uB85C \uBC1B\uAE30</button>').join(' ');
  return '<div class="ai-msg ai-msg-'+msg.role+'"><div class="ai-msg-who">'+who+'</div><div class="ai-msg-body">'+escAi(text)+'</div>'+meta+(sources?'<div class="sub">\uCD9C\uCC98: '+sources+'</div>':'')+(csv?'<div class="rowflex">'+csv+'</div>':'')+'</div>';
 }
@@ -504,8 +504,7 @@ function renderChatPanel(root){
  (tooLong?'<div class="hint" role="alert">\uB300\uD654\uAC00 \uAE38\uC5B4\uC838 \uC0C8 \uB300\uD654\uAC00 \uD544\uC694\uD574\uC694. \u300C\uC0C8 \uB300\uD654\u300D\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694.</div>':'')+
  '<div class="ai-msgs" id="aiMsgs">'+(AI_MESSAGES.length?AI_MESSAGES.map(aiMessageHtml).join(''):'<div class="empty">\uBA54\uC2DC\uC9C0\uB97C \uBCF4\uB0B4 \uB300\uD654\uB97C \uC2DC\uC791\uD558\uC138\uC694.</div>')+'</div>'+
  (!AI_MESSAGES.length&&Array.isArray(a.starters)&&a.starters.length?'<div class="rowflex">'+a.starters.slice(0,4).map((v,i)=>'<button class="mini" data-ai-starter="'+i+'">'+escAi(v)+'</button>').join('')+'</div>':'')+
- (AI_MESSAGES.length?'':'<p class="sub">\uB300\uD654 \uB0B4\uC6A9\uC740 \uC5C5\uBB34 \uD655\uC778\uC744 \uC704\uD574 \uC800\uC7A5\uB418\uBA70 \uC6D0\uC7A5\uB9CC \uBCFC \uC218 \uC788\uC5B4\uC694.</p>')+
- '<label class="mini" for="aiPhotos">?? \uC0AC\uC9C4 (\uCD5C\uB300 4\uC7A5)</label><input id="aiPhotos" type="file" accept="image/jpeg,image/png,image/webp" multiple><div class="sub" id="aiPhotoStatus"></div>'+
+ '<label class="mini" for="aiPhotos">📎 \uC0AC\uC9C4 (\uCD5C\uB300 4\uC7A5)</label><input id="aiPhotos" type="file" accept="image/jpeg,image/png,image/webp" multiple><div class="sub" id="aiPhotoStatus"></div>'+
  (AI_SENDING?'<div class="sub">\uC0DD\uAC01 \uC911...</div>':'')+'<textarea id="aiInput" placeholder="\uBA54\uC2DC\uC9C0\uB97C \uC785\uB825\uD558\uC138\uC694(Ctrl+Enter\uB85C \uBCF4\uB0B4\uAE30)"></textarea><div class="rowflex" style="justify-content:flex-end"><button class="mini stamp" id="aiSendBtn"'+((AI_SENDING||tooLong)?' disabled':'')+'>\uBCF4\uB0B4\uAE30</button></div><div class="hint" id="aiChatErr"></div></div>';
  root.querySelector('[data-ai-back]').addEventListener('click',closeAiChat);root.querySelector('[data-ai-new]').addEventListener('click',function(){startFreshConversation();renderActiveSection();});
  const input=root.querySelector('#aiInput');input.addEventListener('keydown',function(e){if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();sendAiMessage();}});
