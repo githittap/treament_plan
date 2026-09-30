@@ -27,7 +27,9 @@ test('G 온보딩 안내는 원본 코드블록의 고유 항목을 모두 포�
   const homeCard=c.h.onboardingGuideCard({collapsed:true}),documentsCard=c.h.onboardingGuideCard();
   assert.match(homeCard,/<details class="card onboarding-guide-card">/);
   assert.doesNotMatch(homeCard,/<details[^>]*\bopen\b/);
-  assert.match(homeCard,/<summary[^>]*>🧭 신입 첫날 안내 \(15개\) — 눌러서 보기<\/summary>/);
+  assert.match(homeCard,/<summary class="onboarding-guide-summary">🧭 신입 첫날 안내 \(15개\)<\/summary>/);
+  assert.match(html,/\.onboarding-guide-summary::after\{content:' — 눌러서 보기'\}/);
+  assert.match(html,/\.onboarding-guide-card\[open\] \.onboarding-guide-summary::after\{content:' — 눌러서 접기'\}/);
   assert.match(documentsCard,/<details class="card onboarding-guide-card" open>/);
   assert.match(homeCard,/<ol class="onboarding-guide-items">/);
   assert.match(homeCard,/<li>/);
