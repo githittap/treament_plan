@@ -27,7 +27,7 @@ test('foreign charge candidates include KRW purchases from another month',()=>{
     {id:'reversal-krw',parse_status:'recorded',event_kind:'cancellation',currency:'KRW',amount_krw:-12900},
   ];
   assert.deepEqual(JSON.parse(JSON.stringify(h.marketingKrwLinkCandidates(events).map(row=>row.id))),['sep-krw']);
-  const markup=html.match(/async function renderMarketingExpensePanel\(\){[\s\S]*?\n\}\n/)?.[0];
+  const markup=html.match(/async function renderMarketingExpensePanel\(\){[\s\S]*?\r?\n\}\r?\n/)?.[0];
   assert.match(markup,/marketingKrwLinkCandidates\(all\)/,'link options must use all fetched months');
 });
 
@@ -51,12 +51,12 @@ test('linked KRW charge inherits foreign approval category and linked foreign ro
   const summary=h.marketingMonthSummary(events,[],links,'2026-10');
   assert.equal(summary.totalKrw,12900);assert.deepEqual(JSON.parse(JSON.stringify(summary.channels.map(([key,value])=>[key,value.amount,value.rows.map(row=>row.id)]))),[['google',12900,['charge']]]);
   assert.deepEqual(JSON.parse(JSON.stringify(h.marketingForeignEvents(events,[],links).map(row=>row.id))),['foreign']);
-  const markup=html.match(/async function renderMarketingExpensePanel\(\)\{[\s\S]*?\n\}\n/)?.[0];
+  const markup=html.match(/async function renderMarketingExpensePanel\(\)\{[\s\S]*?\r?\n\}\r?\n/)?.[0];
   assert.match(markup,/marketingForeignEvents\(recorded,rules,links\)/,'linked foreign approvals must remain visible for link edits');
 });
 
 test('marketing panel has month, budget, channel details, foreign and exclusions, and no raw SMS selection',()=>{
-  const body=html.match(/async function renderMarketingExpensePanel\(\)\{[\s\S]*?\n\}\n/)?.[0];assert.ok(body,'마케팅비 화면 함수를 찾지 못했습니다.');
+  const body=html.match(/async function renderMarketingExpensePanel\(\)\{[\s\S]*?\r?\n\}\r?\n/)?.[0];assert.ok(body,'마케팅비 화면 함수를 찾지 못했습니다.');
   for(const marker of ['월 예산','미분류','마케팅 아님','외화','취소 검토','가맹점 기본 분류 수정','지난달 내역에도 반영됨','marketing_expense_events'])assert.ok(body.includes(marker),`화면에 ${marker}가 있어야 합니다.`);
   assert.ok(!body.includes('select(\'*\')')&&!body.includes('raw_text'),'마케팅 화면은 승인 원문을 읽지 않아야 합니다.');
 });

@@ -57,6 +57,9 @@ create table if not exists public.marketing_foreign_charge_links (
   check (foreign_event_id <> krw_event_id)
 );
 
+create index if not exists marketing_foreign_charge_links_created_by_idx
+  on public.marketing_foreign_charge_links(created_by);
+
 insert into public.marketing_merchant_rules(merchant_key,merchant_label,category) values
   ('당근','당근','daangn'),('당근페이','당근페이','daangn'),
   ('카카','카카오','kakao'),('카카오','카카오','kakao'),

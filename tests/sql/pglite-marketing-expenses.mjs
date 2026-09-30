@@ -23,6 +23,7 @@ try{
   await db.exec(draft);
   const tables=await q(`select table_name from information_schema.tables where table_schema='public' and table_name like 'marketing_%' order by table_name`);
   assert.deepEqual(tables.map(row=>row.table_name),['marketing_expense_events','marketing_foreign_charge_links','marketing_merchant_rules','marketing_month_budgets']);
+  assert.equal((await q(`select count(*)::int as n from pg_indexes where schemaname='public' and indexname='marketing_foreign_charge_links_created_by_idx'`))[0].n,1,'created_by foreign key has a covering index');
   const cols=await q(`select column_name from information_schema.columns where table_name='marketing_expense_events'`);
   for(const forbidden of ['raw_text','cardholder','card_last4','owner_name'])assert.ok(!cols.some(row=>row.column_name===forbidden),`${forbidden} must not be stored`);
   assert.equal((await q(`select count(*)::int as n from public.marketing_merchant_rules`))[0].n,12,'safe default merchant rules are seeded');
