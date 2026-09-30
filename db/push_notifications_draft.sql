@@ -46,7 +46,7 @@ create table public.push_events (
   id bigint generated always as identity primary key,
   event_key text not null unique,
   recipient_id uuid not null references public.profiles(user_id) on delete cascade,
-  event_type text not null check (event_type in ('leave_submitted','leave_status_changed','payment_pending','approval_submitted','notice_published','document_approved','consultation_received')),
+  event_type text not null check (event_type in ('leave_submitted','leave_status_changed','payment_pending','approval_submitted','notice_published','document_approved','consultation_received','ai_billing_stop','ai_billing_low_balance','ai_billing_charge')),
   payload jsonb not null,
   status text not null default 'queued' check (status in ('queued','sent','failed')),
   attempts integer not null default 0,

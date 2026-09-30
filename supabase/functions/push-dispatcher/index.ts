@@ -40,6 +40,10 @@ Deno.serve(async (req) => {
         const row = (data || [])[0];
         return { data: row ? { active: row.active, approved: row.approved } : null, error: null };
       },
+      canDispatchAiBillingPush: async currentEvent => {
+        const { data, error } = await supabase.rpc("can_dispatch_ai_billing_push", { p_event_id: currentEvent.id, p_claim_token: claimToken });
+        return { data: data === true, error };
+      },
       getSubscriptions: async () => {
         const { data, error } = await supabase.rpc("get_push_event_subscriptions", { p_event_id: event.id, p_claim_token: claimToken });
         if (error) return { data: [], error };

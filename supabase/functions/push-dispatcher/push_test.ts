@@ -10,6 +10,7 @@ Deno.test("business push events have a safe message and a real hub tab", () => {
   const expected = new Map([
     ["approval_submitted", "appr"], ["payment_pending", "onbo"], ["notice_published", "notice"],
     ["document_approved", "onbo"], ["consultation_received", "inbox"],
+    ["ai_billing_stop", "inbox"], ["ai_billing_low_balance", "inbox"], ["ai_billing_charge", "inbox"],
   ]);
   for (const [type, tab] of expected) {
     const payload = safeNotification(type);

@@ -7,6 +7,7 @@ export type DispatcherResult = { id: number; status: string; sent?: number; expi
 export type DispatcherDb = {
   renewClaim(event: PushEvent, claimToken: string): Promise<void>;
   getProfile(recipientId: string): Promise<{ data: DispatcherProfile; error: DispatcherError | null }>;
+  canDispatchAiBillingPush(event: PushEvent): Promise<{ data: boolean; error: DispatcherError | null }>;
   getSubscriptions(recipientId: string): Promise<{ data: Subscription[]; error: DispatcherError | null }>;
   disableUnsafeSubscription(subscription: Subscription): Promise<void>;
   seedDeliveries(event: PushEvent, subscriptions: Subscription[]): Promise<DispatcherError | null>;
@@ -68,13 +69,26 @@ export async function processClaimedEvent(
   }
   const sentIds = new Set(deliveries.data.filter(delivery => delivery.status === "sent").map(delivery => delivery.subscription_id));
   const pendingSubscriptions = safeSubscriptions.filter(subscription => !sentIds.has(subscription.id));
+  let recipientNoLongerAllowed = false;
   const result = await dispatchSubscriptions(event, pendingSubscriptions, async (subscription, payload) => {
     try { await db.renewClaim(event, claimToken); } catch (error) { throw new DispatchAbortError(`claim lease lost before send: ${(error as Error).message}`); }
+    if (event.event_type.startsWith("ai_billing_")) {
+      const authorization = await db.canDispatchAiBillingPush(event);
+      if (authorization.error) throw new Error(`recipient authorization lookup failed: ${authorization.error.message}`);
+      if (!authorization.data) {
+        recipientNoLongerAllowed = true;
+        throw new Error("recipient no longer authorized for advertising push");
+      }
+    }
     await send(subscription, payload);
   }, async (subscription, outcome) => {
     await db.renewClaim(event, claimToken);
     await db.recordDelivery(event, subscription, outcome, claimToken);
   });
+  if (recipientNoLongerAllowed) {
+    await release({ status: "failed", last_error: "recipient no longer authorized for advertising push", next_attempt_at: null });
+    return { id: event.id, status: "skipped", sent: result.sent, expired: result.expired, failed: result.failed };
+  }
   const terminal = result.sent + result.expired >= pendingSubscriptions.length;
   const status = terminal ? "sent" : event.attempts >= MAX_ATTEMPTS ? "failed" : "queued";
   await release({ status, last_error: result.failed ? `failed=${result.failed}` : null, next_attempt_at: status === "queued" ? new Date(Date.now() + Math.min(60_000 * 2 ** Math.max(0, event.attempts - 1), 3_600_000)).toISOString() : null, sent_at: status === "sent" ? new Date().toISOString() : null });

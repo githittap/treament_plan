@@ -7,6 +7,7 @@ const transport = fs.readFileSync('supabase/functions/push-dispatcher/transport.
 const core = fs.readFileSync('supabase/functions/push-dispatcher/dispatcher_core.ts', 'utf8');
 const integration = fs.readFileSync('supabase/functions/push-dispatcher/dispatcher_integration_test.ts', 'utf8');
 const draft = fs.readFileSync('db/push_notifications_draft.sql', 'utf8');
+const aiBillingDraft = fs.readFileSync('db/ai_billing_alerts_draft.sql', 'utf8');
 const rollback = fs.readFileSync('db/push_notifications_rollback.sql', 'utf8');
 const configToml = fs.readFileSync('supabase/config.toml', 'utf8');
 
@@ -28,6 +29,10 @@ test('Push dispatcher never reaches push_events/push_subscriptions/push_event_de
     assert.match(index, new RegExp(`rpc\\(["']${rpcName}["']`), `index.ts should call ${rpcName} via rpc()`);
     assert.match(draft, new RegExp(`grant execute on function public\\.${rpcName}\\([^)]*\\) to service_role`, 'i'), `${rpcName} should grant execute to service_role`);
   }
+  assert.match(index, /rpc\("can_dispatch_ai_billing_push"/);
+  assert.match(aiBillingDraft, /grant execute on function public\.can_dispatch_ai_billing_push\(bigint,uuid\) to service_role/i);
+  assert.match(core, /recipient no longer authorized for advertising push/);
+  assert.match(integration, /queued advertising push escaped updated recipient settings/);
   assert.doesNotMatch(draft, /grant select|grant insert|grant update|grant delete/i, 'outbox tables must stay reachable only through SECURITY DEFINER RPCs');
 });
 

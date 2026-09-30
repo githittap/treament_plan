@@ -1,4 +1,4 @@
-export type PushEvent = { id: number; event_key: string; recipient_id: string; event_type: string; attempts: number };
+export type PushEvent = { id: number; event_key: string; recipient_id: string; event_type: string; attempts: number; payload?: Record<string, unknown> };
 export type Subscription = { id: string; endpoint: string; p256dh: string; auth: string };
 export class DispatchAbortError extends Error { readonly code = "dispatch-abort"; }
 const ALLOWED_PUSH_HOSTS = ["fcm.googleapis.com", "updates.push.services.mozilla.com", "web.push.apple.com", "notify.windows.com"];
@@ -13,7 +13,17 @@ export function isSafePushEndpoint(value: string): boolean {
   } catch { return false; }
 }
 
-export function safeNotification(eventType: string): { title: string; body: string; url: string; tag: string } | null {
+function aiBillingDetails(payload: Record<string, unknown>): string {
+  const name = typeof payload.account_name === "string" ? payload.account_name.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60) : "";
+  const accountId = typeof payload.account_id === "string" && /^\d{5,}$/.test(payload.account_id) ? payload.account_id : "";
+  const account = [name, accountId ? `(${accountId})` : ""].filter(Boolean).join(" ");
+  const amount = typeof payload.amount_krw === "number" && Number.isSafeInteger(payload.amount_krw) && payload.amount_krw > 0 ? payload.amount_krw : null;
+  const threshold = typeof payload.threshold_krw === "number" && Number.isSafeInteger(payload.threshold_krw) && payload.threshold_krw > 0 ? payload.threshold_krw : null;
+  const value = amount ? `${amount.toLocaleString("ko-KR")}원` : threshold ? `${threshold.toLocaleString("ko-KR")}원 이하` : "";
+  return [account ? `계정 ${account}` : "", value].filter(Boolean).join(" · ");
+}
+
+export function safeNotification(eventType: string, payload: Record<string, unknown> = {}): { title: string; body: string; url: string; tag: string } | null {
   if (eventType === "leave_submitted") return { title: "연차 신청 알림", body: "새 연차 신청을 확인해 주세요.", url: "/hr.html?tab=leave", tag: "leave-submitted" };
   if (eventType === "leave_status_changed") return { title: "연차 신청 상태 변경", body: "연차 신청 상태가 변경되었습니다.", url: "/hr.html?tab=leave", tag: "leave-status" };
   if (eventType === "approval_submitted") return { title: "결재 대기 알림", body: "확인할 결재 문서가 있습니다.", url: "/hr.html?tab=appr", tag: "approval-pending" };
@@ -21,13 +31,16 @@ export function safeNotification(eventType: string): { title: string; body: stri
   if (eventType === "notice_published") return { title: "새 공지 알림", body: "새 공지가 등록되었습니다.", url: "/hr.html?tab=notice", tag: "notice-published" };
   if (eventType === "document_approved") return { title: "서류 승인 알림", body: "제출한 서류가 승인되었습니다.", url: "/hr.html?tab=onbo", tag: "document-approved" };
   if (eventType === "consultation_received") return { title: "새 문의 알림", body: "새 문의가 도착했습니다.", url: "/hr.html?tab=inbox", tag: "consultation-received" };
+  if (eventType === "ai_billing_stop") return { title: "네이버 광고 노출 중단", body: [aiBillingDetails(payload), "광고 노출 중단 내용을 허브에서 확인해 주세요."].filter(Boolean).join(" · "), url: "/hr.html?tab=inbox", tag: "ai-billing-stop" };
+  if (eventType === "ai_billing_low_balance") return { title: "네이버 광고 잔액 안내", body: [aiBillingDetails(payload), "잔액 안내를 허브에서 확인해 주세요."].filter(Boolean).join(" · "), url: "/hr.html?tab=inbox", tag: "ai-billing-low-balance" };
+  if (eventType === "ai_billing_charge") return { title: "네이버 광고 충전 완료", body: [aiBillingDetails(payload), "충전 기록을 허브에서 확인해 주세요."].filter(Boolean).join(" · "), url: "/hr.html?tab=inbox", tag: "ai-billing-charge" };
   return null;
 }
 
 export type DispatchResult = { sent: number; expired: number; failed: number; expiredEndpoints: string[]; sentEndpoints: string[]; failedEndpoints: string[] };
 export type DeliveryOutcome = "sent" | "expired" | "failed";
 export async function dispatchSubscriptions(event: PushEvent, subscriptions: Subscription[], send: (subscription: Subscription, payload: string) => Promise<void>, record?: (subscription: Subscription, outcome: DeliveryOutcome) => Promise<void>): Promise<DispatchResult> {
-  const notification = safeNotification(event.event_type);
+  const notification = safeNotification(event.event_type, event.payload || {});
   if (!notification) return { sent: 0, expired: 0, failed: subscriptions.length, expiredEndpoints: [], sentEndpoints: [], failedEndpoints: subscriptions.map(s => s.endpoint) };
   let sent = 0, expired = 0, failed = 0; const expiredEndpoints: string[] = [], sentEndpoints: string[] = [], failedEndpoints: string[] = [];
   for (const subscription of subscriptions) {

@@ -18,13 +18,16 @@ export async function runDispatcherIntegrationTest() {
   let renewCount = 0;
   let loseAt = 0;
   let profileError: Error | null = null;
+  let aiBillingAllowed = true;
+  let revokeAfterQueue = false;
   const db: DispatcherDb = {
     renewClaim: async (_event, token) => { renewCount++; if (loseAt && renewCount === loseAt) throw new Error("claim lost"); claimed.add(token); },
     getProfile: async () => ({ data: profileError ? null : { active: true, approved: true }, error: profileError }),
-    getSubscriptions: async () => ({ data: subscriptions, error: null }),
+    getSubscriptions: async () => { if (revokeAfterQueue) aiBillingAllowed = false; return { data: subscriptions, error: null }; },
+    canDispatchAiBillingPush: async () => ({ data: aiBillingAllowed, error: null }),
     disableUnsafeSubscription: async () => {},
     seedDeliveries: async () => null,
-    getDeliveries: async currentEvent => ({ data: currentEvent.id === 11 ? [] : [...deliveries].map(([subscription_id, status]) => ({ subscription_id, status })), error: null }),
+    getDeliveries: async currentEvent => ({ data: currentEvent.id === 11 || currentEvent.id === 12 ? [] : [...deliveries].map(([subscription_id, status]) => ({ subscription_id, status })), error: null }),
     recordDelivery: async (_event, subscription, outcome, token) => { if (!claimed.has(token)) throw new Error("claim lost during delivery record"); deliveries.set(subscription.id, outcome === "sent" ? "sent" : "failed"); },
     releaseEvent: async (_event, token, fields) => { if (!claimed.has(token)) throw new Error("claim was not held"); released.push(fields); },
   };
@@ -54,6 +57,13 @@ export async function runDispatcherIntegrationTest() {
     if (!String((error as Error).message).includes("claim lease lost")) throw error;
   }
   if (sendsAfterClaimLoss !== 0 || JSON.stringify([...deliveries]) !== JSON.stringify(beforeClaimLoss)) throw new Error("claim loss reached send or delivery recording");
+
+  const adEvent: PushEvent = { id: 12, event_key: "ai-billing:12:u", recipient_id: "u", event_type: "ai_billing_charge", attempts: 1, payload: { account_id: "1970043", account_name: "계정B", amount_krw: 500000 } };
+  aiBillingAllowed = true;
+  revokeAfterQueue = true;
+  let adSends = 0;
+  const revoked = await processClaimedEvent(adEvent, "claim-ad-revoked", db, async () => { adSends++; });
+  if (adSends !== 0 || revoked.status !== "skipped" || released.at(-1)?.status !== "failed") throw new Error(`queued advertising push escaped updated recipient settings: ${JSON.stringify({ adSends, revoked, release: released.at(-1) })}`);
 }
 
 Deno.test("dispatcher integration covers auth, DB error, partial success, and retry", runDispatcherIntegrationTest);
