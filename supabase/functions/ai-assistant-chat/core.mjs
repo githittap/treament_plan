@@ -249,3 +249,22 @@ export function publicErrorKind(reason) {
   if (Object.prototype.hasOwnProperty.call(ERROR_MESSAGES_KO, reason)) return reason;
   return 'upstream_error'; // bad_request · server_error · network_error · refusal · empty_response 등
 }
+
+/**
+ * 대화록에 넣을 두 줄(직원 말·AI 답)을 만든다. PostgREST 묶음 넣기는 한 줄에만 있는 칸을 다른 줄에
+ * 기본값이 아니라 NULL로 채우므로(fallback_used NOT NULL 위반 → 두 줄 다 저장 실패), 두 줄의 칸 이름을 똑같이 맞춘다.
+ * @param {string} conversationId
+ * @param {string} userText
+ * @param {number} imageCount
+ * @param {string} reply
+ * @param {string} status
+ * @param {any} [model]
+ * @param {boolean} [fallback]
+ * @param {number | null} [usageId]
+ */
+export function buildMessageRows(conversationId, userText, imageCount, reply, status, model = null, fallback = false, usageId = null) {
+  return [
+    { conversation_id: conversationId, role: 'user', content: userText, image_count: imageCount || 0, provider: null, model_id: null, fallback_used: false, status: 'ok', usage_id: null },
+    { conversation_id: conversationId, role: 'assistant', content: reply, image_count: 0, provider: (model && model.provider) || null, model_id: (model && model.model_id) || null, fallback_used: fallback === true, status, usage_id: usageId ?? null },
+  ];
+}

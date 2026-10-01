@@ -46,7 +46,20 @@ function makeDb(opts: { existing?: number; limit?: number; role?: string; models
       const api: any = {
         select() { return api; },
         order() { return Promise.resolve({ data: table === "ai_providers" ? (opts.providerRows ?? []) : [], error: null }); },
-        insert(rows: any) { if (table === "ai_assistant_messages") savedMessages.push(...(Array.isArray(rows) ? rows : [rows])); return Promise.resolve({ error: null }); },
+        insert(rows: any) {
+          if (table === "ai_assistant_messages") {
+            // 운영 PostgREST처럼: 묶음 넣기는 모든 줄의 칸 이름을 합쳐 쓰고, 어떤 줄에 없는 칸은 NULL로 넣는다
+            // → NOT NULL 칸(image_count·fallback_used·status)이 NULL이 되면 묶음 전체가 실패한다(10-01 운영 사고 재현).
+            const list = Array.isArray(rows) ? rows : [rows];
+            const keys = new Set(list.flatMap((r: any) => Object.keys(r)));
+            const notNull = ["conversation_id", "role", "content", "image_count", "fallback_used", "status"];
+            for (const r of list) for (const k of keys) if (notNull.includes(k) && (!(k in r) || r[k] === null || r[k] === undefined)) {
+              return Promise.resolve({ error: { code: "23502", message: `null value in column "${k}" violates not-null constraint` } });
+            }
+            savedMessages.push(...list);
+          }
+          return Promise.resolve({ error: null });
+        },
         upsert(row: any) { if (table === "ai_assistant_conversations") savedConversations.push(row); return Promise.resolve({ error: null }); },
         update(p: Record<string, unknown>) { patch = p; return api; },
         eq(col: string, val: unknown) {
@@ -167,6 +180,21 @@ Deno.test("정상: 호출 전 1번 예약하고 같은 행을 ok·토큰·금액
   assertEquals(db.savedMessages.length, 2);
   assertEquals(db.savedMessages[0].role, "user");
   assertEquals(db.savedMessages[1].role, "assistant");
+});
+
+Deno.test("대화 저장: 두 줄의 칸 이름이 같고 fallback_used는 참/거짓(NULL 아님) — 묶음 넣기 NOT NULL 사고 재발 막기", async () => {
+  const db = makeDb();
+  const res = await makeHandler(db, () => Promise.resolve(okResult))(chatReq());
+  assertEquals(res.status, 200);
+  assertEquals(db.savedMessages.length, 2);
+  const [u, a] = db.savedMessages;
+  assertEquals(Object.keys(u).sort(), Object.keys(a).sort());
+  assertEquals(typeof u.fallback_used, "boolean");
+  assertEquals(typeof a.fallback_used, "boolean");
+  assertEquals(typeof u.image_count, "number");
+  assertEquals(typeof a.image_count, "number");
+  assertEquals(u.content.length > 0, true);
+  assertEquals(a.content, "답");
 });
 
 Deno.test("예비 모델: 1차·예비 각각 예약하고, 1차 행은 error·예비 행은 ok+fallback_used", async () => {

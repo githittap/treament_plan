@@ -3,6 +3,7 @@
 // 구조는 supabase/functions/contract-pdf-sign/index.ts(사용자 JWT형: CORS·OPTIONS·userClient.auth.getUser())를 따른다.
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import {
+  buildMessageRows,
   buildSystemPrompt,
   estimateCostUsd,
   errorMessageFor,
@@ -190,10 +191,9 @@ export function createAiAssistantChatHandler(deps: { createClient?: any; env?: (
           const now = new Date().toISOString();
           const { error: convError } = await admin.from("ai_assistant_conversations").upsert({ id: conversationId, user_id: user.id, assistant_id: assistant.id, assistant_name: assistant.name, last_at: now }, { onConflict: "id" });
           if (convError) throw convError;
-          const { error } = await admin.from("ai_assistant_messages").insert([
-            { conversation_id: conversationId, role: "user", content: userText, image_count: imageCount, status: "ok" },
-            { conversation_id: conversationId, role: "assistant", content: reply, provider: model?.provider || null, model_id: model?.model_id || null, fallback_used: fallback, status, usage_id: usageId },
-          ]);
+          // 묶음 넣기는 줄마다 칸 이름이 같아야 한다 — 한 줄에만 있는 칸은 다른 줄에 기본값이 아니라 NULL로 들어가
+          // fallback_used(NOT NULL) 위반으로 두 줄 다 저장이 안 됐다(10-01 운영 로그). 두 줄 모두 같은 칸을 다 채운다.
+          const { error } = await admin.from("ai_assistant_messages").insert(buildMessageRows(conversationId, userText, imageCount, reply, status, model, fallback, usageId));
           if (error) throw error;
         } catch (e) { console.error("ai_assistant_conversation save failed", e instanceof Error ? e.message : "unknown"); }
       }
