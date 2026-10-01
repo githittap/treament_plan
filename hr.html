@@ -377,6 +377,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 
 <footer>© 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지</footer>
 
+<script src="hub-texts.js?v=2026100107"></script>
 <script>
 /* ═══════ 설정 ═══════
    실제 값은 DB의 app_settings 표에서 읽어옵니다.
@@ -389,6 +390,12 @@ let SETTINGS = {
   jongeop_weekday_evening:'20:00', jongeop_weekday_day:'18:30',
   jongeop_sat:'17:00', jongeop_sun:'14:00'
 };
+/* hub-texts.js(원장이 고치는 허브 글·목록)를 못 불러와도 화면은 코드의 기본 글 그대로 나오게 하는 대비책 */
+if(typeof window.hubText!=='function'){
+  window.hubText=function(k,d,v){return v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d);};
+  window.hubTextHtml=function(k,d,v){return window.hubText(k,d,v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/\r?\n/g,'<br>');};
+  window.hubList=function(k,d){return d;};
+}
 let SETTINGS_LOAD_OK=false,SETTINGS_LOAD_ERROR='';
 let TAB_ROLES={};
 let TAB_OVERRIDES={};
@@ -397,6 +404,7 @@ async function loadSettings(){
   try{const result=await sb.from('app_settings').select('key,value');if(!absenceSettingsLoadSucceeded(result))throw result?.error||new Error('설정 응답이 비정상입니다.');result.data.forEach(s=>{SETTINGS[s.key]=s.value;});SETTINGS_LOAD_OK=true;}catch(e){SETTINGS_LOAD_ERROR=e?.message||'설정을 불러오지 못했습니다.';}
   try{TAB_ROLES=JSON.parse(SETTINGS.hr_tab_roles||'{}')||{};}catch(e){TAB_ROLES={};}
   try{TAB_OVERRIDES=JSON.parse(SETTINGS.hr_tab_overrides||'{}')||{};}catch(e){TAB_OVERRIDES={};}
+  if(typeof HubUi!=='undefined')HubUi.setSettings(SETTINGS); // 허브 설정 탭의 숫자·목록 읽기(hubSetting·hubList)가 같은 객체를 본다
 }
 function jongeop(dateStr, evening){        // 종업시각 (요일·야간조)
   const d = new Date(dateStr+'T00:00:00').getDay(); // 0일 6토
@@ -713,8 +721,9 @@ function employmentTermAlertRows(terms,contracts){
 function tabVisible(t){if(ME.role==='deputy')return t.key==='contract';return ME.role==='owner'
     ?t.roles.includes('owner')&&(!t.needsConfid||ME.confidAccess)
     :(()=>{const ov=(TAB_OVERRIDES[ME.id]||{})[t.key],base=(TAB_ROLES[t.key]||t.roles).includes(ME.role),shown=ov===true?true:ov===false?false:base;return t.key!=='owner'&&t.key!=='ownerboards'&&shown&&(!t.needsConfid||ME.confidAccess);})();}
-function visibleTabKeys(){return new Set(TABS.filter(tabVisible).map(t=>t.key));}
-function tabLabel(k){const t=TABS.find(x=>x.key===k);return t?t.label:k;}
+function visibleTabKeys(){return new Set(TABS.filter(tabVisible).filter(t=>t.key!=='hubset'||ME.role==='owner').map(t=>t.key));} /* ⚙️ 허브 설정은 원장에게만 — 탭 노출 설정·사람별 예외로 열어 줘도 직원에게 안 보인다 */
+function tabLabel(k){const t=TABS.find(x=>x.key===k);return t?(typeof hubText==='function'?hubText('tab.'+k,t.label):t.label):k;}
+function menuGroupLabel(e){return typeof hubText==='function'?hubText('menu.'+String(e.key).replace(/-/g,'_'),e.label):e.label;}
 function menuChildKeys(e,vis){return e.children.filter(k=>vis.has(k));}
 function menuEntryVisible(e,vis){return e.kind==='group'?menuChildKeys(e,vis).length>0:vis.has(e.key);}
 function menuEntryOf(k){return MENU.find(e=>e.key===k)||MENU.find(e=>e.children.includes(k))||null;}
@@ -726,7 +735,7 @@ function menuTopRow(vis,cur){
   return MENU.filter(e=>menuEntryVisible(e,vis)).map(e=>{
     const kids=menuChildKeys(e,vis),own=e.kind==='tab'?[e.key]:[];
     // 묶음 버튼은 첫 탭으로 들어가고(이미 그 묶음 안이면 제자리), 뱃지는 보이는 탭 몫을 합쳐 보여 준다.
-    return {key:e.kind==='group'?(cur===e?TAB:kids[0]):e.key,label:e.kind==='group'?e.label:tabLabel(e.key),
+    return {key:e.kind==='group'?(cur===e?TAB:kids[0]):e.key,label:e.kind==='group'?menuGroupLabel(e):tabLabel(e.key),
       on:cur===e,badge:own.concat(kids).reduce((n,k)=>n+(BADGE[k]||0),0)};
   });
 }
@@ -835,6 +844,7 @@ async function render(){
     else if(TAB==='pay')await renderPay(m);
     else if(TAB==='aicost')await renderAicost(m);
     else if(TAB==='ownerboards')await renderOwnerBoards(m);
+    else if(TAB==='hubset'){if(window.HubUi)await window.HubUi.renderSettings(m,{sb,me:ME});else m.innerHTML='<div class="card"><div class="empty">허브 설정을 불러오지 못했습니다. 새로고침해 주세요.</div></div>';}
     else if(TAB==='owner')await renderOwner(m);
     if(SCHEDULE_PEOPLE_ERROR&&m.insertAdjacentHTML)m.insertAdjacentHTML('afterbegin',`<div class="cal-error">${esc(SCHEDULE_PEOPLE_ERROR)} · 잠시 후 다시 로그인하거나 새로고침해 주세요.</div>`);
   }catch(e){console.error(e);m.innerHTML='<div class="card"><div class="empty">오류: '+esc(e.message)+'</div></div>';}
@@ -3155,7 +3165,8 @@ function installOwnerBoardsTab(tabs,menu){
   const group=menu.find(item=>item.key==='g-owner');if(!group)return;
   const costAt=group.children.indexOf('aicost');if(costAt>=0&&!group.children.includes('ownerboards'))group.children.splice(costAt+1,0,'ownerboards');
 }
-if(typeof TABS!=='undefined'&&typeof MENU!=='undefined')installOwnerBoardsTab(TABS,MENU);const OWNER_BOARDS=[
+if(typeof TABS!=='undefined'&&typeof MENU!=='undefined')installOwnerBoardsTab(TABS,MENU);
+const OWNER_BOARDS=[
   {slug:'busd_ledger',title:'📒 뻐스디 장부',description:'AI 일 장부'},
   {slug:'pin_board',title:'📌 명심판',description:'AI가 지킬 약속'},
   {slug:'wordbook',title:'📖 박제 단어장',description:'원장이 알아 둘 말'}
@@ -3186,6 +3197,15 @@ async function openOwnerBoard(slug){
   viewer.querySelector('.owner-board-frame-slot').appendChild(frame);
 }
 /* owner-boards:test-end */
+/* ⚙️ 허브 설정(원장 전용): 허브 글·숫자·목록을 원장이 직접 고치는 화면 — 화면 본체는 hub-texts.js */
+const HUB_SETTINGS_TAB={key:'hubset',label:'⚙️ 허브 설정',roles:['owner']};
+function installHubSettingsTab(tabs,menu){
+  if(tabs.some(tab=>tab.key==='hubset'))return;
+  const at=tabs.findIndex(tab=>tab.key==='owner');tabs.splice(at<0?tabs.length:at+1,0,HUB_SETTINGS_TAB);
+  const group=menu.find(item=>item.key==='g-owner');if(!group||group.children.includes('hubset'))return;
+  const ownerAt=group.children.indexOf('owner');group.children.splice(ownerAt<0?group.children.length:ownerAt+1,0,'hubset');
+}
+if(typeof TABS!=='undefined'&&typeof MENU!=='undefined')installHubSettingsTab(TABS,MENU);
 async function saveAicost(i){
   if(ME.role!=='owner'||!AICOST_PLATFORMS[i])return;
   const amount=Number($('#aiAmount-'+i).value)||0,note=$('#aiNote-'+i).value.trim()||null;
@@ -3618,7 +3638,8 @@ function bulkRoleApplyTargets(profiles,selectedIds,ownerId,role){
   return Array.from(selectedIds||[]).filter(uid=>uid&&uid!==ownerId&&knownIds.has(uid));
 }
 function inviteMessageText(){
-  return '아산정플란트치과 직원허브 가입 안내입니다.\n\n1) 아래 링크로 접속해 회원가입 해주세요.\nhttps://jung-plant.com/hr.html\n2) 회원가입 후 원장 승인을 기다려 주세요.\n3) 승인되면 같은 링크에서 로그인하시면 됩니다.';
+  const base='아산정플란트치과 직원허브 가입 안내입니다.\n\n1) 아래 링크로 접속해 회원가입 해주세요.\nhttps://jung-plant.com/hr.html\n2) 회원가입 후 원장 승인을 기다려 주세요.\n3) 승인되면 같은 링크에서 로그인하시면 됩니다.';
+  return typeof hubText==='function'?hubText('owner.invite.message',base):base; // 원장이 허브 설정에서 고친 글이 있으면 그 글
 }
 /* account-filling:test-end */
 /* account-delete-ui:test-start */
@@ -3647,27 +3668,28 @@ async function accountDeleteFailureText(error,data){
 let BULK_ROLE_SELECTED=new Set();
 async function renderOwner(m){
   const {unlinkedRoster,pendingApproval}=accountFillingLists(SCHEDULE_PEOPLE,PROFILES);
+  const deptItems=hubList('list.profile_depts',[{code:'진료실',label:'진료실'},{code:'데스크',label:'데스크'},{code:'기공팀',label:'기공팀'},{code:'기타',label:'기타'}]); // 원장이 허브 설정 › 목록에서 이름을 고침(코드 고정)
   const {data:accessRows}=await sb.from('confidential_access').select('user_id');
   const accessSet=new Set((accessRows||[]).map(r=>r.user_id));
-  m.innerHTML=`<div class="card"><h2>🛡️ 계정·권한 관리</h2>
+  m.innerHTML=`<div class="card"><h2>${esc(hubText('owner.title','🛡️ 계정·권한 관리'))}</h2>
     <div class="rowflex">
-      <div class="stat"><div class="sub">직원 명부</div><div>${PROFILES.length}명 · owner ${PROFILES.filter(p=>p.role==='owner').length}·chief ${PROFILES.filter(p=>p.role==='chief').length}·manager ${PROFILES.filter(p=>p.role==='manager').length}·deputy ${PROFILES.filter(p=>p.role==='deputy').length}·staff ${PROFILES.filter(p=>p.role==='staff').length}</div></div>
+      <div class="stat"><div class="sub">${esc(hubText('owner.roster.label','직원 명부'))}</div><div>${PROFILES.length}명 · owner ${PROFILES.filter(p=>p.role==='owner').length}·chief ${PROFILES.filter(p=>p.role==='chief').length}·manager ${PROFILES.filter(p=>p.role==='manager').length}·deputy ${PROFILES.filter(p=>p.role==='deputy').length}·staff ${PROFILES.filter(p=>p.role==='staff').length}</div></div>
     </div>
     ${renderJobGroupAdmin()}
-    ${(unlinkedRoster.length||pendingApproval.length)?`<h3>🧩 미가입자·승인 대기</h3>
-    <div class="hint">근무명부에는 있지만 계정이 없는 사람과, 가입 후 원장 승인을 기다리는 사람을 모았습니다.</div>
-    <button class="mini" onclick="copyInviteMessage()">가입 안내 문구 복사</button>
-    ${unlinkedRoster.length?`<h4>계정 없는 근무명부 (${unlinkedRoster.length}명)</h4>
+    ${(unlinkedRoster.length||pendingApproval.length)?`<h3>${esc(hubText('owner.pending.title','🧩 미가입자·승인 대기'))}</h3>
+    <div class="hint">${esc(hubText('owner.pending.hint','근무명부에는 있지만 계정이 없는 사람과, 가입 후 원장 승인을 기다리는 사람을 모았습니다.'))}</div>
+    <button class="mini" onclick="copyInviteMessage()">${esc(hubText('owner.invite.button','가입 안내 문구 복사'))}</button>
+    ${unlinkedRoster.length?`<h4>${esc(hubText('owner.unlinked.title','계정 없는 근무명부 ({n}명)',{n:unlinkedRoster.length}))}</h4>
     <div class="tblwrap"><table><tr><th>이름</th><th>부서</th><th>재직</th></tr>
     ${unlinkedRoster.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.department||'')}</td><td>${p.active===true?'재직':'비활성'}</td></tr>`).join('')}</table></div>`:''}
-    ${pendingApproval.length?`<h4>🆕 가입 승인 대기 (${pendingApproval.length}명)</h4>
+    ${pendingApproval.length?`<h4>${esc(hubText('owner.approval.title','🆕 가입 승인 대기 ({n}명)',{n:pendingApproval.length}))}</h4>
     <div class="tblwrap"><table><tr><th>이름</th><th>부서</th><th>가입일</th><th></th></tr>
     ${pendingApproval.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.dept||'')}</td><td>${p.created_at?md(p.created_at):''}</td>
       <td>${p.account_access_status==='차단'?'<span class="sub">계정 차단됨</span>':'<button class="mini stamp" onclick="approveProfile(\''+p.user_id+'\')">승인</button>'}</td></tr>`).join('')}</table></div>`:''}`:''}
-    <h3>직원 권한 관리 <span class="sub">(입퇴사·승진 시 여기서 변경)</span></h3>
+    <h3>${esc(hubText('owner.members.title','직원 권한 관리'))} <span class="sub">${esc(hubText('owner.members.sub','(입퇴사·승진 시 여기서 변경)'))}</span></h3>
     <div class="msg" id="rosterMsg"></div>
     <div class="tblwrap"><table><tr><th></th><th>이름</th><th>부서</th><th>근무부서</th><th>근무표·집계 포함</th><th>근무명부</th><th>재직 상태·유효일·사유</th><th>입사</th><th>권한</th><th>승인</th></tr>
-    ${PROFILES.map(p=>{const depts=['진료실','데스크','기공팀','기타'],dept=p.dept||'',roster=SCHEDULE_PEOPLE.find(x=>x.profile_user_id===p.user_id),rosterDept=roster&&(SCHEDULE_DEPARTMENTS.includes(roster.department)?roster.department:'미지정'),blocked=p.account_access_status==='차단',acctState=accountDeleteRowState(p,ME.id);return `<tr><td>${p.user_id===ME.id?'':`<input type="checkbox" ${BULK_ROLE_SELECTED.has(p.user_id)?'checked':''} onchange="toggleBulkRoleSelect('${p.user_id}',this.checked)">`}</td><td>${esc(p.name)}</td><td><select class="mini" onchange="setDept('${p.user_id}',this.value)"><option value="" ${dept===''?'selected':''}>-</option>${depts.map(d=>`<option value="${d}" ${dept===d?'selected':''}>${d}</option>`).join('')}${dept&&!depts.includes(dept)?`<option value="${esc(dept)}" selected>${esc(dept)}</option>`:''}</select></td>
+    ${PROFILES.map(p=>{const dept=p.dept||'',roster=SCHEDULE_PEOPLE.find(x=>x.profile_user_id===p.user_id),rosterDept=roster&&(SCHEDULE_DEPARTMENTS.includes(roster.department)?roster.department:'미지정'),blocked=p.account_access_status==='차단',acctState=accountDeleteRowState(p,ME.id);return `<tr><td>${p.user_id===ME.id?'':`<input type="checkbox" ${BULK_ROLE_SELECTED.has(p.user_id)?'checked':''} onchange="toggleBulkRoleSelect('${p.user_id}',this.checked)">`}</td><td>${esc(p.name)}</td><td><select class="mini" onchange="setDept('${p.user_id}',this.value)"><option value="" ${dept===''?'selected':''}>-</option>${deptItems.map(it=>`<option value="${esc(it.code)}" ${dept===it.code?'selected':''}>${esc(it.label)}</option>`).join('')}${dept&&!deptItems.some(it=>it.code===dept)?`<option value="${esc(dept)}" selected>${esc(dept)}</option>`:''}</select></td>
       <td>${roster?`<select class="mini" onchange="setSchedulePersonDepartment('${roster.id}',this.value)">${SCHEDULE_DEPARTMENTS.map(d=>`<option value="${d}" ${rosterDept===d?'selected':''}>${d}</option>`).join('')}</select>`:'<span class="sub">미연결</span>'}</td>
       <td>${roster?`<input type="checkbox" ${roster.included_in_schedule!==false?'checked':''} onchange="setSchedulePersonIncluded('${roster.id}',this.checked)">`:'—'}</td>
       <td>${roster?`<span class="b ${roster.active===true?'ok':'no'}">${roster.active===true?'재직':'비활성'}</span> <button class="mini ${roster.active===true?'rej':'stamp'}" onclick="setSchedulePersonActive('${roster.id}',${roster.active===true?'false':'true'})">${roster.active===true?'비활성화':'재활성화'}</button>`:'—'}</td>
@@ -3678,22 +3700,22 @@ async function renderOwner(m){
       <select id="bulkRoleSelect" class="mini">${BULK_ROLE_ALLOWED_ROLES.map(r=>`<option value="${r}">${r}</option>`).join('')}</select>
       <button class="mini stamp" onclick="applyBulkRole()">선택한 사람에게 적용</button>
     </div>
-    <h3>🔒 케이스노트 접근 명단</h3>
+    <h3>${esc(hubText('owner.confid.title','🔒 케이스노트 접근 명단'))}</h3>
     <div class="tblwrap"><table><tr><th>이름</th><th>권한</th><th>접근</th><th></th></tr>
     ${PROFILES.filter(p=>p.approved!==false).map(p=>`<tr><td>${esc(p.name)}</td><td>${p.role}</td>
       <td>${accessSet.has(p.user_id)?'✅':'—'}</td>
       <td>${accessSet.has(p.user_id)
         ?`<button class="mini rej" onclick="revokeConfid('${p.user_id}')">제거</button>`
         :`<button class="mini" onclick="grantConfid('${p.user_id}')">추가</button>`}</td></tr>`).join('')}</table></div>
-    <h3>🧭 탭 노출 설정 <span class="sub">(역할별 · 즉시 반영)</span></h3>
+    <h3>${esc(hubText('owner.tabs.title','🧭 탭 노출 설정'))} <span class="sub">${esc(hubText('owner.tabs.sub','(역할별 · 즉시 반영)'))}</span></h3>
     <div class="tblwrap"><table><tr><th>탭</th>${['staff','manager','chief','owner'].map(r=>`<th>${r}</th>`).join('')}</tr>
-    ${['att','deposit','sched','leave','appr','notice','onbo','ai'].map(key=>{const t=TABS.find(x=>x.key===key),allowed=TAB_ROLES[key]||t.roles;return `<tr><td>${t.label}</td>${['staff','manager','chief','owner'].map(role=>`<td><input type="checkbox" ${allowed.includes(role)?'checked':''} ${role==='owner'?'disabled':''} onchange="toggleTabRole('${key}','${role}',this.checked)"></td>`).join('')}</tr>`;}).join('')}</table></div>
-    <h3>👤 사람별 탭 예외 <span class="sub">(역할 기본을 개인별로 덮어씀 · 즉시 반영)</span></h3>
+    ${['att','deposit','sched','leave','appr','notice','onbo','ai'].map(key=>{const t=TABS.find(x=>x.key===key),allowed=TAB_ROLES[key]||t.roles;return `<tr><td>${esc(tabLabel(key))}</td>${['staff','manager','chief','owner'].map(role=>`<td><input type="checkbox" ${allowed.includes(role)?'checked':''} ${role==='owner'?'disabled':''} onchange="toggleTabRole('${key}','${role}',this.checked)"></td>`).join('')}</tr>`;}).join('')}</table></div>
+    <h3>${esc(hubText('owner.override.title','👤 사람별 탭 예외'))} <span class="sub">${esc(hubText('owner.override.sub','(역할 기본을 개인별로 덮어씀 · 즉시 반영)'))}</span></h3>
     <select id="ovUser" onchange="renderOverrideRows()"><option value="">직원을 선택하세요</option>${PROFILES.filter(p=>p.approved!==false&&p.role!=='owner').map(p=>`<option value="${p.user_id}">${esc(p.name)} (${p.role})</option>`).join('')}</select>
     <div id="ovRows"></div>
   </div>
-  <div class="card"><h2>다음 설계 예정/혹은 할일 <span class="sub">(설계 완료·구현 예정)</span></h2>
-    <div class="stub">M2 근무표·계약서 자동생성 · M3 급여 대시보드/명세서 발행·월말 평가·휴일근로 계산기 · M4 채용·입금피드·기공차트 통합<br>— 백엔드(표)는 이미 준비됨. 화면만 순차 추가.</div>
+  <div class="card"><h2>${esc(hubText('owner.next.title','다음 설계 예정/혹은 할일'))} <span class="sub">${esc(hubText('owner.next.sub','(설계 완료·구현 예정)'))}</span></h2>
+    <div class="stub">${hubTextHtml('owner.next.body','M2 근무표·계약서 자동생성 · M3 급여 대시보드/명세서 발행·월말 평가·휴일근로 계산기 · M4 채용·입금피드·기공차트 통합\n— 백엔드(표)는 이미 준비됨. 화면만 순차 추가.')}</div>
   </div>`;
   previewEmployeeJobGroup();
   renderOverrideRows();
@@ -3714,7 +3736,7 @@ async function applyBulkRole(){
   await loadProfiles();setStatus('saved');render();
 }
 async function copyInviteMessage(){
-  try{await navigator.clipboard.writeText(inviteMessageText());showScheduleRosterError('안내 문구를 복사했습니다.');}
+  try{await navigator.clipboard.writeText(inviteMessageText());showScheduleRosterError(hubText('owner.invite.copied','안내 문구를 복사했습니다.'));}
   catch(e){showScheduleRosterError('복사 실패: '+(e&&e.message?e.message:'클립보드를 사용할 수 없습니다.'));}
 }
 async function setDept(uid,dept){const {error}=await sb.rpc('update_employee_profile_field',{p_user_id:uid,p_field:'dept',p_value:dept||''});if(error){setStatus('error');showScheduleRosterError('부서 변경 실패: '+error.message);return;}await loadProfiles();setStatus('saved');render();}
@@ -3795,7 +3817,7 @@ function renderOverrideRows(){
   const uid=sel.value,keys=['att','deposit','sched','leave','appr','notice','onbo','ai'];
   if(!uid){rows.innerHTML='<div class="sub">승인된 직원을 선택하세요.</div>';return;}
   const overrides=TAB_OVERRIDES[uid]||{};
-  rows.innerHTML=`<div class="tblwrap"><table><tr><th>탭</th><th>개인 예외</th></tr>${keys.map(key=>{const t=TABS.find(x=>x.key===key),v=overrides[key]===true?'show':overrides[key]===false?'hide':'';return `<tr><td>${t.label}</td><td><select class="mini" onchange="setTabOverride('${uid}','${key}',this.value)"><option value="" ${v===''?'selected':''}>기본(역할규칙)</option><option value="show" ${v==='show'?'selected':''}>보이기(강제)</option><option value="hide" ${v==='hide'?'selected':''}>숨기기(강제)</option></select></td></tr>`;}).join('')}</table></div>`;
+  rows.innerHTML=`<div class="tblwrap"><table><tr><th>탭</th><th>개인 예외</th></tr>${keys.map(key=>{const t=TABS.find(x=>x.key===key),v=overrides[key]===true?'show':overrides[key]===false?'hide':'';return `<tr><td>${esc(tabLabel(key))}</td><td><select class="mini" onchange="setTabOverride('${uid}','${key}',this.value)"><option value="" ${v===''?'selected':''}>기본(역할규칙)</option><option value="show" ${v==='show'?'selected':''}>보이기(강제)</option><option value="hide" ${v==='hide'?'selected':''}>숨기기(강제)</option></select></td></tr>`;}).join('')}</table></div>`;
 }
 async function setTabOverride(uid,key,val){
   const m=TAB_OVERRIDES[uid]||{};
@@ -3851,6 +3873,7 @@ async function onAuthed(session){
         const {data:ca}=await sb.from('confidential_access').select('user_id').eq('user_id',ME.id).maybeSingle();
         ME.confidAccess=!!ca||ME.role==='owner';
       }catch(e){ME.confidAccess=false;} // 조회 실패 시 fail closed — 탭을 숨기는 쪽으로
+      if(typeof HubUi!=='undefined')await HubUi.load(sb); // 원장이 고친 허브 글(hub_ui_texts)을 한 번 읽어 둠 — 실패하면 기본 글 그대로
       const requestedTab=typeof location!=='undefined'&&typeof URLSearchParams==='function'?new URLSearchParams(location.search).get('tab'):null;
       if(requestedTab&&visibleTabKeys().has(requestedTab))TAB=requestedTab;
       $('#meName').textContent=ME.name;$('#meRole').textContent=ME.role;

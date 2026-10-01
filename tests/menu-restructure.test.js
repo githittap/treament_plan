@@ -106,7 +106,8 @@ test('② 메뉴 라벨이 보드와 같다', () => {
 
 test('② 화면 안 제목도 새 이름과 어긋나지 않는다', () => {
   assert.match(hr, /<h2>🔒 진료기록<\/h2>/);
-  assert.match(hr, /<h2>🛡️ 계정·권한 관리<\/h2>/);
+  /* 원장이 허브 설정에서 제목을 고칠 수 있게 되어(hubText) 화면 코드의 기본값이 같은 글인지로 확인한다 */
+  assert.match(hr, /<h2>\$\{esc\(hubText\('owner\.title','🛡️ 계정·권한 관리'\)\)\}<\/h2>/);
   assert.match(hr, /다음 설계 예정\/혹은 할일/);
   assert.match(hr, /\[내 서류함\] 탭에서 제출하세요/);
   assert.doesNotMatch(hr, /다음 마일스톤/);
