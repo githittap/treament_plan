@@ -377,7 +377,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 
 <footer>© 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지</footer>
 
-<script src="hub-texts.js?v=2026100112"></script>
+<script src="hub-texts.js?v=2026100113"></script>
 <script>
 /* ═══════ 설정 ═══════
    실제 값은 DB의 app_settings 표에서 읽어옵니다.
@@ -392,6 +392,7 @@ let SETTINGS = {
 };
 /* 허브 설정의 숫자 읽기·화면 속 고정 글 바꿔 넣기 도우미(hub-texts.js가 없으면 기본값 그대로) */
 function hubN(k,d){return typeof hubSettingChecked==='function'?hubSettingChecked(k,d):d;}
+function hubTE(k,d,v){return hubT(k,d,v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');} /* 글 안에 따옴표가 있어 esc 대신 쓰는 이스케이프(따옴표는 그대로 둠 — 옛 화면과 글자 하나까지 같게) */
 function hubStaticFill(){try{if(typeof hubText!=='function'||typeof document==='undefined')return;document.querySelectorAll('[data-hubk]').forEach(function(el){if(el.dataset.hubd===undefined)el.dataset.hubd=el.textContent;el.textContent=hubText(el.getAttribute('data-hubk'),el.dataset.hubd);});document.querySelectorAll('[data-hubph]').forEach(function(el){if(el.dataset.hubpd===undefined)el.dataset.hubpd=el.getAttribute('placeholder')||'';el.setAttribute('placeholder',hubText(el.getAttribute('data-hubph'),el.dataset.hubpd));});}catch(e){}}
 /* 동적으로 그리는 HTML 속 글(차례 4): 요소에 data-hubk="키"를 달아 두면 표에 값이 있을 때만 그 글로 바꾸고 표지는 지운다(값이 없으면 옛 HTML과 한 글자도 다르지 않음) */
 function hubFillHtml(h){const s=String(h);if(typeof hubText!=='function')return s.replace(/ data-hubk="[a-z0-9_.]+"/g,'');return s.replace(/(<[a-z0-9]+\b[^>]*?) data-hubk="([a-z0-9_.]+)"([^>]*>)([^<]*)/g,function(m,a,k,b,t){const v=hubText(k,t);return a+b+(v===t?t:esc(v));});}
@@ -516,6 +517,7 @@ function buildJobGroupPreview(people = [], selected = [], targetGroup = '', asOf
 }
 let JOB_GROUP_SELECTION = new Map();
 function renderJobGroupAdmin() {
+  const jgT = typeof hubT === 'function' ? hubT : (k, d, v) => v ? String(d).replace(/\{([a-z_]+)\}/g, (m, n) => Object.prototype.hasOwnProperty.call(v, n) ? String(v[n]) : m) : String(d);
   const profileById = new Map(PROFILES.map(profile => [profile.user_id, profile]));
   const current = SCHEDULE_PEOPLE.filter(person => isCurrentJobGroupMember(person, profileById, today()));
   const unassigned = current.filter(person => employeeJobGroupModel(person, profileById).kind === 'unassigned');
@@ -524,7 +526,7 @@ function renderJobGroupAdmin() {
     return `<div class="job-group-summary-card" style="border-left:4px solid ${group.color}"><strong>${group.label}</strong><span>${count}명</span></div>`;
   }).join('');
   const unassignedWarning = unassigned.length
-    ? `<div class="job-group-unassigned-warning" role="alert"><strong>미지정 직원 ${unassigned.length}명</strong><span>${unassigned.map(person => esc(person.name)).join(' · ')}</span></div>`
+    ? `<div class="job-group-unassigned-warning" role="alert"><strong>${esc(jgT('jg.unassigned','미지정 직원 {n}명',{n:unassigned.length}))}</strong><span>${unassigned.map(person => esc(person.name)).join(' · ')}</span></div>`
     : '';
   const rows = current.map(person => {
     const model = employeeJobGroupModel(person, profileById);
@@ -532,13 +534,13 @@ function renderJobGroupAdmin() {
     return `<label class="job-group-person"><input type="checkbox" data-job-person="${esc(person.id)}" aria-label="${esc(person.name)} 직무 분류 대상" onchange="toggleJobGroupPerson('${person.id}',this.checked,'${oldGroup}')"><span>${esc(person.name)}</span><span>${model.label}</span></label>`;
   }).join('');
   const doctors = SCHEDULE_PEOPLE.filter(person => person.department === 'Dr.');
-  return `<section class="job-group-admin" aria-labelledby="jobGroupTitle"><h3 id="jobGroupTitle">직무 분류</h3>
-    <div class="job-group-doctors" role="note"><strong>Dr. 별도 유지 · 편집 제외</strong><span>${doctors.length ? doctors.map(person => `Dr. ${esc(person.name)}`).join(' · ') : '근무표의 기존 Dr. 항목 유지'}</span></div>
+  return `<section class="job-group-admin" aria-labelledby="jobGroupTitle"><h3 id="jobGroupTitle">${esc(jgT('jg.title','직무 분류'))}</h3>
+    <div class="job-group-doctors" role="note"><strong>${esc(jgT('jg.doctors','Dr. 별도 유지 · 편집 제외'))}</strong><span>${doctors.length ? doctors.map(person => `Dr. ${esc(person.name)}`).join(' · ') : esc(jgT('jg.doctors_none','근무표의 기존 Dr. 항목 유지'))}</span></div>
     <div class="job-group-summary">${summary}</div>${unassignedWarning}
-    <div class="job-group-form"><fieldset><legend>1. 대상 선택</legend><div class="job-group-people">${rows || '<span class="sub">현재 분류할 재직 직원 없음</span>'}</div></fieldset>
-      <label>2. 새 분류<select id="jobGroupTarget" aria-label="새 직무 분류" onchange="previewEmployeeJobGroup()"><option value="">분류 선택</option>${EMPLOYEE_JOB_GROUPS.map(group => `<option value="${group.code}">${group.label}</option>`).join('')}</select></label></div>
-    <div id="jobGroupPreview" class="job-group-preview" aria-live="polite">대상을 선택하고 새 분류를 고르면 미리보기가 표시됨</div>
-    <div class="job-group-actions"><span id="jobGroupMessage" role="status"></span><button id="jobGroupSave" class="mini stamp" disabled onclick="saveEmployeeJobGroupPreview()">미리보기대로 저장</button></div></section>`;
+    <div class="job-group-form"><fieldset><legend>${esc(jgT('jg.legend','1. 대상 선택'))}</legend><div class="job-group-people">${rows || '<span class="sub">'+esc(jgT('jg.no_people','현재 분류할 재직 직원 없음'))+'</span>'}</div></fieldset>
+      <label>${esc(jgT('jg.step2','2. 새 분류'))}<select id="jobGroupTarget" aria-label="새 직무 분류" onchange="previewEmployeeJobGroup()"><option value="">${esc(jgT('jg.opt_pick','분류 선택'))}</option>${EMPLOYEE_JOB_GROUPS.map(group => `<option value="${group.code}">${group.label}</option>`).join('')}</select></label></div>
+    <div id="jobGroupPreview" class="job-group-preview" aria-live="polite">${esc(jgT('jg.preview_hint','대상을 선택하고 새 분류를 고르면 미리보기가 표시됨'))}</div>
+    <div class="job-group-actions"><span id="jobGroupMessage" role="status"></span><button id="jobGroupSave" class="mini stamp" disabled onclick="saveEmployeeJobGroupPreview()">${esc(jgT('jg.btn_save','미리보기대로 저장'))}</button></div></section>`;
 }
 function toggleJobGroupPerson(id, checked, oldGroup) {
   if (checked) JOB_GROUP_SELECTION.set(id, { personId: id, oldGroup: oldGroup || null });
@@ -550,18 +552,18 @@ function previewEmployeeJobGroup() {
   if (!previewNode || !button) return;
   const preview = buildJobGroupPreview(SCHEDULE_PEOPLE, [...JOB_GROUP_SELECTION.values()], $('#jobGroupTarget')?.value || '', today(), PROFILES);
   window.JOB_GROUP_PREVIEW = preview;
-  previewNode.innerHTML = `<div><strong>변경 전</strong> ${EMPLOYEE_JOB_GROUPS.map(group => `${group.label} ${preview.beforeCounts[group.code]}명`).join(' · ')} · 미지정 ${preview.unassignedBefore}명</div>
-    <div><strong>변경 후</strong> ${EMPLOYEE_JOB_GROUPS.map(group => `${group.label} ${preview.afterCounts[group.code]}명`).join(' · ')} · 미지정 ${preview.unassignedAfter}명</div>
-    <ul>${preview.moves.map(move => `<li>${esc(move.name)}: ${EMPLOYEE_JOB_GROUPS.find(group => group.code === move.from)?.label || '미지정'} → ${EMPLOYEE_JOB_GROUPS.find(group => group.code === move.to)?.label || '미지정'}${move.stale ? ' · 값이 바뀌었음' : ''}</li>`).join('') || '<li>변경 대상 없음</li>'}</ul>`;
+  previewNode.innerHTML = `<div><strong>${esc(hubT('jg.p_before','변경 전'))}</strong> ${EMPLOYEE_JOB_GROUPS.map(group => `${group.label} ${preview.beforeCounts[group.code]}명`).join(' · ')} · 미지정 ${preview.unassignedBefore}명</div>
+    <div><strong>${esc(hubT('jg.p_after','변경 후'))}</strong> ${EMPLOYEE_JOB_GROUPS.map(group => `${group.label} ${preview.afterCounts[group.code]}명`).join(' · ')} · 미지정 ${preview.unassignedAfter}명</div>
+    <ul>${preview.moves.map(move => `<li>${esc(move.name)}: ${EMPLOYEE_JOB_GROUPS.find(group => group.code === move.from)?.label || '미지정'} → ${EMPLOYEE_JOB_GROUPS.find(group => group.code === move.to)?.label || '미지정'}${move.stale ? ' · ' + esc(hubT('jg.p_stale','값이 바뀌었음')) : ''}</li>`).join('') || '<li>'+esc(hubT('jg.p_none','변경 대상 없음'))+'</li>'}</ul>`;
   button.disabled = !preview.canSave;
 }
 async function saveEmployeeJobGroupPreview() {
   const preview = window.JOB_GROUP_PREVIEW, target = $('#jobGroupTarget')?.value;
   const message = $('#jobGroupMessage'), button = $('#jobGroupSave');
-  if (!preview?.canSave || !target) { if (message) message.textContent = '저장할 수 없음: 대상을 다시 선택하고 미리보기를 확인하세요.'; return; }
-  if (!ME?.id) { if (message) message.textContent = '로그인 세션 없음 — 다시 로그인한 뒤 재시도하세요.'; return; }
+  if (!preview?.canSave || !target) { if (message) message.textContent = hubT('jg.m_cannot','저장할 수 없음: 대상을 다시 선택하고 미리보기를 확인하세요.'); return; }
+  if (!ME?.id) { if (message) message.textContent = hubT('jg.m_nosession','로그인 세션 없음 — 다시 로그인한 뒤 재시도하세요.'); return; }
   if (button) button.disabled = true;
-  if (message) message.textContent = '저장 중…';
+  if (message) message.textContent = hubT('jg.m_saving','저장 중…');
   const failed = [];
   for (const move of preview.moves) {
     const table = move.profileUserId ? 'profiles' : 'schedule_people';
@@ -596,14 +598,14 @@ async function saveEmployeeJobGroupPreview() {
     const serverFailed = failed.some(item => item.code === 'SERVER' || /^5/.test(String(item.code || '')));
     const conflictFailed = failed.some(item => item.code === 'CONFLICT');
     const resultMessage = finalFailed.length
-      ? `${sessionFailed ? '세션 만료' : permissionFailed ? '권한 거부' : serverFailed ? '서버 오류' : conflictFailed ? '동시 변경 충돌' : '일부 저장 실패'} · 성공 ${verified.length}명 / 실패 ${finalFailed.length}명 · 실패 ID ${finalFailed.join(', ')}`
-      : `분류 변경 저장 확인됨: ${verified.length}명`;
+      ? `${sessionFailed ? hubT('jg.f_session','세션 만료') : permissionFailed ? hubT('jg.f_perm','권한 거부') : serverFailed ? hubT('jg.f_server','서버 오류') : conflictFailed ? hubT('jg.f_conflict','동시 변경 충돌') : hubT('jg.f_some','일부 저장 실패')} · ${hubT('jg.f_counts','성공 {ok}명 / 실패 {fail}명 · 실패 ID {ids}',{ok:verified.length,fail:finalFailed.length,ids:finalFailed.join(', ')})}`
+      : hubT('jg.m_ok','분류 변경 저장 확인됨: {n}명',{n:verified.length});
     if (finalMessage) finalMessage.textContent = resultMessage;
     setStatus(finalFailed.length ? 'error' : 'saved');
   } catch (error) {
     JOB_GROUP_SELECTION = new Map(); await render();
     const refreshedMessage = $('#jobGroupMessage');
-    if (refreshedMessage) refreshedMessage.textContent = `저장 후 재조회 실패 — 성공 여부 불명확, 완료로 처리하지 않음: ${error.message || error}`;
+    if (refreshedMessage) refreshedMessage.textContent = hubT('jg.m_refetch','저장 후 재조회 실패 — 성공 여부 불명확, 완료로 처리하지 않음: {detail}',{detail:error.message || error});
     setStatus('error');
   }
 }
@@ -673,8 +675,8 @@ function leaveTypeLabel(code){const it=leaveTypeItems().find(i=>i.code===code);r
 function mondayStr(ds){const d=new Date(ds+'T00:00:00');const g=d.getDay();d.setDate(d.getDate()+(g===0?-6:1-g));return dstr(d);}
 const SHIFTS={work:{l:'근무'},off:{l:'off'},evening:{l:'야간'},etc:{l:'기타'}};
 function setStatus(k){const el=$('#saveTag');if(!el)return;el.classList.remove('err');
-  if(k==='saving')el.textContent='저장 중…';else if(k==='saved'){el.textContent='✓ 저장됨';setTimeout(()=>el.textContent='✓ 자동 저장',1200);}
-  else if(k==='error'){el.textContent='⚠ 저장 안됨 · 인터넷 확인';el.classList.add('err');}else el.textContent='✓ 자동 저장';}
+  if(k==='saving')el.textContent=hubT('save.saving','저장 중…');else if(k==='saved'){el.textContent=hubT('save.saved','✓ 저장됨');setTimeout(()=>el.textContent=hubT('save.auto','✓ 자동 저장'),1200);}
+  else if(k==='error'){el.textContent=hubT('save.error','⚠ 저장 안됨 · 인터넷 확인');el.classList.add('err');}else el.textContent=hubT('save.auto','✓ 자동 저장');}
 function show(id){$('#'+id).classList.add('show');}function hide(id){$('#'+id).classList.remove('show');}
 
 /* ── 탭 정의 (role 노출) ── */
@@ -860,9 +862,16 @@ async function render(){
 }
 
 /* ── 홈 ── */
+function homeFillLiteral(h){return String(h)
+  .replace("onclick=\"go('inbox')\">문의함 열기<",()=>"onclick=\"go('inbox')\">"+esc(hubT('home.inbox_open','문의함 열기'))+'<')
+  .replace(/NEW\(미처리\) 문의 (\d+)건/,(m,n)=>esc(hubT('home.inbox_new','NEW(미처리) 문의 {n}건',{n:n})))
+  .replace(/⚠ 미제출 서류 (\d+)개 — \[내 서류함\] 탭에서 제출하세요\./,(m,n)=>esc(hubT('home.undone_alert','⚠ 미제출 서류 {n}개 — [내 서류함] 탭에서 제출하세요.',{n:n})))
+  .replace('문의함 요약을 불러오지 못했습니다.',()=>esc(hubT('home.inbox_err','문의함 요약을 불러오지 못했습니다.')))
+  .replace('<div class="hint">매니저·실장·원장만 상담 기록을 입력·조회·수정합니다.</div>',()=>'<div class="hint">'+esc(hubT('home.consult_hint','매니저·실장·원장만 상담 기록을 입력·조회·수정합니다.'))+'</div>')
+  .replace("onclick=\"go('consult')\">상담일지 열기<",()=>"onclick=\"go('consult')\">"+esc(hubT('home.consult_open','상담일지 열기'))+'<');} /* 홈 글: 기존 시험이 이 줄 모양을 찾으므로 원문은 그대로 두고, 고쳤을 때만 바꿔 넣음 */
 async function renderHome(m){
   const {data:bal}=await sb.from('v_leave_balance').select('*').eq('user_id',ME.id).maybeSingle();
-  const {data:mySlips}=await sb.from('payslips').select('id,month,html').eq('user_id',ME.id).eq('issued',true).order('month',{ascending:false}).limit(12);
+  const {data:mySlips}=await sb.from('payslips').select('id,month,html').eq('user_id',ME.id).eq('issued',true).order('month',{ascending:false}).limit(hubN('home.payslip_limit',12));
   MY_PAYSLIPS=mySlips||[];
   const {data:oi}=await sb.from('onboarding_items').select('*').eq('active',true);
   const {data:oc}=await sb.from('onboarding_checks').select('*').eq('user_id',ME.id);
@@ -879,27 +888,27 @@ async function renderHome(m){
       if(countError||recentError)inboxError='문의함 요약을 불러오지 못했습니다.';
       else{newCount=count||0;recentRows=homeInboxRecentRows(recent);}
     }catch{inboxError='문의함 요약을 불러오지 못했습니다.';}
-    homeInboxCard=`<div class="card"><div class="rowflex" style="justify-content:space-between;align-items:center;gap:10px"><div><h2 style="margin:0">📥 문의함 <span class="big" style="font-size:20px">${inboxError?'—':newCount}</span></h2><div class="hint">${inboxError?'미처리 개수를 확인할 수 없습니다.':`NEW(미처리) 문의 ${newCount}건`}</div></div><button class="mini" onclick="go('inbox')">문의함 열기</button></div>${inboxError?`<div class="hint" style="color:var(--gold)">${esc(inboxError)}</div>`:recentRows.length?`<div style="margin-top:8px">${recentRows.map(row=>`<div class="hint" style="padding:5px 0;border-top:1px dashed var(--line)">${esc(formatLeaveTimestamp(row.receivedAt)||'미상')} · ${esc(row.source)} · ${esc(row.name)} · <span class="b ${inboxStatusInfo(row.status).className}">${esc(inboxStatusInfo(row.status).label)}</span>${row.message?` · ${esc(row.message)}`:''}</div>`).join('')}</div>`:'<div class="hint" style="margin-top:8px">최근 문의가 없습니다.</div>'}</div>`;
+    homeInboxCard=`<div class="card"><div class="rowflex" style="justify-content:space-between;align-items:center;gap:10px"><div><h2 style="margin:0">${esc(hubT('home.inbox_title','📥 문의함'))} <span class="big" style="font-size:20px">${inboxError?'—':newCount}</span></h2><div class="hint">${inboxError?esc(hubT('home.inbox_count_err','미처리 개수를 확인할 수 없습니다.')):`NEW(미처리) 문의 ${newCount}건`}</div></div><button class="mini" onclick="go('inbox')">문의함 열기</button></div>${inboxError?`<div class="hint" style="color:var(--gold)">${esc(inboxError)}</div>`:recentRows.length?`<div style="margin-top:8px">${recentRows.map(row=>`<div class="hint" style="padding:5px 0;border-top:1px dashed var(--line)">${esc(formatLeaveTimestamp(row.receivedAt)||hubT('home.inbox_unknown','미상'))} · ${esc(row.source)} · ${esc(row.name)} · <span class="b ${inboxStatusInfo(row.status).className}">${esc(inboxStatusInfo(row.status).label)}</span>${row.message?` · ${esc(row.message)}`:''}</div>`).join('')}</div>`:'<div class="hint" style="margin-top:8px">'+esc(hubT('home.inbox_recent_empty','최근 문의가 없습니다.'))+'</div>'}</div>`;
   }
-  m.innerHTML=`
-  <div class="card"><h2>안녕하세요, ${esc(ME.name)}님</h2>
+  m.innerHTML=homeFillLiteral(`
+  <div class="card"><h2>${esc(hubT('home.greeting','안녕하세요, {name}님',{name:((ME.name)??'')}))}</h2>
     <div class="rowflex">
-      <div class="stat"><div class="sub">내 연차 잔여</div><div class="big">${bal?bal.balance:0}<span style="font-size:14px"> 일</span></div></div>
-      <div class="stat"><div class="sub">안 읽은 공지</div><div class="big">${BADGE.notice||0}</div></div>
-      <div class="stat"><div class="sub">미제출 서류</div><div class="big" style="color:${undone.length?'var(--gold)':'var(--mint)'}">${undone.length}</div></div>
+      <div class="stat"><div class="sub">${esc(hubT('home.stat_leave','내 연차 잔여'))}</div><div class="big">${bal?bal.balance:0}<span style="font-size:14px"> 일</span></div></div>
+      <div class="stat"><div class="sub">${esc(hubT('home.stat_notice','안 읽은 공지'))}</div><div class="big">${BADGE.notice||0}</div></div>
+      <div class="stat"><div class="sub">${esc(hubT('home.stat_undone','미제출 서류'))}</div><div class="big" style="color:${undone.length?'var(--gold)':'var(--mint)'}">${undone.length}</div></div>
     </div>
     ${undone.length?`<div class="hint" style="color:var(--gold)">⚠ 미제출 서류 ${undone.length}개 — [내 서류함] 탭에서 제출하세요.</div>`:''}
   </div>
   ${undone.length&&onboardingGuideVisibleForRole(ME.role)?onboardingGuideCard({collapsed:true}):''}
-  ${MY_PAYSLIPS.length?`<div class="card"><h2>💰 내 명세서</h2>${MY_PAYSLIPS.map(s=>`<div class="rowflex" style="justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line)"><span>${esc(s.month)}</span><button class="mini" onclick="openMyPayslip(${s.id})">보기</button></div>`).join('')}</div>`:''}
+  ${MY_PAYSLIPS.length?`<div class="card"><h2>${esc(hubT('home.slip_title','💰 내 명세서'))}</h2>${MY_PAYSLIPS.map(s=>`<div class="rowflex" style="justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line)"><span>${esc(s.month)}</span><button class="mini" onclick="openMyPayslip(${s.id})">${esc(hubT('home.slip_btn','보기'))}</button></div>`).join('')}</div>`:''}
   ${homeInboxCard}
-  ${canManageConsultation()?'<div class="card" style="padding:12px 14px"><div class="rowflex" style="justify-content:space-between;align-items:center;gap:10px"><div><h2 style="margin-bottom:3px">🗂 상담일지</h2><div class="hint">매니저·실장·원장만 상담 기록을 입력·조회·수정합니다.</div></div><button class="mini" onclick="go(\'consult\')">상담일지 열기</button></div></div>':''}`;
+  ${canManageConsultation()?'<div class="card" style="padding:12px 14px"><div class="rowflex" style="justify-content:space-between;align-items:center;gap:10px"><div><h2 style="margin-bottom:3px">'+esc(hubT('home.consult_title','🗂 상담일지'))+'</h2><div class="hint">매니저·실장·원장만 상담 기록을 입력·조회·수정합니다.</div></div><button class="mini" onclick="go(\'consult\')">상담일지 열기</button></div></div>':''}`);
   refreshBadges();
 }
 
 /* ── 입금 ── */
 async function renderDeposit(m){
-  if(!canViewDeposit(ME)){m.innerHTML='<div class="card"><div class="empty">예치금은 데스크·실장·원장만 조회할 수 있습니다.</div></div>';return;}
+  if(!canViewDeposit(ME)){m.innerHTML='<div class="card"><div class="empty">'+esc(hubT('dep.no_access','예치금은 데스크·실장·원장만 조회할 수 있습니다.'))+'</div></div>';return;}
   const tabAtEntry=TAB;
   const nowKst=new Date(Date.now()+9*60*60*1000);
   const y=nowKst.getUTCFullYear(),mo=nowKst.getUTCMonth(),d=nowKst.getUTCDate();
@@ -909,21 +918,21 @@ async function renderDeposit(m){
   else if(DEP_RANGE==='week')fromIso=kstIso(y,mo,d-7);
   else fromIso=kstIso(y,mo,1),toIso=kstIso(y,mo+1,1);
   const {data:rows}=await sb.from('deposits').select('id,bank_dt,amount,payer_raw,is_card,account_tail')
-    .gte('bank_dt',fromIso).lt('bank_dt',toIso).order('bank_dt',{ascending:false}).order('id',{ascending:false}).limit(300);
+    .gte('bank_dt',fromIso).lt('bank_dt',toIso).order('bank_dt',{ascending:false}).order('id',{ascending:false}).limit(hubN('dep.list_limit',300));
   if(TAB!==tabAtEntry||TAB!=='deposit')return;
   const dtf=new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
   m.innerHTML=`
-  <div class="card"><h2>💰 입금</h2>
-    <div class="hint" style="color:var(--gold)">⚠ 미검증 자동 알림 · 회계 원장이 아니며 수기 대조용</div>
+  <div class="card"><h2>${esc(hubT('dep.title','💰 입금'))}</h2>
+    <div class="hint" style="color:var(--gold)">${esc(hubT('dep.warn','⚠ 미검증 자동 알림 · 회계 원장이 아니며 수기 대조용'))}</div>
     <div class="chips" style="margin:10px 0">
-      <button class="mini ${DEP_RANGE==='today'?'stamp':''}" onclick="setDepRange('today')">오늘</button>
-      <button class="mini ${DEP_RANGE==='week'?'stamp':''}" onclick="setDepRange('week')">7일</button>
-      <button class="mini ${DEP_RANGE==='month'?'stamp':''}" onclick="setDepRange('month')">이번달</button>
+      <button class="mini ${DEP_RANGE==='today'?'stamp':''}" onclick="setDepRange('today')">${esc(hubT('dep.btn_today','오늘'))}</button>
+      <button class="mini ${DEP_RANGE==='week'?'stamp':''}" onclick="setDepRange('week')">${esc(hubT('dep.btn_week','7일'))}</button>
+      <button class="mini ${DEP_RANGE==='month'?'stamp':''}" onclick="setDepRange('month')">${esc(hubT('dep.btn_month','이번달'))}</button>
     </div>
-    ${(rows||[]).length?`<div class="tblwrap"><table><tr><th>시각</th><th style="text-align:right">금액</th><th>입금자</th><th>계좌</th></tr>
+    ${(rows||[]).length?`<div class="tblwrap"><table><tr><th>${esc(hubT('dep.th_time','시각'))}</th><th style="text-align:right">${esc(hubT('dep.th_amount','금액'))}</th><th>${esc(hubT('dep.th_payer','입금자'))}</th><th>${esc(hubT('dep.th_account','계좌'))}</th></tr>
     ${(rows||[]).map(r=>`<tr><td>${dtf.format(new Date(r.bank_dt))}</td><td style="text-align:right">₩${Number(r.amount).toLocaleString('ko-KR')}</td>
-      <td>${r.is_card?'💳 카드결제(추정) <span class="sub">'+esc(r.payer_raw||'')+'</span>':esc(r.payer_raw||'')}</td><td>${esc(r.account_tail||'')}</td></tr>`).join('')}</table></div>`
-    :'<div class="empty">입금 내역이 없습니다 (자동 수집 대기)</div>'}
+      <td>${r.is_card?esc(hubT('dep.card_est','💳 카드결제(추정)'))+' <span class="sub">'+esc(r.payer_raw||'')+'</span>':esc(r.payer_raw||'')}</td><td>${esc(r.account_tail||'')}</td></tr>`).join('')}</table></div>`
+    :'<div class="empty">'+esc(hubT('dep.empty','입금 내역이 없습니다 (자동 수집 대기)'))+'</div>'}
   </div>`;
 }
 
@@ -1595,7 +1604,7 @@ async function renderAppr(m){
 function docCard(d,actable,issuedByDoc=new Map()){
   const st=d.status==='완결'?'ok':(['반려','취소'].includes(d.status)?'no':'wait');
   return `<div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px">
-    <b>[${esc(approvalKindDisplay(d))}] ${esc(d.title)}</b> <span class="b ${st}">${esc(d.status)}</span> <span class="sub">${md(d.created_at)} · ${esc(nameOf(d.author))}</span>
+    <b>[${esc(approvalKindDisplay(d))}] ${esc(d.title)}</b> <span class="b ${st}">${esc(approvalStatusLabel(d.status))}</span> <span class="sub">${md(d.created_at)} · ${esc(nameOf(d.author))}</span>
     <div class="sub" style="margin:4px 0;white-space:pre-wrap">${esc(d.body||'')}</div>
     <div id="steps-${d.id}" class="sub">…</div>
     ${issuedByDoc.has(d.id)?`<button class="mini" onclick="openEmploymentCertificate(${issuedByDoc.get(d.id)})">${esc(hubT('appr.card.open_cert','발급본 열기'))}</button>`:''}
@@ -1669,6 +1678,7 @@ function downloadEmploymentCertificate(){
 function printEmploymentCertificate(){document.body.classList.add('certificate-printing');const done=()=>{document.body.classList.remove('certificate-printing');window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);window.print();}
 /* approval-request:test-end */
 function approvalKindItems(){const def=[{code:'연차 신청',label:'연차 신청'},{code:'사직서',label:'사직서'},{code:'재직증명서 발급',label:'재직증명서 발급'},{code:'보고',label:'보고'},{code:'소명',label:'소명'},{code:'기타',label:'기타'}];if(typeof hubList!=='function')return def;const codes=new Set(def.map(d=>d.code));return hubList('list.approval_kinds',def).filter(i=>codes.has(i.code));} /* 결재 종류 이름: 허브 설정 › 목록에서 이름만 고침(코드는 저장 규칙·재직증명서 발급 흐름과 묶여 고정, 새 종류 못 늘림) */
+function approvalStatusLabel(c){const def=[{code:'진행',label:'진행'},{code:'완결',label:'완결'},{code:'반려',label:'반려'},{code:'취소',label:'취소'}];const items=typeof hubList==='function'?hubList('list.approval_status',def):def;const it=items.find(function(i){return i.code===c;});return it?it.label:c;} /* 결재 문서 상태 이름: 허브 설정 › 목록에서 이름만 고침(코드는 결재 흐름·DB 값이라 고정) */
 function approvalKindDisplay(doc){const kind=String(doc&&doc.kind!=null?doc.kind:'');let code=null;if(kind==='기타')code=isEmploymentCertificateRequest(doc)?'재직증명서 발급':'기타';else for(const c in APPROVAL_KIND_VALUES){if(APPROVAL_KIND_VALUES[c]===kind&&c!=='재직증명서 발급'){code=c;break;}}const it=code?approvalKindItems().find(i=>i.code===code):null;return it&&it.label!==code?it.label:kind;} /* 문서 카드의 [종류]: 원장이 이름을 고친 종류만 새 이름, 안 고쳤으면 저장된 종류 그대로(옛 화면과 같음) */
 function apprKindSelectFill(){try{const sel=$('#apKind');if(!sel)return;const items=approvalKindItems(),want=items.map(i=>i.code+'|'+i.label).join('\n'),have=Array.from(sel.options||[]).map(o=>o.value+'|'+o.textContent).join('\n');if(want===have)return;const cur=sel.value;sel.innerHTML=items.map(i=>hubOptionHtml(i.code,i.label)).join('');if(items.some(i=>i.code===cur))sel.value=cur;}catch(e){}} /* 결재 올리기 창의 종류 고르는 칸: 값은 코드, 글은 허브 설정의 이름 */
 /* ── 공지 ── */
@@ -2225,7 +2235,7 @@ function employeeDocumentsCard(docs,error,contractRows,contractError,leaveDocs,l
   const docRows=allRows.map(d=>'<tr data-doc-filter="직원서류">'+who(d)+'<td>'+esc(docKindLabel(d.document_type||'근로계약서'))+'</td><td>'+esc(d.original_name)+'</td><td>'+contractDate(d.created_at)+'</td><td>'+ (d._kind==='contract'?'<button class="mini" onclick="previewEmployeeContract('+d.id+')">'+esc(hubT('onbo.docs.open','열기'))+'</button>':'<button class="mini" onclick="downloadEmployeeDocument('+d.id+')">'+esc(hubT('onbo.docs.open','열기'))+'</button>')+'</td></tr>').join('');
   const leaveRows=(leaveDocs||[]).map(d=>'<tr data-doc-filter="연차증빙">'+who(d)+'<td>'+esc(hubT('onbo.docs.filter_leave','연차증빙'))+'</td><td>'+esc(d.original_name)+'</td><td>'+md(d.created_at)+'</td><td><button class="mini" onclick="downloadLeaveApplicationDocument('+d.id+')">'+esc(hubT('onbo.docs.open','열기'))+'</button></td></tr>').join('');
   const issuedByDoc=new Map(certificates.map(r=>[r.approval_doc_id,r.id]));
-  const approvalRows=(approvalDocs||[]).map(d=>'<tr data-doc-filter="결재 요청">'+who(d)+'<td>'+esc(hubT('onbo.docs.approval_row','결재 요청 · {kind}',{kind:d.kind}))+'</td><td>'+esc(d.title)+'</td><td>'+md(d.created_at)+'</td><td><span class="b '+(d.status==='완결'?'ok':d.status==='반려'?'no':'wait')+'">'+esc(d.status)+'</span>'+ (issuedByDoc.has(d.id)?' <button class="mini" onclick="openEmploymentCertificate('+issuedByDoc.get(d.id)+')">'+esc(hubT('onbo.docs.open_issued','발급본 열기'))+'</button>':'')+'</td></tr>').join('');
+  const approvalRows=(approvalDocs||[]).map(d=>'<tr data-doc-filter="결재 요청">'+who(d)+'<td>'+esc(hubT('onbo.docs.approval_row','결재 요청 · {kind}',{kind:d.kind}))+'</td><td>'+esc(d.title)+'</td><td>'+md(d.created_at)+'</td><td><span class="b '+(d.status==='완결'?'ok':d.status==='반려'?'no':'wait')+'">'+esc(typeof approvalStatusLabel==='function'?approvalStatusLabel(d.status):d.status)+'</span>'+ (issuedByDoc.has(d.id)?' <button class="mini" onclick="openEmploymentCertificate('+issuedByDoc.get(d.id)+')">'+esc(hubT('onbo.docs.open_issued','발급본 열기'))+'</button>':'')+'</td></tr>').join('');
   const allCount=allRows.length+(leaveDocs||[]).length+(approvalDocs||[]).length;
   const rows=docRows+leaveRows+approvalRows;
   const list=allCount?'<div class="tblwrap"><table><thead><tr>'+(lead?'<th>'+esc(hubT('onbo.docs.th_staff','직원'))+'</th>':'')+'<th>'+esc(hubT('onbo.docs.th_kind','종류'))+'</th><th>'+esc(hubT('onbo.docs.th_doc','문서'))+'</th><th>'+esc(hubT('onbo.docs.th_date','날짜'))+'</th><th>'+esc(hubT('onbo.docs.th_state','상태·열기'))+'</th></tr></thead><tbody id="employeeDocumentRows">'+rows+'<tr id="employeeDocumentEmpty" style="display:none"><td colspan="'+(lead?5:4)+'" class="empty">'+esc(hubT('onbo.docs.empty_filter','해당 종류의 문서가 없습니다.'))+'</td></tr></tbody></table></div>':'<div class="empty">'+esc(hubT('onbo.docs.empty_all','올린 서류가 없습니다.'))+'</div>';
@@ -2277,7 +2287,7 @@ function bindPaymentReceiptPreviewHandlers(scope){
 function paymentRequestCard(rows,error,receipts,receiptsError){
   const visible=rows||[],files=receipts||[];PAYMENT_RECEIPT_PREVIEWS=[];
   const errorText=error||receiptsError?'<div class="hint" style="color:var(--red)">'+esc(hubT('onbo.pay.err','결제 요청 연결 대기: {detail}',{detail:(error||receiptsError)?.message||error||receiptsError}))+'</div>':'';
-  const list=visible.length?'<div class="tblwrap"><table><thead><tr><th>'+esc(hubT('onbo.pay.th_item','결제건'))+'</th><th>'+esc(hubT('onbo.pay.th_amount','금액'))+'</th><th>결제마감일</th><th>입금계좌</th><th>'+esc(hubT('onbo.pay.th_status','상태'))+'</th><th>'+esc(hubT('onbo.pay.th_receipt','영수증'))+'</th><th>'+esc(hubT('onbo.pay.th_act','결재'))+'</th></tr></thead><tbody>'+visible.map(r=>{const mineFiles=files.filter(f=>Number(f.request_id)===Number(r.id)),account=[r.bank_name,r.account_holder,r.account_number].filter(Boolean).map(esc).join(' · ');return '<tr><td>'+esc(r.payment_item)+'</td><td>'+Number(r.amount_krw||0).toLocaleString('ko-KR')+'원</td><td>'+esc(r.deadline_date||'-')+'</td><td>'+account+'</td><td>'+esc(paymentRequestStatusLabel(r.status))+'</td><td>'+(mineFiles.length?mineFiles.map(f=>{const index=PAYMENT_RECEIPT_PREVIEWS.push(f)-1;return '<button class="mini" data-payment-receipt-index="'+index+'">'+esc(f.original_name)+'</button>';}).join(' '):esc(hubT('onbo.pay.none','없음')))+'</td><td>'+((paymentRequestCanAct(r,ME.role))?'<button class="mini stamp" onclick="paymentRequestAct('+r.id+',\'approve\')">'+esc(hubT('onbo.pay.btn_approve','승인'))+'</button> <button class="mini rej" onclick="paymentRequestAct('+r.id+',\'reject\')">'+esc(hubT('onbo.pay.btn_reject','반려'))+'</button>':'-')+'</td></tr>';}).join('')+'</tbody></table></div>':'<div class="empty">'+esc(hubT('onbo.pay.empty','내 결제 요청이 없습니다.'))+'</div>';
+  const list=visible.length?'<div class="tblwrap"><table><thead><tr><th>'+esc(hubT('onbo.pay.th_item','결제건'))+'</th><th>'+esc(hubT('onbo.pay.th_amount','금액'))+'</th><th>결제마감일</th><th>입금계좌</th><th>'+esc(hubT('onbo.pay.th_status','상태'))+'</th><th>'+esc(hubT('onbo.pay.th_receipt','영수증'))+'</th><th>'+esc(hubT('onbo.pay.th_act','결재'))+'</th></tr></thead><tbody>'+visible.map(r=>{const mineFiles=files.filter(f=>Number(f.request_id)===Number(r.id)),account=[r.bank_name,r.account_holder,r.account_number].filter(Boolean).map(esc).join(' · ');return '<tr><td>'+esc(r.payment_item)+'</td><td>'+Number(r.amount_krw||0).toLocaleString('ko-KR')+esc(hubT('payreq.unit_won','원'))+'</td><td>'+esc(r.deadline_date||'-')+'</td><td>'+account+'</td><td>'+esc(paymentRequestStatusLabel(r.status))+'</td><td>'+(mineFiles.length?mineFiles.map(f=>{const index=PAYMENT_RECEIPT_PREVIEWS.push(f)-1;return '<button class="mini" data-payment-receipt-index="'+index+'">'+esc(f.original_name)+'</button>';}).join(' '):esc(hubT('onbo.pay.none','없음')))+'</td><td>'+((paymentRequestCanAct(r,ME.role))?'<button class="mini stamp" onclick="paymentRequestAct('+r.id+',\'approve\')">'+esc(hubT('onbo.pay.btn_approve','승인'))+'</button> <button class="mini rej" onclick="paymentRequestAct('+r.id+',\'reject\')">'+esc(hubT('onbo.pay.btn_reject','반려'))+'</button>':'-')+'</td></tr>';}).join('')+'</tbody></table></div>':'<div class="empty">'+esc(hubT('onbo.pay.empty','내 결제 요청이 없습니다.'))+'</div>';
   return `<div class="card" id="paymentRequestBox"><h2>${esc(hubT('onbo.pay.title','💳 결제 요청'))}</h2><div class="hint">${esc(hubT('onbo.pay.hint','금액·계좌·영수증은 요청자와 결재선(실장 → 원장)만 볼 수 있습니다.'))}</div>${errorText}${list}<div class="grid" style="margin-top:10px"><div class="fld w2"><label>${esc(hubT('onbo.pay.f_item','결제건(사유) *'))}</label><input id="paymentItem" maxlength="500"></div><div class="fld"><label>${esc(hubT('onbo.pay.f_amount','결제금액 *'))}</label><input id="paymentAmount" type="number" min="1" inputmode="numeric"></div><div class="fld"><label>${esc(hubT('onbo.pay.f_deadline','결제마감일'))}</label><input id="paymentDeadline" type="date"></div><div class="fld"><label>${esc(hubT('onbo.pay.f_bank','결제은행 *'))}</label><input id="paymentBank" maxlength="100"></div><div class="fld"><label>${esc(hubT('onbo.pay.f_holder','예금주 *'))}</label><input id="paymentHolder" maxlength="100"></div><div class="fld"><label>${esc(hubT('onbo.pay.f_account','계좌번호 *'))}</label><input id="paymentAccount" maxlength="100"></div><div class="fld w2"><label>${esc(hubT('onbo.pay.f_files','영수증·파일'))}</label><input id="paymentFiles" type="file" multiple accept="application/pdf,image/jpeg,image/png,.doc,.docx,.hwp,.hwpx"></div></div><button class="hbtn pri" style="margin-top:10px" onclick="submitPaymentRequest()">${esc(hubT('onbo.pay.btn_submit','실장·원장에게 결제 요청'))}</button><div class="msg" id="paymentMsg"></div></div>`;
 }
 function hubT(k,d,v){return typeof hubText==='function'?hubText(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
@@ -2289,9 +2299,10 @@ async function submitPaymentRequest(){
   setStatus('saved');render();
 }
 async function paymentRequestAct(id,action){const reason=action==='reject'?prompt(hubT('onbo.pay.p_reject_reason','반려 사유를 입력하세요.'))||'':null;if(action==='reject'&&!reason)return;const {error}=await sb.rpc('payment_request_act',{p_request_id:Number(id),p_action:action,p_reason:reason});if(error){alert(hubT('onbo.pay.a_act_fail','결재 처리 실패: {detail}',{detail:error.message}));return;}setStatus('saved');render();}
+function empdocPreviewFill(h){return String(h).replace('title="근로계약서 미리보기"',()=>'title="'+esc(hubT('empdoc.preview_title','근로계약서 미리보기'))+'"');} /* 직원 서류함 계약서 미리보기 창 이름: 기존 시험이 이 줄 모양을 찾으므로 원문은 그대로 두고, 고쳤을 때만 바꿔 넣음 */
 function previewEmployeeContract(id){
   const box=$('#employeeContractPreview'),row=EMPLOYEE_CONTRACT_PREVIEWS[id];if(!box||!row)return;
-  box.style.display='block';box.innerHTML='<h3>'+esc(row.original_name||'근로계약서')+'</h3><iframe title="근로계약서 미리보기" sandbox="" style="width:100%;min-height:520px;border:1px solid var(--line);border-radius:8px;background:#fff" srcdoc="'+esc(contractPreviewHtml(row))+'"></iframe>';
+  box.style.display='block';box.innerHTML=empdocPreviewFill('<h3>'+esc(row.original_name||hubT('empdoc.preview_name','근로계약서'))+'</h3><iframe title="근로계약서 미리보기" sandbox="" style="width:100%;min-height:520px;border:1px solid var(--line);border-radius:8px;background:#fff" srcdoc="'+esc(contractPreviewHtml(row))+'"></iframe>');
 }
 async function uploadEmployeeDocument(){
   const file=$('#edFile')?.files?.[0],msg=$('#edMsg'),type=$('#edType')?.value,problem=validateEmployeeDocument(file,type);if(problem){msg.textContent=problem;return;}
@@ -2339,18 +2350,19 @@ async function confirmOnbo(itemId){await sb.from('onboarding_checks').update({st
 async function addOnboItem(){const l=$('#oiNew').value.trim();if(!l)return;await sb.from('onboarding_items').insert({label:l});setStatus('saved');render();}
 
 /* ── 진료기록(구 케이스노트) ── */
+function confFill(h){return String(h).replace('<h2>🔒 진료기록</h2>',()=>'<h2>'+esc(hubT('cf.title','🔒 진료기록'))+'</h2>');} /* 진료기록 제목: 기존 시험이 이 줄 모양을 찾으므로 원문은 그대로 두고, 고쳤을 때만 바꿔 넣음 */
 async function renderConfid(m){
   const {data,error}=await sb.from('confidential_records').select('*').order('created_at',{ascending:false});
-  if(error){m.innerHTML='<div class="empty">불러오기 오류</div>';return;}
-  m.innerHTML=`<div class="card"><h2>🔒 진료기록</h2>
-    <input id="cfQ" placeholder="환자명·차트번호 검색" style="margin-bottom:8px" oninput="filterConfid()">
+  if(error){m.innerHTML='<div class="empty">'+esc(hubT('cf.err','불러오기 오류'))+'</div>';return;}
+  m.innerHTML=confFill(`<div class="card"><h2>🔒 진료기록</h2>
+    <input id="cfQ" placeholder="${esc(hubT('cf.ph_search','환자명·차트번호 검색'))}" style="margin-bottom:8px" oninput="filterConfid()">
     <div id="cfList"></div></div>
-    <div class="card"><h3>➕ 기록 추가</h3>
-    <input id="cfName" placeholder="환자명 *"> <input id="cfChart" placeholder="차트번호(선택)">
-    <textarea id="cfBody" placeholder="내용" style="width:100%;min-height:80px;margin-top:6px"></textarea>
-    ${ME.role==='owner'?'<label><input type="checkbox" id="cfOwnerOnly"> 원장 전용(다른 직원 안 보임)</label>':''}
-    <button class="hbtn pri" style="margin-top:6px" onclick="submitConfidRecord()">저장</button>
-    <div id="cfMsg" class="sub" style="color:var(--red,#ff7b76)"></div></div>`;
+    <div class="card"><h3>${esc(hubT('cf.add_title','➕ 기록 추가'))}</h3>
+    <input id="cfName" placeholder="${esc(hubT('cf.ph_name','환자명 *'))}"> <input id="cfChart" placeholder="${esc(hubT('cf.ph_chart','차트번호(선택)'))}">
+    <textarea id="cfBody" placeholder="${esc(hubT('cf.ph_body','내용'))}" style="width:100%;min-height:80px;margin-top:6px"></textarea>
+    ${ME.role==='owner'?'<label><input type="checkbox" id="cfOwnerOnly"> '+esc(hubT('cf.owner_only','원장 전용(다른 직원 안 보임)'))+'</label>':''}
+    <button class="hbtn pri" style="margin-top:6px" onclick="submitConfidRecord()">${esc(hubT('cf.btn_save','저장'))}</button>
+    <div id="cfMsg" class="sub" style="color:var(--red,#ff7b76)"></div></div>`);
   window._cfRecords=data||[];
   filterConfid();
 }
@@ -2358,14 +2370,14 @@ function filterConfid(){
   const q=($('#cfQ')?.value||'').trim().toLowerCase();
   const list=(window._cfRecords||[]).filter(r=>!q||String(r.patient_name||'').toLowerCase().includes(q)||String(r.chart_no||'').toLowerCase().includes(q));
   $('#cfList').innerHTML=list.length?list.map(r=>`<div style="padding:8px 0;border-bottom:1px dashed var(--line,#24332f)">
-    <b>${esc(r.patient_name)}</b> ${r.chart_no?`<span class="sub">${esc(r.chart_no)}</span>`:''} ${r.owner_only?'<span class="b no">🔒 원장전용</span>':''} <span class="sub">${md(r.created_at)} · ${esc(r.author||'')}</span>
-    <div style="margin-top:4px;white-space:pre-wrap">${esc(r.body)}</div></div>`).join(''):'<div class="empty">기록 없음</div>';
+    <b>${esc(r.patient_name)}</b> ${r.chart_no?`<span class="sub">${esc(r.chart_no)}</span>`:''} ${r.owner_only?'<span class="b no">'+esc(hubT('cf.badge_owner','🔒 원장전용'))+'</span>':''} <span class="sub">${md(r.created_at)} · ${esc(r.author||'')}</span>
+    <div style="margin-top:4px;white-space:pre-wrap">${esc(r.body)}</div></div>`).join(''):'<div class="empty">'+esc(hubT('cf.empty','기록 없음'))+'</div>';
 }
 async function submitConfidRecord(){
   const patient_name=$('#cfName').value.trim(),body=$('#cfBody').value.trim();
-  if(!patient_name||!body){$('#cfMsg').textContent='환자명과 내용은 필수입니다.';return;}
+  if(!patient_name||!body){$('#cfMsg').textContent=hubT('cf.m_missing','환자명과 내용은 필수입니다.');return;}
   const {error}=await sb.from('confidential_records').insert({patient_name,chart_no:$('#cfChart').value.trim()||null,body,author:ME.name,owner_only:(ME.role==='owner'&&$('#cfOwnerOnly')&&$('#cfOwnerOnly').checked)||false});
-  if(error){$('#cfMsg').textContent='저장 실패: '+error.message;return;}
+  if(error){$('#cfMsg').textContent=hubT('cf.m_fail','저장 실패: {detail}',{detail:error.message});return;}
   $('#cfName').value='';$('#cfChart').value='';$('#cfBody').value='';$('#cfMsg').textContent='';
   renderConfid($('#main'));setStatus('saved');
 }
@@ -2689,7 +2701,8 @@ function contractWageHtml(fields){
 function fixedTermClause(fields){return /^\d{4}-\d{2}-\d{2}$/.test(String(fields['계약종료']||''))?esc(ctT('contract.body.fixed_term','기간 만료 시 근로관계는 종료됩니다. 기간 중 사업운영이 더 이상 어렵거나 담당 직무가 폐지되는 경우에는 관련 절차에 따릅니다.')):'';}
 /* contract-integrated-terms:test-end */
 function contractIsRejected(row){return !!row&&row.status==='취소'&&!!row.reviewed_at&&!row.sent_at;}
-function contractDisplayStatus(row){return contractIsRejected(row)?'반려됨':(row&&row.status||'');}
+function contractStatusLabel(c){const def=[{code:'발송요청',label:'발송요청'},{code:'대기',label:'대기'},{code:'서명완료',label:'서명완료'},{code:'취소',label:'취소'},{code:'반려됨',label:'반려됨'}];const items=typeof hubList==='function'?hubList('list.contract_status',def):def;const it=items.find(function(i){return i.code===c;});return it?it.label:c;} /* 계약 상태 이름: 허브 설정 › 목록에서 이름만 고침(코드는 계약 흐름·DB 값이라 고정. 「반려됨」은 취소된 발송 요청을 화면이 따로 부르는 이름) */
+function contractDisplayStatus(row){return contractIsRejected(row)?contractStatusLabel('반려됨'):contractStatusLabel(row&&row.status||'');}
 function contractVisibleRows(rows){return CONTRACT_SHOW_CANCELLED?(rows||[]):(rows||[]).filter(r=>r&&r.status!=='취소');}
 function setContractShowCancelled(checked){CONTRACT_SHOW_CANCELLED=!!checked;render();}
 function mergeContractHtml(template,values){
@@ -3067,10 +3080,17 @@ function aicostPlatformKey(p){
 /* aicost-platform:test-end */
 let AICOST_MONTH='';
 function setAicostMonth(v){AICOST_MONTH=v;render();}
+function aicostPlatformLabel(p){const m=h7L('list.ai_billing_platforms',Object.fromEntries(AICOST_PLATFORMS.map(function(x){return [x,x];})));return Object.hasOwn(m,p)?m[p]:p;}
 function aicostMoney(v){return Number(v||0).toLocaleString('ko-KR');}
 /* marketing-expenses:test-start */
+/* 허브 설정(차례 7): 글·숫자·이름 목록 읽기 — hub-texts.js가 없거나 시험이 이 구간만 따로 실행해도 기본 글 그대로 */
+function h7T(k,d,v){return typeof hubT==='function'?hubT(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
+function h7X(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function h7N(k,d){return typeof hubN==='function'?hubN(k,d):d;}
+function h7L(k,obj){const def=Object.keys(obj).map(function(c){return {code:c,label:obj[c]};});const items=typeof hubList==='function'?hubList(k,def):def;const m={};items.forEach(function(i){m[i.code]=i.label;});return m;}
 const MARKETING_CHANNELS=[['daangn','당근'],['kakao','카카오'],['google','구글'],['naver','네이버'],['meta','메타']];
 const MARKETING_CATEGORIES=[...MARKETING_CHANNELS,['not_marketing','마케팅 아님']];
+function marketingCategoryItems(){const m=h7L('list.marketing_categories',Object.fromEntries(MARKETING_CATEGORIES));return MARKETING_CATEGORIES.map(function(c){return [c[0],m[c[0]]];});}
 function marketingMonthAt(value){const d=new Date(value);return Number.isNaN(d.getTime())?'':new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit'}).format(d);}
 function shiftMarketingMonth(value,delta){const [year,month]=value.split('-').map(Number),d=new Date(year,month-1+delta,1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
 function marketingKrwLinkCandidates(events){return (events||[]).filter(row=>row.parse_status==='recorded'&&row.currency==='KRW'&&Number(row.amount_krw)>0&&row.event_kind==='purchase');}
@@ -3097,10 +3117,10 @@ function marketingMonthSummary(events,rules,links,month){
   }
   return {totalKrw,channels:Object.entries(channels).sort((a,b)=>b[1].amount-a[1].amount)};
 }
-function marketingCategoryOptions(value,includeDefault=false){return `${includeDefault?'<option value="">기본 분류 사용</option>':''}${MARKETING_CATEGORIES.map(([key,label])=>`<option value="${key}" ${value===key?'selected':''}>${label}</option>`).join('')}`;}
+function marketingCategoryOptions(value,includeDefault=false){return `${includeDefault?'<option value="">'+esc(h7T('mkt.opt_default','기본 분류 사용'))+'</option>':''}${marketingCategoryItems().map(([key,label])=>`<option value="${key}" ${value===key?'selected':''}>${h7X(label)}</option>`).join('')}`;}
 /* marketing-expenses:test-end */
 async function saveMarketingBudget(){
-  if(ME.role!=='owner')return;const value=Number($('#marketingBudget').value);if(!Number.isSafeInteger(value)||value<0){alert('예산은 0원 이상의 정수로 입력해 주세요.');return;}
+  if(ME.role!=='owner')return;const value=Number($('#marketingBudget').value);if(!Number.isSafeInteger(value)||value<0){alert(hubT('mkt.m_budget_int','예산은 0원 이상의 정수로 입력해 주세요.'));return;}
   const {error}=await sb.from('marketing_month_budgets').upsert({month:AICOST_MONTH+'-01',amount_krw:value,updated_at:new Date().toISOString()},{onConflict:'month'});
   if(error){setStatus('error');return;}setStatus('saved');render();
 }
@@ -3121,7 +3141,7 @@ async function saveMarketingForeignLink(foreignId){
   if(result.error){setStatus('error');return;}setStatus('saved');render();
 }
 async function renderMarketingExpensePanel(){
-  if(ME.role!=='owner')return '<div class="card"><div class="empty">원장 전용입니다.</div></div>';
+  if(ME.role!=='owner')return '<div class="card"><div class="empty">'+esc(hubT('mkt.owner_only','원장 전용입니다.'))+'</div></div>';
   try{
     const [{data:events,error:e1},{data:budgets,error:e2},{data:rules,error:e3},{data:links,error:e4}]=await Promise.all([
       sb.from('marketing_expense_events').select('id,received_at,transaction_at,event_kind,parse_status,failure_code,currency,amount_native,amount_krw,merchant,merchant_key,category_override,reversed_event_id').order('transaction_at',{ascending:false}).limit(1500),
@@ -3129,98 +3149,109 @@ async function renderMarketingExpensePanel(){
       sb.from('marketing_merchant_rules').select('merchant_key,merchant_label,category').order('merchant_label'),
       sb.from('marketing_foreign_charge_links').select('foreign_event_id,krw_event_id')
     ]);
-    if(e1||e2||e3||e4)return '<section class="card" id="marketingExpenses"><h2>📣 마케팅비 <span class="sub">(원장 전용)</span></h2><div class="hint">마케팅비 저장 공간을 아직 불러오지 못했습니다.</div></section>';
+    if(e1||e2||e3||e4)return '<section class="card" id="marketingExpenses"><h2>'+esc(hubT('mkt.title','📣 마케팅비'))+' <span class="sub">'+esc(hubT('mkt.sub','(원장 전용)'))+'</span></h2><div class="hint">'+esc(hubT('mkt.err_storage','마케팅비 저장 공간을 아직 불러오지 못했습니다.'))+'</div></section>';
     const all=events||[],month=AICOST_MONTH,recorded=all.filter(row=>row.parse_status==='recorded'&&marketingMonthAt(row.transaction_at)===month),failed=all.filter(row=>row.parse_status==='failed'&&marketingMonthAt(row.received_at)===month),reviewCancellations=failed.filter(row=>row.event_kind==='cancellation'&&['unmatched_cancellation','ambiguous_cancellation','duplicate_cancellation'].includes(row.failure_code)),summary=marketingMonthSummary(all,rules,links,month),budget=budgets?.amount_krw;
     const foreign=marketingForeignEvents(recorded,rules,links);const foreignTotals={};foreign.forEach(row=>{foreignTotals[row.currency]||={amount:0,count:0};foreignTotals[row.currency].amount+=Number(row.amount_native||0);foreignTotals[row.currency].count++;});
     const noMarketing=recorded.filter(row=>marketingEventCategoryFor(row,rules,all,links)==='not_marketing');const unclassified=recorded.filter(row=>!marketingEventCategoryFor(row,rules,all,links));
     const krwRows=marketingKrwLinkCandidates(all);
     const ruleRows=[...new Map(recorded.map(row=>[row.merchant_key,row])).values()];
-    const categoryLabel=key=>MARKETING_CATEGORIES.find(item=>item[0]===key)?.[1]||'미분류';
-    const eventRow=(row,allowLink=false)=>{const inherited=row.event_kind==='cancellation'||(links||[]).some(link=>link.krw_event_id===row.id);return `<div class="rowflex" style="justify-content:space-between;align-items:flex-start;gap:8px;border-top:1px solid var(--line);padding:8px 0;min-width:0"><div style="min-width:0;overflow-wrap:anywhere"><b>${esc(row.merchant||'가맹점 미확인')}${row.event_kind==='cancellation'?' · 취소':''}</b><div class="sub">${esc(formatLeaveTimestamp(row.transaction_at)||'시간 미확인')} · ${esc(categoryLabel(marketingEventCategoryFor(row,rules,all,links)))}</div></div><div style="text-align:right;flex:none"><b>${row.currency==='KRW'?Number(row.amount_krw)<0?'-₩'+aicostMoney(Math.abs(Number(row.amount_krw))):'₩'+aicostMoney(row.amount_krw):esc(row.currency)+' '+Number(row.amount_native).toLocaleString('ko-KR',{maximumFractionDigits:4})}</b>${inherited?'':`<div style="display:flex;justify-content:flex-end;gap:4px;margin-top:4px"><select class="mini" id="marketingOverride-${row.id}" aria-label="개별 분류" style="max-width:145px">${marketingCategoryOptions(row.category_override,true)}</select><button class="mini" onclick="saveMarketingEventOverride('${row.id}')">적용</button></div>`}</div>${allowLink?`<div style="display:flex;gap:4px;max-width:100%"><select class="mini" id="marketingLink-${row.id}" aria-label="원화 청구 연결" style="max-width:190px"><option value="">원화 청구 연결 안 함</option>${krwRows.map(item=>`<option value="${item.id}" ${(links||[]).some(link=>link.foreign_event_id===row.id&&link.krw_event_id===item.id)?'selected':''}>${esc(formatLeaveTimestamp(item.transaction_at)||'')} · ${esc(item.merchant||'')} · ₩${aicostMoney(item.amount_krw)}</option>`).join('')}</select><button class="mini" onclick="saveMarketingForeignLink('${row.id}')">연결</button></div>`:''}</div>`;};
-    const details=(label,rows,options={})=>`<details style="margin-top:8px"><summary style="cursor:pointer">${label} ${rows.length}건</summary><div style="margin-top:6px">${rows.length?rows.map(row=>eventRow(row,options.allowLink)).join(''):'<div class="empty">해당 내역 없음</div>'}</div></details>`;
-    const channelRows=summary.channels.map(([key,value])=>`<details style="margin-top:6px"><summary style="display:flex;justify-content:space-between;gap:8px;cursor:pointer"><span>${categoryLabel(key)} · ${value.count}건</span><b>${value.amount||!value.rows.some(row=>row.currency!=='KRW')?'₩'+aicostMoney(value.amount):'외화 포함'}</b></summary><div style="margin-top:6px">${value.rows.map(row=>eventRow(row)).join('')}</div></details>`).join('');
-    const rulesHtml=ruleRows.map((row,index)=>{const current=marketingCategoryFor(row,rules)||'';return `<div class="rowflex" style="justify-content:space-between;gap:8px;margin:6px 0;min-width:0"><span style="overflow-wrap:anywhere">${esc(row.merchant)}</span><div style="display:flex;gap:4px;flex:none"><select class="mini" id="marketingRule-${index}" style="max-width:135px">${marketingCategoryOptions(current)}</select><button class="mini" onclick="saveMarketingMerchantRule('${esc(row.merchant_key)}','${esc(row.merchant)}',${index})">가맹점 기본값</button></div></div>`;}).join('');
-    return `<section class="card" id="marketingExpenses"><h2>📣 마케팅비 <span class="sub">(원장 전용)</span></h2>
-      <div class="rowflex" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><label>조회 월 <input class="mini" type="month" value="${esc(month)}" onchange="setAicostMonth(this.value)"></label><div style="display:flex;gap:6px"><button class="mini" onclick="setAicostMonth('${shiftMarketingMonth(month,-1)}')">◀</button><button class="mini" onclick="setAicostMonth('${shiftMarketingMonth(month,1)}')">▶</button></div></div>
-      <div class="sub" style="margin-top:14px">이번 달 원화 합계</div><div style="font-size:28px;font-weight:800;color:var(--mint);text-align:right">₩${aicostMoney(summary.totalKrw)}</div>
-      <div class="rowflex" style="justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:8px"><label>월 예산 <input id="marketingBudget" class="mini" type="number" min="0" step="1" inputmode="numeric" placeholder="입력 안 함" value="${budget==null?'':Number(budget)}" style="max-width:150px"> 원</label><button class="mini stamp" onclick="saveMarketingBudget()">예산 저장</button></div>
-      ${budget==null?'':Number(budget)>0?`<div class="hint">예산 ${aicostMoney(budget)}원 중 ${Math.round(summary.totalKrw/Number(budget)*100)}% 사용</div><div style="height:8px;background:var(--line);border-radius:4px;margin:6px 0 10px"><div style="height:100%;width:${Math.min(100,Math.round(summary.totalKrw/Number(budget)*100))}%;background:var(--mint);border-radius:4px"></div></div>`:'<div class="hint">예산이 0원이라 사용 비율을 계산하지 않음</div>'}
-      <div style="margin-top:12px">${channelRows||'<div class="empty">이번 달 집계가 없습니다.</div>'}</div>
-      ${Object.entries(foreignTotals).length?`<div class="hint" style="margin-top:10px"><b>외화</b>${Object.entries(foreignTotals).map(([currency,value])=>`<div class="rowflex" style="justify-content:space-between"><span>${esc(currency)} · ${value.count}건</span><b>${value.amount.toLocaleString('ko-KR',{maximumFractionDigits:4})}</b></div>`).join('')}</div>${details('외화 결제',foreign,{allowLink:true})}`:''}
-      ${details('미분류',unclassified)}${details('마케팅 아님',noMarketing)}${reviewCancellations.length?`<details style="margin-top:8px"><summary style="cursor:pointer">취소 검토 ${reviewCancellations.length}건</summary>${reviewCancellations.map(row=>`<div class="hint" style="border-top:1px solid var(--line);padding:8px 0">${esc(formatLeaveTimestamp(row.transaction_at)||'시간 미확인')} · ${esc(row.merchant)} · ₩${aicostMoney(row.amount_krw)} · ${row.failure_code==='ambiguous_cancellation'?'승인 후보가 여러 건':row.failure_code==='duplicate_cancellation'?'이미 취소 처리된 승인':'연결할 승인 없음'}</div>`).join('')}</details>`:''}<div class="hint" style="margin-top:8px">읽지 못한 문자 ${failed.length-reviewCancellations.length}건</div>
-      ${ruleRows.length?`<details style="margin-top:8px"><summary style="cursor:pointer">가맹점 기본 분류 수정</summary>${rulesHtml}<div class="sub">기본 분류를 바꾸면 같은 가맹점의 지난달 내역에도 반영됨. 개별 분류가 우선 적용됨.</div></details>`:''}
+    const categoryLabel=key=>marketingCategoryItems().find(item=>item[0]===key)?.[1]||hubT('mkt.unclassified','미분류');
+    const eventRow=(row,allowLink=false)=>{const inherited=row.event_kind==='cancellation'||(links||[]).some(link=>link.krw_event_id===row.id);return `<div class="rowflex" style="justify-content:space-between;align-items:flex-start;gap:8px;border-top:1px solid var(--line);padding:8px 0;min-width:0"><div style="min-width:0;overflow-wrap:anywhere"><b>${esc(row.merchant||hubT('mkt.merchant_unknown','가맹점 미확인'))}${row.event_kind==='cancellation'?' · 취소'.replace('취소',()=>esc(hubT('mkt.cancel_tag','취소'))):''}</b><div class="sub">${esc(formatLeaveTimestamp(row.transaction_at)||hubT('mkt.time_unknown','시간 미확인'))} · ${esc(categoryLabel(marketingEventCategoryFor(row,rules,all,links)))}</div></div><div style="text-align:right;flex:none"><b>${row.currency==='KRW'?Number(row.amount_krw)<0?'-₩'+aicostMoney(Math.abs(Number(row.amount_krw))):'₩'+aicostMoney(row.amount_krw):esc(row.currency)+' '+Number(row.amount_native).toLocaleString('ko-KR',{maximumFractionDigits:4})}</b>${inherited?'':`<div style="display:flex;justify-content:flex-end;gap:4px;margin-top:4px"><select class="mini" id="marketingOverride-${row.id}" aria-label="${esc(hubT('mkt.aria_override','개별 분류'))}" style="max-width:145px">${marketingCategoryOptions(row.category_override,true)}</select><button class="mini" onclick="saveMarketingEventOverride('${row.id}')">${esc(hubT('mkt.btn_apply','적용'))}</button></div>`}</div>${allowLink?`<div style="display:flex;gap:4px;max-width:100%"><select class="mini" id="marketingLink-${row.id}" aria-label="${esc(hubT('mkt.aria_link','원화 청구 연결'))}" style="max-width:190px"><option value="">${esc(hubT('mkt.opt_nolink','원화 청구 연결 안 함'))}</option>${krwRows.map(item=>`<option value="${item.id}" ${(links||[]).some(link=>link.foreign_event_id===row.id&&link.krw_event_id===item.id)?'selected':''}>${esc(formatLeaveTimestamp(item.transaction_at)||'')} · ${esc(item.merchant||'')} · ₩${aicostMoney(item.amount_krw)}</option>`).join('')}</select><button class="mini" onclick="saveMarketingForeignLink('${row.id}')">${esc(hubT('mkt.btn_link','연결'))}</button></div>`:''}</div>`;};
+    const details=(label,rows,options={})=>`<details style="margin-top:8px"><summary style="cursor:pointer">${esc(label)} ${esc(hubT('mkt.count','{n}건',{n:rows.length}))}</summary><div style="margin-top:6px">${rows.length?rows.map(row=>eventRow(row,options.allowLink)).join(''):'<div class="empty">'+esc(hubT('mkt.none','해당 내역 없음'))+'</div>'}</div></details>`;
+    const channelRows=summary.channels.map(([key,value])=>`<details style="margin-top:6px"><summary style="display:flex;justify-content:space-between;gap:8px;cursor:pointer"><span>${esc(categoryLabel(key))} · ${esc(hubT('mkt.count','{n}건',{n:value.count}))}</span><b>${value.amount||!value.rows.some(row=>row.currency!=='KRW')?'₩'+aicostMoney(value.amount):esc(hubT('mkt.foreign_mixed','외화 포함'))}</b></summary><div style="margin-top:6px">${value.rows.map(row=>eventRow(row)).join('')}</div></details>`).join('');
+    const rulesHtml=ruleRows.map((row,index)=>{const current=marketingCategoryFor(row,rules)||'';return `<div class="rowflex" style="justify-content:space-between;gap:8px;margin:6px 0;min-width:0"><span style="overflow-wrap:anywhere">${esc(row.merchant)}</span><div style="display:flex;gap:4px;flex:none"><select class="mini" id="marketingRule-${index}" style="max-width:135px">${marketingCategoryOptions(current)}</select><button class="mini" onclick="saveMarketingMerchantRule('${esc(row.merchant_key)}','${esc(row.merchant)}',${index})">${esc(hubT('mkt.btn_rule','가맹점 기본값'))}</button></div></div>`;}).join('');
+    return `<section class="card" id="marketingExpenses"><h2>${esc(hubT('mkt.title','📣 마케팅비'))} <span class="sub">${esc(hubT('mkt.sub','(원장 전용)'))}</span></h2>
+      <div class="rowflex" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><label>${esc(hubT('mkt.f_month','조회 월'))} <input class="mini" type="month" value="${esc(month)}" onchange="setAicostMonth(this.value)"></label><div style="display:flex;gap:6px"><button class="mini" onclick="setAicostMonth('${shiftMarketingMonth(month,-1)}')">◀</button><button class="mini" onclick="setAicostMonth('${shiftMarketingMonth(month,1)}')">▶</button></div></div>
+      <div class="sub" style="margin-top:14px">${esc(hubT('mkt.sum_label','이번 달 원화 합계'))}</div><div style="font-size:28px;font-weight:800;color:var(--mint);text-align:right">₩${aicostMoney(summary.totalKrw)}</div>
+      <div class="rowflex" style="justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:8px"><label>${esc(hubT('mkt.f_budget','월 예산'))} <input id="marketingBudget" class="mini" type="number" min="0" step="1" inputmode="numeric" placeholder="${esc(hubT('mkt.ph_budget','입력 안 함'))}" value="${budget==null?'':Number(budget)}" style="max-width:150px"> ${esc(hubT('mkt.unit_won','원'))}</label><button class="mini stamp" onclick="saveMarketingBudget()">${esc(hubT('mkt.btn_budget','예산 저장'))}</button></div>
+      ${budget==null?'':Number(budget)>0?`<div class="hint">${esc(hubT('mkt.budget_used','예산 {budget}원 중 {pct}% 사용',{budget:aicostMoney(budget),pct:Math.round(summary.totalKrw/Number(budget)*100)}))}</div><div style="height:8px;background:var(--line);border-radius:4px;margin:6px 0 10px"><div style="height:100%;width:${Math.min(100,Math.round(summary.totalKrw/Number(budget)*100))}%;background:var(--mint);border-radius:4px"></div></div>`:'<div class="hint">'+esc(hubT('mkt.budget_zero','예산이 0원이라 사용 비율을 계산하지 않음'))+'</div>'}
+      <div style="margin-top:12px">${channelRows||'<div class="empty">'+esc(hubT('mkt.no_sum','이번 달 집계가 없습니다.'))+'</div>'}</div>
+      ${Object.entries(foreignTotals).length?`<div class="hint" style="margin-top:10px"><b>${esc(hubT('mkt.foreign_title','외화'))}</b>${Object.entries(foreignTotals).map(([currency,value])=>`<div class="rowflex" style="justify-content:space-between"><span>${esc(currency)} · ${esc(hubT('mkt.count','{n}건',{n:value.count}))}</span><b>${value.amount.toLocaleString('ko-KR',{maximumFractionDigits:4})}</b></div>`).join('')}</div>${details(hubT('mkt.d_foreign','외화 결제'),foreign,{allowLink:true})}`:''}
+      ${details(hubT('mkt.unclassified','미분류'),unclassified)}${details(hubT('mkt.d_not_marketing','마케팅 아님'),noMarketing)}${reviewCancellations.length?`<details style="margin-top:8px"><summary style="cursor:pointer">${esc(hubT('mkt.d_cancel','취소 검토 {n}건',{n:reviewCancellations.length}))}</summary>${reviewCancellations.map(row=>`<div class="hint" style="border-top:1px solid var(--line);padding:8px 0">${esc(formatLeaveTimestamp(row.transaction_at)||hubT('mkt.time_unknown','시간 미확인'))} · ${esc(row.merchant)} · ₩${aicostMoney(row.amount_krw)} · ${row.failure_code==='ambiguous_cancellation'?esc(hubT('mkt.cancel_multi','승인 후보가 여러 건')):row.failure_code==='duplicate_cancellation'?esc(hubT('mkt.cancel_dup','이미 취소 처리된 승인')):esc(hubT('mkt.cancel_none','연결할 승인 없음'))}</div>`).join('')}</details>`:''}<div class="hint" style="margin-top:8px">${esc(hubT('mkt.unread','읽지 못한 문자 {n}건',{n:failed.length-reviewCancellations.length}))}</div>
+      ${ruleRows.length?`<details style="margin-top:8px"><summary style="cursor:pointer">${esc(hubT('mkt.rules_title','가맹점 기본 분류 수정'))}</summary>${rulesHtml}<div class="sub">${esc(hubT('mkt.rules_hint','기본 분류를 바꾸면 같은 가맹점의 지난달 내역에도 반영됨. 개별 분류가 우선 적용됨.'))}</div></details>`:''}
     </section>`;
-  }catch{return '<section class="card" id="marketingExpenses"><h2>📣 마케팅비 <span class="sub">(원장 전용)</span></h2><div class="hint">마케팅비를 불러오지 못했습니다.</div></section>';}
+  }catch{return '<section class="card" id="marketingExpenses"><h2>'+esc(hubT('mkt.title','📣 마케팅비'))+' <span class="sub">'+esc(hubT('mkt.sub','(원장 전용)'))+'</span></h2><div class="hint">'+esc(hubT('mkt.err_load','마케팅비를 불러오지 못했습니다.'))+'</div></section>';}
 }
 /* ── AI 사용량 현황판: PC가 올린 Codex 모델별 토큰(ai_model_usage_daily)과 PC 상황판 스냅샷(ai_usage_snapshots: 정가 환산 비용·대화 점검), 원장만 읽기 ── */
 /* ai-usage:test-start */
+/* 허브 설정(차례 7): 글·숫자·이름 목록 읽기 — hub-texts.js가 없거나 시험이 이 구간만 따로 실행해도 기본 글 그대로 */
+function h7T(k,d,v){return typeof hubT==='function'?hubT(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
+function h7X(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function h7N(k,d){return typeof hubN==='function'?hubN(k,d):d;}
+function h7L(k,obj){const def=Object.keys(obj).map(function(c){return {code:c,label:obj[c]};});const items=typeof hubList==='function'?hubList(k,def):def;const m={};items.forEach(function(i){m[i.code]=i.label;});return m;}
 function aiUsageWindow(todayStr,days){const end=String(todayStr).slice(0,10),[y,mo,d]=end.split('-').map(Number);return {start:new Date(Date.UTC(y,mo-1,d-(days-1))).toISOString().slice(0,10),end};}
 function aiUsageSummary(rows,start,end){const per=new Map();let total=0,turns=0,lastSynced='';(rows||[]).forEach(r=>{const day=String(r.usage_date||'').slice(0,10);if(!day||day<start||day>end)return;const model=String(r.model||'(unknown)'),t=Number(r.tokens)||0,n=Number(r.turns)||0;let p=per.get(model);if(!p){p={model,tokens:0,turns:0};per.set(model,p);}p.tokens+=t;p.turns+=n;total+=t;turns+=n;if(r.synced_at&&String(r.synced_at)>lastSynced)lastSynced=String(r.synced_at);});
   const models=[...per.values()].sort((a,b)=>b.tokens-a.tokens||a.model.localeCompare(b.model)).map(x=>({...x,share:total?x.tokens/total*100:0,astra:x.model==='Astra'}));
   return {total,turns,models,astra:models.find(x=>x.astra)||{model:'Astra',tokens:0,turns:0,share:0,astra:true},lastSynced};}
 function aiUsageCompact(n){n=Number(n)||0;if(n>=1e8)return (n/1e8).toFixed(2).replace(/\.?0+$/,'')+'억';if(n>=1e4)return Math.round(n/1e4).toLocaleString('ko-KR')+'만';return n.toLocaleString('ko-KR');}
 function aiUsageSyncedLabel(iso){const d=new Date(iso),p=n=>String(n).padStart(2,'0');return Number.isNaN(d.getTime())?String(iso):`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;}
-function aiUsageModelSection({summary,start,end,error}){
-  const pct=v=>v>0&&v<0.05?'&lt;0.1%':(Math.round(v*10)/10).toFixed(1)+'%',head=`<div data-ai-usage-model-section><h3>🤖 모델별 사용량(최근 7일) <span class="sub">Codex 토큰</span></h3><div class="hint">기간 ${esc(start)} ~ ${esc(end)}${summary&&summary.lastSynced?` · 마지막 동기화 ${esc(aiUsageSyncedLabel(summary.lastSynced))}`:''}</div>`;
-  if(error)return head+`<div class="empty">AI 사용량을 불러오지 못했습니다: ${esc(error)}</div></div>`;
-  if(!summary||!summary.models.length)return head+'<div class="empty">아직 올라온 사용량 기록이 없습니다. PC에서 하루 한 번 올리면 여기에 쌓입니다.</div></div>';
+function aiUsageModelSection({summary,start,end,error,days=7}){
+  const pct=v=>v>0&&v<0.05?'&lt;0.1%':(Math.round(v*10)/10).toFixed(1)+'%',head=`<div data-ai-usage-model-section><h3>${esc(h7T('aiu.model_title','🤖 모델별 사용량(최근 {days}일)',{days:days}))} <span class="sub">${esc(h7T('aiu.model_sub','Codex 토큰'))}</span></h3><div class="hint">${esc(h7T('aiu.period','기간 {start} ~ {end}',{start:((start)??''),end:((end)??'')}))}${summary&&summary.lastSynced?` · ${esc(h7T('aiu.last_sync','마지막 동기화 {when}',{when:((aiUsageSyncedLabel(summary.lastSynced))??'')}))}`:''}</div>`;
+  if(error)return head+`<div class="empty">${esc(h7T('aiu.model_err','AI 사용량을 불러오지 못했습니다: {detail}',{detail:((error)??'')}))}</div></div>`;
+  if(!summary||!summary.models.length)return head+'<div class="empty">'+esc(h7T('aiu.model_empty','아직 올라온 사용량 기록이 없습니다. PC에서 하루 한 번 올리면 여기에 쌓입니다.'))+'</div></div>';
   const a=summary.astra;
-  return head+`<div data-ai-usage-astra-summary style="margin:10px 0 14px;padding:10px 12px;border:1px solid var(--gold);border-radius:8px;background:var(--gold-bg);color:var(--gold)">⚠ <b>Astra</b>(고비용 검증 모델) ${a.tokens?`<b>${aiUsageCompact(a.tokens)} 토큰</b> · 전체의 <b>${pct(a.share)}</b> · ${a.turns.toLocaleString('ko-KR')}턴`:'최근 7일 사용 기록 없음'}</div>
-    <div style="font-size:13px;color:var(--gray)">7일 합계</div><div style="font-size:24px;font-weight:800;color:var(--mint);margin:2px 0 12px">${aiUsageCompact(summary.total)} 토큰 <span class="sub" style="font-size:13px;font-weight:400">· ${summary.turns.toLocaleString('ko-KR')}턴</span></div>
-    <div class="tblwrap"><table><tr><th>모델</th><th>토큰</th><th>비중</th><th>턴</th></tr>${summary.models.map(x=>`<tr data-ai-usage-model="${esc(x.model)}"${x.astra?' data-ai-usage-astra="true" style="background:var(--gold-bg)"':''}><td>${x.astra?'<b style="color:var(--gold)">⚠ Astra</b>':esc(x.model)}</td><td title="${x.tokens.toLocaleString('ko-KR')} 토큰" style="white-space:nowrap">${aiUsageCompact(x.tokens)}</td><td style="min-width:110px"><div class="rowflex" style="gap:8px;align-items:center;flex-wrap:nowrap"><div style="flex:1;min-width:40px;height:8px;background:var(--line);border-radius:4px"><div style="height:100%;width:${Math.min(100,Math.max(0,x.share)).toFixed(1)}%;background:${x.astra?'var(--gold)':'var(--mint)'};border-radius:4px"></div></div><span style="white-space:nowrap">${pct(x.share)}</span></div></td><td style="white-space:nowrap">${x.turns.toLocaleString('ko-KR')}</td></tr>`).join('')}</table></div>
-    <div class="hint">PC에 남은 Codex 대화 기록을 모아 올린 값입니다(오늘은 올린 시점까지). 비용이 큰 Astra는 노란색으로 따로 표시합니다.</div></div>`;
+  return head+`<div data-ai-usage-astra-summary style="margin:10px 0 14px;padding:10px 12px;border:1px solid var(--gold);border-radius:8px;background:var(--gold-bg);color:var(--gold)">⚠ <b>Astra</b>${esc(h7T('aiu.astra_note','(고비용 검증 모델)'))} ${a.tokens?`<b>${aiUsageCompact(a.tokens)} 토큰</b> · 전체의 <b>${pct(a.share)}</b> · ${a.turns.toLocaleString('ko-KR')}턴`:esc(h7T('aiu.astra_none','최근 {days}일 사용 기록 없음',{days:days}))}</div>
+    <div style="font-size:13px;color:var(--gray)">${esc(h7T('aiu.model_total','{days}일 합계',{days:days}))}</div><div style="font-size:24px;font-weight:800;color:var(--mint);margin:2px 0 12px">${aiUsageCompact(summary.total)} 토큰 <span class="sub" style="font-size:13px;font-weight:400">· ${summary.turns.toLocaleString('ko-KR')}턴</span></div>
+    <div class="tblwrap"><table><tr><th>${esc(h7T('aiu.th_model','모델'))}</th><th>${esc(h7T('aiu.th_tokens','토큰'))}</th><th>${esc(h7T('aiu.th_share','비중'))}</th><th>${esc(h7T('aiu.th_turns','턴'))}</th></tr>${summary.models.map(x=>`<tr data-ai-usage-model="${esc(x.model)}"${x.astra?' data-ai-usage-astra="true" style="background:var(--gold-bg)"':''}><td>${x.astra?'<b style="color:var(--gold)">⚠ Astra</b>':esc(x.model)}</td><td title="${x.tokens.toLocaleString('ko-KR')} 토큰" style="white-space:nowrap">${aiUsageCompact(x.tokens)}</td><td style="min-width:110px"><div class="rowflex" style="gap:8px;align-items:center;flex-wrap:nowrap"><div style="flex:1;min-width:40px;height:8px;background:var(--line);border-radius:4px"><div style="height:100%;width:${Math.min(100,Math.max(0,x.share)).toFixed(1)}%;background:${x.astra?'var(--gold)':'var(--mint)'};border-radius:4px"></div></div><span style="white-space:nowrap">${pct(x.share)}</span></div></td><td style="white-space:nowrap">${x.turns.toLocaleString('ko-KR')}</td></tr>`).join('')}</table></div>
+    <div class="hint">${esc(h7T('aiu.model_hint','PC에 남은 Codex 대화 기록을 모아 올린 값입니다(오늘은 올린 시점까지). 비용이 큰 Astra는 노란색으로 따로 표시합니다.'))}</div></div>`;
 }
 const AI_COST_LABELS={claude:'Claude Code',codex:'Codex (OpenAI)',kimi:'Kimi (Moonshot)',openclaw:'OpenClaw'};
+function aiCostLabel(k){const m=h7L('list.ai_cost_platforms',AI_COST_LABELS);return Object.hasOwn(m,k)?m[k]:k;}
 function aiCostWon(usd,fx){return '₩'+Math.round((Number(usd)||0)*(Number(fx)||0)).toLocaleString('ko-KR');}
 function aiCostSectionHtml({cost,error}){
-  const head='<div data-ai-cost-section style="margin-top:22px"><h3>💸 정가 환산 사용가치 <span class="sub">청구액 아님 · PC 상황판 값</span></h3>';
-  if(error)return head+`<div class="empty">비용 기록을 불러오지 못했습니다: ${esc(error)}</div></div>`;
-  if(!cost||!cost.agents)return head+'<div class="empty">아직 올라온 비용 기록이 없습니다. PC 상황판이 갱신된 뒤 올리면 여기에 보입니다.</div></div>';
+  const head='<div data-ai-cost-section style="margin-top:22px"><h3>'+esc(h7T('aiu.cost_title','💸 정가 환산 사용가치'))+' <span class="sub">'+esc(h7T('aiu.cost_sub','청구액 아님 · PC 상황판 값'))+'</span></h3>';
+  if(error)return head+`<div class="empty">${esc(h7T('aiu.cost_err','비용 기록을 불러오지 못했습니다: {detail}',{detail:((error)??'')}))}</div></div>`;
+  if(!cost||!cost.agents)return head+'<div class="empty">'+esc(h7T('aiu.cost_empty','아직 올라온 비용 기록이 없습니다. PC 상황판이 갱신된 뒤 올리면 여기에 보입니다.'))+'</div></div>';
   const fx=Number(cost.fx)||0,thisM=String(cost.this_month||''),agents=Object.entries(cost.agents).sort((a,b)=>(Number(b[1].cumUSD)||0)-(Number(a[1].cumUSD)||0));
-  const monthUsd=cost.month_usd||{},months=Object.keys(monthUsd).filter(k=>k!=='?').sort().slice(-6),max=Math.max(1,...months.map(k=>Number(monthUsd[k])||0));
-  const rows=agents.map(([k,a])=>{const cur=(a.months||[]).find(x=>x.m===thisM);return `<tr data-ai-cost-platform="${esc(k)}"><td>${esc(Object.hasOwn(AI_COST_LABELS,k)?AI_COST_LABELS[k]:k)}</td><td style="white-space:nowrap"><b>${aiCostWon(cur?cur.usd:0,fx)}</b></td><td style="white-space:nowrap">${aiCostWon(a.cumUSD,fx)}</td><td class="sub" style="white-space:nowrap">${aiUsageCompact(a.inTok)} / ${aiUsageCompact(a.outTok)}</td></tr>`;}).join('');
+  const monthUsd=cost.month_usd||{},months=Object.keys(monthUsd).filter(k=>k!=='?').sort().slice(-h7N('aiu.cost_months',6)),max=Math.max(1,...months.map(k=>Number(monthUsd[k])||0));
+  const rows=agents.map(([k,a])=>{const cur=(a.months||[]).find(x=>x.m===thisM);return `<tr data-ai-cost-platform="${esc(k)}"><td>${esc(aiCostLabel(k))}</td><td style="white-space:nowrap"><b>${aiCostWon(cur?cur.usd:0,fx)}</b></td><td style="white-space:nowrap">${aiCostWon(a.cumUSD,fx)}</td><td class="sub" style="white-space:nowrap">${aiUsageCompact(a.inTok)} / ${aiUsageCompact(a.outTok)}</td></tr>`;}).join('');
   const bars=months.map(k=>{const v=Number(monthUsd[k])||0;return `<div data-ai-cost-month="${esc(k)}" style="margin:8px 0"><div class="rowflex" style="justify-content:space-between"><span>${esc(k)}</span><b>${aiCostWon(v,fx)}</b></div><div style="height:8px;background:var(--line);border-radius:4px;margin-top:4px"><div style="height:100%;width:${Math.round(v/max*100)}%;background:var(--mint);border-radius:4px"></div></div></div>`;}).join('');
-  return head+`<div class="hint">기준 ${esc(cost.generated)} · 환율 US$1 = ₩${Math.round(fx).toLocaleString('ko-KR')}${cost.fx_src?` (${esc(cost.fx_src)})`:''}</div>
-    <div style="font-size:13px;color:var(--gray);margin-top:10px">이번 달(${esc(thisM||'-')}) 정가 환산 · 청구액 아님</div><div style="font-size:24px;font-weight:800;color:var(--mint);margin:2px 0 12px">${aiCostWon(cost.this_usd,fx)} <span class="sub" style="font-size:13px;font-weight:400">· 누적 ${aiCostWon(cost.total_usd,fx)}</span></div>
-    <div class="tblwrap"><table><tr><th>플랫폼</th><th>이번 달</th><th>누적</th><th>토큰(입력/출력)</th></tr>${rows}</table></div>
-    ${bars?`<div style="margin-top:12px"><b style="font-size:13px">월별 합계(전 플랫폼)</b>${bars}</div>`:''}
-    <div class="hint">쓴 토큰을 API 정가로 환산한 <b>사용 가치</b>입니다. Claude·Codex는 구독제라 실제 결제는 이보다 훨씬 적습니다. 실제 청구액은 맨 위 표를 보세요.</div></div>`;
+  return head+`<div class="hint">${esc(h7T('aiu.cost_basis','기준 {generated} · 환율 US$1 = ₩{fx}',{generated:((cost.generated)??''),fx:Math.round(fx).toLocaleString('ko-KR')}))}${cost.fx_src?` (${esc(cost.fx_src)})`:''}</div>
+    <div style="font-size:13px;color:var(--gray);margin-top:10px">${esc(h7T('aiu.cost_this_month','이번 달({month}) 정가 환산 · 청구액 아님',{month:((thisM||'-')??'')}))}</div><div style="font-size:24px;font-weight:800;color:var(--mint);margin:2px 0 12px">${aiCostWon(cost.this_usd,fx)} <span class="sub" style="font-size:13px;font-weight:400">${esc(h7T('aiu.cost_cum','· 누적 {won}',{won:aiCostWon(cost.total_usd,fx)}))}</span></div>
+    <div class="tblwrap"><table><tr><th>${esc(h7T('aiu.cost_th_platform','플랫폼'))}</th><th>${esc(h7T('aiu.cost_th_month','이번 달'))}</th><th>${esc(h7T('aiu.cost_th_cum','누적'))}</th><th>${esc(h7T('aiu.cost_th_tokens','토큰(입력/출력)'))}</th></tr>${rows}</table></div>
+    ${bars?`<div style="margin-top:12px"><b style="font-size:13px">${esc(h7T('aiu.cost_monthly','월별 합계(전 플랫폼)'))}</b>${bars}</div>`:''}
+    <div class="hint">${esc(h7T('aiu.cost_hint_a','쓴 토큰을 API 정가로 환산한'))} <b>${esc(h7T('aiu.cost_hint_b','사용 가치'))}</b>${esc(h7T('aiu.cost_hint_c','입니다. Claude·Codex는 구독제라 실제 결제는 이보다 훨씬 적습니다. 실제 청구액은 맨 위 표를 보세요.'))}</div></div>`;
 }
 const AI_EXTERNAL_LABELS={deepseek:'딥시크',step5:'스텝5',kimi:'키미',luna:'루나','?':'이름 모름'},AI_EXTERNAL_COST_SINCE='2026-09-30';
-function aiExternalLabel(k){return Object.hasOwn(AI_EXTERNAL_LABELS,k)?AI_EXTERNAL_LABELS[k]:k;}
+function aiExternalLabel(k){const m=h7L('list.ai_external_names',AI_EXTERNAL_LABELS);return Object.hasOwn(m,k)?m[k]:k;}
 function aiExternalCount(v){return (Number(v)||0).toLocaleString('ko-KR');}
 function aiExternalMoney(e,day){
   const calls=Number(e.calls)||0,costed=Number(e.costed_calls)||0;
-  if(day&&day<AI_EXTERNAL_COST_SINCE)return '<span class="sub">금액 기록 전</span>';
-  if(!costed)return day?`<span class="sub">금액 미집계(0/${aiExternalCount(calls)}건)</span>`:'<span class="sub">금액 기록 전</span>';
-  return `<b>₩${Math.round(Number(e.krw)||0).toLocaleString('ko-KR')}</b>${costed<calls?` <span class="sub">(${aiExternalCount(costed)}/${aiExternalCount(calls)}건 기록)</span>`:''}`;
+  if(day&&day<AI_EXTERNAL_COST_SINCE)return '<span class="sub">'+esc(h7T('aiu.ext_before','금액 기록 전'))+'</span>';
+  if(!costed)return day?`<span class="sub">${esc(h7T('aiu.ext_uncounted','금액 미집계(0/{calls}건)',{calls:aiExternalCount(calls)}))}</span>`:'<span class="sub">'+esc(h7T('aiu.ext_before','금액 기록 전'))+'</span>';
+  return `<b>₩${Math.round(Number(e.krw)||0).toLocaleString('ko-KR')}</b>${costed<calls?` <span class="sub">${esc(h7T('aiu.ext_partial','({costed}/{calls}건 기록)',{costed:aiExternalCount(costed),calls:aiExternalCount(calls)}))}</span>`:''}`;
 }
 function aiExternalSectionHtml({external,error}){
-  const head='<div data-ai-external-section style="margin-top:22px"><h3>🛰️ 외부 AI(딥시크·스텝5 등) <span class="sub">PC에서 부른 횟수 · 정가 환산</span></h3>';
-  if(error)return head+`<div class="empty">외부 AI 기록을 불러오지 못했습니다: ${esc(error)}</div></div>`;
-  if(!external||!external.days||typeof external.days!=='object')return head+'<div class="empty">아직 올라온 외부 AI 기록이 없습니다. PC 집계가 갱신된 뒤 올리면 여기에 보입니다.</div></div>';
-  const totals=Object.entries(external.totals||{}).sort((a,b)=>(Number(b[1].calls)||0)-(Number(a[1].calls)||0)||a[0].localeCompare(b[0])),days=Object.entries(external.days).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,14);
-  const cards=totals.map(([k,e])=>`<div data-ai-external-ai="${esc(k)}" style="flex:1 1 150px;min-width:140px;border:1px solid var(--line);border-radius:8px;padding:10px 12px"><div style="font-size:13px;color:var(--gray)">${esc(aiExternalLabel(k))}</div><div style="font-size:22px;font-weight:800;color:var(--mint);margin:2px 0">${aiExternalCount(e.calls)}건</div><div class="sub">성공 ${aiExternalCount(e.ok)} · 실패 ${aiExternalCount(e.fail)}</div><div style="margin-top:4px">${aiExternalMoney(e)}</div></div>`).join('');
+  const head='<div data-ai-external-section style="margin-top:22px"><h3>'+esc(h7T('aiu.ext_title','🛰️ 외부 AI(딥시크·스텝5 등)'))+' <span class="sub">'+esc(h7T('aiu.ext_sub','PC에서 부른 횟수 · 정가 환산'))+'</span></h3>';
+  if(error)return head+`<div class="empty">${esc(h7T('aiu.ext_err','외부 AI 기록을 불러오지 못했습니다: {detail}',{detail:((error)??'')}))}</div></div>`;
+  if(!external||!external.days||typeof external.days!=='object')return head+'<div class="empty">'+esc(h7T('aiu.ext_empty','아직 올라온 외부 AI 기록이 없습니다. PC 집계가 갱신된 뒤 올리면 여기에 보입니다.'))+'</div></div>';
+  const totals=Object.entries(external.totals||{}).sort((a,b)=>(Number(b[1].calls)||0)-(Number(a[1].calls)||0)||a[0].localeCompare(b[0])),days=Object.entries(external.days).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,h7N('aiu.external_days',14));
+  const cards=totals.map(([k,e])=>`<div data-ai-external-ai="${esc(k)}" style="flex:1 1 150px;min-width:140px;border:1px solid var(--line);border-radius:8px;padding:10px 12px"><div style="font-size:13px;color:var(--gray)">${esc(aiExternalLabel(k))}</div><div style="font-size:22px;font-weight:800;color:var(--mint);margin:2px 0">${aiExternalCount(e.calls)}건</div><div class="sub">${esc(h7T('aiu.ext_okfail','성공 {ok} · 실패 {fail}',{ok:aiExternalCount(e.ok),fail:aiExternalCount(e.fail)}))}</div><div style="margin-top:4px">${aiExternalMoney(e)}</div></div>`).join('');
   const rows=days.map(([day,ais])=>Object.entries(ais||{}).sort((a,b)=>(Number(b[1].calls)||0)-(Number(a[1].calls)||0)||a[0].localeCompare(b[0])).map(([k,e])=>`<tr data-ai-external-day="${esc(day)}" data-ai-external-row="${esc(k)}"><td style="white-space:nowrap">${esc(day)}</td><td>${esc(aiExternalLabel(k))}</td><td style="white-space:nowrap">${aiExternalCount(e.calls)}건</td><td style="white-space:nowrap">${aiExternalCount(e.ok)} / ${aiExternalCount(e.fail)}</td><td style="white-space:nowrap">${aiExternalMoney(e,day)}</td></tr>`).join('')).join('');
-  return head+`<div class="hint">기준 ${esc(external.generated)} · 환율 US$1 = ₩${Math.round(Number(external.fx)||0).toLocaleString('ko-KR')}(고정) · 누적은 전체 기간, 날짜별 표는 최근 14일</div>
+  return head+`<div class="hint">${esc(h7T('aiu.ext_basis','기준 {generated} · 환율 US$1 = ₩{fx}(고정) · 누적은 전체 기간, 날짜별 표는 최근 {days}일',{generated:((external.generated)??''),fx:Math.round(Number(external.fx)||0).toLocaleString('ko-KR'),days:h7N('aiu.external_days',14)}))}</div>
     ${cards?`<div class="rowflex" style="gap:10px;flex-wrap:wrap;margin:10px 0">${cards}</div>`:''}
-    ${rows?`<div class="tblwrap"><table><tr><th>날짜</th><th>AI</th><th>건수</th><th>성공 / 실패</th><th>금액</th></tr>${rows}</table></div>`:'<div class="empty">날짜별 기록이 없습니다.</div>'}
-    <div class="hint">금액은 ${AI_EXTERNAL_COST_SINCE}부터 기록합니다(그 전 날짜는 금액 기록 전). 청구액이 아니라 쓴 토큰을 정가로 환산한 값입니다.</div></div>`;
+    ${rows?`<div class="tblwrap"><table><tr><th>${esc(h7T('aiu.ext_th_date','날짜'))}</th><th>${esc(h7T('aiu.ext_th_ai','AI'))}</th><th>${esc(h7T('aiu.ext_th_calls','건수'))}</th><th>${esc(h7T('aiu.ext_th_okfail','성공 / 실패'))}</th><th>${esc(h7T('aiu.ext_th_money','금액'))}</th></tr>${rows}</table></div>`:'<div class="empty">'+esc(h7T('aiu.ext_rows_empty','날짜별 기록이 없습니다.'))+'</div>'}
+    <div class="hint">${esc(h7T('aiu.ext_note','금액은 {since}부터 기록합니다(그 전 날짜는 금액 기록 전). 청구액이 아니라 쓴 토큰을 정가로 환산한 값입니다.',{since:AI_EXTERNAL_COST_SINCE}))}</div></div>`;
 }
 function aiSessionSectionHtml({sessions,error}){
-  const head='<div data-ai-session-section style="margin-top:22px"><h3>🩺 Codex 대화 효율 점검 <span class="sub">오늘 · 돈이 새는 대화</span></h3>';
-  if(error)return head+`<div class="empty">점검 기록을 불러오지 못했습니다: ${esc(error)}</div></div>`;
-  if(!sessions||!Array.isArray(sessions.flagged))return head+'<div class="empty">아직 올라온 점검 기록이 없습니다.</div></div>';
-  const meta=`<div class="hint">기준 ${esc(sessions.generated)} · 오늘 전체 약 ₩${Math.round(Number(sessions.won_today_total)||0).toLocaleString('ko-KR')} · 🔴 지금 헛도는 중(멈추고 새 대화에서 #이어서) · 🟠 오늘 비쌈 · 추정 비용은 대략값</div>`;
-  if(!sessions.flagged.length)return head+meta+'<div class="empty">지금 돈이 새는 대화 없음</div></div>';
-  return head+meta+sessions.flagged.slice(0,8).map(f=>`<div data-ai-session="${esc(f.thread||'')}" style="border-top:1px solid var(--line);padding:6px 0"><div class="rowflex" style="justify-content:space-between;gap:8px;flex-wrap:nowrap"><span>${f.sev==='red'?'🔴':'🟠'} ${esc(f.name||f.thread||'')} <span class="sub">(${f.active?'활성':'멈춤'})</span></span><b style="white-space:nowrap">약 ₩${Math.round(Number(f.won_today)||0).toLocaleString('ko-KR')}</b></div><div class="sub">${esc((f.reasons||[]).join(' · '))}</div></div>`).join('')+'</div>';
+  const head='<div data-ai-session-section style="margin-top:22px"><h3>'+esc(h7T('aiu.sess_title','🩺 Codex 대화 효율 점검'))+' <span class="sub">'+esc(h7T('aiu.sess_sub','오늘 · 돈이 새는 대화'))+'</span></h3>';
+  if(error)return head+`<div class="empty">${esc(h7T('aiu.sess_err','점검 기록을 불러오지 못했습니다: {detail}',{detail:((error)??'')}))}</div></div>`;
+  if(!sessions||!Array.isArray(sessions.flagged))return head+'<div class="empty">'+esc(h7T('aiu.sess_empty','아직 올라온 점검 기록이 없습니다.'))+'</div></div>';
+  const meta=`<div class="hint">${esc(h7T('aiu.sess_meta','기준 {generated} · 오늘 전체 약 ₩{won} · 🔴 지금 헛도는 중(멈추고 새 대화에서 #이어서) · 🟠 오늘 비쌈 · 추정 비용은 대략값',{generated:((sessions.generated)??''),won:Math.round(Number(sessions.won_today_total)||0).toLocaleString('ko-KR')}))}</div>`;
+  if(!sessions.flagged.length)return head+meta+'<div class="empty">'+esc(h7T('aiu.sess_none','지금 돈이 새는 대화 없음'))+'</div></div>';
+  return head+meta+sessions.flagged.slice(0,h7N('aiu.session_limit',8)).map(f=>`<div data-ai-session="${esc(f.thread||'')}" style="border-top:1px solid var(--line);padding:6px 0"><div class="rowflex" style="justify-content:space-between;gap:8px;flex-wrap:nowrap"><span>${f.sev==='red'?'🔴':'🟠'} ${esc(f.name||f.thread||'')} <span class="sub">(${f.active?esc(h7T('aiu.sess_on','활성')):esc(h7T('aiu.sess_off','멈춤'))})</span></span><b style="white-space:nowrap">약 ₩${Math.round(Number(f.won_today)||0).toLocaleString('ko-KR')}</b></div><div class="sub">${esc((f.reasons||[]).join(' · '))}</div></div>`).join('')+'</div>';
 }
-function aiUsagePanelHtml({summary,start,end,error,cost,costError,external,externalError,sessions,sessionsError}){
-  return `<div class="card" id="aiUsagePanel"><h2>📊 AI 사용량 현황판 <span class="sub">원장 전용 · PC가 모아 올린 값</span></h2>${aiUsageModelSection({summary,start,end,error})}${aiCostSectionHtml({cost,error:costError})}${aiExternalSectionHtml({external,error:externalError})}${aiSessionSectionHtml({sessions,error:sessionsError})}</div>`;
+function aiUsagePanelHtml({summary,start,end,error,days,cost,costError,external,externalError,sessions,sessionsError}){
+  return `<div class="card" id="aiUsagePanel"><h2>${esc(h7T('aiu.panel_title','📊 AI 사용량 현황판'))} <span class="sub">${esc(h7T('aiu.panel_sub','원장 전용 · PC가 모아 올린 값'))}</span></h2>${aiUsageModelSection({summary,start,end,error,days})}${aiCostSectionHtml({cost,error:costError})}${aiExternalSectionHtml({external,error:externalError})}${aiSessionSectionHtml({sessions,error:sessionsError})}</div>`;
 }
 /* ai-usage:test-end */
 /* ── 원장 보기판: PC가 올린 완결 HTML을 격리 iframe으로만 표시 ── */
 /* owner-boards:test-start */
+/* 허브 설정(차례 7): 글·숫자·이름 목록 읽기 — hub-texts.js가 없거나 시험이 이 구간만 따로 실행해도 기본 글 그대로 */
+function h7T(k,d,v){return typeof hubT==='function'?hubT(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
+function h7X(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function h7N(k,d){return typeof hubN==='function'?hubN(k,d):d;}
+function h7L(k,obj){const def=Object.keys(obj).map(function(c){return {code:c,label:obj[c]};});const items=typeof hubList==='function'?hubList(k,def):def;const m={};items.forEach(function(i){m[i.code]=i.label;});return m;}
 const OWNER_BOARD_TAB={key:'ownerboards',label:'📒 원장 보기판',roles:['owner']};
 function ownerBoardSrcdoc(html){
   const source=String(html||''),style='<style>#btn-png{display:none!important}</style>';
@@ -3241,16 +3272,17 @@ const OWNER_BOARDS=[
   {slug:'pin_board',title:'📌 명심판',description:'AI가 지킬 약속'},
   {slug:'wordbook',title:'📖 박제 단어장',description:'원장이 알아 둘 말'}
 ];
+function ownerBoardTexts(board){const m={busd_ledger:{title:h7T('ob.busd_title','📒 뻐스디 장부'),description:h7T('ob.busd_desc','AI 일 장부')},pin_board:{title:h7T('ob.pin_title','📌 명심판'),description:h7T('ob.pin_desc','AI가 지킬 약속')},wordbook:{title:h7T('ob.word_title','📖 박제 단어장'),description:h7T('ob.word_desc','원장이 알아 둘 말')}};return m[board.slug]||{title:board.title,description:board.description};}
 function ownerBoardsTimestamp(value){if(!value)return '';const d=new Date(value),p=n=>String(n).padStart(2,'0');return Number.isNaN(d.getTime())?String(value):`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;}
 function ownerBoardsMissing(error){return !!error&&(error.code==='42P01'||error.code==='PGRST205'||Number(error.status)===404);}
 function ownerBoardsPanelHtml(rows,error){
   const bySlug=new Map((rows||[]).map(row=>[row.slug,row]));
-  const cards=OWNER_BOARDS.map(board=>{const row=bySlug.get(board.slug),synced=row&&row.synced_at?`마지막으로 올라온 때 ${esc(ownerBoardsTimestamp(row.synced_at))}`:'아직 PC에서 올라오지 않음';return `<button type="button" class="card owner-board-card" data-owner-board="${board.slug}" onclick="openOwnerBoard('${board.slug}')"><strong>${board.title}</strong><span>${board.description}</span><small>${synced}</small></button>`;}).join('');
-  const notice=error?(ownerBoardsMissing(error)?'<div class="hint">원장 보기판이 준비 중입니다.</div>':`<div class="cal-error">원장 보기판 목록을 불러오지 못했습니다: ${esc(error.message||'조회 오류')}</div>`):'';
-  return `<section class="card" id="ownerBoardsPanel"><h2>📒 원장 보기판 <span class="sub">원장 전용</span></h2>${notice}<div class="owner-board-grid">${cards}</div><div id="ownerBoardViewer" hidden></div></section>`;
+  const cards=OWNER_BOARDS.map(board=>{const row=bySlug.get(board.slug),synced=row&&row.synced_at?esc(h7T('ob.synced','마지막으로 올라온 때 {when}',{when:ownerBoardsTimestamp(row.synced_at)})):esc(h7T('ob.not_synced','아직 PC에서 올라오지 않음'));return `<button type="button" class="card owner-board-card" data-owner-board="${board.slug}" onclick="openOwnerBoard('${board.slug}')"><strong>${esc(ownerBoardTexts(board).title)}</strong><span>${esc(ownerBoardTexts(board).description)}</span><small>${synced}</small></button>`;}).join('');
+  const notice=error?(ownerBoardsMissing(error)?'<div class="hint">'+esc(h7T('ob.preparing','원장 보기판이 준비 중입니다.'))+'</div>':`<div class="cal-error">${esc(h7T('ob.list_err','원장 보기판 목록을 불러오지 못했습니다: {detail}',{detail:error.message||h7T('ob.list_err_unknown','조회 오류')}))}</div>`):'';
+  return `<section class="card" id="ownerBoardsPanel"><h2>${esc(h7T('ob.title','📒 원장 보기판'))} <span class="sub">${esc(h7T('ob.sub','원장 전용'))}</span></h2>${notice}<div class="owner-board-grid">${cards}</div><div id="ownerBoardViewer" hidden></div></section>`;
 }
 async function renderOwnerBoards(m){
-  if(ME.role!=='owner'){m.innerHTML='<div class="card"><div class="empty">원장 전용입니다.</div></div>';return;}
+  if(ME.role!=='owner'){m.innerHTML='<div class="card"><div class="empty">'+esc(h7T('ob.owner_only','원장 전용입니다.'))+'</div></div>';return;}
   const {data,error}=await sb.from('owner_boards').select('slug,sha256,synced_at');
   m.innerHTML=ownerBoardsPanelHtml(data,error);
 }
@@ -3259,11 +3291,11 @@ async function openOwnerBoard(slug){
   if(ME.role!=='owner')return;
   const board=OWNER_BOARDS.find(item=>item.slug===slug);if(!board)return;
   const viewer=document.getElementById('ownerBoardViewer');if(!viewer)return;
-  viewer.hidden=false;viewer.innerHTML='<div class="empty">판을 불러오는 중…</div>';
+  viewer.hidden=false;viewer.innerHTML='<div class="empty">'+esc(h7T('ob.loading','판을 불러오는 중…'))+'</div>';
   const {data,error}=await sb.from('owner_boards').select('html,synced_at').eq('slug',board.slug).maybeSingle();
-  if(error||!data){viewer.innerHTML=ownerBoardsMissing(error)?'<div class="hint">원장 보기판이 준비 중입니다.</div>':`<div class="cal-error">판을 불러오지 못했습니다: ${esc(error?.message||'아직 PC에서 올라오지 않음')}</div>`;return;}
-  viewer.innerHTML=`<div class="owner-board-view-head"><div><strong>${board.title}</strong><div class="sub">마지막으로 올라온 때 ${esc(data.synced_at?ownerBoardsTimestamp(data.synced_at):'확인되지 않음')}</div><div class="sub">PNG 저장은 PC 판에서만 됨 · 허브에서는 PDF 저장을 쓰세요</div></div><button type="button" class="mini" onclick="closeOwnerBoard()">닫기</button></div><div class="owner-board-frame-slot"></div>`;
-  const frame=document.createElement('iframe');frame.setAttribute('sandbox','allow-scripts allow-downloads allow-modals');frame.setAttribute('referrerpolicy','no-referrer');frame.setAttribute('title',board.title+' 보기');frame.style.width='100%';frame.style.maxWidth='100%';frame.style.height='max(480px, calc(100vh - 140px))';frame.style.border='1px solid var(--line)';frame.style.borderRadius='8px';frame.style.background='#fff';frame.srcdoc=ownerBoardSrcdoc(data.html);
+  if(error||!data){viewer.innerHTML=ownerBoardsMissing(error)?'<div class="hint">'+esc(h7T('ob.preparing','원장 보기판이 준비 중입니다.'))+'</div>':`<div class="cal-error">${esc(h7T('ob.view_err','판을 불러오지 못했습니다: {detail}',{detail:error?.message||h7T('ob.not_synced','아직 PC에서 올라오지 않음')}))}</div>`;return;}
+  viewer.innerHTML=`<div class="owner-board-view-head"><div><strong>${esc(ownerBoardTexts(board).title)}</strong><div class="sub">${esc(h7T('ob.synced','마지막으로 올라온 때 {when}',{when:data.synced_at?ownerBoardsTimestamp(data.synced_at):h7T('ob.unknown_time','확인되지 않음')}))}</div><div class="sub">${esc(h7T('ob.png_note','PNG 저장은 PC 판에서만 됨 · 허브에서는 PDF 저장을 쓰세요'))}</div></div><button type="button" class="mini" onclick="closeOwnerBoard()">${esc(h7T('ob.btn_close','닫기'))}</button></div><div class="owner-board-frame-slot"></div>`;
+  const frame=document.createElement('iframe');frame.setAttribute('sandbox','allow-scripts allow-downloads allow-modals');frame.setAttribute('referrerpolicy','no-referrer');frame.setAttribute('title',h7T('ob.frame_title','{title} 보기',{title:ownerBoardTexts(board).title}));frame.style.width='100%';frame.style.maxWidth='100%';frame.style.height='max(480px, calc(100vh - 140px))';frame.style.border='1px solid var(--line)';frame.style.borderRadius='8px';frame.style.background='#fff';frame.srcdoc=ownerBoardSrcdoc(data.html);
   viewer.querySelector('.owner-board-frame-slot').appendChild(frame);
 }
 /* owner-boards:test-end */
@@ -3282,13 +3314,13 @@ async function saveAicost(i){
   setStatus('saving');
   const {error}=await sb.from('ai_billing').upsert({ym:AICOST_MONTH,platform:AICOST_PLATFORMS[i],amount_krw:amount,note,
     updated_by:ME.name,updated_at:new Date().toISOString()},{onConflict:'ym,platform'});
-  if(error){alert('AI 비용 저장 실패: '+error.message);setStatus('error');return;}
+  if(error){alert(hubT('aic.a_save_fail','AI 비용 저장 실패: {detail}',{detail:error.message}));setStatus('error');return;}
   setStatus('saved');render();
 }
 async function renderAicost(m){
-  if(ME.role!=='owner'){m.innerHTML='<div class="card"><div class="empty">원장만 사용할 수 있습니다.</div></div>';return;}
+  if(ME.role!=='owner'){m.innerHTML='<div class="card"><div class="empty">'+esc(hubT('aic.owner_only','원장만 사용할 수 있습니다.'))+'</div></div>';return;}
   if(!AICOST_MONTH)AICOST_MONTH=today().slice(0,7);
-  const usageWin=aiUsageWindow(today(),7);
+  const usageDays=hubN('aiu.model_days',7),usageWin=aiUsageWindow(today(),usageDays);
   const [{data:rows,error},{data:history,error:historyError},{data:events,error:eventsError},{data:usageRows,error:usageError},{data:snapshots,error:snapshotError}]=await Promise.all([
     sb.from('ai_billing').select('*').eq('ym',AICOST_MONTH),
     sb.from('ai_billing').select('ym,amount_krw').order('ym',{ascending:false}),
@@ -3296,35 +3328,35 @@ async function renderAicost(m){
     sb.from('ai_model_usage_daily').select('usage_date,model,tokens,turns,synced_at').gte('usage_date',usageWin.start).order('usage_date',{ascending:false}).limit(2000),
     sb.from('ai_usage_snapshots').select('kind,payload,synced_at').in('kind',['platform_cost','codex_sessions','external_ai'])
   ]);
-  if(error||historyError||eventsError){setStatus('error');m.innerHTML=`<div class="card"><div class="empty">AI 비용을 불러오지 못했습니다: ${esc((error||historyError||eventsError).message)}</div></div>`;return;}
+  if(error||historyError||eventsError){setStatus('error');m.innerHTML=`<div class="card"><div class="empty">${esc(hubT('aic.load_err','AI 비용을 불러오지 못했습니다: {detail}',{detail:(((error||historyError||eventsError).message)??'')}))}</div></div>`;return;}
   const byPlatform={};(rows||[]).forEach(r=>byPlatform[r.platform]=r);
   // 자동감지(문자 웹훅 등) — 선택한 달의 이벤트만 플랫폼별 합산(이름은 대소문자·앞뒤 공백 무시로 목록 값에 맞추고, 목록 밖은 기타로 모음)
   const billableEvents=(events||[]).filter(e=>!isNaverAdBillingEvent(e));const autoByPlatform={};billableEvents.forEach(e=>{if(formatLeaveMonth(e.received_at)===AICOST_MONTH){const k=aicostPlatformKey(e.platform);autoByPlatform[k]=(autoByPlatform[k]||0)+Number(e.amount_krw||0);}});
   const total=AICOST_PLATFORMS.reduce((sum,p)=>sum+Number((byPlatform[p]||{}).amount_krw||0)+Number(autoByPlatform[p]||0),0);
   const totals={};(history||[]).forEach(r=>totals[r.ym]=(totals[r.ym]||0)+Number(r.amount_krw||0));
   billableEvents.forEach(e=>{const ym=formatLeaveMonth(e.received_at);totals[ym]=(totals[ym]||0)+Number(e.amount_krw||0);});
-  const recent=Object.entries(totals).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,6),max=Math.max(1,...recent.map(x=>x[1]));
-  const recentEvents=billableEvents.slice(0,20);
+  const recent=Object.entries(totals).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,hubN('aic.history_months',6)),max=Math.max(1,...recent.map(x=>x[1]));
+  const recentEvents=billableEvents.slice(0,hubN('aic.auto_limit',20));
   const snap={};(snapshots||[]).forEach(s=>snap[s.kind]=s.payload);
-  const usageHtml=aiUsagePanelHtml({summary:aiUsageSummary(usageRows,usageWin.start,usageWin.end),start:usageWin.start,end:usageWin.end,error:usageError?usageError.message:'',
+  const usageHtml=aiUsagePanelHtml({summary:aiUsageSummary(usageRows,usageWin.start,usageWin.end),start:usageWin.start,end:usageWin.end,days:usageDays,error:usageError?usageError.message:'',
     cost:snap.platform_cost||null,costError:snapshotError?snapshotError.message:'',external:snap.external_ai||null,externalError:snapshotError?snapshotError.message:'',sessions:snap.codex_sessions||null,sessionsError:snapshotError?snapshotError.message:''});
   const marketingHtml=await renderMarketingExpensePanel();
-  m.innerHTML=`<div class="card"><h2>💰 AI비용 <span class="sub">(원장 전용)</span></h2>
-    <div class="fld" style="max-width:220px"><label>조회 월</label><input type="month" value="${esc(AICOST_MONTH)}" onchange="setAicostMonth(this.value)"></div>
-    <div style="font-size:13px;color:var(--gray);margin-top:16px">이번 달 실제 청구액 (직접 입력 + 자동감지 문자 합계)</div>
+  m.innerHTML=`<div class="card"><h2>${esc(hubT('aic.title','💰 AI비용'))} <span class="sub">${esc(hubT('aic.sub','(원장 전용)'))}</span></h2>
+    <div class="fld" style="max-width:220px"><label>${esc(hubT('aic.f_month','조회 월'))}</label><input type="month" value="${esc(AICOST_MONTH)}" onchange="setAicostMonth(this.value)"></div>
+    <div style="font-size:13px;color:var(--gray);margin-top:16px">${esc(hubT('aic.total_label','이번 달 실제 청구액 (직접 입력 + 자동감지 문자 합계)'))}</div>
     <div style="font-size:30px;font-weight:800;color:var(--mint);margin:4px 0 18px">₩${aicostMoney(total)}</div>
-    <div class="tblwrap"><table><tr><th>플랫폼</th><th>직접 입력</th><th>자동감지(문자)</th><th>메모</th><th></th></tr>
-    ${AICOST_PLATFORMS.map((p,i)=>{const r=byPlatform[p]||{},auto=Number(autoByPlatform[p]||0);return `<tr><td>${esc(p)}</td>
-      <td><input class="mini" id="aiAmount-${i}" type="number" step="1" value="${Number(r.amount_krw)||0}" style="width:130px"> 원</td>
+    <div class="tblwrap"><table><tr><th>${esc(hubT('aic.th_platform','플랫폼'))}</th><th>${esc(hubT('aic.th_manual','직접 입력'))}</th><th>${esc(hubT('aic.th_auto','자동감지(문자)'))}</th><th>${esc(hubT('aic.th_note','메모'))}</th><th></th></tr>
+    ${AICOST_PLATFORMS.map((p,i)=>{const r=byPlatform[p]||{},auto=Number(autoByPlatform[p]||0);return `<tr><td>${esc(aicostPlatformLabel(p))}</td>
+      <td><input class="mini" id="aiAmount-${i}" type="number" step="1" value="${Number(r.amount_krw)||0}" style="width:130px"> ${esc(hubT('aic.unit_won','원'))}</td>
       <td>${auto?`<b style="color:var(--mint)">₩${aicostMoney(auto)}</b>`:'<span class="sub">-</span>'}</td>
-      <td><input class="mini" id="aiNote-${i}" value="${esc(r.note||'')}" placeholder="선택 입력" style="min-width:200px"></td>
-      <td><button class="mini stamp" onclick="saveAicost(${i})">저장</button></td></tr>`;}).join('')}</table></div>
-    <div class="hint">"직접 입력"은 원장이 넣는 값, "자동감지(문자)"는 결제 문자를 MacroDroid가 자동으로 전송해 쌓인 값(수정 불가·자동 집계). 합계가 위 총액에 함께 반영됩니다.</div></div>
+      <td><input class="mini" id="aiNote-${i}" value="${esc(r.note||'')}" placeholder="${esc(hubT('aic.ph_note','선택 입력'))}" style="min-width:200px"></td>
+      <td><button class="mini stamp" onclick="saveAicost(${i})">${esc(hubT('aic.btn_save','저장'))}</button></td></tr>`;}).join('')}</table></div>
+    <div class="hint">${hubTE('aic.hint','"직접 입력"은 원장이 넣는 값, "자동감지(문자)"는 결제 문자를 MacroDroid가 자동으로 전송해 쌓인 값(수정 불가·자동 집계). 합계가 위 총액에 함께 반영됩니다.')}</div></div>
     ${usageHtml}
     ${marketingHtml}
-  <div class="card"><h2>최근 6개월 실제 청구액</h2>${recent.length?recent.map(([ym,sum])=>`<div style="margin:10px 0"><div class="rowflex" style="justify-content:space-between"><span>${esc(ym)}</span><b>₩${aicostMoney(sum)}</b></div><div style="height:8px;background:var(--line);border-radius:4px;margin-top:5px"><div style="height:100%;width:${Math.round(sum/max*100)}%;background:var(--mint);border-radius:4px"></div></div></div>`).join(''):'<div class="empty">저장된 청구 내역이 없습니다.</div>'}</div>
-  <div class="card"><h2>📩 자동감지 내역 <span class="sub">(최근 20건, 문자 웹훅)</span></h2>${recentEvents.length?`<div class="tblwrap"><table><tr><th>수신</th><th>플랫폼</th><th>금액</th><th>원문</th></tr>
-    ${recentEvents.map(e=>`<tr><td>${esc(formatLeaveTimestamp(e.received_at)||'미상')}</td><td>${esc(e.platform)}</td><td>₩${aicostMoney(e.amount_krw)}</td><td class="sub" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.raw_text||'')}">${esc(e.raw_text||e.note||'')}</td></tr>`).join('')}</table></div>`:'<div class="empty">아직 자동감지된 결제 문자가 없습니다. MacroDroid 연동 후 결제 문자가 오면 여기 쌓입니다.</div>'}</div>`;
+  <div class="card"><h2>${esc(hubT('aic.hist_title','최근 {n}개월 실제 청구액',{n:hubN('aic.history_months',6)}))}</h2>${recent.length?recent.map(([ym,sum])=>`<div style="margin:10px 0"><div class="rowflex" style="justify-content:space-between"><span>${esc(ym)}</span><b>₩${aicostMoney(sum)}</b></div><div style="height:8px;background:var(--line);border-radius:4px;margin-top:5px"><div style="height:100%;width:${Math.round(sum/max*100)}%;background:var(--mint);border-radius:4px"></div></div></div>`).join(''):'<div class="empty">'+esc(hubT('aic.hist_empty','저장된 청구 내역이 없습니다.'))+'</div>'}</div>
+  <div class="card"><h2>${esc(hubT('aic.auto_title','📩 자동감지 내역'))} <span class="sub">${esc(hubT('aic.auto_sub','(최근 {n}건, 문자 웹훅)',{n:hubN('aic.auto_limit',20)}))}</span></h2>${recentEvents.length?`<div class="tblwrap"><table><tr><th>${esc(hubT('aic.auto_th_time','수신'))}</th><th>${esc(hubT('aic.auto_th_platform','플랫폼'))}</th><th>${esc(hubT('aic.auto_th_amount','금액'))}</th><th>${esc(hubT('aic.auto_th_text','원문'))}</th></tr>
+    ${recentEvents.map(e=>`<tr><td>${esc(formatLeaveTimestamp(e.received_at)||hubT('aic.unknown_time','미상'))}</td><td>${esc(e.platform)}</td><td>₩${aicostMoney(e.amount_krw)}</td><td class="sub" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.raw_text||'')}">${esc(e.raw_text||e.note||'')}</td></tr>`).join('')}</table></div>`:'<div class="empty">'+esc(hubT('aic.auto_empty','아직 자동감지된 결제 문자가 없습니다. MacroDroid 연동 후 결제 문자가 오면 여기 쌓입니다.'))+'</div>'}</div>`;
 }
 
 /* ── 급여 ── */
@@ -3352,61 +3384,62 @@ function payNumber(v){
   if(!/^-?\d+(\.\d+)?$/.test(s))return null;
   const n=Number(s);return Number.isFinite(n)?(neg?-Math.abs(n):n):null;
 }
-function payTop(){return `<div class="card"><h2>💰 급여 <span class="sub">(원장 전용)</span></h2>
-  <button class="mini ${PAY_VIEW==='ledger'?'stamp':''}" onclick="setPayView('ledger')">급여대장</button>
-  <button class="mini ${PAY_VIEW==='wage'?'stamp':''}" onclick="setPayView('wage')">시급설정</button>
-  <button class="mini ${PAY_VIEW==='payslip'?'stamp':''}" onclick="setPayView('payslip')">명세서</button></div>`;}
+function payWageTypeLabel(c){const def=[{code:'monthly',label:'월급'},{code:'hourly',label:'시급'}];const items=typeof hubList==='function'?hubList('list.pay_wage_types',def):def;const it=items.find(function(i){return i.code===c;});return it?it.label:c;}
+function payTop(){return `<div class="card"><h2>${esc(hubT('pay.title','💰 급여'))} <span class="sub">${esc(hubT('pay.sub','(원장 전용)'))}</span></h2>
+  <button class="mini ${PAY_VIEW==='ledger'?'stamp':''}" onclick="setPayView('ledger')">${esc(hubT('pay.tab_ledger','급여대장'))}</button>
+  <button class="mini ${PAY_VIEW==='wage'?'stamp':''}" onclick="setPayView('wage')">${esc(hubT('pay.tab_wage','시급설정'))}</button>
+  <button class="mini ${PAY_VIEW==='payslip'?'stamp':''}" onclick="setPayView('payslip')">${esc(hubT('pay.tab_slip','명세서'))}</button></div>`;}
 function setPayView(v){PAY_VIEW=v;PAY_MESSAGE='';render();}
 async function renderPay(m){
-  if(ME.role!=='owner'){m.innerHTML='<div class="card"><div class="empty">원장만 사용할 수 있습니다.</div></div>';return;}
+  if(ME.role!=='owner'){m.innerHTML='<div class="card"><div class="empty">'+esc(hubT('pay.owner_only','원장만 사용할 수 있습니다.'))+'</div></div>';return;}
   if(PAY_VIEW==='wage')await renderPayWages(m);else if(PAY_VIEW==='payslip')await renderPaySlip(m);else await renderPayLedger(m);
 }
 async function renderPayWages(m){
   const {data,error}=await sb.from('wage_info').select('*').order('effective_from',{ascending:false});
-  if(error){setStatus('error');m.innerHTML=payTop()+`<div class="card"><div class="empty">시급 정보를 불러오지 못했습니다: ${esc(error.message)}</div></div>`;return;}
+  if(error){setStatus('error');m.innerHTML=payTop()+`<div class="card"><div class="empty">${esc(hubT('pay.wage_err','시급 정보를 불러오지 못했습니다: {detail}',{detail:((error.message)??'')}))}</div></div>`;return;}
   PAY_WAGE_LATEST={};(data||[]).forEach(r=>{if(!PAY_WAGE_LATEST[r.user_id])PAY_WAGE_LATEST[r.user_id]=r;});
   const staff=PROFILES.filter(p=>p.active!==false);
-  m.innerHTML=payTop()+`<div class="card"><h2>시급설정</h2>
+  m.innerHTML=payTop()+`<div class="card"><h2>${esc(hubT('pay.wage_title','시급설정'))}</h2>
     ${PAY_MESSAGE?`<div class="hint">${esc(PAY_MESSAGE)}</div>`:''}
-    <div class="tblwrap"><table><tr><th>직원</th><th>급여형태</th><th>기본급/시급</th><th>통상시간</th><th>고정상여</th><th>숙소지원</th><th>적용일</th><th>메모</th><th></th></tr>
+    <div class="tblwrap"><table><tr><th>${esc(hubT('pay.wage_th_name','직원'))}</th><th>${esc(hubT('pay.wage_th_type','급여형태'))}</th><th>${esc(hubT('pay.wage_th_base','기본급/시급'))}</th><th>${esc(hubT('pay.wage_th_hours','통상시간'))}</th><th>${esc(hubT('pay.wage_th_bonus','고정상여'))}</th><th>${esc(hubT('pay.wage_th_housing','숙소지원'))}</th><th>${esc(hubT('pay.wage_th_from','적용일'))}</th><th>${esc(hubT('pay.wage_th_memo','메모'))}</th><th></th></tr>
     ${staff.map(p=>{const w=PAY_WAGE_LATEST[p.user_id]||{};return `<tr><td>${esc(p.name)}</td>
-      <td><select class="mini" id="pw-type-${p.user_id}"><option value="monthly" ${w.wage_type!=='hourly'?'selected':''}>월급</option><option value="hourly" ${w.wage_type==='hourly'?'selected':''}>시급</option></select></td>
+      <td><select class="mini" id="pw-type-${p.user_id}"><option value="monthly" ${w.wage_type!=='hourly'?'selected':''}>${esc(payWageTypeLabel('monthly'))}</option><option value="hourly" ${w.wage_type==='hourly'?'selected':''}>${esc(payWageTypeLabel('hourly'))}</option></select></td>
       <td><input class="mini" id="pw-base-${p.user_id}" type="number" min="0" step="1" value="${w.base_wage==null?0:w.base_wage}"></td>
       <td><input class="mini" id="pw-hours-${p.user_id}" type="number" min="0" step="0.01" value="${w.normal_hours==null?209:w.normal_hours}" style="width:80px"></td>
       <td><input class="mini" id="pw-bonus-${p.user_id}" type="number" min="0" step="1" value="${w.fixed_bonus==null?0:w.fixed_bonus}"></td>
       <td><input class="mini" id="pw-housing-${p.user_id}" type="number" min="0" step="1" value="${w.housing_support==null?0:w.housing_support}"></td>
       <td><input class="mini" id="pw-from-${p.user_id}" type="date" value="${w.effective_from||today()}"></td>
       <td><input class="mini" id="pw-memo-${p.user_id}" value="${esc(w.memo||'')}" style="width:130px"></td>
-      <td><button class="mini stamp" onclick="saveWageInfo('${p.user_id}')">저장</button></td></tr>`;}).join('')}</table></div>
-    <div class="hint">적용일을 새 날짜로 바꾸어 저장하면 기존 값을 덮지 않고 새 임금 이력이 만들어집니다.</div></div>`;
+      <td><button class="mini stamp" onclick="saveWageInfo('${p.user_id}')">${esc(hubT('pay.wage_btn_save','저장'))}</button></td></tr>`;}).join('')}</table></div>
+    <div class="hint">${esc(hubT('pay.wage_hint','적용일을 새 날짜로 바꾸어 저장하면 기존 값을 덮지 않고 새 임금 이력이 만들어집니다.'))}</div></div>`;
 }
 async function saveWageInfo(uid){
   const prior=PAY_WAGE_LATEST[uid]||{},effective=$('#pw-from-'+uid).value;
-  if(!effective){PAY_MESSAGE='적용일을 입력하세요.';setStatus('error');render();return;}
+  if(!effective){PAY_MESSAGE=hubT('pay.m_wage_date','적용일을 입력하세요.');setStatus('error');render();return;}
   const payload={user_id:uid,wage_type:$('#pw-type-'+uid).value,base_wage:payNumber($('#pw-base-'+uid).value)||0,
     normal_hours:payNumber($('#pw-hours-'+uid).value)||0,fixed_bonus:payNumber($('#pw-bonus-'+uid).value)||0,
     housing_support:payNumber($('#pw-housing-'+uid).value)||0,effective_from:effective,
     housing_from:prior.housing_from||null,housing_to:prior.housing_to||null,memo:$('#pw-memo-'+uid).value||null,
     updated_by:ME.name,updated_at:new Date().toISOString()};
   setStatus('saving');const {error}=await sb.from('wage_info').upsert(payload,{onConflict:'user_id,effective_from'});
-  if(error){PAY_MESSAGE='저장 실패: '+error.message;setStatus('error');render();return;}
-  PAY_MESSAGE=nameOf(uid)+' 시급 정보를 저장했습니다.';setStatus('saved');render();
+  if(error){PAY_MESSAGE=hubT('pay.m_wage_fail','저장 실패: {detail}',{detail:error.message});setStatus('error');render();return;}
+  PAY_MESSAGE=hubT('pay.m_wage_saved','{name} 시급 정보를 저장했습니다.',{name:nameOf(uid)});setStatus('saved');render();
 }
-function setPayMonth(v){if(v!==PAY_MONTH){PAY_ROWS=[];PAY_SOURCE_FILE=null;PAY_MESSAGE='대상 월을 바꿨습니다. 새 월의 대장 파일을 다시 선택하세요.';}PAY_MONTH=v;render();}
+function setPayMonth(v){if(v!==PAY_MONTH){PAY_ROWS=[];PAY_SOURCE_FILE=null;PAY_MESSAGE=hubT('pay.m_month_changed','대상 월을 바꿨습니다. 새 월의 대장 파일을 다시 선택하세요.');}PAY_MONTH=v;render();}
 function setPayRowUser(i,uid){const p=PROFILES.find(x=>x.user_id===uid);PAY_ROWS[i].user_id=uid;PAY_ROWS[i].name=p?p.name:PAY_ROWS[i].name;render();}
 function setPayItem(i,j,v){const key=PAY_COLUMNS[j].key,n=payNumber(v);if(n==null)delete PAY_ROWS[i].items[key];else PAY_ROWS[i].items[key]=n;}
 function addPayRow(){
   if(!PAY_COLUMNS.length)PAY_COLUMNS=[
     {key:'base_pay',label:'기본급'},{key:'meal_allow',label:'식대'},{key:'gross_total',label:'지급액계'},
     {key:'deduct_total',label:'공제액계'},{key:'net_pay',label:'차인지급액'}];
-  PAY_ROWS.push({user_id:'',name:'',items:{},manual:true});PAY_MESSAGE='수기 입력 행을 추가했습니다.';render();
+  PAY_ROWS.push({user_id:'',name:'',items:{},manual:true});PAY_MESSAGE=hubT('pay.m_row_added','수기 입력 행을 추가했습니다.');render();
 }
 function parsePayrollXls(ev){
   const f=ev.target.files[0];if(!f)return;PAY_SOURCE_FILE=null;
   const rd=new FileReader();
   rd.onload=async e=>{try{const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});const ws=wb.Sheets[wb.SheetNames[0]];
     const aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true});if(await buildPayrollPreview(aoa)){PAY_SOURCE_FILE=f;render();}
-  }catch(err){PAY_MESSAGE='엑셀을 읽지 못했습니다: '+err.message;setStatus('error');render();}};
+  }catch(err){PAY_MESSAGE=hubT('pay.m_xls_read_fail','엑셀을 읽지 못했습니다: {detail}',{detail:err.message});setStatus('error');render();}};
   rd.readAsArrayBuffer(f);
 }
 async function buildPayrollPreview(aoa){
@@ -3414,7 +3447,7 @@ async function buildPayrollPreview(aoa){
   // 기본급·식대 등 지급/공제 항목명은 그 아래 항목행. 항목행을 기준으로 잡고,
   // 항목행이 빈 열은 바로 윗행에서 끌어와 한 줄 헤더로 병합한다. (1행 헤더면 병합이 저절로 무효)
   const itemRow=aoa.findIndex(row=>(row||[]).some(x=>normPayHeader(x).includes('기본급')));
-  if(itemRow<0){PAY_MESSAGE='기본급 열이 있는 헤더 행을 찾지 못했습니다.';setStatus('error');render();return false;}
+  if(itemRow<0){PAY_MESSAGE=hubT('pay.m_xls_no_base','기본급 열이 있는 헤더 행을 찾지 못했습니다.');setStatus('error');render();return false;}
   const above=itemRow>0?(aoa[itemRow-1]||[]):[],cur=aoa[itemRow]||[];
   const width=Math.max(cur.length,above.length);
   const labels=[];for(let c=0;c<width;c++){labels[c]=normPayHeader(cur[c])||normPayHeader(above[c]);}
@@ -3422,7 +3455,7 @@ async function buildPayrollPreview(aoa){
   // 차인지급액(net_pay) 이후 열(비고·세후·상여·급여구성 세전내역 등)은 정식 대장이 아니라 보조·중복이므로 매핑에서 제외한다
   const netCol=initial.find(c=>c.key==='net_pay'),payCut=netCol?netCol.index:Infinity;
   const nameCol=initial.find(c=>c.key==='name');
-  if(!nameCol){PAY_MESSAGE='성명 열을 찾지 못했습니다.';setStatus('error');render();return false;}
+  if(!nameCol){PAY_MESSAGE=hubT('pay.m_xls_no_name','성명 열을 찾지 못했습니다.');setStatus('error');render();return false;}
   const raw=[];
   for(let i=itemRow+1;i<aoa.length;i++){const row=aoa[i]||[],name=String(row[nameCol.index]==null?'':row[nameCol.index]).trim();
     const stop=normPayHeader(name);if(!name||stop==='인원'||stop==='총합계')break;raw.push(row);}
@@ -3438,7 +3471,7 @@ async function buildPayrollPreview(aoa){
     return {user_id:matches.length===1?matches[0].user_id:'',name,items,manual:false};});
   SETTINGS.payroll_col_map=JSON.stringify(headerMap);
   const {error}=await sb.from('app_settings').upsert({key:'payroll_col_map',value:SETTINGS.payroll_col_map},{onConflict:'key'});
-  PAY_MESSAGE=`엑셀 ${PAY_ROWS.length}행을 읽었습니다.`+(error?' 열 매핑 저장 실패: '+error.message:' 열 매핑도 저장했습니다.');
+  PAY_MESSAGE=hubT('pay.m_xls_read','엑셀 {n}행을 읽었습니다.',{n:PAY_ROWS.length})+(error?' '+hubT('pay.m_xls_map_fail','열 매핑 저장 실패: {detail}',{detail:error.message}):' '+hubT('pay.m_xls_map_ok','열 매핑도 저장했습니다.'));
   setStatus(error?'error':'saved');render();return PAY_ROWS.length>0;
 }
 async function renderPayLedger(m){
@@ -3450,48 +3483,48 @@ async function renderPayLedger(m){
   ]);
   const staff=PROFILES.filter(p=>p.active!==false);
   const cols=PAY_COLUMNS;
-  m.innerHTML=payTop()+`<div class="card"><h2>급여대장</h2>
-    <div class="rowflex"><label>대상 월 <input class="mini" type="month" value="${PAY_MONTH}" onchange="setPayMonth(this.value)"></label>
-      <label class="mini stamp" style="cursor:pointer">엑셀 업로드<input type="file" accept=".xls,.xlsx" style="display:none" onchange="parsePayrollXls(event)"></label>
-      <button class="mini" onclick="addPayRow()">수기 행 추가</button>
-      <button class="mini stamp" onclick="savePayrollRows()">급여대장 저장</button></div>
-    <div class="hint">선택 월 저장 행 ${saved.data?.length||0}건 · 복구 가능 보관 행 ${archived.data?.length||0}건${PAY_SOURCE_FILE?` · 저장 대기 원본: ${esc(PAY_SOURCE_FILE.name)}`:''}</div>
-    <div class="rowflex" style="margin:8px 0"><label>옮길 월 <input id="payMoveMonth" class="mini" type="month"></label><button class="mini" onclick="movePayrollMonth()" ${!saved.data?.length?'disabled':''}>선택 월을 옮기기</button><button class="mini" onclick="archivePayrollMonth()" ${!saved.data?.length?'disabled':''}>선택 월 삭제(복구 가능)</button><button class="mini" onclick="restorePayrollMonth()" ${!archived.data?.length?'disabled':''}>선택 월 복구</button></div>
-    <div class="hint">원본 파일: ${uploads.error?'목록 조회 실패: '+esc(uploads.error.message):(uploads.data||[]).map(u=>`<button class="mini" data-pay-upload="${esc(u.id)}" onclick="downloadPayrollOriginal(this.dataset.payUpload)">원본 받기 · ${esc(u.file_name)}</button>`).join(' ')||'저장된 원본 없음'}</div>
-    ${PAY_MESSAGE?`<div class="hint" id="payMsg">${esc(PAY_MESSAGE)}</div>`:'<div class="hint" id="payMsg">노무법인 급여대장의 첫 시트를 올리거나 수기 행을 추가하세요.</div>'}
-    ${PAY_ROWS.length?`<div class="tblwrap"><table><tr><th>직원 매핑</th><th>원본 성명</th>${cols.map(c=>`<th>${esc(c.label)}</th>`).join('')}</tr>
-      ${PAY_ROWS.map((r,i)=>`<tr class="${r.user_id?'':'warn'}"><td><select class="mini" onchange="setPayRowUser(${i},this.value)"><option value="">${r.user_id?'선택':'미매핑'}</option>
-        ${staff.map(p=>`<option value="${p.user_id}" ${r.user_id===p.user_id?'selected':''}>${esc(p.name)}</option>`).join('')}</select></td><td>${esc(r.name||'수기')}</td>
-        ${cols.map((c,j)=>`<td><input class="mini" type="number" step="any" value="${r.items[c.key]==null?'':r.items[c.key]}" oninput="setPayItem(${i},${j},this.value)" style="width:100px"></td>`).join('')}</tr>`).join('')}</table></div>`:'<div class="empty">입력된 급여 행이 없습니다.</div>'}
-    <div class="hint">직원 이름이 정확히 한 명과 일치할 때만 자동 매핑합니다. 미매핑 행은 저장하지 않습니다.</div></div>`;
+  m.innerHTML=payTop()+`<div class="card"><h2>${esc(hubT('pay.ledger_title','급여대장'))}</h2>
+    <div class="rowflex"><label>${esc(hubT('pay.f_month','대상 월'))} <input class="mini" type="month" value="${PAY_MONTH}" onchange="setPayMonth(this.value)"></label>
+      <label class="mini stamp" style="cursor:pointer">${esc(hubT('pay.btn_upload','엑셀 업로드'))}<input type="file" accept=".xls,.xlsx" style="display:none" onchange="parsePayrollXls(event)"></label>
+      <button class="mini" onclick="addPayRow()">${esc(hubT('pay.btn_addrow','수기 행 추가'))}</button>
+      <button class="mini stamp" onclick="savePayrollRows()">${esc(hubT('pay.btn_save_ledger','급여대장 저장'))}</button></div>
+    <div class="hint">${esc(hubT('pay.counts','선택 월 저장 행 {saved}건 · 복구 가능 보관 행 {archived}건',{saved:saved.data?.length||0,archived:archived.data?.length||0}))}${PAY_SOURCE_FILE?` · ${esc(hubT('pay.pending_src','저장 대기 원본: {name}',{name:((PAY_SOURCE_FILE.name)??'')}))}`:''}</div>
+    <div class="rowflex" style="margin:8px 0"><label>${esc(hubT('pay.f_move','옮길 월'))} <input id="payMoveMonth" class="mini" type="month"></label><button class="mini" onclick="movePayrollMonth()" ${!saved.data?.length?'disabled':''}>${esc(hubT('pay.btn_move','선택 월을 옮기기'))}</button><button class="mini" onclick="archivePayrollMonth()" ${!saved.data?.length?'disabled':''}>${esc(hubT('pay.btn_archive','선택 월 삭제(복구 가능)'))}</button><button class="mini" onclick="restorePayrollMonth()" ${!archived.data?.length?'disabled':''}>${esc(hubT('pay.btn_restore','선택 월 복구'))}</button></div>
+    <div class="hint">${esc(hubT('pay.orig_label','원본 파일:'))} ${uploads.error?esc(hubT('pay.orig_list_err','목록 조회 실패: {detail}',{detail:uploads.error.message})):(uploads.data||[]).map(u=>`<button class="mini" data-pay-upload="${esc(u.id)}" onclick="downloadPayrollOriginal(this.dataset.payUpload)">${esc(hubT('pay.orig_btn','원본 받기 · {name}',{name:((u.file_name)??'')}))}</button>`).join(' ')||esc(hubT('pay.orig_none','저장된 원본 없음'))}</div>
+    ${PAY_MESSAGE?`<div class="hint" id="payMsg">${esc(PAY_MESSAGE)}</div>`:'<div class="hint" id="payMsg">'+esc(hubT('pay.ledger_msg','노무법인 급여대장의 첫 시트를 올리거나 수기 행을 추가하세요.'))+'</div>'}
+    ${PAY_ROWS.length?`<div class="tblwrap"><table><tr><th>${esc(hubT('pay.th_map','직원 매핑'))}</th><th>${esc(hubT('pay.th_srcname','원본 성명'))}</th>${cols.map(c=>`<th>${esc(c.label)}</th>`).join('')}</tr>
+      ${PAY_ROWS.map((r,i)=>`<tr class="${r.user_id?'':'warn'}"><td><select class="mini" onchange="setPayRowUser(${i},this.value)"><option value="">${r.user_id?esc(hubT('pay.opt_pick','선택')):esc(hubT('pay.opt_unmapped','미매핑'))}</option>
+        ${staff.map(p=>`<option value="${p.user_id}" ${r.user_id===p.user_id?'selected':''}>${esc(p.name)}</option>`).join('')}</select></td><td>${esc(r.name||hubT('pay.manual_name','수기'))}</td>
+        ${cols.map((c,j)=>`<td><input class="mini" type="number" step="any" value="${r.items[c.key]==null?'':r.items[c.key]}" oninput="setPayItem(${i},${j},this.value)" style="width:100px"></td>`).join('')}</tr>`).join('')}</table></div>`:'<div class="empty">'+esc(hubT('pay.empty','입력된 급여 행이 없습니다.'))+'</div>'}
+    <div class="hint">${esc(hubT('pay.ledger_hint','직원 이름이 정확히 한 명과 일치할 때만 자동 매핑합니다. 미매핑 행은 저장하지 않습니다.'))}</div></div>`;
 }
 async function savePayrollRows(){
-  if(!PAY_MONTH){PAY_MESSAGE='대상 월을 선택하세요.';setStatus('error');render();return;}
+  if(!PAY_MONTH){PAY_MESSAGE=hubT('pay.m_pick_month','대상 월을 선택하세요.');setStatus('error');render();return;}
   const now=new Date().toISOString(),seen=new Set(),payload=[];let skipped=0;
   PAY_ROWS.forEach(r=>{if(!r.user_id||seen.has(r.user_id)){skipped++;return;}seen.add(r.user_id);
     payload.push({month:PAY_MONTH,user_id:r.user_id,items:{...r.items},net:r.items.net_pay==null?null:r.items.net_pay,imported_by:ME.name,imported_at:now});});
-  if(!payload.length){PAY_MESSAGE=`저장할 매핑 행이 없습니다. 건너뜀 ${skipped}건.`;setStatus('error');render();return;}
+  if(!payload.length){PAY_MESSAGE=hubT('pay.m_save_none','저장할 매핑 행이 없습니다. 건너뜀 {skipped}건.',{skipped:skipped});setStatus('error');render();return;}
   setStatus('saving');const {error}=await sb.from('payroll_rows').upsert(payload,{onConflict:'month,user_id'});
-  if(error){PAY_MESSAGE='급여대장 저장 실패: '+error.message;setStatus('error');render();return;}
-  let sourceResult='';if(PAY_SOURCE_FILE){try{await uploadPayrollOriginal(PAY_SOURCE_FILE,PAY_MONTH);PAY_SOURCE_FILE=null;sourceResult=' · 원본 보관 완료';}catch(e){sourceResult=' · 원본 보관 실패: '+e.message;setStatus('error');}}
-  PAY_MESSAGE=`급여대장 ${payload.length}건 저장 완료`+(skipped?` · 건너뜀 ${skipped}건`:'')+sourceResult;if(!sourceResult.includes('실패'))setStatus('saved');render();
+  if(error){PAY_MESSAGE=hubT('pay.m_ledger_fail','급여대장 저장 실패: {detail}',{detail:error.message});setStatus('error');render();return;}
+  let sourceResult='',sourceFailed=false;if(PAY_SOURCE_FILE){try{await uploadPayrollOriginal(PAY_SOURCE_FILE,PAY_MONTH);PAY_SOURCE_FILE=null;sourceResult=' · '+hubT('pay.m_src_ok','원본 보관 완료');}catch(e){sourceResult=' · '+hubT('pay.m_src_fail','원본 보관 실패: {detail}',{detail:e.message});sourceFailed=true;setStatus('error');}}
+  PAY_MESSAGE=hubT('pay.m_saved','급여대장 {n}건 저장 완료',{n:payload.length})+(skipped?' · '+hubT('pay.m_skipped','건너뜀 {n}건',{n:skipped}):'')+sourceResult;if(!sourceFailed)setStatus('saved');render();
 }
 async function uploadPayrollOriginal(file,month){
-  if(!/\.xlsx?$/i.test(file.name)||file.size<1||file.size>20971520)throw new Error('원본은 20MB 이하 XLS/XLSX만 보관할 수 있습니다.');
+  if(!/\.xlsx?$/i.test(file.name)||file.size<1||file.size>20971520)throw new Error(hubT('pay.e_orig_limit','원본은 20MB 이하 XLS/XLSX만 보관할 수 있습니다.'));
   const bytes=await file.arrayBuffer(),sha256=await contractPdfHash(bytes),path=`${ME.id}/${crypto.randomUUID()}${/\.xlsx$/i.test(file.name)?'.xlsx':'.xls'}`;
   const {error}=await sb.storage.from('payroll-originals').upload(path,file,{contentType:file.type||'application/octet-stream',upsert:false});if(error)throw error;
   const record=await sb.from('payroll_uploads').insert({month,storage_path:path,file_name:file.name,size_bytes:file.size,sha256,uploaded_by:ME.id});
-  if(record.error)throw new Error('파일은 비공개 Storage에 보관됐지만 목록 등록 실패: '+record.error.message);
+  if(record.error)throw new Error(hubT('pay.e_orig_list','파일은 비공개 Storage에 보관됐지만 목록 등록 실패: {detail}',{detail:record.error.message}));
 }
 async function downloadPayrollOriginal(id){
-  const {data:row,error}=await sb.from('payroll_uploads').select('file_name,storage_path,sha256').eq('id',id).single();if(error||!row){alert('원본 기록을 찾지 못했습니다.');return;}
-  const result=await sb.storage.from('payroll-originals').download(row.storage_path);if(result.error){alert('원본 다운로드 실패: '+result.error.message);return;}
-  const hash=await contractPdfHash(await result.data.arrayBuffer());if(hash!==row.sha256){alert('원본 파일 검증에 실패했습니다. 내려받기를 중단했습니다.');return;}
+  const {data:row,error}=await sb.from('payroll_uploads').select('file_name,storage_path,sha256').eq('id',id).single();if(error||!row){alert(hubT('pay.a_orig_none','원본 기록을 찾지 못했습니다.'));return;}
+  const result=await sb.storage.from('payroll-originals').download(row.storage_path);if(result.error){alert(hubT('pay.a_orig_fail','원본 다운로드 실패: {detail}',{detail:result.error.message}));return;}
+  const hash=await contractPdfHash(await result.data.arrayBuffer());if(hash!==row.sha256){alert(hubT('pay.a_orig_hash','원본 파일 검증에 실패했습니다. 내려받기를 중단했습니다.'));return;}
   const url=URL.createObjectURL(result.data),a=document.createElement('a');a.href=url;a.download=row.file_name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
 }
-async function movePayrollMonth(){const target=$('#payMoveMonth')?.value;if(!target||target===PAY_MONTH){PAY_MESSAGE='옮길 다른 월을 선택하세요.';render();return;}if(!confirm(`${PAY_MONTH} 급여대장을 ${target}(으)로 옮깁니다. 계속할까요?`))return;const {data,error}=await sb.rpc('payroll_move_month',{p_from:PAY_MONTH,p_to:target});PAY_MESSAGE=error?'월 변경 실패: '+error.message:`${data}건을 ${target}(으)로 옮겼습니다.`;if(!error){PAY_MONTH=target;PAY_ROWS=[];PAY_SOURCE_FILE=null;}setStatus(error?'error':'saved');render();}
-async function archivePayrollMonth(){if(!confirm(`${PAY_MONTH} 급여대장 행을 복구 가능한 보관함으로 옮깁니다. 원본 파일은 그대로 보관합니다. 계속할까요?`))return;const {data,error}=await sb.rpc('payroll_archive_month',{p_month:PAY_MONTH});PAY_MESSAGE=error?'삭제 실패: '+error.message:`${data}건을 보관함으로 옮겼습니다. 같은 월의 복구 버튼으로 되돌릴 수 있습니다.`;if(!error){PAY_ROWS=[];PAY_SOURCE_FILE=null;}setStatus(error?'error':'saved');render();}
-async function restorePayrollMonth(){const {data,error}=await sb.rpc('payroll_restore_month',{p_month:PAY_MONTH});PAY_MESSAGE=error?'복구 실패: '+error.message:`${data}건을 복구했습니다.`;setStatus(error?'error':'saved');render();}
+async function movePayrollMonth(){const target=$('#payMoveMonth')?.value;if(!target||target===PAY_MONTH){PAY_MESSAGE=hubT('pay.m_move_pick','옮길 다른 월을 선택하세요.');render();return;}if(!confirm(hubT('pay.c_move','{from} 급여대장을 {to}(으)로 옮깁니다. 계속할까요?',{from:PAY_MONTH,to:target})))return;const {data,error}=await sb.rpc('payroll_move_month',{p_from:PAY_MONTH,p_to:target});PAY_MESSAGE=error?hubT('pay.m_move_fail','월 변경 실패: {detail}',{detail:error.message}):hubT('pay.m_moved','{n}건을 {to}(으)로 옮겼습니다.',{n:data,to:target});if(!error){PAY_MONTH=target;PAY_ROWS=[];PAY_SOURCE_FILE=null;}setStatus(error?'error':'saved');render();}
+async function archivePayrollMonth(){if(!confirm(hubT('pay.c_archive','{month} 급여대장 행을 복구 가능한 보관함으로 옮깁니다. 원본 파일은 그대로 보관합니다. 계속할까요?',{month:PAY_MONTH})))return;const {data,error}=await sb.rpc('payroll_archive_month',{p_month:PAY_MONTH});PAY_MESSAGE=error?hubT('pay.m_archive_fail','삭제 실패: {detail}',{detail:error.message}):hubT('pay.m_archived','{n}건을 보관함으로 옮겼습니다. 같은 월의 복구 버튼으로 되돌릴 수 있습니다.',{n:data});if(!error){PAY_ROWS=[];PAY_SOURCE_FILE=null;}setStatus(error?'error':'saved');render();}
+async function restorePayrollMonth(){const {data,error}=await sb.rpc('payroll_restore_month',{p_month:PAY_MONTH});PAY_MESSAGE=error?hubT('pay.m_restore_fail','복구 실패: {detail}',{detail:error.message}):hubT('pay.m_restored','{n}건을 복구했습니다.',{n:data});setStatus(error?'error':'saved');render();}
 
 /* ── 명세서 (M3 2단계) ──
    숫자의 정본은 항상 payroll_rows.items(업로드된 대장 값)이다. 아래 계산 함수는 "검산"용
@@ -3584,6 +3617,11 @@ function minutesToHours(min){return Math.round((Number(min)||0)/60*10)/10;}
 /* payroll-payslip:test-end */
 
 const payWon=aicostMoney;
+/* 허브 설정(차례 7): 글·숫자·이름 목록 읽기 — hub-texts.js가 없거나 시험이 이 구간만 따로 실행해도 기본 글 그대로 */
+function h7T(k,d,v){return typeof hubT==='function'?hubT(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
+function h7X(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function h7N(k,d){return typeof hubN==='function'?hubN(k,d):d;}
+function h7L(k,obj){const def=Object.keys(obj).map(function(c){return {code:c,label:obj[c]};});const items=typeof hubList==='function'?hubList(k,def):def;const m={};items.forEach(function(i){m[i.code]=i.label;});return m;}
 const PAYSLIP_PAY_ITEMS=[
   ['base_pay','기본급','월 기본급(일할계산 시 계약월액÷그달일수×근무일수)'],['meal_allow','식대','월 고정(비과세 200,000원 한도)'],
   ['fixed_ot','포괄시간외근로수당','월 고정(포괄임금)'],['fixed_annual','포괄연차수당','월 고정(포괄임금)'],
@@ -3603,10 +3641,10 @@ const PAYSLIP_DEDUCT_ITEMS=[
 ];
 function payslipStatusBadge(row){
   if(!row)return '';
-  if(row.status==='ledger_only')return `<span class="sub">대장 값 사용</span>`;
-  if(row.status==='ledger_missing')return `<span class="sub">검산 ${payWon(row.calc)}(대장에 값 없음)</span>`;
-  if(row.status==='diff')return `<span class="sub" style="color:var(--gold)">검산 ${payWon(row.calc)}(차이 ${payWon(Math.abs(row.diff))})</span>`;
-  return `<span class="sub">검산 일치 ${payWon(row.calc)}</span>`;
+  if(row.status==='ledger_only')return `<span class="sub">${esc(h7T('slip.badge_ledger','대장 값 사용'))}</span>`;
+  if(row.status==='ledger_missing')return `<span class="sub">${esc(h7T('slip.badge_missing','검산 {won}(대장에 값 없음)',{won:payWon(row.calc)}))}</span>`;
+  if(row.status==='diff')return `<span class="sub" style="color:var(--gold)">${esc(h7T('slip.badge_diff','검산 {won}(차이 {diff})',{won:payWon(row.calc),diff:payWon(Math.abs(row.diff))}))}</span>`;
+  return `<span class="sub">${esc(h7T('slip.badge_match','검산 일치 {won}',{won:payWon(row.calc)}))}</span>`;
 }
 function buildPayslipHtml(ctx){
   const items=ctx.items||{},cc=ctx.crossCheck||[],ccByKey={};cc.forEach(r=>ccByKey[r.key]=r);
@@ -3614,37 +3652,37 @@ function buildPayslipHtml(ctx){
   const ws=ctx.workSummary||{workedDays:0,totalWorkMinutes:0,overtimeMinutes:0,nightMinutes:0,holidayMinutes:0};
   const th='border:1px solid #111;padding:6px;background:#f4f8f7',td='border:1px solid #111;padding:6px';
   const issuedLine=ctx.issued
-    ?`<div style="margin-top:10px;text-align:right">${appStamp(ctx.issuedBy,ctx.issuedAt,'발행')}</div>`
-    :`<div class="hint" style="margin-top:10px;color:var(--gold)">⚠ 아직 발행 전 — 미리보기입니다. 발행하면 이 화면 그대로 잠깁니다.</div>`;
+    ?`<div style="margin-top:10px;text-align:right">${appStamp(ctx.issuedBy,ctx.issuedAt,h7T('slip.stamp_label','발행'))}</div>`
+    :`<div class="hint" style="margin-top:10px;color:var(--gold)">${esc(h7T('slip.draft_note','⚠ 아직 발행 전 — 미리보기입니다. 발행하면 이 화면 그대로 잠깁니다.'))}</div>`;
   return `<div class="payslip-doc" style="background:#fff;color:#111;padding:28px;line-height:1.6;font-size:13px">
     <div style="border-top:4px solid #156f72;border-bottom:1px solid #156f72;padding:10px 0;text-align:center">
-      <div style="font-size:12px;color:#156f72;font-weight:700">아산정플란트치과의원</div><h1 style="margin:4px 0 0;font-size:22px">급 여 명 세 서</h1></div>
+      <div style="font-size:12px;color:#156f72;font-weight:700">${esc(h7T('slip.clinic','아산정플란트치과의원'))}</div><h1 style="margin:4px 0 0;font-size:22px">${esc(h7T('slip.doc_title','급 여 명 세 서'))}</h1></div>
     <table style="width:100%;border-collapse:collapse;margin-top:16px">
-      <tr><th style="${th};width:16%">성명</th><td style="${td};width:34%">${esc(ctx.employee.name)}</td><th style="${th};width:16%">귀속월</th><td style="${td}">${esc(ctx.month)}</td></tr>
-      <tr><th style="${th}">소속</th><td style="${td}">${esc(ctx.employee.dept||'')}</td><th style="${th}">지급일</th><td style="${td}">${ctx.issuedAt?stampDate(ctx.issuedAt):'발행 시 자동 기록'}</td></tr></table>
+      <tr><th style="${th};width:16%">${esc(h7T('slip.th_name','성명'))}</th><td style="${td};width:34%">${esc(ctx.employee.name)}</td><th style="${th};width:16%">${esc(h7T('slip.th_month','귀속월'))}</th><td style="${td}">${esc(ctx.month)}</td></tr>
+      <tr><th style="${th}">${esc(h7T('slip.th_dept','소속'))}</th><td style="${td}">${esc(ctx.employee.dept||'')}</td><th style="${th}">${esc(h7T('slip.th_paid','지급일'))}</th><td style="${td}">${ctx.issuedAt?stampDate(ctx.issuedAt):h7X(h7T('slip.paid_auto','발행 시 자동 기록'))}</td></tr></table>
     <table style="width:100%;border-collapse:collapse;margin-top:10px">
-      <tr><th style="${th}">근로일수</th><td style="${td}">${ws.workedDays}일</td><th style="${th}">총근로시간</th><td style="${td}">${minutesToHours(ws.totalWorkMinutes)}시간</td></tr>
-      <tr><th style="${th}">연장근로시간</th><td style="${td}">${minutesToHours(ws.overtimeMinutes)}시간</td><th style="${th}">야간근로시간</th><td style="${td}">${minutesToHours(ws.nightMinutes)}시간</td></tr>
-      <tr><th style="${th}">휴일근로시간</th><td style="${td}" colspan="3">${minutesToHours(ws.holidayMinutes)}시간</td></tr></table>
+      <tr><th style="${th}">${esc(h7T('slip.th_days','근로일수'))}</th><td style="${td}">${esc(h7T('slip.unit_days','{n}일',{n:ws.workedDays}))}</td><th style="${th}">${esc(h7T('slip.th_total','총근로시간'))}</th><td style="${td}">${esc(h7T('slip.unit_hours','{n}시간',{n:minutesToHours(ws.totalWorkMinutes)}))}</td></tr>
+      <tr><th style="${th}">${esc(h7T('slip.th_ot','연장근로시간'))}</th><td style="${td}">${esc(h7T('slip.unit_hours','{n}시간',{n:minutesToHours(ws.overtimeMinutes)}))}</td><th style="${th}">${esc(h7T('slip.th_night','야간근로시간'))}</th><td style="${td}">${esc(h7T('slip.unit_hours','{n}시간',{n:minutesToHours(ws.nightMinutes)}))}</td></tr>
+      <tr><th style="${th}">${esc(h7T('slip.th_holiday','휴일근로시간'))}</th><td style="${td}" colspan="3">${esc(h7T('slip.unit_hours','{n}시간',{n:minutesToHours(ws.holidayMinutes)}))}</td></tr></table>
     <div style="display:flex;gap:12px;margin-top:14px">
-      <div style="flex:1"><div style="font-weight:700;color:#156f72;margin-bottom:4px">지급</div>
+      <div style="flex:1"><div style="font-weight:700;color:#156f72;margin-bottom:4px">${esc(h7T('slip.pay_head','지급'))}</div>
         <table style="width:100%;border-collapse:collapse"><tr><th style="${th}">항목</th><th style="${th};text-align:right">금액</th><th style="${th}">산출식</th></tr>
         ${payRows.map(([k,label,formula])=>`<tr><td style="${td}">${esc(label)}</td><td style="${td};text-align:right">${payWon(items[k])}</td><td style="${td};font-size:11px;color:#555">${esc(formula)}</td></tr>`).join('')}
-        <tr><td style="${td};font-weight:700">지급액계</td><td style="${td};text-align:right;font-weight:700">${payWon(items.gross_total)}</td><td style="${td}"></td></tr></table></div>
-      <div style="flex:1"><div style="font-weight:700;color:#156f72;margin-bottom:4px">공제</div>
+        <tr><td style="${td};font-weight:700">${esc(h7T('slip.total_gross','지급액계'))}</td><td style="${td};text-align:right;font-weight:700">${payWon(items.gross_total)}</td><td style="${td}"></td></tr></table></div>
+      <div style="flex:1"><div style="font-weight:700;color:#156f72;margin-bottom:4px">${esc(h7T('slip.deduct_head','공제'))}</div>
         <table style="width:100%;border-collapse:collapse"><tr><th style="${th}">항목</th><th style="${th};text-align:right">금액</th><th style="${th}">산출식</th></tr>
         ${deductRows.map(([k,label,formula])=>`<tr><td style="${td}">${esc(label)}</td><td style="${td};text-align:right">${payWon(items[k])}</td><td style="${td};font-size:11px;color:#555">${esc(formula)}<br>${payslipStatusBadge(ccByKey[k])}</td></tr>`).join('')}
-        <tr><td style="${td};font-weight:700">공제액계</td><td style="${td};text-align:right;font-weight:700">${payWon(items.deduct_total)}</td><td style="${td}"></td></tr></table></div></div>
-    <table style="width:100%;border-collapse:collapse;margin-top:10px"><tr><th style="${th};width:30%">차인지급액(임금총액)</th>
-      <td style="${td};text-align:right;font-size:16px;font-weight:800;color:#156f72">${payWon(items.net_pay!=null?items.net_pay:ctx.net)}원</td></tr></table>
-    <div class="hint" style="margin-top:8px;font-size:11px;color:#889">검산(회색)은 이 병원 급여 규정에 따른 참고 재계산이며, 실제 지급은 항상 왼쪽 대장 금액을 따릅니다. 국민연금·소득세·연말정산·조정수당은 노무법인 산출값을 그대로 사용합니다.</div>
+        <tr><td style="${td};font-weight:700">${esc(h7T('slip.total_deduct','공제액계'))}</td><td style="${td};text-align:right;font-weight:700">${payWon(items.deduct_total)}</td><td style="${td}"></td></tr></table></div></div>
+    <table style="width:100%;border-collapse:collapse;margin-top:10px"><tr><th style="${th};width:30%">${esc(h7T('slip.th_net','차인지급액(임금총액)'))}</th>
+      <td style="${td};text-align:right;font-size:16px;font-weight:800;color:#156f72">${payWon(items.net_pay!=null?items.net_pay:ctx.net)}${esc(h7T('slip.unit_won','원'))}</td></tr></table>
+    <div class="hint" style="margin-top:8px;font-size:11px;color:#889">${esc(h7T('slip.foot_note','검산(회색)은 이 병원 급여 규정에 따른 참고 재계산이며, 실제 지급은 항상 왼쪽 대장 금액을 따릅니다. 국민연금·소득세·연말정산·조정수당은 노무법인 산출값을 그대로 사용합니다.'))}</div>
     ${issuedLine}</div>`;
 }
 async function renderPaySlip(m){
   if(!PAY_MONTH)PAY_MONTH=today().slice(0,7);
   const staff=PROFILES.filter(p=>p.active!==false);
   if(!PAY_SLIP_USER&&staff.length)PAY_SLIP_USER=staff[0].user_id;
-  let body='<div class="empty">직원이 없습니다.</div>';
+  let body='<div class="empty">'+esc(hubT('pay.slip_none','직원이 없습니다.'))+'</div>';
   PAY_SLIP_HTML='';
   if(PAY_SLIP_USER){
     const bounds=attendanceMonthBounds(PAY_MONTH);
@@ -3657,9 +3695,9 @@ async function renderPaySlip(m){
     ]);
     const p=PROFILES.find(x=>x.user_id===PAY_SLIP_USER)||{};
     if(attError||manualError||resolutionError){
-      body=`<div class="cal-error">근태 시간 집계를 불러오지 못했습니다: ${esc((attError||manualError||resolutionError).message)}</div>`;
+      body=`<div class="cal-error">${esc(hubT('pay.slip_att_err','근태 시간 집계를 불러오지 못했습니다: {detail}',{detail:(((attError||manualError||resolutionError).message)??'')}))}</div>`;
     }else if(!prow){
-      body=`<div class="empty">${esc(PAY_MONTH)} 급여대장에 ${esc(p.name||'')} 행이 없습니다. 급여대장 탭에서 먼저 업로드·저장하세요.</div>`;
+      body=`<div class="empty">${esc(hubT('pay.slip_no_row','{month} 급여대장에 {name} 행이 없습니다. 급여대장 탭에서 먼저 업로드·저장하세요.',{month:((PAY_MONTH)??''),name:((p.name||'')??'')}))}</div>`;
     }else{
       const items=prow.items||{};
       PAY_SLIP_HTML=buildPayslipHtml({employee:{name:p.name,dept:p.dept},month:PAY_MONTH,items,net:prow.net,
@@ -3667,24 +3705,24 @@ async function renderPaySlip(m){
         issued:!!(existing&&existing.issued),issuedBy:existing&&existing.issued_by,issuedAt:existing&&existing.issued_at});
       body=`<div style="border:1px solid var(--line);border-radius:8px;overflow:hidden">${PAY_SLIP_HTML}</div>
         <div class="rowflex" style="margin-top:10px">
-          <button class="hbtn pri" onclick="issuePayslip()">${existing&&existing.issued?'재발행(덮어쓰기)':'발행'}</button>
-          <button class="mini" onclick="openPayslipHtml(PAY_SLIP_HTML)">🖨️ 인쇄 미리보기</button></div>`;
+          <button class="hbtn pri" onclick="issuePayslip()">${existing&&existing.issued?esc(hubT('pay.btn_reissue','재발행(덮어쓰기)')):esc(hubT('pay.btn_issue','발행'))}</button>
+          <button class="mini" onclick="openPayslipHtml(PAY_SLIP_HTML)">${esc(hubT('pay.btn_print','🖨️ 인쇄 미리보기'))}</button></div>`;
     }
   }
-  m.innerHTML=payTop()+`<div class="card"><h2>명세서</h2>
-    <div class="rowflex"><label>대상 월 <input class="mini" type="month" value="${esc(PAY_MONTH)}" onchange="setPaySlipMonth(this.value)"></label>
-      <label>직원 <select class="mini" onchange="setPaySlipUser(this.value)">${staff.map(p=>`<option value="${p.user_id}" ${p.user_id===PAY_SLIP_USER?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label></div>
+  m.innerHTML=payTop()+`<div class="card"><h2>${esc(hubT('pay.slip_title','명세서'))}</h2>
+    <div class="rowflex"><label>${esc(hubT('pay.slip_f_month','대상 월'))} <input class="mini" type="month" value="${esc(PAY_MONTH)}" onchange="setPaySlipMonth(this.value)"></label>
+      <label>${esc(hubT('pay.slip_f_user','직원'))} <select class="mini" onchange="setPaySlipUser(this.value)">${staff.map(p=>`<option value="${p.user_id}" ${p.user_id===PAY_SLIP_USER?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label></div>
     ${PAY_MESSAGE?`<div class="hint">${esc(PAY_MESSAGE)}</div>`:''}
     <div style="margin-top:12px">${body}</div></div>`;
 }
 function setPaySlipMonth(v){PAY_MONTH=v;PAY_MESSAGE='';render();}
 function setPaySlipUser(v){PAY_SLIP_USER=v;PAY_MESSAGE='';render();}
 async function issuePayslip(){
-  if(!PAY_SLIP_HTML){PAY_MESSAGE='먼저 급여대장이 있는 월·직원을 선택하세요.';setStatus('error');render();return;}
+  if(!PAY_SLIP_HTML){PAY_MESSAGE=hubT('pay.m_slip_pick','먼저 급여대장이 있는 월·직원을 선택하세요.');setStatus('error');render();return;}
   setStatus('saving');
   const {error}=await sb.from('payslips').upsert({month:PAY_MONTH,user_id:PAY_SLIP_USER,html:PAY_SLIP_HTML,issued:true,issued_at:new Date().toISOString(),issued_by:ME.name},{onConflict:'month,user_id'});
-  if(error){PAY_MESSAGE='발행 실패: '+error.message;setStatus('error');render();return;}
-  PAY_MESSAGE='명세서를 발행했습니다.';setStatus('saved');render();
+  if(error){PAY_MESSAGE=hubT('pay.m_slip_fail','발행 실패: {detail}',{detail:error.message});setStatus('error');render();return;}
+  PAY_MESSAGE=hubT('pay.m_slip_done','명세서를 발행했습니다.');setStatus('saved');render();
 }
 function openPayslipHtml(html){$('#psBody').innerHTML=html;show('psMask');}
 function openMyPayslip(id){const s=MY_PAYSLIPS.find(x=>x.id===id);if(s)openPayslipHtml(s.html);}
@@ -3713,6 +3751,7 @@ function inviteMessageText(){
 }
 /* account-filling:test-end */
 /* account-delete-ui:test-start */
+function acctT(k,d,v){return typeof hubT==='function'?hubT(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));} /* 위험 작업 확인창 글: 허브 설정에서 고치는 글(hub-texts.js가 없거나 시험이 이 구간만 실행해도 기본 글 그대로) */
 function accountDeleteRowState(p,meId){
   if(!p||p.account_access_status!=='차단')return {show:'none'};
   if(p.auth_deleted_at)return {show:'deleted',authDeletedAt:p.auth_deleted_at};
@@ -3824,7 +3863,7 @@ async function disableEmployeeAccountPreserveRecords(uid){
   const p=PROFILES.find(x=>x.user_id===uid),status=$(`#employment-${uid}-status`).value,effectiveDate=$(`#employment-${uid}-effective`).value,reason=$(`#employment-${uid}-reason`).value;
   if(status==='재직'){setStatus('error');showScheduleRosterError('영구 차단 전 자진퇴사·계약만료·권고사직 중 하나를 선택하세요.');return;}
   if(!effectiveDate){setStatus('error');showScheduleRosterError('계정 차단 유효일을 입력하세요.');return;}
-  if(!confirm(`${p?p.name:'이 직원'} 계정의 접속을 영구 차단합니다. 인사·계약·출퇴근·휴가·급여 기록은 삭제하지 않습니다. 계속하시겠습니까?`))return;
+  if(!confirm(acctT('acct.c_block','{name} 계정의 접속을 영구 차단합니다. 인사·계약·출퇴근·휴가·급여 기록은 삭제하지 않습니다. 계속하시겠습니까?',{name:p?p.name:'이 직원'})))return;
   setStatus('saving');
   const {error}=await sb.rpc('disable_employee_account_preserve_records',{p_user_id:uid,p_employment_status:status,p_reason:reason,p_effective_date:effectiveDate});
   if(error){setStatus('error');showScheduleRosterError('계정 차단 실패: '+error.message);return;}
@@ -3835,8 +3874,8 @@ async function disableEmployeeAccountPreserveRecords(uid){
 async function hardDeleteAccountPreserveRecords(uid){
   const p=PROFILES.find(x=>x.user_id===uid);
   if(!p||accountDeleteRowState(p,ME.id).show!=='blocked-deletable'){setStatus('error');showScheduleRosterError('로그인 계정을 삭제할 수 있는 상태가 아닙니다.');return;}
-  if(!confirm(`${p.name} 님의 로그인 계정(이메일 포함)을 영구히 삭제합니다. 되돌릴 수 없습니다.\n\n· 근무·연차·계약·출퇴근 기록은 그대로 남습니다.\n· 이 직원이 올린 파일도 지우지 않고, 소유권만 원장 계정으로 옮깁니다.\n· 다만 케이스노트 접근권한은 함께 사라집니다(다시 주려면 새로 부여해야 합니다).\n\n계속하시겠습니까?`))return;
-  const raw=prompt(`정말로 삭제하려면 이름을 정확히 입력하세요: ${p.name}`);
+  if(!confirm(acctT('acct.c_delete','{name} 님의 로그인 계정(이메일 포함)을 영구히 삭제합니다. 되돌릴 수 없습니다.\n\n· 근무·연차·계약·출퇴근 기록은 그대로 남습니다.\n· 이 직원이 올린 파일도 지우지 않고, 소유권만 원장 계정으로 옮깁니다.\n· 다만 케이스노트 접근권한은 함께 사라집니다(다시 주려면 새로 부여해야 합니다).\n\n계속하시겠습니까?',{name:p.name})))return;
+  const raw=prompt(acctT('acct.p_delete','정말로 삭제하려면 이름을 정확히 입력하세요: {name}',{name:p.name}));
   if(raw===null)return;
   const typed=raw.trim();
   if(typed!==p.name){setStatus('error');showScheduleRosterError('입력한 이름이 일치하지 않아 취소했습니다.');return;}
@@ -3867,7 +3906,7 @@ async function approveProfile(uid){
 async function revokeApproval(uid){
   if(uid===ME.id)return;
   const p=PROFILES.find(x=>x.user_id===uid);
-  if(!confirm(`${p?p.name:'이 직원'}의 승인을 취소합니다. 로그인은 되지만 업무 화면과 주요 데이터 접근이 막힙니다. 계속하시겠습니까?`))return;
+  if(!confirm(acctT('acct.c_revoke','{name}의 승인을 취소합니다. 로그인은 되지만 업무 화면과 주요 데이터 접근이 막힙니다. 계속하시겠습니까?',{name:p?p.name:'이 직원'})))return;
   const {error}=await sb.rpc('revoke_employee_profile_approval',{p_user_id:uid});
   if(error){setStatus('error');showScheduleRosterError('승인 취소 실패: '+error.message);return;}
   await loadProfiles();setStatus('saved');render();
@@ -3943,7 +3982,7 @@ async function onAuthed(session){
         const {data:ca}=await sb.from('confidential_access').select('user_id').eq('user_id',ME.id).maybeSingle();
         ME.confidAccess=!!ca||ME.role==='owner';
       }catch(e){ME.confidAccess=false;} // 조회 실패 시 fail closed — 탭을 숨기는 쪽으로
-      if(typeof HubUi!=='undefined')await HubUi.load(sb); // 원장이 고친 허브 글(hub_ui_texts)을 한 번 읽어 둠 — 실패하면 기본 글 그대로
+      if(typeof HubUi!=='undefined')await HubUi.load(sb);setStatus('idle'); // 원장이 고친 허브 글(hub_ui_texts)을 한 번 읽어 둠 — 실패하면 기본 글 그대로
       const requestedTab=typeof location!=='undefined'&&typeof URLSearchParams==='function'?new URLSearchParams(location.search).get('tab'):null;
       if(requestedTab&&visibleTabKeys().has(requestedTab))TAB=requestedTab;
       $('#meName').textContent=ME.name;$('#meRole').textContent=ME.role;
