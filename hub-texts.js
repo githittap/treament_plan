@@ -5,6 +5,7 @@
    · 글  → 표 hub_ui_texts(db/hub_ui_texts.sql) · 숫자·목록 → 이미 있는 표 app_settings(키만 더함, 표·정책은 안 고침)
    hr.html은 이 파일을 main 스크립트보다 먼저 <script src="hub-texts.js?v=…"> 로 불러온다(함수는 전역 hubText·hubSetting·hubList·HubUi).
    로그인 전 화면 글은 표를 읽을 수 없어 이 엔진을 쓰지 않는다(설계서 5장).
+   차례 6: 근로계약서 글(hubTextDefsChapter6 — 화면 글 + 계약서 본문 기본 문구) + 계약 만료 알림 일수(app_settings contract.expiry_alert_days — 정수 1~365 · 1~5개 · 중복 없음, 틀리면 기본 14·30·60. 화면에만 있던 숫자라 옮김 · DB 함수·크론·Edge에는 같은 숫자 없음). 이미 발송·서명한 계약서는 저장된 본문(merged_html)을 그대로 보여 줘서 글을 고쳐도 안 바뀜.
    차례 5: 문의함·상담일지 글(hubTextDefsChapter5) + 문의 출처·문의 상태·상담 구분·상담 상태 이름 목록(코드는 DB 허락값이라 이름만) + 문의함·상담일지 숫자 기준 5개 — 광고 알림 기준 금액 100,000원은 DB 함수에도 있어 안 옮김.
    차례 4: 결재함·공지·캘린더·건의함 글(hubTextDefsChapter4) + 결재 종류·일정 종류 이름 목록 + 결재 목록 건수(hubSettingChecked) — 첨부 한도·건의 점수·순위는 DB가 같은 값을 쥐고 있어 안 옮김.
    차례 3: 출퇴근·근무표·연차 글(hubTextDefsChapter3) + 연차 유형·근무부서 이름 목록 + 연차·소명 숫자 기준(hubSettingChecked).
@@ -67,6 +68,15 @@ function hubSettingChecked(key,defNum){
   const chk=hubSettingValidate(d,raw);
   return chk.ok?Number(chk.value):Number(d.def);
 }
+// 정수 목록 읽기(차례 6): 허브 설정이 정한 모양(1~5개 · 각각 정수 범위 · 중복 없음)이 아니면 기본 목록. 작은 수부터 정렬해서 돌려준다.
+function hubSettingIntList(key){
+  const d=hubSettingDefByKey(key);
+  if(!d)return [];
+  const chk=hubSettingValidate(d,hubSetting(key,d.def));
+  return JSON.parse(chk.ok?chk.value:d.def);
+}
+// 근로계약서 만료 알림 일수(오름차순): 가장 작은 수=긴급 · 두 번째=경고 · 나머지=예정. 기본 [14,30,60]
+function hubContractExpiryDays(){return hubSettingIntList('contract.expiry_alert_days');}
 // 목록: [{code,label}]. 코드는 고정이고 보이는 이름(label)만 고친다. 모양이 틀리면 기본 목록.
 function hubListParse(raw){
   let a;
@@ -950,6 +960,202 @@ function hubTextDefsChapter5(add){
   add('cj.q_empty',C3,'오늘이나 기한 지난 다음 조치가 하나도 없을 때 뜨는 글','오늘 또는 기한이 지난 다음 조치가 없습니다.');
   add('cj.q_limit_hint',C3,'「오늘·기한 지남」이 꽉 찼을 때 표 아래 글({n}=보이는 최대 건수 — 건수는 🔢 숫자·기준 탭에서 고쳐요)','최대 {n}건 표시 중임',['n']);
 }
+// ── 차례 6: 근로계약서 글(기본 글은 hr.html의 글과 같아야 함 — 시험이 대조). 계약서 본문 문구(contract.body.*)는 새로 만드는 계약서에만 쓰여요 ──
+function hubTextDefsChapter6(add){
+  const C1='📝 근로계약서 › 새 계약서 쓰기·미리보기';
+  const C2='📝 근로계약서 › 발송·반려·원본 PDF';
+  const C3='📝 근로계약서 › 계약 목록·계약기간·만료 알림';
+  const C4='📝 근로계약서 › 직원 서명 화면';
+  const C5='📝 근로계약서 › 계약서 본문 기본 문구';
+  add('contract.new_title',C1,'근로계약서 화면 맨 위 「새 계약서」 칸 제목(원장·실장·매니저)','📝 새 근로계약서');
+  add('contract.new_hint',C1,'새 계약서 칸 제목 아래 안내','✓ 작성 중인 내용은 이 PC에 자동 저장됨(주민번호·생년월일·주소 제외)');
+  add('contract.btn_clear',C1,'새 계약서 칸 — 작성 중인 내용을 비우는 단추 글','새로 쓰기');
+  add('contract.btn_preset_save',C1,'새 계약서 칸 — 입력한 값을 내 설정으로 저장하는 단추 글','설정값 저장');
+  add('contract.opt_preset_load',C1,'새 계약서 칸 — 저장한 내 설정을 고르는 칸의 맨 위 항목','내 설정 불러오기');
+  add('contract.btn_preset_del',C1,'새 계약서 칸 — 저장한 내 설정을 지우는 단추 글','삭제');
+  add('contract.f_template',C1,'새 계약서 칸 — 서식 고르는 칸 이름','서식');
+  add('contract.f_employee',C1,'새 계약서 칸 — 직원 고르는 칸 이름(계약 종료일 설정 창의 「직원」도 같음)','직원');
+  add('contract.f_role',C1,'새 계약서 칸 — 역할(부서) 고르는 칸 이름','역할(부서)');
+  add('contract.opt_none',C1,'새 계약서 칸 — 역할(부서) 칸의 「고르지 않음」 항목','선택 안 함');
+  add('contract.f_period',C1,'새 계약서 칸 — 계약 기간 칸 이름(계약 종료일 설정 창도 같음)','계약 기간');
+  add('contract.f_noend',C1,'「기간의 정함 없음」 체크 옆 글(새 계약서·직원별 계약기간 표·종료일 설정 창). 체크했을 때 계약서에 들어가는 값 자체는 코드에 고정이라 이 글을 고쳐도 안 바뀌어요','기간의 정함 없음');
+  add('contract.opt_need',C1,'새 계약서 칸 — 꼭 골라야 하는 선택칸의 맨 위 항목','선택 필요');
+  add('contract.details',C1,'새 계약서 칸 — 접어 둔 「상세 조건」 줄 글','상세 조건 (특별한 경우만 수정)');
+  add('contract.f_due',C1,'새 계약서 상세 조건 — 서명 만료일 칸 이름','서명 만료일');
+  add('contract.btn_preview',C1,'새 계약서 칸 — 미리보기 단추 글(「원장 최종 발송 대기」 표의 미리보기 단추도 같음)','미리보기');
+  add('contract.btn_send_owner',C1,'새 계약서 칸 — 원장 화면의 발송 단추 글','최종 발송');
+  add('contract.btn_send_req',C1,'새 계약서 칸 — 실장·매니저 화면의 발송 요청 단추 글','원장 발송 요청');
+  add('contract.preview_empty',C1,'계약서 미리보기 자리에 처음 보이는 글','미리보기 또는 계약 보기를 선택하세요.');
+  add('contract.preview_h',C1,'미리보기를 눌렀을 때 미리보기 칸 맨 위 제목','미리보기');
+  add('contract.no_template',C1,'쓸 수 있는 계약서 서식이 하나도 없을 때 뜨는 글','활성 근로계약서 서식이 없습니다.');
+  add('contract.err_load',C1,'계약 정보를 못 불러왔을 때 뜨는 글({msg}는 서버 오류)','계약 정보를 불러오지 못했습니다: {msg}',['msg']);
+  add('contract.sch_hint',C1,'근무시간표 입력 칸 맨 위 안내','요일을 복수 선택하고 주간·야간·별도 시간을 각각 추가하세요.');
+  add('contract.sch_add',C1,'근무시간표 — 시간대를 한 줄 더 넣는 단추 글','+ 시간대 추가');
+  add('contract.sch_day_label',C1,'근무시간표 한 줄 — 근무일 방식 고르는 칸 이름','근무일');
+  add('contract.sch_mode_fixed',C1,'근무시간표 — 근무일 방식 항목: 요일을 직접 고름','고정 요일');
+  add('contract.sch_mode_rot',C1,'근무시간표 — 근무일 방식 항목: 주 5일 교대','월~일 중 주 5일 교대(주말 가능)');
+  add('contract.sch_mode_twice',C1,'근무시간표 — 근무일 방식 항목: 평일 야간 2회','상기 주 5일 중 평일 야간 2회');
+  add('contract.sch_note_rot',C1,'근무시간표 — 「주 5일 교대」를 골랐을 때 옆에 뜨는 설명','토·일을 포함해 근무표에 따라 주 5일 근무');
+  add('contract.sch_note_twice',C1,'근무시간표 — 「평일 야간 2회」를 골랐을 때 옆에 뜨는 설명','상기 주 5일 중 평일 야간 주 2회(근무표에 따름)');
+  add('contract.sch_note_fixed',C1,'근무시간표 — 「고정 요일」을 골랐을 때 옆에 뜨는 설명','근무하는 요일을 선택하세요.');
+  add('contract.sch_ph_break',C1,'근무시간표 — 휴게시간 입력칸 안의 예시 글','휴게 13:00 ~ 14:00');
+  add('contract.sch_ph_note',C1,'근무시간표 — 비고 입력칸 안의 예시 글','비고(선택)');
+  add('contract.sch_aria_start',C1,'근무시간표 — 시업 시간 입력칸의 읽어 주는 이름(화면에는 안 보임)','시업시간');
+  add('contract.sch_aria_end',C1,'근무시간표 — 종업 시간 입력칸의 읽어 주는 이름(화면에는 안 보임)','종업시간');
+  add('contract.sch_aria_del',C1,'근무시간표 — 줄 지우기 단추의 읽어 주는 이름(화면에는 안 보임)','근무시간 행 삭제');
+  add('contract.send_title',C2,'원장 화면 — 「최종 발송 대기」 칸 제목','🖋 원장 최종 발송 대기');
+  add('contract.th_employee',C2,'계약 표 머리 — 직원(최종 발송 대기·계약 목록·직원별 계약기간 표 모두 같음)','직원');
+  add('contract.th_author',C2,'최종 발송 대기 표 머리 — 작성자','작성자');
+  add('contract.th_due',C2,'최종 발송 대기 표·계약 목록 머리 — 서명기한','서명기한');
+  add('contract.btn_edit',C2,'최종 발송 대기 표 — 수정 단추 글','수정');
+  add('contract.btn_approve',C2,'최종 발송 대기 표 — 확인 후 발송 단추 글','확인 후 최종 발송');
+  add('contract.btn_reject',C2,'최종 발송 대기 표 — 반려 단추 글','반려');
+  add('contract.send_empty',C2,'최종 발송 요청이 하나도 없을 때 뜨는 글','최종 발송 요청이 없습니다.');
+  add('contract.pdf_title',C2,'원본 PDF 등록 칸 제목(원장·실장·매니저)','📄 원본 근로계약서 PDF 등록');
+  add('contract.pdf_hint',C2,'원본 PDF 등록 칸 제목 아래 안내','실제 직원을 위한 PDF를 임의로 선택하지 않습니다. 발송 요청 계약에 확인된 원본만 등록하고, 원본 파일은 변경하지 않은 채 별도 완료 PDF를 만듭니다.');
+  add('contract.pdf_f_contract',C2,'원본 PDF 등록 — 계약 고르는 칸 이름','발송 요청 계약');
+  add('contract.opt_choose',C2,'원본 PDF 등록 — 계약 고르는 칸의 맨 위 항목','선택');
+  add('contract.pdf_f_version',C2,'원본 PDF 등록 — 원본 버전 칸 이름','원본 버전');
+  add('contract.pdf_ph_version',C2,'원본 PDF 등록 — 원본 버전 칸 안의 예시 글','예: 2026-09-20 검토본');
+  add('contract.pdf_f_file',C2,'원본 PDF 등록 — 파일 고르는 칸 이름','PDF 파일');
+  add('contract.pdf_btn',C2,'원본 PDF 등록 — 등록 단추 글','원본 PDF 해시 등록');
+  add('contract.m_need_basic',C2,'발송 — 서식·직원·서명 만료일 중 빈 것이 있을 때 뜨는 글','서식, 직원, 서명 만료일을 모두 선택하세요.');
+  add('contract.m_need_fields',C2,'발송 — 꼭 적어야 하는 계약 조건이 비었을 때 뜨는 글({list}=빈 항목 이름들)','필수 계약 조건을 입력하세요: {list}',['list']);
+  add('contract.m_need_end',C2,'발송·종료일 저장 — 계약 종료일도 「기간의 정함 없음」도 안 골랐을 때 뜨는 글','계약 종료일을 입력하거나 \'기간의 정함 없음\'을 선택하세요.');
+  add('contract.m_need_schedule',C2,'발송 — 근무시간표에 요일·시간이 비었을 때 뜨는 글','근무시간표에서 요일·시업·종업시간을 모두 입력하세요.');
+  add('contract.m_bad_due',C2,'발송 — 서명 만료일이 날짜로 읽히지 않을 때 뜨는 글','서명 만료일을 확인하세요.');
+  add('contract.m_sending_edit',C2,'발송 — 요청을 고쳐서 최종 발송하는 동안 뜨는 글','수정 후 최종 발송 중…');
+  add('contract.m_sending_owner',C2,'발송 — 원장이 발송하는 동안 뜨는 글','발송 중…');
+  add('contract.m_sending_req',C2,'발송 — 실장·매니저가 원장에게 요청하는 동안 뜨는 글','원장 발송 요청 중…');
+  add('contract.m_fail_edit',C2,'발송 — 고쳐서 발송하다 실패했을 때 뜨는 글({msg}는 서버 오류)','수정 발송 실패: {msg}',['msg']);
+  add('contract.m_fail_send',C2,'발송 실패 글({msg}는 서버 오류 · 최종 발송 확인 때도 같음)','발송 실패: {msg}',['msg']);
+  add('contract.m_sent',C2,'발송을 마쳤을 때 새 계약서 칸 아래에 뜨는 글(원장)','발송했습니다.');
+  add('contract.m_requested',C2,'원장에게 발송을 요청했을 때 새 계약서 칸 아래에 뜨는 글(실장·매니저)','원장에게 최종 발송을 요청했습니다.');
+  add('contract.m_edit_sent',C2,'요청을 고쳐서 발송했을 때 새 계약서 칸 아래에 뜨는 글','수정 후 발송했습니다.');
+  add('contract.m_approved',C2,'최종 발송을 확인해서 마쳤을 때 새 계약서 칸 아래에 뜨는 글','최종 발송을 완료했습니다.');
+  add('contract.m_rejected',C2,'발송 요청을 반려했을 때 새 계약서 칸 아래에 뜨는 글','발송 요청을 반려했습니다.');
+  add('contract.m_archive_fail',C2,'최종 발송 — 최종본 보관에 실패했을 때 알림창({msg}는 서버 오류)','최종본 보관 실패: {msg}',['msg']);
+  add('contract.confirm_reject',C2,'반려 단추를 눌렀을 때 뜨는 확인창','이 발송 요청을 반려할까요? 직원에게 가지 않고 취소로 바뀝니다');
+  add('contract.m_reject_fail',C2,'반려 실패 알림창({msg}는 서버 오류)','반려하지 못했습니다: {msg}',['msg']);
+  add('contract.m_already_done',C2,'반려하려는데 이미 다른 사람이 처리했을 때 알림창','이미 처리된 요청입니다.');
+  add('contract.m_pdf_need',C2,'원본 PDF 등록 — 계약·PDF 파일(20MB 이하)을 안 골랐을 때 뜨는 글','발송 요청 계약과 PDF 파일(최대 20MB)을 선택하세요.');
+  add('contract.m_pdf_version',C2,'원본 PDF 등록 — 원본 버전을 안 적었을 때 뜨는 글','원본 PDF 버전을 입력하세요.');
+  add('contract.m_pdf_state',C2,'원본 PDF 등록 — 발송 요청 상태가 아닌 계약을 골랐을 때 뜨는 글','발송 요청 상태의 계약만 등록할 수 있습니다.');
+  add('contract.m_pdf_saving',C2,'원본 PDF 등록 — 파일을 보관하는 동안 뜨는 글','원본 PDF 보관 중…');
+  add('contract.m_pdf_save_fail',C2,'원본 PDF 등록 — 보관 실패({msg}는 서버 오류)','원본 PDF 보관 실패: {msg}',['msg']);
+  add('contract.m_pdf_reg_fail',C2,'원본 PDF 등록 — 해시 등록 실패({msg}는 서버 오류)','원본 PDF 등록 실패: {msg}',['msg']);
+  add('contract.m_pdf_done',C2,'원본 PDF 등록을 마쳤을 때 뜨는 글','원본 PDF를 보관하고 해시를 등록했습니다.');
+  add('contract.m_pdf_open_fail',C2,'원본 PDF를 못 열었을 때 알림창({msg}는 서버 오류)','원본 PDF를 열 수 없습니다: {msg}',['msg']);
+  add('contract.m_signed_open_fail',C2,'완료 PDF를 못 열었을 때 알림창({msg}는 서버 오류)','완료 PDF를 열 수 없습니다: {msg}',['msg']);
+  add('contract.m_no_file',C2,'PDF를 못 열었는데 서버 오류 글이 없을 때 {msg} 자리에 대신 들어가는 글','파일 없음');
+  add('contract.v_warn',C3,'계약 「보기」 — 예전 방식으로 저장된 요청일 때 뜨는 경고 첫 문장','이전 브라우저에서 저장된 요청이라 근무시간표 값을 다시 확인해야 합니다.');
+  add('contract.v_warn_owner',C3,'계약 「보기」 경고 — 원장 화면 뒤 문장','아래 ‘수정 후 최종 발송’으로 시간표를 입력하세요.');
+  add('contract.v_warn_other',C3,'계약 「보기」 경고 — 실장·매니저 화면 뒤 문장','원장 최종 검토 후 시간표를 입력해야 합니다.');
+  add('contract.v_review',C3,'계약 「보기」 — 근무시간표가 깨져 읽을 수 없을 때 그 자리에 대신 뜨는 글','근무시간표 확인 필요');
+  add('contract.default_title',C3,'계약서 서식 이름을 못 찾았을 때 대신 쓰는 계약서 제목','근로계약서');
+  add('contract.list_title',C3,'계약 목록 칸 제목','📚 계약 목록');
+  add('contract.show_cancelled',C3,'계약 목록·내 근로계약서 — 취소된 계약을 보는 체크칸 글','취소된 계약 보기');
+  add('contract.th_template',C3,'계약 목록 표 머리 — 서식','서식');
+  add('contract.th_status',C3,'계약 목록 표 머리 — 상태','상태');
+  add('contract.th_end',C3,'계약 목록 표 머리 — 계약종료','계약종료');
+  add('contract.th_sent',C3,'계약 목록 표 머리 — 발송일','발송일');
+  add('contract.th_signed',C3,'계약 목록 표 머리 — 서명일','서명일');
+  add('contract.btn_view',C3,'계약 목록 한 줄 끝 — 보기 단추 글','보기');
+  add('contract.btn_pdf',C3,'계약 목록 한 줄 끝 — 완료 PDF 단추 글','완료 PDF');
+  add('contract.btn_set_end',C3,'계약 목록 한 줄 끝 — 종료일 설정 단추 글','종료일 설정');
+  add('contract.btn_cancel',C3,'계약 목록 한 줄 끝 — 발송 취소 단추 글','취소');
+  add('contract.list_hidden',C3,'계약이 있는데 모두 취소된 것이라 숨겨졌을 때 뜨는 글(직원 화면도 같음)','취소된 계약은 숨겨져 있습니다.');
+  add('contract.list_empty',C3,'계약이 하나도 없을 때 뜨는 글','계약이 없습니다.');
+  add('contract.confirm_cancel',C3,'발송한 계약을 취소하려 할 때 뜨는 확인창','이 계약 발송을 취소할까요?');
+  add('contract.m_cancel_fail',C3,'계약 취소 실패 알림창({msg}는 서버 오류)','취소하지 못했습니다: {msg}',['msg']);
+  add('contract.m_changed',C3,'계약 취소 — 그 사이 상태가 바뀌었을 때 {msg} 자리에 대신 들어가는 글','이미 상태가 변경되었습니다.');
+  add('contract.al_title',C3,'만료 알림 칸 제목','⏰ 근로계약 만료 확인');
+  add('contract.al_count',C3,'만료 알림 칸 제목 옆 건수({n}=건수)','{n}건',['n']);
+  add('contract.al_end',C3,'만료 알림 한 줄 — 계약 종료일 글({end}=날짜)','계약 종료 {end}',['end']);
+  add('contract.al_end_none',C3,'만료 알림 한 줄 — 종료일이 비어 있을 때 글','계약 종료일 미입력');
+  add('contract.al_review',C3,'만료 알림·계약 목록 — 종료일을 읽을 수 없어 사람이 봐야 할 때 표시','관리자 확인 필요');
+  add('contract.al_expired',C3,'만료 알림 한 줄 오른쪽 표시 — 이미 만료됨({n}=지난 일수)','만료 {n}일 경과',['n']);
+  add('contract.al_today',C3,'만료 알림 한 줄 오른쪽 표시 — 오늘 만료','오늘 만료');
+  add('contract.al_dday',C3,'만료 알림 한 줄 오른쪽 표시 — 남은 일수({n}=남은 일수)','D-{n}',['n']);
+  add('contract.al_btn',C3,'만료 알림 칸 — 계약서로 가는 단추 글','계약서에서 확인');
+  add('contract.al_empty',C3,'만료가 다가온 계약이 하나도 없을 때 뜨는 글({n}=🔢 숫자·기준 탭의 만료 알림 일수 중 가장 큰 수)','{n}일 안에 만료되거나 확인이 필요한 계약이 없습니다.',['n']);
+  add('contract.term_title',C3,'직원별 계약기간 관리 칸 제목','🗓 직원별 계약기간 관리');
+  add('contract.term_sub',C3,'직원별 계약기간 관리 칸 제목 옆 작은 글','(계약서 파일이 없어도 설정 가능)');
+  add('contract.th_start',C3,'직원별 계약기간 표 머리 — 계약 시작일','계약 시작일');
+  add('contract.th_termend',C3,'직원별 계약기간 표 머리 — 계약 종료일','계약 종료일');
+  add('contract.th_noend',C3,'직원별 계약기간 표 머리 — 무기한','무기한');
+  add('contract.btn_save',C3,'직원별 계약기간 표·종료일 설정 창 — 저장 단추 글','저장');
+  add('contract.term_hint',C3,'직원별 계약기간 표 아래 안내','원장·실장·매니저가 등록·변경할 수 있으며, 종료일 값이 만료 알림의 기준입니다.');
+  add('contract.m_term_start',C3,'계약기간 저장 — 시작일이 날짜로 읽히지 않을 때 알림창','계약 시작일을 확인하세요.');
+  add('contract.m_term_end',C3,'계약기간 저장 — 종료일도 「기간의 정함 없음」도 안 골랐을 때 알림창','종료일을 입력하거나 \'기간의 정함 없음\'을 선택하세요.');
+  add('contract.m_term_order',C3,'계약기간 저장 — 종료일이 시작일보다 빠를 때 알림창','계약 종료일은 시작일보다 빠를 수 없습니다.');
+  add('contract.m_save_fail',C3,'계약기간·종료일 저장 실패({msg}는 서버 오류 · 알림창과 종료일 설정 창 모두 같음)','저장 실패: {msg}',['msg']);
+  add('contract.end_title',C3,'계약 종료일 설정 창 제목','📅 계약 종료일 설정');
+  add('contract.end_f_date',C3,'계약 종료일 설정 창 — 계약 종료일 칸 이름','계약 종료일');
+  add('contract.end_hint',C3,'계약 종료일 설정 창 — 아래 안내','계약서 본문·서명·발송 기록은 바꾸지 않고, 만료 알림 기준인 종료일만 보완합니다.');
+  add('contract.m_saving',C3,'계약 종료일 설정 창 — 저장하는 동안 뜨는 글','저장 중…');
+  add('contract.m_not_found',C3,'계약 종료일 저장 — 계약을 못 찾았을 때 {msg} 자리에 대신 들어가는 글','계약을 찾지 못했습니다.');
+  add('contract.err_mine',C4,'내 계약서를 못 불러왔을 때 뜨는 글({msg}는 서버 오류)','내 계약서를 불러오지 못했습니다: {msg}',['msg']);
+  add('contract.mine_title',C4,'직원 화면 — 「내 근로계약서」 칸 제목','📝 내 근로계약서');
+  add('contract.mine_hint',C4,'직원 화면 — 받은 계약서가 있을 때 칸 제목 아래 안내','계약 내용을 확인한 뒤 서명란에 직접 서명하세요.');
+  add('contract.mine_empty',C4,'직원 화면 — 받은 계약서가 하나도 없을 때 뜨는 글','받은 근로계약서가 없습니다.');
+  add('contract.meta_sent',C4,'직원 화면 계약서 한 장 위 줄 — 발송일 글({date}=날짜)','발송 {date}',['date']);
+  add('contract.meta_due',C4,'직원 화면 계약서 한 장 위 줄 — 서명기한 글({date}=날짜)','서명기한 {date}',['date']);
+  add('contract.meta_signed',C4,'직원 화면 계약서 한 장 위 줄 — 서명한 날 글({date}=날짜)','서명 {date}',['date']);
+  add('contract.pdf_base',C4,'직원 화면 — 원본 PDF가 있는 계약서에 뜨는 안내','이 계약의 기준 문서는 원본 PDF이며, HTML 계약 본문과 별도 보관됩니다.');
+  add('contract.btn_pdf_down',C4,'직원 화면 — 서명 끝난 계약의 완료 PDF 내려받기 단추 글','완료 PDF 다운로드');
+  add('contract.expired',C4,'직원 화면 — 서명기한이 지난 계약에 뜨는 글','서명 기간 만료, 원장에게 문의');
+  add('contract.pdf_pos3',C4,'직원 화면 — 세 구역 서명 + 원본 PDF 계약의 서명 위치 안내','원본 PDF의 세 서명 위치를 확인하세요. 좌표 기준은 PDF 왼쪽 아래입니다.');
+  add('contract.btn_pdf_open',C4,'직원 화면 — 원본 PDF를 여는 단추 글','원본 PDF 확인');
+  add('contract.sign_h',C4,'직원 화면 — 서명 칸 위 제목','직원 서명');
+  add('contract.pdf_pos1',C4,'직원 화면 — 원본 PDF 계약의 서명 위치 안내','원본 PDF를 먼저 확인하세요. 좌표 기준은 PDF 왼쪽 아래이며, 실제 페이지에 맞게 조정합니다.');
+  add('contract.f_page',C4,'PDF 서명 위치 칸 이름 — 페이지','페이지');
+  add('contract.ph_page',C4,'세 구역 서명의 PDF 위치 칸 안 글 — 쪽','쪽');
+  add('contract.f_w',C4,'PDF 서명 위치 칸 이름 — 가로(칸 안 글도 같음)','가로');
+  add('contract.f_h',C4,'PDF 서명 위치 칸 이름 — 세로(칸 안 글도 같음)','세로');
+  add('contract.btn_clear_sig',C4,'서명 칸 — 서명을 지우는 단추 글','지우기');
+  add('contract.btn_use_sig',C4,'서명 칸 — 보관해 둔 내 서명을 쓰는 단추 글','보관 서명 사용');
+  add('contract.btn_sign_pdf',C4,'서명 칸 — 원본 PDF 계약의 서명 완료 단추 글','원본 확인 후 PDF 서명');
+  add('contract.btn_sign_save',C4,'서명 칸 — 일반 계약의 서명 저장 단추 글','원문 확인 후 서명 저장');
+  add('contract.signed_ok',C4,'직원 화면 — 서명을 마친 계약에 뜨는 글','✓ 서명 완료');
+  add('contract.int_sig_h',C4,'세 구역 서명 칸 제목({part}=구역 이름 · 읽어 주는 이름도 같음)','{part} 서명',['part']);
+  add('contract.int_confirm',C4,'세 구역 서명 칸 — 내용을 읽었다는 체크칸 글({part}=구역 이름)','{part} 내용을 읽고 이 서명을 확인함',['part']);
+  add('contract.btn_print',C4,'세 구역 서명 화면 — 인쇄 단추 글','🖨️ 인쇄·PDF 저장');
+  add('contract.btn_int_done',C4,'세 구역 서명 화면 — 완료 단추 글','3개 모두 서명 후 완료');
+  add('contract.int_bad',C4,'세 구역 서명 — 본문 구성을 읽을 수 없을 때 뜨는 글','통합 계약 본문 구성을 확인할 수 없습니다.');
+  add('contract.m_processed',C4,'서명 저장 — 이미 처리된 계약일 때 뜨는 글','이미 처리된 계약입니다.');
+  add('contract.m_expired',C4,'서명 — 서명 기간이 지났을 때 뜨는 글','서명 기간이 만료되었습니다. 원장에게 문의하세요.');
+  add('contract.m_sign_first',C4,'서명 — 서명을 안 하고 저장하려 할 때 뜨는 글','서명을 먼저 작성하세요.');
+  add('contract.m_no_slot',C4,'서명 저장 — 계약서에서 직원 서명 자리를 못 찾았을 때 뜨는 글','직원 서명 위치를 찾지 못했습니다. 원장에게 문의하세요.');
+  add('contract.m_sig_saving',C4,'서명 저장하는 동안 뜨는 글','서명 저장 중…');
+  add('contract.m_sig_fail',C4,'서명 저장 실패({msg}는 서버 오류)','서명 저장 실패: {msg}',['msg']);
+  add('contract.m_state_changed',C4,'서명 저장 — 서버 오류 글이 없을 때 {msg} 자리에 대신 들어가는 글','계약 상태가 변경되었습니다.');
+  add('contract.m_not_pdf',C4,'PDF 서명 — PDF 서명 대상이 아닌 계약일 때 뜨는 글','PDF 서명 대상이 아닙니다.');
+  add('contract.m_pdf_conf_fail',C4,'PDF 서명 — 원본 확인 기록 실패({msg}는 서버 오류)','원본 PDF 확인 기록 실패: {msg}',['msg']);
+  add('contract.m_pdf_pos',C4,'PDF 서명 — 서명 위치 값이 잘못됐을 때 뜨는 글','PDF 서명 위치 값을 확인하세요.');
+  add('contract.m_pdf_pos3',C4,'세 구역 PDF 서명 — 서명 위치 값이 잘못됐을 때 뜨는 글','세 PDF 서명 위치를 확인하세요.');
+  add('contract.m_pdf_making',C4,'PDF 서명 — 완료 PDF를 만드는 동안 뜨는 글','완료 PDF 생성 중…');
+  add('contract.m_pdf_sign_fail',C4,'PDF 서명 실패({msg}는 서버 오류)','PDF 서명 실패: {msg}',['msg']);
+  add('contract.m_no_func',C4,'PDF 서명 실패인데 오류 글이 없을 때 {msg} 자리에 대신 들어가는 글','함수 미배포');
+  add('contract.m_pdf_signed',C4,'PDF 서명을 마쳤을 때 뜨는 글','완료 PDF를 보관하고 서명 기록을 남겼습니다.');
+  add('contract.m_int_need',C4,'세 구역 서명 — 세 구역을 다 확인·서명하지 않았을 때 뜨는 글','세 구역의 내용을 확인하고 각각 서명하세요.');
+  add('contract.m_int_saving',C4,'세 구역 서명을 저장하는 동안 뜨는 글','세 서명 저장 중…');
+  add('contract.m_int_fail',C4,'세 구역 서명 저장 실패({msg}는 서버 오류)','세 서명 저장 실패: {msg}',['msg']);
+  add('contract.body.fixed_term',C5,'⚠️ 새로 만드는 계약서 본문에 들어가는 글이에요(이미 발송·서명한 계약서는 저장된 본문이 그대로라 안 바뀌어요). 법적 효력이 있는 문구라 고친 뒤 새 계약서 「미리보기」로 꼭 확인해 주세요. 계약 종료일이 정해진 계약서에서만 들어가는 「기간 만료」 조항','기간 만료 시 근로관계는 종료됩니다. 기간 중 사업운영이 더 이상 어렵거나 담당 직무가 폐지되는 경우에는 관련 절차에 따릅니다.');
+  add('contract.body.holiday',C5,'⚠️ 새로 만드는 계약서 본문에 들어가는 글이에요(이미 발송·서명한 계약서는 저장된 본문이 그대로라 안 바뀌어요). 법적 효력이 있는 문구라 고친 뒤 새 계약서 「미리보기」로 꼭 확인해 주세요. 「공휴일 근무」를 「포함」으로 고른 계약서에 들어가는 한 줄','■ 설·추석 등 공휴일 근무 포함');
+  add('contract.body.na',C5,'⚠️ 새로 만드는 계약서 본문에 들어가는 글이에요(이미 발송·서명한 계약서는 저장된 본문이 그대로라 안 바뀌어요). 법적 효력이 있는 문구라 고친 뒤 새 계약서 「미리보기」로 꼭 확인해 주세요. 선택 항목(연봉세전·통상시급 등)을 비워 두면 그 자리에 들어가는 글','해당 없음');
+  add('contract.body.wage_caption',C5,'⚠️ 새로 만드는 계약서 본문에 들어가는 글이에요(이미 발송·서명한 계약서는 저장된 본문이 그대로라 안 바뀌어요). 법적 효력이 있는 문구라 고친 뒤 새 계약서 「미리보기」로 꼭 확인해 주세요. 계약서의 임금 구성표 제목(임금 항목 이름 자체는 코드에 있어요)','직원별 임금 구성 · 계약 발송 전 확인');
+  add('contract.body.wage_empty',C5,'⚠️ 새로 만드는 계약서 본문에 들어가는 글이에요(이미 발송·서명한 계약서는 저장된 본문이 그대로라 안 바뀌어요). 법적 효력이 있는 문구라 고친 뒤 새 계약서 「미리보기」로 꼭 확인해 주세요. 임금 구성을 아직 안 적은 계약서의 임금 자리 문장','임금 구성은 계약 발송 전에 직원별로 기입합니다.');
+  add('contract.body.wage_hours',C5,'⚠️ 새로 만드는 계약서 본문에 들어가는 글이에요(이미 발송·서명한 계약서는 저장된 본문이 그대로라 안 바뀌어요). 법적 효력이 있는 문구라 고친 뒤 새 계약서 「미리보기」로 꼭 확인해 주세요. 임금 항목 이름 뒤에 붙는 산정 시간 글({h}=시간)','(산정: {h})',['h']);
+  add('contract.body.sched_th_days',C5,'⚠️ 새로 만드는 계약서 본문에 들어가는 글이에요(이미 발송·서명한 계약서는 저장된 본문이 그대로라 안 바뀌어요). 법적 효력이 있는 문구라 고친 뒤 새 계약서 「미리보기」로 꼭 확인해 주세요. 계약서 근무시간표 머리 — 근무일','근무일');
+  add('contract.body.sched_th_kind',C5,'⚠️ 새로 만드는 계약서 본문에 들어가는 글이에요(이미 발송·서명한 계약서는 저장된 본문이 그대로라 안 바뀌어요). 법적 효력이 있는 문구라 고친 뒤 새 계약서 「미리보기」로 꼭 확인해 주세요. 계약서 근무시간표 머리 — 구분','구분');
+  add('contract.body.sched_th_time',C5,'⚠️ 새로 만드는 계약서 본문에 들어가는 글이에요(이미 발송·서명한 계약서는 저장된 본문이 그대로라 안 바뀌어요). 법적 효력이 있는 문구라 고친 뒤 새 계약서 「미리보기」로 꼭 확인해 주세요. 계약서 근무시간표 머리 — 시업~종업','시업~종업');
+  add('contract.body.sched_th_break',C5,'⚠️ 새로 만드는 계약서 본문에 들어가는 글이에요(이미 발송·서명한 계약서는 저장된 본문이 그대로라 안 바뀌어요). 법적 효력이 있는 문구라 고친 뒤 새 계약서 「미리보기」로 꼭 확인해 주세요. 계약서 근무시간표 머리 — 휴게시간','휴게시간');
+  add('contract.body.sched_th_note',C5,'⚠️ 새로 만드는 계약서 본문에 들어가는 글이에요(이미 발송·서명한 계약서는 저장된 본문이 그대로라 안 바뀌어요). 법적 효력이 있는 문구라 고친 뒤 새 계약서 「미리보기」로 꼭 확인해 주세요. 계약서 근무시간표 머리 — 비고','비고');
+  add('contract.body.sched_rot',C5,'⚠️ 새로 만드는 계약서 본문에 들어가는 글이에요(이미 발송·서명한 계약서는 저장된 본문이 그대로라 안 바뀌어요). 법적 효력이 있는 문구라 고친 뒤 새 계약서 「미리보기」로 꼭 확인해 주세요. 계약서 근무시간표 — 「주 5일 교대」(평일만)의 근무일 칸({days}=고른 요일)','{days} 중 주 5일 (교대)',['days']);
+  add('contract.body.sched_rot_wk',C5,'⚠️ 새로 만드는 계약서 본문에 들어가는 글이에요(이미 발송·서명한 계약서는 저장된 본문이 그대로라 안 바뀌어요). 법적 효력이 있는 문구라 고친 뒤 새 계약서 「미리보기」로 꼭 확인해 주세요. 계약서 근무시간표 — 「주 5일 교대」에 토·일이 들어 있을 때 근무일 칸({days}=고른 요일)','{days} 중 주 5일 (교대·주말 포함 가능)',['days']);
+  add('contract.body.sched_twice',C5,'⚠️ 새로 만드는 계약서 본문에 들어가는 글이에요(이미 발송·서명한 계약서는 저장된 본문이 그대로라 안 바뀌어요). 법적 효력이 있는 문구라 고친 뒤 새 계약서 「미리보기」로 꼭 확인해 주세요. 계약서 근무시간표 — 「평일 야간 2회」의 근무일 칸({days}=고른 요일)','상기 주 5일 중 {days} 야간 2회 (근무표에 따름)',['days']);
+}
 let HUB_TEXT_DEFS_CACHE=null;
 function hubTextDefs(){
   if(HUB_TEXT_DEFS_CACHE)return HUB_TEXT_DEFS_CACHE;
@@ -981,6 +1187,7 @@ function hubTextDefs(){
   hubTextDefsChapter3(add);
   hubTextDefsChapter4(add);
   hubTextDefsChapter5(add);
+  hubTextDefsChapter6(add);
   HUB_TEXT_DEFS_CACHE=defs;
   return defs;
 }
@@ -1016,7 +1223,8 @@ const HUB_SETTING_DEFS=[
   {key:'inbox.group_window_min',screen:'📥 문의함 기준',label:'같은 사람의 문의를 한 묶음으로 보는 간격',where:'문의함 — 같은 출처·같은 사람이 보낸 문의가 이 시간(분) 안에 이어지면 한 줄로 묶어서 보여 줘요(예 30이면 30분 안에 이어진 문의를 한 묶음으로)',def:'30',kind:'int',min:5,max:180,unit:'분'},
   {key:'inbox.alert_limit',screen:'📥 문의함 기준',label:'네이버 광고 알림 카드에 불러오는 알림 건수',where:'문의함 위쪽 「네이버 광고 알림」 카드(원장·매니저) — 아직 처리 안 한 알림을 최근 몇 건까지 불러올지',def:'20',kind:'int',min:5,max:100,unit:'건'},
   {key:'consult.page_size',screen:'🗂 상담일지 기준',label:'상담 기록 목록 한 쪽에 보이는 건수',where:'상담일지 — 목록 한 쪽에 상담 기록을 몇 건씩 보여 줄지',def:'20',kind:'int',min:10,max:100,unit:'건'},
-  {key:'consult.action_limit',screen:'🗂 상담일지 기준',label:'「오늘·기한 지남」 목록에 보이는 건수',where:'상담일지 — 「오늘·기한 지남」 표에 몇 건까지 보여 줄지(꽉 차면 표 아래에 「최대 N건 표시 중임」 글이 떠요)',def:'100',kind:'int',min:20,max:300,unit:'건'}
+  {key:'consult.action_limit',screen:'🗂 상담일지 기준',label:'「오늘·기한 지남」 목록에 보이는 건수',where:'상담일지 — 「오늘·기한 지남」 표에 몇 건까지 보여 줄지(꽉 차면 표 아래에 「최대 N건 표시 중임」 글이 떠요)',def:'100',kind:'int',min:20,max:300,unit:'건'},
+  {key:'contract.expiry_alert_days',screen:'📝 근로계약 기준',label:'계약 만료 알림 일수',where:'근로계약서(원장·실장·매니저 화면) › 「⏰ 근로계약 만료 확인」 — 계약 종료일까지 남은 날이 이 일수 안이면 알림 목록에 올라와요. 가장 작은 수=긴급 · 두 번째=경고 · 나머지=예정이고(예 14, 30, 60이면 14일 이내 긴급 · 30일 이내 경고 · 60일 이내 예정), 가장 큰 수는 「N일 안에 만료되는 계약이 없습니다」 글에도 쓰여요. 이미 저장된 계약서는 안 바뀌어요',def:'[14,30,60]',kind:'intlist',min:1,max:365,unit:'일'}
 ];
 function hubSettingDefByKey(key){
   for(let i=0;i<HUB_SETTING_DEFS.length;i++)if(HUB_SETTING_DEFS[i].key===key)return HUB_SETTING_DEFS[i];
@@ -1040,6 +1248,23 @@ function hubSettingValidate(def,raw){
     const n=Number(v);
     if(n<def.min||n>def.max)return {ok:false,reason:def.min+'부터 '+def.max+'까지만 쓸 수 있어요.'};
     return {ok:true,value:String(n)};
+  }
+  if(def.kind==='intlist'){ // 정수 목록(차례 6): 쉼표·띄어쓰기로 나눈 글 또는 [14,30,60] 모양 — 각각 정수 min~max · 1~5개 · 중복 없음 · 작은 수부터 정렬해 [14,30,60] 모양으로 저장
+    let arr;
+    try{arr=v.charAt(0)==='['?JSON.parse(v):v.split(/[\s,]+/).filter(function(x){return x!=='';});}
+    catch(e){return {ok:false,reason:'일수는 14, 30, 60 처럼 쉼표로 나눠 적어 주세요.'};}
+    if(!Array.isArray(arr)||arr.length<1||arr.length>5)return {ok:false,reason:'일수는 1개부터 5개까지 적어 주세요(예 14, 30, 60).'};
+    const nums=[];
+    for(let i=0;i<arr.length;i++){
+      const x=String(arr[i]).trim();
+      if(!/^\d{1,3}$/.test(x))return {ok:false,reason:'일수는 숫자만 적어 주세요(예 14, 30, 60).'};
+      const n=Number(x);
+      if(n<def.min||n>def.max)return {ok:false,reason:def.min+'부터 '+def.max+'까지만 쓸 수 있어요.'};
+      if(nums.indexOf(n)>=0)return {ok:false,reason:'같은 일수가 두 번 들어 있어요: '+n};
+      nums.push(n);
+    }
+    nums.sort(function(a,b){return a-b;});
+    return {ok:true,value:JSON.stringify(nums)};
   }
   return v?{ok:true,value:v}:{ok:false,reason:'비워 둘 수 없어요.'};
 }
@@ -1424,6 +1649,8 @@ function hubAfterTextWrite(sec,i,r,okMsg){
 async function hubSaveTextRow(sec,i){
   const d=hubTextDefs()[i],inp=sec.querySelector('#hubTxtIn_'+i);
   if(!d||!inp)return;
+  // 계약서 본문 문구(법적 효력)는 저장 전에 한 번 확인(기본 글로 돌리는 경우는 안 물음)
+  if(/^contract\.body\./.test(d.key)&&typeof root.confirm==='function'&&hubTextNorm(inp.value)!==''&&hubTextNorm(inp.value)!==hubTextNorm(d.def)&&!root.confirm('이 글은 앞으로 새로 만드는 근로계약서 본문에 들어가는 법적 문구예요(이미 발송·서명한 계약서는 안 바뀌어요). 저장할까요?')){const m0=sec.querySelector('#hubTxtMsg_'+i);if(m0)m0.textContent='저장하지 않았어요.';return;}
   const r=await hubTextsSave(HUB_SB,d.key,inp.value);
   hubAfterTextWrite(sec,i,r,r.ok&&r.action==='reset'?'기본 글과 같거나 비어 있어서 기본 글로 돌렸어요.':'');
 }
@@ -1441,6 +1668,17 @@ async function hubRenderSettingsSection(sec){
   catch(e){sec.innerHTML='<div class="empty">불러오지 못했습니다: '+hubEsc((e&&e.message)||'')+'</div>';return;}
   hubDrawSettingsSection(sec);
 }
+// 정수 목록은 화면에 「14, 30, 60」 모양으로 보여 주고, 기본값 비교도 같은 모양(검사를 거친 값)으로 한다.
+function hubSettingShow(d,raw){
+  if(d.kind!=='intlist')return raw;
+  const chk=hubSettingValidate(d,raw);
+  return chk.ok?JSON.parse(chk.value).join(', '):String(raw);
+}
+function hubSettingIsDefault(d,raw){
+  if(d.kind!=='intlist')return raw===d.def;
+  const a=hubSettingValidate(d,raw),b=hubSettingValidate(d,d.def);
+  return a.ok&&b.ok?a.value===b.value:true; // 잘못된 값이 들어 있으면 읽을 때 기본값을 쓰므로 기본으로 본다
+}
 function hubDrawSettingsSection(sec){
   const groups=[];
   HUB_SETTING_DEFS.forEach(function(d,i){
@@ -1455,11 +1693,13 @@ function hubDrawSettingsSection(sec){
           const d=x.d,i=x.i,cur=hubSetting(d.key,d.def);
           const input=d.kind==='time'
             ?'<input id="hubSetIn_'+i+'" type="time" value="'+hubEsc(cur)+'">'
+            :d.kind==='intlist'
+            ?'<input id="hubSetIn_'+i+'" type="text" inputmode="numeric" size="16" placeholder="14, 30, 60" value="'+hubEsc(hubSettingShow(d,cur))+'"> '+hubEsc(d.unit||'')+' (쉼표로 나눠 적어요)'
             :'<input id="hubSetIn_'+i+'" type="number" inputmode="'+(d.kind==='dec'?'decimal':'numeric')+'"'+(d.kind==='dec'?' step="0.1"':'')+' min="'+d.min+'" max="'+d.max+'" value="'+hubEsc(cur)+'"> '+hubEsc(d.unit||'');
           return '<div class="hub-row" data-hub-set-row="'+i+'">'+
-            '<div class="hub-where"><b>'+hubEsc(d.label)+'</b> <span id="hubSetBadge_'+i+'">'+hubBadge(cur!==d.def)+'</span></div>'+
+            '<div class="hub-where"><b>'+hubEsc(d.label)+'</b> <span id="hubSetBadge_'+i+'">'+hubBadge(!hubSettingIsDefault(d,cur))+'</span></div>'+
             '<div class="sub">'+hubEsc(d.where)+' · 이름표: '+hubEsc(d.key)+'</div>'+
-            '<div class="sub">처음 값 '+hubEsc(d.def)+(d.kind==='int'||d.kind==='dec'?' · '+d.min+'~'+d.max+' 사이':'')+'</div>'+
+            '<div class="sub">처음 값 '+hubEsc(hubSettingShow(d,d.def))+(d.kind==='int'||d.kind==='dec'?' · '+d.min+'~'+d.max+' 사이':(d.kind==='intlist'?' · 숫자 1~5개, 각각 '+d.min+'~'+d.max+' 사이':''))+'</div>'+
             '<div class="rowflex">'+input+'<button class="mini stamp" data-hub-set-save="'+i+'">저장</button><button class="mini" data-hub-set-reset="'+i+'">기본으로 되돌리기</button><span class="hint" id="hubSetMsg_'+i+'"></span></div>'+
             '</div>';
         }).join('')+'</details>';
@@ -1475,8 +1715,8 @@ function hubAfterSettingWrite(sec,i,r){
     return;
   }
   const cur=hubSetting(d.key,d.def);
-  if(inp)inp.value=cur;
-  if(badge)badge.innerHTML=hubBadge(cur!==d.def);
+  if(inp)inp.value=hubSettingShow(d,cur);
+  if(badge)badge.innerHTML=hubBadge(!hubSettingIsDefault(d,cur));
   if(msg)msg.textContent=r.action==='reset'?'처음 값으로 돌렸어요.':'저장했어요.';
 }
 async function hubSaveSettingRow(sec,i){
@@ -1671,13 +1911,14 @@ const HubUi={
   setSettings:hubSettingSetValues,
   renderSettings:renderHubSettings,
   applyTextFilter:hubApplyTextFilter, // 검색칸 동작(시험용으로도 공개)
-  helpers:{hubText:hubText,hubSetting:hubSetting,hubSettingChecked:hubSettingChecked,hubList:hubList,hubCards:hubCards}
+  helpers:{hubText:hubText,hubSetting:hubSetting,hubSettingChecked:hubSettingChecked,hubSettingIntList:hubSettingIntList,hubContractExpiryDays:hubContractExpiryDays,hubList:hubList,hubCards:hubCards}
 };
 root.hubText=hubText;
 root.hubTextHtml=hubTextHtml;
 root.hubSetting=hubSetting;
 root.hubSettingNumber=hubSettingNumber;
 root.hubSettingChecked=hubSettingChecked;
+root.hubContractExpiryDays=hubContractExpiryDays;
 root.hubList=hubList;
 root.hubCards=hubCards;
 root.HubUi=HubUi;

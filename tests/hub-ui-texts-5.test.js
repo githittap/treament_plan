@@ -101,8 +101,8 @@ test('화면 코드(hr.html)에 박힌 기본 글이 기본값 목록과 글자�
 
 test('숫자·목록 기본값: 숫자 4개와 문의 출처·문의 상태·상담 구분·상담 상태 목록이 hr.html·DB와 같다 · 캐시 번호',()=>{
   const h=helpers(),S=k=>h.HUB_SETTING_DEFS.find(d=>d.key===k),L=k=>h.HUB_LIST_DEFS.find(d=>d.key===k);
-  assert.deepEqual(clone(h.HUB_SETTING_DEFS.slice(14).map(d=>[d.key,d.def,d.kind,d.min,d.max])),[['inbox.group_window_min','30','int',5,180],['inbox.alert_limit','20','int',5,100],['consult.page_size','20','int',10,100],['consult.action_limit','100','int',20,300]]);
-  assert.equal(h.HUB_SETTING_DEFS.length,18);
+  assert.deepEqual(clone(h.HUB_SETTING_DEFS.slice(14,18).map(d=>[d.key,d.def,d.kind,d.min,d.max])),[['inbox.group_window_min','30','int',5,180],['inbox.alert_limit','20','int',5,100],['consult.page_size','20','int',10,100],['consult.action_limit','100','int',20,300]]);
+  assert.equal(h.HUB_SETTING_DEFS.length,19);
   assert.match(hr,/hubSettingChecked\('inbox\.group_window_min',30\)/);
   assert.match(hr,/limit\(hubN\('inbox\.alert_limit',20\)\)/);
   assert.match(hr,/CONSULTATION_PAGE_SIZE=hubN\('consult\.page_size',20\)/);
@@ -126,7 +126,7 @@ test('숫자·목록 기본값: 숫자 4개와 문의 출처·문의 상태·상
   assert.match(read('db/consultation_inbox_followup_draft.sql'),/status in \('new','in_progress','recall_1','recall_2','recall_3','closed','converted'\)/);
   assert.match(read('db/consultation_journal_draft.sql'),/source_sheet in \('교정', '확정', '미확정 및 부분확정', '홈페이지', '카카오,네이버예약,당근', '원본'\)/);
   assert.match(read('db/consultation_journal_draft.sql'),/status in \('대기', '미확정', '부분확정', '확정', '종결'\)/);
-  assert.match(hr,/hub-texts\.js\?v=2026100111/,'캐시 번호를 새 값으로 올림(차례 5에서 2026100110 → 2026100111)');
+  assert.match(hr,/hub-texts\.js\?v=2026100112/,'캐시 번호를 새 값으로 올림(차례 5에서 2026100110 → 2026100111, 차례 6에서 → 2026100112)');
   assert.ok(!/hub-texts\.js\?v=2026100110/.test(hr));
 });
 
@@ -462,7 +462,7 @@ test('화면: 🔢 숫자·기준 — 문의함·상담일지 숫자 4개가 더
   await t.render(OWNER);
   await t.click('[hub-subtab]=settings');
   const sec=t.section.innerHTML;
-  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,18);
+  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,19);
   assert.ok(sec.includes('📥 문의함 기준')&&sec.includes('🗂 상담일지 기준'));
   assert.match(sec,/id="hubSetIn_14" type="number" inputmode="numeric" min="5" max="180" value="30"/);
   assert.match(sec,/id="hubSetIn_15" type="number" inputmode="numeric" min="5" max="100" value="20"/);
