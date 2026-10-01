@@ -5,6 +5,7 @@
    · 글  → 표 hub_ui_texts(db/hub_ui_texts.sql) · 숫자·목록 → 이미 있는 표 app_settings(키만 더함, 표·정책은 안 고침)
    hr.html은 이 파일을 main 스크립트보다 먼저 <script src="hub-texts.js?v=…"> 로 불러온다(함수는 전역 hubText·hubSetting·hubList·HubUi).
    로그인 전 화면 글은 표를 읽을 수 없어 이 엔진을 쓰지 않는다(설계서 5장).
+   차례 5: 문의함·상담일지 글(hubTextDefsChapter5) + 문의 출처·문의 상태·상담 구분·상담 상태 이름 목록(코드는 DB 허락값이라 이름만) + 문의함·상담일지 숫자 기준 5개 — 광고 알림 기준 금액 100,000원은 DB 함수에도 있어 안 옮김.
    차례 4: 결재함·공지·캘린더·건의함 글(hubTextDefsChapter4) + 결재 종류·일정 종류 이름 목록 + 결재 목록 건수(hubSettingChecked) — 첨부 한도·건의 점수·순위는 DB가 같은 값을 쥐고 있어 안 옮김.
    차례 3: 출퇴근·근무표·연차 글(hubTextDefsChapter3) + 연차 유형·근무부서 이름 목록 + 연차·소명 숫자 기준(hubSettingChecked).
    차례 2: 내 서류함·업무자료 글(hubTextDefsChapter2) + 서류 종류·상태 이름 목록 + 업무자료 카드(app_settings cards.work_materials, 링크는 http(s)만).
@@ -785,6 +786,170 @@ function hubTextDefsChapter4(add){
   add('sug.m_campaign_check',G2,'캠페인 설정 저장 — 제목·기간·상금이 잘못됐을 때 알림창(원장)','캠페인 설정을 확인하세요.');
   add('sug.m_campaign_fail',G2,'캠페인 설정 저장 실패 알림창(원장 · {msg}는 서버 오류)','캠페인 설정을 저장하지 못했습니다: {msg}',['msg']);
 }
+// ── 차례 5: 문의함·상담일지 글(기본 글은 hr.html의 글과 같아야 함 — 시험이 대조) ──
+function hubTextDefsChapter5(add){
+  const I1='📥 문의함 › 문의함 화면';
+  const I2='📥 문의함 › 문의 목록·상태 글';
+  const I3='📥 문의함 › 문의 상세·답변';
+  const I4='📥 문의함 › 카카오 예약';
+  const I5='📥 문의함 › 빠른 수기 접수';
+  const I6='📥 문의함 › 네이버 광고 알림';
+  add('inbox.title',I1,'문의함 화면 맨 위 큰 제목','📥 통합 문의함');
+  add('inbox.hint',I1,'문의함 제목 아래 설명(자동 접수 경로가 늘거나 줄면 이 글도 같이 고쳐 주세요)','네이버 톡톡·당근·카카오·네이버메일·홈페이지·전화 문의를 한곳에서 확인합니다. 네이버 톡톡·홈페이지·카카오·당근은 자동 접수되고, 전화·기타 문의는 수기로 접수할 수 있습니다.');
+  add('inbox.btn_consult',I1,'문의함 제목 옆 「상담일지 열기」 단추 글(상담일지를 볼 수 있는 직원 화면)','상담일지 열기');
+  add('inbox.f_all_source',I1,'문의 목록 맨 위 — 출처 고르는 칸의 맨 위 항목(전체 보기)','전체 출처');
+  add('inbox.f_all_status',I1,'문의 목록 맨 위 — 상태 고르는 칸의 맨 위 항목(전체 보기). 상태 이름 자체는 📋 목록 탭에서 고쳐요','전체 상태');
+  add('inbox.btn_reservation',I1,'문의 목록 맨 위 — 카카오 예약만 보는 단추({n}=덴트웹에 아직 안 넣은 예약 건수)','📅 예약 · 미입력 {n}건',['n']);
+  add('inbox.btn_filter',I1,'문의 목록 맨 위 — 출처·상태를 적용하는 「필터」 단추','필터');
+  add('inbox.no_access',I1,'문의함을 볼 수 없는 직원이 문의함에 들어갔을 때 뜨는 글','통합 문의함 접근 권한이 없습니다.');
+  add('inbox.err_load',I1,'문의 목록을 못 불러왔을 때 뜨는 글({msg}는 서버 오류)','문의함 불러오기 실패: {msg}',['msg']);
+  add('inbox.th_time',I2,'문의 목록 표 머리 — 받은 시각(컴퓨터 화면)','수신');
+  add('inbox.th_source',I2,'문의 목록 표 머리 — 출처','출처');
+  add('inbox.th_sender',I2,'문의 목록 표 머리 — 문의한 사람','문의자');
+  add('inbox.th_subject',I2,'문의 목록 표 머리 — 제목','제목');
+  add('inbox.th_status',I2,'문의 목록 표 머리 — 상태','상태');
+  add('inbox.th_assignee',I2,'문의 목록 표 머리 — 담당자','담당');
+  add('inbox.btn_detail',I2,'문의 한 줄 끝 「상세」 단추 글(카카오 예약 줄도 같음)','상세');
+  add('inbox.unknown_time',I2,'받은 시각을 알 수 없을 때 대신 보이는 글(상세 화면도 같음)','미상');
+  add('inbox.neg_kw',I2,'불만·환불 같은 말이 들어 있는 문의 앞에 붙는 표시(어떤 말을 잡는지는 아직 코드에 있어요)','부정 키워드');
+  add('inbox.m_assignee',I2,'스마트폰 화면 문의 카드의 담당자 글({name}=담당자 이름)','담당 {name}',['name']);
+  add('inbox.group_count',I2,'같은 사람의 문의가 한 묶음일 때 이름 뒤에 붙는 건수({n}=묶음 속 문의 수)','({n}건)',['n']);
+  add('inbox.status_hint',I2,'문의 목록 맨 위 건수 줄 아래 상태 풀이 글(상태 이름을 고치면 이 글도 같이 고쳐 주세요)','NEW = 아직 아무도 처리 안 함 · 진행중 = 담당자가 답하는 중 · 리콜 = 다시 연락할 문의 · 종결 = 답변 끝 또는 광고 등 정리');
+  add('inbox.sum_new',I2,'문의 목록 맨 위 건수 줄 — 새 문의(뒤에 건수가 붙음)','NEW');
+  add('inbox.sum_progress',I2,'문의 목록 맨 위 건수 줄 — 진행 중(뒤에 건수가 붙음)','진행중');
+  add('inbox.sum_recall',I2,'문의 목록 맨 위 건수 줄 — 리콜 1·2·3차를 합친 것(뒤에 건수가 붙음)','리콜');
+  add('inbox.sum_closed',I2,'문의 목록 맨 위 건수 줄 — 종결(뒤에 건수가 붙음)','종결');
+  add('inbox.sum_converted',I2,'문의 목록 맨 위 건수 줄 — 상담일지로 넘어간 것(뒤에 건수가 붙음)','전환');
+  add('inbox.empty',I2,'조건에 맞는 문의가 하나도 없을 때 뜨는 글','조건에 맞는 문의가 없습니다.');
+  add('inbox.btn_call',I2,'전화 문의 줄에 뜨는 전화 걸기 링크 글','전화 걸기');
+  add('inbox.btn_reply_go',I2,'채팅·홈페이지 문의 줄에 뜨는 「답하러 가기」 링크 글(눌러서 가는 주소는 코드에 있어요)','답하러 가기');
+  add('inbox.d_count',I3,'문의 상세 맨 위 줄 끝 건수({n}=이 사람의 문의 수)','{n}건',['n']);
+  add('inbox.opt_unassigned',I3,'담당자 고르는 칸의 「담당 없음」 항목','미배정');
+  add('inbox.btn_save',I3,'문의 상세 — 상태·담당을 저장하는 단추 글','상태·담당 저장');
+  add('inbox.btn_convert',I3,'문의 상세 — 상담일지로 넘기는 단추 글','상담일지로 전환');
+  add('inbox.f_reply',I3,'문의 상세 — 답변 쓰는 칸 이름','실제 답변 기록');
+  add('inbox.btn_reply_save',I3,'문의 상세 — 답변을 기록하는 단추 글','답변 기록');
+  add('inbox.err_replies',I3,'답변 이력을 못 불러왔을 때 뜨는 글({msg}는 서버 오류)','답변 이력 불러오기 실패: {msg}',['msg']);
+  add('inbox.replies_none',I3,'기록된 답변이 하나도 없을 때 뜨는 글','기록된 답변 없음');
+  add('inbox.err_views',I3,'열람 이력을 못 불러왔을 때 뜨는 글(원장 화면 · {msg}는 서버 오류)','열람 이력 불러오기 실패: {msg}',['msg']);
+  add('inbox.views_title',I3,'열람 이력 칸 제목(원장 화면)','열람 이력 · 원장 전용');
+  add('inbox.m_reply_empty',I3,'답변 기록 — 답변을 안 적고 눌렀을 때 뜨는 글','실제 답변 내용을 입력하세요.');
+  add('inbox.m_reply_fail',I3,'답변 기록 저장 실패({msg}는 서버 오류)','기록 실패: {msg}',['msg']);
+  add('inbox.m_convert_fail',I3,'상담일지 전환 실패 알림창({msg}는 서버 오류)','상담일지 전환 실패: {msg}',['msg']);
+  add('inbox.m_convert_close_fail',I3,'상담일지 전환은 됐는데 나머지 문의를 종결 처리하다 실패했을 때 알림창({msg}는 서버 오류)','상담일지 전환은 됐지만 나머지 문의 종결에는 실패했습니다: {msg}',['msg']);
+  add('inbox.m_converted',I3,'상담일지 전환이 끝났을 때 상세 칸에 뜨는 글','상담일지로 전환했습니다. 나머지 처리 대상 문의는 종결 상태로 보존했습니다.');
+  add('inbox.kb_title',I4,'카카오 예약 줄·상세의 맨 앞 글(뒤에 일정이나 상태가 이어 붙음)','📅 카카오 예약');
+  add('inbox.kb_entered',I4,'카카오 예약 — 덴트웹에 입력을 마친 표시(상세 글 앞부분도 같음)','✅ 덴트웹 입력함');
+  add('inbox.kb_not_entered',I4,'카카오 예약 목록 줄 — 덴트웹에 아직 안 넣은 표시','덴트웹 입력 전');
+  add('inbox.kb_not_yet',I4,'카카오 예약 상세 — 덴트웹에 아직 안 넣었을 때 뜨는 글','아직 덴트웹 입력 전');
+  add('inbox.kb_alert',I4,'카카오 예약 — 예약 내용을 못 읽었을 때 첫 줄이 비어 있으면 대신 보이는 글, 상세 칸 이름','예약 알림');
+  add('inbox.kb_time_unknown',I4,'카카오 예약 목록 줄 — 일정도 받은 시각도 없을 때 대신 보이는 글','받은 시각 확인 필요');
+  add('inbox.kb_check',I4,'카카오 예약 상세 — 상품·예약자·연락처를 못 읽었을 때 대신 보이는 글','확인 필요');
+  add('inbox.kb_f_schedule',I4,'카카오 예약 상세 칸 이름 — 일정','일정');
+  add('inbox.kb_f_received',I4,'카카오 예약 상세 칸 이름 — 받은 시각(일정을 못 읽었을 때 값 자리에도 같은 글이 보임)','받은 시각');
+  add('inbox.kb_f_product',I4,'카카오 예약 상세 칸 이름 — 상품','상품');
+  add('inbox.kb_f_option',I4,'카카오 예약 상세 칸 이름 — 옵션','옵션');
+  add('inbox.kb_none',I4,'카카오 예약 상세 — 옵션이 없을 때 뜨는 글','없음');
+  add('inbox.kb_f_name',I4,'카카오 예약 상세 칸 이름 — 예약자','예약자');
+  add('inbox.kb_f_contact',I4,'카카오 예약 상세 칸 이름 — 연락처','연락처');
+  add('inbox.kb_partner_open',I4,'카카오 예약 상세 — 카카오 파트너센터를 여는 링크 글','카카오 파트너센터 열기');
+  add('inbox.kb_btn_undo',I4,'카카오 예약 상세 — 덴트웹 입력 표시를 되돌리는 단추 글','↩️ 덴트웹 입력 표시 되돌리기');
+  add('inbox.kb_btn_set',I4,'카카오 예약 상세 — 덴트웹에 입력했다고 표시하는 단추 글','✅ 덴트웹에 입력함');
+  add('inbox.kb_confirm_hint',I4,'카카오 예약 상세 아래 작은 안내','예약확정은 파트너센터에서');
+  add('inbox.kb_original',I4,'카카오 예약 상세 — 받은 글 원문을 펼치는 줄 글','받은 글 원문');
+  add('inbox.m_dentweb_unavailable',I4,'덴트웹 입력 표시를 눌렀는데 DB가 아직 준비 안 됐을 때 뜨는 글','완료 기록은 DB 변경을 적용한 뒤 사용할 수 있습니다.');
+  add('inbox.confirm_undo_dentweb',I4,'덴트웹 입력 표시를 되돌리려 할 때 뜨는 확인창','덴트웹 입력 완료 표시를 되돌릴까요?');
+  add('inbox.m_dentweb_fail',I4,'덴트웹 입력 표시 저장 실패({msg}는 서버 오류)','저장 실패: {msg}',['msg']);
+  add('inbox.q_title',I5,'빠른 수기 접수 칸 제목','빠른 수기 접수');
+  add('inbox.q_f_source',I5,'빠른 수기 접수 칸 이름 — 출처(고르는 항목 이름은 📋 목록 탭에서 고쳐요)','출처');
+  add('inbox.q_f_name',I5,'빠른 수기 접수 칸 이름 — 문의한 사람(필수)','문의자 *');
+  add('inbox.q_f_contact',I5,'빠른 수기 접수 칸 이름 — 연락처','연락처');
+  add('inbox.q_f_subject',I5,'빠른 수기 접수 칸 이름 — 제목','제목');
+  add('inbox.q_f_message',I5,'빠른 수기 접수 칸 이름 — 문의 내용(필수)','문의 내용 *');
+  add('inbox.q_btn',I5,'빠른 수기 접수 — 접수 단추 글','문의 접수');
+  add('inbox.m_manual_required',I5,'수기 접수 — 문의자나 내용을 안 적었을 때 뜨는 글','문의자와 문의 내용은 필수입니다.');
+  add('inbox.m_manual_fail',I5,'수기 접수 저장 실패({msg}는 서버 오류)','저장 실패: {msg}',['msg']);
+  add('inbox.m_manual_ok',I5,'수기 접수가 끝났을 때 뜨는 글','문의로 접수했습니다.');
+  add('inbox.ad_title',I6,'문의함 위쪽 「네이버 광고 알림」 카드 제목(원장·매니저 화면)','네이버 광고 알림');
+  add('inbox.ad_pending',I6,'광고 알림 카드 제목 옆 건수({n}=아직 처리 안 한 알림 수)','미처리 {n}건',['n']);
+  add('inbox.ad_more',I6,'광고 알림이 여러 개일 때 펼치는 줄 글({n}=나머지 건수)','+{n}건 펼치기',['n']);
+  add('inbox.ad_recent_only',I6,'광고 알림이 너무 많을 때 펼친 칸 아래 글({n}=보이는 건수)','최근 {n}건만 표시함',['n']);
+  add('inbox.ad_low',I6,'광고 알림 한 줄 — 잔액이 모자랄 때 제목({n}=기준 금액 숫자)','🟠 네이버 광고 잔액 {n}원 이하',['n']);
+  add('inbox.ad_stop',I6,'광고 알림 한 줄 — 광고가 멈췄을 때 제목','🔴 네이버 광고 노출 중단');
+  add('inbox.ad_btn_raw',I6,'광고 알림 한 줄 — 받은 원문을 보는 단추 글','원문');
+  add('inbox.ad_btn_charged',I6,'광고 알림 한 줄 — 충전했다고 표시하는 단추 글','충전했음');
+  add('inbox.ad_charged_fail',I6,'충전 표시 저장 실패 알림창({msg}는 서버 오류)','처리 실패: {msg}',['msg']);
+  add('inbox.rc_title',I6,'「광고 푸시 받는 매니저」 칸 제목(원장 화면)','네이버 광고 푸시 받는 매니저');
+  add('inbox.rc_owner_always',I6,'「광고 푸시 받는 매니저」 칸 제목 옆 작은 글','원장은 항상 받음');
+  add('inbox.rc_hint',I6,'「광고 푸시 받는 매니저」 칸 안내','처음에는 활성 매니저 전원이 받음. 체크를 끄면 그 매니저만 제외됨.');
+  add('inbox.rc_none',I6,'받을 수 있는 활성 매니저가 한 명도 없을 때 뜨는 글','활성 매니저 없음');
+  add('inbox.rc_btn_save',I6,'「광고 푸시 받는 매니저」 칸 — 저장 단추 글','받는 사람 저장');
+  add('inbox.rc_err',I6,'받는 사람 설정을 못 불러왔을 때 뜨는 글({msg}는 서버 오류)','받는 사람 설정을 불러오지 못함: {msg}',['msg']);
+  add('inbox.rc_save_fail',I6,'받는 사람 저장 실패 알림창({msg}는 서버 오류)','받는 사람 저장 실패: {msg}',['msg']);
+  const C1='🗂 상담일지 › 목록·검색';
+  const C2='🗂 상담일지 › 기록 입력·수정';
+  const C3='🗂 상담일지 › 오늘·기한 지남';
+  add('cj.title',C1,'상담일지 화면 맨 위 큰 제목','🗂 상담일지');
+  add('cj.hint',C1,'상담일지 제목 아래 설명(상담일지를 볼 수 있는 직위가 바뀌면 이 글도 같이 고쳐 주세요)','매니저·실장·원장만 볼 수 있습니다. 원본 엑셀 행은 가져오지 않으며, 새 기록만 저장합니다.');
+  add('cj.btn_home',C1,'상담일지 제목 옆 「홈으로」 단추 글','홈으로');
+  add('cj.ph_search',C1,'상담일지 검색 칸 안에 흐리게 보이는 글','환자명·다음 조치 검색');
+  add('cj.f_all_kind',C1,'상담일지 검색 — 구분 고르는 칸의 맨 위 항목(구분 이름은 📋 목록 탭에서 고쳐요)','전체 상담 구분');
+  add('cj.f_all_status',C1,'상담일지 검색 — 상태 고르는 칸의 맨 위 항목(상태 이름은 📋 목록 탭에서 고쳐요)','전체 상태');
+  add('cj.btn_search',C1,'상담일지 검색 단추 글','검색');
+  add('cj.th_date',C1,'상담일지 표 머리 — 상담한 날','상담일');
+  add('cj.th_patient',C1,'상담일지 표 머리 — 환자(「오늘·기한 지남」 표도 같음)','환자');
+  add('cj.th_kind',C1,'상담일지 표 머리 — 상담 구분','구분');
+  add('cj.th_status',C1,'상담일지 표 머리 — 상태','상태');
+  add('cj.th_amount',C1,'상담일지 표 머리 — 제시한 비용','제시 비용');
+  add('cj.th_next',C1,'상담일지 표 머리 — 다음 조치(「오늘·기한 지남」 표도 같음)','다음 조치');
+  add('cj.btn_edit',C1,'상담일지 표 한 줄 끝 수정 단추 글','수정');
+  add('cj.list_empty',C1,'조건에 맞는 상담 기록이 하나도 없을 때 뜨는 글','조건에 맞는 상담 기록이 없습니다.');
+  add('cj.page_info',C1,'목록 아래 쪽 안내({total}=전체 건수 · {page}=지금 쪽 번호)','{total}건 · {page}쪽',['total','page']);
+  add('cj.btn_prev',C1,'목록 아래 이전 쪽 단추 글','이전');
+  add('cj.btn_next',C1,'목록 아래 다음 쪽 단추 글','다음');
+  add('cj.no_access',C1,'상담일지를 볼 수 없는 직원이 들어갔을 때 뜨는 글','상담일지 접근 권한이 없습니다.');
+  add('cj.m_load_fail',C1,'상담일지를 못 불러왔을 때 뜨는 글({msg}는 서버 오류)','상담일지 불러오기 실패: {msg}',['msg']);
+  add('cj.unknown_error',C1,'서버 오류 내용이 없을 때 {msg} 자리에 대신 들어가는 글(저장·수정 실패 글도 같음)','알 수 없는 오류');
+  add('cj.form_new',C2,'새 기록 쓰는 칸 제목(「새로 입력」을 눌렀을 때도 같은 글)','➕ 새 상담 기록');
+  add('cj.form_edit',C2,'기록을 불러와 고칠 때 칸 제목','✏️ 상담 기록 수정');
+  add('cj.f_name',C2,'입력 칸 이름 — 환자 이름(필수)','환자명 *');
+  add('cj.f_phone',C2,'입력 칸 이름 — 환자 연락처','연락처');
+  add('cj.f_kind',C2,'입력 칸 이름 — 상담 구분(필수 · 고르는 항목 이름은 📋 목록 탭에서 고쳐요)','상담 구분 *');
+  add('cj.f_date',C2,'입력 칸 이름 — 상담한 날(필수)','상담일 *');
+  add('cj.f_status',C2,'입력 칸 이름 — 상태(필수 · 고르는 항목 이름은 📋 목록 탭에서 고쳐요)','상태 *');
+  add('cj.f_amount',C2,'입력 칸 이름 — 제시한 비용','제시 비용');
+  add('cj.f_note',C2,'입력 칸 이름 — 상담 내용(필수)','상담 내용 *');
+  add('cj.f_instruction',C2,'입력 칸 이름 — 지시·기타사항','지시/혹은 기타사항');
+  add('cj.f_special',C2,'입력 칸 이름 — 특이사항','특이사항');
+  add('cj.f_next',C2,'입력 칸 이름 — 다음 조치','다음 조치');
+  add('cj.src_title',C2,'입력 칸 아래 「원본 시트 추가 칸」 제목(칸 이름 자체는 코드에 있어요)','원본 시트 추가 칸');
+  add('cj.f_assignee',C2,'입력 칸 이름 — 다음 조치 담당자','다음 조치 담당자');
+  add('cj.opt_unassigned',C2,'다음 조치 담당자 고르는 칸의 「담당 없음」 항목(「오늘·기한 지남」 표의 담당자 칸도 같음)','미지정');
+  add('cj.opt_stale',C2,'이미 저장된 담당자가 지금은 고를 수 없는 사람일 때 그 항목에 보이는 글','기존 담당자(현재 배정 불가)');
+  add('cj.f_due',C2,'입력 칸 이름 — 다음 조치 예정일','예정일');
+  add('cj.f_done',C2,'입력 칸 이름 — 조치를 마쳤는지 표시하는 칸','완료');
+  add('cj.f_done_check',C2,'「완료」 칸의 체크 옆 글','조치 완료');
+  add('cj.btn_save',C2,'새 기록 저장 단추 글','저장');
+  add('cj.btn_save_edit',C2,'기록을 고친 뒤 저장하는 단추 글','수정 저장');
+  add('cj.btn_reset',C2,'입력 칸을 비우는 단추 글','새로 입력');
+  add('cj.m_required',C2,'저장 — 환자명·상담일·상담 내용을 안 적었을 때 뜨는 글','환자명, 상담일, 상담 내용은 필수입니다.');
+  add('cj.m_amount',C2,'저장 — 제시 비용이 0 이상 숫자가 아닐 때 뜨는 글','제시 비용은 0 이상의 숫자로 입력하세요.');
+  add('cj.m_not_allowed',C2,'저장 — 허락되지 않은 구분·상태가 들어 있을 때 뜨는 글','허용되지 않은 상담 구분 또는 상태입니다.');
+  add('cj.m_need_next',C2,'저장 — 다음 조치 없이 담당자·예정일·완료만 적었을 때 뜨는 글','담당자·예정일·완료 표시에는 다음 조치 내용이 필요합니다.');
+  add('cj.m_saving',C2,'저장하는 동안 뜨는 글','저장 중…');
+  add('cj.m_save_fail',C2,'새 기록 저장 실패({msg}는 서버 오류)','상담일지 저장 실패: {msg}',['msg']);
+  add('cj.m_update_fail',C2,'기록 수정 저장 실패({msg}는 서버 오류)','상담일지 수정 실패: {msg}',['msg']);
+  add('cj.q_title',C3,'「오늘·기한 지남」 칸 제목','오늘·기한 지남');
+  add('cj.q_loading',C3,'「오늘·기한 지남」 칸을 불러오는 동안 뜨는 글','불러오는 중…');
+  add('cj.queue_err',C3,'「오늘·기한 지남」 목록을 못 불러왔을 때 뜨는 글({msg}는 서버 오류)','오늘·기한 지남 목록 불러오기 실패: {msg}',['msg']);
+  add('cj.q_th_due',C3,'「오늘·기한 지남」 표 머리 — 기한','기한');
+  add('cj.q_th_who',C3,'「오늘·기한 지남」 표 머리 — 담당자','담당자');
+  add('cj.q_overdue',C3,'「오늘·기한 지남」 표 — 기한이 지난 건의 표시','기한 지남');
+  add('cj.q_today',C3,'「오늘·기한 지남」 표 — 오늘이 기한인 건의 표시','오늘');
+  add('cj.q_btn_open',C3,'「오늘·기한 지남」 표 한 줄 끝 단추 글(눌러서 그 기록을 불러옴)','열기');
+  add('cj.q_empty',C3,'오늘이나 기한 지난 다음 조치가 하나도 없을 때 뜨는 글','오늘 또는 기한이 지난 다음 조치가 없습니다.');
+  add('cj.q_limit_hint',C3,'「오늘·기한 지남」이 꽉 찼을 때 표 아래 글({n}=보이는 최대 건수 — 건수는 🔢 숫자·기준 탭에서 고쳐요)','최대 {n}건 표시 중임',['n']);
+}
 let HUB_TEXT_DEFS_CACHE=null;
 function hubTextDefs(){
   if(HUB_TEXT_DEFS_CACHE)return HUB_TEXT_DEFS_CACHE;
@@ -815,6 +980,7 @@ function hubTextDefs(){
   hubTextDefsChapter2(add);
   hubTextDefsChapter3(add);
   hubTextDefsChapter4(add);
+  hubTextDefsChapter5(add);
   HUB_TEXT_DEFS_CACHE=defs;
   return defs;
 }
@@ -831,7 +997,7 @@ function hubTextMatches(def,query,current){
   return q.split(/\s+/).every(function(w){return hay.indexOf(w)>=0;});
 }
 
-/* 숫자 기준(app_settings 키) — 근태 기준 7개(차례 1) + 연차·소명 기준 5개(차례 3) + 결재 목록 건수 2개(차례 4: 화면에만 있던 숫자만 — DB 함수·Storage 규칙에도 박힌 숫자는 안 옮김) */
+/* 숫자 기준(app_settings 키) — 근태 기준 7개(차례 1) + 연차·소명 기준 5개(차례 3) + 결재 목록 건수 2개(차례 4) + 문의함·상담일지 건수·간격 5개(차례 5: 화면에만 있던 숫자만 — DB 함수·Storage 규칙에도 박힌 숫자는 안 옮김) */
 const HUB_SETTING_DEFS=[
   {key:'late_cut',screen:'🕘 근태 기준',label:'지각 판정 시각',where:'출퇴근 — 이 시각을 넘겨 출근하면 지각으로 계산(예 09:40이면 09:41부터 지각)',def:'09:40',kind:'time'},
   {key:'siueop',screen:'🕘 근태 기준',label:'시업(공식 출근) 시각',where:'출퇴근 — 화면에 보여 주는 공식 출근 시각',def:'10:00',kind:'time'},
@@ -846,7 +1012,11 @@ const HUB_SETTING_DEFS=[
   {key:'leave.half_day_value',screen:'🌿 연차 기준',label:'반차·조퇴 1건이 쓰는 연차 일수',where:'연차 신청 — 반차·조퇴를 신청할 때 장부에서 빠지는 일수(예 0.5). 이미 신청된 건은 안 바뀌어요',def:'0.5',kind:'dec',min:0.1,max:1,unit:'일'},
   {key:'leave.my_list_limit',screen:'🌿 연차 기준',label:'내 신청 내역에 보이는 건수',where:'연차 — 「내 신청 내역」 표에 최근 몇 건까지 보여 줄지',def:'20',kind:'int',min:5,max:100,unit:'건'},
   {key:'appr.my_list_limit',screen:'🖊 결재 기준',label:'「내가 올린 문서」에 보이는 건수',where:'결재함 — 「내가 올린 문서」에 최근 몇 건까지 보여 줄지',def:'20',kind:'int',min:5,max:100,unit:'건'},
-  {key:'appr.done_list_limit',screen:'🖊 결재 기준',label:'「완결된 결재 문서」에 보이는 건수',where:'결재함(실장·원장 화면) — 「완결된 결재 문서」(취소된 문서 포함)에 최근 몇 건까지 보여 줄지',def:'50',kind:'int',min:10,max:200,unit:'건'}
+  {key:'appr.done_list_limit',screen:'🖊 결재 기준',label:'「완결된 결재 문서」에 보이는 건수',where:'결재함(실장·원장 화면) — 「완결된 결재 문서」(취소된 문서 포함)에 최근 몇 건까지 보여 줄지',def:'50',kind:'int',min:10,max:200,unit:'건'},
+  {key:'inbox.group_window_min',screen:'📥 문의함 기준',label:'같은 사람의 문의를 한 묶음으로 보는 간격',where:'문의함 — 같은 출처·같은 사람이 보낸 문의가 이 시간(분) 안에 이어지면 한 줄로 묶어서 보여 줘요(예 30이면 30분 안에 이어진 문의를 한 묶음으로)',def:'30',kind:'int',min:5,max:180,unit:'분'},
+  {key:'inbox.alert_limit',screen:'📥 문의함 기준',label:'네이버 광고 알림 카드에 불러오는 알림 건수',where:'문의함 위쪽 「네이버 광고 알림」 카드(원장·매니저) — 아직 처리 안 한 알림을 최근 몇 건까지 불러올지',def:'20',kind:'int',min:5,max:100,unit:'건'},
+  {key:'consult.page_size',screen:'🗂 상담일지 기준',label:'상담 기록 목록 한 쪽에 보이는 건수',where:'상담일지 — 목록 한 쪽에 상담 기록을 몇 건씩 보여 줄지',def:'20',kind:'int',min:10,max:100,unit:'건'},
+  {key:'consult.action_limit',screen:'🗂 상담일지 기준',label:'「오늘·기한 지남」 목록에 보이는 건수',where:'상담일지 — 「오늘·기한 지남」 표에 몇 건까지 보여 줄지(꽉 차면 표 아래에 「최대 N건 표시 중임」 글이 떠요)',def:'100',kind:'int',min:20,max:300,unit:'건'}
 ];
 function hubSettingDefByKey(key){
   for(let i=0;i<HUB_SETTING_DEFS.length;i++)if(HUB_SETTING_DEFS[i].key===key)return HUB_SETTING_DEFS[i];
@@ -907,7 +1077,23 @@ const HUB_LIST_DEFS=[
   {key:'list.calendar_kinds',screen:'📅 캘린더',label:'일정 종류 이름',addable:false,
    where:'캘린더 › 일정 추가 줄(실장·원장)의 종류 고르는 칸 · 일정 위에 마우스를 올렸을 때 나오는 종류 글',
    note:'일정 종류는 서버가 허락하는 3가지(이벤트·단축근무·면접)로 정해져 있어서 코드는 못 바꾸고 새 종류도 못 늘려요. 보이는 이름만 고칠 수 있어요.',
-   def:[{code:'이벤트',label:'이벤트'},{code:'단축근무',label:'단축근무'},{code:'면접',label:'면접'}]}
+   def:[{code:'이벤트',label:'이벤트'},{code:'단축근무',label:'단축근무'},{code:'면접',label:'면접'}]},
+  {key:'list.inquiry_sources',screen:'📥 문의함',label:'문의 출처 이름',addable:false,
+   where:'문의함 › 목록 맨 위 「출처」 고르는 칸 · 문의 목록 한 줄의 출처 글 · 문의 상세 맨 위 줄 · 「빠른 수기 접수」의 출처 고르는 칸(전화·수기·기타)',
+   note:'문의 출처는 서버가 허락하는 8가지로 정해져 있고 자동 접수 연결도 이 코드로 움직여서 코드는 못 바꾸고 새 출처도 못 늘려요. 보이는 이름만 고칠 수 있어요.',
+   def:[{code:'daangn',label:'당근'},{code:'kakao',label:'카카오'},{code:'naver_email',label:'네이버메일'},{code:'naver_talktalk',label:'네이버 톡톡'},{code:'homepage',label:'홈페이지'},{code:'phone',label:'전화'},{code:'manual',label:'수기'},{code:'other',label:'기타'}]},
+  {key:'list.inquiry_status',screen:'📥 문의함',label:'문의 상태 이름',addable:false,
+   where:'문의함 › 목록 맨 위 「상태」 고르는 칸 · 문의 목록의 상태 표시 · 문의 상세의 상태 고르는 칸 · 카카오 예약 상세 맨 위 줄',
+   note:'문의 상태는 서버가 허락하는 7가지로 정해져 있고 문의 처리 흐름(새 문의 → 진행중 → 리콜 → 종결, 상담일지 전환)이 이 코드로 움직여서 코드는 못 바꾸고 새 상태도 못 늘려요. 보이는 이름만 고칠 수 있어요. 이름을 고치면 목록·필터·상세 어디서든 그 이름으로 보이고, 안 고치면 지금처럼(필터·목록은 NEW(미처리)·진행중·종결, 상세 고르는 칸은 신규·확인 중·완료)으로 보여요. 목록 맨 위 건수 줄과 풀이 글은 📝 글 고치기에서 따로 고쳐요.',
+   def:[{code:'new',label:'NEW(미처리)'},{code:'in_progress',label:'진행중'},{code:'recall_1',label:'리콜 1차'},{code:'recall_2',label:'리콜 2차'},{code:'recall_3',label:'리콜 3차'},{code:'closed',label:'종결'},{code:'converted',label:'상담일지 전환'}]},
+  {key:'list.consult_kinds',screen:'🗂 상담일지',label:'상담 구분 이름',addable:false,
+   where:'상담일지 › 검색의 「전체 상담 구분」 고르는 칸 · 새 기록의 「상담 구분」 고르는 칸 · 목록 표의 구분 글',
+   note:'상담 구분은 원본 엑셀의 시트 이름 6가지로 정해져 있고 서버가 이 값만 저장하며 시트별 추가 칸도 이 구분으로 움직여서 코드는 못 바꾸고 새 구분도 못 늘려요. 보이는 이름만 고칠 수 있어요. 이미 저장된 기록은 그대로예요.',
+   def:[{code:'교정',label:'교정'},{code:'확정',label:'확정'},{code:'미확정 및 부분확정',label:'미확정 및 부분확정'},{code:'홈페이지',label:'홈페이지'},{code:'카카오,네이버예약,당근',label:'카카오,네이버예약,당근'},{code:'원본',label:'원본'}]},
+  {key:'list.consult_status',screen:'🗂 상담일지',label:'상담 상태 이름',addable:false,
+   where:'상담일지 › 검색의 「전체 상태」 고르는 칸 · 새 기록의 「상태」 고르는 칸 · 목록 표의 상태 글',
+   note:'상담 상태는 서버가 허락하는 5가지로 정해져 있고 목록의 색깔(확정=초록·종결=노랑)도 이 코드로 정해서 코드는 못 바꾸고 새 상태도 못 늘려요. 보이는 이름만 고칠 수 있어요. 이미 저장된 기록은 그대로예요.',
+   def:[{code:'대기',label:'대기'},{code:'미확정',label:'미확정'},{code:'부분확정',label:'부분확정'},{code:'확정',label:'확정'},{code:'종결',label:'종결'}]}
 ];
 // 카드 목록(app_settings의 JSON). 기본 카드는 hr.html의 workDocuments와 같아야 한다(시험이 대조).
 const HUB_CARD_DEFS=[

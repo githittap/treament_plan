@@ -101,7 +101,7 @@ test('숫자·목록 기본값: 연차·소명 숫자 5개와 연차 유형·근
   assert.match(hr,/<select id="lvType"><option>연차<\/option><option>반차<\/option><option>조퇴<\/option><option>기타<\/option><\/select>/,'신청 창 기본 선택칸(기존 시험이 이 줄을 찾음)');
   assert.equal(L('list.work_depts').addable,false);assert.equal(L('list.leave_types').addable,false);
   assert.ok(S('leave.same_day_limit').where.includes('DB에는 없어요'));
-  assert.match(hr,/hub-texts\.js\?v=2026100110/,'캐시 번호를 새 값으로 올림(차례 4에서 2026100109 → 2026100110)');
+  assert.match(hr,/hub-texts\.js\?v=2026100111/,'캐시 번호를 새 값으로 올림(차례 4에서 2026100109 → 2026100110, 차례 5에서 → 2026100111)');
 });
 
 /* ───────────── 2. 기본값만 있을 때 옛 화면과 똑같음 ───────────── */
@@ -373,7 +373,7 @@ test('화면: 🔢 숫자·기준 — 연차·소명 기준 5개가 더 있고(�
   await t.render(OWNER);
   await t.click('[hub-subtab]=settings');
   const sec=t.section.innerHTML;
-  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,12+2,'근태 7 + 연차·소명 5 + 차례 4 결재 건수 2');
+  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,12+2+4,'근태 7 + 연차·소명 5 + 차례 4 결재 건수 2 + 차례 5 문의함·상담일지 4');
   assert.ok(sec.includes('🌿 연차 기준')&&sec.includes('🕘 근태 기준'));
   assert.match(sec,/id="hubSetIn_8" type="number" inputmode="numeric" min="1" max="30" value="2"/);
   assert.match(sec,/id="hubSetIn_10" type="number" inputmode="decimal" step="0\.1" min="0\.1" max="1" value="0\.5"/);
@@ -398,7 +398,7 @@ test('화면: 📋 목록에 연차 유형 이름·근무부서 이름이 있고
   await t.click('[hub-subtab]=lists');
   let sec=t.section.innerHTML;
   assert.ok(sec.includes('연차 유형 이름')&&sec.includes('근무부서 이름'));
-  assert.equal((sec.match(/<span class="hub-code">/g)||[]).length,4+6+3+4+4+7+6+3,'차례 4: 결재 종류 6 · 일정 종류 3 추가');
+  assert.equal((sec.match(/<span class="hub-code">/g)||[]).length,4+6+3+4+4+7+6+3+8+7+6+5,'차례 4: 결재 종류 6 · 일정 종류 3 추가 + 차례 5: 문의 출처 8 · 문의 상태 7 · 상담 구분 6 · 상담 상태 5');
   assert.equal((sec.match(/data-hub-list-add=/g)||[]).length,2,'새 항목을 늘릴 수 있는 목록은 직원 부서·서류 종류뿐');
   assert.match(sec,/<span class="hub-code">반차<\/span><input id="hubLstLbl_4_1" type="text" maxlength="20" value="반차"/);
   assert.match(sec,/<span class="hub-code">Dr\.<\/span><input id="hubLstLbl_5_0" type="text" maxlength="20" value="Dr\."/);
