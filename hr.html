@@ -314,36 +314,36 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 
 <!-- 결재 기안 -->
 <div class="mask" id="apMask"><div class="modal">
-  <h3>🖊 결재 올리기<button class="x" onclick="hide('apMask')">✕</button></h3>
+  <h3><span data-hubk="appr.modal.title">🖊 결재 올리기</span><button class="x" onclick="hide('apMask')">✕</button></h3>
   <div class="grid">
-    <div class="fld"><label>종류</label><select id="apKind"><option>연차 신청</option><option>사직서</option><option>재직증명서 발급</option><option>보고</option><option>소명</option><option>기타</option></select></div>
-    <div class="fld w2"><label>제목</label><input id="apTitle"></div>
-    <div class="fld w4"><label>내용</label><textarea id="apBody"></textarea></div>
+    <div class="fld"><label data-hubk="appr.modal.f_kind">종류</label><select id="apKind"><option>연차 신청</option><option>사직서</option><option>재직증명서 발급</option><option>보고</option><option>소명</option><option>기타</option></select></div>
+    <div class="fld w2"><label data-hubk="appr.modal.f_title">제목</label><input id="apTitle"></div>
+    <div class="fld w4"><label data-hubk="appr.modal.f_body">내용</label><textarea id="apBody"></textarea></div>
   </div>
-  <div class="hint">결재선: 나 → 실장 → 원장 (각 단계 도장). 재직증명서는 최종 승인 시 재직 정보를 확인해 발급되며, 필수 정보가 없으면 발급되지 않습니다.</div>
-  <button class="hbtn pri" style="margin-top:10px" onclick="submitApproval()">올리기</button>
+  <div class="hint" data-hubk="appr.modal.hint">결재선: 나 → 실장 → 원장 (각 단계 도장). 재직증명서는 최종 승인 시 재직 정보를 확인해 발급되며, 필수 정보가 없으면 발급되지 않습니다.</div>
+  <button class="hbtn pri" style="margin-top:10px" onclick="submitApproval()" data-hubk="appr.modal.btn_submit">올리기</button>
   <div class="msg" id="apMsg"></div>
 </div></div>
 
 <!-- 공지 작성 -->
 <div class="mask" id="ntMask"><div class="modal">
-  <h3>📢 공지 작성<button class="x" onclick="hide('ntMask')">✕</button></h3>
+  <h3><span data-hubk="notice.modal.title">📢 공지 작성</span><button class="x" onclick="hide('ntMask')">✕</button></h3>
   <div class="grid">
-    <div class="fld w4"><label>제목</label><input id="ntTitle"></div>
-  <div class="fld w4"><label>내용(짧게)</label><textarea id="ntBody"></textarea><div id="ntPastePreview" class="rowflex" style="margin-top:6px"></div><div class="hint">화면을 캡처한 뒤 Ctrl+V로 본문에 붙여넣을 수 있습니다.</div></div>
-    <div class="fld w4"><label>긴 글은 노션 링크(선택)</label><input id="ntUrl" placeholder="https://notion.so/..."></div>
-    <div class="fld w4"><label>업무파일 첨부</label><input id="ntFiles" type="file" multiple accept="*/*"><div class="hint">일반 문서를 허용하며 압축·실행 파일은 거부됩니다.</div></div>
-    <div class="fld"><label><input type="checkbox" id="ntPin"> 상단 고정</label></div>
+    <div class="fld w4"><label data-hubk="notice.modal.f_title">제목</label><input id="ntTitle"></div>
+  <div class="fld w4"><label data-hubk="notice.modal.f_body">내용(짧게)</label><textarea id="ntBody"></textarea><div id="ntPastePreview" class="rowflex" style="margin-top:6px"></div><div class="hint" data-hubk="notice.modal.paste_hint">화면을 캡처한 뒤 Ctrl+V로 본문에 붙여넣을 수 있습니다.</div></div>
+    <div class="fld w4"><label data-hubk="notice.modal.f_url">긴 글은 노션 링크(선택)</label><input id="ntUrl" placeholder="https://notion.so/..."></div>
+    <div class="fld w4"><label data-hubk="notice.modal.f_files">업무파일 첨부</label><input id="ntFiles" type="file" multiple accept="*/*"><div class="hint" data-hubk="notice.modal.files_hint">일반 문서를 허용하며 압축·실행 파일은 거부됩니다.</div></div>
+    <div class="fld"><label><input type="checkbox" id="ntPin"> <span data-hubk="notice.modal.f_pin">상단 고정</span></label></div>
   </div>
-  <button class="hbtn pri" style="margin-top:10px" onclick="submitNotice()">게시</button>
+  <button class="hbtn pri" style="margin-top:10px" onclick="submitNotice()" data-hubk="notice.modal.btn_submit">게시</button>
   <div class="msg" id="ntMsg"></div>
 </div></div>
 
 <div class="mask" id="certificateMask"><div class="modal wide">
-  <h3>📄 재직증명서 <button class="hbtn mini" onclick="downloadEmploymentCertificate()">⬇️ 발급본 다운로드</button><button class="hbtn mini" onclick="printEmploymentCertificate()">🖨️ 인쇄·PDF 저장</button><button class="x" onclick="hide('certificateMask')">✕</button></h3>
+  <h3><span data-hubk="appr.cert.title">📄 재직증명서</span> <button class="hbtn mini" onclick="downloadEmploymentCertificate()" data-hubk="appr.cert.btn_download">⬇️ 발급본 다운로드</button><button class="hbtn mini" onclick="printEmploymentCertificate()" data-hubk="appr.cert.btn_print">🖨️ 인쇄·PDF 저장</button><button class="x" onclick="hide('certificateMask')">✕</button></h3>
   <div id="certificateBody"></div>
 </div></div>
-<div class="mask" id="noticePreviewMask"><div class="modal wide"><h3>📎 첨부 미리보기<button class="x" onclick="hide('noticePreviewMask')">✕</button></h3><div id="noticePreviewBody"></div></div></div>
+<div class="mask" id="noticePreviewMask"><div class="modal wide"><h3><span data-hubk="notice.preview.title">📎 첨부 미리보기</span><button class="x" onclick="hide('noticePreviewMask')">✕</button></h3><div id="noticePreviewBody"></div></div></div>
 
 <!-- 엑셀 미리보기 -->
 <div class="mask" id="xlMask"><div class="modal wide">
@@ -377,7 +377,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 
 <footer>© 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지</footer>
 
-<script src="hub-texts.js?v=2026100109"></script>
+<script src="hub-texts.js?v=2026100110"></script>
 <script>
 /* ═══════ 설정 ═══════
    실제 값은 DB의 app_settings 표에서 읽어옵니다.
@@ -393,6 +393,10 @@ let SETTINGS = {
 /* 허브 설정의 숫자 읽기·화면 속 고정 글 바꿔 넣기 도우미(hub-texts.js가 없으면 기본값 그대로) */
 function hubN(k,d){return typeof hubSettingChecked==='function'?hubSettingChecked(k,d):d;}
 function hubStaticFill(){try{if(typeof hubText!=='function'||typeof document==='undefined')return;document.querySelectorAll('[data-hubk]').forEach(function(el){if(el.dataset.hubd===undefined)el.dataset.hubd=el.textContent;el.textContent=hubText(el.getAttribute('data-hubk'),el.dataset.hubd);});document.querySelectorAll('[data-hubph]').forEach(function(el){if(el.dataset.hubpd===undefined)el.dataset.hubpd=el.getAttribute('placeholder')||'';el.setAttribute('placeholder',hubText(el.getAttribute('data-hubph'),el.dataset.hubpd));});}catch(e){}}
+/* 동적으로 그리는 HTML 속 글(차례 4): 요소에 data-hubk="키"를 달아 두면 표에 값이 있을 때만 그 글로 바꾸고 표지는 지운다(값이 없으면 옛 HTML과 한 글자도 다르지 않음) */
+function hubFillHtml(h){const s=String(h);if(typeof hubText!=='function')return s.replace(/ data-hubk="[a-z0-9_.]+"/g,'');return s.replace(/(<[a-z0-9]+\b[^>]*?) data-hubk="([a-z0-9_.]+)"([^>]*>)([^<]*)/g,function(m,a,k,b,t){const v=hubText(k,t);return a+b+(v===t?t:esc(v));});}
+/* 선택칸 항목 한 줄: 이름을 안 고쳤으면 옛 HTML 그대로(<option>이름</option>), 고쳤으면 값은 코드·글은 새 이름 */
+function hubOptionHtml(code,label){return label===code?'<option>'+esc(code)+'</option>':'<option value="'+esc(code)+'">'+esc(label)+'</option>';}
 /* hub-texts.js(원장이 고치는 허브 글·목록)를 못 불러와도 화면은 코드의 기본 글 그대로 나오게 하는 대비책 */
 if(typeof window.hubText!=='function'){
   window.hubText=function(k,d,v){return v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d);};
@@ -437,7 +441,7 @@ const NOTICE_BLOCKED_EXT=/\.(exe|msi|bat|cmd|com|scr|js|vbs|ps1|sh|jar|dll|dmg|i
 const NOTICE_BLOCKED_TYPES=new Set(['application/x-msdownload','application/x-msdos-program','application/x-7z-compressed','application/zip','application/x-rar-compressed','application/vnd.rar','application/gzip','application/x-gzip','application/x-bzip2','application/x-xz','application/x-tar','application/x-sh','text/javascript','application/javascript','application/x-javascript','application/java-archive']);
 function isAllowedNoticeAttachment(file){return !!file&&file.size>0&&file.size<=NOTICE_ATTACHMENT_MAX_BYTES&&!NOTICE_BLOCKED_EXT.test(String(file.name||''))&&!NOTICE_BLOCKED_TYPES.has(String(file.type||''));}
 let NOTICE_PASTED_IMAGES=[];
-function renderNoticePastePreview(){const box=$('#ntPastePreview');if(!box)return;box.innerHTML=NOTICE_PASTED_IMAGES.map((file,i)=>`<span class="sub">📷 ${esc(file.name||'캡처 이미지 '+(i+1))}</span>`).join(' ');}
+function renderNoticePastePreview(){const box=$('#ntPastePreview');if(!box)return;box.innerHTML=NOTICE_PASTED_IMAGES.map((file,i)=>`<span class="sub">📷 ${esc(file.name||hubT('notice.capture_name','캡처 이미지 {n}',{n:i+1}))}</span>`).join(' ');}
 function handleNoticePaste(event){const items=[...(event.clipboardData?.items||[])],images=items.filter(item=>item.kind==='file'&&String(item.type||'').startsWith('image/')).map(item=>item.getAsFile()).filter(Boolean);if(!images.length)return;event.preventDefault();NOTICE_PASTED_IMAGES.push(...images);renderNoticePastePreview();}
 function bindNoticePaste(input){if(!input||input.dataset.noticePasteBound)return;input.addEventListener('paste',handleNoticePaste);input.dataset.noticePasteBound='true';}
 bindNoticePaste($('#ntBody'));
@@ -827,7 +831,7 @@ async function refreshBadges(){
 
 /* ── 렌더 라우터 ── */
 async function render(){
-  const m=$('#main');m.innerHTML='<div class="empty">불러오는 중…</div>';hubStaticFill();
+  const m=$('#main');m.innerHTML='<div class="empty">불러오는 중…</div>';hubStaticFill();apprKindSelectFill();
   try{
     if(TAB==='home')await renderHome(m);
     else if(TAB==='ai'){if(window.AIAssistants)await window.AIAssistants.render(m,{sb,me:ME});else m.innerHTML='<div class="card"><div class="empty">AI 도우미를 불러오지 못했습니다. 새로고침해 주세요.</div></div>';}
@@ -1569,7 +1573,7 @@ async function applyLeaveAccrual(){
 function hubT(k,d,v){return typeof hubText==='function'?hubText(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
 /* ── 결재함 ── */
 async function renderAppr(m){
-  const {data:mine}=await sb.from('approval_docs').select('*').eq('author',ME.id).order('created_at',{ascending:false}).limit(20);
+  const {data:mine}=await sb.from('approval_docs').select('*').eq('author',ME.id).order('created_at',{ascending:false}).limit(hubN('appr.my_list_limit',20));
   const {data:issued}=await sb.from('employment_certificates').select('id,approval_doc_id');
   const issuedByDoc=new Map((issued||[]).map(row=>[row.approval_doc_id,row.id]));
   let inbox='';
@@ -1579,29 +1583,29 @@ async function renderAppr(m){
     const ids=[...new Set((steps||[]).map(s=>s.doc_id))];
     let docs=[];
     if(ids.length){const {data:d}=await sb.from('approval_docs').select('*').in('id',ids).eq('status','진행');docs=d||[];}
-    inbox=`<div class="card"><h2>📥 내 결재 대기</h2>${docs.length?docs.map(d=>docCard(d,true,issuedByDoc)).join(''):'<div class="empty">대기 없음</div>'}</div>`;
-    const {data:completed}=await sb.from('approval_docs').select('*').in('status',['완결','취소']).order('created_at',{ascending:false}).limit(50);
-    archive=`<div class="card"><h2>🗂 완결된 결재 문서</h2>${(completed||[]).length?(completed||[]).map(d=>`<div>${docCard(d,false,issuedByDoc)}${d.status==='완결'&&!issuedByDoc.has(d.id)?`<div style="margin:-4px 0 10px"><button class="mini rej" onclick="cancelApprovalDoc(${d.id})">취소</button></div>`:''}</div>`).join(''):'<div class="empty">없음</div>'}</div>`;
+    inbox=`<div class="card"><h2>${esc(hubT('appr.inbox.title','📥 내 결재 대기'))}</h2>${docs.length?docs.map(d=>docCard(d,true,issuedByDoc)).join(''):'<div class="empty">'+esc(hubT('appr.inbox.empty','대기 없음'))+'</div>'}</div>`;
+    const {data:completed}=await sb.from('approval_docs').select('*').in('status',['완결','취소']).order('created_at',{ascending:false}).limit(hubN('appr.done_list_limit',50));
+    archive=`<div class="card"><h2>${esc(hubT('appr.archive.title','🗂 완결된 결재 문서'))}</h2>${(completed||[]).length?(completed||[]).map(d=>`<div>${docCard(d,false,issuedByDoc)}${d.status==='완결'&&!issuedByDoc.has(d.id)?`<div style="margin:-4px 0 10px"><button class="mini rej" onclick="cancelApprovalDoc(${d.id})">${esc(hubT('appr.btn_cancel','취소'))}</button></div>`:''}</div>`).join(''):'<div class="empty">'+esc(hubT('appr.archive.empty','없음'))+'</div>'}</div>`;
   }
-  m.innerHTML=`<div class="card"><h2>🖊 결재</h2><p class="hint">직원은 문서를 올리고 진행 상태를 확인합니다. 실장은 올라온 문서를 먼저 검토하고, 원장이 최종 결재합니다.</p><button class="hbtn pri" onclick="show('apMask');$('#apMsg').textContent='';">결재 올리기</button></div>
+  m.innerHTML=`<div class="card"><h2>${esc(hubT('appr.title','🖊 결재'))}</h2><p class="hint">${esc(hubT('appr.hint','직원은 문서를 올리고 진행 상태를 확인합니다. 실장은 올라온 문서를 먼저 검토하고, 원장이 최종 결재합니다.'))}</p><button class="hbtn pri" onclick="show('apMask');$('#apMsg').textContent='';">${esc(hubT('appr.btn_new','결재 올리기'))}</button></div>
   ${inbox}
   ${archive}
-  <div class="card"><h2>📄 내가 올린 문서</h2>${(mine||[]).length?(mine||[]).map(d=>docCard(d,false,issuedByDoc)).join(''):'<div class="empty">없음</div>'}</div>`;
+  <div class="card"><h2>${esc(hubT('appr.mine.title','📄 내가 올린 문서'))}</h2>${(mine||[]).length?(mine||[]).map(d=>docCard(d,false,issuedByDoc)).join(''):'<div class="empty">'+esc(hubT('appr.mine.empty','없음'))+'</div>'}</div>`;
 }
 function docCard(d,actable,issuedByDoc=new Map()){
   const st=d.status==='완결'?'ok':(['반려','취소'].includes(d.status)?'no':'wait');
   return `<div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px">
-    <b>[${esc(d.kind)}] ${esc(d.title)}</b> <span class="b ${st}">${esc(d.status)}</span> <span class="sub">${md(d.created_at)} · ${esc(nameOf(d.author))}</span>
+    <b>[${esc(approvalKindDisplay(d))}] ${esc(d.title)}</b> <span class="b ${st}">${esc(d.status)}</span> <span class="sub">${md(d.created_at)} · ${esc(nameOf(d.author))}</span>
     <div class="sub" style="margin:4px 0;white-space:pre-wrap">${esc(d.body||'')}</div>
     <div id="steps-${d.id}" class="sub">…</div>
-    ${issuedByDoc.has(d.id)?`<button class="mini" onclick="openEmploymentCertificate(${issuedByDoc.get(d.id)})">발급본 열기</button>`:''}
-    ${actable?`<div style="margin-top:6px"><button class="mini stamp" onclick="apprAct(${d.id},'ok')">🔴 도장(승인)</button> <button class="mini rej" onclick="apprAct(${d.id},'rej')">반려</button></div>`:''}
+    ${issuedByDoc.has(d.id)?`<button class="mini" onclick="openEmploymentCertificate(${issuedByDoc.get(d.id)})">${esc(hubT('appr.card.open_cert','발급본 열기'))}</button>`:''}
+    ${actable?`<div style="margin-top:6px"><button class="mini stamp" onclick="apprAct(${d.id},'ok')">${esc(hubT('appr.card.btn_ok','🔴 도장(승인)'))}</button> <button class="mini rej" onclick="apprAct(${d.id},'rej')">${esc(hubT('appr.card.btn_rej','반려'))}</button></div>`:''}
   </div>`;
 }
 async function cancelApprovalDoc(docId){
   const {data:d}=await sb.from('approval_docs').select('*').eq('id',docId).single();
-  if(!d||d.status!=='완결'){alert('취소할 수 없는 상태입니다.');return;}
-  if(!confirm(`[${d.kind}] ${d.title} 문서의 완결 처리를 취소합니다. 계속하시겠습니까?`))return;
+  if(!d||d.status!=='완결'){alert(hubT('appr.m_cancel_state','취소할 수 없는 상태입니다.'));return;}
+  if(!confirm(hubT('appr.cancel.confirm','[{kind}] {title} 문서의 완결 처리를 취소합니다. 계속하시겠습니까?',{kind:approvalKindDisplay(d),title:d.title})))return;
   await sb.from('approval_docs').update({status:'취소',cancelled_by:ME.name,cancelled_at:new Date().toISOString()}).eq('id',docId);
   setStatus('saved');render();refreshBadges();
 }
@@ -1609,20 +1613,20 @@ async function loadSteps(){
   document.querySelectorAll('[id^="steps-"]').forEach(async el=>{
     const id=el.id.split('-')[1];
     const {data}=await sb.from('approval_steps').select('*').eq('doc_id',id).order('seq');
-    el.innerHTML='결재선: '+(data||[]).map(s=>`${s.approver_role==='chief'?'실장':'원장'} ${s.status==='승인'?'🔴':(s.status==='반려'?'✖':'⬜')}`).join(' → ');
+    el.innerHTML=esc(hubT('appr.steps.label','결재선:'))+' '+(data||[]).map(s=>`${s.approver_role==='chief'?esc(hubT('appr.steps.chief','실장')):esc(hubT('appr.steps.owner','원장'))} ${s.status==='승인'?'🔴':(s.status==='반려'?'✖':'⬜')}`).join(' → ');
   });
 }
 async function apprAct(docId,act){
   const {data:requested,error:requestError}=await sb.from('approval_docs').select('kind,title,body').eq('id',docId).maybeSingle();
-  if(requestError||!requested){alert('결재 요청을 확인하지 못했습니다.');return;}
+  if(requestError||!requested){alert(hubT('appr.act.m_req_fail','결재 요청을 확인하지 못했습니다.'));return;}
   if(act==='ok'&&ME.role==='owner'&&isEmploymentCertificateRequest(requested)){
     const {error}=await sb.rpc('issue_employment_certificate',{p_doc_id:docId});
-    if(error){alert('재직증명서 발급 실패: '+error.message);return;}
+    if(error){alert(hubT('appr.act.m_cert_fail','재직증명서 발급 실패: {msg}',{msg:error.message}));return;}
     setStatus('saved');render();refreshBadges();return;
   }
   const {data:steps}=await sb.from('approval_steps').select('*').eq('doc_id',docId).order('seq');
   const cur=(steps||[]).find(s=>s.status==='대기'&&s.approver_role===ME.role);
-  if(!cur){alert('현재 단계가 아닙니다.');return;}
+  if(!cur){alert(hubT('appr.act.m_no_step','현재 단계가 아닙니다.'));return;}
   if(act==='rej'){await sb.from('approval_steps').update({status:'반려',approver_id:ME.id,acted_at:new Date().toISOString()}).eq('id',cur.id);
     await sb.from('approval_docs').update({status:'반려'}).eq('id',docId);}
   else{await sb.from('approval_steps').update({status:'승인',approver_id:ME.id,stamp:ME.stamp||ME.name,acted_at:new Date().toISOString()}).eq('id',cur.id);
@@ -1632,11 +1636,11 @@ async function apprAct(docId,act){
 }
 async function submitApproval(){
   const label=$('#apKind').value,title=$('#apTitle').value.trim();
-  if(!title){$('#apMsg').textContent='제목을 입력하세요.';return;}
+  if(!title){$('#apMsg').textContent=hubT('appr.m_title_required','제목을 입력하세요.');return;}
   if(label==='연차 신청'){hide('apMask');openLeave();return;}
   const kind=approvalKindValue(label),storedTitle=approvalRequestTitle(label,title),storedBody=approvalRequestBody(label,$('#apBody').value);
   const {data:doc,error}=await sb.from('approval_docs').insert({kind,title:storedTitle,body:storedBody,author:ME.id}).select().single();
-  if(error){$('#apMsg').textContent='실패: '+error.message;return;}
+  if(error){$('#apMsg').textContent=hubT('appr.m_fail','실패: {msg}',{msg:error.message});return;}
   await sb.from('approval_steps').insert([{doc_id:doc.id,seq:1,approver_role:'chief'},{doc_id:doc.id,seq:2,approver_role:'owner'}]);
   hide('apMask');$('#apTitle').value='';$('#apBody').value='';setStatus('saved');render();
 }
@@ -1649,7 +1653,7 @@ function approvalRequestBody(label,body){return label==='재직증명서 발급'
 function isEmploymentCertificateRequest(doc){return doc?.kind==='기타'&&doc.title?.startsWith('[재직증명서 발급] ')&&doc.body?.startsWith('[재직증명서 발급 요청]');}
 async function openEmploymentCertificate(id){
   const {data:r,error}=await sb.from('employment_certificates').select('*').eq('id',id).maybeSingle();
-  if(error||!r?.issued_html){alert('보관된 발급본을 열 수 없습니다.');return;}
+  if(error||!r?.issued_html){alert(hubT('appr.cert.m_no_html','보관된 발급본을 열 수 없습니다.'));return;}
   $('#certificateBody').innerHTML=r.issued_html;
   window.CURRENT_EMPLOYMENT_CERTIFICATE={id:r.id,html:r.issued_html};
   show('certificateMask');
@@ -1664,6 +1668,9 @@ function downloadEmploymentCertificate(){
 }
 function printEmploymentCertificate(){document.body.classList.add('certificate-printing');const done=()=>{document.body.classList.remove('certificate-printing');window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);window.print();}
 /* approval-request:test-end */
+function approvalKindItems(){const def=[{code:'연차 신청',label:'연차 신청'},{code:'사직서',label:'사직서'},{code:'재직증명서 발급',label:'재직증명서 발급'},{code:'보고',label:'보고'},{code:'소명',label:'소명'},{code:'기타',label:'기타'}];if(typeof hubList!=='function')return def;const codes=new Set(def.map(d=>d.code));return hubList('list.approval_kinds',def).filter(i=>codes.has(i.code));} /* 결재 종류 이름: 허브 설정 › 목록에서 이름만 고침(코드는 저장 규칙·재직증명서 발급 흐름과 묶여 고정, 새 종류 못 늘림) */
+function approvalKindDisplay(doc){const kind=String(doc&&doc.kind!=null?doc.kind:'');let code=null;if(kind==='기타')code=isEmploymentCertificateRequest(doc)?'재직증명서 발급':'기타';else for(const c in APPROVAL_KIND_VALUES){if(APPROVAL_KIND_VALUES[c]===kind&&c!=='재직증명서 발급'){code=c;break;}}const it=code?approvalKindItems().find(i=>i.code===code):null;return it&&it.label!==code?it.label:kind;} /* 문서 카드의 [종류]: 원장이 이름을 고친 종류만 새 이름, 안 고쳤으면 저장된 종류 그대로(옛 화면과 같음) */
+function apprKindSelectFill(){try{const sel=$('#apKind');if(!sel)return;const items=approvalKindItems(),want=items.map(i=>i.code+'|'+i.label).join('\n'),have=Array.from(sel.options||[]).map(o=>o.value+'|'+o.textContent).join('\n');if(want===have)return;const cur=sel.value;sel.innerHTML=items.map(i=>hubOptionHtml(i.code,i.label)).join('');if(items.some(i=>i.code===cur))sel.value=cur;}catch(e){}} /* 결재 올리기 창의 종류 고르는 칸: 값은 코드, 글은 허브 설정의 이름 */
 /* ── 공지 ── */
 let NOTICE_INLINE_OBJECT_URLS=[];
 function revokeNoticeInlineObjectUrls(){for(const url of NOTICE_INLINE_OBJECT_URLS.splice(0))URL.revokeObjectURL(url);}
@@ -1685,29 +1692,29 @@ async function renderNotice(m){
   const {data:list}=await sb.from('notices').select('*').order('pinned',{ascending:false}).order('created_at',{ascending:false});
   const rows=await Promise.all((list||[]).map(async n=>`<div style="padding:8px 0;border-bottom:1px dashed var(--line)">
       ${n.pinned?'📌 ':''}<b>${esc(n.title)}</b> <span class="sub">${md(n.created_at)} · ${esc(n.author||'')}</span>
-      ${n.notion_url?` · <a href="${esc(n.notion_url)}" target="_blank" rel="noopener">전문 ↗</a>`:''}
+      ${n.notion_url?` · <a href="${esc(n.notion_url)}" target="_blank" rel="noopener">${esc(hubT('notice.link_full','전문 ↗'))}</a>`:''}
       <div class="sub" style="white-space:pre-wrap">${await renderNoticeBody(n.body,n.attachments)}</div>${noticeAttachmentLinks(n)}
-      ${isLead()?`<button class="mini rej" style="margin-top:4px" onclick="delNotice(${n.id})">삭제</button>`:''}</div>`));
-  m.innerHTML=`<div class="card"><h2>📢 공지</h2><button class="hbtn pri" onclick="show('ntMask')">공지 작성</button>
-    ${(list||[]).length?rows.join(''):'<div class="empty">공지 없음</div>'}
+      ${isLead()?`<button class="mini rej" style="margin-top:4px" onclick="delNotice(${n.id})">${esc(hubT('notice.btn_del','삭제'))}</button>`:''}</div>`));
+  m.innerHTML=`<div class="card"><h2>${esc(hubT('notice.title','📢 공지'))}</h2><button class="hbtn pri" onclick="show('ntMask')">${esc(hubT('notice.btn_new','공지 작성'))}</button>
+    ${(list||[]).length?rows.join(''):'<div class="empty">'+esc(hubT('notice.empty','공지 없음'))+'</div>'}
   </div>`;
   for(const n of (list||[])) sb.from('notice_reads').upsert({notice_id:n.id,user_id:ME.id},{onConflict:'notice_id,user_id',ignoreDuplicates:true}).then(()=>{});
   refreshBadges();
 }
-function noticeAttachmentLinks(notice){const attachments=Array.isArray(notice.attachments)?notice.attachments:[];if(!attachments.length)return '<div class="sub">첨부 없음</div>';return `<div class="sub">첨부: ${attachments.map(a=>`<button class="mini" data-notice-attachment-path="${esc(a.path||'')}" data-notice-attachment-name="${esc(a.name||'첨부파일')}" data-notice-attachment-type="${esc(a.type||'')}" onclick="previewNoticeAttachment(this.dataset.noticeAttachmentPath,this.dataset.noticeAttachmentName,this.dataset.noticeAttachmentType)">${esc(a.name||'첨부파일')}</button>`).join(' ')}</div>`;}
-function documentPreviewMarkup(url,name,type){if(String(type||'').startsWith('image/'))return `<img src="${url}" alt="${esc(name)}" style="max-width:100%;max-height:70vh;display:block;margin:auto">`;if(type==='application/pdf'||/\.pdf$/i.test(name||''))return `<iframe title="${esc(name)}" src="${url}" style="width:100%;height:70vh;border:1px solid var(--line);background:#fff"></iframe>`;return `<div class="empty">이 형식은 미리보기를 지원하지 않습니다. 다운로드하여 확인하세요.</div>`;}
-async function previewNoticeAttachment(path,name,type){if(!path)return;const {data,error}=await sb.storage.from('notice-attachments').download(path);if(error){alert('첨부 열기 실패: '+error.message);return;}const url=URL.createObjectURL(data),box=$('#noticePreviewBody');if(box){box.innerHTML=documentPreviewMarkup(url,name,type||data.type);box.style.display='block';show('noticePreviewMask');}setTimeout(()=>URL.revokeObjectURL(url),60000);}
+function noticeAttachmentLinks(notice){const attachments=Array.isArray(notice.attachments)?notice.attachments:[];if(!attachments.length)return '<div class="sub">'+esc(hubT('notice.attach_none','첨부 없음'))+'</div>';return `<div class="sub">${esc(hubT('notice.attach_label','첨부:'))} ${attachments.map(a=>`<button class="mini" data-notice-attachment-path="${esc(a.path||'')}" data-notice-attachment-name="${esc(a.name||hubT('notice.attach_default_name','첨부파일'))}" data-notice-attachment-type="${esc(a.type||'')}" onclick="previewNoticeAttachment(this.dataset.noticeAttachmentPath,this.dataset.noticeAttachmentName,this.dataset.noticeAttachmentType)">${esc(a.name||hubT('notice.attach_default_name','첨부파일'))}</button>`).join(' ')}</div>`;}
+function documentPreviewMarkup(url,name,type){if(String(type||'').startsWith('image/'))return `<img src="${url}" alt="${esc(name)}" style="max-width:100%;max-height:70vh;display:block;margin:auto">`;if(type==='application/pdf'||/\.pdf$/i.test(name||''))return `<iframe title="${esc(name)}" src="${url}" style="width:100%;height:70vh;border:1px solid var(--line);background:#fff"></iframe>`;return `<div class="empty">${esc(hubT('notice.preview_unsupported','이 형식은 미리보기를 지원하지 않습니다. 다운로드하여 확인하세요.'))}</div>`;}
+async function previewNoticeAttachment(path,name,type){if(!path)return;const {data,error}=await sb.storage.from('notice-attachments').download(path);if(error){alert(hubT('notice.m_open_fail','첨부 열기 실패: {msg}',{msg:error.message}));return;}const url=URL.createObjectURL(data),box=$('#noticePreviewBody');if(box){box.innerHTML=documentPreviewMarkup(url,name,type||data.type);box.style.display='block';show('noticePreviewMask');}setTimeout(()=>URL.revokeObjectURL(url),60000);}
 async function downloadNoticeAttachment(path,name){return previewNoticeAttachment(path,name,'');}
 async function cleanupNoticeUploads(paths){if(paths.length)await sb.storage.from('notice-attachments').remove(paths);}
 async function submitNotice(){
-  const title=$('#ntTitle').value.trim();if(!title){$('#ntMsg').textContent='제목을 입력하세요.';return;}
-  const selectedFiles=[...($('#ntFiles').files||[])],pastedFiles=[...NOTICE_PASTED_IMAGES],files=[...selectedFiles,...pastedFiles];if(files.some(f=>!isAllowedNoticeAttachment(f))){$('#ntMsg').textContent='허용되지 않은 파일 형식 또는 10MB 초과 파일이 있습니다.';return;}
+  const title=$('#ntTitle').value.trim();if(!title){$('#ntMsg').textContent=hubT('notice.m_title_required','제목을 입력하세요.');return;}
+  const selectedFiles=[...($('#ntFiles').files||[])],pastedFiles=[...NOTICE_PASTED_IMAGES],files=[...selectedFiles,...pastedFiles];if(files.some(f=>!isAllowedNoticeAttachment(f))){$('#ntMsg').textContent=hubT('notice.m_bad_file','허용되지 않은 파일 형식 또는 10MB 초과 파일이 있습니다.');return;}
   const attachments=[],uploaded=[],inlineMarkers=[];for(const file of files){const name=file.name||`capture-${Date.now()}.png`,path=`${ME.id}/tmp/${crypto.randomUUID()}-${name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;const {error}=await sb.storage.from('notice-attachments').upload(path,file,{contentType:file.type,upsert:false});if(error){await cleanupNoticeUploads(uploaded);$('#ntMsg').textContent='첨부 실패: '+error.message;return;}uploaded.push(path);attachments.push({path,name,type:file.type,size:file.size});if(pastedFiles.includes(file))inlineMarkers.push(`[[notice-image:${path}]]`);}
   const body=[String($('#ntBody').value||''),...inlineMarkers].filter(Boolean).join('\n');
   const {error}=await sb.from('notices').insert({title,body,notion_url:$('#ntUrl').value||null,pinned:$('#ntPin').checked,author_id:ME.id,attachments});if(error){await cleanupNoticeUploads(uploaded);$('#ntMsg').textContent='공지 저장 실패: '+error.message;return;}
   hide('ntMask');$('#ntTitle').value='';$('#ntBody').value='';$('#ntUrl').value='';$('#ntFiles').value='';$('#ntPin').checked=false;NOTICE_PASTED_IMAGES=[];renderNoticePastePreview();setStatus('saved');render();
 }
-async function delNotice(id){if(!confirm('삭제할까요?'))return;await sb.from('notices').delete().eq('id',id);setStatus('saved');render();}
+async function delNotice(id){if(!confirm(hubT('notice.del.confirm','삭제할까요?')))return;await sb.from('notices').delete().eq('id',id);setStatus('saved');render();}
 
 /* ── 업무자료 ── */
 /* work-documents:test-start */
@@ -1763,6 +1770,7 @@ function renderWorkDocuments(m){
 }
 /* work-documents:render-end */
 /* ── 캘린더 ── */
+function hubT(k,d,v){return typeof hubText==='function'?hubText(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
 let CAL_MONTH=null,CAL_VIEW='all',CAL_PERIOD='week',CAL_WEEK_START=null,CAL_SELECTED_DATE=null,CAL_DETAIL_DATE=null;
 function setCalendarView(view){CAL_VIEW=view;CAL_DETAIL_DATE=null;render();}
 function calendarAddDays(date,amount){const d=new Date(date+'T00:00:00');d.setDate(d.getDate()+amount);return dstr(d);}
@@ -1780,7 +1788,7 @@ function calendarDepartmentGroups(roster){
 function calendarRosterTag(label,names,kind){
   if(!names.length)return '';
   const detail=names.join(', ');
-  return `<span class="cal-tag ${kind} cal-roster"><span class="cal-summary">${esc(label)} ${names.length}명</span><span class="cal-names" title="${esc(label)}: ${esc(detail)}">${esc(detail)}</span></span>`;
+  return `<span class="cal-tag ${kind} cal-roster"><span class="cal-summary">${esc(hubT('cal.roster_count','{label} {n}명',{label:label,n:names.length}))}</span><span class="cal-names" title="${esc(label)}: ${esc(detail)}">${esc(detail)}</span></span>`;
 }
 function calendarWeekRoleRows(roster,leaveItems){
   const departments=roster&&roster.departments||{},rows=[['Dr.','dr',departments['Dr.']||[]]];
@@ -1795,9 +1803,9 @@ function calendarWeekRoleRows(roster,leaveItems){
 }
 function renderCalendarWeekTable(dates,scheduleByDate,leaveByDate,byDate,weekByStart){
   const dayRows=dates.map(date=>calendarWeekRoleRows(scheduleByDate[date]||emptyCalendarRoster(),leaveByDate[date]||[])),rows=dayRows[0]||calendarWeekRoleRows(emptyCalendarRoster(),[]);
-  const rowHtml=rows.map(([label,color],index)=>`<tr class="${color}"><th class="calendar-week-role">${esc(label)}</th>${dates.map((date,dayIndex)=>{const count=dayRows[dayIndex][index][2].length;return `<td><button type="button" class="${count?'':'zero'}" aria-label="${esc(date)} ${esc(label)} ${count}명 상세 보기" onclick="selectCalendarDay('${date}',event)">${count}</button></td>`;}).join('')}</tr>`).join('');
-  const headers=dates.map(date=>{const info=byDate[date]||{holidays:[],events:[]},week=weekByStart.get(mondayStr(date)),status=week&&week.status==='공표'?'확정':week&&week.status==='초안'?'작성 중':'';const notes=[...(info.holidays||[]).map(item=>item.name),...(info.events||[]).map(item=>item.title),status].filter(Boolean);const d=new Date(date+'T00:00:00'),label=['일','월','화','수','목','금','토'][d.getDay()];return `<th><span class="calendar-week-date">${label} ${Number(date.slice(-2))}</span>${notes.length?`<span class="calendar-week-note">${esc(notes.join(' · '))}</span>`:''}</th>`;}).join('');
-  return `<div class="calendar-week-wrap"><table class="calendar-week-table"><thead><tr><th>직무</th>${headers}</tr></thead><tbody>${rowHtml}</tbody></table></div>`;
+  const rowHtml=rows.map(([label,color],index)=>`<tr class="${color}"><th class="calendar-week-role">${esc(label)}</th>${dates.map((date,dayIndex)=>{const count=dayRows[dayIndex][index][2].length;return `<td><button type="button" class="${count?'':'zero'}" aria-label="${esc(date)} ${esc(label)} ${esc(hubT('cal.week.aria_count','{n}명 상세 보기',{n:count}))}" onclick="selectCalendarDay('${date}',event)">${count}</button></td>`;}).join('')}</tr>`).join('');
+  const headers=dates.map(date=>{const info=byDate[date]||{holidays:[],events:[]},week=weekByStart.get(mondayStr(date)),status=week&&week.status==='공표'?hubT('cal.status_pub','확정'):week&&week.status==='초안'?hubT('cal.status_draft','작성 중'):'';const notes=[...(info.holidays||[]).map(item=>item.name),...(info.events||[]).map(item=>item.title),status].filter(Boolean);const d=new Date(date+'T00:00:00'),label=['일','월','화','수','목','금','토'][d.getDay()];return `<th><span class="calendar-week-date">${label} ${Number(date.slice(-2))}</span>${notes.length?`<span class="calendar-week-note">${esc(notes.join(' · '))}</span>`:''}</th>`;}).join('');
+  return `<div class="calendar-week-wrap"><table class="calendar-week-table"><thead><tr><th>${esc(hubT('cal.week.th_role','직무'))}</th>${headers}</tr></thead><tbody>${rowHtml}</tbody></table></div>`;
 }
 function calendarLeaveTags(items){
   const grouped=new Map();for(const item of items||[]){const label=leaveDisplayText(item.type,item.type_note),names=grouped.get(label)||[];names.push(item.label);grouped.set(label,names);}
@@ -1809,7 +1817,7 @@ function renderCalendarDayPanel(date,roster,leaveNames){
   tags.push(...calendarLeaveTags(leaveNames));
   if((roster&&roster.off||[]).length)tags.push(calendarRosterTag('OFF',roster.off,'off'));
   if((roster&&roster.etc||[]).length)tags.push(calendarRosterTag('기타',roster.etc,'etc'));
-  return `<aside class="calendar-day-panel"><div class="sub">선택 날짜</div><h3>${esc(date||'날짜를 선택하세요')}</h3>${tags.length?tags.join(''):'<div class="empty">등록된 근무·연차가 없습니다.</div>'}</aside>`;
+  return `<aside class="calendar-day-panel"><div class="sub">${esc(hubT('cal.day.label','선택 날짜'))}</div><h3>${esc(date||hubT('cal.day.pick','날짜를 선택하세요'))}</h3>${tags.length?tags.join(''):'<div class="empty">'+esc(hubT('cal.day.empty','등록된 근무·연차가 없습니다.'))+'</div>'}</aside>`;
 }
 function renderCalendarDayDetail(date,roster,leaveItems){
   const groups=calendarDepartmentGroups(roster),sections=[];
@@ -1819,8 +1827,8 @@ function renderCalendarDayDetail(date,roster,leaveItems){
   if((roster&&roster.etc||[]).length)sections.push(`<section class="calendar-day-detail-section"><h4>기타</h4>${roster.etc.map(name=>`<div class="calendar-day-detail-row">${esc(name)}</div>`).join('')}</section>`);
   const leaveGroups=new Map();for(const item of leaveItems||[]){const label=leaveDisplayText(item.type,item.type_note),names=leaveGroups.get(label)||[];names.push(item.label);leaveGroups.set(label,names);}
   for(const [label,names] of leaveGroups)sections.push(`<section class="calendar-day-detail-section"><h4>${esc(label)}</h4>${names.map(name=>`<div class="calendar-day-detail-row">${esc(name)}</div>`).join('')}</section>`);
-  if(!sections.length)sections.push('<div class="calendar-day-detail-empty">등록된 근무·OFF·연차가 없습니다.</div>');
-  return `<div class="calendar-day-detail" role="dialog" aria-modal="true" aria-labelledby="calendarDayTitle" tabindex="-1" onclick="if(event.target===event.currentTarget)closeCalendarDayDetail()" onkeydown="if(event.key==='Escape'){event.preventDefault();closeCalendarDayDetail()}else if(event.key==='Tab'){event.preventDefault();document.getElementById('calendarDayClose')?.focus()}"><div class="calendar-day-detail-card"><div class="calendar-day-detail-head"><h3 id="calendarDayTitle">${esc(date)} 상세</h3><button type="button" class="mini" id="calendarDayClose" autofocus aria-label="날짜 상세 닫기" onclick="closeCalendarDayDetail()">닫기</button></div>${sections.join('')}</div></div>`;
+  if(!sections.length)sections.push('<div class="calendar-day-detail-empty">'+esc(hubT('cal.detail.empty','등록된 근무·OFF·연차가 없습니다.'))+'</div>');
+  return `<div class="calendar-day-detail" role="dialog" aria-modal="true" aria-labelledby="calendarDayTitle" tabindex="-1" onclick="if(event.target===event.currentTarget)closeCalendarDayDetail()" onkeydown="if(event.key==='Escape'){event.preventDefault();closeCalendarDayDetail()}else if(event.key==='Tab'){event.preventDefault();document.getElementById('calendarDayClose')?.focus()}"><div class="calendar-day-detail-card"><div class="calendar-day-detail-head"><h3 id="calendarDayTitle">${esc(hubT('cal.detail.title','{date} 상세',{date:date}))}</h3><button type="button" class="mini" id="calendarDayClose" autofocus aria-label="${esc(hubT('cal.detail.aria_close','날짜 상세 닫기'))}" onclick="closeCalendarDayDetail()">${esc(hubT('cal.detail.close','닫기'))}</button></div>${sections.join('')}</div></div>`;
 }
 function selectCalendarDay(date,event){
   if(event&&event.target&&event.target.closest&&event.target.closest('a,button,input,select'))return;
@@ -1837,7 +1845,7 @@ async function saveCalendarPng(){
     const image=await new Promise((resolve,reject)=>{const value=new Image();value.onload=()=>resolve(value);value.onerror=reject;value.src=url;});
     const canvas=document.createElement('canvas');canvas.width=width*2;canvas.height=height*2;const ctx=canvas.getContext('2d');ctx.scale(2,2);ctx.drawImage(image,0,0);
     const link=document.createElement('a');link.href=canvas.toDataURL('image/png');link.download=`근무_캘린더_${CAL_MONTH}.png`;link.click();
-  }catch(error){alert('PNG 저장을 준비하지 못했습니다. 브라우저에서 다시 시도하세요.');}
+  }catch(error){alert(hubT('cal.m_png_fail','PNG 저장을 준비하지 못했습니다. 브라우저에서 다시 시도하세요.'));}
   finally{URL.revokeObjectURL(url);}
 }
 /* schedule-print:test-start */
@@ -1877,6 +1885,8 @@ function toggleCalendarDay(cell,event){
   const expanded=cell.classList.toggle('expanded');
   cell.setAttribute('aria-expanded',String(expanded));
 }
+function calendarKindItems(){const def=[{code:'이벤트',label:'이벤트'},{code:'단축근무',label:'단축근무'},{code:'면접',label:'면접'}];if(typeof hubList!=='function')return def;const codes=new Set(def.map(d=>d.code));return hubList('list.calendar_kinds',def).filter(i=>codes.has(i.code));} /* 일정 종류 이름: 허브 설정 › 목록에서 이름만 고침(코드는 DB가 허락하는 3가지로 고정, 새 종류 못 늘림) */
+function calendarKindLabel(kind){const it=calendarKindItems().find(i=>i.code===kind);return it?it.label:kind;}
 async function renderCalendar(m){
   if(!CAL_MONTH)CAL_MONTH=today().slice(0,7);
   if(!CAL_WEEK_START)CAL_WEEK_START=mondayStr(today());
@@ -1898,7 +1908,7 @@ async function renderCalendar(m){
     sb.from('schedule_weeks').select('week_start,status').gte('week_start',weekFrom).lte('week_start',weekTo)
   ]);
   const loadError=holidaysError||eventsError||leaveError||schedulesError||weeksError;
-  if(loadError){m.innerHTML='<div class="card"><h2>📅 캘린더</h2><div class="cal-error">캘린더 정보를 불러오지 못했습니다. 잠시 후 다시 시도하세요.</div><button class="mini stamp" onclick="render()">다시 시도</button></div>';return;}
+  if(loadError){m.innerHTML='<div class="card"><h2>'+esc(hubT('cal.title','📅 캘린더'))+'</h2><div class="cal-error">'+esc(hubT('cal.err_load','캘린더 정보를 불러오지 못했습니다. 잠시 후 다시 시도하세요.'))+'</div><button class="mini stamp" onclick="render()">'+esc(hubT('cal.btn_retry','다시 시도'))+'</button></div>';return;}
   const leaveByDate=calendarLeaveIndex(lv||[],SCHEDULE_PEOPLE,from,to,nameOf,true);
   const scheduleByDate=scheduleCalendarIndex(scheduleRowsWithoutApprovedLeave(schedules||[],lv||[]),SCHEDULE_PEOPLE,weeks||[],new Map((PROFILES||[]).map(profile=>[profile.user_id,profile])));
   const weekByStart=new Map((weeks||[]).map(w=>[w.week_start,w]));
@@ -1919,7 +1929,7 @@ async function renderCalendar(m){
     const dCls=info.holidays.length?'hol':(dowIdx===0?'sun':(dowIdx===6?'sat':''));
     const tags=[
       ...info.holidays.map(h=>`<span class="cal-tag hol"><span title="${esc(h.name)}">${esc(h.name)}</span></span>`),
-      ...info.events.map(e=>`<span class="cal-tag ev"><span title="${esc(e.kind)} ${esc(e.title)}">${esc(e.title)}</span>${isLead()?`<a href="javascript:void(0)" onclick="event.stopPropagation();deleteCalendarEvent(${e.id})">✕</a>`:''}</span>`),
+      ...info.events.map(e=>`<span class="cal-tag ev"><span title="${esc(calendarKindLabel(e.kind))} ${esc(e.title)}">${esc(e.title)}</span>${isLead()?`<a href="javascript:void(0)" onclick="event.stopPropagation();deleteCalendarEvent(${e.id})">✕</a>`:''}</span>`),
       calendarRosterTag('Dr.',roster.departments['Dr.'],'dept dr'),
       ...EMPLOYEE_JOB_GROUPS.map((group,index)=>calendarRosterTag(group.label,roster.departments[group.label],'dept job-group job-'+index)),
       calendarRosterTag('미지정',roster.departments['미지정'],'unassigned'),
@@ -1927,7 +1937,7 @@ async function renderCalendar(m){
       ...(CAL_VIEW==='all'?calendarLeaveTags(leaveByDate[c.ds]||[]):[]),
       calendarRosterTag('OFF',roster.off,'off'),
       calendarRosterTag('기타',roster.etc,'etc'),
-      weekStatus?`<span class="cal-tag status ${weekStatus}"><span>${weekStatus==='published'?'확정':'작성 중'}</span></span>`:''
+      weekStatus?`<span class="cal-tag status ${weekStatus}"><span>${weekStatus==='published'?esc(hubT('cal.status_pub','확정')):esc(hubT('cal.status_draft','작성 중'))}</span></span>`:''
     ].filter(Boolean).join('');
     return `<div class="cal-cell${c.ds===todayStr?' today':''}${c.ds===CAL_SELECTED_DATE?' selected':''}" tabindex="0" role="button" aria-expanded="${c.ds===CAL_SELECTED_DATE}" onclick="selectCalendarDay('${c.ds}',event)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectCalendarDay('${c.ds}',event)}"><div class="d ${dCls}">${c.d}</div>${tags}</div>`;
   }).join('');
@@ -1937,14 +1947,14 @@ async function renderCalendar(m){
       ${dow.map((w,i)=>`<div class="cal-dow ${i===0?'sun':(i===6?'sat':'')}">${w}</div>`).join('')}
       ${cellsHtml}
     </div></div>`;
-  const periodControls=CAL_PERIOD==='week'?`<button class="mini" onclick="shiftCalendarPeriod(-1)">◀ 지난주</button><b>${esc(from)} ~ ${esc(to)}</b><button class="mini" onclick="shiftCalendarPeriod(1)">다음주 ▶</button><label>날짜 <input class="mini" type="date" value="${CAL_SELECTED_DATE}" onchange="CAL_SELECTED_DATE=this.value;CAL_WEEK_START=mondayStr(this.value);CAL_MONTH=this.value.slice(0,7);CAL_DETAIL_DATE=null;render()"></label>`:`<button class="mini" onclick="shiftCalendarPeriod(-1)">◀ 지난달</button><label>대상 월 <input class="mini" type="month" value="${CAL_MONTH}" onchange="CAL_MONTH=this.value;CAL_SELECTED_DATE=this.value+'-01';CAL_DETAIL_DATE=null;render()"></label><button class="mini" onclick="shiftCalendarPeriod(1)">다음달 ▶</button>`;
-  m.innerHTML=`<div class="card" id="calendarCard"><h2>📅 캘린더</h2>
-    <div class="rowflex"><button class="mini ${CAL_VIEW==='all'?'stamp':''}" onclick="setCalendarView('all')">전체</button><button class="mini ${CAL_VIEW==='work'?'stamp':''}" onclick="setCalendarView('work')">근무</button><button class="mini ${CAL_VIEW==='leave'?'stamp':''}" onclick="setCalendarView('leave')">연차</button></div>
-    <div class="rowflex"><button class="mini ${CAL_PERIOD==='week'?'stamp':''}" onclick="setCalendarPeriod('week')">주간</button><button class="mini ${CAL_PERIOD==='month'?'stamp':''}" onclick="setCalendarPeriod('month')">월간</button></div>
-    <div class="rowflex calendar-actions">${periodControls}<button class="mini" onclick="saveCalendarPng()">PNG로 저장</button><button class="mini" onclick="printCalendar()">PDF로 저장</button></div>
+  const periodControls=CAL_PERIOD==='week'?`<button class="mini" onclick="shiftCalendarPeriod(-1)">${esc(hubT('cal.prev_week','◀ 지난주'))}</button><b>${esc(from)} ~ ${esc(to)}</b><button class="mini" onclick="shiftCalendarPeriod(1)">${esc(hubT('cal.next_week','다음주 ▶'))}</button><label>${esc(hubT('cal.f_date','날짜'))} <input class="mini" type="date" value="${CAL_SELECTED_DATE}" onchange="CAL_SELECTED_DATE=this.value;CAL_WEEK_START=mondayStr(this.value);CAL_MONTH=this.value.slice(0,7);CAL_DETAIL_DATE=null;render()"></label>`:`<button class="mini" onclick="shiftCalendarPeriod(-1)">${esc(hubT('cal.prev_month','◀ 지난달'))}</button><label>${esc(hubT('cal.f_month','대상 월'))} <input class="mini" type="month" value="${CAL_MONTH}" onchange="CAL_MONTH=this.value;CAL_SELECTED_DATE=this.value+'-01';CAL_DETAIL_DATE=null;render()"></label><button class="mini" onclick="shiftCalendarPeriod(1)">${esc(hubT('cal.next_month','다음달 ▶'))}</button>`;
+  m.innerHTML=hubFillHtml(`<div class="card" id="calendarCard"><h2 data-hubk="cal.title">📅 캘린더</h2>
+    <div class="rowflex"><button class="mini ${CAL_VIEW==='all'?'stamp':''}" data-hubk="cal.view_all" onclick="setCalendarView('all')">전체</button><button class="mini ${CAL_VIEW==='work'?'stamp':''}" data-hubk="cal.view_work" onclick="setCalendarView('work')">근무</button><button class="mini ${CAL_VIEW==='leave'?'stamp':''}" data-hubk="cal.view_leave" onclick="setCalendarView('leave')">연차</button></div>
+    <div class="rowflex"><button class="mini ${CAL_PERIOD==='week'?'stamp':''}" data-hubk="cal.period_week" onclick="setCalendarPeriod('week')">주간</button><button class="mini ${CAL_PERIOD==='month'?'stamp':''}" data-hubk="cal.period_month" onclick="setCalendarPeriod('month')">월간</button></div>
+    <div class="rowflex calendar-actions">${periodControls}<button class="mini" onclick="saveCalendarPng()">${esc(hubT('cal.btn_png','PNG로 저장'))}</button><button class="mini" onclick="printCalendar()">${esc(hubT('cal.btn_pdf','PDF로 저장'))}</button></div>
     ${calendarBody}
-    ${isLead()?`<div class="rowflex" style="margin-top:10px"><input class="mini" type="date" id="calDate" value="${today()}"><input class="mini" id="calTitle" placeholder="제목"><select class="mini" id="calKind"><option>이벤트</option><option>단축근무</option><option>면접</option></select><button class="mini" onclick="addCalendarEvent()">추가</button></div>`:''}
-  </div>${CAL_DETAIL_DATE?renderCalendarDayDetail(CAL_DETAIL_DATE,scheduleByDate[CAL_DETAIL_DATE]||emptyCalendarRoster(),leaveByDate[CAL_DETAIL_DATE]||[]):''}`;
+    ${isLead()?`<div class="rowflex" style="margin-top:10px"><input class="mini" type="date" id="calDate" value="${today()}"><input class="mini" id="calTitle" placeholder="${esc(hubT('cal.ph_title','제목'))}"><select class="mini" id="calKind">${calendarKindItems().map(i=>hubOptionHtml(i.code,i.label)).join('')}</select><button class="mini" onclick="addCalendarEvent()">${esc(hubT('cal.btn_add','추가'))}</button></div>`:''}
+  </div>${CAL_DETAIL_DATE?renderCalendarDayDetail(CAL_DETAIL_DATE,scheduleByDate[CAL_DETAIL_DATE]||emptyCalendarRoster(),leaveByDate[CAL_DETAIL_DATE]||[]):''}`);
   if(CAL_DETAIL_DATE)document.getElementById('calendarDayClose')?.focus();
 }
 /* ── 건의함 ── */
@@ -1971,56 +1981,56 @@ function beginSuggestionEdit(id){SUGGESTION_EDIT_ID=id;render();}
 function cancelSuggestionEdit(){SUGGESTION_EDIT_ID=null;render();}
 async function saveSuggestion(id){
   const prefix=id?'suggestionEdit-'+id:'suggestionNew',title=$('#'+prefix+'Title').value.trim(),body=$('#'+prefix+'Body').value.trim();
-  if(!title||!body){alert('제목과 내용을 입력하세요.');return;}
+  if(!title||!body){alert(hubT('sug.m_need_both','제목과 내용을 입력하세요.'));return;}
   setStatus('saving');
   const payload=id?{title,body,updated_at:new Date().toISOString()}:{campaign_id:SUGGESTION_CAMPAIGN_ID,user_id:ME.id,title,body};
   const result=id?await sb.from('suggestions').update(payload).eq('id',id):await sb.from('suggestions').insert(payload);
-  if(result.error){setStatus('error');alert('건의를 저장하지 못했습니다: '+result.error.message);return;}
+  if(result.error){setStatus('error');alert(hubT('sug.m_save_fail','건의를 저장하지 못했습니다: {msg}',{msg:result.error.message}));return;}
   setStatus('saved');SUGGESTION_EDIT_ID=null;render();
 }
 async function deleteSuggestion(id){
-  if(!confirm('이 건의를 삭제할까요?'))return;setStatus('saving');const {error}=await sb.from('suggestions').delete().eq('id',id);
-  if(error){setStatus('error');alert('건의를 삭제하지 못했습니다: '+error.message);return;}setStatus('saved');render();
+  if(!confirm(hubT('sug.del.confirm','이 건의를 삭제할까요?')))return;setStatus('saving');const {error}=await sb.from('suggestions').delete().eq('id',id);
+  if(error){setStatus('error');alert(hubT('sug.m_del_fail','건의를 삭제하지 못했습니다: {msg}',{msg:error.message}));return;}setStatus('saved');render();
 }
 async function toggleSuggestionLikeRemote(id,liked){
   const action=toggleSuggestionLike(id,liked);setStatus('saving');
   const result=action.action==='insert'?await sb.from('suggestion_likes').insert({suggestion_id:id,user_id:ME.id}):await sb.from('suggestion_likes').delete().eq('suggestion_id',id).eq('user_id',ME.id);
-  if(result.error){setStatus('error');alert('좋아요를 변경하지 못했습니다: '+result.error.message);return;}setStatus('saved');render();
+  if(result.error){setStatus('error');alert(hubT('sug.m_like_fail','좋아요를 변경하지 못했습니다: {msg}',{msg:result.error.message}));return;}setStatus('saved');render();
 }
 async function saveSuggestionReview(id){
   const score=$('#suggestionScore-'+id).value, note=$('#suggestionNote-'+id).value.trim(), rank=$('#suggestionRank-'+id).value;
   setStatus('saving');const {error}=await sb.from('suggestion_reviews').upsert({campaign_id:SUGGESTION_CAMPAIGN_ID,suggestion_id:id,originality_score:score?Number(score):null,review_note:note||null,award_rank:rank?Number(rank):null,reviewer_id:ME.id,updated_at:new Date().toISOString()},{onConflict:'campaign_id,suggestion_id'});
-  if(error){setStatus('error');alert('평가를 저장하지 못했습니다: '+error.message);return;}setStatus('saved');render();
+  if(error){setStatus('error');alert(hubT('sug.m_review_fail','평가를 저장하지 못했습니다: {msg}',{msg:error.message}));return;}setStatus('saved');render();
 }
 async function saveSuggestionCampaign(){
   const title=$('#suggestionCampaignTitle').value.trim(),starts_at=$('#suggestionStartsAt').value,ends_at=$('#suggestionEndsAt').value;
   const prize_1=Number($('#suggestionPrize1').value||0),prize_2=Number($('#suggestionPrize2').value||0),prize_3=Number($('#suggestionPrize3').value||0);
-  if(!title||!starts_at||!ends_at||starts_at>ends_at||[prize_1,prize_2,prize_3].some(value=>value<0)){alert('캠페인 설정을 확인하세요.');return;}
+  if(!title||!starts_at||!ends_at||starts_at>ends_at||[prize_1,prize_2,prize_3].some(value=>value<0)){alert(hubT('sug.m_campaign_check','캠페인 설정을 확인하세요.'));return;}
   setStatus('saving');const {error}=await sb.from('suggestion_campaigns').update({title,starts_at,ends_at,prize_1,prize_2,prize_3,updated_at:new Date().toISOString()}).eq('id',SUGGESTION_CAMPAIGN_ID);
-  if(error){setStatus('error');alert('캠페인 설정을 저장하지 못했습니다: '+error.message);return;}setStatus('saved');render();
+  if(error){setStatus('error');alert(hubT('sug.m_campaign_fail','캠페인 설정을 저장하지 못했습니다: {msg}',{msg:error.message}));return;}setStatus('saved');render();
 }
 async function renderSuggestions(m){
   const campaignResult=await sb.from('suggestion_campaigns').select('*').order('starts_at',{ascending:false}).limit(1).maybeSingle();
-  if(campaignResult.error){m.innerHTML=`<div class="card"><h2>💡 건의함</h2><div class="cal-error">건의함 정보를 불러오지 못했습니다: ${esc(campaignResult.error.message||'알 수 없는 오류')}</div></div>`;return;}
+  if(campaignResult.error){m.innerHTML=`<div class="card"><h2>${esc(hubT('sug.title','💡 건의함'))}</h2><div class="cal-error">${esc(hubT('sug.err_load','건의함 정보를 불러오지 못했습니다: {msg}',{msg:campaignResult.error.message||hubT('sug.unknown_error','알 수 없는 오류')}))}</div></div>`;return;}
   const campaign=campaignResult.data;
-  if(!campaign){m.innerHTML='<div class="card"><h2>💡 건의함</h2><div class="empty">진행 중인 건의함이 없습니다.</div></div>';return;}
+  if(!campaign){m.innerHTML='<div class="card"><h2>'+esc(hubT('sug.title','💡 건의함'))+'</h2><div class="empty">'+esc(hubT('sug.none','진행 중인 건의함이 없습니다.'))+'</div></div>';return;}
   SUGGESTION_CAMPAIGN_ID=campaign.id;const now=today(),active=campaign.starts_at<=now&&campaign.ends_at>=now,owner=ME.role==='owner';
   const suggestionResult=await sb.from('suggestions').select('id,campaign_id,user_id,title,body,created_at,updated_at').eq('campaign_id',campaign.id).order('created_at',{ascending:false});
-  if(suggestionResult.error){m.innerHTML=`<div class="card"><h2>💡 건의함</h2><div class="cal-error">건의함 정보를 불러오지 못했습니다: ${esc(suggestionResult.error.message||'알 수 없는 오류')}</div></div>`;return;}
+  if(suggestionResult.error){m.innerHTML=`<div class="card"><h2>${esc(hubT('sug.title','💡 건의함'))}</h2><div class="cal-error">${esc(hubT('sug.err_load','건의함 정보를 불러오지 못했습니다: {msg}',{msg:suggestionResult.error.message||hubT('sug.unknown_error','알 수 없는 오류')}))}</div></div>`;return;}
   const rows=suggestionResult.data||[],ids=rows.map(row=>row.id),likeResult=ids.length?await sb.from('suggestion_likes').select('suggestion_id,user_id').in('suggestion_id',ids):{data:[],error:null};
-  if(likeResult.error){m.innerHTML=`<div class="card"><h2>💡 건의함</h2><div class="cal-error">좋아요 정보를 불러오지 못했습니다: ${esc(likeResult.error.message||'알 수 없는 오류')}</div></div>`;return;}
+  if(likeResult.error){m.innerHTML=`<div class="card"><h2>${esc(hubT('sug.title','💡 건의함'))}</h2><div class="cal-error">${esc(hubT('sug.err_like','좋아요 정보를 불러오지 못했습니다: {msg}',{msg:likeResult.error.message||hubT('sug.unknown_error','알 수 없는 오류')}))}</div></div>`;return;}
   const likes=likeResult.data||[],summary=summarizeSuggestions(rows,likes,campaign.id),liked=new Set(likes.filter(row=>row.user_id===ME.id).map(row=>String(row.suggestion_id)));
   let reviews=[],awardRows=[];
-  if(owner){const result=await sb.from('suggestion_reviews').select('suggestion_id,originality_score,review_note,award_rank').eq('campaign_id',campaign.id);if(result.error){m.innerHTML=`<div class="card"><h2>💡 건의함</h2><div class="cal-error">평가 정보를 불러오지 못했습니다: ${esc(result.error.message||'알 수 없는 오류')}</div></div>`;return;}reviews=result.data||[];}
-  if(!active){const result=await sb.from('suggestion_awards_public').select('campaign_id,suggestion_id,award_rank,title,user_id,ends_at,prize_amount').eq('campaign_id',campaign.id).order('award_rank');if(result.error){m.innerHTML=`<div class="card"><h2>💡 건의함</h2><div class="cal-error">수상 정보를 불러오지 못했습니다: ${esc(result.error.message||'알 수 없는 오류')}</div></div>`;return;}awardRows=result.data||[];}
+  if(owner){const result=await sb.from('suggestion_reviews').select('suggestion_id,originality_score,review_note,award_rank').eq('campaign_id',campaign.id);if(result.error){m.innerHTML=`<div class="card"><h2>${esc(hubT('sug.title','💡 건의함'))}</h2><div class="cal-error">${esc(hubT('sug.err_review','평가 정보를 불러오지 못했습니다: {msg}',{msg:result.error.message||hubT('sug.unknown_error','알 수 없는 오류')}))}</div></div>`;return;}reviews=result.data||[];}
+  if(!active){const result=await sb.from('suggestion_awards_public').select('campaign_id,suggestion_id,award_rank,title,user_id,ends_at,prize_amount').eq('campaign_id',campaign.id).order('award_rank');if(result.error){m.innerHTML=`<div class="card"><h2>${esc(hubT('sug.title','💡 건의함'))}</h2><div class="cal-error">${esc(hubT('sug.err_award','수상 정보를 불러오지 못했습니다: {msg}',{msg:result.error.message||hubT('sug.unknown_error','알 수 없는 오류')}))}</div></div>`;return;}awardRows=result.data||[];}
   const reviewById=new Map(reviews.map(row=>[String(row.suggestion_id),row]));
   const winnerRows=winnerVisibility(campaign,awardRows,awardRows,now);
-  const campaignForm=owner?`<div class="hint"><b>owner 캠페인 설정</b><div class="rowflex"><input class="mini" id="suggestionCampaignTitle" value="${esc(campaign.title)}"><input class="mini" type="date" id="suggestionStartsAt" value="${campaign.starts_at}"><input class="mini" type="date" id="suggestionEndsAt" value="${campaign.ends_at}"><input class="mini" type="number" id="suggestionPrize1" value="${campaign.prize_1}"><input class="mini" type="number" id="suggestionPrize2" value="${campaign.prize_2}"><input class="mini" type="number" id="suggestionPrize3" value="${campaign.prize_3}"><button class="mini" onclick="saveSuggestionCampaign()">저장</button></div></div>`:'';
-  const form=active?`<div class="hint"><b>새 건의 작성</b><input id="suggestionNewTitle" class="mini" style="width:100%;margin-top:6px" maxlength="120" placeholder="제목"><textarea id="suggestionNewBody" rows="4" style="width:100%;margin-top:6px" maxlength="5000" placeholder="건의 내용을 입력하세요."></textarea><button class="mini stamp" style="margin-top:6px" onclick="saveSuggestion(null)">건의 등록</button></div>`:'';
-  const people=Object.entries(summary.byUser).filter(([,item])=>item.posts>0).map(([userId,item])=>({name:nameOf(userId),item})).sort((a,b)=>b.item.posts-a.item.posts||b.item.likes-a.item.likes||a.name.localeCompare(b.name,'ko')).map(person=>`<span class="sub">${esc(person.name)} · 게시글 ${person.item.posts}개 · 받은 좋아요 ${person.item.likes}개</span>`).join('');
-  const cards=rows.length?rows.map(row=>{const own=row.user_id===ME.id,count=likes.filter(like=>like.suggestion_id===row.id).length,isLiked=liked.has(String(row.id)),review=reviewById.get(String(row.id)),editing=SUGGESTION_EDIT_ID===row.id;return `<div class="card"><div class="rowflex"><b>${esc(row.title)}</b><span class="sub">${esc(nameOf(row.user_id))}</span></div><div style="white-space:pre-wrap;margin:8px 0">${esc(row.body)}</div><button class="mini" ${own||!active?'disabled':''} onclick="toggleSuggestionLikeRemote(${row.id},${isLiked})">${isLiked?'좋아요 취소':'좋아요'} ${count}</button>${own&&active?` <button class="mini" onclick="beginSuggestionEdit(${row.id})">수정</button>`:''}${(own&&active||owner)?` <button class="mini" onclick="deleteSuggestion(${row.id})">삭제</button>`:''}${editing?`<div class="hint"><input id="suggestionEditTitle-${row.id}" class="mini" value="${esc(row.title)}"><textarea id="suggestionEditBody-${row.id}" rows="3" style="width:100%">${esc(row.body)}</textarea><button class="mini stamp" onclick="saveSuggestion(${row.id})">수정 저장</button><button class="mini" onclick="cancelSuggestionEdit()">취소</button></div>`:''}${owner?`<div class="hint" style="margin-top:8px"><input class="mini" id="suggestionScore-${row.id}" type="number" min="1" max="5" value="${review?.originality_score??''}" placeholder="점수 1~5"><input class="mini" id="suggestionRank-${row.id}" type="number" min="1" max="3" value="${review?.award_rank??''}" placeholder="순위 1~3"><input class="mini" id="suggestionNote-${row.id}" value="${esc(review?.review_note||'')}" placeholder="평가 메모"><button class="mini" onclick="saveSuggestionReview(${row.id})">평가 저장</button></div>`:''}</div>`;}).join(''):'<div class="empty">등록된 건의가 없습니다.</div>';
-  const winners=!active?`<div class="hint"><b>수상 결과</b>${winnerRows.length?winnerRows.map(row=>`<div>${row.award_rank}위 · ${esc(nameOf(row.user_id))} · ${esc(row.title)} · ${Number(row.prize_amount).toLocaleString()}원</div>`).join(''):'<div>수상 결과가 없습니다.</div>'}<div class="sub">지급 기능 없음</div></div>`:'';
-  m.innerHTML=`<div class="card"><h2>💡 ${esc(campaign.title)}</h2><div class="hint">${campaign.starts_at} ~ ${campaign.ends_at} · ${active?'진행 중':'종료'} · 1위 ${Number(campaign.prize_1).toLocaleString()}원 / 2위 ${Number(campaign.prize_2).toLocaleString()}원 / 3위 ${Number(campaign.prize_3).toLocaleString()}원</div>${campaignForm}${form}<div class="rowflex" style="margin-top:10px"><span>게시글 ${summary.totalPosts}개</span><span>좋아요 ${summary.totalLikes}개</span></div><div class="rowflex" style="margin-top:8px">${people}</div></div>${winners}${cards}`;
+  const campaignForm=owner?`<div class="hint"><b>${esc(hubT('sug.campaign.title','owner 캠페인 설정'))}</b><div class="rowflex"><input class="mini" id="suggestionCampaignTitle" value="${esc(campaign.title)}"><input class="mini" type="date" id="suggestionStartsAt" value="${campaign.starts_at}"><input class="mini" type="date" id="suggestionEndsAt" value="${campaign.ends_at}"><input class="mini" type="number" id="suggestionPrize1" value="${campaign.prize_1}"><input class="mini" type="number" id="suggestionPrize2" value="${campaign.prize_2}"><input class="mini" type="number" id="suggestionPrize3" value="${campaign.prize_3}"><button class="mini" onclick="saveSuggestionCampaign()">${esc(hubT('sug.campaign.btn_save','저장'))}</button></div></div>`:'';
+  const form=active?`<div class="hint"><b>${esc(hubT('sug.new.title','새 건의 작성'))}</b><input id="suggestionNewTitle" class="mini" style="width:100%;margin-top:6px" maxlength="120" placeholder="${esc(hubT('sug.new.ph_title','제목'))}"><textarea id="suggestionNewBody" rows="4" style="width:100%;margin-top:6px" maxlength="5000" placeholder="${esc(hubT('sug.new.ph_body','건의 내용을 입력하세요.'))}"></textarea><button class="mini stamp" style="margin-top:6px" onclick="saveSuggestion(null)">${esc(hubT('sug.new.btn_submit','건의 등록'))}</button></div>`:'';
+  const people=Object.entries(summary.byUser).filter(([,item])=>item.posts>0).map(([userId,item])=>({name:nameOf(userId),item})).sort((a,b)=>b.item.posts-a.item.posts||b.item.likes-a.item.likes||a.name.localeCompare(b.name,'ko')).map(person=>`<span class="sub">${esc(hubT('sug.people_line','{name} · 게시글 {posts}개 · 받은 좋아요 {likes}개',{name:person.name,posts:person.item.posts,likes:person.item.likes}))}</span>`).join('');
+  const cards=rows.length?rows.map(row=>{const own=row.user_id===ME.id,count=likes.filter(like=>like.suggestion_id===row.id).length,isLiked=liked.has(String(row.id)),review=reviewById.get(String(row.id)),editing=SUGGESTION_EDIT_ID===row.id;return `<div class="card"><div class="rowflex"><b>${esc(row.title)}</b><span class="sub">${esc(nameOf(row.user_id))}</span></div><div style="white-space:pre-wrap;margin:8px 0">${esc(row.body)}</div><button class="mini" ${own||!active?'disabled':''} onclick="toggleSuggestionLikeRemote(${row.id},${isLiked})">${isLiked?esc(hubT('sug.btn_unlike','좋아요 취소')):esc(hubT('sug.btn_like','좋아요'))} ${count}</button>${own&&active?` <button class="mini" onclick="beginSuggestionEdit(${row.id})">${esc(hubT('sug.btn_edit','수정'))}</button>`:''}${(own&&active||owner)?` <button class="mini" onclick="deleteSuggestion(${row.id})">${esc(hubT('sug.btn_del','삭제'))}</button>`:''}${editing?`<div class="hint"><input id="suggestionEditTitle-${row.id}" class="mini" value="${esc(row.title)}"><textarea id="suggestionEditBody-${row.id}" rows="3" style="width:100%">${esc(row.body)}</textarea><button class="mini stamp" onclick="saveSuggestion(${row.id})">${esc(hubT('sug.btn_edit_save','수정 저장'))}</button><button class="mini" onclick="cancelSuggestionEdit()">${esc(hubT('sug.btn_cancel','취소'))}</button></div>`:''}${owner?`<div class="hint" style="margin-top:8px"><input class="mini" id="suggestionScore-${row.id}" type="number" min="1" max="5" value="${review?.originality_score??''}" placeholder="${esc(hubT('sug.review.ph_score','점수 1~5'))}"><input class="mini" id="suggestionRank-${row.id}" type="number" min="1" max="3" value="${review?.award_rank??''}" placeholder="${esc(hubT('sug.review.ph_rank','순위 1~3'))}"><input class="mini" id="suggestionNote-${row.id}" value="${esc(review?.review_note||'')}" placeholder="${esc(hubT('sug.review.ph_note','평가 메모'))}"><button class="mini" onclick="saveSuggestionReview(${row.id})">${esc(hubT('sug.review.btn_save','평가 저장'))}</button></div>`:''}</div>`;}).join(''):'<div class="empty">'+esc(hubT('sug.empty','등록된 건의가 없습니다.'))+'</div>';
+  const winners=!active?`<div class="hint"><b>${esc(hubT('sug.win.title','수상 결과'))}</b>${winnerRows.length?winnerRows.map(row=>`<div>${esc(hubT('sug.win.row','{rank}위 · {name} · {title} · {amount}원',{rank:row.award_rank,name:nameOf(row.user_id),title:row.title,amount:Number(row.prize_amount).toLocaleString()}))}</div>`).join(''):'<div>'+esc(hubT('sug.win.none','수상 결과가 없습니다.'))+'</div>'}<div class="sub">${esc(hubT('sug.win.note','지급 기능 없음'))}</div></div>`:'';
+  m.innerHTML=`<div class="card"><h2>💡 ${esc(campaign.title)}</h2><div class="hint">${campaign.starts_at} ~ ${campaign.ends_at} · ${active?esc(hubT('sug.state_active','진행 중')):esc(hubT('sug.state_ended','종료'))} · ${esc(hubT('sug.prize_line','1위 {a}원 / 2위 {b}원 / 3위 {c}원',{a:Number(campaign.prize_1).toLocaleString(),b:Number(campaign.prize_2).toLocaleString(),c:Number(campaign.prize_3).toLocaleString()}))}</div>${campaignForm}${form}<div class="rowflex" style="margin-top:10px"><span>게시글 ${summary.totalPosts}개</span><span>좋아요 ${summary.totalLikes}개</span></div><div class="rowflex" style="margin-top:8px">${people}</div></div>${winners}${cards}`;
 }
 /* suggestion-board:render-end */
 /* ── 연차현황 ── */
@@ -2070,15 +2080,15 @@ async function renderLeaveStatus(m,embedded){
   else if(!LVSTATUS_MONTH)LVSTATUS_MONTH=today().slice(0,7);
   const from=LVSTATUS_MONTH+'-01',to=leaveCalendarMonthEnd(LVSTATUS_MONTH);
   const {data,error}=await sb.from('leave_requests').select('id,user_id,type,type_note,date_from,date_to,days,status,owner_at,chief_at,created_at').eq('status','승인').lte('date_from',to).gte('date_to',from).order('date_from');
-  if(error){m.innerHTML=`<div class="card"><h2>🏖 연차캘린더</h2><div class="cal-error">연차 정보를 불러오지 못했습니다: ${esc(error.message||'알 수 없는 오류')}</div><button class="mini stamp" onclick="render()">다시 시도</button></div>`;return;}
+  if(error){m.innerHTML=`<div class="card"><h2>${esc(hubT('lvs.title_err','🏖 연차캘린더'))}</h2><div class="cal-error">${esc(hubT('lvs.err_load','연차 정보를 불러오지 못했습니다: {msg}',{msg:error.message||hubT('lvs.unknown_error','알 수 없는 오류')}))}</div><button class="mini stamp" onclick="render()">${esc(hubT('cal.btn_retry','다시 시도'))}</button></div>`;return;}
   const rows=(data||[]).map(row=>({...row,user_name:nameOf(row.user_id)})),index=buildLeaveCalendarIndex(rows,from,to),owner=ME.role==='owner';
   const first=new Date(from+'T00:00:00'),days=new Date(first.getFullYear(),first.getMonth()+1,0).getDate(),leading=first.getDay(),dow=['일','월','화','수','목','금','토'];
   const cells=[];for(let i=0;i<leading;i++)cells.push('<div class="cal-cell out"></div>');
   for(let day=1;day<=days;day++){const date=LVSTATUS_MONTH+'-'+String(day).padStart(2,'0'),items=index[date]||[];cells.push(`<div class="cal-cell"><div class="d">${day}</div>${items.map(item=>`<div class="cal-tag lv"><span>${esc(leaveCalendarLabel(item,ME.role))}</span></div>`).join('')}</div>`);}
   const listRows=[...rows].sort((a,b)=>a.date_from.localeCompare(b.date_from)||compareLeaveRowsByCreatedAtThenId(a,b));
-  const table=rows.length?`<div class="tblwrap"><table><tr><th>이름</th>${owner?'<th>종류</th>':''}<th>기간</th><th>일수</th>${owner?'<th>신청 시각</th><th>승인 시각</th>':''}</tr>${listRows.map(row=>`<tr><td>${esc(row.user_name)}</td>${owner?`<td>${esc(row.type||'')}${row.type_note?' '+esc(row.type_note):''}</td>`:''}<td>${md(row.date_from)}~${md(row.date_to)}</td><td>${row.days}</td>${owner?`<td>${esc(formatLeaveTimestamp(row.created_at)||'미상')}</td><td>${esc(formatLeaveTimestamp(row.owner_at)||formatLeaveTimestamp(row.chief_at)||'미상')}</td>`:''}</tr>`).join('')}</table></div>`:'<div class="empty">선택한 달의 승인 연차가 없습니다.</div>';
-  const calendar=`<div class="cal-grid">${dow.map((label,index)=>`<div class="cal-dow ${index===0?'sun':index===6?'sat':''}">${label}</div>`).join('')}${cells.join('')}</div>`,calendarView=rows.length?calendar:'<div class="empty">선택한 달의 승인 연차가 없습니다.</div>';
-  m.innerHTML=`<div class="card"><h2>🏖 연차 캘린더</h2><div class="rowflex"><button class="mini ${CAL_VIEW==='work'?'':'stamp'}" onclick="setCalendarView('work')">근무 캘린더</button><button class="mini ${CAL_VIEW==='leave'?'stamp':''}" onclick="setCalendarView('leave')">연차 캘린더</button><label>대상 월 <input class="mini" type="month" value="${LVSTATUS_MONTH}" onchange="LVSTATUS_MONTH=this.value;CAL_MONTH=this.value;render()"></label><button class="mini ${LVSTATUS_VIEW==='calendar'?'stamp':''}" onclick="LVSTATUS_VIEW='calendar';render()">달력 보기</button><button class="mini ${LVSTATUS_VIEW==='list'?'stamp':''}" onclick="LVSTATUS_VIEW='list';render()">목록 보기</button></div><div class="hint">승인된 연차만 표시합니다.</div>${LVSTATUS_VIEW==='calendar'?calendarView:table}</div>`;
+  const table=rows.length?`<div class="tblwrap"><table><tr><th>${esc(hubT('lvs.th_name','이름'))}</th>${owner?'<th>'+esc(hubT('lvs.th_type','종류'))+'</th>':''}<th>${esc(hubT('lvs.th_period','기간'))}</th><th>${esc(hubT('lvs.th_days','일수'))}</th>${owner?'<th>'+esc(hubT('lvs.th_applied','신청 시각'))+'</th><th>'+esc(hubT('lvs.th_approved','승인 시각'))+'</th>':''}</tr>${listRows.map(row=>`<tr><td>${esc(row.user_name)}</td>${owner?`<td>${esc(row.type||'')}${row.type_note?' '+esc(row.type_note):''}</td>`:''}<td>${md(row.date_from)}~${md(row.date_to)}</td><td>${row.days}</td>${owner?`<td>${esc(formatLeaveTimestamp(row.created_at)||'미상')}</td><td>${esc(formatLeaveTimestamp(row.owner_at)||formatLeaveTimestamp(row.chief_at)||'미상')}</td>`:''}</tr>`).join('')}</table></div>`:'<div class="empty">'+esc(hubT('lvs.empty','선택한 달의 승인 연차가 없습니다.'))+'</div>';
+  const calendar=`<div class="cal-grid">${dow.map((label,index)=>`<div class="cal-dow ${index===0?'sun':index===6?'sat':''}">${label}</div>`).join('')}${cells.join('')}</div>`,calendarView=rows.length?calendar:'<div class="empty">'+esc(hubT('lvs.empty','선택한 달의 승인 연차가 없습니다.'))+'</div>';
+  m.innerHTML=`<div class="card"><h2>${esc(hubT('lvs.title','🏖 연차 캘린더'))}</h2><div class="rowflex"><button class="mini ${CAL_VIEW==='work'?'':'stamp'}" onclick="setCalendarView('work')">${esc(hubT('lvs.btn_work','근무 캘린더'))}</button><button class="mini ${CAL_VIEW==='leave'?'stamp':''}" onclick="setCalendarView('leave')">${esc(hubT('lvs.btn_leave','연차 캘린더'))}</button><label>${esc(hubT('cal.f_month','대상 월'))} <input class="mini" type="month" value="${LVSTATUS_MONTH}" onchange="LVSTATUS_MONTH=this.value;CAL_MONTH=this.value;render()"></label><button class="mini ${LVSTATUS_VIEW==='calendar'?'stamp':''}" onclick="LVSTATUS_VIEW='calendar';render()">${esc(hubT('lvs.btn_cal','달력 보기'))}</button><button class="mini ${LVSTATUS_VIEW==='list'?'stamp':''}" onclick="LVSTATUS_VIEW='list';render()">${esc(hubT('lvs.btn_list','목록 보기'))}</button></div><div class="hint">${esc(hubT('lvs.hint','승인된 연차만 표시합니다.'))}</div>${LVSTATUS_VIEW==='calendar'?calendarView:table}</div>`;
 }
 /* leave-calendar:render-end */
 async function addCalendarEvent(){
@@ -2087,7 +2097,7 @@ async function addCalendarEvent(){
   if(error){setStatus('error');return;}setStatus('saved');render();
 }
 async function deleteCalendarEvent(id){
-  if(!confirm('삭제할까요?'))return;setStatus('saving');const {error}=await sb.from('calendar_events').delete().eq('id',id);
+  if(!confirm(hubT('cal.del.confirm','삭제할까요?')))return;setStatus('saving');const {error}=await sb.from('calendar_events').delete().eq('id',id);
   if(error){setStatus('error');return;}setStatus('saved');render();
 }
 

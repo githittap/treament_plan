@@ -5,6 +5,7 @@
    · 글  → 표 hub_ui_texts(db/hub_ui_texts.sql) · 숫자·목록 → 이미 있는 표 app_settings(키만 더함, 표·정책은 안 고침)
    hr.html은 이 파일을 main 스크립트보다 먼저 <script src="hub-texts.js?v=…"> 로 불러온다(함수는 전역 hubText·hubSetting·hubList·HubUi).
    로그인 전 화면 글은 표를 읽을 수 없어 이 엔진을 쓰지 않는다(설계서 5장).
+   차례 4: 결재함·공지·캘린더·건의함 글(hubTextDefsChapter4) + 결재 종류·일정 종류 이름 목록 + 결재 목록 건수(hubSettingChecked) — 첨부 한도·건의 점수·순위는 DB가 같은 값을 쥐고 있어 안 옮김.
    차례 3: 출퇴근·근무표·연차 글(hubTextDefsChapter3) + 연차 유형·근무부서 이름 목록 + 연차·소명 숫자 기준(hubSettingChecked).
    차례 2: 내 서류함·업무자료 글(hubTextDefsChapter2) + 서류 종류·상태 이름 목록 + 업무자료 카드(app_settings cards.work_materials, 링크는 http(s)만).
    © 2026 Jung · 아산정플란트치과 */
@@ -624,6 +625,166 @@ function hubTextDefsChapter3(add){
   add('leave.acc.m_none','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적용 — 새로 적용된 기록이 없을 때','새로 적용된 기록이 없습니다. 이미 기록된 발생일인지 확인하세요.');
   add('leave.acc.m_recheck_fail','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적용 — 적용은 됐는데 다시 불러오기가 실패했을 때(뒤에 위 메시지가 붙음)','적용 응답은 성공했으나 재조회 실패 — {msg}',['msg']);
 }
+// ── 차례 4: 결재함·공지·캘린더·건의함 글(기본 글은 hr.html의 글과 같아야 함 — 시험이 대조) ──
+function hubTextDefsChapter4(add){
+  const A1='🖊 결재함 › 결재함 화면';
+  const A2='🖊 결재함 › 문서 카드·결재 처리';
+  const A3='🖊 결재함 › 결재 올리기 창';
+  const A4='🖊 결재함 › 재직증명서 창';
+  add('appr.title',A1,'결재함 화면 맨 위 큰 제목','🖊 결재');
+  add('appr.hint',A1,'결재함 제목 아래 설명(결재선이 바뀌면 이 글도 같이 고쳐 주세요)','직원은 문서를 올리고 진행 상태를 확인합니다. 실장은 올라온 문서를 먼저 검토하고, 원장이 최종 결재합니다.');
+  add('appr.btn_new',A1,'결재함 맨 위 「결재 올리기」 단추 글','결재 올리기');
+  add('appr.inbox.title',A1,'「내 결재 대기」 묶음 제목(실장·원장 화면)','📥 내 결재 대기');
+  add('appr.inbox.empty',A1,'내 결재 대기가 하나도 없을 때 뜨는 글','대기 없음');
+  add('appr.archive.title',A1,'「완결된 결재 문서」 묶음 제목(실장·원장 화면)','🗂 완결된 결재 문서');
+  add('appr.archive.empty',A1,'완결된 결재 문서가 하나도 없을 때 뜨는 글','없음');
+  add('appr.btn_cancel',A1,'완결된 결재 문서 아래 「취소」 단추 글(완결 처리를 되돌리는 단추)','취소');
+  add('appr.mine.title',A1,'「내가 올린 문서」 묶음 제목','📄 내가 올린 문서');
+  add('appr.mine.empty',A1,'내가 올린 문서가 하나도 없을 때 뜨는 글','없음');
+  add('appr.card.open_cert',A2,'재직증명서가 발급된 문서 카드의 「발급본 열기」 단추 글','발급본 열기');
+  add('appr.card.btn_ok',A2,'결재 대기 문서 카드의 승인 단추 글','🔴 도장(승인)');
+  add('appr.card.btn_rej',A2,'결재 대기 문서 카드의 반려 단추 글','반려');
+  add('appr.steps.label',A2,'문서 카드의 결재선 줄 맨 앞 글(뒤에 단계가 이어 붙음)','결재선:');
+  add('appr.steps.chief',A2,'결재선 줄에 보이는 실장 단계 이름','실장');
+  add('appr.steps.owner',A2,'결재선 줄에 보이는 원장 단계 이름','원장');
+  add('appr.m_cancel_state',A2,'완결이 아닌 문서의 완결 취소를 눌렀을 때 알림창','취소할 수 없는 상태입니다.');
+  add('appr.cancel.confirm',A2,'완결 취소를 누르면 뜨는 확인창({kind}=결재 종류 · {title}=문서 제목)','[{kind}] {title} 문서의 완결 처리를 취소합니다. 계속하시겠습니까?',['kind','title']);
+  add('appr.act.m_req_fail',A2,'승인·반려를 눌렀는데 결재 요청을 못 읽었을 때 알림창','결재 요청을 확인하지 못했습니다.');
+  add('appr.act.m_cert_fail',A2,'재직증명서 발급 승인이 실패했을 때 알림창({msg}는 서버 오류)','재직증명서 발급 실패: {msg}',['msg']);
+  add('appr.act.m_no_step',A2,'내 차례가 아닌 단계를 처리하려 했을 때 알림창','현재 단계가 아닙니다.');
+  add('appr.modal.title',A3,'결재 올리기 창 맨 위 제목','🖊 결재 올리기');
+  add('appr.modal.f_kind',A3,'결재 올리기 창 칸 이름 — 종류(고르는 종류 이름은 📋 목록 탭에서 고침)','종류');
+  add('appr.modal.f_title',A3,'결재 올리기 창 칸 이름 — 제목','제목');
+  add('appr.modal.f_body',A3,'결재 올리기 창 칸 이름 — 내용','내용');
+  add('appr.modal.hint',A3,'결재 올리기 창 아래 안내(결재선·재직증명서 발급 안내)','결재선: 나 → 실장 → 원장 (각 단계 도장). 재직증명서는 최종 승인 시 재직 정보를 확인해 발급되며, 필수 정보가 없으면 발급되지 않습니다.');
+  add('appr.modal.btn_submit',A3,'결재 올리기 창 아래 올리기 단추','올리기');
+  add('appr.m_title_required',A3,'결재 올리기 — 제목을 안 적었을 때 창 안에 뜨는 글','제목을 입력하세요.');
+  add('appr.m_fail',A3,'결재 올리기 저장 실패({msg}는 서버 오류)','실패: {msg}',['msg']);
+  add('appr.cert.title',A4,'재직증명서 보기 창 맨 위 제목','📄 재직증명서');
+  add('appr.cert.btn_download',A4,'재직증명서 보기 창 — 내려받기 단추','⬇️ 발급본 다운로드');
+  add('appr.cert.btn_print',A4,'재직증명서 보기 창 — 인쇄·PDF 저장 단추','🖨️ 인쇄·PDF 저장');
+  add('appr.cert.m_no_html',A4,'보관된 발급본을 못 열 때 알림창','보관된 발급본을 열 수 없습니다.');
+  const N1='📢 공지 › 공지 화면';
+  const N2='📢 공지 › 공지 작성 창';
+  const N3='📢 공지 › 첨부 미리보기';
+  add('notice.title',N1,'공지 화면 맨 위 큰 제목','📢 공지');
+  add('notice.btn_new',N1,'공지 화면 맨 위 「공지 작성」 단추 글','공지 작성');
+  add('notice.empty',N1,'공지가 하나도 없을 때 뜨는 글','공지 없음');
+  add('notice.link_full',N1,'노션 링크가 있는 공지의 「전문」 링크 글','전문 ↗');
+  add('notice.btn_del',N1,'공지 아래 삭제 단추 글(실장·원장 화면)','삭제');
+  add('notice.attach_none',N1,'첨부가 없는 공지에 뜨는 글','첨부 없음');
+  add('notice.attach_label',N1,'첨부가 있는 공지의 첨부 줄 맨 앞 글(뒤에 파일 이름 단추가 이어 붙음)','첨부:');
+  add('notice.attach_default_name',N1,'이름이 없는 첨부 파일 단추에 대신 보이는 글','첨부파일');
+  add('notice.del.confirm',N1,'공지 삭제를 누르면 뜨는 확인창','삭제할까요?');
+  add('notice.modal.title',N2,'공지 작성 창 맨 위 제목','📢 공지 작성');
+  add('notice.modal.f_title',N2,'공지 작성 창 칸 이름 — 제목','제목');
+  add('notice.modal.f_body',N2,'공지 작성 창 칸 이름 — 내용','내용(짧게)');
+  add('notice.modal.paste_hint',N2,'공지 작성 창 내용 칸 아래 안내(캡처 붙여넣기)','화면을 캡처한 뒤 Ctrl+V로 본문에 붙여넣을 수 있습니다.');
+  add('notice.modal.f_url',N2,'공지 작성 창 칸 이름 — 노션 링크','긴 글은 노션 링크(선택)');
+  add('notice.modal.f_files',N2,'공지 작성 창 칸 이름 — 파일 첨부','업무파일 첨부');
+  add('notice.modal.files_hint',N2,'공지 작성 창 파일 칸 아래 안내(글만 고침 — 허용·차단 파일 형식과 10MB 한도는 서버 규칙이라 그대로예요)','일반 문서를 허용하며 압축·실행 파일은 거부됩니다.');
+  add('notice.modal.f_pin',N2,'공지 작성 창 — 상단 고정 체크 칸 글','상단 고정');
+  add('notice.modal.btn_submit',N2,'공지 작성 창 아래 게시 단추','게시');
+  add('notice.m_title_required',N2,'공지 작성 — 제목을 안 적었을 때 창 안에 뜨는 글','제목을 입력하세요.');
+  add('notice.m_bad_file',N2,'공지 작성 — 허용 안 되는 파일이나 큰 파일을 골랐을 때 뜨는 글(글만 고침 — 실제 한도는 그대로예요)','허용되지 않은 파일 형식 또는 10MB 초과 파일이 있습니다.');
+  add('notice.capture_name',N2,'붙여넣은 캡처 이미지에 이름이 없을 때 대신 보이는 이름({n}은 몇 번째)','캡처 이미지 {n}',['n']);
+  add('notice.preview.title',N3,'첨부 미리보기 창 맨 위 제목(내 서류함에서 서류를 미리 볼 때도 같은 창)','📎 첨부 미리보기');
+  add('notice.preview_unsupported',N3,'미리보기가 안 되는 형식의 파일을 열었을 때 뜨는 글(내 서류함 미리보기도 같음)','이 형식은 미리보기를 지원하지 않습니다. 다운로드하여 확인하세요.');
+  add('notice.m_open_fail',N3,'첨부 파일을 못 열었을 때 알림창({msg}는 서버 오류)','첨부 열기 실패: {msg}',['msg']);
+  const C1='📅 캘린더 › 월·주간 화면';
+  const C2='📅 캘린더 › 날짜 상세·일정 추가';
+  const C3='📅 캘린더 › 연차 캘린더 보기';
+  add('cal.title',C1,'캘린더 화면 맨 위 큰 제목(불러오기 실패 화면 제목도 같음)','📅 캘린더');
+  add('cal.view_all',C1,'보기 고르는 단추 — 전체','전체');
+  add('cal.view_work',C1,'보기 고르는 단추 — 근무','근무');
+  add('cal.view_leave',C1,'보기 고르는 단추 — 연차(누르면 연차 캘린더로 바뀜)','연차');
+  add('cal.period_week',C1,'기간 고르는 단추 — 주간','주간');
+  add('cal.period_month',C1,'기간 고르는 단추 — 월간','월간');
+  add('cal.prev_week',C1,'주간 보기 — 지난주 단추','◀ 지난주');
+  add('cal.next_week',C1,'주간 보기 — 다음주 단추','다음주 ▶');
+  add('cal.f_date',C1,'주간 보기 — 날짜 고르는 칸 이름','날짜');
+  add('cal.prev_month',C1,'월간 보기 — 지난달 단추','◀ 지난달');
+  add('cal.f_month',C1,'월간 보기 — 대상 월 고르는 칸 이름(연차 캘린더의 같은 칸도 같은 글)','대상 월');
+  add('cal.next_month',C1,'월간 보기 — 다음달 단추','다음달 ▶');
+  add('cal.btn_png',C1,'캘린더 이미지로 저장 단추','PNG로 저장');
+  add('cal.btn_pdf',C1,'캘린더 PDF로 저장(인쇄) 단추','PDF로 저장');
+  add('cal.err_load',C1,'캘린더를 못 불러왔을 때 뜨는 글','캘린더 정보를 불러오지 못했습니다. 잠시 후 다시 시도하세요.');
+  add('cal.btn_retry',C1,'캘린더·연차 캘린더 불러오기 실패 화면의 다시 시도 단추','다시 시도');
+  add('cal.status_pub',C1,'근무표가 확정된 주의 표시(날짜 칸 아래·주간 표 머리)','확정');
+  add('cal.status_draft',C1,'근무표가 작성 중인 주의 표시(날짜 칸 아래·주간 표 머리)','작성 중');
+  add('cal.week.th_role',C1,'주간 보기 표 맨 왼쪽 위 머리 글','직무');
+  add('cal.week.aria_count',C1,'주간 보기 숫자 단추에 붙는 화면 읽기용 글({n}=인원 수)','{n}명 상세 보기',['n']);
+  add('cal.roster_count',C1,'날짜 칸의 부서별 인원 글({label}=부서 이름 · {n}=인원 수)','{label} {n}명',['label','n']);
+  add('cal.m_png_fail',C1,'PNG 저장을 못 준비했을 때 알림창','PNG 저장을 준비하지 못했습니다. 브라우저에서 다시 시도하세요.');
+  add('cal.day.label',C2,'오른쪽 날짜 패널 맨 위 작은 글','선택 날짜');
+  add('cal.day.pick',C2,'날짜를 아직 안 골랐을 때 패널 제목 자리에 뜨는 글','날짜를 선택하세요');
+  add('cal.day.empty',C2,'고른 날짜에 근무·연차가 하나도 없을 때 패널에 뜨는 글','등록된 근무·연차가 없습니다.');
+  add('cal.detail.title',C2,'날짜 상세 창 제목({date}=고른 날짜)','{date} 상세',['date']);
+  add('cal.detail.aria_close',C2,'날짜 상세 창 닫기 단추에 붙는 화면 읽기용 글','날짜 상세 닫기');
+  add('cal.detail.close',C2,'날짜 상세 창 닫기 단추 글','닫기');
+  add('cal.detail.empty',C2,'날짜 상세 창에 근무·OFF·연차가 하나도 없을 때 뜨는 글','등록된 근무·OFF·연차가 없습니다.');
+  add('cal.ph_title',C2,'일정 추가 줄 — 제목 칸 안에 흐리게 보이는 글(실장·원장 화면)','제목');
+  add('cal.btn_add',C2,'일정 추가 줄 — 추가 단추 글(일정 종류 이름은 📋 목록 탭에서 고침)','추가');
+  add('cal.del.confirm',C2,'일정(✕)을 지우려 할 때 뜨는 확인창','삭제할까요?');
+  add('lvs.title',C3,'연차 캘린더 화면 제목','🏖 연차 캘린더');
+  add('lvs.title_err',C3,'연차 정보를 못 불러왔을 때 화면 제목(띄어쓰기 없는 옛 글 그대로)','🏖 연차캘린더');
+  add('lvs.err_load',C3,'연차 정보를 못 불러왔을 때 뜨는 글({msg}는 서버 오류)','연차 정보를 불러오지 못했습니다: {msg}',['msg']);
+  add('lvs.unknown_error',C3,'서버 오류 내용이 없을 때 {msg} 자리에 대신 들어가는 글','알 수 없는 오류');
+  add('lvs.btn_work',C3,'연차 캘린더 맨 위 — 근무 캘린더로 돌아가는 단추','근무 캘린더');
+  add('lvs.btn_leave',C3,'연차 캘린더 맨 위 — 연차 캘린더 단추','연차 캘린더');
+  add('lvs.btn_cal',C3,'연차 캘린더 — 달력 보기 단추','달력 보기');
+  add('lvs.btn_list',C3,'연차 캘린더 — 목록 보기 단추','목록 보기');
+  add('lvs.hint',C3,'연차 캘린더 단추 아래 안내','승인된 연차만 표시합니다.');
+  add('lvs.empty',C3,'선택한 달에 승인된 연차가 하나도 없을 때 뜨는 글','선택한 달의 승인 연차가 없습니다.');
+  add('lvs.th_name',C3,'목록 보기 표 머리 — 이름','이름');
+  add('lvs.th_type',C3,'목록 보기 표 머리 — 종류(원장 화면)','종류');
+  add('lvs.th_period',C3,'목록 보기 표 머리 — 기간','기간');
+  add('lvs.th_days',C3,'목록 보기 표 머리 — 일수','일수');
+  add('lvs.th_applied',C3,'목록 보기 표 머리 — 신청 시각(원장 화면)','신청 시각');
+  add('lvs.th_approved',C3,'목록 보기 표 머리 — 승인 시각(원장 화면)','승인 시각');
+  const G1='💡 건의함 › 건의함 화면';
+  const G2='💡 건의함 › 평가·수상·알림창';
+  add('sug.title',G1,'건의함 화면 맨 위 제목(캠페인이 없거나 불러오기 실패일 때. 캠페인이 있을 땐 캠페인 제목이 보임)','💡 건의함');
+  add('sug.none',G1,'진행 중인 건의 캠페인이 하나도 없을 때 뜨는 글','진행 중인 건의함이 없습니다.');
+  add('sug.err_load',G1,'건의함 정보를 못 불러왔을 때 뜨는 글({msg}는 서버 오류)','건의함 정보를 불러오지 못했습니다: {msg}',['msg']);
+  add('sug.err_like',G1,'좋아요 정보를 못 불러왔을 때 뜨는 글({msg}는 서버 오류)','좋아요 정보를 불러오지 못했습니다: {msg}',['msg']);
+  add('sug.err_review',G1,'평가 정보를 못 불러왔을 때 뜨는 글(원장 화면 · {msg}는 서버 오류)','평가 정보를 불러오지 못했습니다: {msg}',['msg']);
+  add('sug.err_award',G1,'수상 정보를 못 불러왔을 때 뜨는 글({msg}는 서버 오류)','수상 정보를 불러오지 못했습니다: {msg}',['msg']);
+  add('sug.unknown_error',G1,'서버 오류 내용이 없을 때 {msg} 자리에 대신 들어가는 글','알 수 없는 오류');
+  add('sug.state_active',G1,'캠페인 기간 줄 — 진행 중일 때 표시','진행 중');
+  add('sug.state_ended',G1,'캠페인 기간 줄 — 끝났을 때 표시','종료');
+  add('sug.prize_line',G1,'캠페인 기간 줄의 상금 글({a}·{b}·{c}=1·2·3위 상금 숫자. 상금 금액 자체는 「캠페인 설정」에서 고쳐요)','1위 {a}원 / 2위 {b}원 / 3위 {c}원',['a','b','c']);
+  add('sug.campaign.title',G1,'캠페인 설정 칸 제목(원장 화면)','owner 캠페인 설정');
+  add('sug.campaign.btn_save',G1,'캠페인 설정 칸 저장 단추(원장 화면)','저장');
+  add('sug.new.title',G1,'새 건의 쓰는 칸 제목(캠페인 기간 중에만 보임)','새 건의 작성');
+  add('sug.new.ph_title',G1,'새 건의 — 제목 칸 안에 흐리게 보이는 글','제목');
+  add('sug.new.ph_body',G1,'새 건의 — 내용 칸 안에 흐리게 보이는 글','건의 내용을 입력하세요.');
+  add('sug.new.btn_submit',G1,'새 건의 — 등록 단추','건의 등록');
+  add('sug.people_line',G1,'맨 위 사람별 줄({name}=이름 · {posts}=게시글 수 · {likes}=받은 좋아요 수)','{name} · 게시글 {posts}개 · 받은 좋아요 {likes}개',['name','posts','likes']);
+  add('sug.btn_like',G1,'건의 카드 좋아요 단추 글(뒤에 숫자가 붙음)','좋아요');
+  add('sug.btn_unlike',G1,'이미 좋아요를 눌렀을 때 단추 글(뒤에 숫자가 붙음)','좋아요 취소');
+  add('sug.btn_edit',G1,'건의 카드 수정 단추(내 글)','수정');
+  add('sug.btn_del',G1,'건의 카드 삭제 단추(내 글·원장)','삭제');
+  add('sug.btn_edit_save',G1,'건의 수정 칸 저장 단추','수정 저장');
+  add('sug.btn_cancel',G1,'건의 수정 칸 취소 단추','취소');
+  add('sug.empty',G1,'등록된 건의가 하나도 없을 때 뜨는 글','등록된 건의가 없습니다.');
+  add('sug.review.ph_score',G2,'평가 칸(원장) — 점수 칸 안에 흐리게 보이는 글(글만 고침 — 점수는 1~5만 저장돼요)','점수 1~5');
+  add('sug.review.ph_rank',G2,'평가 칸(원장) — 순위 칸 안에 흐리게 보이는 글(글만 고침 — 순위는 1~3만 저장돼요)','순위 1~3');
+  add('sug.review.ph_note',G2,'평가 칸(원장) — 메모 칸 안에 흐리게 보이는 글','평가 메모');
+  add('sug.review.btn_save',G2,'평가 칸(원장) — 저장 단추','평가 저장');
+  add('sug.win.title',G2,'캠페인이 끝난 뒤 수상 결과 칸 제목','수상 결과');
+  add('sug.win.row',G2,'수상 결과 한 줄({rank}=순위 · {name}=이름 · {title}=건의 제목 · {amount}=상금 숫자)','{rank}위 · {name} · {title} · {amount}원',['rank','name','title','amount']);
+  add('sug.win.none',G2,'수상 결과가 하나도 없을 때 뜨는 글','수상 결과가 없습니다.');
+  add('sug.win.note',G2,'수상 결과 칸 맨 아래 작은 글','지급 기능 없음');
+  add('sug.m_need_both',G2,'건의 저장 — 제목이나 내용이 비었을 때 알림창','제목과 내용을 입력하세요.');
+  add('sug.m_save_fail',G2,'건의 저장 실패 알림창({msg}는 서버 오류)','건의를 저장하지 못했습니다: {msg}',['msg']);
+  add('sug.del.confirm',G2,'건의 삭제를 누르면 뜨는 확인창','이 건의를 삭제할까요?');
+  add('sug.m_del_fail',G2,'건의 삭제 실패 알림창({msg}는 서버 오류)','건의를 삭제하지 못했습니다: {msg}',['msg']);
+  add('sug.m_like_fail',G2,'좋아요 변경 실패 알림창({msg}는 서버 오류)','좋아요를 변경하지 못했습니다: {msg}',['msg']);
+  add('sug.m_review_fail',G2,'평가 저장 실패 알림창(원장 · {msg}는 서버 오류)','평가를 저장하지 못했습니다: {msg}',['msg']);
+  add('sug.m_campaign_check',G2,'캠페인 설정 저장 — 제목·기간·상금이 잘못됐을 때 알림창(원장)','캠페인 설정을 확인하세요.');
+  add('sug.m_campaign_fail',G2,'캠페인 설정 저장 실패 알림창(원장 · {msg}는 서버 오류)','캠페인 설정을 저장하지 못했습니다: {msg}',['msg']);
+}
 let HUB_TEXT_DEFS_CACHE=null;
 function hubTextDefs(){
   if(HUB_TEXT_DEFS_CACHE)return HUB_TEXT_DEFS_CACHE;
@@ -653,6 +814,7 @@ function hubTextDefs(){
   add('owner.next.body',S,'맨 아래 카드 본문(줄바꿈 그대로 보임)',HUB_NEXT_BODY_DEFAULT);
   hubTextDefsChapter2(add);
   hubTextDefsChapter3(add);
+  hubTextDefsChapter4(add);
   HUB_TEXT_DEFS_CACHE=defs;
   return defs;
 }
@@ -669,7 +831,7 @@ function hubTextMatches(def,query,current){
   return q.split(/\s+/).every(function(w){return hay.indexOf(w)>=0;});
 }
 
-/* 숫자 기준(app_settings 키) — 근태 기준 7개(차례 1) + 연차·소명 기준 5개(차례 3: 화면에만 있던 숫자만 — DB 함수에도 박힌 숫자는 안 옮김) */
+/* 숫자 기준(app_settings 키) — 근태 기준 7개(차례 1) + 연차·소명 기준 5개(차례 3) + 결재 목록 건수 2개(차례 4: 화면에만 있던 숫자만 — DB 함수·Storage 규칙에도 박힌 숫자는 안 옮김) */
 const HUB_SETTING_DEFS=[
   {key:'late_cut',screen:'🕘 근태 기준',label:'지각 판정 시각',where:'출퇴근 — 이 시각을 넘겨 출근하면 지각으로 계산(예 09:40이면 09:41부터 지각)',def:'09:40',kind:'time'},
   {key:'siueop',screen:'🕘 근태 기준',label:'시업(공식 출근) 시각',where:'출퇴근 — 화면에 보여 주는 공식 출근 시각',def:'10:00',kind:'time'},
@@ -682,7 +844,9 @@ const HUB_SETTING_DEFS=[
   {key:'leave.same_day_limit',screen:'🌿 연차 기준',label:'같은 날 동시 휴가, 신청이 막히는 인원',where:'연차 신청 — 같은 날 이미 이 인원 이상이 휴가(대기·승인 포함)면 신청할 수 없음(예 2이면 이미 2명이 있을 때 막힘). 화면 규칙이라 DB에는 없어요',def:'2',kind:'int',min:1,max:30,unit:'명'},
   {key:'leave.same_day_reason_from',screen:'🌿 연차 기준',label:'같은 날 동시 휴가, 특별사정 사유가 필요해지는 인원',where:'연차 신청 — 같은 날 이미 이 인원 이상이 휴가면 「특별사정」 사유를 적어야 신청됨(예 1이면 이미 1명이 있을 때부터). 위 「막히는 인원」보다 작아야 의미가 있어요',def:'1',kind:'int',min:1,max:30,unit:'명'},
   {key:'leave.half_day_value',screen:'🌿 연차 기준',label:'반차·조퇴 1건이 쓰는 연차 일수',where:'연차 신청 — 반차·조퇴를 신청할 때 장부에서 빠지는 일수(예 0.5). 이미 신청된 건은 안 바뀌어요',def:'0.5',kind:'dec',min:0.1,max:1,unit:'일'},
-  {key:'leave.my_list_limit',screen:'🌿 연차 기준',label:'내 신청 내역에 보이는 건수',where:'연차 — 「내 신청 내역」 표에 최근 몇 건까지 보여 줄지',def:'20',kind:'int',min:5,max:100,unit:'건'}
+  {key:'leave.my_list_limit',screen:'🌿 연차 기준',label:'내 신청 내역에 보이는 건수',where:'연차 — 「내 신청 내역」 표에 최근 몇 건까지 보여 줄지',def:'20',kind:'int',min:5,max:100,unit:'건'},
+  {key:'appr.my_list_limit',screen:'🖊 결재 기준',label:'「내가 올린 문서」에 보이는 건수',where:'결재함 — 「내가 올린 문서」에 최근 몇 건까지 보여 줄지',def:'20',kind:'int',min:5,max:100,unit:'건'},
+  {key:'appr.done_list_limit',screen:'🖊 결재 기준',label:'「완결된 결재 문서」에 보이는 건수',where:'결재함(실장·원장 화면) — 「완결된 결재 문서」(취소된 문서 포함)에 최근 몇 건까지 보여 줄지',def:'50',kind:'int',min:10,max:200,unit:'건'}
 ];
 function hubSettingDefByKey(key){
   for(let i=0;i<HUB_SETTING_DEFS.length;i++)if(HUB_SETTING_DEFS[i].key===key)return HUB_SETTING_DEFS[i];
@@ -735,7 +899,15 @@ const HUB_LIST_DEFS=[
   {key:'list.work_depts',screen:'🗓 근무표',label:'근무부서 이름',addable:false,
    where:'근무표 › 근무명부 관리 표의 「근무부서」 고르는 칸 · 「비로그인 근무자 추가」 부서 고르는 칸',
    note:'근무부서는 서버에 저장 가능한 7가지로 정해져 있어요(Dr. 이름은 화면이 직접 알아보는 코드이기도 해요). 그래서 코드는 못 바꾸고 새 부서도 못 늘려요. 보이는 이름만 고칠 수 있어요.',
-   def:[{code:'Dr.',label:'Dr.'},{code:'진료실',label:'진료실'},{code:'데스크',label:'데스크'},{code:'기공실',label:'기공실'},{code:'미지정',label:'미지정'},{code:'상담',label:'상담'},{code:'행정',label:'행정'}]}
+   def:[{code:'Dr.',label:'Dr.'},{code:'진료실',label:'진료실'},{code:'데스크',label:'데스크'},{code:'기공실',label:'기공실'},{code:'미지정',label:'미지정'},{code:'상담',label:'상담'},{code:'행정',label:'행정'}]},
+  {key:'list.approval_kinds',screen:'🖊 결재함',label:'결재 종류 이름',addable:false,
+   where:'결재함 › 「결재 올리기」 창의 「종류」 고르는 칸 · 이름을 고친 종류는 결재 문서 카드의 [종류] 표시에도 바뀌어 보여요',
+   note:'결재 종류는 서버에 저장되는 값(연차·사직서·보고·소명·기타)과 재직증명서 발급 흐름이 이 코드로 움직여서 코드는 못 바꾸고 새 종류도 못 늘려요. 보이는 이름만 고칠 수 있어요. 이미 올라간 문서의 제목·내용은 안 바뀌어요.',
+   def:[{code:'연차 신청',label:'연차 신청'},{code:'사직서',label:'사직서'},{code:'재직증명서 발급',label:'재직증명서 발급'},{code:'보고',label:'보고'},{code:'소명',label:'소명'},{code:'기타',label:'기타'}]},
+  {key:'list.calendar_kinds',screen:'📅 캘린더',label:'일정 종류 이름',addable:false,
+   where:'캘린더 › 일정 추가 줄(실장·원장)의 종류 고르는 칸 · 일정 위에 마우스를 올렸을 때 나오는 종류 글',
+   note:'일정 종류는 서버가 허락하는 3가지(이벤트·단축근무·면접)로 정해져 있어서 코드는 못 바꾸고 새 종류도 못 늘려요. 보이는 이름만 고칠 수 있어요.',
+   def:[{code:'이벤트',label:'이벤트'},{code:'단축근무',label:'단축근무'},{code:'면접',label:'면접'}]}
 ];
 // 카드 목록(app_settings의 JSON). 기본 카드는 hr.html의 workDocuments와 같아야 한다(시험이 대조).
 const HUB_CARD_DEFS=[

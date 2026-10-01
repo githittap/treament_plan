@@ -73,8 +73,8 @@ test('화면 코드(hr.html)에 박힌 기본 글이 기본값 목록과 글자�
   }
   // 모달처럼 고정된 HTML 속 글: data-hubk(글) · data-hubph(칸 안 흐린 글)
   const stat=new Map();
-  for(const sm of hr.matchAll(/<[a-z0-9]+\b[^>]*\bdata-hubk="([a-z0-9_.]+)"[^>]*>([^<]*)</g))stat.set(sm[1],sm[2]);
-  for(const sm of hr.matchAll(/<[a-z0-9]+\b[^>]*\bdata-hubph="([a-z0-9_.]+)"[^>]*>/g)){const ph=/placeholder="([^"]*)"/.exec(sm[0]);assert.ok(ph,sm[1]+' 흐린 글 칸');stat.set(sm[1],ph[1]);}
+  for(const sm of hr.matchAll(/<[a-z0-9]+\b[^>]*\bdata-hubk="([a-z0-9_.]+)"[^>]*>([^<]*)</g))if(CH3.test(sm[1]))stat.set(sm[1],sm[2]); // 차례 4의 고정 글 표지(결재·공지 창)는 차례 4 시험이 따로 봄
+  for(const sm of hr.matchAll(/<[a-z0-9]+\b[^>]*\bdata-hubph="([a-z0-9_.]+)"[^>]*>/g)){const ph=/placeholder="([^"]*)"/.exec(sm[0]);assert.ok(ph,sm[1]+' 흐린 글 칸');if(CH3.test(sm[1]))stat.set(sm[1],ph[1]);}
   const defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
   for(const d of defs){
     if(stat.has(d.key)){assert.equal(stat.get(d.key),d.def,d.key+' 고정 글이 기본값과 다름');assert.ok(!found.has(d.key),d.key+' 고정 글과 호출이 겹침');continue;}
@@ -87,7 +87,7 @@ test('화면 코드(hr.html)에 박힌 기본 글이 기본값 목록과 글자�
 
 test('숫자·목록 기본값: 연차·소명 숫자 5개와 연차 유형·근무부서 목록이 hr.html과 같다 · 캐시 번호',()=>{
   const h=helpers(),S=k=>h.HUB_SETTING_DEFS.find(d=>d.key===k),L=k=>h.HUB_LIST_DEFS.find(d=>d.key===k);
-  assert.deepEqual(clone(h.HUB_SETTING_DEFS.slice(7).map(d=>[d.key,d.def,d.kind,d.min,d.max])),[
+  assert.deepEqual(clone(h.HUB_SETTING_DEFS.slice(7,12).map(d=>[d.key,d.def,d.kind,d.min,d.max])),[
     ['att.issue_list_limit','30','int',5,100],['leave.same_day_limit','2','int',1,30],['leave.same_day_reason_from','1','int',1,30],['leave.half_day_value','0.5','dec',0.1,1],['leave.my_list_limit','20','int',5,100]]);
   // 화면 코드의 기본값도 같음
   assert.match(hr,/hubN\('att\.issue_list_limit',30\)/);assert.match(hr,/hubN\('leave\.my_list_limit',20\)/);assert.match(hr,/hubN\('leave\.half_day_value',0\.5\)/);
@@ -101,7 +101,7 @@ test('숫자·목록 기본값: 연차·소명 숫자 5개와 연차 유형·근
   assert.match(hr,/<select id="lvType"><option>연차<\/option><option>반차<\/option><option>조퇴<\/option><option>기타<\/option><\/select>/,'신청 창 기본 선택칸(기존 시험이 이 줄을 찾음)');
   assert.equal(L('list.work_depts').addable,false);assert.equal(L('list.leave_types').addable,false);
   assert.ok(S('leave.same_day_limit').where.includes('DB에는 없어요'));
-  assert.match(hr,/hub-texts\.js\?v=2026100109/,'캐시 번호를 새 값으로 올림');
+  assert.match(hr,/hub-texts\.js\?v=2026100110/,'캐시 번호를 새 값으로 올림(차례 4에서 2026100109 → 2026100110)');
 });
 
 /* ───────────── 2. 기본값만 있을 때 옛 화면과 똑같음 ───────────── */
@@ -178,8 +178,8 @@ test('표에 값이 있어도 글이 비어 있거나 공백뿐이면 무시하�
 /* ───────────── 4. 고정 HTML(모달) 속 글 ───────────── */
 test('모달 속 고정 글 19개: 기본값 그대로·표에 값이 있으면 바뀌고·되돌리면 다시 기본값(연차 신청 창·휴가 신청서 창·지문 엑셀 창)',async()=>{
   const items=[];
-  for(const sm of hr.matchAll(/<[a-z0-9]+\b[^>]*\bdata-hubk="([a-z0-9_.]+)"[^>]*>([^<]*)</g))items.push({kind:'k',key:sm[1],text:sm[2]});
-  for(const sm of hr.matchAll(/<[a-z0-9]+\b[^>]*\bdata-hubph="([a-z0-9_.]+)"[^>]*>/g))items.push({kind:'ph',key:sm[1],text:/placeholder="([^"]*)"/.exec(sm[0])[1]});
+  for(const sm of hr.matchAll(/<[a-z0-9]+\b[^>]*\bdata-hubk="([a-z0-9_.]+)"[^>]*>([^<]*)</g))if(CH3.test(sm[1]))items.push({kind:'k',key:sm[1],text:sm[2]});
+  for(const sm of hr.matchAll(/<[a-z0-9]+\b[^>]*\bdata-hubph="([a-z0-9_.]+)"[^>]*>/g))if(CH3.test(sm[1]))items.push({kind:'ph',key:sm[1],text:/placeholder="([^"]*)"/.exec(sm[0])[1]});
   assert.equal(items.length,19);
   const els=items.map(it=>{const attrs={};return {dataset:{},_attrs:attrs,textContent:it.kind==='k'?it.text:'',getAttribute(n){return n==='data-hubk'||n==='data-hubph'?it.key:(n==='placeholder'?attrs.placeholder:null);},setAttribute(n,v){attrs[n]=v;},it};});
   for(const e of els.filter(e=>e.it.kind==='ph'))e._attrs.placeholder=e.it.text;
@@ -373,7 +373,7 @@ test('화면: 🔢 숫자·기준 — 연차·소명 기준 5개가 더 있고(�
   await t.render(OWNER);
   await t.click('[hub-subtab]=settings');
   const sec=t.section.innerHTML;
-  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,12);
+  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,12+2,'근태 7 + 연차·소명 5 + 차례 4 결재 건수 2');
   assert.ok(sec.includes('🌿 연차 기준')&&sec.includes('🕘 근태 기준'));
   assert.match(sec,/id="hubSetIn_8" type="number" inputmode="numeric" min="1" max="30" value="2"/);
   assert.match(sec,/id="hubSetIn_10" type="number" inputmode="decimal" step="0\.1" min="0\.1" max="1" value="0\.5"/);
@@ -398,7 +398,7 @@ test('화면: 📋 목록에 연차 유형 이름·근무부서 이름이 있고
   await t.click('[hub-subtab]=lists');
   let sec=t.section.innerHTML;
   assert.ok(sec.includes('연차 유형 이름')&&sec.includes('근무부서 이름'));
-  assert.equal((sec.match(/<span class="hub-code">/g)||[]).length,4+6+3+4+4+7);
+  assert.equal((sec.match(/<span class="hub-code">/g)||[]).length,4+6+3+4+4+7+6+3,'차례 4: 결재 종류 6 · 일정 종류 3 추가');
   assert.equal((sec.match(/data-hub-list-add=/g)||[]).length,2,'새 항목을 늘릴 수 있는 목록은 직원 부서·서류 종류뿐');
   assert.match(sec,/<span class="hub-code">반차<\/span><input id="hubLstLbl_4_1" type="text" maxlength="20" value="반차"/);
   assert.match(sec,/<span class="hub-code">Dr\.<\/span><input id="hubLstLbl_5_0" type="text" maxlength="20" value="Dr\."/);
