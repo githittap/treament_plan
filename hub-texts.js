@@ -5,6 +5,7 @@
    · 글  → 표 hub_ui_texts(db/hub_ui_texts.sql) · 숫자·목록 → 이미 있는 표 app_settings(키만 더함, 표·정책은 안 고침)
    hr.html은 이 파일을 main 스크립트보다 먼저 <script src="hub-texts.js?v=…"> 로 불러온다(함수는 전역 hubText·hubSetting·hubList·HubUi).
    로그인 전 화면 글은 표를 읽을 수 없어 이 엔진을 쓰지 않는다(설계서 5장).
+   차례 3: 출퇴근·근무표·연차 글(hubTextDefsChapter3) + 연차 유형·근무부서 이름 목록 + 연차·소명 숫자 기준(hubSettingChecked).
    차례 2: 내 서류함·업무자료 글(hubTextDefsChapter2) + 서류 종류·상태 이름 목록 + 업무자료 카드(app_settings cards.work_materials, 링크는 http(s)만).
    © 2026 Jung · 아산정플란트치과 */
 (function(root){
@@ -55,6 +56,14 @@ function hubSetting(key,def){
 function hubSettingNumber(key,def){
   const n=Number(hubSetting(key,String(def)));
   return Number.isFinite(n)?n:def;
+}
+// 숫자 읽기(차례 3): 허브 설정이 정한 범위 안의 숫자만 쓰고, 값이 없거나 숫자가 아니거나 범위 밖이면 기본값.
+function hubSettingChecked(key,defNum){
+  const d=hubSettingDefByKey(key);
+  const raw=hubSetting(key,d?d.def:String(defNum));
+  if(!d){const n=Number(raw);return Number.isFinite(n)?n:defNum;}
+  const chk=hubSettingValidate(d,raw);
+  return chk.ok?Number(chk.value):Number(d.def);
 }
 // 목록: [{code,label}]. 코드는 고정이고 보이는 이름(label)만 고친다. 모양이 틀리면 기본 목록.
 function hubListParse(raw){
@@ -299,6 +308,322 @@ function hubTextDefsChapter2(add){
   add('onbo.over.all_done',S11,'전원이 제출했을 때 뜨는 글','전원 제출 완료');
   add('onbo.over.hint',S11,'카드 맨 아래 설명','chief·manager는 완료 여부를 안내·점검하며 계좌번호 원문은 보지 않습니다.');
 }
+// ── 차례 3: 출퇴근·근무표·연차 글(기본 글은 hr.html의 글과 같아야 함 — 시험이 대조) ──
+function hubTextDefsChapter3(add){
+  add('att.my.err','🕘 출퇴근 › 내 출퇴근(직원 화면)','내 출퇴근 — 수기 근태 조회 실패 앞 글(뒤에 오류 내용이 붙음)','수기 근태 조회 실패:');
+  add('att.my.err_draft','🕘 출퇴근 › 내 출퇴근(직원 화면)','내 출퇴근 — 수기 조회 실패인데 오류 내용이 없을 때','DB 초안이 아직 적용되지 않았습니다.');
+  add('att.my.title','🕘 출퇴근 › 내 출퇴근(직원 화면)','내 출퇴근 카드 제목','🕘 내 출퇴근');
+  add('att.my.th_in','🕘 출퇴근 › 내 출퇴근(직원 화면)','내 출퇴근 표 머리 — 출근','출근');
+  add('att.my.th_out','🕘 출퇴근 › 내 출퇴근(직원 화면)','내 출퇴근 표 머리 — 퇴근','퇴근');
+  add('att.my.th_late','🕘 출퇴근 › 내 출퇴근(직원 화면)','내 출퇴근 표 머리 — 지각','지각');
+  add('att.my.th_ot','🕘 출퇴근 › 내 출퇴근(직원 화면)','내 출퇴근 표 머리 — 연장','연장');
+  add('att.my.th_basis','🕘 출퇴근 › 내 출퇴근(직원 화면)','내 출퇴근 표 머리 — 기준(지문·수기·승인 보정 표시)','기준');
+  add('att.my.orig','🕘 출퇴근 › 내 출퇴근(직원 화면)','내 출퇴근 — 승인 보정된 칸의 「원래 값」 표시({v}는 원래 출근·퇴근 시각)','원 {v}',['v']);
+  add('att.my.late','🕘 출퇴근 › 내 출퇴근(직원 화면)','내 출퇴근 — 지각한 날 칸 글({n}은 지각 분)','지각 {n}분',['n']);
+  add('att.my.orig_min','🕘 출퇴근 › 내 출퇴근(직원 화면)','내 출퇴근 — 승인 보정된 지각·연장 칸의 「원래 값」 표시({v}는 원래 분)','원 {v}분',['v']);
+  add('att.my.basis_adj','🕘 출퇴근 › 내 출퇴근(직원 화면)','내 출퇴근 기준 칸 — 승인 보정','승인 보정');
+  add('att.my.basis_manual','🕘 출퇴근 › 내 출퇴근(직원 화면)','내 출퇴근 기준 칸 — 수기 기록','수기 기록');
+  add('att.my.basis_fp','🕘 출퇴근 › 내 출퇴근(직원 화면)','내 출퇴근 기준 칸 — 지문 기록','지문 기록');
+  add('att.my.empty','🕘 출퇴근 › 내 출퇴근(직원 화면)','내 출퇴근 — 이번 달 기록이 없을 때','이번 달 기록 없음 (지문은 월말 일괄 입력)');
+  add('att.my.manual_list','🕘 출퇴근 › 내 출퇴근(직원 화면)','내 출퇴근 — 수기 제출 내역 앞 글(뒤에 날짜·상태가 이어 붙음)','수기 제출 내역:');
+  add('att.my.fix_a','🕘 출퇴근 › 내 출퇴근(직원 화면)','내 출퇴근 아래 안내 앞부분','기록이 실제와 다르면 관리자에게');
+  add('att.my.fix_b','🕘 출퇴근 › 내 출퇴근(직원 화면)','내 출퇴근 아래 안내 — 굵게 보이는 말','지문누락 소명');
+  add('att.my.fix_c','🕘 출퇴근 › 내 출퇴근(직원 화면)','내 출퇴근 아래 안내 뒷부분','을 요청하세요.');
+  add('att.my.fix_btn','🕘 출퇴근 › 내 출퇴근(직원 화면)','내 출퇴근 — 소명 올리기 단추','소명 올리기');
+  add('att.manual.reason_prefix','🕘 출퇴근 › 수기 출퇴근 입력','선택한 날짜 상세 — 「정정 사유」 앞 글(뒤에 사유가 이어 붙음)','정정 사유:');
+  add('att.manual.note_prefix','🕘 출퇴근 › 수기 출퇴근 입력','선택한 날짜 상세 — 「비고」 앞 글(뒤에 비고가 이어 붙음)','비고:');
+  add('att.manual.minutes_line','🕘 출퇴근 › 수기 출퇴근 입력','선택한 날짜 상세 — 점심·퇴근·저녁 추가근무 분 줄({lunch}·{clockout}·{evening}은 화면이 채우는 분 수)','{lunch}분 점심 · {clockout}분 퇴근 · {evening}분 저녁',['lunch','clockout','evening']);
+  add('att.manual.no_notes','🕘 출퇴근 › 수기 출퇴근 입력','선택한 날짜 상세 — 사유·비고가 하나도 없을 때','사유·비고 없음');
+  add('att.manual.pick_hour','🕘 출퇴근 › 수기 출퇴근 입력','시·분 고르는 칸의 맨 위 안내(출근·퇴근 「시」 칸)','시 선택');
+  add('att.manual.pick_min','🕘 출퇴근 › 수기 출퇴근 입력','시·분 고르는 칸의 맨 위 안내(출근·퇴근 「분」 칸)','분 선택');
+  add('att.manual.title','🕘 출퇴근 › 수기 출퇴근 입력','수기 입력 카드 맨 위 제목','📝 수기 출퇴근 입력');
+  add('att.manual.title_sub','🕘 출퇴근 › 수기 출퇴근 입력','수기 입력 제목 옆 작은 글(괄호는 화면이 붙임)','지문 기록과 별도 대조 원장');
+  add('att.manual.f_date','🕘 출퇴근 › 수기 출퇴근 입력','수기 입력 칸 이름 — 근무일','근무일');
+  add('att.manual.f_in','🕘 출퇴근 › 수기 출퇴근 입력','수기 입력 칸 이름 — 출근','출근');
+  add('att.manual.f_out','🕘 출퇴근 › 수기 출퇴근 입력','수기 입력 칸 이름 — 퇴근','퇴근');
+  add('att.manual.f_weekday','🕘 출퇴근 › 수기 출퇴근 입력','수기 입력 칸 이름 — 요일','요일');
+  add('att.manual.f_late','🕘 출퇴근 › 수기 출퇴근 입력','수기 입력 칸 이름 — 지각 분','지각(분)');
+  add('att.manual.f_early','🕘 출퇴근 › 수기 출퇴근 입력','수기 입력 칸 이름 — 조퇴 분','조퇴(분)');
+  add('att.manual.f_lunch','🕘 출퇴근 › 수기 출퇴근 입력','수기 입력 칸 이름 — 점심 추가근무','점심 추가근무');
+  add('att.manual.ph_ot','🕘 출퇴근 › 수기 출퇴근 입력','점심·퇴근 추가근무 칸 안에 흐리게 보이는 예시','예: 9, 20 또는 01:09');
+  add('att.manual.f_clockout_ot','🕘 출퇴근 › 수기 출퇴근 입력','수기 입력 칸 이름 — 퇴근 추가근무','퇴근 추가근무');
+  add('att.manual.f_evening_ot','🕘 출퇴근 › 수기 출퇴근 입력','수기 입력 칸 이름 — 저녁 추가근무','저녁 추가근무');
+  add('att.manual.ph_evening','🕘 출퇴근 › 수기 출퇴근 입력','저녁 추가근무 칸 안에 흐리게 보이는 예시','분 또는 01:09');
+  add('att.manual.f_total','🕘 출퇴근 › 수기 출퇴근 입력','수기 입력 칸 이름 — 추가근무 합계','추가근무 합계');
+  add('att.manual.f_half','🕘 출퇴근 › 수기 출퇴근 입력','수기 입력 칸 이름 — 반차(고르는 칸 안의 값은 못 바꿈)','반차');
+  add('att.manual.f_correct','🕘 출퇴근 › 수기 출퇴근 입력','수기 입력 — 정정·예외 체크 칸 글','정정·예외 입력');
+  add('att.manual.ph_reason','🕘 출퇴근 › 수기 출퇴근 입력','수기 입력 — 사유 칸 안에 흐리게 보이는 글','정정·예외일 때 사유 필수');
+  add('att.manual.ph_note','🕘 출퇴근 › 수기 출퇴근 입력','수기 입력 — 비고 칸 안에 흐리게 보이는 글','비고');
+  add('att.manual.detail_close','🕘 출퇴근 › 수기 출퇴근 입력','수기 입력 — 선택 날짜 상세를 열어 둔 상태의 단추 글','선택 날짜 상세 닫기');
+  add('att.manual.detail_open','🕘 출퇴근 › 수기 출퇴근 입력','수기 입력 — 선택 날짜 상세를 닫아 둔 상태의 단추 글','선택 날짜 상세 열기');
+  add('att.manual.no_note','🕘 출퇴근 › 수기 출퇴근 입력','선택한 날짜 상세(첫 화면) — 비고가 하나도 없을 때','비고 없음');
+  add('att.manual.submit','🕘 출퇴근 › 수기 출퇴근 입력','수기 입력 아래 제출 단추','수기 입력 제출');
+  add('att.manual.m_format','🕘 출퇴근 › 수기 출퇴근 입력','수기 입력 제출 — 연장 형식이나 정정 사유가 빠졌을 때 뜨는 글','출퇴근·연장 원자료 형식 또는 정정 사유를 확인하세요.');
+  add('att.manual.m_fail','🕘 출퇴근 › 수기 출퇴근 입력','수기 입력 제출 실패 — 뒤에 서버 오류가 붙음({msg})','실패: {msg}',['msg']);
+  add('att.manual.m_ok','🕘 출퇴근 › 수기 출퇴근 입력','수기 입력을 제출했을 때 뜨는 글','제출했습니다. 승인 대기 중입니다.');
+  add('att.review.m_fail','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','수기 출퇴근 검토 — 승인·반려 처리가 실패했을 때({msg}는 서버 오류)','처리 실패: {msg}',['msg']);
+  add('att.btn.chief_ok','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','출퇴근 — 실장이 누르는 승인 단추(수기·소명 공통)','실장 승인');
+  add('att.btn.owner_ok','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','출퇴근 — 원장이 누르는 확정 단추(수기·소명 공통)','원장 확정');
+  add('att.btn.reject','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','출퇴근 — 반려 단추(수기·소명 공통)','반려');
+  add('att.close.title','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 마감 카드 제목(실장·원장·매니저 화면)','🗂 지문 근태 — 월 마감');
+  add('att.close.hint','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 마감 카드 설명','지문인식기 엑셀(.xls/.xlsx)을 올리면 출근·퇴근·지각·연장을 자동 판정합니다. (하루 최초 인식=출근, 최후=퇴근)');
+  add('att.close.state','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 마감 카드 — 이번 달 상태 앞 글','이번 달 상태:');
+  add('att.close.state_none','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 마감 카드 — 아직 집계 전일 때 상태 글','미집계');
+  add('att.close.btn','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 마감 카드 — 원장 전용 확정 단추','이번 달 확정');
+  add('att.resol.title','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','인정 근태 카드 제목','🧾 지문 오류 승인 인정 근태');
+  add('att.resol.th_time','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','인정 근태 표 머리 — 인정 출퇴근','인정 출퇴근');
+  add('att.resol.th_at','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','인정 근태 표 머리 — 승인일','승인일');
+  add('att.resol.empty','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','인정 근태 카드 — 아직 하나도 없을 때','별도 인정 근태 없음');
+  add('att.review.title','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','수기 출퇴근 검토 카드 제목(실장·원장)','📝 수기 출퇴근 검토');
+  add('att.review.th_manual','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','수기 검토 표 머리 — 수기 기록','수기');
+  add('att.review.th_fp','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','수기 검토 표 머리 — 지문 기록','지문');
+  add('att.review.empty','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','수기 검토 카드 — 수기 입력이 하나도 없을 때','수기 입력 없음');
+  add('att.review.err','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','수기 검토 카드 — 조회 실패 앞 글(뒤에 오류 내용이 붙음)','수기 근태 조회 실패:');
+  add('att.review.err_draft','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','수기 검토 조회 실패인데 오류 내용이 없을 때','DB 초안이 아직 적용되지 않았습니다.');
+  add('att.close.confirm','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 확정 누르면 뜨는 확인창({month}는 해당 달)','{month} 근태를 확정할까요? (이후 수정은 소명/정정으로)',['month']);
+  add('att.absset.title','🕘 출퇴근 › 결근 후보·지문누락 소명','결근 후보 기준 카드 제목(원장만 보임)','⚙ 결근/미기록 후보 기준');
+  add('att.absset.title_sub','🕘 출퇴근 › 결근 후보·지문누락 소명','결근 후보 기준 제목 옆 작은 글','원장');
+  add('att.absset.f_siueop','🕘 출퇴근 › 결근 후보·지문누락 소명','결근 후보 기준 — 시업 시각 칸','시업 시각');
+  add('att.absset.f_delay','🕘 출퇴근 › 결근 후보·지문누락 소명','결근 후보 기준 — 확인 지연 칸','확인 지연(분)');
+  add('att.absset.f_days','🕘 출퇴근 › 결근 후보·지문누락 소명','결근 후보 기준 — 무단결근 일수 칸','무단결근 기준 일수');
+  add('att.absset.f_exclude','🕘 출퇴근 › 결근 후보·지문누락 소명','결근 후보 기준 — 수기근태 제외 체크 칸 글','대기·실장승인·원장확정 수기근태는 후보에서 제외');
+  add('att.absset.save','🕘 출퇴근 › 결근 후보·지문누락 소명','결근 후보 기준 저장 단추','기준 저장');
+  add('att.absset.m_check','🕘 출퇴근 › 결근 후보·지문누락 소명','결근 후보 기준 저장 — 값이 틀렸을 때','시업 시각·지연 분·무단결근 일수를 확인하세요.');
+  add('att.absset.m_fail','🕘 출퇴근 › 결근 후보·지문누락 소명','결근 후보 기준 저장 실패({msg}는 서버 오류)','저장 실패: {msg}',['msg']);
+  add('att.absset.m_ok','🕘 출퇴근 › 결근 후보·지문누락 소명','결근 후보 기준 저장 성공','저장했습니다.');
+  add('att.th.person','🕘 출퇴근 › 결근 후보·지문누락 소명','출퇴근 화면 표 머리 — 직원(여러 표 공통)','직원');
+  add('att.th.date','🕘 출퇴근 › 결근 후보·지문누락 소명','출퇴근 화면 표 머리 — 날짜(여러 표 공통)','날짜');
+  add('att.th.status','🕘 출퇴근 › 결근 후보·지문누락 소명','출퇴근 화면 표 머리 — 상태(여러 표 공통)','상태');
+  add('att.absent.title','🕘 출퇴근 › 결근 후보·지문누락 소명','결근/미기록 후보 카드 제목','🚫 결근/미기록 후보');
+  add('att.absent.btn','🕘 출퇴근 › 결근 후보·지문누락 소명','결근/미기록 후보 카드 — 확인하기 단추','확인하기');
+  add('att.absent.hint','🕘 출퇴근 › 결근 후보·지문누락 소명','결근/미기록 후보 카드 — 누르기 전 안내','근무표와 기록을 대조해 확인이 필요한 후보만 보여줍니다.');
+  add('att.issue.title','🕘 출퇴근 › 결근 후보·지문누락 소명','지문누락 소명 카드 제목(실장·원장)','🙋 지문누락 소명');
+  add('att.issue.title_sub','🕘 출퇴근 › 결근 후보·지문누락 소명','지문누락 소명 제목 옆 작은 글','실장·원장 승인');
+  add('att.issue.th_type','🕘 출퇴근 › 결근 후보·지문누락 소명','소명 표 머리 — 유형','유형');
+  add('att.issue.th_reason','🕘 출퇴근 › 결근 후보·지문누락 소명','소명 표 머리 — 사유','사유');
+  add('att.issue.empty','🕘 출퇴근 › 결근 후보·지문누락 소명','지문누락 소명 카드 — 소명이 하나도 없을 때','소명 없음');
+  add('att.issue.m_act_fail','🕘 출퇴근 › 결근 후보·지문누락 소명','지문누락 소명 승인·반려 실패({msg}는 서버 오류)','소명 처리 실패: {msg}',['msg']);
+  add('att.issue.p_date','🕘 출퇴근 › 결근 후보·지문누락 소명','소명 올리기 — 근무일을 묻는 창','소명할 근무일 (YYYY-MM-DD):');
+  add('att.issue.p_type','🕘 출퇴근 › 결근 후보·지문누락 소명','소명 올리기 — 오류 유형을 묻는 창(고르는 값 3개는 서버 규칙이라 못 바꿈)','오류 유형을 입력하세요: 지문인식오류 / 입력오류 / 기타');
+  add('att.issue.m_type','🕘 출퇴근 › 결근 후보·지문누락 소명','소명 올리기 — 오류 유형을 잘못 적었을 때','오류 유형은 지문인식오류, 입력오류, 기타 중 하나여야 합니다.');
+  add('att.issue.p_reason','🕘 출퇴근 › 결근 후보·지문누락 소명','소명 올리기 — 사유를 묻는 창','사유 (예: 지문 찍었으나 인식 누락):');
+  add('att.issue.m_save_fail','🕘 출퇴근 › 결근 후보·지문누락 소명','소명 올리기 실패({msg}는 서버 오류)','소명 저장 실패: {msg}',['msg']);
+  add('att.issue.m_saved','🕘 출퇴근 › 결근 후보·지문누락 소명','소명을 올렸을 때 뜨는 글','소명을 올렸습니다. 실장 승인 후 반영됩니다.');
+  add('att.absent.loading','🕘 출퇴근 › 결근 후보·지문누락 소명','결근 후보 확인 중 글','확인 중…');
+  add('att.absent.err','🕘 출퇴근 › 결근 후보·지문누락 소명','결근 후보 확인 실패 앞 글(뒤에 오류 내용이 붙음)','후보 확인 실패:');
+  add('att.absent.set_warn','🕘 출퇴근 › 결근 후보·지문누락 소명','결근 후보 — 설정을 못 불러왔을 때 경고','설정 불러오기 오류: 오늘 후보는 표시하지 않습니다.');
+  add('att.absent.th_sched','🕘 출퇴근 › 결근 후보·지문누락 소명','결근 후보 표 머리 — 근무표','근무표');
+  add('att.absent.found','🕘 출퇴근 › 결근 후보·지문누락 소명','결근 후보 — 후보가 있을 때 표 아래 안내','결근/미기록 후보입니다. 소명 또는 수기근태를 확인하세요.');
+  add('att.absent.none','🕘 출퇴근 › 결근 후보·지문누락 소명','결근 후보 — 후보가 없을 때','결근/미기록 후보 없음 ✓');
+  add('att.xl.m_read_fail','🕘 출퇴근 › 지문 엑셀 올리기 창','지문 엑셀 올리기 — 파일을 못 읽었을 때({msg}는 오류 내용)','엑셀을 읽지 못했습니다: {msg}',['msg']);
+  add('att.xl.m_no_col','🕘 출퇴근 › 지문 엑셀 올리기 창','지문 엑셀 올리기 — 필요한 열이 없을 때','열을 찾지 못했습니다(직원 식별/발생일). 지문기 원본을 그대로 올려보세요.');
+  add('att.xl.sum_a','🕘 출퇴근 › 지문 엑셀 올리기 창','엑셀 미리보기 요약 — 「총 ○행」의 앞 글','총');
+  add('att.xl.sum_b','🕘 출퇴근 › 지문 엑셀 올리기 창','엑셀 미리보기 요약 — 「행」 뒤 글','행 · 직원 매핑');
+  add('att.xl.sum_c','🕘 출퇴근 › 지문 엑셀 올리기 창','엑셀 미리보기 요약 — 「/ 미매핑」','/ 미매핑');
+  add('att.xl.unmapped_a','🕘 출퇴근 › 지문 엑셀 올리기 창','엑셀 미리보기 — 직원 명부에 없는 이름 안내(처음 올릴 때)','미매핑 (직원 명부에 없음):');
+  add('att.xl.map_pick','🕘 출퇴근 › 지문 엑셀 올리기 창','엑셀 미리보기 — 미매핑 이름 옆 고르는 칸 첫 글','이 직원으로');
+  add('att.xl.unmapped_b','🕘 출퇴근 › 지문 엑셀 올리기 창','엑셀 미리보기 — 이름을 매핑한 뒤 남은 미매핑 안내','미매핑:');
+  add('att.xl.all_mapped','🕘 출퇴근 › 지문 엑셀 올리기 창','엑셀 미리보기 — 전원 매핑됐을 때','전원 매핑됨');
+  add('att.xl.th_sched','🕘 출퇴근 › 지문 엑셀 올리기 창','엑셀 미리보기 표 머리 — 근무표','근무표');
+  add('att.xl.th_early','🕘 출퇴근 › 지문 엑셀 올리기 창','엑셀 미리보기 표 머리 — 조퇴','조퇴');
+  add('att.xl.th_evening','🕘 출퇴근 › 지문 엑셀 올리기 창','엑셀 미리보기 표 머리 — 야간 체크','야간');
+  add('att.xl.th_note','🕘 출퇴근 › 지문 엑셀 올리기 창','엑셀 미리보기 표 머리 — 비고','비고');
+  add('att.xl.b_unmapped','🕘 출퇴근 › 지문 엑셀 올리기 창','엑셀 미리보기 비고 — 직원 못 찾음','미매핑');
+  add('att.xl.b_single','🕘 출퇴근 › 지문 엑셀 올리기 창','엑셀 미리보기 비고 — 한 번만 인식됨','단일인식(누락?)');
+  add('att.xl.b_off','🕘 출퇴근 › 지문 엑셀 올리기 창','엑셀 미리보기 비고 — 쉬는 날 출근','휴무 출근');
+  add('att.xl.m_no_rows','🕘 출퇴근 › 지문 엑셀 올리기 창','지문 엑셀 저장 — 매핑된 행이 없을 때','매핑된 행이 없습니다.');
+  add('att.xl.m_saving','🕘 출퇴근 › 지문 엑셀 올리기 창','지문 엑셀 저장 중 글','저장 중…');
+  add('att.xl.m_fail','🕘 출퇴근 › 지문 엑셀 올리기 창','지문 엑셀 저장 실패({msg}는 서버 오류)','실패: {msg}',['msg']);
+  add('att.xl.auto_reason','🕘 출퇴근 › 지문 엑셀 올리기 창','지문이 한 번만 찍힌 날 자동으로 올라가는 소명의 사유 글','지문 단일 인식(자동 감지)');
+  add('att.xl.m_issue_fail','🕘 출퇴근 › 지문 엑셀 올리기 창','지문 엑셀 저장 — 일부 소명 생성 실패({saved}=저장한 건수 · {fail}=실패 건수 · {total}=전체 소명 대상 · {detail}=실패 내용)','근태 {saved}건 저장됨 · 누락 issue {fail}/{total}건 실패: {detail}',['saved','fail','total','detail']);
+  add('att.xl.m_done','🕘 출퇴근 › 지문 엑셀 올리기 창','지문 엑셀 저장 성공({n}은 저장 건수)','저장 완료: {n}건',['n']);
+  add('att.xl.m_done_miss','🕘 출퇴근 › 지문 엑셀 올리기 창','지문 엑셀 저장 성공 뒤 누락 의심이 있을 때 덧붙는 글(앞의 \' · \'는 화면이 붙임, {n}은 건수)','누락 의심 {n}건 소명 대기 생성',['n']);
+  add('att.xl.modal_title','🕘 출퇴근 › 지문 엑셀 올리기 창','지문 엑셀 올리기 창 맨 위 제목','🗂 지문 근태 업로드 — 미리보기');
+  add('att.xl.hint_a','🕘 출퇴근 › 지문 엑셀 올리기 창','지문 엑셀 올리기 창 아래 안내 — 앞부분','야간·조퇴는');
+  add('att.xl.hint_b','🕘 출퇴근 › 지문 엑셀 올리기 창','지문 엑셀 올리기 창 아래 안내 — 굵게 보이는 말','공표된 근무표');
+  add('att.xl.hint_c','🕘 출퇴근 › 지문 엑셀 올리기 창','지문 엑셀 올리기 창 아래 안내 — 뒷부분','가 기준(야간=자동 체크). 지각 컷·연장 단위는 설정 표 값 적용. 저장하면 해당 월 attendance에 기록됩니다. (조퇴 공제는 급여 단계에서)');
+  add('att.xl.btn_save','🕘 출퇴근 › 지문 엑셀 올리기 창','지문 엑셀 올리기 창 아래 저장 단추','저장');
+  add('sched.title','🗓 근무표 › 주간·월간 화면','근무표 화면 맨 위 제목(월간·주간·오류 카드 공통)','🗓 근무표');
+  add('sched.err_month','🗓 근무표 › 주간·월간 화면','월간 근무표를 못 불러왔을 때 앞 글(뒤에 오류 내용이 붙음)','월간 근무표를 불러오지 못했습니다:');
+  add('sched.err_unknown','🗓 근무표 › 주간·월간 화면','근무표를 못 불러왔을 때 오류 내용이 없으면 쓰는 글','알 수 없는 오류');
+  add('sched.btn_week','🗓 근무표 › 주간·월간 화면','근무표 단추 — 주간 편집(주간·월간 화면 공통)','주간 편집');
+  add('sched.btn_month_role','🗓 근무표 › 주간·월간 화면','월간 화면의 단추 — 월간 직무표','월간 직무표');
+  add('sched.btn_pdf','🗓 근무표 › 주간·월간 화면','근무표 단추 — PDF 저장(주간·월간 공통)','PDF 저장');
+  add('sched.btn_print','🗓 근무표 › 주간·월간 화면','근무표 단추 — 인쇄(주간·월간 공통)','인쇄');
+  add('sched.f_month','🗓 근무표 › 주간·월간 화면','월간 화면 — 대상 월 고르는 칸 이름','대상 월');
+  add('sched.st_confirmed','🗓 근무표 › 주간·월간 화면','월간 화면 주차 제목 옆 — 공표된 주차 표시','확정');
+  add('sched.st_writing','🗓 근무표 › 주간·월간 화면','월간 화면 주차 제목 옆 — 아직 공표 전인 주차 표시','작성 중');
+  add('sched.th_role','🗓 근무표 › 주간·월간 화면','근무표 표 맨 왼쪽 머리(주간·월간 공통)','직무·상태');
+  add('sched.hint','🗓 근무표 › 주간·월간 화면','근무표 맨 아래 안내(주간·월간 공통)','직무·상태 셀을 열어 여러 명을 선택합니다. 승인 연차자는 근무·야간 선택이 잠깁니다. 모든 승인 직원은 초안을 편집할 수 있고, 공표는 실장·원장만 가능합니다.');
+  add('sched.err_week','🗓 근무표 › 주간·월간 화면','주간 근무표 — 주차 정보를 못 불러왔을 때 앞 글(뒤에 오류 내용이 붙음)','근무표 주차 정보를 불러오지 못했습니다:');
+  add('sched.err_rows','🗓 근무표 › 주간·월간 화면','주간 근무표 — 근무표 내용을 못 불러왔을 때 앞 글(뒤에 오류 내용이 붙음)','근무표를 불러오지 못했습니다:');
+  add('sched.err_leave','🗓 근무표 › 주간·월간 화면','주간 근무표 — 연차 정보를 못 불러왔을 때 앞 글(뒤에 오류 내용이 붙음)','연차 정보를 불러오지 못했습니다:');
+  add('sched.wk_published','🗓 근무표 › 주간·월간 화면','주간 화면 제목 옆 — 공표된 주','공표됨');
+  add('sched.wk_draft','🗓 근무표 › 주간·월간 화면','주간 화면 제목 옆 — 공표 전인 주','초안');
+  add('sched.btn_month_edit','🗓 근무표 › 주간·월간 화면','주간 화면의 단추 — 월간 편집','월간 편집');
+  add('sched.btn_prev','🗓 근무표 › 주간·월간 화면','주간 화면 — 지난주로 이동하는 단추','◀ 지난주');
+  add('sched.btn_next','🗓 근무표 › 주간·월간 화면','주간 화면 — 다음주로 이동하는 단추','다음주 ▶');
+  add('sched.btn_copy','🗓 근무표 › 주간·월간 화면','주간 화면 — 지난주 복사 단추','지난주 복사');
+  add('sched.btn_publish','🗓 근무표 › 주간·월간 화면','주간 화면 — 공표(확정) 단추(실장·원장)','공표(확정)');
+  add('sched.empty','🗓 근무표 › 주간·월간 화면','근무표 — 포함된 인원이 하나도 없을 때','근무표에 포함된 인원이 아직 없습니다.');
+  add('sched.m_no_prev','🗓 근무표 › 주간·월간 화면','지난주 복사 — 지난주 근무표가 비어 있을 때','지난주 근무표가 없습니다.');
+  add('sched.m_copy_fail','🗓 근무표 › 주간·월간 화면','지난주 복사 실패({msg}는 서버 오류)','지난주 근무표 복사 실패: {msg}',['msg']);
+  add('sched.cell.past','🗓 근무표 › 주간·월간 화면','근무표 칸 안 — 과거 기록으로만 남은 사람 이름 뒤에 붙는 말(앞의 \' · \'는 화면이 붙임)','과거 기록');
+  add('sched.rt.src_login','🗓 근무표 › 근무명부 관리','근무명부 표 — 구분 칸: 로그인 계정이 있는 사람','로그인 계정');
+  add('sched.rt.src_none','🗓 근무표 › 근무명부 관리','근무명부 표 — 구분 칸: 로그인 계정이 없는 사람','비로그인 명부');
+  add('sched.rt.included','🗓 근무표 › 근무명부 관리','근무명부 표 — 근무표·집계 포함 체크 칸 글','포함');
+  add('sched.rt.active','🗓 근무표 › 근무명부 관리','근무명부 표 — 재직 중인 사람 표시','재직');
+  add('sched.rt.inactive','🗓 근무표 › 근무명부 관리','근무명부 표 — 비활성인 사람 표시','비활성');
+  add('sched.rt.btn_off','🗓 근무표 › 근무명부 관리','근무명부 표 — 비활성화 단추','비활성화');
+  add('sched.rt.btn_on','🗓 근무표 › 근무명부 관리','근무명부 표 — 재활성화 단추','재활성화');
+  add('sched.rt.title','🗓 근무표 › 근무명부 관리','근무명부 관리 카드 제목(눌러서 펼침)','👥 근무명부 관리');
+  add('sched.rt.hint','🗓 근무표 › 근무명부 관리','근무명부 관리 카드 설명','로그인 계정과 비로그인 명부를 함께 관리합니다. 근무표·집계 포함 여부는 계정 로그인·승인과 별개입니다.');
+  add('sched.rt.ph_name','🗓 근무표 › 근무명부 관리','근무명부 — 이름 칸 안에 흐리게 보이는 글','이름');
+  add('sched.rt.pick_dept','🗓 근무표 › 근무명부 관리','근무명부 — 근무부서 고르는 칸 첫 글','근무부서 선택');
+  add('sched.rt.btn_add','🗓 근무표 › 근무명부 관리','근무명부 — 로그인 없는 근무자 추가 단추','비로그인 근무자 추가');
+  add('sched.rt.th_name','🗓 근무표 › 근무명부 관리','근무명부 표 머리 — 이름','이름');
+  add('sched.rt.th_kind','🗓 근무표 › 근무명부 관리','근무명부 표 머리 — 구분','구분');
+  add('sched.rt.th_dept','🗓 근무표 › 근무명부 관리','근무명부 표 머리 — 근무부서','근무부서');
+  add('sched.rt.th_incl','🗓 근무표 › 근무명부 관리','근무명부 표 머리 — 근무표·집계 포함','근무표·집계 포함');
+  add('sched.rt.th_state','🗓 근무표 › 근무명부 관리','근무명부 표 머리 — 재직 상태','재직 상태');
+  add('sched.rt.empty','🗓 근무표 › 근무명부 관리','근무명부 — 등록된 사람이 없을 때','등록된 근무명부가 없습니다.');
+  add('sched.rt.m_no_perm','🗓 근무표 › 근무명부 관리','근무명부 관리 — 권한이 없을 때','근무명부 관리 권한이 없습니다.');
+  add('sched.rt.m_fail','🗓 근무표 › 근무명부 관리','근무명부 관리 — 추가·저장 실패({label}은 한 일 이름 · {msg}는 서버 오류)','{label} 실패: {msg}',['label','msg']);
+  add('sched.rt.m_reload_fail','🗓 근무표 › 근무명부 관리','근무명부 관리 — 저장 뒤 새로고침 실패({msg}는 오류 내용)','근무명부 새로고침 실패: {msg}',['msg']);
+  add('sched.rt.m_need_both','🗓 근무표 › 근무명부 관리','근무명부 — 이름이나 근무부서를 비우고 추가했을 때','이름과 근무부서를 모두 입력하세요.');
+  add('sched.rt.act_add','🗓 근무표 › 근무명부 관리','근무명부 — 추가 실패 메시지 앞에 붙는 일 이름','근무자 추가');
+  add('sched.rt.m_bad_dept','🗓 근무표 › 근무명부 관리','근무명부 — 근무부서가 올바르지 않을 때','올바른 근무부서를 선택하세요.');
+  add('sched.rt.act_dept','🗓 근무표 › 근무명부 관리','근무명부 — 부서 저장 실패 메시지 앞에 붙는 일 이름','근무부서 저장');
+  add('sched.rt.act_incl','🗓 근무표 › 근무명부 관리','근무명부 — 포함 여부 저장 실패 메시지 앞에 붙는 일 이름','근무표·집계 포함 저장');
+  add('sched.rt.confirm_off','🗓 근무표 › 근무명부 관리','근무자 비활성화 누르면 뜨는 확인창','이 근무자를 비활성화할까요? 기존 근무 기록은 삭제되지 않으며 같은 행에서 재활성화할 수 있습니다.');
+  add('sched.rt.act_react','🗓 근무표 › 근무명부 관리','근무명부 — 재활성화 실패 메시지 앞에 붙는 일 이름','재활성화');
+  add('sched.rt.act_deact','🗓 근무표 › 근무명부 관리','근무명부 — 비활성화 실패 메시지 앞에 붙는 일 이름','비활성화');
+  add('leave.th.person','🌿 연차 › 내 연차·신청 내역·승인','연차 화면 표 머리 — 직원(여러 표 공통)','직원');
+  add('leave.th.type','🌿 연차 › 내 연차·신청 내역·승인','연차 화면 표 머리 — 유형(여러 표 공통)','유형');
+  add('leave.th.period','🌿 연차 › 내 연차·신청 내역·승인','연차 화면 표 머리 — 기간(여러 표 공통)','기간');
+  add('leave.th.days','🌿 연차 › 내 연차·신청 내역·승인','연차 화면 표 머리 — 일수(여러 표 공통)','일수');
+  add('leave.th.status','🌿 연차 › 내 연차·신청 내역·승인','연차 화면 표 머리 — 상태(여러 표 공통)','상태');
+  add('leave.btn.form','🌿 연차 › 내 연차·신청 내역·승인','연차 화면 — 신청서 열기 단추(여러 표 공통)','📄 신청서');
+  add('leave.btn.reject','🌿 연차 › 내 연차·신청 내역·승인','연차 화면 — 반려 단추','반려');
+  add('leave.f_month','🌿 연차 › 내 연차·신청 내역·승인','연차 화면 — 대상 월 고르는 칸 이름','대상 월');
+  add('leave.pend.title','🌿 연차 › 내 연차·신청 내역·승인','승인 대기 카드 제목(실장·원장)','✅ 승인 대기');
+  add('leave.pend.sub_chief','🌿 연차 › 내 연차·신청 내역·승인','승인 대기 제목 옆 — 실장이 볼 때','실장 최종');
+  add('leave.pend.sub_owner','🌿 연차 › 내 연차·신청 내역·승인','승인 대기 제목 옆 — 원장이 볼 때','원장 사전 반려');
+  add('leave.pend.th_reason','🌿 연차 › 내 연차·신청 내역·승인','승인 대기 표 머리 — 사유','사유');
+  add('leave.pend.special','🌿 연차 › 내 연차·신청 내역·승인','승인 대기 표 — 특별사정으로 신청한 건의 표시','특별사정');
+  add('leave.pend.btn_ok','🌿 연차 › 내 연차·신청 내역·승인','승인 대기 표 — 실장 최종 승인 단추','실장 최종 승인');
+  add('leave.pend.empty','🌿 연차 › 내 연차·신청 내역·승인','승인 대기 카드 — 대기 건이 없을 때','대기 없음');
+  add('leave.arch.title','🌿 연차 › 내 연차·신청 내역·승인','승인 내역 카드 제목(실장·원장)','📚 승인 내역');
+  add('leave.arch.th_approver','🌿 연차 › 내 연차·신청 내역·승인','승인 내역 표 머리 — 승인자·승인일','승인자·승인일');
+  add('leave.arch.th_canceler','🌿 연차 › 내 연차·신청 내역·승인','승인 내역 표 머리 — 취소자·취소일','취소자·취소일');
+  add('leave.arch.th_action','🌿 연차 › 내 연차·신청 내역·승인','승인 내역 표 머리 — 액션','액션');
+  add('leave.arch.btn_cancel','🌿 연차 › 내 연차·신청 내역·승인','승인 내역 표 — 원장의 승인 취소·복구 단추','승인 취소·복구');
+  add('leave.arch.done','🌿 연차 › 내 연차·신청 내역·승인','승인 내역 표 — 이미 승인된 건의 표시','승인완료');
+  add('leave.arch.empty','🌿 연차 › 내 연차·신청 내역·승인','승인 내역 카드 — 그 달 내역이 없을 때','선택한 달의 승인·취소 내역 없음');
+  add('leave.my.title','🌿 연차 › 내 연차·신청 내역·승인','내 연차 카드 제목','📅 내 연차');
+  add('leave.my.balance','🌿 연차 › 내 연차·신청 내역·승인','내 연차 카드 — 잔여 일수 위 작은 글','잔여');
+  add('leave.my.btn_edit','🌿 연차 › 내 연차·신청 내역·승인','내 연차 표 — 대기 중인 내 신청의 수정 단추','수정');
+  add('leave.my.btn_cancel','🌿 연차 › 내 연차·신청 내역·승인','내 연차 표 — 대기 중인 내 신청의 취소 단추','취소');
+  add('leave.my.empty','🌿 연차 › 내 연차·신청 내역·승인','내 연차 카드 — 신청 내역이 없을 때','신청 내역 없음');
+  add('leave.m_cancel_confirm','🌿 연차 › 내 연차·신청 내역·승인','내 대기 신청 취소 누르면 뜨는 확인창','아직 승인 전인 연차 신청을 취소할까요?');
+  add('leave.m_cancel_fail','🌿 연차 › 내 연차·신청 내역·승인','내 대기 신청 취소 실패({msg}는 서버 오류)','취소 실패: {msg}',['msg']);
+  add('leave.m_cancel_unknown','🌿 연차 › 내 연차·신청 내역·승인','내 대기 신청 취소 — 결과를 확인 못 했을 때','취소 결과를 확인하지 못했습니다.');
+  add('leave.m_ok_confirm','🌿 연차 › 내 연차·신청 내역·승인','실장 최종 승인 누르면 뜨는 확인창','실장 최종 승인하시겠습니까?');
+  add('leave.m_rej_confirm','🌿 연차 › 내 연차·신청 내역·승인','연차 반려 누르면 뜨는 확인창','이 연차 신청을 반려하시겠습니까?');
+  add('leave.m_act_fail','🌿 연차 › 내 연차·신청 내역·승인','연차 승인·반려 처리 실패({msg}는 서버 오류)','처리 실패: {msg}',['msg']);
+  add('leave.m_act_unknown','🌿 연차 › 내 연차·신청 내역·승인','연차 승인·반려 — 결과를 확인 못 했을 때','처리 결과를 확인하지 못했습니다. 새로고침 후 확인하세요.');
+  add('leave.m_cancelok_state','🌿 연차 › 내 연차·신청 내역·승인','승인 취소·복구 — 승인 상태가 아닐 때','취소할 수 없는 상태입니다.');
+  add('leave.m_cancelok_confirm','🌿 연차 › 내 연차·신청 내역·승인','승인 취소·복구 누르면 뜨는 확인창({name}=직원 이름 · {from}~{to}=휴가 기간)','{name}님의 {from}~{to} 연차 승인을 취소하고 사용일수를 복구합니다. 계속하시겠습니까?',['name','from','to']);
+  add('leave.m_cancelok_fail','🌿 연차 › 내 연차·신청 내역·승인','승인 취소·복구 실패({msg}는 서버 오류)','승인 취소·복구 실패: {msg}',['msg']);
+  add('leave.m_cancelok_unknown','🌿 연차 › 내 연차·신청 내역·승인','승인 취소·복구 — 결과를 확인 못 했을 때','취소·복구 결과를 확인하지 못했습니다. 새로고침 후 확인하세요.');
+  add('leave.my.btn_apply','🌿 연차 › 내 연차·신청 내역·승인','내 연차 카드 — 연차 신청 단추','연차 신청');
+  add('leave.my.list_title','🌿 연차 › 내 연차·신청 내역·승인','내 연차 카드 — 신청 내역 소제목','내 신청 내역');
+  add('leave.m_edit_only','🌿 연차 › 연차 신청 창','연차 신청 수정 — 대기 중이 아니거나 내 신청이 아닐 때','대기 중인 본인 신청만 수정할 수 있습니다.');
+  add('leave.m_edit_hint','🌿 연차 › 연차 신청 창','연차 신청 창 — 수정하려고 열었을 때 안내','수정 후 저장하세요.');
+  add('leave.m_overlap','🌿 연차 › 연차 신청 창','연차 신청 창 — 같은 날 이미 신청한 사람 안내({names}는 이름들)','이미 신청됨: {names}',['names']);
+  add('leave.m_clash','🌿 연차 › 연차 신청 창','연차 신청 창 — 같은 날 휴가 인원이 가득 차서 신청 못 할 때({n}은 허브 설정의 동시 휴가 한도)','그 날 이미 {n}명이 휴가입니다. 신청할 수 없습니다',['n']);
+  add('leave.m_need_period','🌿 연차 › 연차 신청 창','연차 신청 — 기간을 안 넣고 신청했을 때','기간을 입력하세요.');
+  add('leave.m_bad_period','🌿 연차 › 연차 신청 창','연차 신청 — 종료일이 시작일보다 빠를 때','종료일이 시작일보다 빠릅니다.');
+  add('leave.m_bad_time','🌿 연차 › 연차 신청 창','연차 신청 — 반차·조퇴 시간 범위가 틀렸을 때','반차·조퇴의 시간 범위를 확인하세요.');
+  add('leave.m_full','🌿 연차 › 연차 신청 창','연차 신청 — 같은 날 휴가 인원이 가득 차서 신청이 안 됐을 때({n}은 허브 설정의 동시 휴가 한도)','⚠ 신청되지 않았습니다 — 그 날 이미 {n}명이 휴가입니다.',['n']);
+  add('leave.m_need_reason','🌿 연차 › 연차 신청 창','연차 신청 — 같은 날 이미 휴가자가 있는데 특별사정 사유를 안 적었을 때','⚠ 신청되지 않았습니다 — 그날 이미 휴가자가 있어 특별사정 사유를 적어야 신청됩니다.');
+  add('leave.m_save_unknown','🌿 연차 › 연차 신청 창','연차 신청 — 저장 결과를 확인 못 했을 때','신청 저장 결과를 확인하지 못했습니다.');
+  add('leave.m_fail','🌿 연차 › 연차 신청 창','연차 신청 실패({msg}는 서버 오류)','실패: {msg}',['msg']);
+  add('leave.apply.title','🌿 연차 › 연차 신청 창','연차 신청 창 맨 위 제목','📅 연차 신청');
+  add('leave.apply.f_type','🌿 연차 › 연차 신청 창','연차 신청 창 칸 이름 — 유형(고르는 값의 이름은 📋 목록에서 고침)','유형');
+  add('leave.apply.f_time','🌿 연차 › 연차 신청 창','연차 신청 창 칸 이름 — 반차·조퇴 시간 범위','시간 범위');
+  add('leave.apply.f_note','🌿 연차 › 연차 신청 창','연차 신청 창 칸 이름 — 유형이 「기타」일 때 사유','기타 사유(타이핑)');
+  add('leave.apply.f_from','🌿 연차 › 연차 신청 창','연차 신청 창 칸 이름 — 시작일','시작일');
+  add('leave.apply.f_to','🌿 연차 › 연차 신청 창','연차 신청 창 칸 이름 — 종료일','종료일');
+  add('leave.apply.f_reason','🌿 연차 › 연차 신청 창','연차 신청 창 칸 이름 — 사유','사유(선택)');
+  add('leave.apply.f_contact','🌿 연차 › 연차 신청 창','연차 신청 창 칸 이름 — 연락처','연락처(선택)');
+  add('leave.apply.ph_contact','🌿 연차 › 연차 신청 창','연차 신청 창 — 연락처 칸 안에 흐리게 보이는 글','연락처(선택)');
+  add('leave.apply.special','🌿 연차 › 연차 신청 창','연차 신청 창 — 같은 날 이미 휴가자가 있을 때 뜨는 특별사정 안내(몇 명부터인지는 🔢 숫자·기준에서 고침)','⚠ 그날 이미 휴가자가 있습니다. 특별사정이면 사유를 적고 신청하세요.');
+  add('leave.apply.ph_special','🌿 연차 › 연차 신청 창','연차 신청 창 — 특별사정 칸 안에 흐리게 보이는 글','특별사정 사유');
+  add('leave.apply.btn','🌿 연차 › 연차 신청 창','연차 신청 창 아래 신청 단추','신청');
+  add('leave.form.title','🌿 연차 › 휴가 신청서','휴가 신청서 인쇄물 맨 위 큰 제목(글자 사이 띄어쓰기도 그대로)','휴 가 신 청 서');
+  add('leave.form.sign_a','🌿 연차 › 휴가 신청서','휴가 신청서 오른쪽 위 결재칸 — 첫째 칸 이름','중간관리자');
+  add('leave.form.sign_b','🌿 연차 › 휴가 신청서','휴가 신청서 오른쪽 위 결재칸 — 둘째 칸 이름','대표원장');
+  add('leave.form.f_name','🌿 연차 › 휴가 신청서','휴가 신청서 칸 이름 — 성명','성명');
+  add('leave.form.f_dept','🌿 연차 › 휴가 신청서','휴가 신청서 칸 이름 — 소속','소속');
+  add('leave.form.lead','🌿 연차 › 휴가 신청서','휴가 신청서 본문 첫 문장','아래와 같이 휴가를 실시하고자 하오니 승인하여 주시기 바랍니다.');
+  add('leave.form.f_type','🌿 연차 › 휴가 신청서','휴가 신청서 칸 이름 — 휴가종류','휴가종류');
+  add('leave.form.f_period','🌿 연차 › 휴가 신청서','휴가 신청서 칸 이름 — 기간','기간');
+  add('leave.form.f_reason','🌿 연차 › 휴가 신청서','휴가 신청서 칸 이름 — 사유','사유');
+  add('leave.form.f_contact','🌿 연차 › 휴가 신청서','휴가 신청서 칸 이름 — 연락처','연락처');
+  add('leave.form.f_etc','🌿 연차 › 휴가 신청서','휴가 신청서 칸 이름 — 기타','기타');
+  add('leave.form.special','🌿 연차 › 휴가 신청서','휴가 신청서 기타 칸 — 특별사정으로 신청한 건 앞 글(뒤에 사유가 이어 붙음)','특별사정:');
+  add('leave.form.applied_on','🌿 연차 › 휴가 신청서','휴가 신청서 — 신청일 앞 글(뒤에 날짜가 붙음)','신청일:');
+  add('leave.form.applicant','🌿 연차 › 휴가 신청서','휴가 신청서 — 신청인 서명줄 앞 글(뒤에 이름이 붙음)','위 신청인');
+  add('leave.form.stamp_apply','🌿 연차 › 휴가 신청서','휴가 신청서 — 신청인 도장 위에 찍히는 말','신청');
+  add('leave.form.to','🌿 연차 › 휴가 신청서','휴가 신청서 맨 아래 받는 곳(병원 이름)','아산정플란트치과의원 대표자 귀하');
+  add('leave.form.modal_title','🌿 연차 › 휴가 신청서','휴가 신청서 창 맨 위 제목(인쇄물 제목과 별개)','📄 휴가 신청서');
+  add('leave.form.btn_print','🌿 연차 › 휴가 신청서','휴가 신청서 창 — 1장 인쇄 단추','🖨️ 1장 인쇄');
+  add('leave.form.stamp_ok','🌿 연차 › 휴가 신청서','휴가 신청서 오른쪽 위 결재칸 도장 위에 찍히는 말(실장·원장 승인 도장)','승인');
+  add('leave.form.total','🌿 연차 › 휴가 신청서','휴가 신청서 기간 칸 — 총 일수 글({n}은 일수)','총 {n}일',['n']);
+  add('leave.grant.title','🌿 연차 › 연차 부여·자동 적립(원장)','연차 부여 카드 제목(원장)','➕ 연차 부여/절대 잔액 설정');
+  add('leave.owner_tag','🌿 연차 › 연차 부여·자동 적립(원장)','원장 전용 카드 제목 옆 작은 글(부여·자동 적립 공통)','원장');
+  add('leave.grant.th_name','🌿 연차 › 연차 부여·자동 적립(원장)','연차 부여 표 머리 — 이름','이름');
+  add('leave.grant.th_hire','🌿 연차 › 연차 부여·자동 적립(원장)','연차 부여 표 머리 — 입사일','입사일');
+  add('leave.grant.th_suggest','🌿 연차 › 연차 부여·자동 적립(원장)','연차 부여 표 머리 — 제안일수','제안일수');
+  add('leave.grant.btn_fill','🌿 연차 › 연차 부여·자동 적립(원장)','연차 부여 표 — 제안 일수 채우기 단추','이 값으로 채우기');
+  add('leave.grant.ph_days','🌿 연차 › 연차 부여·자동 적립(원장)','연차 부여 — 일수 칸 안에 흐리게 보이는 글','일수');
+  add('leave.grant.ph_note','🌿 연차 › 연차 부여·자동 적립(원장)','연차 부여 — 메모 칸 안에 흐리게 보이는 글','메모(예: 2026년 정기부여)');
+  add('leave.grant.hint','🌿 연차 › 연차 부여·자동 적립(원장)','연차 부여 카드 아래 안내','정기 부여는 아래 발생일별 미리보기에서 개근·재직을 확인한 뒤 적용합니다. 이 화면의 ‘부여’는 해당 확인 화면으로 이동합니다. ‘조정’은 목표 잔액을 설정합니다.');
+  add('leave.acc.title','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 카드 제목(원장)','📆 자동 연차 적립 확인');
+  add('leave.acc.hint','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 카드 설명','먼저 발생 예정 내역을 확인하고, 각 기간의 개근·재직을 원장이 확인한 뒤 적용합니다. 기존 수기 지급분은 중복 지급하지 않도록 반영됩니다.');
+  add('leave.acc.f_asof','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 — 기준일 칸 이름','기준일');
+  add('leave.acc.btn_preview','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 — 미리보기 단추','미리보기');
+  add('leave.acc.btn_apply','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 — 확인한 항목 적용 단추','확인한 항목 적용');
+  add('leave.acc.need_preview','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 — 미리보기를 누르기 전 안내','적용 전 미리보기가 필요합니다.');
+  add('leave.m_grant_pick','🌿 연차 › 연차 부여·자동 적립(원장)','연차 부여 — 「부여」를 눌렀을 때 아래 적립 확인 화면 안내','해당 직원·발생일을 확인해 선택하세요. 이미 수기로 준 일수는 미리보기에서 상계됩니다.');
+  add('leave.m_grant_days','🌿 연차 › 연차 부여·자동 적립(원장)','연차 부여 — 일수를 잘못 넣었을 때','일수는 0 이상으로 입력하세요. 0일도 절대 잔액 조정값으로 기록할 수 있습니다.');
+  add('leave.m_grant_fail','🌿 연차 › 연차 부여·자동 적립(원장)','연차 부여·잔액 설정 실패({msg}는 서버 오류)','연차 기록 실패: {msg}',['msg']);
+  add('leave.m_grant_unknown','🌿 연차 › 연차 부여·자동 적립(원장)','연차 잔액 설정 — 결과를 확인 못 했을 때','잔액 설정 결과를 확인하지 못했습니다.');
+  add('leave.acc.m_bad_date','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 — 기준일이 틀렸을 때','오늘 이전의 올바른 기준일을 선택하세요.');
+  add('leave.acc.m_loading','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 — 미리보기 불러오는 중','미리보기 불러오는 중…');
+  add('leave.acc.m_prev_fail','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 — 미리보기 실패({msg}는 서버 오류)','연차 미리보기 실패: {msg}',['msg']);
+  add('leave.acc.th_check','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 표 머리 — 개근·재직 확인','개근·재직 확인');
+  add('leave.acc.th_hire','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 표 머리 — 입사일','입사일');
+  add('leave.acc.th_due','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 표 머리 — 발생일','발생일');
+  add('leave.acc.th_kind','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 표 머리 — 구분','구분');
+  add('leave.acc.th_step','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 표 머리 — 단계','단계');
+  add('leave.acc.th_exist','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 표 머리 — 기존 수기 포함','기존 수기 포함');
+  add('leave.acc.th_grant','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 표 머리 — 이번 지급','이번 지급');
+  add('leave.acc.recorded','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 표 — 이미 기록된 건 표시','기록됨');
+  add('leave.acc.kind_annual','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 표 구분 칸 — 입사 1년째 연차','1년 15일');
+  add('leave.acc.kind_month','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 표 구분 칸 — 월차','월차');
+  add('leave.acc.empty','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 — 기준일까지 내역이 하나도 없을 때','기준일까지 발생한 내역이 없습니다.');
+  add('leave.acc.m_check_hint','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 — 미리보기를 불러온 뒤 안내','적용할 발생일마다 개근·재직을 확인해 체크하세요. 0일도 수기 지급 충족 기록을 남길 수 있습니다.');
+  add('leave.acc.m_redo_preview','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적용 — 기준일을 바꾼 뒤 적용하려 할 때','기준일을 다시 미리보기로 확인하세요.');
+  add('leave.acc.m_pick_one','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적용 — 체크한 항목이 없을 때','개근·재직을 확인한 항목을 선택하세요.');
+  add('leave.acc.m_confirm','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적용 누르면 뜨는 확인창({n}=선택한 발생일 수 · {days}=지급될 일수)','{n}개 발생일의 개근·재직을 확인하고, 미리보기 기준 {days}일을 연차 장부에 적용할까요?',['n','days']);
+  add('leave.acc.m_applying','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적용 중 글','적용 중…');
+  add('leave.acc.m_apply_fail','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적용 실패({msg}는 서버 오류)','적용 실패: {msg}',['msg']);
+  add('leave.acc.m_done','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적용 성공({created}=기록 건수 · {granted}=실제 지급 일수)','적용 완료: {created}건 기록, 실제 {granted}일 지급. 기록 상태를 확인하세요.',['created','granted']);
+  add('leave.acc.m_none','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적용 — 새로 적용된 기록이 없을 때','새로 적용된 기록이 없습니다. 이미 기록된 발생일인지 확인하세요.');
+  add('leave.acc.m_recheck_fail','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적용 — 적용은 됐는데 다시 불러오기가 실패했을 때(뒤에 위 메시지가 붙음)','적용 응답은 성공했으나 재조회 실패 — {msg}',['msg']);
+}
 let HUB_TEXT_DEFS_CACHE=null;
 function hubTextDefs(){
   if(HUB_TEXT_DEFS_CACHE)return HUB_TEXT_DEFS_CACHE;
@@ -327,6 +652,7 @@ function hubTextDefs(){
   add('owner.next.sub',S,'맨 아래 카드 제목 옆 작은 글','(설계 완료·구현 예정)');
   add('owner.next.body',S,'맨 아래 카드 본문(줄바꿈 그대로 보임)',HUB_NEXT_BODY_DEFAULT);
   hubTextDefsChapter2(add);
+  hubTextDefsChapter3(add);
   HUB_TEXT_DEFS_CACHE=defs;
   return defs;
 }
@@ -343,7 +669,7 @@ function hubTextMatches(def,query,current){
   return q.split(/\s+/).every(function(w){return hay.indexOf(w)>=0;});
 }
 
-/* 숫자 기준(app_settings 키) — 지금은 SQL로만 고치던 근태 기준 7개 */
+/* 숫자 기준(app_settings 키) — 근태 기준 7개(차례 1) + 연차·소명 기준 5개(차례 3: 화면에만 있던 숫자만 — DB 함수에도 박힌 숫자는 안 옮김) */
 const HUB_SETTING_DEFS=[
   {key:'late_cut',screen:'🕘 근태 기준',label:'지각 판정 시각',where:'출퇴근 — 이 시각을 넘겨 출근하면 지각으로 계산(예 09:40이면 09:41부터 지각)',def:'09:40',kind:'time'},
   {key:'siueop',screen:'🕘 근태 기준',label:'시업(공식 출근) 시각',where:'출퇴근 — 화면에 보여 주는 공식 출근 시각',def:'10:00',kind:'time'},
@@ -351,7 +677,12 @@ const HUB_SETTING_DEFS=[
   {key:'jongeop_weekday_day',screen:'🕘 근태 기준',label:'평일 비야간 종업 시각',where:'출퇴근 — 월~금 야간조가 아닌 사람의 종업 시각',def:'18:30',kind:'time'},
   {key:'jongeop_sat',screen:'🕘 근태 기준',label:'토요일 종업 시각',where:'출퇴근 — 토요일 종업 시각',def:'17:00',kind:'time'},
   {key:'jongeop_sun',screen:'🕘 근태 기준',label:'일요일 종업 시각',where:'출퇴근 — 일요일 종업 시각',def:'14:00',kind:'time'},
-  {key:'ot_unit_min',screen:'🕘 근태 기준',label:'연장근로 인정 단위(분)',where:'출퇴근 — 이 단위로 버림(예 10이면 9분→0분, 11분→10분)',def:'10',kind:'int',min:1,max:60,unit:'분'}
+  {key:'ot_unit_min',screen:'🕘 근태 기준',label:'연장근로 인정 단위(분)',where:'출퇴근 — 이 단위로 버림(예 10이면 9분→0분, 11분→10분)',def:'10',kind:'int',min:1,max:60,unit:'분'},
+  {key:'att.issue_list_limit',screen:'🕘 근태 기준',label:'지문누락 소명 목록에 보이는 건수',where:'출퇴근(실장·원장 화면) — 지문누락 소명 표에 최근 몇 건까지 보여 줄지',def:'30',kind:'int',min:5,max:100,unit:'건'},
+  {key:'leave.same_day_limit',screen:'🌿 연차 기준',label:'같은 날 동시 휴가, 신청이 막히는 인원',where:'연차 신청 — 같은 날 이미 이 인원 이상이 휴가(대기·승인 포함)면 신청할 수 없음(예 2이면 이미 2명이 있을 때 막힘). 화면 규칙이라 DB에는 없어요',def:'2',kind:'int',min:1,max:30,unit:'명'},
+  {key:'leave.same_day_reason_from',screen:'🌿 연차 기준',label:'같은 날 동시 휴가, 특별사정 사유가 필요해지는 인원',where:'연차 신청 — 같은 날 이미 이 인원 이상이 휴가면 「특별사정」 사유를 적어야 신청됨(예 1이면 이미 1명이 있을 때부터). 위 「막히는 인원」보다 작아야 의미가 있어요',def:'1',kind:'int',min:1,max:30,unit:'명'},
+  {key:'leave.half_day_value',screen:'🌿 연차 기준',label:'반차·조퇴 1건이 쓰는 연차 일수',where:'연차 신청 — 반차·조퇴를 신청할 때 장부에서 빠지는 일수(예 0.5). 이미 신청된 건은 안 바뀌어요',def:'0.5',kind:'dec',min:0.1,max:1,unit:'일'},
+  {key:'leave.my_list_limit',screen:'🌿 연차 기준',label:'내 신청 내역에 보이는 건수',where:'연차 — 「내 신청 내역」 표에 최근 몇 건까지 보여 줄지',def:'20',kind:'int',min:5,max:100,unit:'건'}
 ];
 function hubSettingDefByKey(key){
   for(let i=0;i<HUB_SETTING_DEFS.length;i++)if(HUB_SETTING_DEFS[i].key===key)return HUB_SETTING_DEFS[i];
@@ -363,6 +694,12 @@ function hubSettingValidate(def,raw){
   if(def.kind==='time'){
     if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(v))return {ok:false,reason:'시각은 09:40 처럼 시:분(24시간)으로 적어 주세요.'};
     return {ok:true,value:v};
+  }
+  if(def.kind==='dec'){
+    if(!/^\d{1,2}(\.\d)?$/.test(v))return {ok:false,reason:'숫자만 적어 주세요(예 0.5).'};
+    const n=Number(v);
+    if(n<def.min||n>def.max)return {ok:false,reason:def.min+'부터 '+def.max+'까지만 쓸 수 있어요.'};
+    return {ok:true,value:String(n)};
   }
   if(def.kind==='int'){
     if(!/^\d{1,4}$/.test(v))return {ok:false,reason:'숫자만 적어 주세요.'};
@@ -390,7 +727,15 @@ const HUB_LIST_DEFS=[
   {key:'list.payment_status',screen:'📎 내 서류함',label:'결제 요청 상태 이름',addable:false,
    where:'내 서류함 › 결제 요청 표의 「상태」 칸에 보이는 이름',
    note:'결재 단계(실장 → 원장)가 이 코드로 움직여서 코드는 못 바꾸고 새 항목도 못 늘려요. 보이는 이름만 고칠 수 있어요.',
-   def:[{code:'chief_pending',label:'실장 검토 대기'},{code:'owner_pending',label:'원장 결재 대기'},{code:'approved',label:'승인'},{code:'rejected',label:'반려'}]}
+   def:[{code:'chief_pending',label:'실장 검토 대기'},{code:'owner_pending',label:'원장 결재 대기'},{code:'approved',label:'승인'},{code:'rejected',label:'반려'}]},
+  {key:'list.leave_types',screen:'🌿 연차',label:'연차 유형 이름',addable:false,
+   where:'연차 › 「연차 신청」 창의 「유형」 고르는 칸 · 내 신청 내역·승인 대기·휴가 신청서·근무표·캘린더에 보이는 유형 이름',
+   note:'연차·반차·조퇴·기타는 서버 규칙(저장 가능한 값)과 일수 계산(반차·조퇴 0.5일)이 이 코드로 움직여서 코드는 못 바꾸고 새 유형도 못 늘려요. 보이는 이름만 고칠 수 있어요.',
+   def:[{code:'연차',label:'연차'},{code:'반차',label:'반차'},{code:'조퇴',label:'조퇴'},{code:'기타',label:'기타'}]},
+  {key:'list.work_depts',screen:'🗓 근무표',label:'근무부서 이름',addable:false,
+   where:'근무표 › 근무명부 관리 표의 「근무부서」 고르는 칸 · 「비로그인 근무자 추가」 부서 고르는 칸',
+   note:'근무부서는 서버에 저장 가능한 7가지로 정해져 있어요(Dr. 이름은 화면이 직접 알아보는 코드이기도 해요). 그래서 코드는 못 바꾸고 새 부서도 못 늘려요. 보이는 이름만 고칠 수 있어요.',
+   def:[{code:'Dr.',label:'Dr.'},{code:'진료실',label:'진료실'},{code:'데스크',label:'데스크'},{code:'기공실',label:'기공실'},{code:'미지정',label:'미지정'},{code:'상담',label:'상담'},{code:'행정',label:'행정'}]}
 ];
 // 카드 목록(app_settings의 JSON). 기본 카드는 hr.html의 workDocuments와 같아야 한다(시험이 대조).
 const HUB_CARD_DEFS=[
@@ -745,18 +1090,18 @@ function hubDrawSettingsSection(sec){
     if(!g){g={name:d.screen,items:[]};groups.push(g);}
     g.items.push({d:d,i:i});
   });
-  sec.innerHTML='<div class="sub">출퇴근 계산이 쓰는 기준이에요. 지금까지는 SQL로만 고쳤는데 여기서 바로 고쳐요. 저장하면 출퇴근 화면이 다음에 열릴 때부터 새 기준으로 계산해요(이미 저장된 지난 기록은 안 바뀌어요).</div>'+
+  sec.innerHTML='<div class="sub">출퇴근 계산·연차 신청이 쓰는 기준이에요. 출퇴근 기준은 지금까지 SQL로만 고쳤는데 여기서 바로 고쳐요. 저장하면 그 화면이 다음에 열릴 때부터 새 기준으로 움직여요(이미 저장된 지난 기록·신청은 안 바뀌어요).</div>'+
     groups.map(function(g){
       return '<details class="hub-grp" open><summary>'+hubEsc(g.name)+' <span class="sub">('+g.items.length+'개)</span></summary>'+
         g.items.map(function(x){
           const d=x.d,i=x.i,cur=hubSetting(d.key,d.def);
           const input=d.kind==='time'
             ?'<input id="hubSetIn_'+i+'" type="time" value="'+hubEsc(cur)+'">'
-            :'<input id="hubSetIn_'+i+'" type="number" inputmode="numeric" min="'+d.min+'" max="'+d.max+'" value="'+hubEsc(cur)+'"> '+hubEsc(d.unit||'');
+            :'<input id="hubSetIn_'+i+'" type="number" inputmode="'+(d.kind==='dec'?'decimal':'numeric')+'"'+(d.kind==='dec'?' step="0.1"':'')+' min="'+d.min+'" max="'+d.max+'" value="'+hubEsc(cur)+'"> '+hubEsc(d.unit||'');
           return '<div class="hub-row" data-hub-set-row="'+i+'">'+
             '<div class="hub-where"><b>'+hubEsc(d.label)+'</b> <span id="hubSetBadge_'+i+'">'+hubBadge(cur!==d.def)+'</span></div>'+
             '<div class="sub">'+hubEsc(d.where)+' · 이름표: '+hubEsc(d.key)+'</div>'+
-            '<div class="sub">처음 값 '+hubEsc(d.def)+(d.kind==='int'?' · '+d.min+'~'+d.max+' 사이':'')+'</div>'+
+            '<div class="sub">처음 값 '+hubEsc(d.def)+(d.kind==='int'||d.kind==='dec'?' · '+d.min+'~'+d.max+' 사이':'')+'</div>'+
             '<div class="rowflex">'+input+'<button class="mini stamp" data-hub-set-save="'+i+'">저장</button><button class="mini" data-hub-set-reset="'+i+'">기본으로 되돌리기</button><span class="hint" id="hubSetMsg_'+i+'"></span></div>'+
             '</div>';
         }).join('')+'</details>';
@@ -968,12 +1313,13 @@ const HubUi={
   setSettings:hubSettingSetValues,
   renderSettings:renderHubSettings,
   applyTextFilter:hubApplyTextFilter, // 검색칸 동작(시험용으로도 공개)
-  helpers:{hubText:hubText,hubSetting:hubSetting,hubList:hubList,hubCards:hubCards}
+  helpers:{hubText:hubText,hubSetting:hubSetting,hubSettingChecked:hubSettingChecked,hubList:hubList,hubCards:hubCards}
 };
 root.hubText=hubText;
 root.hubTextHtml=hubTextHtml;
 root.hubSetting=hubSetting;
 root.hubSettingNumber=hubSettingNumber;
+root.hubSettingChecked=hubSettingChecked;
 root.hubList=hubList;
 root.hubCards=hubCards;
 root.HubUi=HubUi;

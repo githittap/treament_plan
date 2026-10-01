@@ -287,28 +287,28 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 
 <!-- 연차 신청 -->
 <div class="mask" id="lvMask"><div class="modal">
-  <h3>📅 연차 신청<button class="x" onclick="hide('lvMask')">✕</button></h3>
+  <h3><span data-hubk="leave.apply.title">📅 연차 신청</span><button class="x" onclick="hide('lvMask')">✕</button></h3>
   <div class="grid">
-    <div class="fld"><label>유형</label><select id="lvType"><option>연차</option><option>반차</option><option>조퇴</option><option>기타</option></select></div>
-    <div class="fld" id="lvTimeWrap" style="display:none"><label>시간 범위</label><div class="rowflex"><input type="time" id="lvTimeFrom"><span>~</span><input type="time" id="lvTimeTo"></div></div>
-    <div class="fld" id="lvNoteWrap" style="display:none"><label>기타 사유(타이핑)</label><input id="lvNote"></div>
-    <div class="fld"><label>시작일</label><input type="date" id="lvFrom"></div>
-    <div class="fld"><label>종료일</label><input type="date" id="lvTo"></div>
+    <div class="fld"><label data-hubk="leave.apply.f_type">유형</label><select id="lvType"><option>연차</option><option>반차</option><option>조퇴</option><option>기타</option></select></div>
+    <div class="fld" id="lvTimeWrap" style="display:none"><label data-hubk="leave.apply.f_time">시간 범위</label><div class="rowflex"><input type="time" id="lvTimeFrom"><span>~</span><input type="time" id="lvTimeTo"></div></div>
+    <div class="fld" id="lvNoteWrap" style="display:none"><label data-hubk="leave.apply.f_note">기타 사유(타이핑)</label><input id="lvNote"></div>
+    <div class="fld"><label data-hubk="leave.apply.f_from">시작일</label><input type="date" id="lvFrom"></div>
+    <div class="fld"><label data-hubk="leave.apply.f_to">종료일</label><input type="date" id="lvTo"></div>
     <div id="lvOverlap" class="hint fld w4"></div>
-    <div class="fld w4"><label>사유(선택)</label><input id="lvReason"></div>
-    <div class="fld w4"><label>연락처(선택)</label><input id="lvContact" placeholder="연락처(선택)"></div>
+    <div class="fld w4"><label data-hubk="leave.apply.f_reason">사유(선택)</label><input id="lvReason"></div>
+    <div class="fld w4"><label data-hubk="leave.apply.f_contact">연락처(선택)</label><input id="lvContact" placeholder="연락처(선택)" data-hubph="leave.apply.ph_contact"></div>
     <div class="fld w4" id="lvSpecialWrap" style="display:none">
-      <label style="color:var(--gold)">⚠ 그날 이미 휴가자가 있습니다. 특별사정이면 사유를 적고 신청하세요.</label>
-      <input id="lvSpecial" placeholder="특별사정 사유">
+      <label style="color:var(--gold)" data-hubk="leave.apply.special">⚠ 그날 이미 휴가자가 있습니다. 특별사정이면 사유를 적고 신청하세요.</label>
+      <input id="lvSpecial" placeholder="특별사정 사유" data-hubph="leave.apply.ph_special">
     </div>
   </div>
-  <button class="hbtn pri" style="margin-top:12px" onclick="submitLeave()">신청</button>
+  <button class="hbtn pri" style="margin-top:12px" onclick="submitLeave()" data-hubk="leave.apply.btn">신청</button>
   <div class="msg" id="lvMsg" style="color:var(--red)"></div>
 </div></div>
 
 <!-- 휴가 신청서 -->
 <div class="mask" id="lvFormMask"><div class="modal wide">
-  <h3>📄 휴가 신청서<button class="hbtn mini" onclick="printLeaveForm()">🖨️ 1장 인쇄</button><button class="x" onclick="hide('lvFormMask')">✕</button></h3>
+  <h3><span data-hubk="leave.form.modal_title">📄 휴가 신청서</span><button class="hbtn mini" onclick="printLeaveForm()" data-hubk="leave.form.btn_print">🖨️ 1장 인쇄</button><button class="x" onclick="hide('lvFormMask')">✕</button></h3>
   <div id="lvFormBody"></div>
 </div></div>
 
@@ -347,12 +347,12 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 
 <!-- 엑셀 미리보기 -->
 <div class="mask" id="xlMask"><div class="modal wide">
-  <h3>🗂 지문 근태 업로드 — 미리보기<button class="x" onclick="hide('xlMask')">✕</button></h3>
+  <h3><span data-hubk="att.xl.modal_title">🗂 지문 근태 업로드 — 미리보기</span><button class="x" onclick="hide('xlMask')">✕</button></h3>
   <div id="xlSummary" class="sub"></div>
   <div id="xlUnmapped"></div>
   <div class="tblwrap" style="margin-top:8px"><table id="xlTable"></table></div>
-  <div class="hint">야간·조퇴는 <b>공표된 근무표</b>가 기준(야간=자동 체크). 지각 컷·연장 단위는 설정 표 값 적용. 저장하면 해당 월 attendance에 기록됩니다. (조퇴 공제는 급여 단계에서)</div>
-  <button class="hbtn pri" style="margin-top:10px" id="xlSaveBtn" onclick="saveAttendance()">저장</button>
+  <div class="hint"><span data-hubk="att.xl.hint_a">야간·조퇴는</span> <b data-hubk="att.xl.hint_b">공표된 근무표</b><span data-hubk="att.xl.hint_c">가 기준(야간=자동 체크). 지각 컷·연장 단위는 설정 표 값 적용. 저장하면 해당 월 attendance에 기록됩니다. (조퇴 공제는 급여 단계에서)</span></div>
+  <button class="hbtn pri" style="margin-top:10px" id="xlSaveBtn" onclick="saveAttendance()" data-hubk="att.xl.btn_save">저장</button>
   <div class="msg" id="xlMsg"></div>
 </div></div>
 
@@ -377,7 +377,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 
 <footer>© 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지</footer>
 
-<script src="hub-texts.js?v=2026100108"></script>
+<script src="hub-texts.js?v=2026100109"></script>
 <script>
 /* ═══════ 설정 ═══════
    실제 값은 DB의 app_settings 표에서 읽어옵니다.
@@ -390,6 +390,9 @@ let SETTINGS = {
   jongeop_weekday_evening:'20:00', jongeop_weekday_day:'18:30',
   jongeop_sat:'17:00', jongeop_sun:'14:00'
 };
+/* 허브 설정의 숫자 읽기·화면 속 고정 글 바꿔 넣기 도우미(hub-texts.js가 없으면 기본값 그대로) */
+function hubN(k,d){return typeof hubSettingChecked==='function'?hubSettingChecked(k,d):d;}
+function hubStaticFill(){try{if(typeof hubText!=='function'||typeof document==='undefined')return;document.querySelectorAll('[data-hubk]').forEach(function(el){if(el.dataset.hubd===undefined)el.dataset.hubd=el.textContent;el.textContent=hubText(el.getAttribute('data-hubk'),el.dataset.hubd);});document.querySelectorAll('[data-hubph]').forEach(function(el){if(el.dataset.hubpd===undefined)el.dataset.hubpd=el.getAttribute('placeholder')||'';el.setAttribute('placeholder',hubText(el.getAttribute('data-hubph'),el.dataset.hubpd));});}catch(e){}}
 /* hub-texts.js(원장이 고치는 허브 글·목록)를 못 불러와도 화면은 코드의 기본 글 그대로 나오게 하는 대비책 */
 if(typeof window.hubText!=='function'){
   window.hubText=function(k,d,v){return v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d);};
@@ -659,7 +662,9 @@ function scheduleRowsWithoutApprovedLeave(rows,leaveRows){
     return !(leaveRows||[]).some(leave=>leave.type!=='반차'&&leave.user_id===row.user_id&&leave.date_from<=date&&leave.date_to>=date);
   });
 }
-function leaveDisplayText(type,note){const label=type==='반차'?'반차':type==='조퇴'?'조퇴':type==='기타'?'기타':'연차';return note?label+' · '+note:label;}
+function leaveDisplayText(type,note){const code=type==='반차'?'반차':type==='조퇴'?'조퇴':type==='기타'?'기타':'연차',label=typeof leaveTypeLabel==='function'?leaveTypeLabel(code):code;return note?label+' · '+note:label;}
+function leaveTypeItems(){const def=[{code:'연차',label:'연차'},{code:'반차',label:'반차'},{code:'조퇴',label:'조퇴'},{code:'기타',label:'기타'}];if(typeof hubList!=='function')return def;const codes=new Set(def.map(d=>d.code));return hubList('list.leave_types',def).filter(i=>codes.has(i.code));} /* 연차 유형 이름: 허브 설정 › 목록에서 이름만 고침(코드는 서버 규칙·계산과 묶여 고정, 새 유형 못 늘림) */
+function leaveTypeLabel(code){const it=leaveTypeItems().find(i=>i.code===code);return it?it.label:code;}
 /* schedule-roster:test-end */
 function mondayStr(ds){const d=new Date(ds+'T00:00:00');const g=d.getDay();d.setDate(d.getDate()+(g===0?-6:1-g));return dstr(d);}
 const SHIFTS={work:{l:'근무'},off:{l:'off'},evening:{l:'야간'},etc:{l:'기타'}};
@@ -822,7 +827,7 @@ async function refreshBadges(){
 
 /* ── 렌더 라우터 ── */
 async function render(){
-  const m=$('#main');m.innerHTML='<div class="empty">불러오는 중…</div>';
+  const m=$('#main');m.innerHTML='<div class="empty">불러오는 중…</div>';hubStaticFill();
   try{
     if(TAB==='home')await renderHome(m);
     else if(TAB==='ai'){if(window.AIAssistants)await window.AIAssistants.render(m,{sb,me:ME});else m.innerHTML='<div class="card"><div class="empty">AI 도우미를 불러오지 못했습니다. 새로고침해 주세요.</div></div>';}
@@ -926,10 +931,11 @@ function applyAttendanceResolutions(rows,resolutions){
 }
 let MANUAL_DETAIL_OPEN=false;
 let MANUAL_DETAIL_ROWS=[];
-function manualAttendanceDetailText(row){const notes=[row.reason?'정정 사유: '+row.reason:'',row.manual_note?'비고: '+row.manual_note:''].filter(Boolean);return `${row.lunch_overtime_min||0}분 점심 · ${row.clockout_overtime_min||0}분 퇴근 · ${row.evening_overtime_min||0}분 저녁${row.half_day&&row.half_day!=='없음'?' · '+esc(row.half_day):''}<br>${notes.length?notes.map(esc).join(' · '):'사유·비고 없음'}`;}
+function hubT(k,d,v){return typeof hubText==='function'?hubText(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
+function manualAttendanceDetailText(row){const notes=[row.reason?hubT('att.manual.reason_prefix','정정 사유:')+' '+row.reason:'',row.manual_note?hubT('att.manual.note_prefix','비고:')+' '+row.manual_note:''].filter(Boolean);return `${esc(hubT('att.manual.minutes_line','{lunch}분 점심 · {clockout}분 퇴근 · {evening}분 저녁',{lunch:row.lunch_overtime_min||0,clockout:row.clockout_overtime_min||0,evening:row.evening_overtime_min||0}))}${row.half_day&&row.half_day!=='없음'?' · '+esc(row.half_day):''}<br>${notes.length?notes.map(esc).join(' · '):esc(hubT('att.manual.no_notes','사유·비고 없음'))}`;}
 function renderManualAttendanceDayDetail(date){const row=MANUAL_DETAIL_ROWS.find(r=>r.work_date===date)||{},text=$('#manualAttendanceDayDetailText');if(text)text.innerHTML=manualAttendanceDetailText(row);const weekday=$('#manualWeekday');if(weekday)weekday.value=['일','월','화','수','목','금','토'][new Date(date+'T00:00:00').getDay()]+'요일';const half=$('#manualHalfDay');if(half)half.value=row.half_day||'없음';}
-function manualClockOptions(selected,minutes){const placeholder=selected?'':`<option value="" selected>${minutes===24?'시':'분'} 선택</option>`;return placeholder+Array.from({length:minutes},(_,i)=>{const v=String(i).padStart(2,'0');return `<option value="${v}" ${v===selected?'selected':''}>${v}</option>`;}).join('');}
-function manualAttendanceFormHtml(){const rows=arguments[0]||[];MANUAL_DETAIL_ROWS=rows;const date=today(),current=MANUAL_DETAIL_ROWS.find(r=>r.work_date===date)||{},weekday=['일','월','화','수','목','금','토'][new Date(date+'T00:00:00').getDay()],half=current.half_day||'없음';return `<div class="card"><h2>📝 수기 출퇴근 입력 <span class="sub">(지문 기록과 별도 대조 원장)</span></h2><div class="manual-attendance-layout"><div class="fld"><label>근무일</label><input type="hidden" id="manualWorkDate" value="${date}"><div id="manualAttendanceCalendar"></div></div><div class="grid"><div class="fld"><label>출근</label><div class="rowflex"><select id="manualClockInHour" aria-label="출근 시">${manualClockOptions('',24)}</select><span>시</span><select id="manualClockInMinute" aria-label="출근 분">${manualClockOptions('',60)}</select><span>분</span></div></div><div class="fld"><label>퇴근</label><div class="rowflex"><select id="manualClockOutHour" aria-label="퇴근 시">${manualClockOptions('',24)}</select><span>시</span><select id="manualClockOutMinute" aria-label="퇴근 분">${manualClockOptions('',60)}</select><span>분</span></div></div><div class="fld"><label>요일</label><input id="manualWeekday" value="${weekday}요일" readonly></div><div class="fld"><label>지각(분)</label><input type="number" id="manualLate" min="0" value="0"></div><div class="fld"><label>조퇴(분)</label><input type="number" id="manualEarly" min="0" value="0"></div><div class="fld"><label>점심 추가근무</label><input id="manualLunchOvertimeRaw" placeholder="예: 9, 20 또는 01:09" oninput="updateManualOvertimeTotal()" onchange="updateManualOvertimeTotal()"></div><div class="fld"><label>퇴근 추가근무</label><input id="manualClockoutOvertimeRaw" placeholder="예: 9, 20 또는 01:09" oninput="updateManualOvertimeTotal()" onchange="updateManualOvertimeTotal()"></div><div class="fld"><label>저녁 추가근무</label><input id="manualEveningOvertimeRaw" placeholder="분 또는 01:09" oninput="updateManualOvertimeTotal()" onchange="updateManualOvertimeTotal()"></div><div class="fld"><label>추가근무 합계</label><output id="manualOvertimeTotal">0분</output></div><div class="fld"><label>반차</label><select id="manualHalfDay"><option ${half==='없음'?'selected':''}>없음</option><option ${half==='오전 반차'?'selected':''}>오전 반차</option><option ${half==='오후 반차'?'selected':''}>오후 반차</option></select></div><div class="fld w4"><label><input type="checkbox" id="manualReasonRequired"> 정정·예외 입력</label><input id="manualReason" placeholder="정정·예외일 때 사유 필수"><textarea id="manualNote" placeholder="비고"></textarea></div></div></div><div id="manualAttendanceDayDetail" class="hint" ${MANUAL_DETAIL_OPEN?'':'hidden'}><button type="button" class="mini" onclick="toggleManualAttendanceDetail()">${MANUAL_DETAIL_OPEN?'선택 날짜 상세 닫기':'선택 날짜 상세 열기'}</button><div id="manualAttendanceDayDetailText">${current.lunch_overtime_min||0}분 점심 · ${current.clockout_overtime_min||0}분 퇴근 · ${current.evening_overtime_min||0}분 저녁 · ${esc(current.half_day&&current.half_day!=='없음'?current.half_day+' · ':'')}${esc(current.manual_note||current.reason||'비고 없음')}</div></div><button class="hbtn pri" style="margin-top:10px" onclick="submitManualAttendance()">수기 입력 제출</button><div class="msg" id="manualAttMsg"></div></div>`;}
+function manualClockOptions(selected,minutes){const placeholder=selected?'':`<option value="" selected>${esc(minutes===24?hubT('att.manual.pick_hour','시 선택'):hubT('att.manual.pick_min','분 선택'))}</option>`;return placeholder+Array.from({length:minutes},(_,i)=>{const v=String(i).padStart(2,'0');return `<option value="${v}" ${v===selected?'selected':''}>${v}</option>`;}).join('');}
+function manualAttendanceFormHtml(){const rows=arguments[0]||[];MANUAL_DETAIL_ROWS=rows;const date=today(),current=MANUAL_DETAIL_ROWS.find(r=>r.work_date===date)||{},weekday=['일','월','화','수','목','금','토'][new Date(date+'T00:00:00').getDay()],half=current.half_day||'없음';return `<div class="card"><h2>${esc(hubT('att.manual.title','📝 수기 출퇴근 입력'))} <span class="sub">(${esc(hubT('att.manual.title_sub','지문 기록과 별도 대조 원장'))})</span></h2><div class="manual-attendance-layout"><div class="fld"><label>${esc(hubT('att.manual.f_date','근무일'))}</label><input type="hidden" id="manualWorkDate" value="${date}"><div id="manualAttendanceCalendar"></div></div><div class="grid"><div class="fld"><label>${esc(hubT('att.manual.f_in','출근'))}</label><div class="rowflex"><select id="manualClockInHour" aria-label="출근 시">${manualClockOptions('',24)}</select><span>시</span><select id="manualClockInMinute" aria-label="출근 분">${manualClockOptions('',60)}</select><span>분</span></div></div><div class="fld"><label>${esc(hubT('att.manual.f_out','퇴근'))}</label><div class="rowflex"><select id="manualClockOutHour" aria-label="퇴근 시">${manualClockOptions('',24)}</select><span>시</span><select id="manualClockOutMinute" aria-label="퇴근 분">${manualClockOptions('',60)}</select><span>분</span></div></div><div class="fld"><label>${esc(hubT('att.manual.f_weekday','요일'))}</label><input id="manualWeekday" value="${weekday}요일" readonly></div><div class="fld"><label>${esc(hubT('att.manual.f_late','지각(분)'))}</label><input type="number" id="manualLate" min="0" value="0"></div><div class="fld"><label>${esc(hubT('att.manual.f_early','조퇴(분)'))}</label><input type="number" id="manualEarly" min="0" value="0"></div><div class="fld"><label>${esc(hubT('att.manual.f_lunch','점심 추가근무'))}</label><input id="manualLunchOvertimeRaw" placeholder="${esc(hubT('att.manual.ph_ot','예: 9, 20 또는 01:09'))}" oninput="updateManualOvertimeTotal()" onchange="updateManualOvertimeTotal()"></div><div class="fld"><label>${esc(hubT('att.manual.f_clockout_ot','퇴근 추가근무'))}</label><input id="manualClockoutOvertimeRaw" placeholder="${esc(hubT('att.manual.ph_ot','예: 9, 20 또는 01:09'))}" oninput="updateManualOvertimeTotal()" onchange="updateManualOvertimeTotal()"></div><div class="fld"><label>${esc(hubT('att.manual.f_evening_ot','저녁 추가근무'))}</label><input id="manualEveningOvertimeRaw" placeholder="${esc(hubT('att.manual.ph_evening','분 또는 01:09'))}" oninput="updateManualOvertimeTotal()" onchange="updateManualOvertimeTotal()"></div><div class="fld"><label>${esc(hubT('att.manual.f_total','추가근무 합계'))}</label><output id="manualOvertimeTotal">0분</output></div><div class="fld"><label>${esc(hubT('att.manual.f_half','반차'))}</label><select id="manualHalfDay"><option ${half==='없음'?'selected':''}>없음</option><option ${half==='오전 반차'?'selected':''}>오전 반차</option><option ${half==='오후 반차'?'selected':''}>오후 반차</option></select></div><div class="fld w4"><label><input type="checkbox" id="manualReasonRequired"> ${esc(hubT('att.manual.f_correct','정정·예외 입력'))}</label><input id="manualReason" placeholder="${esc(hubT('att.manual.ph_reason','정정·예외일 때 사유 필수'))}"><textarea id="manualNote" placeholder="${esc(hubT('att.manual.ph_note','비고'))}"></textarea></div></div></div><div id="manualAttendanceDayDetail" class="hint" ${MANUAL_DETAIL_OPEN?'':'hidden'}><button type="button" class="mini" onclick="toggleManualAttendanceDetail()">${MANUAL_DETAIL_OPEN?esc(hubT('att.manual.detail_close','선택 날짜 상세 닫기')):esc(hubT('att.manual.detail_open','선택 날짜 상세 열기'))}</button><div id="manualAttendanceDayDetailText">${esc(hubT('att.manual.minutes_line','{lunch}분 점심 · {clockout}분 퇴근 · {evening}분 저녁',{lunch:current.lunch_overtime_min||0,clockout:current.clockout_overtime_min||0,evening:current.evening_overtime_min||0}))} · ${esc(current.half_day&&current.half_day!=='없음'?current.half_day+' · ':'')}${esc(current.manual_note||current.reason||hubT('att.manual.no_note','비고 없음'))}</div></div><button class="hbtn pri" style="margin-top:10px" onclick="submitManualAttendance()">${esc(hubT('att.manual.submit','수기 입력 제출'))}</button><div class="msg" id="manualAttMsg"></div></div>`;}
 function manualCalendarDate(y,m,d){return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;}
 function renderManualAttendanceCalendar(month){const input=$('#manualWorkDate');if(!input)return;const selected=input.value||today(),[sy,sm]=selected.split('-').map(Number),base=month||new Date(sy,sm-1,1),y=base.getFullYear(),m=base.getMonth(),first=new Date(y,m,1).getDay(),last=new Date(y,m+1,0).getDate(),focusDate=sy===y&&sm===m+1?selected:manualCalendarDate(y,m,1);let cells='';for(let i=0;i<42;i++){const d=i-first+1;if(d<1||d>last){cells+='<button type="button" disabled aria-hidden="true"></button>';continue;}const date=manualCalendarDate(y,m,d),chosen=date===selected;cells+=`<button type="button" role="gridcell" aria-label="${date}" aria-selected="${chosen}" tabindex="${date===focusDate?0:-1}" onclick="selectManualAttendanceDate('${date}')" onkeydown="manualAttendanceCalendarKey(event,'${date}')">${d}</button>`;}$('#manualAttendanceCalendar').innerHTML=`<div class="manual-calendar-head"><button type="button" class="mini" aria-label="이전 달" onclick="renderManualAttendanceCalendar(new Date(${y},${m-1},1))">‹</button><span class="manual-calendar-title">${y}년 ${m+1}월</span><button type="button" class="mini" aria-label="다음 달" onclick="renderManualAttendanceCalendar(new Date(${y},${m+1},1))">›</button></div><div class="manual-calendar-week" aria-hidden="true"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div><div class="manual-calendar-grid" role="grid" aria-label="근무일 선택">${cells}</div><div class="manual-calendar-help">방향키·Home·End로 날짜 이동 · Enter로 선택</div>`;}
 function selectManualAttendanceDate(date){const input=$('#manualWorkDate');if(!input)return;input.value=date;MANUAL_DETAIL_OPEN=true;renderManualAttendanceCalendar(new Date(date+'T00:00:00'));if(typeof renderManualAttendanceDayDetail==='function')renderManualAttendanceDayDetail(date);$('#manualAttendanceDayDetail')?.removeAttribute('hidden');$('#manualAttendanceCalendar')?.querySelector(`[aria-label="${date}"][tabindex="0"]`)?.focus();}
@@ -939,9 +945,9 @@ function overtimeDraftMinutes(raw){const s=String(raw||'').trim();if(!s)return 0
 function updateManualOvertimeTotal(){const total=['#manualLunchOvertimeRaw','#manualClockoutOvertimeRaw','#manualEveningOvertimeRaw'].reduce((sum,id)=>sum+(overtimeDraftMinutes($(id)?.value)||0),0);if($('#manualOvertimeTotal'))$('#manualOvertimeTotal').textContent=total+'분';}
 function normalizeManualClockTime(raw){let s=String(raw||'').trim().toLowerCase();if(!s||s==='off')return null;const pm=/^오후\s*/.test(s),am=/^오전\s*/.test(s);s=s.replace(/^(오전|오후)\s*/,'');if(/^\d{3,4}$/.test(s))s=`${s.slice(0,-2)}:${s.slice(-2)}`;const m=s.match(/^(\d{1,2}):(\d{2})$/);if(!m||Number(m[2])>59||Number(m[1])>23)return null;let h=Number(m[1]);if(am&&h===12)h=0;if(pm&&h<12)h+=12;return `${String(h).padStart(2,'0')}:${m[2]}`;}
 function manualClockValue(hourId,minuteId){const h=$('#'+hourId)?.value,m=$('#'+minuteId)?.value;return h&&m?`${h}:${m}`:null;}
-async function submitManualAttendance(){const msg=$('#manualAttMsg'),lunchRaw=$('#manualLunchOvertimeRaw').value.trim(),clockoutRaw=$('#manualClockoutOvertimeRaw').value.trim(),eveningRaw=$('#manualEveningOvertimeRaw').value.trim(),lunch=overtimeDraftMinutes(lunchRaw),clockout=overtimeDraftMinutes(clockoutRaw),evening=overtimeDraftMinutes(eveningRaw),clockIn=manualClockValue('manualClockInHour','manualClockInMinute'),clockOut=manualClockValue('manualClockOutHour','manualClockOutMinute'),required=$('#manualReasonRequired').checked,reason=$('#manualReason').value.trim();if(lunch==null||clockout==null||evening==null||required&&!reason){msg.textContent='출퇴근·연장 원자료 형식 또는 정정 사유를 확인하세요.';return;}const {error}=await sb.rpc('submit_manual_attendance_d',{p_work_date:$('#manualWorkDate').value,p_clock_in:clockIn,p_clock_out:clockOut,p_late_min:Number($('#manualLate').value||0),p_early_min:Number($('#manualEarly').value||0),p_lunch_overtime_raw_text:lunchRaw,p_lunch_overtime_min:lunch,p_clockout_overtime_raw_text:clockoutRaw,p_clockout_overtime_min:clockout,p_evening_overtime_raw_text:eveningRaw,p_evening_overtime_min:evening,p_reason:reason||null,p_reason_required:required,p_manual_note:$('#manualNote').value.trim()||null,p_half_day:$('#manualHalfDay').value});msg.textContent=error?'실패: '+error.message:'제출했습니다. 승인 대기 중입니다.';if(!error)setTimeout(()=>render(),700);}
+async function submitManualAttendance(){const msg=$('#manualAttMsg'),lunchRaw=$('#manualLunchOvertimeRaw').value.trim(),clockoutRaw=$('#manualClockoutOvertimeRaw').value.trim(),eveningRaw=$('#manualEveningOvertimeRaw').value.trim(),lunch=overtimeDraftMinutes(lunchRaw),clockout=overtimeDraftMinutes(clockoutRaw),evening=overtimeDraftMinutes(eveningRaw),clockIn=manualClockValue('manualClockInHour','manualClockInMinute'),clockOut=manualClockValue('manualClockOutHour','manualClockOutMinute'),required=$('#manualReasonRequired').checked,reason=$('#manualReason').value.trim();if(lunch==null||clockout==null||evening==null||required&&!reason){msg.textContent=hubT('att.manual.m_format','출퇴근·연장 원자료 형식 또는 정정 사유를 확인하세요.');return;}const {error}=await sb.rpc('submit_manual_attendance_d',{p_work_date:$('#manualWorkDate').value,p_clock_in:clockIn,p_clock_out:clockOut,p_late_min:Number($('#manualLate').value||0),p_early_min:Number($('#manualEarly').value||0),p_lunch_overtime_raw_text:lunchRaw,p_lunch_overtime_min:lunch,p_clockout_overtime_raw_text:clockoutRaw,p_clockout_overtime_min:clockout,p_evening_overtime_raw_text:eveningRaw,p_evening_overtime_min:evening,p_reason:reason||null,p_reason_required:required,p_manual_note:$('#manualNote').value.trim()||null,p_half_day:$('#manualHalfDay').value});msg.textContent=error?hubT('att.manual.m_fail','실패: {msg}',{msg:error.message}):hubT('att.manual.m_ok','제출했습니다. 승인 대기 중입니다.');if(!error)setTimeout(()=>render(),700);}
 // 기존 submit_manual_attendance_v2 RPC 계약은 db 초안과 기존 기록 호환을 위해 보존한다. 예전 호출: sb.rpc('submit_manual_attendance_v2', payload)
-async function reviewManualAttendance(id,action){const {error}=await sb.rpc('review_manual_attendance',{p_id:id,p_action:action});if(error){alert('처리 실패: '+error.message);return;}setStatus('saved');render();}
+async function reviewManualAttendance(id,action){const {error}=await sb.rpc('review_manual_attendance',{p_id:id,p_action:action});if(error){alert(hubT('att.review.m_fail','처리 실패: {msg}',{msg:error.message}));return;}setStatus('saved');render();}
 function attendanceMonthBounds(month){const [y,m]=month.split('-').map(Number),next=m===12?`${y+1}-01-01`:`${y}-${String(m+1).padStart(2,'0')}-01`;return {start:`${month}-01`,next};}
 /* absence-candidate:test-start */
 function absenceSettingsLoadSucceeded(result){return !result?.error&&Array.isArray(result?.data);}
@@ -963,14 +969,14 @@ function absenceCandidateDecision({ds,todaySeoul,nowSeoul,siueop,afterMinutes,af
 function absenceManualExcluded(rows){return (rows||[]).some(row=>['대기','실장승인','원장확정'].includes(row?.status));}
 /* absence-candidate:test-end */
 function seoulDateTime(){const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date()),get=t=>parts.find(x=>x.type===t)?.value||'';return {date:`${get('year')}-${get('month')}-${get('day')}`,time:`${get('hour')}:${get('minute')}`};}
-function absenceSettingsHtml(){return ME.role==='owner'?`<div class="card"><h2>⚙ 결근/미기록 후보 기준 <span class="sub">(원장)</span></h2><div class="grid"><div class="fld"><label>시업 시각</label><input id="absenceSiueop" type="time" value="${esc(SETTINGS.siueop||'10:00')}"></div><div class="fld"><label>확인 지연(분)</label><input id="absenceDelay" type="number" min="0" max="1440" step="1" value="${esc(SETTINGS.absence_confirm_after_minutes||'0')}"></div><div class="fld"><label>무단결근 기준 일수</label><input id="absenceDays" type="number" min="0" max="365" step="1" value="${esc(SETTINGS.absence_confirm_after_days||'1')}"></div><div class="fld"><label><input id="absenceManualExclude" type="checkbox" ${String(SETTINGS.absence_exclude_pending_manual)!=='false'?'checked':''}> 대기·실장승인·원장확정 수기근태는 후보에서 제외</label></div></div><button class="mini stamp" onclick="saveAbsenceSettings()">기준 저장</button><div class="msg" id="absenceSettingsMsg"></div></div>`:'';}
-async function saveAbsenceSettings(){const msg=$('#absenceSettingsMsg'),siueop=$('#absenceSiueop').value,delay=$('#absenceDelay').value,days=$('#absenceDays').value;if(!/^\d{2}:\d{2}$/.test(siueop)||!/^\d+$/.test(delay)||Number(delay)>1440||!/^(?:0|[1-9]\d*)$/.test(days)||Number(days)>365){msg.textContent='시업 시각·지연 분·무단결근 일수를 확인하세요.';setStatus('error');return;}const rows=[{key:'siueop',value:siueop},{key:'absence_confirm_after_minutes',value:delay},{key:'absence_confirm_after_days',value:days},{key:'absence_exclude_pending_manual',value:$('#absenceManualExclude').checked?'true':'false'}],{error}=await sb.from('app_settings').upsert(rows,{onConflict:'key'});if(error){msg.textContent='저장 실패: '+error.message;setStatus('error');return;}rows.forEach(x=>SETTINGS[x.key]=x.value);msg.textContent='저장했습니다.';setStatus('saved');}
+function absenceSettingsHtml(){return ME.role==='owner'?`<div class="card"><h2>${esc(hubT('att.absset.title','⚙ 결근/미기록 후보 기준'))} <span class="sub">(${esc(hubT('att.absset.title_sub','원장'))})</span></h2><div class="grid"><div class="fld"><label>${esc(hubT('att.absset.f_siueop','시업 시각'))}</label><input id="absenceSiueop" type="time" value="${esc(SETTINGS.siueop||'10:00')}"></div><div class="fld"><label>${esc(hubT('att.absset.f_delay','확인 지연(분)'))}</label><input id="absenceDelay" type="number" min="0" max="1440" step="1" value="${esc(SETTINGS.absence_confirm_after_minutes||'0')}"></div><div class="fld"><label>${esc(hubT('att.absset.f_days','무단결근 기준 일수'))}</label><input id="absenceDays" type="number" min="0" max="365" step="1" value="${esc(SETTINGS.absence_confirm_after_days||'1')}"></div><div class="fld"><label><input id="absenceManualExclude" type="checkbox" ${String(SETTINGS.absence_exclude_pending_manual)!=='false'?'checked':''}> ${esc(hubT('att.absset.f_exclude','대기·실장승인·원장확정 수기근태는 후보에서 제외'))}</label></div></div><button class="mini stamp" onclick="saveAbsenceSettings()">${esc(hubT('att.absset.save','기준 저장'))}</button><div class="msg" id="absenceSettingsMsg"></div></div>`:'';}
+async function saveAbsenceSettings(){const msg=$('#absenceSettingsMsg'),siueop=$('#absenceSiueop').value,delay=$('#absenceDelay').value,days=$('#absenceDays').value;if(!/^\d{2}:\d{2}$/.test(siueop)||!/^\d+$/.test(delay)||Number(delay)>1440||!/^(?:0|[1-9]\d*)$/.test(days)||Number(days)>365){msg.textContent=hubT('att.absset.m_check','시업 시각·지연 분·무단결근 일수를 확인하세요.');setStatus('error');return;}const rows=[{key:'siueop',value:siueop},{key:'absence_confirm_after_minutes',value:delay},{key:'absence_confirm_after_days',value:days},{key:'absence_exclude_pending_manual',value:$('#absenceManualExclude').checked?'true':'false'}],{error}=await sb.from('app_settings').upsert(rows,{onConflict:'key'});if(error){msg.textContent=hubT('att.absset.m_fail','저장 실패: {msg}',{msg:error.message});setStatus('error');return;}rows.forEach(x=>SETTINGS[x.key]=x.value);msg.textContent=hubT('att.absset.m_ok','저장했습니다.');setStatus('saved');}
 async function fetchAttendancePages(makeQuery,pageSize=500){const rows=[];for(let page=0;page<20;page++){const {data,error}=await makeQuery().range(page*pageSize,(page+1)*pageSize-1);if(error)return {data:null,error};rows.push(...(data||[]));if((data||[]).length<pageSize)break;}return {data:rows,error:null};}
 async function renderAtt(m){
   const month=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit'}).format(new Date()),bounds=attendanceMonthBounds(month);
   if(isMgr()){
     const {data:mrow}=await sb.from('att_months').select('*').eq('month',month).maybeSingle();
-    const {data:iss}=await sb.from('attendance_issues').select('*').order('created_at',{ascending:false}).limit(30);
+    const {data:iss}=await sb.from('attendance_issues').select('*').order('created_at',{ascending:false}).limit(hubN('att.issue_list_limit',30));
     const {data:manualRows,error:manualError}=await sb.from('attendance_manual_entries').select('*').order('created_at',{ascending:false}).limit(50);
     const manualUsers=[...new Set((manualRows||[]).map(r=>r.user_id))],manualDates=[...new Set((manualRows||[]).map(r=>r.work_date))];
     const fpQuery=manualUsers.length&&manualDates.length?()=>sb.from('attendance').select('user_id,work_date,clock_in,clock_out,source').in('user_id',manualUsers).in('work_date',manualDates).order('work_date',{ascending:false}):null;
@@ -980,25 +986,25 @@ async function renderAtt(m){
     const {data:issueResolutions,error:resolutionError}=await fetchAttendancePages(()=>sb.from('attendance_issue_resolutions').select('user_id,work_date,clock_in,clock_out,late_min,early_min,overtime_min,source,approved_at').gte('work_date',bounds.start).lt('work_date',bounds.next).order('work_date',{ascending:false}));
     const fpByKey=new Map((fpRows||[]).map(r=>[r.user_id+'|'+r.work_date,r]));
     m.innerHTML=`
-    <div class="card"><h2>🗂 지문 근태 — 월 마감 <span class="sub">(${month})</span></h2>
-      <p class="sub">지문인식기 엑셀(.xls/.xlsx)을 올리면 출근·퇴근·지각·연장을 자동 판정합니다. (하루 최초 인식=출근, 최후=퇴근)</p>
+    <div class="card"><h2>${esc(hubT('att.close.title','🗂 지문 근태 — 월 마감'))} <span class="sub">(${month})</span></h2>
+      <p class="sub">${esc(hubT('att.close.hint','지문인식기 엑셀(.xls/.xlsx)을 올리면 출근·퇴근·지각·연장을 자동 판정합니다. (하루 최초 인식=출근, 최후=퇴근)'))}</p>
       <div style="margin:10px 0"><input type="file" id="xlFile" accept=".xls,.xlsx" onchange="parseXls(event)"></div>
-      <div class="sub">이번 달 상태: <b class="${mrow&&mrow.status==='확정'?'':'b wait'}">${mrow?mrow.status:'미집계'}</b>
-        ${ME.role==='owner'?`<button class="mini" style="margin-left:8px" onclick="closeMonth('${month}')">이번 달 확정</button>`:''}</div>
+      <div class="sub">${esc(hubT('att.close.state','이번 달 상태:'))} <b class="${mrow&&mrow.status==='확정'?'':'b wait'}">${mrow?mrow.status:esc(hubT('att.close.state_none','미집계'))}</b>
+        ${ME.role==='owner'?`<button class="mini" style="margin-left:8px" onclick="closeMonth('${month}')">${esc(hubT('att.close.btn','이번 달 확정'))}</button>`:''}</div>
     </div>
     ${manualAttendanceFormHtml(manualRows||[])}
-    <div class="card"><h2>🧾 지문 오류 승인 인정 근태 <span class="sub">(${month})</span></h2>${(issueResolutions||[]).length?`<div class="tblwrap"><table><tr><th>직원</th><th>날짜</th><th>인정 출퇴근</th><th>상태</th><th>승인일</th></tr>${issueResolutions.map(r=>`<tr><td>${esc(nameOf(r.user_id))}</td><td>${md(r.work_date)}</td><td>${r.clock_in||'-'} ~ ${r.clock_out||'-'}</td><td>${r.late_min||0}분 / ${r.early_min||0}분 / ${r.overtime_min||0}분</td><td>${r.approved_at?esc(new Date(r.approved_at).toLocaleDateString('ko-KR')):'-'}</td></tr>`).join('')}</table></div>`:'<div class="empty">별도 인정 근태 없음</div>'}</div>
-    ${isLead()&&!manualError&&!fpError?`<div class="card"><h2>📝 수기 출퇴근 검토</h2>${(manualRows||[]).length?`<div class="tblwrap"><table><tr><th>직원</th><th>날짜</th><th>수기</th><th>지문</th><th>상태</th><th></th></tr>${manualRows.map(r=>{const fp=fpByKey.get(r.user_id+'|'+r.work_date);return `<tr><td>${esc(nameOf(r.user_id))}</td><td>${md(r.work_date)}</td><td>${r.clock_in||'-'} ~ ${r.clock_out||'-'}</td><td>${fp?`${fp.clock_in||'-'} ~ ${fp.clock_out||'-'}`:'-'}</td><td><span class="b ${r.status==='원장확정'?'ok':(r.status==='반려'?'no':'wait')}">${esc(r.status)}</span></td><td>${r.status==='대기'&&ME.role==='chief'?`<button class="mini stamp" onclick="reviewManualAttendance(${r.id},'approve')">실장 승인</button>`:''}${r.status==='실장승인'&&ME.role==='owner'?`<button class="mini stamp" onclick="reviewManualAttendance(${r.id},'approve')">원장 확정</button>`:''}${(r.status==='대기'||r.status==='실장승인')?` <button class="mini rej" onclick="reviewManualAttendance(${r.id},'reject')">반려</button>`:''}</td></tr>`;}).join('')}</table></div>`:'<div class="empty">수기 입력 없음</div>'}</div>`:isLead()?`<div class="card"><h2>📝 수기 출퇴근 검토</h2><div class="cal-error">수기 근태 조회 실패: ${esc(manualError?.message||fpError?.message||'DB 초안이 아직 적용되지 않았습니다.')}</div></div>`:''}
+    <div class="card"><h2>${esc(hubT('att.resol.title','🧾 지문 오류 승인 인정 근태'))} <span class="sub">(${month})</span></h2>${(issueResolutions||[]).length?`<div class="tblwrap"><table><tr><th>${esc(hubT('att.th.person','직원'))}</th><th>${esc(hubT('att.th.date','날짜'))}</th><th>${esc(hubT('att.resol.th_time','인정 출퇴근'))}</th><th>${esc(hubT('att.th.status','상태'))}</th><th>${esc(hubT('att.resol.th_at','승인일'))}</th></tr>${issueResolutions.map(r=>`<tr><td>${esc(nameOf(r.user_id))}</td><td>${md(r.work_date)}</td><td>${r.clock_in||'-'} ~ ${r.clock_out||'-'}</td><td>${r.late_min||0}분 / ${r.early_min||0}분 / ${r.overtime_min||0}분</td><td>${r.approved_at?esc(new Date(r.approved_at).toLocaleDateString('ko-KR')):'-'}</td></tr>`).join('')}</table></div>`:'<div class="empty">'+esc(hubT('att.resol.empty','별도 인정 근태 없음'))+'</div>'}</div>
+    ${isLead()&&!manualError&&!fpError?`<div class="card"><h2>${esc(hubT('att.review.title','📝 수기 출퇴근 검토'))}</h2>${(manualRows||[]).length?`<div class="tblwrap"><table><tr><th>${esc(hubT('att.th.person','직원'))}</th><th>${esc(hubT('att.th.date','날짜'))}</th><th>${esc(hubT('att.review.th_manual','수기'))}</th><th>${esc(hubT('att.review.th_fp','지문'))}</th><th>${esc(hubT('att.th.status','상태'))}</th><th></th></tr>${manualRows.map(r=>{const fp=fpByKey.get(r.user_id+'|'+r.work_date);return `<tr><td>${esc(nameOf(r.user_id))}</td><td>${md(r.work_date)}</td><td>${r.clock_in||'-'} ~ ${r.clock_out||'-'}</td><td>${fp?`${fp.clock_in||'-'} ~ ${fp.clock_out||'-'}`:'-'}</td><td><span class="b ${r.status==='원장확정'?'ok':(r.status==='반려'?'no':'wait')}">${esc(r.status)}</span></td><td>${r.status==='대기'&&ME.role==='chief'?`<button class="mini stamp" onclick="reviewManualAttendance(${r.id},'approve')">${esc(hubT('att.btn.chief_ok','실장 승인'))}</button>`:''}${r.status==='실장승인'&&ME.role==='owner'?`<button class="mini stamp" onclick="reviewManualAttendance(${r.id},'approve')">${esc(hubT('att.btn.owner_ok','원장 확정'))}</button>`:''}${(r.status==='대기'||r.status==='실장승인')?` <button class="mini rej" onclick="reviewManualAttendance(${r.id},'reject')">${esc(hubT('att.btn.reject','반려'))}</button>`:''}</td></tr>`;}).join('')}</table></div>`:'<div class="empty">'+esc(hubT('att.review.empty','수기 입력 없음'))+'</div>'}</div>`:isLead()?`<div class="card"><h2>${esc(hubT('att.review.title','📝 수기 출퇴근 검토'))}</h2><div class="cal-error">${esc(hubT('att.review.err','수기 근태 조회 실패:'))} ${esc(manualError?.message||fpError?.message||hubT('att.review.err_draft','DB 초안이 아직 적용되지 않았습니다.'))}</div></div>`:''}
     ${absenceSettingsHtml()}
-    <div class="card"><h2>🚫 결근/미기록 후보 <span class="sub">(${month})</span></h2>
-      <button class="mini" onclick="checkAbsent('${month}')">확인하기</button>
-      <div id="absentBox" style="margin-top:8px"><div class="sub">근무표와 기록을 대조해 확인이 필요한 후보만 보여줍니다.</div></div>
+    <div class="card"><h2>${esc(hubT('att.absent.title','🚫 결근/미기록 후보'))} <span class="sub">(${month})</span></h2>
+      <button class="mini" onclick="checkAbsent('${month}')">${esc(hubT('att.absent.btn','확인하기'))}</button>
+      <div id="absentBox" style="margin-top:8px"><div class="sub">${esc(hubT('att.absent.hint','근무표와 기록을 대조해 확인이 필요한 후보만 보여줍니다.'))}</div></div>
     </div>
-    <div class="card"><h2>🙋 지문누락 소명 <span class="sub">(실장·원장 승인)</span></h2>
-      ${(iss||[]).length?`<div class="tblwrap"><table><tr><th>직원</th><th>날짜</th><th>유형</th><th>사유</th><th>상태</th><th></th></tr>
+    <div class="card"><h2>${esc(hubT('att.issue.title','🙋 지문누락 소명'))} <span class="sub">(${esc(hubT('att.issue.title_sub','실장·원장 승인'))})</span></h2>
+      ${(iss||[]).length?`<div class="tblwrap"><table><tr><th>${esc(hubT('att.th.person','직원'))}</th><th>${esc(hubT('att.th.date','날짜'))}</th><th>${esc(hubT('att.issue.th_type','유형'))}</th><th>${esc(hubT('att.issue.th_reason','사유'))}</th><th>${esc(hubT('att.th.status','상태'))}</th><th></th></tr>
       ${(iss||[]).map(i=>`<tr><td>${esc(nameOf(i.user_id))}</td><td>${md(i.work_date)}</td><td>${esc(i.rule_label||i.type||'')}</td><td>${esc(i.reason||'')}</td>
         <td><span class="b ${i.status==='원장확정'?'ok':(i.status==='반려'?'no':'wait')}">${esc(i.status)}</span></td>
-        <td>${issueBtns(i)}</td></tr>`).join('')}</table></div>`:'<div class="empty">소명 없음</div>'}
+        <td>${issueBtns(i)}</td></tr>`).join('')}</table></div>`:'<div class="empty">'+esc(hubT('att.issue.empty','소명 없음'))+'</div>'}
     </div>`;
   } else {
     const {data:att}=await sb.from('attendance').select('*').eq('user_id',ME.id).gte('work_date',bounds.start).lt('work_date',bounds.next).order('work_date',{ascending:false});
@@ -1007,15 +1013,15 @@ async function renderAtt(m){
     const effectiveAtt=applyAttendanceResolutions(att,(issueResolutions||[]).map(r=>({...r,user_id:ME.id})));
     m.innerHTML=`
     ${manualAttendanceFormHtml(manualRows||[])}
-    ${manualError?`<div class="card"><div class="cal-error">수기 근태 조회 실패: ${esc(manualError.message||'DB 초안이 아직 적용되지 않았습니다.')}</div></div>`:''}
-    <div class="card"><h2>🕘 내 출퇴근 <span class="sub">(${month})</span></h2>
-      ${(effectiveAtt||[]).length?`<div class="tblwrap"><table><tr><th>날짜</th><th>출근</th><th>퇴근</th><th>지각</th><th>연장</th><th>기준</th></tr>
-      ${(effectiveAtt||[]).map(a=>`<tr class="${a.late_min>0?'warn':''}"><td>${md(a.work_date)}</td><td>${a.clock_in||'-'}${a.is_issue_adjustment?` <span class="sub">(원 ${a.original_clock_in||'-'})</span>`:''}</td><td>${a.clock_out||'-'}${a.is_issue_adjustment?` <span class="sub">(원 ${a.original_clock_out||'-'})</span>`:''}</td>
-        <td>${a.late_min>0?'<span class="b no">지각 '+a.late_min+'분</span>':'-'}${a.is_issue_adjustment?` <span class="sub">(원 ${a.original_late_min}분)</span>`:''}</td><td>${a.overtime_min>0?a.overtime_min+'분':'-'}${a.is_issue_adjustment?` <span class="sub">(원 ${a.original_overtime_min}분)</span>`:''}</td><td>${a.is_issue_adjustment?'<span class="b ok">승인 보정</span>':a.source==='manual'?'<span class="b wait">수기 기록</span>':'지문 기록'}</td></tr>`).join('')}</table></div>`
-      :'<div class="empty">이번 달 기록 없음 (지문은 월말 일괄 입력)</div>'}
-      ${(manualRows||[]).length?`<div class="hint">수기 제출 내역: ${manualRows.map(r=>`${md(r.work_date)} ${esc(r.status)}`).join(' · ')}</div>`:''}
-      <div class="hint">기록이 실제와 다르면 관리자에게 <b>지문누락 소명</b>을 요청하세요.
-        <button class="mini" onclick="openIssue()">소명 올리기</button></div>
+    ${manualError?`<div class="card"><div class="cal-error">${esc(hubT('att.my.err','수기 근태 조회 실패:'))} ${esc(manualError.message||hubT('att.my.err_draft','DB 초안이 아직 적용되지 않았습니다.'))}</div></div>`:''}
+    <div class="card"><h2>${esc(hubT('att.my.title','🕘 내 출퇴근'))} <span class="sub">(${month})</span></h2>
+      ${(effectiveAtt||[]).length?`<div class="tblwrap"><table><tr><th>${esc(hubT('att.th.date','날짜'))}</th><th>${esc(hubT('att.my.th_in','출근'))}</th><th>${esc(hubT('att.my.th_out','퇴근'))}</th><th>${esc(hubT('att.my.th_late','지각'))}</th><th>${esc(hubT('att.my.th_ot','연장'))}</th><th>${esc(hubT('att.my.th_basis','기준'))}</th></tr>
+      ${(effectiveAtt||[]).map(a=>`<tr class="${a.late_min>0?'warn':''}"><td>${md(a.work_date)}</td><td>${a.clock_in||'-'}${a.is_issue_adjustment?` <span class="sub">(${esc(hubT('att.my.orig','원 {v}',{v:a.original_clock_in||'-'}))})</span>`:''}</td><td>${a.clock_out||'-'}${a.is_issue_adjustment?` <span class="sub">(${esc(hubT('att.my.orig','원 {v}',{v:a.original_clock_out||'-'}))})</span>`:''}</td>
+        <td>${a.late_min>0?'<span class="b no">'+esc(hubT('att.my.late','지각 {n}분',{n:a.late_min}))+'</span>':'-'}${a.is_issue_adjustment?` <span class="sub">(${esc(hubT('att.my.orig_min','원 {v}분',{v:a.original_late_min}))})</span>`:''}</td><td>${a.overtime_min>0?a.overtime_min+'분':'-'}${a.is_issue_adjustment?` <span class="sub">(${esc(hubT('att.my.orig_min','원 {v}분',{v:a.original_overtime_min}))})</span>`:''}</td><td>${a.is_issue_adjustment?'<span class="b ok">'+esc(hubT('att.my.basis_adj','승인 보정'))+'</span>':a.source==='manual'?'<span class="b wait">'+esc(hubT('att.my.basis_manual','수기 기록'))+'</span>':esc(hubT('att.my.basis_fp','지문 기록'))}</td></tr>`).join('')}</table></div>`
+      :'<div class="empty">'+esc(hubT('att.my.empty','이번 달 기록 없음 (지문은 월말 일괄 입력)'))+'</div>'}
+      ${(manualRows||[]).length?`<div class="hint">${esc(hubT('att.my.manual_list','수기 제출 내역:'))} ${manualRows.map(r=>`${md(r.work_date)} ${esc(r.status)}`).join(' · ')}</div>`:''}
+      <div class="hint">${esc(hubT('att.my.fix_a','기록이 실제와 다르면 관리자에게'))} <b>${esc(hubT('att.my.fix_b','지문누락 소명'))}</b>${esc(hubT('att.my.fix_c','을 요청하세요.'))}
+        <button class="mini" onclick="openIssue()">${esc(hubT('att.my.fix_btn','소명 올리기'))}</button></div>
     </div>`;
   }
   renderManualAttendanceDayDetail($('#manualWorkDate')?.value||today());
@@ -1028,32 +1034,32 @@ function issueBtns(i){
 }
 async function issueAct(id,act){
   const {error}=await sb.rpc('review_attendance_issue',{p_id:id,p_action:act==='rej'?'reject':'approve'});
-  if(error){alert('소명 처리 실패: '+error.message);return;}setStatus('saved');render();
+  if(error){alert(hubT('att.issue.m_act_fail','소명 처리 실패: {msg}',{msg:error.message}));return;}setStatus('saved');render();
 }
 async function openIssue(){
-  const wd=prompt('소명할 근무일 (YYYY-MM-DD):',today());if(!wd)return;
-  const label=prompt('오류 유형을 입력하세요: 지문인식오류 / 입력오류 / 기타','지문인식오류');if(!['지문인식오류','입력오류','기타'].includes(label)){alert('오류 유형은 지문인식오류, 입력오류, 기타 중 하나여야 합니다.');return;}
-  const reason=prompt('사유 (예: 지문 찍었으나 인식 누락):');if(!reason)return;
-  const {error}=await sb.rpc('submit_attendance_issue',{p_work_date:wd,p_type:'정정',p_rule_label:label,p_reason:reason});if(error){setStatus('error');alert('소명 저장 실패: '+error.message);return;}setStatus('saved');alert('소명을 올렸습니다. 실장 승인 후 반영됩니다.');
+  const wd=prompt(hubT('att.issue.p_date','소명할 근무일 (YYYY-MM-DD):'),today());if(!wd)return;
+  const label=prompt(hubT('att.issue.p_type','오류 유형을 입력하세요: 지문인식오류 / 입력오류 / 기타'),'지문인식오류');if(!['지문인식오류','입력오류','기타'].includes(label)){alert(hubT('att.issue.m_type','오류 유형은 지문인식오류, 입력오류, 기타 중 하나여야 합니다.'));return;}
+  const reason=prompt(hubT('att.issue.p_reason','사유 (예: 지문 찍었으나 인식 누락):'));if(!reason)return;
+  const {error}=await sb.rpc('submit_attendance_issue',{p_work_date:wd,p_type:'정정',p_rule_label:label,p_reason:reason});if(error){setStatus('error');alert(hubT('att.issue.m_save_fail','소명 저장 실패: {msg}',{msg:error.message}));return;}setStatus('saved');alert(hubT('att.issue.m_saved','소명을 올렸습니다. 실장 승인 후 반영됩니다.'));
 }
 async function closeMonth(month){
-  if(!confirm(month+' 근태를 확정할까요? (이후 수정은 소명/정정으로)'))return;
+  if(!confirm(hubT('att.close.confirm','{month} 근태를 확정할까요? (이후 수정은 소명/정정으로)',{month:month})))return;
   await sb.from('att_months').upsert({month,status:'확정',closed_by:ME.name,closed_at:new Date().toISOString()},{onConflict:'month'});setStatus('saved');render();
 }
 async function checkAbsent(month){
-  const el=$('#absentBox');el.innerHTML='확인 중…';
+  const el=$('#absentBox');el.innerHTML=esc(hubT('att.absent.loading','확인 중…'));
   const bounds=attendanceMonthBounds(month),[scResult,attResult,leaveResult,manualResult]=await Promise.all([
     sb.from('schedules').select('person_id,user_id,day,week_start,shift'),sb.from('attendance').select('user_id,work_date').gte('work_date',bounds.start).lt('work_date',bounds.next),
     sb.from('leave_requests').select('user_id,date_from,date_to,days,type,status').eq('status','승인').lte('date_from',bounds.next).gte('date_to',bounds.start),
     sb.from('attendance_manual_entries').select('user_id,work_date,status').gte('work_date',bounds.start).lt('work_date',bounds.next)
-  ]);if(scResult.error||attResult.error||leaveResult.error||manualResult.error){el.innerHTML=`<div class="cal-error">후보 확인 실패: ${esc((scResult.error||attResult.error||leaveResult.error||manualResult.error).message)}</div>`;return;}
+  ]);if(scResult.error||attResult.error||leaveResult.error||manualResult.error){el.innerHTML=`<div class="cal-error">${esc(hubT('att.absent.err','후보 확인 실패:'))} ${esc((scResult.error||attResult.error||leaveResult.error||manualResult.error).message)}</div>`;return;}
   const sc=scResult.data,att=attResult.data,leaves=leaveResult.data,manuals=manualResult.data;
   const has=new Set((att||[]).map(a=>a.user_id+'|'+a.work_date));
-  const manualByKey=new Map();(manuals||[]).forEach(row=>{const key=row.user_id+'|'+row.work_date,rows=manualByKey.get(key)||[];rows.push(row);manualByKey.set(key,rows);});const now=seoulDateTime(),miss=[],seen=new Set(),settingsWarning=SETTINGS_LOAD_OK?'':`<div class="cal-error">설정 불러오기 오류: 오늘 후보는 표시하지 않습니다.</div>`;
+  const manualByKey=new Map();(manuals||[]).forEach(row=>{const key=row.user_id+'|'+row.work_date,rows=manualByKey.get(key)||[];rows.push(row);manualByKey.set(key,rows);});const now=seoulDateTime(),miss=[],seen=new Set(),settingsWarning=SETTINGS_LOAD_OK?'':`<div class="cal-error">${esc(hubT('att.absent.set_warn','설정 불러오기 오류: 오늘 후보는 표시하지 않습니다.'))}</div>`;
   (sc||[]).forEach(s=>{ if(!s.user_id||s.shift==='off')return;
     for(let i=0;i<7;i++){const ds=addDays(s.week_start,i);const d=new Date(ds+'T00:00:00');
       if(d.getDay()!==s.day||ds.slice(0,7)!==month||seen.has(s.user_id+'|'+ds))return;seen.add(s.user_id+'|'+ds);const p=PROFILES.find(x=>x.user_id===s.user_id)||{},leave=(leaves||[]).find(x=>x.user_id===s.user_id&&x.date_from<=ds&&x.date_to>=ds),decision=absenceCandidateDecision({ds,todaySeoul:now.date,nowSeoul:now.time,siueop:SETTINGS.siueop,afterMinutes:SETTINGS.absence_confirm_after_minutes,afterDays:SETTINGS.absence_confirm_after_days,shift:s.shift,hasAttendance:has.has(s.user_id+'|'+ds),leave,manualStatus:absenceManualExcluded(manualByKey.get(s.user_id+'|'+ds))?'대기':undefined,excludePendingManual:String(SETTINGS.absence_exclude_pending_manual)!=='false',hireDate:p.hire_date,employmentStatus:p.employment_status,effectiveDate:p.employment_effective_date,settingsLoaded:SETTINGS_LOAD_OK});if(decision.candidate)miss.push({u:s.user_id,ds,shift:s.shift});}});
-  el.innerHTML=settingsWarning+(miss.length?`<table><tr><th>직원</th><th>날짜</th><th>근무표</th></tr>${miss.sort((a,b)=>a.ds<b.ds?-1:1).map(x=>`<tr class="warn"><td>${esc(nameOf(x.u))}</td><td>${md(x.ds)}</td><td>${SHIFTS[x.shift]?SHIFTS[x.shift].l:esc(x.shift)}</td></tr>`).join('')}</table><div class="hint">결근/미기록 후보입니다. 소명 또는 수기근태를 확인하세요.</div>`:'<div class="empty">결근/미기록 후보 없음 ✓</div>');
+  el.innerHTML=settingsWarning+(miss.length?`<table><tr><th>${esc(hubT('att.th.person','직원'))}</th><th>${esc(hubT('att.th.date','날짜'))}</th><th>${esc(hubT('att.absent.th_sched','근무표'))}</th></tr>${miss.sort((a,b)=>a.ds<b.ds?-1:1).map(x=>`<tr class="warn"><td>${esc(nameOf(x.u))}</td><td>${md(x.ds)}</td><td>${SHIFTS[x.shift]?SHIFTS[x.shift].l:esc(x.shift)}</td></tr>`).join('')}</table><div class="hint">${esc(hubT('att.absent.found','결근/미기록 후보입니다. 소명 또는 수기근태를 확인하세요.'))}</div>`:'<div class="empty">'+esc(hubT('att.absent.none','결근/미기록 후보 없음 ✓'))+'</div>');
 }
 
 /* ── 근무표(M2) ── */
@@ -1102,9 +1108,10 @@ function scheduleRolePeople(role,people,rows,weekStart,day){
 }
 function scheduleRoleColor(person){const group=scheduleRoleGroupModel(person);return group.kind==='doctor'?'role-dr':group.code==='clinical_consult'?'role-clinic':group.code==='desk'?'role-desk':group.kind==='unassigned'?'role-etc':'role-etc';}
 function scheduleRoleCell(role,weekStart,ds,people,rows,leaveByUser,canEdit){
+  const T=typeof hubT==='function'?hubT:function(k,d,v){return v?String(d).replace(/\{([a-z_]+)\}/g,function(x,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):x;}):String(d);};
   const day=scheduleDayForDate(ds),selected=new Set((rows||[]).filter(r=>r.week_start===weekStart&&r.day===day&&((role==='야간'&&r.shift==='evening')||(role==='OFF'&&r.shift==='off')||(role!=='야간'&&role!=='OFF'&&(r.shift==='work'||r.shift==='evening')))).map(r=>r.person_id));
   if(role==='연차·반차'){const names=Object.values(leaveByUser||{}).filter(v=>v.date===ds).map(v=>v.label);return names.length?'<div class="schedule-leave-list">'+names.map(esc).join('<br>')+'</div>':'-';}
-  const items=scheduleRolePeople(role,people,rows,weekStart,day);if(!items.length)return '<div class="schedule-role-empty">등록된 대상 없음</div>';const html=items.map(p=>{const leave=leaveByUser[(p.profile_user_id||'')+'|'+p.id+'|'+ds],historical=p.active!==true||p.included_in_schedule===false,disabled=!!leave||historical,checked=selected.has(p.id);return '<label class="schedule-check '+scheduleRoleColor(p)+(checked?' schedule-selected':'')+(historical?' schedule-historical':'')+'"><input type="checkbox" '+(checked?'checked ':'')+(disabled?'disabled ':'')+' onchange="toggleScheduleRoleMember(\''+role+'\',\''+p.id+'\',\''+(p.profile_user_id||'')+'\',\''+ds+'\',this.checked,this)"><span>'+esc(schedulePersonLabel(p))+(historical?' · 과거 기록':disabled&&leave?' · '+esc(leave.label):'')+'</span></label>';}).join('');
+  const items=scheduleRolePeople(role,people,rows,weekStart,day);if(!items.length)return '<div class="schedule-role-empty">등록된 대상 없음</div>';const html=items.map(p=>{const leave=leaveByUser[(p.profile_user_id||'')+'|'+p.id+'|'+ds],historical=p.active!==true||p.included_in_schedule===false,disabled=!!leave||historical,checked=selected.has(p.id);return '<label class="schedule-check '+scheduleRoleColor(p)+(checked?' schedule-selected':'')+(historical?' schedule-historical':'')+'"><input type="checkbox" '+(checked?'checked ':'')+(disabled?'disabled ':'')+' onchange="toggleScheduleRoleMember(\''+role+'\',\''+p.id+'\',\''+(p.profile_user_id||'')+'\',\''+ds+'\',this.checked,this)"><span>'+esc(schedulePersonLabel(p))+(historical?' · '+esc(T('sched.cell.past','과거 기록')):disabled&&leave?' · '+esc(leave.label):'')+'</span></label>';}).join('');
   return '<details class="schedule-role-cell"><summary>'+role+' · '+items.filter(p=>selected.has(p.id)).length+'명</summary><div class="schedule-check-list">'+(canEdit?html:html.replace(/<input /g,'<input disabled '))+'</div></details>';
 }
 async function toggleScheduleRoleMember(role,personId,profileUserId,ds,checked,input){
@@ -1118,6 +1125,7 @@ function scheduleMobileRoleDays(weekStart,dates,roles,people,rows,leaveByUser,ca
   return '<div class="schedule-mobile-days">'+dates.map(ds=>'<section class="schedule-mobile-day"><h4>'+md(ds)+' '+weekdays[scheduleDayForDate(ds)]+'요일</h4>'+roles.map(role=>'<div class="schedule-mobile-role"><strong>'+esc(role)+'</strong><div>'+scheduleRoleCell(role,weekStart,ds,people,rows,leaveByUser,canEdit)+'</div></div>').join('')+'</section>').join('')+'</div>';
 }
 async function renderScheduleMonth(m){
+  const T=typeof hubT==='function'?hubT:function(k,d,v){return v?String(d).replace(/\{([a-z_]+)\}/g,function(x,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):x;}):String(d);};
   if(!SCHED_MONTH)SCHED_MONTH=today().slice(0,7);
   const range=scheduleMonthWeeks(SCHED_MONTH),weeks=range.weeks,first=range.first,last=range.last;
   const [{data:rows,error:scheduleError},{data:weekRows,error:weekError},{data:lv,error:leaveError}]=await Promise.all([
@@ -1125,65 +1133,68 @@ async function renderScheduleMonth(m){
     sb.from('schedule_weeks').select('week_start,status').in('week_start',weeks),
     sb.from('leave_requests').select('user_id,type,type_note,date_from,date_to').eq('status','승인').lte('date_from',last).gte('date_to',first)
   ]);
-  const loadError=scheduleError||weekError||leaveError;if(loadError){m.innerHTML='<div class="card"><h2>🗓 근무표</h2><div class="cal-error">월간 근무표를 불러오지 못했습니다: '+esc(loadError.message||'알 수 없는 오류')+'</div></div>';return;}
+  const loadError=scheduleError||weekError||leaveError;if(loadError){m.innerHTML='<div class="card"><h2>'+esc(T('sched.title','🗓 근무표'))+'</h2><div class="cal-error">'+esc(T('sched.err_month','월간 근무표를 불러오지 못했습니다:'))+' '+esc(loadError.message||T('sched.err_unknown','알 수 없는 오류'))+'</div></div>';return;}
   const leaveByUser={};for(const r of lv||[]){for(let ds=r.date_from<first?first:r.date_from;ds<=(r.date_to>last?last:r.date_to);ds=addDays(ds,1)){const p=(SCHEDULE_PEOPLE||[]).find(x=>x.profile_user_id===r.user_id);if(p)leaveByUser[r.user_id+'|'+p.id+'|'+ds]={date:ds,label:leaveDisplayText(r.type,r.type_note)};}}
   const roles=['Dr.',...EMPLOYEE_JOB_GROUPS.map(group=>group.label),...(scheduleHasUnassignedRole(SCHEDULE_PEOPLE,rows)?['미지정']:[]),'야간','OFF','연차·반차'];
-  let html='<div class="card"><h2>🗓 근무표</h2><div class="rowflex schedule-actions"><button class="mini" onclick="SCHED_VIEW=\'week\';render()">주간 편집</button><button class="mini stamp" onclick="SCHED_VIEW=\'month\';render()">월간 직무표</button><button class="mini" onclick="printSchedule(\'pdf\')">PDF 저장</button><button class="mini" onclick="printSchedule(\'print\')">인쇄</button><label>대상 월 <input class="mini" type="month" value="'+esc(SCHED_MONTH)+'" onchange="SCHED_MONTH=this.value;render()"></label></div>';
-  for(const ws of weeks){const status=(weekRows||[]).find(w=>w.week_start===ws)?.status||'초안';const canEdit=status!=='공표'||isLead();const dates=Array.from({length:7},(_,i)=>addDays(ws,i));html+='<section class="schedule-week-block"><h3>'+md(ws)+' ~ '+md(addDays(ws,6))+' <span class="b '+(status==='공표'?'ok':'wait')+'">'+(status==='공표'?'확정':'작성 중')+'</span></h3><div class="tblwrap"><table class="schedule-role-table"><tr><th>직무·상태</th>'+dates.map(ds=>'<th>'+['월','화','수','목','금','토','일'][scheduleDayForDate(ds)-1<0?6:scheduleDayForDate(ds)-1]+'<br><span class="sub">'+md(ds)+'</span></th>').join('')+'</tr>';
+  let html='<div class="card"><h2>'+esc(T('sched.title','🗓 근무표'))+'</h2><div class="rowflex schedule-actions"><button class="mini" onclick="SCHED_VIEW=\'week\';render()">'+esc(T('sched.btn_week','주간 편집'))+'</button><button class="mini stamp" onclick="SCHED_VIEW=\'month\';render()">'+esc(T('sched.btn_month_role','월간 직무표'))+'</button><button class="mini" onclick="printSchedule(\'pdf\')">'+esc(T('sched.btn_pdf','PDF 저장'))+'</button><button class="mini" onclick="printSchedule(\'print\')">'+esc(T('sched.btn_print','인쇄'))+'</button><label>'+esc(T('sched.f_month','대상 월'))+' <input class="mini" type="month" value="'+esc(SCHED_MONTH)+'" onchange="SCHED_MONTH=this.value;render()"></label></div>';
+  for(const ws of weeks){const status=(weekRows||[]).find(w=>w.week_start===ws)?.status||'초안';const canEdit=status!=='공표'||isLead();const dates=Array.from({length:7},(_,i)=>addDays(ws,i));html+='<section class="schedule-week-block"><h3>'+md(ws)+' ~ '+md(addDays(ws,6))+' <span class="b '+(status==='공표'?'ok':'wait')+'">'+(status==='공표'?esc(T('sched.st_confirmed','확정')):esc(T('sched.st_writing','작성 중')))+'</span></h3><div class="tblwrap"><table class="schedule-role-table"><tr><th>'+esc(T('sched.th_role','직무·상태'))+'</th>'+dates.map(ds=>'<th>'+['월','화','수','목','금','토','일'][scheduleDayForDate(ds)-1<0?6:scheduleDayForDate(ds)-1]+'<br><span class="sub">'+md(ds)+'</span></th>').join('')+'</tr>';
     for(const role of roles){html+='<tr><th class="schedule-role-label">'+role+'</th>'+dates.map(ds=>'<td>'+scheduleRoleCell(role,ws,ds,SCHEDULE_PEOPLE,rows||[],leaveByUser,canEdit)+'</td>').join('')+'</tr>';}
     html+='</table></div>'+scheduleMobileRoleDays(ws,dates,roles,SCHEDULE_PEOPLE,rows||[],leaveByUser,canEdit)+'</section>';}
-  html+='<div class="hint">직무·상태 셀을 열어 여러 명을 선택합니다. 승인 연차자는 근무·야간 선택이 잠깁니다. 모든 승인 직원은 초안을 편집할 수 있고, 공표는 실장·원장만 가능합니다.</div></div>'+(isMgr()?scheduleRosterAdminCard():'');m.innerHTML=html;
+  html+='<div class="hint">'+esc(T('sched.hint','직무·상태 셀을 열어 여러 명을 선택합니다. 승인 연차자는 근무·야간 선택이 잠깁니다. 모든 승인 직원은 초안을 편집할 수 있고, 공표는 실장·원장만 가능합니다.'))+'</div></div>'+(isMgr()?scheduleRosterAdminCard():'');m.innerHTML=html;
 }
 async function applyScheduleShift(el,personId,profileUserId,day,ws,shift){const previous=el&&el.dataset?el.dataset.prevValue||'':'';const key=personId+'|'+ws+'|'+day;if(!Object.hasOwn(SCHEDULE_CELL_VALUES,key))SCHEDULE_CELL_VALUES[key]=previous;const seq=(SCHEDULE_WRITE_SEQ[key]||0)+1;SCHEDULE_WRITE_SEQ[key]=seq;const previousTail=SCHEDULE_WRITE_TAIL[key]||Promise.resolve();const operation=previousTail.catch(()=>{}).then(()=>setShift(personId,profileUserId,day,ws,shift)).catch(()=>{if(SCHEDULE_WRITE_SEQ[key]===seq)setStatus('error');return false;});const queued=operation.finally(()=>{if(SCHEDULE_WRITE_TAIL[key]===queued)delete SCHEDULE_WRITE_TAIL[key];});SCHEDULE_WRITE_TAIL[key]=queued;const ok=await operation;const latest=SCHEDULE_WRITE_SEQ[key]===seq;if(ok)SCHEDULE_CELL_VALUES[key]=shift;if(!latest)return null;if(!ok&&el){el.value=SCHEDULE_CELL_VALUES[key]??previous;}else if(ok&&el?.dataset)el.dataset.prevValue=shift;return ok;}
 function setShiftByDate(personId,profileUserId,ds,shift){return applyScheduleShift(null,personId,profileUserId,scheduleDayForDate(ds),scheduleWeekForDate(ds),shift);}
 async function renderSched(m){
+  const T=typeof hubT==='function'?hubT:function(k,d,v){return v?String(d).replace(/\{([a-z_]+)\}/g,function(x,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):x;}):String(d);};
   if(SCHED_VIEW==='month'){await renderScheduleMonth(m);return;}
   if(!SCHED_WEEK)SCHED_WEEK=mondayStr(today());
   const ws=SCHED_WEEK;
   const {data:wk,error:weekError}=await sb.from('schedule_weeks').select('*').eq('week_start',ws).maybeSingle();
-  if(weekError){m.innerHTML=`<div class="card"><h2>🗓 근무표</h2><div class="cal-error">근무표 주차 정보를 불러오지 못했습니다: ${esc(weekError.message||'알 수 없는 오류')}</div></div>`;return;}
+  if(weekError){m.innerHTML=`<div class="card"><h2>${esc(T('sched.title','🗓 근무표'))}</h2><div class="cal-error">${esc(T('sched.err_week','근무표 주차 정보를 불러오지 못했습니다:'))} ${esc(weekError.message||T('sched.err_unknown','알 수 없는 오류'))}</div></div>`;return;}
   const {data:rows,error:scheduleError}=await sb.from('schedules').select('person_id,user_id,week_start,day,shift,note').eq('week_start',ws);
-  if(scheduleError){m.innerHTML=`<div class="card"><h2>🗓 근무표</h2><div class="cal-error">근무표를 불러오지 못했습니다: ${esc(scheduleError.message||'알 수 없는 오류')}</div></div>`;return;}
+  if(scheduleError){m.innerHTML=`<div class="card"><h2>${esc(T('sched.title','🗓 근무표'))}</h2><div class="cal-error">${esc(T('sched.err_rows','근무표를 불러오지 못했습니다:'))} ${esc(scheduleError.message||T('sched.err_unknown','알 수 없는 오류'))}</div></div>`;return;}
   const {data:lv,error:leaveError}=await sb.from('leave_requests').select('user_id,type,type_note,date_from,date_to').eq('status','승인').lte('date_from',addDays(ws,6)).gte('date_to',ws);
-  if(leaveError){m.innerHTML=`<div class="card"><h2>🗓 근무표</h2><div class="cal-error">연차 정보를 불러오지 못했습니다: ${esc(leaveError.message||'알 수 없는 오류')}</div></div>`;return;}
+  if(leaveError){m.innerHTML=`<div class="card"><h2>${esc(T('sched.title','🗓 근무표'))}</h2><div class="cal-error">${esc(T('sched.err_leave','연차 정보를 불러오지 못했습니다:'))} ${esc(leaveError.message||T('sched.err_unknown','알 수 없는 오류'))}</div></div>`;return;}
   const staff=schedulePeopleForWeek(SCHEDULE_PEOPLE,rows);
   const published=wk&&(SCHEDULE_STATUS_OVERRIDES[ws]||wk.status)==='공표';
   const canEdit=!published||isLead();
   const leaveByUser={};for(const r of lv||[]){for(let ds=r.date_from<ws?ws:r.date_from;ds<=(r.date_to>addDays(ws,6)?addDays(ws,6):r.date_to);ds=addDays(ds,1)){const p=(SCHEDULE_PEOPLE||[]).find(x=>x.profile_user_id===r.user_id);if(p)leaveByUser[r.user_id+'|'+p.id+'|'+ds]={date:ds,label:leaveDisplayText(r.type,r.type_note)};}}
   const roles=['Dr.',...EMPLOYEE_JOB_GROUPS.map(group=>group.label),...(scheduleHasUnassignedRole(SCHEDULE_PEOPLE,rows)?['미지정']:[]),'야간','OFF','연차·반차'],dates=Array.from({length:7},(_,i)=>addDays(ws,i));
-  let grid='<div class="tblwrap"><table class="schedule-role-table"><tr><th>직무·상태</th>'+dates.map(ds=>'<th>'+['월','화','수','목','금','토','일'][scheduleDayForDate(ds)-1<0?6:scheduleDayForDate(ds)-1]+'<br><span class="sub">'+md(ds)+'</span></th>').join('')+'</tr>';
+  let grid='<div class="tblwrap"><table class="schedule-role-table"><tr><th>'+esc(T('sched.th_role','직무·상태'))+'</th>'+dates.map(ds=>'<th>'+['월','화','수','목','금','토','일'][scheduleDayForDate(ds)-1<0?6:scheduleDayForDate(ds)-1]+'<br><span class="sub">'+md(ds)+'</span></th>').join('')+'</tr>';
   for(const role of roles){grid+='<tr><th class="schedule-role-label">'+role+'</th>'+dates.map(ds=>'<td>'+scheduleRoleCell(role,ws,ds,SCHEDULE_PEOPLE,rows||[],leaveByUser,canEdit)+'</td>').join('')+'</tr>';}
   grid+='</table></div>'+scheduleMobileRoleDays(ws,dates,roles,SCHEDULE_PEOPLE,rows||[],leaveByUser,canEdit);
-  m.innerHTML=`<div class="card"><h2>🗓 근무표 <span class="b ${published?'ok':'wait'}">${published?'공표됨':'초안'}</span></h2>
+  m.innerHTML=`<div class="card"><h2>${esc(T('sched.title','🗓 근무표'))} <span class="b ${published?'ok':'wait'}">${published?esc(T('sched.wk_published','공표됨')):esc(T('sched.wk_draft','초안'))}</span></h2>
     <div class="rowflex schedule-actions" style="align-items:center;margin-bottom:8px;gap:8px">
-      <button class="mini ${SCHED_VIEW==='week'?'stamp':''}" onclick="SCHED_VIEW='week';render()">주간 편집</button><button class="mini ${SCHED_VIEW==='month'?'stamp':''}" onclick="SCHED_VIEW='month';SCHED_MONTH='${ws.slice(0,7)}';render()">월간 편집</button><button class="mini" onclick="navWeek(-7)">◀ 지난주</button>
+      <button class="mini ${SCHED_VIEW==='week'?'stamp':''}" onclick="SCHED_VIEW='week';render()">${esc(T('sched.btn_week','주간 편집'))}</button><button class="mini ${SCHED_VIEW==='month'?'stamp':''}" onclick="SCHED_VIEW='month';SCHED_MONTH='${ws.slice(0,7)}';render()">${esc(T('sched.btn_month_edit','월간 편집'))}</button><button class="mini" onclick="navWeek(-7)">${esc(T('sched.btn_prev','◀ 지난주'))}</button>
       <b>${md(ws)} ~ ${md(addDays(ws,6))}</b>
-      <button class="mini" onclick="navWeek(7)">다음주 ▶</button>
-      <button class="mini" onclick="printSchedule('pdf')">PDF 저장</button><button class="mini" onclick="printSchedule('print')">인쇄</button>
-      ${canEdit?`<button class="mini" onclick="copyPrevWeek('${ws}')">지난주 복사</button>`:''}
-      ${isLead()?`<button class="mini stamp" onclick="publishSched('${ws}')">공표(확정)</button>`:''}
+      <button class="mini" onclick="navWeek(7)">${esc(T('sched.btn_next','다음주 ▶'))}</button>
+      <button class="mini" onclick="printSchedule('pdf')">${esc(T('sched.btn_pdf','PDF 저장'))}</button><button class="mini" onclick="printSchedule('print')">${esc(T('sched.btn_print','인쇄'))}</button>
+      ${canEdit?`<button class="mini" onclick="copyPrevWeek('${ws}')">${esc(T('sched.btn_copy','지난주 복사'))}</button>`:''}
+      ${isLead()?`<button class="mini stamp" onclick="publishSched('${ws}')">${esc(T('sched.btn_publish','공표(확정)'))}</button>`:''}
     </div>
-    ${staff.length?grid:'<div class="empty">근무표에 포함된 인원이 아직 없습니다.</div>'}
-    <div class="hint">직무·상태 셀을 열어 여러 명을 선택합니다. 승인 연차자는 근무·야간 선택이 잠깁니다. 모든 승인 직원은 초안을 편집할 수 있고, 공표는 실장·원장만 가능합니다.</div>
+    ${staff.length?grid:'<div class="empty">'+esc(T('sched.empty','근무표에 포함된 인원이 아직 없습니다.'))+'</div>'}
+    <div class="hint">${esc(T('sched.hint','직무·상태 셀을 열어 여러 명을 선택합니다. 승인 연차자는 근무·야간 선택이 잠깁니다. 모든 승인 직원은 초안을 편집할 수 있고, 공표는 실장·원장만 가능합니다.'))}</div>
   </div>${isMgr()?scheduleRosterAdminCard():''}`;
 }
 /* schedule-roster-admin:test-start */
+function hubT(k,d,v){return typeof hubText==='function'?hubText(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
 const SCHEDULE_DEPARTMENTS=['Dr.','진료실','데스크','기공실','미지정','상담','행정'];
+function scheduleDepartmentItems(){const def=SCHEDULE_DEPARTMENTS.map(d=>({code:d,label:d}));if(typeof hubList!=='function')return def;const codes=new Set(SCHEDULE_DEPARTMENTS);return hubList('list.work_depts',def).filter(i=>codes.has(i.code));} /* 근무부서 이름: 허브 설정 › 목록에서 이름만 고침(코드는 서버 규칙이라 고정·새 부서 못 늘림) */
 function scheduleRosterAdminCard(){
-  const departmentOptions=current=>SCHEDULE_DEPARTMENTS.map(department=>`<option value="${department}" ${current===department?'selected':''}>${department}</option>`).join('');
+  const departmentOptions=current=>scheduleDepartmentItems().map(it=>`<option value="${esc(it.code)}" ${current===it.code?'selected':''}>${esc(it.label)}</option>`).join('');
   const rows=SCHEDULE_PEOPLE.map(person=>{
     const department=SCHEDULE_DEPARTMENTS.includes(person.department)?person.department:'미지정';
-    const source=person.profile_user_id?'로그인 계정':'비로그인 명부';
-    return `<tr><td>${esc(person.name)}</td><td><span class="b ${person.profile_user_id?'ok':'wait'}">${source}</span></td>
+    const source=person.profile_user_id?hubT('sched.rt.src_login','로그인 계정'):hubT('sched.rt.src_none','비로그인 명부');
+    return `<tr><td>${esc(person.name)}</td><td><span class="b ${person.profile_user_id?'ok':'wait'}">${esc(source)}</span></td>
       <td><select class="mini" onchange="setSchedulePersonDepartment('${person.id}',this.value)">${departmentOptions(department)}</select></td>
-      <td><label><input type="checkbox" ${person.included_in_schedule!==false?'checked':''} onchange="setSchedulePersonIncluded('${person.id}',this.checked)"> 포함</label></td>
-      <td><span class="b ${person.active===true?'ok':'no'}">${person.active===true?'재직':'비활성'}</span> <button class="mini ${person.active===true?'rej':'stamp'}" onclick="setSchedulePersonActive('${person.id}',${person.active===true?'false':'true'})">${person.active===true?'비활성화':'재활성화'}</button></td></tr>`;
+      <td><label><input type="checkbox" ${person.included_in_schedule!==false?'checked':''} onchange="setSchedulePersonIncluded('${person.id}',this.checked)"> ${esc(hubT('sched.rt.included','포함'))}</label></td>
+      <td><span class="b ${person.active===true?'ok':'no'}">${person.active===true?esc(hubT('sched.rt.active','재직')):esc(hubT('sched.rt.inactive','비활성'))}</span> <button class="mini ${person.active===true?'rej':'stamp'}" onclick="setSchedulePersonActive('${person.id}',${person.active===true?'false':'true'})">${person.active===true?esc(hubT('sched.rt.btn_off','비활성화')):esc(hubT('sched.rt.btn_on','재활성화'))}</button></td></tr>`;
   }).join('');
-  return `<details class="card schedule-roster-admin"><summary style="cursor:pointer;font-weight:800">👥 근무명부 관리</summary>
-    <div class="hint">로그인 계정과 비로그인 명부를 함께 관리합니다. 근무표·집계 포함 여부는 계정 로그인·승인과 별개입니다.</div>
-    <div class="rowflex" style="margin:10px 0"><input class="mini" id="rosterName" placeholder="이름"><select class="mini" id="rosterDepartment"><option value="">근무부서 선택</option>${departmentOptions('')}</select><button class="mini stamp" onclick="saveSchedulePerson()">비로그인 근무자 추가</button></div>
+  return `<details class="card schedule-roster-admin"><summary style="cursor:pointer;font-weight:800">${esc(hubT('sched.rt.title','👥 근무명부 관리'))}</summary>
+    <div class="hint">${esc(hubT('sched.rt.hint','로그인 계정과 비로그인 명부를 함께 관리합니다. 근무표·집계 포함 여부는 계정 로그인·승인과 별개입니다.'))}</div>
+    <div class="rowflex" style="margin:10px 0"><input class="mini" id="rosterName" placeholder="${esc(hubT('sched.rt.ph_name','이름'))}"><select class="mini" id="rosterDepartment"><option value="">${esc(hubT('sched.rt.pick_dept','근무부서 선택'))}</option>${departmentOptions('')}</select><button class="mini stamp" onclick="saveSchedulePerson()">${esc(hubT('sched.rt.btn_add','비로그인 근무자 추가'))}</button></div>
     <div class="msg" id="rosterMsg"></div>
-    ${rows?`<div class="tblwrap"><table><tr><th>이름</th><th>구분</th><th>근무부서</th><th>근무표·집계 포함</th><th>재직 상태</th></tr>${rows}</table></div>`:'<div class="empty">등록된 근무명부가 없습니다.</div>'}
+    ${rows?`<div class="tblwrap"><table><tr><th>${esc(hubT('sched.rt.th_name','이름'))}</th><th>${esc(hubT('sched.rt.th_kind','구분'))}</th><th>${esc(hubT('sched.rt.th_dept','근무부서'))}</th><th>${esc(hubT('sched.rt.th_incl','근무표·집계 포함'))}</th><th>${esc(hubT('sched.rt.th_state','재직 상태'))}</th></tr>${rows}</table></div>`:'<div class="empty">'+esc(hubT('sched.rt.empty','등록된 근무명부가 없습니다.'))+'</div>'}
   </details>`;
 }
 function showScheduleRosterError(message){
@@ -1192,42 +1203,42 @@ function showScheduleRosterError(message){
 }
 function canMutateScheduleRoster(){
   if(isMgr())return true;
-  setStatus('error');showScheduleRosterError('근무명부 관리 권한이 없습니다.');return false;
+  setStatus('error');showScheduleRosterError(hubT('sched.rt.m_no_perm','근무명부 관리 권한이 없습니다.'));return false;
 }
 async function finishScheduleRosterMutation(result,label){
-  if(result&&result.error){setStatus('error');showScheduleRosterError(`${label} 실패: ${result.error.message}`);return false;}
+  if(result&&result.error){setStatus('error');showScheduleRosterError(hubT('sched.rt.m_fail','{label} 실패: {msg}',{label:label,msg:result.error.message}));return false;}
   try{await loadSchedulePeople();}
-  catch(error){setStatus('error');showScheduleRosterError(`근무명부 새로고침 실패: ${error.message}`);return false;}
+  catch(error){setStatus('error');showScheduleRosterError(hubT('sched.rt.m_reload_fail','근무명부 새로고침 실패: {msg}',{msg:error.message}));return false;}
   setStatus('saved');await render();return true;
 }
 async function saveSchedulePerson(){
   if(!canMutateScheduleRoster())return;
   const nameEl=$('#rosterName'),departmentEl=$('#rosterDepartment');
   const name=nameEl?nameEl.value.trim():'',department=departmentEl?departmentEl.value:'';
-  if(!name||!SCHEDULE_DEPARTMENTS.includes(department)){setStatus('error');showScheduleRosterError('이름과 근무부서를 모두 입력하세요.');return;}
+  if(!name||!SCHEDULE_DEPARTMENTS.includes(department)){setStatus('error');showScheduleRosterError(hubT('sched.rt.m_need_both','이름과 근무부서를 모두 입력하세요.'));return;}
   setStatus('saving');
   const result=await sb.from('schedule_people').insert({profile_user_id:null,name,department,included_in_schedule:true,active:true});
-  await finishScheduleRosterMutation(result,'근무자 추가');
+  await finishScheduleRosterMutation(result,hubT('sched.rt.act_add','근무자 추가'));
 }
 async function setSchedulePersonDepartment(id,department){
   if(!canMutateScheduleRoster())return;
-  if(!SCHEDULE_DEPARTMENTS.includes(department)){setStatus('error');showScheduleRosterError('올바른 근무부서를 선택하세요.');return;}
+  if(!SCHEDULE_DEPARTMENTS.includes(department)){setStatus('error');showScheduleRosterError(hubT('sched.rt.m_bad_dept','올바른 근무부서를 선택하세요.'));return;}
   setStatus('saving');
   const result=await sb.from('schedule_people').update({department}).eq('id',id);
-  await finishScheduleRosterMutation(result,'근무부서 저장');
+  await finishScheduleRosterMutation(result,hubT('sched.rt.act_dept','근무부서 저장'));
 }
 async function setSchedulePersonIncluded(id,included_in_schedule){
   if(!canMutateScheduleRoster())return;
   setStatus('saving');
   const result=await sb.from('schedule_people').update({included_in_schedule}).eq('id',id);
-  await finishScheduleRosterMutation(result,'근무표·집계 포함 저장');
+  await finishScheduleRosterMutation(result,hubT('sched.rt.act_incl','근무표·집계 포함 저장'));
 }
 async function setSchedulePersonActive(id,active){
   if(!canMutateScheduleRoster())return;
-  if(!active&&!confirm('이 근무자를 비활성화할까요? 기존 근무 기록은 삭제되지 않으며 같은 행에서 재활성화할 수 있습니다.'))return;
+  if(!active&&!confirm(hubT('sched.rt.confirm_off','이 근무자를 비활성화할까요? 기존 근무 기록은 삭제되지 않으며 같은 행에서 재활성화할 수 있습니다.')))return;
   setStatus('saving');
   const result=await sb.from('schedule_people').update({active}).eq('id',id);
-  await finishScheduleRosterMutation(result,active?'재활성화':'비활성화');
+  await finishScheduleRosterMutation(result,active?hubT('sched.rt.act_react','재활성화'):hubT('sched.rt.act_deact','비활성화'));
 }
 /* schedule-roster-admin:test-end */
 function navWeek(n){SCHED_WEEK=addDays(SCHED_WEEK||mondayStr(today()),n);render();}
@@ -1237,11 +1248,11 @@ async function setShift(personId,profileUserId,day,ws,shift){
   SCHEDULE_STATUS_OVERRIDES[ws]='초안';setStatus('saved');return true;
 }
 async function publishSched(ws){const {error}=await sb.from('schedule_weeks').upsert({week_start:ws,status:'공표',confirmed_by:ME.name,confirmed_at:new Date().toISOString()},{onConflict:'week_start'});if(error){setStatus('error');return;}delete SCHEDULE_STATUS_OVERRIDES[ws];setStatus('saved');render();}
-async function copyPrevWeek(ws){const prev=addDays(ws,-7);const {data,error:readError}=await sb.from('schedules').select('person_id,user_id,day,shift,note').eq('week_start',prev);
+async function copyPrevWeek(ws){const T=typeof hubT==='function'?hubT:function(k,d,v){return v?String(d).replace(/\{([a-z_]+)\}/g,function(x,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):x;}):String(d);}; const prev=addDays(ws,-7);const {data,error:readError}=await sb.from('schedules').select('person_id,user_id,day,shift,note').eq('week_start',prev);
   if(readError){setStatus('error');return;}
-  if(!data||!data.length){alert('지난주 근무표가 없습니다.');return;}
+  if(!data||!data.length){alert(T('sched.m_no_prev','지난주 근무표가 없습니다.'));return;}
   const {error}=await sb.rpc('copy_schedule_week',{p_source_week:prev,p_target_week:ws});
-  if(error){setStatus('error');alert('지난주 근무표 복사 실패: '+(error.message||'알 수 없는 오류'));return;}
+  if(error){setStatus('error');alert(T('sched.m_copy_fail','지난주 근무표 복사 실패: {msg}',{msg:(error.message||T('sched.err_unknown','알 수 없는 오류'))}));return;}
   setStatus('saved');render();}
 
 /* 엑셀 파싱 */
@@ -1254,7 +1265,7 @@ function parseXls(ev){
       const ws=wb.Sheets[wb.SheetNames[0]];
       const aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true});
       buildPreview(aoa);
-    }catch(err){alert('엑셀을 읽지 못했습니다: '+err.message);}
+    }catch(err){alert(hubT('att.xl.m_read_fail','엑셀을 읽지 못했습니다: {msg}',{msg:err.message}));}
   };
   rd.readAsArrayBuffer(f);
 }
@@ -1270,7 +1281,7 @@ async function buildPreview(aoa){
   const cId=findCol(hdr,['사번','USERID','USER ID','아이디']);
   const cDate=findCol(hdr,['발생일','일자','날짜']);
   const cTime=findCol(hdr,['입실시간','발생시각','시간','시각']);
-  if((cId<0&&cName<0)||cDate<0){alert('열을 찾지 못했습니다(직원 식별/발생일). 지문기 원본을 그대로 올려보세요.');return;}
+  if((cId<0&&cName<0)||cDate<0){alert(hubT('att.xl.m_no_col','열을 찾지 못했습니다(직원 식별/발생일). 지문기 원본을 그대로 올려보세요.'));return;}
   // 이름 또는 사번(fp_id) 어느 쪽이든 직원 명부와 대조
   const resolve=tok=>{const t=String(tok).trim();return PROFILES.find(p=>(p.name&&p.name===t)||(p.fp_id&&String(p.fp_id).trim()===t))||null;};
   const group={},unmapped=new Set();
@@ -1304,8 +1315,8 @@ async function buildPreview(aoa){
     }
   }catch(e){}
   const um=[...unmapped];
-  $('#xlSummary').innerHTML=`총 <b>${xlRows.length}</b>행 · 직원 매핑 <b>${xlRows.filter(r=>r.user_id).length}</b> / 미매핑 <b style="color:var(--red)">${xlRows.filter(r=>!r.user_id).length}</b>`;
-  $('#xlUnmapped').innerHTML=um.length?`<div class="hint" style="color:var(--gold)">⚠ 미매핑 (직원 명부에 없음): ${um.map(f=>`<b>${esc(f)}</b> <select class="mini" onchange="mapToken('${esc(f)}',this.value)"><option value="">이 직원으로</option>${PROFILES.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select>`).join(' &nbsp; ')}</div>`:'';
+  $('#xlSummary').innerHTML=`${esc(hubT('att.xl.sum_a','총'))} <b>${xlRows.length}</b>${esc(hubT('att.xl.sum_b','행 · 직원 매핑'))} <b>${xlRows.filter(r=>r.user_id).length}</b> ${esc(hubT('att.xl.sum_c','/ 미매핑'))} <b style="color:var(--red)">${xlRows.filter(r=>!r.user_id).length}</b>`;
+  $('#xlUnmapped').innerHTML=um.length?`<div class="hint" style="color:var(--gold)">⚠ ${esc(hubT('att.xl.unmapped_a','미매핑 (직원 명부에 없음):'))} ${um.map(f=>`<b>${esc(f)}</b> <select class="mini" onchange="mapToken('${esc(f)}',this.value)"><option value="">${esc(hubT('att.xl.map_pick','이 직원으로'))}</option>${PROFILES.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select>`).join(' &nbsp; ')}</div>`:'';
   renderXlTable();
   show('xlMask');
 }
@@ -1314,7 +1325,7 @@ window.mapToken=async(tok,uid)=>{if(!uid)return;const prof=PROFILES.find(p=>p.us
   if(/^[0-9]+$/.test(tok)){const {error}=await sb.rpc('update_employee_profile_field',{p_user_id:uid,p_field:'fp_id',p_value:tok});if(error){setStatus('error');return;}await loadProfiles();} // 숫자면 지문 사번 기억
   renderXlTable();buildUnmappedAfter();setStatus('saved');};
 function buildUnmappedAfter(){const um=[...new Set(xlRows.filter(r=>!r.user_id).map(r=>r.tok))];
-  $('#xlUnmapped').innerHTML=um.length?`<div class="hint" style="color:var(--gold)">⚠ 미매핑: ${um.map(f=>`<b>${esc(f)}</b> <select class="mini" onchange="mapToken('${esc(f)}',this.value)"><option value="">이 직원으로</option>${PROFILES.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select>`).join(' &nbsp; ')}</div>`:'<div class="hint" style="color:var(--mint)">✓ 전원 매핑됨</div>';}
+  $('#xlUnmapped').innerHTML=um.length?`<div class="hint" style="color:var(--gold)">⚠ ${esc(hubT('att.xl.unmapped_b','미매핑:'))} ${um.map(f=>`<b>${esc(f)}</b> <select class="mini" onchange="mapToken('${esc(f)}',this.value)"><option value="">${esc(hubT('att.xl.map_pick','이 직원으로'))}</option>${PROFILES.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select>`).join(' &nbsp; ')}</div>`:'<div class="hint" style="color:var(--mint)">✓ '+esc(hubT('att.xl.all_mapped','전원 매핑됨'))+'</div>';}
 function calcRow(r){
   const unit = parseInt(SETTINGS.ot_unit_min)||10;
   const late = r.ci!=null ? Math.max(0, r.ci - toMin(SETTINGS.late_cut)) : 0;
@@ -1325,10 +1336,10 @@ function calcRow(r){
   return {late,ot,early};
 }
 function renderXlTable(){
-  $('#xlTable').innerHTML=`<tr><th>날짜</th><th>직원</th><th>근무표</th><th>출근</th><th>퇴근</th><th>지각</th><th>조퇴</th><th>연장</th><th>야간</th><th>비고</th></tr>`+
+  $('#xlTable').innerHTML=`<tr><th>${esc(hubT('att.th.date','날짜'))}</th><th>${esc(hubT('att.th.person','직원'))}</th><th>${esc(hubT('att.xl.th_sched','근무표'))}</th><th>${esc(hubT('att.my.th_in','출근'))}</th><th>${esc(hubT('att.my.th_out','퇴근'))}</th><th>${esc(hubT('att.my.th_late','지각'))}</th><th>${esc(hubT('att.xl.th_early','조퇴'))}</th><th>${esc(hubT('att.my.th_ot','연장'))}</th><th>${esc(hubT('att.xl.th_evening','야간'))}</th><th>${esc(hubT('att.xl.th_note','비고'))}</th></tr>`+
   xlRows.map((r,i)=>{const c=calcRow(r);const bad=!r.user_id||r.single||(r.sched==='off');
     const schedTxt=r.sched?SHIFTS[r.sched].l:'<span class="sub">-</span>';
-    const bigo=[];if(!r.user_id)bigo.push('<span class="b no">미매핑</span>');if(r.single)bigo.push('<span class="b wait">단일인식(누락?)</span>');if(r.sched==='off')bigo.push('<span class="b no">휴무 출근</span>');
+    const bigo=[];if(!r.user_id)bigo.push('<span class="b no">'+esc(hubT('att.xl.b_unmapped','미매핑'))+'</span>');if(r.single)bigo.push('<span class="b wait">'+esc(hubT('att.xl.b_single','단일인식(누락?)'))+'</span>');if(r.sched==='off')bigo.push('<span class="b no">'+esc(hubT('att.xl.b_off','휴무 출근'))+'</span>');
     return `<tr class="${bad?'warn':''}"><td>${md(r.ds)}</td><td>${esc(r.name)}</td><td>${schedTxt}</td><td>${r.ci!=null?minToT(r.ci):'-'}</td><td>${r.co!=null?minToT(r.co):'-'}</td>
     <td>${c.late>0?'<span class="b no">'+c.late+'분</span>':'-'}</td><td>${c.early>0?'<span class="b wait">'+c.early+'분</span>':'-'}</td><td>${c.ot>0?c.ot+'분':'-'}</td>
     <td><input type="checkbox" ${r.evening?'checked':''} onchange="xlRows[${i}].evening=this.checked;renderXlTable()"></td>
@@ -1337,25 +1348,25 @@ function renderXlTable(){
 }
 async function saveAttendance(){
   const rows=xlRows.filter(r=>r.user_id);
-  if(!rows.length){$('#xlMsg').textContent='매핑된 행이 없습니다.';return;}
-  $('#xlMsg').textContent='저장 중…';setStatus('saving');
+  if(!rows.length){$('#xlMsg').textContent=hubT('att.xl.m_no_rows','매핑된 행이 없습니다.');return;}
+  $('#xlMsg').textContent=hubT('att.xl.m_saving','저장 중…');setStatus('saving');
   const holi=new Set((await sb.from('holidays').select('date')).data?.map(h=>h.date)||[]);
   const payload=rows.map(r=>{const c=calcRow(r);return {user_id:r.user_id,work_date:r.ds,clock_in:r.ci!=null?minToT(r.ci)+':00':null,clock_out:r.co!=null?minToT(r.co)+':00':null,
     source:'fp',late_min:c.late,early_min:c.early,overtime_min:c.ot,evening:r.evening,is_holiday:holi.has(r.ds)};});
   const {error}=await sb.from('attendance').upsert(payload,{onConflict:'user_id,work_date'});
-  if(error){$('#xlMsg').textContent='실패: '+error.message;setStatus('error');return;}
+  if(error){$('#xlMsg').textContent=hubT('att.xl.m_fail','실패: {msg}',{msg:error.message});setStatus('error');return;}
   // 소명 자동 생성: 단일 인식(누락 의심)
   const miss=rows.filter(r=>r.single);
-  const issueErrors=[];for(const r of miss){const {error:issueError}=await sb.rpc('record_auto_attendance_issue',{p_user_id:r.user_id,p_work_date:r.ds,p_type:r.ci!=null&&r.co==null?'종업누락':'시업누락',p_reason:'지문 단일 인식(자동 감지)'});if(issueError)issueErrors.push(`${r.ds}: ${issueError.message}`);}
-  if(issueErrors.length){setStatus('error');$('#xlMsg').textContent=`근태 ${payload.length}건 저장됨 · 누락 issue ${issueErrors.length}/${miss.length}건 실패: ${issueErrors.slice(0,3).join(' | ')}`;return;}
-  setStatus('saved');$('#xlMsg').textContent=`저장 완료: ${payload.length}건${miss.length?` · 누락 의심 ${miss.length}건 소명 대기 생성`:''}`;
+  const issueErrors=[];for(const r of miss){const {error:issueError}=await sb.rpc('record_auto_attendance_issue',{p_user_id:r.user_id,p_work_date:r.ds,p_type:r.ci!=null&&r.co==null?'종업누락':'시업누락',p_reason:hubT('att.xl.auto_reason','지문 단일 인식(자동 감지)')});if(issueError)issueErrors.push(`${r.ds}: ${issueError.message}`);}
+  if(issueErrors.length){setStatus('error');$('#xlMsg').textContent=hubT('att.xl.m_issue_fail','근태 {saved}건 저장됨 · 누락 issue {fail}/{total}건 실패: {detail}',{saved:payload.length,fail:issueErrors.length,total:miss.length,detail:issueErrors.slice(0,3).join(' | ')});return;}
+  setStatus('saved');$('#xlMsg').textContent=hubT('att.xl.m_done','저장 완료: {n}건',{n:payload.length})+(miss.length?' · '+hubT('att.xl.m_done_miss','누락 의심 {n}건 소명 대기 생성',{n:miss.length}):'');
   setTimeout(()=>{hide('xlMask');render();},1200);
 }
 
 /* ── 연차 ── */
 let LEAVE_ARCHIVE_MONTH=null,LEAVE_EDIT_ID=null;
 async function computeLeaveDays(uid,from,to,type){
-  if(type==='반차'||type==='조퇴')return 0.5;
+  if(type==='반차'||type==='조퇴')return hubN('leave.half_day_value',0.5);
   const dates=[];for(let d=from;d<=to;d=addDays(d,1))dates.push(d);
   const holiSet=new Set((await sb.from('holidays').select('date')).data?.map(h=>h.date)||[]);
   const weekStarts=[...new Set(dates.map(d=>mondayStr(d)))];
@@ -1385,50 +1396,51 @@ function suggestGrantDays(hireDate){
 let LEAVE_ACCRUAL_PREVIEW=[],LEAVE_ACCRUAL_AS_OF='';
 async function renderLeave(m){
   const {data:bal}=await sb.from('v_leave_balance').select('*').eq('user_id',ME.id).maybeSingle();
-  const {data:mine}=await sb.from('leave_requests').select('*').eq('user_id',ME.id).order('created_at',{ascending:false}).limit(20);
+  const {data:mine}=await sb.from('leave_requests').select('*').eq('user_id',ME.id).order('created_at',{ascending:false}).limit(hubN('leave.my_list_limit',20));
   let leadHtml='';
   let archiveHtml='';
   if(isLead()){
     const {data:pend}=await sb.from('leave_requests').select('*').in('status',['대기','1차승인']).order('date_from');
     const forme=(pend||[]).filter(r=>r.status==='대기'||r.status==='1차승인');
-    leadHtml=`<div class="card"><h2>✅ 승인 대기 <span class="sub">(${ME.role==='chief'?'실장 최종':'원장 사전 반려'})</span></h2>
-      ${forme.length?`<div class="tblwrap"><table><tr><th>직원</th><th>유형</th><th>기간</th><th>일수</th><th>상태</th><th>사유</th><th></th></tr>
-      ${forme.map(r=>`<tr class="${r.special?'warn':''}"><td>${esc(nameOf(r.user_id))}</td><td>${esc(r.type)}${r.type_note?'('+esc(r.type_note)+')':''}</td>
-        <td>${md(r.date_from)}~${md(r.date_to)}</td><td>${r.days}</td><td><span class="b ${r.status==='대기'?'wait':'ok'}">${esc(r.status)}</span></td><td>${esc(r.reason||'')}${r.special?' <span class="b no">특별사정</span> '+esc(r.special_reason||''):''}</td>
-        <td><button class="mini" onclick="openLeaveForm(${r.id})">📄 신청서</button> ${ME.role==='chief'?`<button class="mini stamp" onclick="leaveAct(${r.id},'ok')">실장 최종 승인</button>`:''} <button class="mini rej" onclick="leaveAct(${r.id},'rej')">반려</button></td></tr>`).join('')}</table></div>`:'<div class="empty">대기 없음</div>'}</div>`;
+    leadHtml=`<div class="card"><h2>${esc(hubT('leave.pend.title','✅ 승인 대기'))} <span class="sub">(${ME.role==='chief'?esc(hubT('leave.pend.sub_chief','실장 최종')):esc(hubT('leave.pend.sub_owner','원장 사전 반려'))})</span></h2>
+      ${forme.length?`<div class="tblwrap"><table><tr><th>${esc(hubT('leave.th.person','직원'))}</th><th>${esc(hubT('leave.th.type','유형'))}</th><th>${esc(hubT('leave.th.period','기간'))}</th><th>${esc(hubT('leave.th.days','일수'))}</th><th>${esc(hubT('leave.th.status','상태'))}</th><th>${esc(hubT('leave.pend.th_reason','사유'))}</th><th></th></tr>
+      ${forme.map(r=>`<tr class="${r.special?'warn':''}"><td>${esc(nameOf(r.user_id))}</td><td>${esc(leaveTypeLabel(r.type))}${r.type_note?'('+esc(r.type_note)+')':''}</td>
+        <td>${md(r.date_from)}~${md(r.date_to)}</td><td>${r.days}</td><td><span class="b ${r.status==='대기'?'wait':'ok'}">${esc(r.status)}</span></td><td>${esc(r.reason||'')}${r.special?' <span class="b no">'+esc(hubT('leave.pend.special','특별사정'))+'</span> '+esc(r.special_reason||''):''}</td>
+        <td><button class="mini" onclick="openLeaveForm(${r.id})">${esc(hubT('leave.btn.form','📄 신청서'))}</button> ${ME.role==='chief'?`<button class="mini stamp" onclick="leaveAct(${r.id},'ok')">${esc(hubT('leave.pend.btn_ok','실장 최종 승인'))}</button>`:''} <button class="mini rej" onclick="leaveAct(${r.id},'rej')">${esc(hubT('leave.btn.reject','반려'))}</button></td></tr>`).join('')}</table></div>`:'<div class="empty">'+esc(hubT('leave.pend.empty','대기 없음'))+'</div>'}</div>`;
     if(!LEAVE_ARCHIVE_MONTH)LEAVE_ARCHIVE_MONTH=today().slice(0,7);
     const archiveStart=LEAVE_ARCHIVE_MONTH+'-01',archiveEnd=addDays(archiveStart,32).slice(0,7)+'-01';
     const {data:archive}=await sb.from('leave_requests').select('*').in('status',['승인','취소']).gte('date_from',archiveStart).lt('date_from',archiveEnd).order('date_from',{ascending:false});
-    archiveHtml=`<div class="card"><h2>📚 승인 내역</h2>
-      <div class="rowflex"><label>대상 월 <input class="mini" type="month" value="${LEAVE_ARCHIVE_MONTH}" onchange="LEAVE_ARCHIVE_MONTH=this.value;render()"></label></div>
-      ${(archive||[]).length?`<div class="tblwrap"><table><tr><th>직원</th><th>기간</th><th>일수</th><th>상태</th><th>승인자·승인일</th><th>취소자·취소일</th><th>액션</th></tr>
-      ${(archive||[]).map(r=>`<tr><td>${esc(nameOf(r.user_id))}</td><td>${md(r.date_from)}~${md(r.date_to)}</td><td>${r.days}</td><td><span class="b ${r.status==='승인'?'ok':'no'}">${esc(r.status)}</span></td><td>${esc(r.owner_by||r.chief_by||'')}${r.owner_at||r.chief_at?' · '+stampDate(r.owner_at||r.chief_at):''}</td><td>${r.cancelled_by?esc(r.cancelled_by)+(r.cancelled_at?' · '+stampDate(r.cancelled_at):''):''}</td><td>${r.status==='승인'&&ME.role==='owner'?`<button class="mini rej" onclick="cancelApprovedLeave(${r.id})">승인 취소·복구</button>`:r.status==='승인'?'<span class="sub">승인완료</span>':''}</td></tr>`).join('')}</table></div>`:'<div class="empty">선택한 달의 승인·취소 내역 없음</div>'}</div>`;
+    archiveHtml=`<div class="card"><h2>${esc(hubT('leave.arch.title','📚 승인 내역'))}</h2>
+      <div class="rowflex"><label>${esc(hubT('leave.f_month','대상 월'))} <input class="mini" type="month" value="${LEAVE_ARCHIVE_MONTH}" onchange="LEAVE_ARCHIVE_MONTH=this.value;render()"></label></div>
+      ${(archive||[]).length?`<div class="tblwrap"><table><tr><th>${esc(hubT('leave.th.person','직원'))}</th><th>${esc(hubT('leave.th.period','기간'))}</th><th>${esc(hubT('leave.th.days','일수'))}</th><th>${esc(hubT('leave.th.status','상태'))}</th><th>${esc(hubT('leave.arch.th_approver','승인자·승인일'))}</th><th>${esc(hubT('leave.arch.th_canceler','취소자·취소일'))}</th><th>${esc(hubT('leave.arch.th_action','액션'))}</th></tr>
+      ${(archive||[]).map(r=>`<tr><td>${esc(nameOf(r.user_id))}</td><td>${md(r.date_from)}~${md(r.date_to)}</td><td>${r.days}</td><td><span class="b ${r.status==='승인'?'ok':'no'}">${esc(r.status)}</span></td><td>${esc(r.owner_by||r.chief_by||'')}${r.owner_at||r.chief_at?' · '+stampDate(r.owner_at||r.chief_at):''}</td><td>${r.cancelled_by?esc(r.cancelled_by)+(r.cancelled_at?' · '+stampDate(r.cancelled_at):''):''}</td><td>${r.status==='승인'&&ME.role==='owner'?`<button class="mini rej" onclick="cancelApprovedLeave(${r.id})">${esc(hubT('leave.arch.btn_cancel','승인 취소·복구'))}</button>`:r.status==='승인'?'<span class="sub">'+esc(hubT('leave.arch.done','승인완료'))+'</span>':''}</td></tr>`).join('')}</table></div>`:'<div class="empty">'+esc(hubT('leave.arch.empty','선택한 달의 승인·취소 내역 없음'))+'</div>'}</div>`;
   }
-  let grantHtml=ME.role==='owner'?`<div class="card"><h2>➕ 연차 부여/절대 잔액 설정 <span class="sub">(원장)</span></h2>
-    <div class="tblwrap"><table><tr><th>이름</th><th>입사일</th><th>제안일수</th><th></th></tr>
-    ${PROFILES.filter(p=>p.active!==false).map(p=>{const suggested=suggestGrantDays(p.hire_date);return `<tr><td>${esc(p.name)}</td><td>${p.hire_date?esc(p.hire_date):'—'}</td><td>${suggested==null?'—':suggested}</td><td><button class="mini" ${suggested==null?'disabled':`onclick="$('#gvUser').value='${p.user_id}';$('#gvDays').value=${suggested};$('#gvKind').value='부여'"`}>이 값으로 채우기</button></td></tr>`;}).join('')}</table></div>
+  let grantHtml=ME.role==='owner'?`<div class="card"><h2>${esc(hubT('leave.grant.title','➕ 연차 부여/절대 잔액 설정'))} <span class="sub">(${esc(hubT('leave.owner_tag','원장'))})</span></h2>
+    <div class="tblwrap"><table><tr><th>${esc(hubT('leave.grant.th_name','이름'))}</th><th>${esc(hubT('leave.grant.th_hire','입사일'))}</th><th>${esc(hubT('leave.grant.th_suggest','제안일수'))}</th><th></th></tr>
+    ${PROFILES.filter(p=>p.active!==false).map(p=>{const suggested=suggestGrantDays(p.hire_date);return `<tr><td>${esc(p.name)}</td><td>${p.hire_date?esc(p.hire_date):'—'}</td><td>${suggested==null?'—':suggested}</td><td><button class="mini" ${suggested==null?'disabled':`onclick="$('#gvUser').value='${p.user_id}';$('#gvDays').value=${suggested};$('#gvKind').value='부여'"`}>${esc(hubT('leave.grant.btn_fill','이 값으로 채우기'))}</button></td></tr>`;}).join('')}</table></div>
     <div class="rowflex"><select id="gvUser" class="mini">${PROFILES.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select>
     <select id="gvKind" class="mini"><option>부여</option><option>조정</option></select>
-    <input id="gvDays" class="mini" type="number" step="0.5" placeholder="일수" style="width:80px">
-    <input id="gvNote" class="mini" placeholder="메모(예: 2026년 정기부여)">
+    <input id="gvDays" class="mini" type="number" step="0.5" placeholder="${esc(hubT('leave.grant.ph_days','일수'))}" style="width:80px">
+    <input id="gvNote" class="mini" placeholder="${esc(hubT('leave.grant.ph_note','메모(예: 2026년 정기부여)'))}">
     <button class="mini stamp" onclick="grantLeave()">저장</button></div>
-    <div class="hint">정기 부여는 아래 발생일별 미리보기에서 개근·재직을 확인한 뒤 적용합니다. 이 화면의 ‘부여’는 해당 확인 화면으로 이동합니다. ‘조정’은 목표 잔액을 설정합니다.</div></div>`:'';
-  const accrualHtml=ME.role==='owner'?`<div class="card"><h2>📆 자동 연차 적립 확인 <span class="sub">(원장)</span></h2><div class="hint">먼저 발생 예정 내역을 확인하고, 각 기간의 개근·재직을 원장이 확인한 뒤 적용합니다. 기존 수기 지급분은 중복 지급하지 않도록 반영됩니다.</div><div class="rowflex" style="margin-top:8px"><label>기준일 <input id="laAsOf" class="mini" type="date" value="${esc(LEAVE_ACCRUAL_AS_OF||today())}" max="${today()}"></label><button class="mini" onclick="previewLeaveAccrual()">미리보기</button><button id="laApply" class="mini stamp" onclick="applyLeaveAccrual()" disabled>확인한 항목 적용</button></div><div id="laMsg" class="hint" style="margin-top:8px">적용 전 미리보기가 필요합니다.</div><div id="laRows"></div></div>`:'';
+    <div class="hint">${esc(hubT('leave.grant.hint','정기 부여는 아래 발생일별 미리보기에서 개근·재직을 확인한 뒤 적용합니다. 이 화면의 ‘부여’는 해당 확인 화면으로 이동합니다. ‘조정’은 목표 잔액을 설정합니다.'))}</div></div>`:'';
+  const accrualHtml=ME.role==='owner'?`<div class="card"><h2>${esc(hubT('leave.acc.title','📆 자동 연차 적립 확인'))} <span class="sub">(${esc(hubT('leave.owner_tag','원장'))})</span></h2><div class="hint">${esc(hubT('leave.acc.hint','먼저 발생 예정 내역을 확인하고, 각 기간의 개근·재직을 원장이 확인한 뒤 적용합니다. 기존 수기 지급분은 중복 지급하지 않도록 반영됩니다.'))}</div><div class="rowflex" style="margin-top:8px"><label>${esc(hubT('leave.acc.f_asof','기준일'))} <input id="laAsOf" class="mini" type="date" value="${esc(LEAVE_ACCRUAL_AS_OF||today())}" max="${today()}"></label><button class="mini" onclick="previewLeaveAccrual()">${esc(hubT('leave.acc.btn_preview','미리보기'))}</button><button id="laApply" class="mini stamp" onclick="applyLeaveAccrual()" disabled>${esc(hubT('leave.acc.btn_apply','확인한 항목 적용'))}</button></div><div id="laMsg" class="hint" style="margin-top:8px">${esc(hubT('leave.acc.need_preview','적용 전 미리보기가 필요합니다.'))}</div><div id="laRows"></div></div>`:'';
   m.innerHTML=`
-  <div class="card"><h2>📅 내 연차</h2>
-    <div class="rowflex"><div class="stat"><div class="sub">잔여</div><div class="big">${bal?bal.balance:0}<span style="font-size:14px"> 일</span></div></div></div>
-    <button class="hbtn pri" style="margin-top:10px" onclick="openLeave()">연차 신청</button>
-    <h3>내 신청 내역</h3>
-    ${(mine||[]).length?`<div class="tblwrap"><table><tr><th>유형</th><th>기간</th><th>일수</th><th>상태</th><th></th></tr>
-    ${(mine||[]).map(r=>`<tr><td>${esc(r.type)}${r.type_note&&r.type!=='기타'?' · '+esc(r.type_note):''}</td><td>${md(r.date_from)}~${md(r.date_to)}</td><td>${r.days}</td>
-      <td><span class="b ${r.status==='승인'?'ok':(r.status==='반려'?'no':'wait')}">${esc(r.status)}</span></td><td><button class="mini" onclick="openLeaveForm(${r.id})">📄 신청서</button> ${r.status==='대기'?`<button class="mini" onclick="openLeaveEdit(${r.id})">수정</button><button class="mini rej" onclick="cancelPendingLeave(${r.id})">취소</button>`:''}</td></tr>`).join('')}</table></div>`:'<div class="empty">신청 내역 없음</div>'}
+  <div class="card"><h2>${esc(hubT('leave.my.title','📅 내 연차'))}</h2>
+    <div class="rowflex"><div class="stat"><div class="sub">${esc(hubT('leave.my.balance','잔여'))}</div><div class="big">${bal?bal.balance:0}<span style="font-size:14px"> 일</span></div></div></div>
+    <button class="hbtn pri" style="margin-top:10px" onclick="openLeave()">${esc(hubT('leave.my.btn_apply','연차 신청'))}</button>
+    <h3>${esc(hubT('leave.my.list_title','내 신청 내역'))}</h3>
+    ${(mine||[]).length?`<div class="tblwrap"><table><tr><th>${esc(hubT('leave.th.type','유형'))}</th><th>${esc(hubT('leave.th.period','기간'))}</th><th>${esc(hubT('leave.th.days','일수'))}</th><th>${esc(hubT('leave.th.status','상태'))}</th><th></th></tr>
+    ${(mine||[]).map(r=>`<tr><td>${esc(leaveTypeLabel(r.type))}${r.type_note&&r.type!=='기타'?' · '+esc(r.type_note):''}</td><td>${md(r.date_from)}~${md(r.date_to)}</td><td>${r.days}</td>
+      <td><span class="b ${r.status==='승인'?'ok':(r.status==='반려'?'no':'wait')}">${esc(r.status)}</span></td><td><button class="mini" onclick="openLeaveForm(${r.id})">${esc(hubT('leave.btn.form','📄 신청서'))}</button> ${r.status==='대기'?`<button class="mini" onclick="openLeaveEdit(${r.id})">${esc(hubT('leave.my.btn_edit','수정'))}</button><button class="mini rej" onclick="cancelPendingLeave(${r.id})">${esc(hubT('leave.my.btn_cancel','취소'))}</button>`:''}</td></tr>`).join('')}</table></div>`:'<div class="empty">'+esc(hubT('leave.my.empty','신청 내역 없음'))+'</div>'}
   </div>${leadHtml}${archiveHtml}${grantHtml}${accrualHtml}`;
 }
+function leaveApplyModalPrepare(){try{hubStaticFill();const sel=$('#lvType');if(sel)sel.innerHTML=leaveTypeItems().map(i=>'<option value="'+esc(i.code)+'">'+esc(i.label)+'</option>').join('');}catch(e){}}
 function refreshLeaveTypeFields(){const type=$('#lvType').value,isTimed=type==='반차'||type==='조퇴';$('#lvNoteWrap').style.display=type==='기타'?'':'none';$('#lvTimeWrap').style.display=isTimed?'':'none';}
 $('#lvType') && $('#lvType').addEventListener('change',refreshLeaveTypeFields);
-function openLeave(){LEAVE_EDIT_ID=null;$('#lvFrom').value=today();$('#lvTo').value=today();$('#lvType').value='연차';$('#lvTimeFrom').value='';$('#lvTimeTo').value='';$('#lvReason').value='';$('#lvNote').value='';$('#lvContact').value='';$('#lvSpecial').value='';$('#lvSpecialWrap').style.display='none';$('#lvMsg').textContent='';$('#lvOverlap').textContent='';refreshLeaveTypeFields();show('lvMask');checkClash();}
-async function openLeaveEdit(id){const {data:r,error}=await sb.from('leave_requests').select('*').eq('id',id).eq('user_id',ME.id).maybeSingle();if(error||!r||r.status!=='대기'){alert('대기 중인 본인 신청만 수정할 수 있습니다.');return;}LEAVE_EDIT_ID=id;$('#lvType').value=r.type||'연차';const times=/^(\d{2}:\d{2})~(\d{2}:\d{2})$/.exec(r.type_note||'');$('#lvTimeFrom').value=times?times[1]:'';$('#lvTimeTo').value=times?times[2]:'';$('#lvNote').value=r.type==='기타'?r.type_note||'':'';$('#lvFrom').value=r.date_from;$('#lvTo').value=r.date_to;$('#lvReason').value=r.reason||'';$('#lvContact').value=r.contact||'';$('#lvSpecial').value=r.special_reason||'';$('#lvMsg').textContent='수정 후 저장하세요.';refreshLeaveTypeFields();show('lvMask');checkClash();}
-async function cancelPendingLeave(id){if(!confirm('아직 승인 전인 연차 신청을 취소할까요?'))return;const result=await sb.rpc('process_leave_request',{p_id:id,p_action:'cancel'});if(result.error){alert('취소 실패: '+result.error.message);return;}if(!result.data||!result.data.length){alert('취소 결과를 확인하지 못했습니다.');return;}setStatus('saved');render();refreshBadges();}
+function openLeave(){leaveApplyModalPrepare();LEAVE_EDIT_ID=null;$('#lvFrom').value=today();$('#lvTo').value=today();$('#lvType').value='연차';$('#lvTimeFrom').value='';$('#lvTimeTo').value='';$('#lvReason').value='';$('#lvNote').value='';$('#lvContact').value='';$('#lvSpecial').value='';$('#lvSpecialWrap').style.display='none';$('#lvMsg').textContent='';$('#lvOverlap').textContent='';refreshLeaveTypeFields();show('lvMask');checkClash();}
+async function openLeaveEdit(id){const {data:r,error}=await sb.from('leave_requests').select('*').eq('id',id).eq('user_id',ME.id).maybeSingle();if(error||!r||r.status!=='대기'){alert(hubT('leave.m_edit_only','대기 중인 본인 신청만 수정할 수 있습니다.'));return;}LEAVE_EDIT_ID=id;leaveApplyModalPrepare();$('#lvType').value=r.type||'연차';const times=/^(\d{2}:\d{2})~(\d{2}:\d{2})$/.exec(r.type_note||'');$('#lvTimeFrom').value=times?times[1]:'';$('#lvTimeTo').value=times?times[2]:'';$('#lvNote').value=r.type==='기타'?r.type_note||'':'';$('#lvFrom').value=r.date_from;$('#lvTo').value=r.date_to;$('#lvReason').value=r.reason||'';$('#lvContact').value=r.contact||'';$('#lvSpecial').value=r.special_reason||'';$('#lvMsg').textContent=hubT('leave.m_edit_hint','수정 후 저장하세요.');refreshLeaveTypeFields();show('lvMask');checkClash();}
+async function cancelPendingLeave(id){if(!confirm(hubT('leave.m_cancel_confirm','아직 승인 전인 연차 신청을 취소할까요?')))return;const result=await sb.rpc('process_leave_request',{p_id:id,p_action:'cancel'});if(result.error){alert(hubT('leave.m_cancel_fail','취소 실패: {msg}',{msg:result.error.message}));return;}if(!result.data||!result.data.length){alert(hubT('leave.m_cancel_unknown','취소 결과를 확인하지 못했습니다.'));return;}setStatus('saved');render();refreshBadges();}
 function printLeaveForm(){document.body.classList.add('leave-printing');const done=()=>{document.body.classList.remove('leave-printing');window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);window.print();}
 ['lvFrom','lvTo'].forEach(id=>{const el=$('#'+id);if(el)el.addEventListener('change',checkClash);});
 async function leaveConflictDetails(from,to){
@@ -1445,66 +1457,68 @@ async function leaveConflict(from,to){return (await leaveConflictDetails(from,to
 async function checkClash(){
   const f=$('#lvFrom').value,t=$('#lvTo').value;if(!f||!t){$('#lvOverlap').textContent='';return;}
   if(t<f){$('#lvSpecialWrap').style.display='none';$('#lvOverlap').textContent='';return;}
-  const detail=await leaveConflictDetails(f,t),others=detail.max;
-  $('#lvOverlap').textContent=detail.names.length?'이미 신청됨: '+detail.names.join(', '):'';
-  $('#lvSpecialWrap').style.display=others===1?'':'none';
-  $('#lvMsg').textContent=others>=2?'그 날 이미 2명이 휴가입니다. 신청할 수 없습니다':'';
+  const detail=await leaveConflictDetails(f,t),others=detail.max,rules=leaveSameDayRules();
+  $('#lvOverlap').textContent=detail.names.length?hubT('leave.m_overlap','이미 신청됨: {names}',{names:detail.names.join(', ')}):'';
+  $('#lvSpecialWrap').style.display=others>=rules.reasonFrom&&others<rules.limit?'':'none';
+  $('#lvMsg').textContent=others>=rules.limit?hubT('leave.m_clash','그 날 이미 {n}명이 휴가입니다. 신청할 수 없습니다',{n:rules.limit}):'';
 }
 async function submitLeave(){
-  const f=$('#lvFrom').value,t=$('#lvTo').value;if(!f||!t){$('#lvMsg').textContent='기간을 입력하세요.';return;}
-  if(t<f){$('#lvMsg').textContent='종료일이 시작일보다 빠릅니다.';return;}
+  const f=$('#lvFrom').value,t=$('#lvTo').value;if(!f||!t){$('#lvMsg').textContent=hubT('leave.m_need_period','기간을 입력하세요.');return;}
+  if(t<f){$('#lvMsg').textContent=hubT('leave.m_bad_period','종료일이 시작일보다 빠릅니다.');return;}
   const type=$('#lvType').value;
   const timeFrom=$('#lvTimeFrom').value,timeTo=$('#lvTimeTo').value;
-  if((type==='반차'||type==='조퇴')&&(!timeFrom||!timeTo||timeTo<=timeFrom)){ $('#lvMsg').textContent='반차·조퇴의 시간 범위를 확인하세요.';return; }
-  const others=await leaveConflict(f,t);
-  if(others>=2){$('#lvMsg').innerHTML='<b style="color:var(--red)">⚠ 신청되지 않았습니다 — 그 날 이미 2명이 휴가입니다.</b>';return;}
-  const special=others===1&&$('#lvSpecial').value.trim()!=='';
-  if(others===1&&!special){$('#lvMsg').innerHTML='<b style="color:var(--red)">⚠ 신청되지 않았습니다 — 그날 이미 휴가자가 있어 특별사정 사유를 적어야 신청됩니다.</b>';return;}
+  if((type==='반차'||type==='조퇴')&&(!timeFrom||!timeTo||timeTo<=timeFrom)){ $('#lvMsg').textContent=hubT('leave.m_bad_time','반차·조퇴의 시간 범위를 확인하세요.');return; }
+  const others=await leaveConflict(f,t),rules=leaveSameDayRules();
+  if(others>=rules.limit){$('#lvMsg').innerHTML='<b style="color:var(--red)">'+esc(hubT('leave.m_full','⚠ 신청되지 않았습니다 — 그 날 이미 {n}명이 휴가입니다.',{n:rules.limit}))+'</b>';return;}
+  const reasonNeeded=others>=rules.reasonFrom,special=reasonNeeded&&$('#lvSpecial').value.trim()!=='';
+  if(reasonNeeded&&!special){$('#lvMsg').innerHTML='<b style="color:var(--red)">'+esc(hubT('leave.m_need_reason','⚠ 신청되지 않았습니다 — 그날 이미 휴가자가 있어 특별사정 사유를 적어야 신청됩니다.'))+'</b>';return;}
   const days=await computeLeaveDays(ME.id,f,t,type);
   const payload={type,type_note:(type==='반차'||type==='조퇴')?`${timeFrom}~${timeTo}`:type==='기타'?$('#lvNote').value:null,date_from:f,date_to:t,days,reason:$('#lvReason').value||null,contact:$('#lvContact').value||null,special,special_reason:special?$('#lvSpecial').value:null};
   let error=null;
   if(LEAVE_EDIT_ID){const result=await sb.rpc('replace_pending_leave_request',{p_id:LEAVE_EDIT_ID,p_type:type,p_type_note:payload.type_note,p_date_from:f,p_date_to:t,p_days:days,p_reason:payload.reason,p_contact:payload.contact,p_special:special,p_special_reason:payload.special_reason});error=result.error;}
-  else{const created=await sb.from('leave_requests').insert({...payload,user_id:ME.id}).select('id').maybeSingle();error=created.error||(!created.data?{message:'신청 저장 결과를 확인하지 못했습니다.'}:null);}
-  if(error){$('#lvMsg').textContent='실패: '+error.message;return;}
+  else{const created=await sb.from('leave_requests').insert({...payload,user_id:ME.id}).select('id').maybeSingle();error=created.error||(!created.data?{message:hubT('leave.m_save_unknown','신청 저장 결과를 확인하지 못했습니다.')}:null);}
+  if(error){$('#lvMsg').textContent=hubT('leave.m_fail','실패: {msg}',{msg:error.message});return;}
   LEAVE_EDIT_ID=null;hide('lvMask');setStatus('saved');render();refreshBadges();
 }
+function hubT(k,d,v){return typeof hubText==='function'?hubText(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
+function leaveSameDayRules(){const ok=typeof hubSettingChecked==='function',lim=ok?hubSettingChecked('leave.same_day_limit',2):2,from=ok?hubSettingChecked('leave.same_day_reason_from',1):1;return {limit:lim,reasonFrom:Math.min(from,lim)};} /* 같은 날 동시 휴가: 이 인원 이상이면 신청 불가 · 이 인원 이상이면 특별사정 사유 필요(허브 설정 › 숫자·기준) */
 function stampDate(s){
   const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(s));
   const get=type=>parts.find(p=>p.type===type).value;
   return `${get('year')}.${get('month')}.${get('day')}`;
 }
-function appStamp(name,at,label='승인'){return `<span class="appstamp">${label}<br>${esc(name||'')}<br>${stampDate(at)}</span>`;}
+function appStamp(name,at,label='승인'){return `<span class="appstamp">${esc(label)}<br>${esc(name||'')}<br>${stampDate(at)}</span>`;}
 async function openLeaveForm(id){
   const {data:r,error}=await sb.from('leave_requests').select('*').eq('id',id).single();
   if(error||!r)return;
   const {data:p}=await sb.from('profiles').select('name,dept').eq('user_id',r.user_id).maybeSingle();
   const applicant=(p&&p.name)||nameOf(r.user_id),dept=(p&&p.dept)||'';
   $('#lvFormBody').innerHTML=`<div style="background:#fff;color:#111;padding:30px;line-height:1.7;font-size:14px">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start"><h1 style="margin:0;font-size:26px;text-align:center;flex:1">휴 가 신 청 서</h1><table style="border-collapse:collapse;margin-left:20px;text-align:center"><tr><th style="border:1px solid #111;padding:4px 12px">중간관리자</th><th style="border:1px solid #111;padding:4px 12px">대표원장</th></tr><tr><td style="border:1px solid #111;height:66px;padding:4px 12px">${r.chief_at?appStamp(r.chief_by,r.chief_at):''}</td><td style="border:1px solid #111;height:66px;padding:4px 12px">${r.owner_at?appStamp(r.owner_by,r.owner_at):''}</td></tr></table></div>
-    <table style="width:100%;border-collapse:collapse;margin-top:28px"><tr><th style="border:1px solid #111;padding:8px;width:18%">성명</th><td style="border:1px solid #111;padding:8px">${esc(applicant)}</td><th style="border:1px solid #111;padding:8px;width:18%">소속</th><td style="border:1px solid #111;padding:8px">${esc(dept)}</td></tr></table>
-    <p style="margin:28px 0 18px;text-align:center">아래와 같이 휴가를 실시하고자 하오니 승인하여 주시기 바랍니다.</p>
-    <table style="width:100%;border-collapse:collapse"><tr><th style="border:1px solid #111;padding:8px;width:18%">휴가종류</th><td style="border:1px solid #111;padding:8px">${esc(r.type)}${r.type_note?' ('+esc(r.type_note)+')':''}</td></tr><tr><th style="border:1px solid #111;padding:8px">기간</th><td style="border:1px solid #111;padding:8px">${esc(r.date_from)} ~ ${esc(r.date_to)} (총 ${esc(r.days)}일)</td></tr><tr><th style="border:1px solid #111;padding:8px">사유</th><td style="border:1px solid #111;padding:8px">${esc(r.reason||'')}</td></tr><tr><th style="border:1px solid #111;padding:8px">연락처</th><td style="border:1px solid #111;padding:8px">${esc(r.contact||'')}</td></tr><tr><th style="border:1px solid #111;padding:8px">기타</th><td style="border:1px solid #111;padding:8px">${r.special?'특별사정: '+esc(r.special_reason||''):''}</td></tr></table>
-    <div style="margin-top:28px;text-align:right">신청일: ${r.created_at?stampDate(r.created_at):''}</div>
-    <div style="margin-top:24px;text-align:right">위 신청인 ${esc(applicant)} ${r.created_at?appStamp(applicant,r.created_at,'신청'):''}</div>
-    <div style="margin-top:34px;text-align:center">아산정플란트치과의원 대표자 귀하</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start"><h1 style="margin:0;font-size:26px;text-align:center;flex:1">${esc(hubT('leave.form.title','휴 가 신 청 서'))}</h1><table style="border-collapse:collapse;margin-left:20px;text-align:center"><tr><th style="border:1px solid #111;padding:4px 12px">${esc(hubT('leave.form.sign_a','중간관리자'))}</th><th style="border:1px solid #111;padding:4px 12px">${esc(hubT('leave.form.sign_b','대표원장'))}</th></tr><tr><td style="border:1px solid #111;height:66px;padding:4px 12px">${r.chief_at?appStamp(r.chief_by,r.chief_at,hubT('leave.form.stamp_ok','승인')):''}</td><td style="border:1px solid #111;height:66px;padding:4px 12px">${r.owner_at?appStamp(r.owner_by,r.owner_at,hubT('leave.form.stamp_ok','승인')):''}</td></tr></table></div>
+    <table style="width:100%;border-collapse:collapse;margin-top:28px"><tr><th style="border:1px solid #111;padding:8px;width:18%">${esc(hubT('leave.form.f_name','성명'))}</th><td style="border:1px solid #111;padding:8px">${esc(applicant)}</td><th style="border:1px solid #111;padding:8px;width:18%">${esc(hubT('leave.form.f_dept','소속'))}</th><td style="border:1px solid #111;padding:8px">${esc(dept)}</td></tr></table>
+    <p style="margin:28px 0 18px;text-align:center">${esc(hubT('leave.form.lead','아래와 같이 휴가를 실시하고자 하오니 승인하여 주시기 바랍니다.'))}</p>
+    <table style="width:100%;border-collapse:collapse"><tr><th style="border:1px solid #111;padding:8px;width:18%">${esc(hubT('leave.form.f_type','휴가종류'))}</th><td style="border:1px solid #111;padding:8px">${esc(leaveTypeLabel(r.type))}${r.type_note?' ('+esc(r.type_note)+')':''}</td></tr><tr><th style="border:1px solid #111;padding:8px">${esc(hubT('leave.form.f_period','기간'))}</th><td style="border:1px solid #111;padding:8px">${esc(r.date_from)} ~ ${esc(r.date_to)} (${esc(hubT('leave.form.total','총 {n}일',{n:r.days}))})</td></tr><tr><th style="border:1px solid #111;padding:8px">${esc(hubT('leave.form.f_reason','사유'))}</th><td style="border:1px solid #111;padding:8px">${esc(r.reason||'')}</td></tr><tr><th style="border:1px solid #111;padding:8px">${esc(hubT('leave.form.f_contact','연락처'))}</th><td style="border:1px solid #111;padding:8px">${esc(r.contact||'')}</td></tr><tr><th style="border:1px solid #111;padding:8px">${esc(hubT('leave.form.f_etc','기타'))}</th><td style="border:1px solid #111;padding:8px">${r.special?esc(hubT('leave.form.special','특별사정:'))+' '+esc(r.special_reason||''):''}</td></tr></table>
+    <div style="margin-top:28px;text-align:right">${esc(hubT('leave.form.applied_on','신청일:'))} ${r.created_at?stampDate(r.created_at):''}</div>
+    <div style="margin-top:24px;text-align:right">${esc(hubT('leave.form.applicant','위 신청인'))} ${esc(applicant)} ${r.created_at?appStamp(applicant,r.created_at,hubT('leave.form.stamp_apply','신청')):''}</div>
+    <div style="margin-top:34px;text-align:center">${esc(hubT('leave.form.to','아산정플란트치과의원 대표자 귀하'))}</div>
   </div>`;
   show('lvFormMask');
 }
 async function leaveAct(id,act){
-  if(act==='ok'&&!confirm('실장 최종 승인하시겠습니까?'))return;
-  if(act==='rej'&&!confirm('이 연차 신청을 반려하시겠습니까?'))return;
+  if(act==='ok'&&!confirm(hubT('leave.m_ok_confirm','실장 최종 승인하시겠습니까?')))return;
+  if(act==='rej'&&!confirm(hubT('leave.m_rej_confirm','이 연차 신청을 반려하시겠습니까?')))return;
   const result=await sb.rpc('process_leave_request',{p_id:id,p_action:act==='ok'?'approve':'reject'});
-  if(result.error){alert('처리 실패: '+result.error.message);return;}
-  if(!result.data||!result.data.length){alert('처리 결과를 확인하지 못했습니다. 새로고침 후 확인하세요.');return;}
+  if(result.error){alert(hubT('leave.m_act_fail','처리 실패: {msg}',{msg:result.error.message}));return;}
+  if(!result.data||!result.data.length){alert(hubT('leave.m_act_unknown','처리 결과를 확인하지 못했습니다. 새로고침 후 확인하세요.'));return;}
   setStatus('saved');render();refreshBadges();
 }
 async function cancelApprovedLeave(id){
   const {data:r,error:readError}=await sb.from('leave_requests').select('*').eq('id',id).maybeSingle();
-  if(readError||!r||r.status!=='승인'){alert('취소할 수 없는 상태입니다.');return;}
-  if(!confirm(`${nameOf(r.user_id)}님의 ${md(r.date_from)}~${md(r.date_to)} 연차 승인을 취소하고 사용일수를 복구합니다. 계속하시겠습니까?`))return;
+  if(readError||!r||r.status!=='승인'){alert(hubT('leave.m_cancelok_state','취소할 수 없는 상태입니다.'));return;}
+  if(!confirm(hubT('leave.m_cancelok_confirm','{name}님의 {from}~{to} 연차 승인을 취소하고 사용일수를 복구합니다. 계속하시겠습니까?',{name:nameOf(r.user_id),from:md(r.date_from),to:md(r.date_to)})))return;
   const result=await sb.rpc('process_leave_request',{p_id:id,p_action:'cancel_approved'});
-  if(result.error){alert('승인 취소·복구 실패: '+result.error.message);return;}
-  if(!result.data||!result.data.length){alert('취소·복구 결과를 확인하지 못했습니다. 새로고침 후 확인하세요.');return;}
+  if(result.error){alert(hubT('leave.m_cancelok_fail','승인 취소·복구 실패: {msg}',{msg:result.error.message}));return;}
+  if(!result.data||!result.data.length){alert(hubT('leave.m_cancelok_unknown','취소·복구 결과를 확인하지 못했습니다. 새로고침 후 확인하세요.'));return;}
   setStatus('saved');render();refreshBadges();
 }
 async function grantLeave(){
@@ -1513,45 +1527,46 @@ async function grantLeave(){
     $('#laAsOf').value=today();
     await previewLeaveAccrual();
     $('#laRows').scrollIntoView?.({block:'nearest'});
-    $('#laMsg').textContent='해당 직원·발생일을 확인해 선택하세요. 이미 수기로 준 일수는 미리보기에서 상계됩니다.';
+    $('#laMsg').textContent=hubT('leave.m_grant_pick','해당 직원·발생일을 확인해 선택하세요. 이미 수기로 준 일수는 미리보기에서 상계됩니다.');
     return;
   }
-  if(Number.isNaN(days)||days<0){alert('일수는 0 이상으로 입력하세요. 0일도 절대 잔액 조정값으로 기록할 수 있습니다.');return;}
+  if(Number.isNaN(days)||days<0){alert(hubT('leave.m_grant_days','일수는 0 이상으로 입력하세요. 0일도 절대 잔액 조정값으로 기록할 수 있습니다.'));return;}
   const result=await sb.rpc('set_leave_balance',{p_user_id:uid,p_target:days,p_note:$('#gvNote').value||`절대 잔액 설정: ${days}일`});
-  if(result.error){alert('연차 기록 실패: '+result.error.message);return;}
-  if(!result.data||!result.data.length){alert('잔액 설정 결과를 확인하지 못했습니다.');return;}
+  if(result.error){alert(hubT('leave.m_grant_fail','연차 기록 실패: {msg}',{msg:result.error.message}));return;}
+  if(!result.data||!result.data.length){alert(hubT('leave.m_grant_unknown','잔액 설정 결과를 확인하지 못했습니다.'));return;}
   setStatus('saved');render();
 }
 async function previewLeaveAccrual(){
   if(ME.role!=='owner')return;
   const asOf=$('#laAsOf').value,msg=$('#laMsg'),rows=$('#laRows');
   LEAVE_ACCRUAL_PREVIEW=[];LEAVE_ACCRUAL_AS_OF='';$('#laApply').disabled=true;rows.innerHTML='';
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(asOf)||asOf>today()){msg.textContent='오늘 이전의 올바른 기준일을 선택하세요.';return false;}
-  msg.textContent='미리보기 불러오는 중…';
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(asOf)||asOf>today()){msg.textContent=hubT('leave.acc.m_bad_date','오늘 이전의 올바른 기준일을 선택하세요.');return false;}
+  msg.textContent=hubT('leave.acc.m_loading','미리보기 불러오는 중…');
   const {data,error}=await sb.rpc('preview_monthly_leave_accruals',{p_as_of:asOf});
-  if(error){msg.textContent='연차 미리보기 실패: '+error.message;setStatus('error');return false;}
+  if(error){msg.textContent=hubT('leave.acc.m_prev_fail','연차 미리보기 실패: {msg}',{msg:error.message});setStatus('error');return false;}
   LEAVE_ACCRUAL_AS_OF=asOf;LEAVE_ACCRUAL_PREVIEW=data||[];
-  rows.innerHTML=LEAVE_ACCRUAL_PREVIEW.length?`<div class="tblwrap"><table><tr><th>개근·재직 확인</th><th>직원</th><th>입사일</th><th>발생일</th><th>구분</th><th>단계</th><th>기존 수기 포함</th><th>이번 지급</th></tr>${LEAVE_ACCRUAL_PREVIEW.map((r,i)=>`<tr><td>${r.already_recorded?'<span class="b ok">기록됨</span>':`<input type="checkbox" data-la-index="${i}" aria-label="${esc(r.user_name||'직원')} ${esc(r.due_date)} 개근·재직 확인">`}</td><td>${esc(r.user_name||'')}</td><td>${esc(r.hire_date||'')}</td><td>${esc(r.due_date||'')}${r.past?' <span class="sub">· 지난 발생분</span>':''}</td><td>${r.accrual_kind==='annual'?'1년 15일':'월차'}</td><td>${esc(String(r.target_days))}일</td><td>${esc(String(r.existing_credit_days))}일</td><td>${esc(String(r.grant_days))}일</td></tr>`).join('')}</table></div>`:'<div class="empty">기준일까지 발생한 내역이 없습니다.</div>';
+  rows.innerHTML=LEAVE_ACCRUAL_PREVIEW.length?`<div class="tblwrap"><table><tr><th>${esc(hubT('leave.acc.th_check','개근·재직 확인'))}</th><th>${esc(hubT('leave.th.person','직원'))}</th><th>${esc(hubT('leave.acc.th_hire','입사일'))}</th><th>${esc(hubT('leave.acc.th_due','발생일'))}</th><th>${esc(hubT('leave.acc.th_kind','구분'))}</th><th>${esc(hubT('leave.acc.th_step','단계'))}</th><th>${esc(hubT('leave.acc.th_exist','기존 수기 포함'))}</th><th>${esc(hubT('leave.acc.th_grant','이번 지급'))}</th></tr>${LEAVE_ACCRUAL_PREVIEW.map((r,i)=>`<tr><td>${r.already_recorded?'<span class="b ok">'+esc(hubT('leave.acc.recorded','기록됨'))+'</span>':`<input type="checkbox" data-la-index="${i}" aria-label="${esc(r.user_name||'직원')} ${esc(r.due_date)} 개근·재직 확인">`}</td><td>${esc(r.user_name||'')}</td><td>${esc(r.hire_date||'')}</td><td>${esc(r.due_date||'')}${r.past?' <span class="sub">· 지난 발생분</span>':''}</td><td>${r.accrual_kind==='annual'?''+esc(hubT('leave.acc.kind_annual','1년 15일'))+'':''+esc(hubT('leave.acc.kind_month','월차'))+''}</td><td>${esc(String(r.target_days))}일</td><td>${esc(String(r.existing_credit_days))}일</td><td>${esc(String(r.grant_days))}일</td></tr>`).join('')}</table></div>`:'<div class="empty">'+esc(hubT('leave.acc.empty','기준일까지 발생한 내역이 없습니다.'))+'</div>';
   $('#laApply').disabled=!LEAVE_ACCRUAL_PREVIEW.some(r=>!r.already_recorded);
-  msg.textContent='적용할 발생일마다 개근·재직을 확인해 체크하세요. 0일도 수기 지급 충족 기록을 남길 수 있습니다.';
+  msg.textContent=hubT('leave.acc.m_check_hint','적용할 발생일마다 개근·재직을 확인해 체크하세요. 0일도 수기 지급 충족 기록을 남길 수 있습니다.');
   return true;
 }
 async function applyLeaveAccrual(){
-  if(ME.role!=='owner'||!LEAVE_ACCRUAL_AS_OF||$('#laAsOf').value!==LEAVE_ACCRUAL_AS_OF){$('#laMsg').textContent='기준일을 다시 미리보기로 확인하세요.';return;}
+  if(ME.role!=='owner'||!LEAVE_ACCRUAL_AS_OF||$('#laAsOf').value!==LEAVE_ACCRUAL_AS_OF){$('#laMsg').textContent=hubT('leave.acc.m_redo_preview','기준일을 다시 미리보기로 확인하세요.');return;}
   const selected=[...$('#laRows').querySelectorAll('[data-la-index]:checked')].map(el=>LEAVE_ACCRUAL_PREVIEW[Number(el.dataset.laIndex)]).filter(r=>r&&!r.already_recorded);
-  if(!selected.length){$('#laMsg').textContent='개근·재직을 확인한 항목을 선택하세요.';return;}
+  if(!selected.length){$('#laMsg').textContent=hubT('leave.acc.m_pick_one','개근·재직을 확인한 항목을 선택하세요.');return;}
   const days=selected.reduce((sum,r)=>sum+Number(r.grant_days||0),0);
-  if(!confirm(`${selected.length}개 발생일의 개근·재직을 확인하고, 미리보기 기준 ${days}일을 연차 장부에 적용할까요?`))return;
-  $('#laApply').disabled=true;$('#laMsg').textContent='적용 중…';
+  if(!confirm(hubT('leave.acc.m_confirm','{n}개 발생일의 개근·재직을 확인하고, 미리보기 기준 {days}일을 연차 장부에 적용할까요?',{n:selected.length,days:days})))return;
+  $('#laApply').disabled=true;$('#laMsg').textContent=hubT('leave.acc.m_applying','적용 중…');
   const confirmations=selected.map(r=>({user_id:r.user_id,due_date:r.due_date,full_attendance:true}));
   const {data,error}=await sb.rpc('apply_monthly_leave_accruals',{p_as_of:LEAVE_ACCRUAL_AS_OF,p_attendance_confirmations:confirmations,p_apply_confirmed:true});
-  if(error){$('#laMsg').textContent='적용 실패: '+error.message;$('#laApply').disabled=false;setStatus('error');return;}
+  if(error){$('#laMsg').textContent=hubT('leave.acc.m_apply_fail','적용 실패: {msg}',{msg:error.message});$('#laApply').disabled=false;setStatus('error');return;}
   const granted=(data||[]).reduce((sum,r)=>sum+Number(r.granted_days||0),0),created=(data||[]).reduce((sum,r)=>sum+Number(r.created_runs||0),0);
   setStatus('saved');await renderLeave($('#main'));const refreshed=await previewLeaveAccrual();
-  if(refreshed)$('#laMsg').textContent=created?`적용 완료: ${created}건 기록, 실제 ${granted}일 지급. 기록 상태를 확인하세요.`:'새로 적용된 기록이 없습니다. 이미 기록된 발생일인지 확인하세요.';
-  else $('#laMsg').textContent='적용 응답은 성공했으나 재조회 실패 — '+$('#laMsg').textContent;
+  if(refreshed)$('#laMsg').textContent=created?hubT('leave.acc.m_done','적용 완료: {created}건 기록, 실제 {granted}일 지급. 기록 상태를 확인하세요.',{created:created,granted:granted}):hubT('leave.acc.m_none','새로 적용된 기록이 없습니다. 이미 기록된 발생일인지 확인하세요.');
+  else $('#laMsg').textContent=hubT('leave.acc.m_recheck_fail','적용 응답은 성공했으나 재조회 실패 — {msg}',{msg:$('#laMsg').textContent});
 }
 
+function hubT(k,d,v){return typeof hubText==='function'?hubText(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
 /* ── 결재함 ── */
 async function renderAppr(m){
   const {data:mine}=await sb.from('approval_docs').select('*').eq('author',ME.id).order('created_at',{ascending:false}).limit(20);
