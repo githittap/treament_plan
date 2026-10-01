@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<!-- hub-texts.js 「⚙️ 허브 설정」 눈으로 보는 미리보기 — 운영 Supabase에 연결하지 않고 메모리 속 가짜 표만 쓴다.
+     주소 뒤 ?as=owner(기본) 또는 ?as=staff 로 역할을 바꿔 연다. 저장·되돌리기를 눌러 보면 아래 「가짜 표 내용」에 그대로 보인다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>허브 설정 미리보기</title>
+<style>
+:root{
+  --bg:#0d1715; --card:#14201d; --panel:#182823; --ink:#e6f2ef; --gray:#8fa5a0; --line:#24332f;
+  --mint:#2fd9c4; --mint-dk:#0e2b27; --gold:#e3b341; --gold-bg:#2a2312; --red:#ff7b76; --red-bg:#2b1512;
+  --blue:#6fb2ff; --blue-bg:#13202e; --brand:#156f72;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;font-size:14px}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:13.5px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 9px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:rgba(47,217,196,.55)}
+textarea{resize:vertical;min-height:60px}
+h2{font-size:17px;margin-bottom:8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:14px}
+.sub{font-size:12px;color:var(--gray)}
+.rowflex{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.mini{background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:7px;padding:3px 9px;font-size:12px;font-weight:700}
+.mini:hover{border-color:var(--mint);color:var(--mint)}
+.mini.stamp{background:var(--gold-bg);border-color:var(--gold);color:var(--gold)}
+.mini.rej{background:var(--red-bg);border-color:#5c2420;color:var(--red)}
+.b{display:inline-block;border-radius:5px;padding:1px 7px;font-size:11px;font-weight:700}
+.b.ok{background:var(--mint-dk);color:var(--mint)} .b.mid{background:var(--blue-bg);color:var(--blue)}
+.empty{color:var(--gray);font-size:12.5px;padding:10px 2px}
+.hint{font-size:11.5px;color:var(--gray)}
+header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:9px 14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+header .ttl{font-weight:800;font-size:15px}
+header a{color:var(--blue);text-decoration:none;font-size:12.5px;margin-left:auto}
+main{max-width:900px;margin:14px auto;padding:0 14px}
+pre.db{white-space:pre-wrap;font-size:11.5px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px}
+</style>
+</head>
+<body>
+<header>
+  <span class="ttl">⚙️ 허브 설정 미리보기</span>
+  <span class="b mid" id="roleBadge"></span>
+  <a href="?as=staff">직원(staff)으로 보기</a>
+  <a href="?as=owner">원장(owner)으로 보기</a>
+</header>
+<main>
+  <div id="main"><div class="empty">불러오는 중…</div></div>
+  <div class="card"><h2>가짜 표 내용(저장하면 여기가 바뀜)</h2><pre class="db" id="dbDump"></pre></div>
+</main>
+<script src="../../hub-texts.js"></script>
+<script>
+/* ── 가짜 supabase: hub_ui_texts · app_settings 두 표만 흉내 ── */
+const params=new URLSearchParams(location.search),AS=params.get('as')==='staff'?'staff':'owner';
+document.getElementById('roleBadge').textContent=AS==='owner'?'원장으로 보는 중':'직원으로 보는 중';
+const DB={hub_ui_texts:[{key:'tab.home',value:'시작'},{key:'owner.pending.hint',value:'아직 계정이 없거나 승인을 기다리는 분들이에요.'}],
+          app_settings:[{key:'late_cut',value:'09:50'},{key:'siueop',value:'10:00'},{key:'ot_unit_min',value:'10'}]};
+function dump(){document.getElementById('dbDump').textContent=JSON.stringify(DB,null,1);}
+const sb={from(table){
+  const q={op:null,payload:null,filters:{}};
+  const api={select(){q.op='select';return api;},upsert(row){q.op='upsert';q.payload=row;return api;},delete(){q.op='delete';return api;},eq(k,v){q.filters[k]=v;return api;},
+    then(res,rej){
+      const rows=DB[table]||[];let out;
+      if(q.op==='select')out={data:rows.map(r=>Object.assign({},r)),error:null};
+      else if(AS!=='owner')out={data:null,error:{code:'42501',message:'new row violates row-level security policy'}};
+      else if(q.op==='upsert'){const i=rows.findIndex(r=>r.key===q.payload.key);if(i>=0)rows[i]=Object.assign({},rows[i],q.payload);else rows.push(Object.assign({},q.payload));out={data:null,error:null};}
+      else{DB[table]=rows.filter(r=>r.key!==q.filters.key);out={data:null,error:null};}
+      dump();return Promise.resolve(out).then(res,rej);}};
+  return api;}};
+dump();
+const SETTINGS={};DB.app_settings.forEach(r=>SETTINGS[r.key]=r.value);
+HubUi.setSettings(SETTINGS);
+HubUi.load(sb).then(()=>HubUi.renderSettings(document.getElementById('main'),{sb,me:{id:AS==='owner'?'o1':'s1',role:AS}}));
+</script>
+</body>
+</html>
