@@ -394,9 +394,9 @@ test('화면: 원장에게는 「📝 글 고치기 · 🔢 숫자·기준 · �
   assert.match(html,/📝 글 고치기/);assert.match(html,/🔢 숫자·기준/);assert.match(html,/📋 목록/);
   const sec=t.section.innerHTML;
   assert.match(sec,/<input id="hubTxtSearch"/);
-  assert.equal((sec.match(/<details class="hub-grp" data-hub-group="/g)||[]).length,3+11+11+12+9+5,'화면별 접기: 탭 이름·메뉴 묶음 이름·계정·권한 + 차례 2(내 서류함 8 · 업무자료 3) + 차례 3(출퇴근 5 · 근무표 2 · 연차 4) + 차례 4(결재함 4 · 공지 3 · 캘린더 3 · 건의함 2) + 차례 5(문의함 6 · 상담일지 3)');
+  assert.equal((sec.match(/<details class="hub-grp" data-hub-group="/g)||[]).length,3+11+11+12+9+5+14,'화면별 접기: 탭 이름·메뉴 묶음 이름·계정·권한 + 차례 2(내 서류함 8 · 업무자료 3) + 차례 3(출퇴근 5 · 근무표 2 · 연차 4) + 차례 4(결재함 4 · 공지 3 · 캘린더 3 · 건의함 2) + 차례 5(문의함 6 · 상담일지 3)');
   const n=(sec.match(/data-hub-text-save="\d+"/g)||[]).length;
-  assert.equal(n,21+4+19+192+313+145+152+188,'키마다 저장 단추(탭 21 + 묶음 4 + 계정·권한 19 + 차례 2 글 192 + 차례 3 글 313 + 차례 4 글 145 + 차례 5 글 152 + 차례 6 글 188)');
+  assert.equal(n,21+4+19+192+313+145+152+188+329,'키마다 저장 단추(탭 21 + 묶음 4 + 계정·권한 19 + 차례 2 글 192 + 차례 3 글 313 + 차례 4 글 145 + 차례 5 글 152 + 차례 6 글 188 + 차례 7 글 329)');
   assert.equal((sec.match(/data-hub-text-reset="\d+"/g)||[]).length,n);
   assert.match(sec,/고친 것 1개/);assert.match(sec,/<span class="b ok">고침<\/span>/);
   assert.match(sec,/이름표: tab\.home/);
@@ -450,7 +450,7 @@ test('화면: 🔢 숫자·기준 — 근태 기준 7개, 잘못된 값은 DB �
   await t.render({id:'o1',role:'owner'});
   await t.click('[hub-subtab]=settings');
   const sec=t.section.innerHTML;
-  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,7+5+2+4+1);
+  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,7+5+2+4+1+8);
   assert.match(sec,/id="hubSetIn_0" type="time" value="09:50"/,'지금 값(표에서 읽음)');
   assert.match(sec,/처음 값 09:40/);
   assert.match(sec,/<span id="hubSetBadge_0"><span class="b ok">고침<\/span><\/span>/);
@@ -479,7 +479,7 @@ test('화면: 📋 목록 — 코드는 회색(못 고침), 이름만 고침, �
   await t.click('[hub-subtab]=lists');
   let sec=t.section.innerHTML;
   assert.match(sec,/직원 부서/);
-  assert.equal((sec.match(/<span class="hub-code">/g)||[]).length,4+6+3+4+4+7+6+3+8+7+6+5,'기본 코드는 글자(입력칸 아님): 부서 4 + 차례 2의 서류 종류 6·입사 제출물 상태 3·결제 상태 4 + 차례 3의 연차 유형 4·근무부서 7 + 차례 4의 결재 종류 6·일정 종류 3 + 차례 5의 문의 출처 8·문의 상태 7·상담 구분 6·상담 상태 5');
+  assert.equal((sec.match(/<span class="hub-code">/g)||[]).length,4+6+3+4+4+7+6+3+8+7+6+5+32,'기본 코드는 글자(입력칸 아님): 부서 4 + 차례 2의 서류 종류 6·입사 제출물 상태 3·결제 상태 4 + 차례 3의 연차 유형 4·근무부서 7 + 차례 4의 결재 종류 6·일정 종류 3 + 차례 5의 문의 출처 8·문의 상태 7·상담 구분 6·상담 상태 5');
   assert.match(sec,/<span class="hub-code">데스크<\/span><input id="hubLstLbl_0_1" type="text" maxlength="20" value="데스크"/);
   assert.equal((sec.match(/data-hub-list-del=/g)||[]).length,0,'기본 항목은 뺄 수 없음');
   assert.match(sec,/data-hub-list-add="0"/);
