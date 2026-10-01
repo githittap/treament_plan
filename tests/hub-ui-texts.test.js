@@ -394,9 +394,9 @@ test('화면: 원장에게는 「📝 글 고치기 · 🔢 숫자·기준 · �
   assert.match(html,/📝 글 고치기/);assert.match(html,/🔢 숫자·기준/);assert.match(html,/📋 목록/);
   const sec=t.section.innerHTML;
   assert.match(sec,/<input id="hubTxtSearch"/);
-  assert.equal((sec.match(/<details class="hub-grp" data-hub-group="/g)||[]).length,3,'화면별 접기: 탭 이름·메뉴 묶음 이름·계정·권한');
+  assert.equal((sec.match(/<details class="hub-grp" data-hub-group="/g)||[]).length,3+11,'화면별 접기: 탭 이름·메뉴 묶음 이름·계정·권한 + 차례 2(내 서류함 8 · 업무자료 3)');
   const n=(sec.match(/data-hub-text-save="\d+"/g)||[]).length;
-  assert.equal(n,21+4+19,'키마다 저장 단추(탭 21 + 묶음 4 + 계정·권한 19)');
+  assert.equal(n,21+4+19+192,'키마다 저장 단추(탭 21 + 묶음 4 + 계정·권한 19 + 차례 2 글 192)');
   assert.equal((sec.match(/data-hub-text-reset="\d+"/g)||[]).length,n);
   assert.match(sec,/고친 것 1개/);assert.match(sec,/<span class="b ok">고침<\/span>/);
   assert.match(sec,/이름표: tab\.home/);
@@ -479,7 +479,7 @@ test('화면: 📋 목록 — 코드는 회색(못 고침), 이름만 고침, �
   await t.click('[hub-subtab]=lists');
   let sec=t.section.innerHTML;
   assert.match(sec,/직원 부서/);
-  assert.equal((sec.match(/<span class="hub-code">/g)||[]).length,4,'기본 부서 4개의 코드는 글자(입력칸 아님)');
+  assert.equal((sec.match(/<span class="hub-code">/g)||[]).length,4+6+3+4,'기본 코드는 글자(입력칸 아님): 부서 4 + 차례 2의 서류 종류 6·입사 제출물 상태 3·결제 상태 4');
   assert.match(sec,/<span class="hub-code">데스크<\/span><input id="hubLstLbl_0_1" type="text" maxlength="20" value="데스크"/);
   assert.equal((sec.match(/data-hub-list-del=/g)||[]).length,0,'기본 항목은 뺄 수 없음');
   assert.match(sec,/data-hub-list-add="0"/);
