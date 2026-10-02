@@ -346,6 +346,16 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
   <div id="certificateBody"></div>
 </div></div>
 <div class="mask" id="noticePreviewMask"><div class="modal wide"><h3><span data-hubk="notice.preview.title">📎 첨부 미리보기</span><button class="x" onclick="hide('noticePreviewMask')">✕</button></h3><div id="noticePreviewBody"></div></div></div>
+<div class="mask" id="attIssueMask"><div class="modal wide">
+  <h3><span id="attIssueFormTitle">🙋 지문누락 소명</span><button class="x" id="attIssueCloseBtn" onclick="closeAttendanceIssueForm()">✕</button></h3>
+  <div id="attIssueFormBody"></div>
+  <button class="hbtn pri" id="attIssueSaveBtn" style="margin-top:10px" onclick="submitAttendanceIssueForm()">저장</button>
+  <div class="msg" id="attIssueFormMsg"></div>
+</div></div>
+<div class="mask" id="attEvidenceMask"><div class="modal">
+  <h3><span id="attEvidenceTitle">소명 증거 파일</span><button class="x" onclick="hide('attEvidenceMask')">✕</button></h3>
+  <div id="attEvidenceList"></div>
+</div></div>
 
 <!-- 엑셀 미리보기 -->
 <div class="mask" id="xlMask"><div class="modal wide">
@@ -380,7 +390,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 <footer>© 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지</footer>
 
 <script src="hub-intro.js?v=2026100301"></script>
-<script src="hub-texts.js?v=2026100301"></script>
+<script src="hub-texts.js?v=2026100302"></script>
 <script>
 /* ═══════ 설정 ═══════
    실제 값은 DB의 app_settings 표에서 읽어옵니다.
@@ -929,6 +939,10 @@ async function refreshBadges(){
   const {data:rd}=await sb.from('notice_reads').select('notice_id').eq('user_id',ME.id);
   const readset=new Set((rd||[]).map(r=>r.notice_id));
   BADGE.notice=(nt||[]).filter(n=>!readset.has(n.id)).length||0;
+  if(ME.role!=='owner'){
+    const {count}=await sb.from('attendance_issues').select('id',{count:'exact',head:true}).eq('user_id',ME.id).eq('rule_label','자동').eq('status','대기').is('staff_responded_at',null);
+    BADGE.att=count||0;
+  }
   // 결재 대기(내가 처리자)
   if(isLead()){
     const {data:st}=await sb.from('approval_steps').select('id,approver_role,status').eq('status','대기').eq('approver_role',ME.role);
@@ -1080,6 +1094,65 @@ async function submitManualAttendance(){const msg=$('#manualAttMsg'),lunchRaw=$(
 // 기존 submit_manual_attendance_v2 RPC 계약은 db 초안과 기존 기록 호환을 위해 보존한다. 예전 호출: sb.rpc('submit_manual_attendance_v2', payload)
 async function reviewManualAttendance(id,action){const {error}=await sb.rpc('review_manual_attendance',{p_id:id,p_action:action});if(error){alert(hubT('att.review.m_fail','처리 실패: {msg}',{msg:error.message}));return;}setStatus('saved');render();}
 function attendanceMonthBounds(month){const [y,m]=month.split('-').map(Number),next=m===12?`${y+1}-01-01`:`${y}-${String(m+1).padStart(2,'0')}-01`;return {start:`${month}-01`,next};}
+/* attendance-issue-form:test-start */
+function attendanceIssueFormProblem({workDate,kind,reason,files,existingCount,reasonMin,evidenceMax,evidenceRequired}){
+  if(workDate!==null){const parsed=/^\d{4}-\d{2}-\d{2}$/.test(workDate)?new Date(workDate+'T00:00:00Z'):null;if(!parsed||Number.isNaN(parsed.getTime())||parsed.toISOString().slice(0,10)!==workDate)return 'date';}
+  if(!kind||!['지문인식오류','입력오류','기타'].includes(kind))return 'kind';
+  const text=String(reason||'').trim();if(text.length<reasonMin||text.length>1000)return 'reason';
+  const selected=files||[];if(existingCount+selected.length>evidenceMax)return 'count';
+  if(evidenceRequired&&existingCount+selected.length===0)return 'required';
+  for(const file of selected){if(!['image/jpeg','image/png','image/webp','application/pdf'].includes(file.type))return 'type';if(file.size<=0||file.size>10485760)return 'size';}
+  return '';
+}
+function attendanceIssueStaffReason(issue){return issue?.staff_reason||((issue?.rule_label==='자동')?'':issue?.reason)||'';}
+function attendanceIssueKindLabel(code){const defs=[{code:'지문인식오류',label:'지문인식오류(찍었는데 인식 안 됨)'},{code:'입력오류',label:'입력오류(안 찍었거나 잘못 찍음)'},{code:'기타',label:'기타(외근·기기 고장 등)'}],items=typeof hubList==='function'?hubList('list.att_issue_kinds',defs):defs;return items.find(i=>i.code===code)?.label||code||'';}
+function attendanceIssueInitialRpc(issue){return issue?'respond_attendance_issue':'submit_attendance_issue_v2';}
+function attendanceIssueUnlinkedUploads(uploaded,linked){const linkedPaths=new Set((linked||[]).map(f=>f.storage_path));return (uploaded||[]).filter(path=>!linkedPaths.has(path));}
+function attendanceIssueFailedFileCount(selectedCount,linkedCount){return Math.max(0,selectedCount-linkedCount);}
+/* attendance-issue-form:test-end */
+let ATT_ISSUE_FORM={mode:'new',issue:null,existingFiles:[],presetDate:null,busy:false};
+let ATT_ISSUE_EVIDENCE={};
+let ATT_ISSUE_EVIDENCE_FAILED_IDS=new Set();
+function issueEvidenceFiles(issues){const ids=(issues||[]).map(i=>Number(i.id)).filter(Number.isFinite);if(!ids.length)return Promise.resolve({data:[],error:null});return sb.from('attendance_issue_evidence').select('*').in('issue_id',ids).order('uploaded_at',{ascending:true});}
+function attendanceIssueFormHtml(){
+  const form=ATT_ISSUE_FORM,issue=form.issue,kind=issue?.staff_kind||(issue?.rule_label==='자동'?'':issue?.rule_label)||'',reason=issue?.staff_reason||(issue?.rule_label==='자동'?'':issue?.reason)||'',items=typeof hubList==='function'?hubList('list.att_issue_kinds',[{code:'지문인식오류',label:'지문인식오류(찍었는데 인식 안 됨)'},{code:'입력오류',label:'입력오류(안 찍었거나 잘못 찍음)'},{code:'기타',label:'기타(외근·기기 고장 등)'}]):[],min=hubN('att.issue.reason_min',10),max=hubN('att.issue.evidence_max',5),required=hubN('att.issue.evidence_required',1)===1;
+  const currentKind=kind||items[0]?.code||'지문인식오류';
+  return `<div class="hint">${esc(hubT(form.mode==='new'?'att.issueform.mode_new':form.mode==='answer'?'att.issueform.mode_answer':'att.issueform.mode_edit',form.mode==='new'?'새 소명을 올립니다.':form.mode==='answer'?'자동 감지된 소명에 사유를 적습니다.':'대기 중인 내 소명을 고칩니다.'))}</div>
+  ${issue?`<div class="fld"><label>${esc(hubT('att.issue.p_date','소명할 근무일 (YYYY-MM-DD):'))}</label><input type="date" aria-label="${esc(hubT('att.issueform.date','근무일'))}" value="${esc(issue.work_date||'')}" readonly></div>`:form.mode==='new'?`<div class="fld"><label>${esc(hubT('att.issue.p_date','소명할 근무일 (YYYY-MM-DD):'))}</label><input type="date" id="attIssueDate" aria-label="${esc(hubT('att.issueform.date','근무일'))}" value="${esc(form.presetDate||today())}"></div>`:''}
+  ${issue?.rule_label==='자동'?`<div class="hint">${esc(hubT('att.issueform.auto','{kind} 지문 없음(자동 감지)',{kind:issue.type==='종업누락'?'퇴근':'출근'}))}</div>`:''}
+  <div class="fld"><label>${esc(hubT('att.issueform.kind','사유 종류'))}</label><select id="attIssueKind">${items.map(i=>`<option value="${esc(i.code)}" ${i.code===currentKind?'selected':''}>${esc(i.label)}</option>`).join('')}</select></div>
+  <div class="fld"><label>${esc(hubT('att.issueform.reason','자세한 사유'))}</label><textarea id="attIssueReason" maxlength="1000" rows="4">${esc(reason)}</textarea><div class="hint">${esc(hubT('att.issueform.reason_hint','언제·왜 지문이 빠졌는지, 실제 출근·퇴근 시각을 적어 주세요.'))}</div></div>
+  <div class="fld"><label>${esc(hubT('att.issueform.evidence','증거 파일'))}${required?` <span class="b wait">${esc(hubT('att.issueform.evidence_required','증거 파일을 꼭 내야 합니다.'))}</span>`:''}</label><input id="attIssueFiles" type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf"><div class="hint">${esc(hubT('att.issueform.evidence_hint','카톡 캡처·사진 등 사유를 보여 주는 자료를 올려 주세요. JPG·PNG·WEBP·PDF, 파일마다 10MB 이하.'))} (${form.existingFiles.length}/${max})</div><div id="attIssueExistingFiles">${form.existingFiles.length?`<b>${esc(hubT('att.issueform.files','이미 낸 파일'))}</b><br>${form.existingFiles.map(f=>esc(f.original_name)).join('<br>')}`:esc(hubT('att.issueform.no_files','아직 낸 파일이 없습니다.'))}</div></div>`;
+}
+async function openAttendanceIssueEvidence(issueId){
+  const files=ATT_ISSUE_EVIDENCE[Number(issueId)]||[];$('#attEvidenceTitle').textContent=hubT('att.issue.evidence_view','소명 증거 파일');
+  $('#attEvidenceList').innerHTML=files.length?files.map((f,index)=>`<button class="mini" style="margin:4px" onclick="openAttendanceIssueEvidenceFile(${Number(issueId)},${index})">${esc(f.original_name||'파일')}</button>`).join(''): `<div class="empty">${esc(hubT('att.issue.evidence_empty','연결된 증거 파일이 없습니다.'))}</div>`;show('attEvidenceMask');
+}
+async function openAttendanceIssueEvidenceFile(issueId,index){
+  const file=(ATT_ISSUE_EVIDENCE[Number(issueId)]||[])[index];if(!file)return;const popup=window.open('about:blank','_blank');if(!popup){alert(hubT('att.issue.evidence_open_blocked','새 탭이 막혔습니다. 팝업 허용 후 다시 눌러 주세요.'));return;}popup.opener=null;
+  const {data,error}=await sb.storage.from('attendance-evidence').createSignedUrl(file.storage_path,600);if(error||!data?.signedUrl){popup.close();alert(hubT('att.issue.evidence_open_fail','파일 주소를 만들지 못했습니다: {detail}',{detail:error?.message||hubT('att.issue.evidence_missing','파일 없음')}));return;}popup.location=data.signedUrl;
+}
+function attendanceIssueMyCardHtml(issues){
+  if(ME.role==='owner')return '';
+  const rows=issues||[],pending=rows.filter(i=>i.rule_label==='자동'&&i.status==='대기'&&!i.staff_responded_at),limit=hubN('att.myissue_list_limit',20),visible=rows.slice(0,limit),kinds=visible.map(i=>i.id);
+  return `<div class="card"><h2>${esc(hubT('att.myissue.title','🙋 내 지문누락 소명'))}</h2><h3>${esc(hubT('att.myissue.pending','답이 필요한 소명'))}</h3>${pending.length?pending.map(i=>`<div class="rowflex"><span>${esc(hubFmtDate(i.work_date)||i.work_date)} · ${esc(hubT(i.type==='종업누락'?'att.issue.auto_clock_out':'att.issue.auto_clock_in',i.type==='종업누락'?'퇴근 지문 없음(자동 감지)':'출근 지문 없음(자동 감지)'))}</span><button class="mini" onclick="openIssue(${Number(i.id)},'answer')">${esc(hubT('att.myissue.btn_answer','사유 쓰기'))}</button></div>`).join(''):`<div class="empty">${esc(hubT('att.myissue.pending_empty','답이 필요한 소명이 없습니다.'))}</div>`}<h3>${esc(hubT('att.myissue.list','내 소명'))}</h3>${visible.length?`<div class="tblwrap"><table><tr><th>${esc(hubT('att.th.date','날짜'))}</th><th>${esc(hubT('att.myissue.th_kind','종류'))}</th><th>${esc(hubT('att.myissue.th_reason','사유'))}</th><th>${esc(hubT('att.myissue.th_evidence','증거'))}</th><th>${esc(hubT('att.th.status','상태'))}</th><th></th></tr>${visible.map(i=>{const files=ATT_ISSUE_EVIDENCE[Number(i.id)]||[],failed=ATT_ISSUE_EVIDENCE_FAILED_IDS.has(Number(i.id));return `<tr><td>${esc(hubFmtDate(i.work_date)||i.work_date)}</td><td>${esc(i.rule_label==='자동'?hubT(i.type==='종업누락'?'att.issue.auto_clock_out':'att.issue.auto_clock_in',i.type==='종업누락'?'퇴근 지문 없음(자동 감지)':'출근 지문 없음(자동 감지)'):attendanceIssueKindLabel(i.staff_kind||i.rule_label))}</td><td>${esc(attendanceIssueStaffReason(i)||'-')}</td><td>${failed?esc(hubT('att.issue.evidence_load_fail','증거 파일 조회 실패')):files.length?`<button class="mini" onclick="openAttendanceIssueEvidence(${Number(i.id)})">${esc(hubT('att.issue.evidence_count','📎 {n}',{n:files.length}))}</button>`:'-'}</td><td><span class="b ${i.status==='원장확정'?'ok':i.status==='반려'?'no':'wait'}">${esc(i.status)}</span></td><td>${i.status==='대기'?`<button class="mini" onclick="openIssue(${Number(i.id)},'edit')">${esc(hubT('att.myissue.btn_edit','고치기'))}</button>`:''}</td></tr>`;}).join('')}</table></div>`:`<div class="empty">${esc(hubT('att.myissue.empty','올린 소명이 없습니다.'))}</div>`}<button class="mini" style="margin-top:8px" onclick="openIssue()">${esc(hubT('att.myissue.btn_new','소명 올리기'))}</button></div>`;
+}
+async function submitAttendanceIssueForm(){
+  const msg=$('#attIssueFormMsg'),button=$('#attIssueSaveBtn'),files=[...($('#attIssueFiles')?.files||[])],date=ATT_ISSUE_FORM.mode==='new'?($('#attIssueDate')?.value||''):null,kind=$('#attIssueKind')?.value,reason=$('#attIssueReason')?.value||'',existing=ATT_ISSUE_FORM.existingFiles||[],issue=ATT_ISSUE_FORM.issue,min=hubN('att.issue.reason_min',10),max=hubN('att.issue.evidence_max',5),required=hubN('att.issue.evidence_required',1)===1,problem=attendanceIssueFormProblem({workDate:date,kind,reason,files,existingCount:existing.length,reasonMin:min,evidenceMax:max,evidenceRequired:required});
+  const problemText={date:hubT('att.issueform.m_date','근무일을 확인해 주세요.'),kind:hubT('att.issueform.m_kind','사유 종류를 골라 주세요.'),reason:hubT('att.issueform.m_reason','자세한 사유는 {min}자 이상 1000자 이하로 적어 주세요.',{min}),count:hubT('att.issueform.m_file_count','파일은 한 건에 최대 {max}개까지 올릴 수 있습니다.',{max}),required:hubT('att.issueform.m_evidence_required','증거 파일을 하나 이상 올려 주세요.'),type:hubT('att.issueform.m_file_type','JPG·PNG·WEBP·PDF 파일만 올릴 수 있습니다.'),size:hubT('att.issueform.m_file_size','파일마다 10MB 이하만 올릴 수 있습니다.')};
+  if(problem){msg.textContent=problemText[problem];return;}if(ATT_ISSUE_FORM.busy)return;
+  ATT_ISSUE_FORM.busy=true;button.disabled=true;setStatus('saving');msg.textContent=hubT('att.issueform.m_saving','소명을 저장하는 중…');
+  let saveComplete=false;try{
+    let row=issue;
+    if(attendanceIssueInitialRpc(row)==='submit_attendance_issue_v2'){const result=await sb.rpc('submit_attendance_issue_v2',{p_work_date:date,p_kind:kind,p_reason:reason.trim()});if(result.error)throw result.error;row=result.data;ATT_ISSUE_FORM.issue=row;ATT_ISSUE_FORM.mode='edit';}
+    else {const {error}=await sb.rpc('respond_attendance_issue',{p_id:Number(row.id),p_kind:kind,p_reason:reason.trim()});if(error)throw error;row={...row,staff_kind:kind,staff_reason:reason.trim(),staff_responded_at:new Date().toISOString()};ATT_ISSUE_FORM.issue=row;}
+    const uploaded=[],linked=[];let failed=0;
+    for(const file of files){const ext={'image/jpeg':/\.jpe?g$/i.test(file.name)?file.name.match(/\.jpe?g$/i)[0].slice(1).toLowerCase():'jpg','image/png':'png','image/webp':'webp','application/pdf':'pdf'}[file.type],token=crypto.randomUUID().replace(/-/g,'').slice(0,16),path=`${ME.id}/${row.id}/${token}.${ext}`;uploaded.push(path);try{const upload=await sb.storage.from('attendance-evidence').upload(path,file,{contentType:file.type,upsert:false});if(upload.error)throw upload.error;const attached=await sb.rpc('attendance_issue_add_evidence',{p_issue_id:Number(row.id),p_storage_path:path,p_original_name:file.name,p_mime_type:file.type,p_size_bytes:file.size});if(attached.error)throw attached.error;linked.push({issue_id:row.id,storage_path:path,original_name:file.name,mime_type:file.type,size_bytes:file.size});}catch(_error){failed++;}}
+    if(failed){const cleanup=attendanceIssueUnlinkedUploads(uploaded,linked);if(cleanup.length){try{await sb.storage.from('attendance-evidence').remove(cleanup);}catch(_cleanupError){/* 다음 저장 때 고아 경로를 다시 정리할 수 없으므로 실패 수는 그대로 표시 */}}ATT_ISSUE_FORM.existingFiles=existing.concat(linked);ATT_ISSUE_EVIDENCE[Number(row.id)]=ATT_ISSUE_FORM.existingFiles;$('#attIssueFiles').value='';msg.textContent=hubT('att.issueform.m_partial','소명은 저장됐고 파일 {n}개가 안 올라갔습니다. 「내 소명」의 고치기로 다시 올려 주세요.',{n:failed});setStatus('error');await refreshBadges();renderNav();return;}
+    ATT_ISSUE_FORM.existingFiles=existing.concat(linked);ATT_ISSUE_EVIDENCE[Number(row.id)]=ATT_ISSUE_FORM.existingFiles;$('#attIssueFiles').value='';msg.textContent=hubT('att.issueform.m_saved','소명을 저장했습니다.');setStatus('saved');saveComplete=true;await refreshBadges();renderNav();setTimeout(()=>{hide('attIssueMask');ATT_ISSUE_FORM.busy=false;button.disabled=false;render();},500);
+  }catch(error){msg.textContent=hubT('att.issueform.m_fail','소명 저장 실패: {detail}',{detail:error?.message||String(error)});setStatus('error');}
+  finally{if(!saveComplete){ATT_ISSUE_FORM.busy=false;button.disabled=false;}}
+}
 /* absence-candidate:test-start */
 function absenceSettingsLoadSucceeded(result){return !result?.error&&Array.isArray(result?.data);}
 function absenceCandidateDecision({ds,todaySeoul,nowSeoul,siueop,afterMinutes,afterDays,shift,hasAttendance,leave,manualStatus,excludePendingManual,hireDate,employmentStatus,effectiveDate,settingsLoaded}){
@@ -1108,6 +1181,10 @@ async function renderAtt(m){
   if(isMgr()){
     const {data:mrow}=await sb.from('att_months').select('*').eq('month',month).maybeSingle();
     const {data:iss}=await sb.from('attendance_issues').select('*').order('created_at',{ascending:false}).limit(hubN('att.issue_list_limit',30));
+    const {data:myIssueRows}=await sb.from('attendance_issues').select('*').eq('user_id',ME.id).order('created_at',{ascending:false});
+    ATT_ISSUE_EVIDENCE={};ATT_ISSUE_EVIDENCE_FAILED_IDS=new Set();
+    const {data:myIssueFiles,error:myIssueEvidenceError}=await issueEvidenceFiles(myIssueRows||[]);if(myIssueEvidenceError)(myIssueRows||[]).forEach(i=>ATT_ISSUE_EVIDENCE_FAILED_IDS.add(Number(i.id)));(myIssueFiles||[]).forEach(f=>(ATT_ISSUE_EVIDENCE[Number(f.issue_id)]||(ATT_ISSUE_EVIDENCE[Number(f.issue_id)]=[])).push(f));
+    if(ME.role==='chief'||ME.role==='owner'){const ownIds=new Set((myIssueRows||[]).map(i=>Number(i.id))),adminRows=(iss||[]).filter(i=>!ownIds.has(Number(i.id)));const {data:issueFiles,error:adminIssueEvidenceError}=await issueEvidenceFiles(adminRows);if(adminIssueEvidenceError)adminRows.forEach(i=>ATT_ISSUE_EVIDENCE_FAILED_IDS.add(Number(i.id)));(issueFiles||[]).forEach(f=>(ATT_ISSUE_EVIDENCE[Number(f.issue_id)]||(ATT_ISSUE_EVIDENCE[Number(f.issue_id)]=[])).push(f));}
     const {data:manualRows,error:manualError}=await sb.from('attendance_manual_entries').select('*').order('created_at',{ascending:false}).limit(50);
     const manualUsers=[...new Set((manualRows||[]).map(r=>r.user_id))],manualDates=[...new Set((manualRows||[]).map(r=>r.work_date))];
     const fpQuery=manualUsers.length&&manualDates.length?()=>sb.from('attendance').select('user_id,work_date,clock_in,clock_out,source').in('user_id',manualUsers).in('work_date',manualDates).order('work_date',{ascending:false}):null;
@@ -1132,14 +1209,14 @@ async function renderAtt(m){
       <div id="absentBox" style="margin-top:8px"><div class="sub">${esc(hubT('att.absent.hint','근무표와 기록을 대조해 확인이 필요한 후보만 보여줍니다.'))}</div></div>
     </div>
     <div class="card"><h2>${esc(hubT('att.issue.title','🙋 지문누락 소명'))} <span class="sub">(${esc(hubT('att.issue.title_sub','실장·원장 승인'))})</span></h2>
-      ${(iss||[]).length?`<div class="tblwrap"><table><tr><th>${esc(hubT('att.th.person','직원'))}</th><th>${esc(hubT('att.th.date','날짜'))}</th><th>${esc(hubT('att.issue.th_type','유형'))}</th><th>${esc(hubT('att.issue.th_reason','사유'))}</th><th>${esc(hubT('att.th.status','상태'))}</th><th></th></tr>
-      ${(iss||[]).map(i=>`<tr><td>${esc(nameOf(i.user_id))}</td><td>${md(i.work_date)}</td><td>${esc(i.rule_label||i.type||'')}</td><td>${esc(i.reason||'')}</td>
-        <td><span class="b ${i.status==='원장확정'?'ok':(i.status==='반려'?'no':'wait')}">${esc(i.status)}</span></td>
-        <td>${issueBtns(i)}</td></tr>`).join('')}</table></div>`:'<div class="empty">'+esc(hubT('att.issue.empty','소명 없음'))+'</div>'}
-    </div>`;
+      ${(iss||[]).length?`<div class="tblwrap"><table><tr><th>${esc(hubT('att.th.person','직원'))}</th><th>${esc(hubT('att.th.date','날짜'))}</th><th>${esc(hubT('att.issue.th_type','유형'))}</th><th>${esc(hubT('att.issue.th_reason','사유'))}</th><th>${esc(hubT('att.issue.admin_evidence','증거'))}</th><th>${esc(hubT('att.th.status','상태'))}</th><th></th></tr>
+      ${(iss||[]).map(i=>{const files=ATT_ISSUE_EVIDENCE[Number(i.id)]||[],evidenceFailed=ATT_ISSUE_EVIDENCE_FAILED_IDS.has(Number(i.id)),waiting=i.rule_label==='자동'&&!i.staff_responded_at;const kind=i.rule_label==='자동'?hubT(i.type==='종업누락'?'att.issue.auto_clock_out':'att.issue.auto_clock_in',i.type==='종업누락'?'퇴근 지문 없음(자동 감지)':'출근 지문 없음(자동 감지)')+(i.staff_kind?' · '+attendanceIssueKindLabel(i.staff_kind):''):attendanceIssueKindLabel(i.staff_kind||i.rule_label),reason=attendanceIssueStaffReason(i);return `<tr><td>${esc(nameOf(i.user_id))}</td><td>${md(i.work_date)}</td><td>${esc(kind)}</td><td>${reason?esc(reason):waiting?`<span class="b wait">${esc(hubT('att.issue.awaiting_staff','직원 답 기다림'))}</span>`:'-'}</td><td>${ME.role==='chief'||ME.role==='owner'?evidenceFailed?esc(hubT('att.issue.evidence_load_fail','증거 파일 조회 실패')):files.length?`<button class="mini" onclick="openAttendanceIssueEvidence(${Number(i.id)})">${esc(hubT('att.issue.evidence_count','📎 {n}',{n:files.length}))}</button>`:hubN('att.issue.evidence_required',1)?`<span class="b no">${esc(hubT('att.issue.evidence_none','증거 없음'))}</span>`:'-':'-'}</td><td><span class="b ${i.status==='원장확정'?'ok':(i.status==='반려'?'no':'wait')}">${esc(i.status)}</span></td><td>${issueBtns(i)}</td></tr>`;}).join('')}</table></div>`:'<div class="empty">'+esc(hubT('att.issue.empty','소명 없음'))+'</div>'}
+    </div>${attendanceIssueMyCardHtml(myIssueRows||[])}`;
   } else {
     const {data:att}=await sb.from('attendance').select('*').eq('user_id',ME.id).gte('work_date',bounds.start).lt('work_date',bounds.next).order('work_date',{ascending:false});
     const {data:manualRows,error:manualError}=await sb.from('attendance_manual_entries').select('*').eq('user_id',ME.id).gte('work_date',bounds.start).lt('work_date',bounds.next).order('work_date',{ascending:false});
+    const {data:myIssueRows}=await sb.from('attendance_issues').select('*').eq('user_id',ME.id).order('created_at',{ascending:false});
+    ATT_ISSUE_EVIDENCE={};ATT_ISSUE_EVIDENCE_FAILED_IDS=new Set();const {data:myIssueFiles,error:myIssueEvidenceError}=await issueEvidenceFiles(myIssueRows||[]);if(myIssueEvidenceError)(myIssueRows||[]).forEach(i=>ATT_ISSUE_EVIDENCE_FAILED_IDS.add(Number(i.id)));(myIssueFiles||[]).forEach(f=>(ATT_ISSUE_EVIDENCE[Number(f.issue_id)]||(ATT_ISSUE_EVIDENCE[Number(f.issue_id)]=[])).push(f));
     const {data:issueResolutions}=await sb.from('attendance_issue_resolutions').select('work_date,clock_in,clock_out,late_min,early_min,overtime_min,source,approved_at').eq('user_id',ME.id).gte('work_date',bounds.start).lt('work_date',bounds.next).order('work_date',{ascending:false}).limit(100);
     const effectiveAtt=applyAttendanceResolutions(att,(issueResolutions||[]).map(r=>({...r,user_id:ME.id})));
     m.innerHTML=`
@@ -1153,7 +1230,7 @@ async function renderAtt(m){
       ${(manualRows||[]).length?`<div class="hint">${esc(hubT('att.my.manual_list','수기 제출 내역:'))} ${manualRows.map(r=>`${md(r.work_date)} ${esc(r.status)}`).join(' · ')}</div>`:''}
       <div class="hint">${esc(hubT('att.my.fix_a','기록이 실제와 다르면 관리자에게'))} <b>${esc(hubT('att.my.fix_b','지문누락 소명'))}</b>${esc(hubT('att.my.fix_c','을 요청하세요.'))}
         <button class="mini" onclick="openIssue()">${esc(hubT('att.my.fix_btn','소명 올리기'))}</button></div>
-    </div>`;
+    </div>${attendanceIssueMyCardHtml(myIssueRows||[])}`;
   }
   renderManualAttendanceDayDetail($('#manualWorkDate')?.value||today());
   renderManualAttendanceCalendar();
@@ -1167,11 +1244,15 @@ async function issueAct(id,act){
   const {error}=await sb.rpc('review_attendance_issue',{p_id:id,p_action:act==='rej'?'reject':'approve'});
   if(error){alert(hubT('att.issue.m_act_fail','소명 처리 실패: {msg}',{msg:error.message}));return;}setStatus('saved');render();
 }
-async function openIssue(){
-  const wd=prompt(hubT('att.issue.p_date','소명할 근무일 (YYYY-MM-DD):'),today());if(!wd)return;
-  const label=prompt(hubT('att.issue.p_type','오류 유형을 입력하세요: 지문인식오류 / 입력오류 / 기타'),'지문인식오류');if(!['지문인식오류','입력오류','기타'].includes(label)){alert(hubT('att.issue.m_type','오류 유형은 지문인식오류, 입력오류, 기타 중 하나여야 합니다.'));return;}
-  const reason=prompt(hubT('att.issue.p_reason','사유 (예: 지문 찍었으나 인식 누락):'));if(!reason)return;
-  const {error}=await sb.rpc('submit_attendance_issue',{p_work_date:wd,p_type:'정정',p_rule_label:label,p_reason:reason});if(error){setStatus('error');alert(hubT('att.issue.m_save_fail','소명 저장 실패: {msg}',{msg:error.message}));return;}setStatus('saved');alert(hubT('att.issue.m_saved','소명을 올렸습니다. 실장 승인 후 반영됩니다.'));
+function closeAttendanceIssueForm(){if(ATT_ISSUE_FORM.busy)return;hide('attIssueMask');}
+async function openIssue(idOrDate,mode='new'){
+  if(ATT_ISSUE_FORM.busy)return;
+  let issue=null,presetDate=null;
+  if(typeof idOrDate==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(idOrDate))presetDate=idOrDate;
+  else if(idOrDate!=null){const {data,error}=await sb.from('attendance_issues').select('*').eq('id',Number(idOrDate)).eq('user_id',ME.id).maybeSingle();if(error||!data){alert(hubT('att.issueform.m_not_found','소명을 찾지 못했습니다: {detail}',{detail:error?.message||''}));return;}issue=data;if(mode==='new')mode='edit';if(issue.status!=='대기'){alert(hubT('att.issueform.m_not_editable','대기 중인 소명만 고칠 수 있습니다.'));return;}}
+  let existingFiles=[];if(issue){const {data,error}=await sb.from('attendance_issue_evidence').select('*').eq('issue_id',issue.id).order('uploaded_at',{ascending:true});if(error){alert(hubT('att.issue.evidence_load_fail','증거 파일 조회 실패'));return;}existingFiles=data||[];}
+  ATT_ISSUE_FORM={mode:issue?mode:'new',issue,existingFiles,presetDate,busy:false};
+  $('#attIssueFormTitle').textContent=hubT('att.issueform.title','🙋 지문누락 소명');$('#attIssueFormBody').innerHTML=attendanceIssueFormHtml();$('#attIssueFormMsg').textContent='';$('#attIssueSaveBtn').textContent=hubT('att.issueform.btn_submit','저장');$('#attIssueSaveBtn').disabled=false;$('#attIssueCloseBtn').title=hubT('att.issueform.btn_cancel','닫기');show('attIssueMask');
 }
 async function closeMonth(month){
   if(!confirm(hubT('att.close.confirm','{month} 근태를 확정할까요? (이후 수정은 소명/정정으로)',{month:month})))return;

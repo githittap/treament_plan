@@ -46,7 +46,7 @@ const dynRows=defs=>defs.map(d=>({key:d.key,value:'«'+d.key+'»'+(d.vars?' '+d.
 /* ───────────── 1. 기본 글 목록 ───────────── */
 test('차례 3 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 11개(출퇴근 5 · 근무표 2 · 연차 4)',()=>{
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
-  assert.equal(defs.length,313,'차례 3 글 키 수(고쳐 쓰는 글 294 + 모달 속 고정 글 19)');
+  assert.equal(defs.length,365,'차례 3 글 키 수(기존 313 + 신규 소명·증거 UI 글)');
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
   for(const d of defs){
     assert.match(d.key,/^[a-z][a-z0-9_.]{1,80}$/,d.key);
@@ -101,7 +101,7 @@ test('숫자·목록 기본값: 연차·소명 숫자 5개와 연차 유형·근
   assert.match(hr,/<select id="lvType"><option>연차<\/option><option>반차<\/option><option>조퇴<\/option><option>기타<\/option><\/select>/,'신청 창 기본 선택칸(기존 시험이 이 줄을 찾음)');
   assert.equal(L('list.work_depts').addable,false);assert.equal(L('list.leave_types').addable,false);
   assert.ok(S('leave.same_day_limit').where.includes('DB에는 없어요'));
-  assert.match(hr,/hub-texts\.js\?v=2026100301/,'캐시 번호를 새 값으로 올림(차례 4에서 2026100109 → 2026100110, 차례 5에서 → 2026100111, 차례 6에서 → 2026100112, 차례 7에서 → 2026100113, 10-02 원장요청 5건에서 → 2026100221, 10-02 인박스 판에서 → 2026100223)');
+  assert.match(hr,/hub-texts\.js\?v=2026100302/,'캐시 번호를 새 값으로 올림(차례 4에서 2026100109 → 2026100110, 차례 5에서 → 2026100111, 차례 6에서 → 2026100112, 차례 7에서 → 2026100113, 10-02 원장요청 5건에서 → 2026100221, 10-03 첫 화면에서 → 2026100301, 10-03 근태·문의 개선에서 → 2026100302)');
 });
 
 /* ───────────── 2. 기본값만 있을 때 옛 화면과 똑같음 ───────────── */
@@ -144,7 +144,7 @@ test('표에 값이 있으면 그 글: 고쳐 쓰는 글 294개가 모두 화면
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
   const stat=new Set([...hr.matchAll(/\bdata-hub(?:k|ph)="([a-z0-9_.]+)"/g)].map(m=>m[1]));
   const dyn=defs.filter(d=>!stat.has(d.key));
-  assert.equal(dyn.length,294);
+  assert.equal(dyn.length,346,'기존 294개 + 신규 소명 UI 글 52개');
   const out=await renderAll(hr,{engine:true,textRows:dynRows(dyn),settings:{}});
   const all=Object.values(out).join('\n');
   const missing=dyn.filter(d=>!all.includes('«'+d.key+'»')).map(d=>d.key);
@@ -373,7 +373,7 @@ test('화면: 🔢 숫자·기준 — 연차·소명 기준 5개가 더 있고(�
   await t.render(OWNER);
   await t.click('[hub-subtab]=settings');
   const sec=t.section.innerHTML;
-  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,12+2+4+1+8,'근태 7 + 연차·소명 5 + 차례 4 결재 건수 2 + 차례 5 문의함·상담일지 4');
+  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,12+2+4+1+8+6,'근태 기존 7 + 연차·소명 5 + 결재 2 + 문의·상담 4 + B2 설정 6');
   assert.ok(sec.includes('🌿 연차 기준')&&sec.includes('🕘 근태 기준'));
   assert.match(sec,/id="hubSetIn_8" type="number" inputmode="numeric" min="1" max="30" value="2"/);
   assert.match(sec,/id="hubSetIn_10" type="number" inputmode="decimal" step="0\.1" min="0\.1" max="1" value="0\.5"/);
@@ -398,7 +398,7 @@ test('화면: 📋 목록에 연차 유형 이름·근무부서 이름이 있고
   await t.click('[hub-subtab]=lists');
   let sec=t.section.innerHTML;
   assert.ok(sec.includes('연차 유형 이름')&&sec.includes('근무부서 이름'));
-  assert.equal((sec.match(/<span class="hub-code">/g)||[]).length,4+6+3+4+4+7+6+3+8+7+6+5+32,'차례 4: 결재 종류 6 · 일정 종류 3 추가 + 차례 5: 문의 출처 8 · 문의 상태 7 · 상담 구분 6 · 상담 상태 5');
+  assert.equal((sec.match(/<span class="hub-code">/g)||[]).length,4+6+3+4+4+7+6+3+8+7+6+5+32+3,'차례 4: 결재 종류 6 · 일정 종류 3 추가 + 차례 5: 문의 출처 8 · 문의 상태 7 · 상담 구분 6 · 상담 상태 5 + B2 소명 종류 3');
   assert.equal((sec.match(/data-hub-list-add=/g)||[]).length,2,'새 항목을 늘릴 수 있는 목록은 직원 부서·서류 종류뿐');
   assert.match(sec,/<span class="hub-code">반차<\/span><input id="hubLstLbl_4_1" type="text" maxlength="20" value="반차"/);
   assert.match(sec,/<span class="hub-code">Dr\.<\/span><input id="hubLstLbl_5_0" type="text" maxlength="20" value="Dr\."/);

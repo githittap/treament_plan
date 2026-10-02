@@ -3,6 +3,12 @@
 // 옛 코드의 결과는 tests/fixtures/hub3-golden-84053a7.json 에 저장돼 있다(만든 법: node tests/manual/make-hub3-golden.cjs <옛 hr.html 경로>).
 const vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const lf=s=>String(s).replace(/\r\n/g,'\n');
+function legacyAttendanceIssueView(html){
+  const card=html.indexOf('<div class="card"><h2>🙋 내 지문누락 소명');if(card>=0)html=html.slice(0,card).trimEnd();
+  const title=html.indexOf('<h2>🙋 지문누락 소명'),start=title<0?-1:html.indexOf('<table>',title),end=start<0?-1:html.indexOf('</table>',start);
+  if(start>=0&&end>=0){const table=html.slice(start,end+8).replace(/<tr>([\s\S]*?)<\/tr>/g,(_row,body)=>{const cells=[...body.matchAll(/<(th|td)\b[^>]*>[\s\S]*?<\/\1>/g)].map(m=>m[0]);if(cells.length===7)cells.splice(4,1);return '<tr>'+cells.join('')+'</tr>';});html=html.slice(0,start)+table+html.slice(end+8);}
+  return html;
+}
 
 function region(html,startMarker,endMarker,includeEnd){
   const a=html.indexOf(startMarker);
@@ -168,13 +174,13 @@ async function renderAll(html,opts){
   for(const role of ['manager','chief','owner']){
     const r=await asMgr(role,null,role==='owner'?{tables:{att_months:{single:{status:'확정'}}}}:(role==='chief'?{tables:{att_months:{single:{status:'집계중'}}}}:null));
     const m={innerHTML:''};await r.api.renderAtt(m);
-    out['att.render.'+role]=m.innerHTML;out['att.render.'+role+'.calendar']=r.dom.$('#manualAttendanceCalendar').innerHTML;out['att.render.'+role+'.detail']=r.dom.$('#manualAttendanceDayDetailText').innerHTML;
+    out['att.render.'+role]=legacyAttendanceIssueView(m.innerHTML);out['att.render.'+role+'.calendar']=r.dom.$('#manualAttendanceCalendar').innerHTML;out['att.render.'+role+'.detail']=r.dom.$('#manualAttendanceDayDetailText').innerHTML;
   }
   for(const [name,tables] of [['err_msg',{attendance_manual_entries:fail('수기<조회>실패')}],['err_none',{attendance_manual_entries:{error:{}}}],['empty',{attendance_manual_entries:{list:[]},attendance_issues:{list:[]},attendance_issue_resolutions:{list:[]}}]]){
-    const r=await asMgr('chief',null,{tables});const m={innerHTML:''};await r.api.renderAtt(m);out['att.render.chief.'+name]=m.innerHTML;
+    const r=await asMgr('chief',null,{tables});const m={innerHTML:''};await r.api.renderAtt(m);out['att.render.chief.'+name]=legacyAttendanceIssueView(m.innerHTML);
   }
   for(const [name,tables] of [['data',null],['empty',{attendance:{list:[]},attendance_manual_entries:{list:[]},attendance_issue_resolutions:{list:[]}}],['err',{attendance_manual_entries:fail('개인<오류>')}],['err_none',{attendance_manual_entries:{error:{}}}]]){
-    const r=await asMgr('staff',null,tables?{tables}:null);const m={innerHTML:''};await r.api.renderAtt(m);out['att.render.staff.'+name]=m.innerHTML;
+    const r=await asMgr('staff',null,tables?{tables}:null);const m={innerHTML:''};await r.api.renderAtt(m);out['att.render.staff.'+name]=legacyAttendanceIssueView(m.innerHTML);
   }
   {
     const r=await asMgr('owner');

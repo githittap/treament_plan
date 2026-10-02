@@ -18,14 +18,14 @@ test('출석 수직 경로 프론트 연결이 포함되어 있다', () => {
   const renderEnd = html.indexOf('function issueBtns', renderStart);
   assert.ok(renderStart >= 0 && renderEnd > renderStart);
   assert.doesNotMatch(html.slice(renderStart, renderEnd), /\.lte\('work_date',month\+'-31'\)/);
-  assert.match(html, /rule_label:label/);
-  assert.match(html, /p_type:'정정',p_rule_label:label/);
+  assert.match(html, /p_kind:kind,p_reason:reason\.trim\(\)/);
+  assert.match(html, /submit_attendance_issue_v2/);
   assert.match(html, /\.in\('user_id',manualUsers\)\.in\('work_date',manualDates\)/);
   assert.match(html, /fetchAttendancePages/);
   assert.match(html, /record_auto_attendance_issue/);
   assert.doesNotMatch(html, /from\('attendance_issues'\)\.insert/);
   assert.match(html, /bounds\.start\)\.lt\('work_date',bounds\.next\)/);
-  assert.match(html, /소명 저장 실패/);
+  assert.match(html, /att\.issueform\.m_fail/);
   assert.match(html, /a\.source==='manual'/);
   assert.match(html, /r\.status==='실장승인'&&ME\.role==='owner'/);
   assert.doesNotMatch(html, /\(r\.status==='대기'\|\|r\.status==='실장승인'\)&&ME\.role==='owner'/);
