@@ -288,7 +288,7 @@ test('⚙️ 허브 설정 탭: 원장 전용 묶음에 계정·권한 다음으
   assert.equal(st.ctx.visibleTabKeys().has('owner'),false);
   assert.match(hr,/else if\(TAB==='hubset'\)\{if\(window\.HubUi\)await window\.HubUi\.renderSettings\(m,\{sb,me:ME\}\)/);
   assert.match(hr,/<script src="hub-texts\.js\?v=\d+"><\/script>\s*<script>\s*\/\* ═+ 설정 ═+/,'hub-texts.js는 main 스크립트보다 먼저 불러옴');
-  assert.match(hr,/<script src="ai-assistants\.js\?v=2026100221"><\/script>/,'AI 도우미 스크립트 번호(10-02 원장요청 5건에서 2026100106 → 2026100221)');
+  assert.match(hr,/<script src="ai-assistants\.js\?v=2026100308"><\/script>/,'AI 도우미 스크립트 번호(10-02 원장요청 5건에서 2026100106 → 2026100221)');
 });
 
 test('가입 안내 글: 기본은 지금과 같은 글, 원장이 고치면 그 글(복사되는 글)',()=>{
@@ -450,7 +450,7 @@ test('화면: 🔢 숫자·기준 — 근태 기준 7개, 잘못된 값은 DB �
   await t.render({id:'o1',role:'owner'});
   await t.click('[hub-subtab]=settings');
   const sec=t.section.innerHTML;
-  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,7+5+2+4+1+8+1);
+  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,7+5+2+4+1+8+1+1);
   assert.match(sec,/id="hubSetIn_0" type="time" value="09:50"/,'지금 값(표에서 읽음)');
   assert.match(sec,/처음 값 09:40/);
   assert.match(sec,/<span id="hubSetBadge_0"><span class="b ok">고침<\/span><\/span>/);

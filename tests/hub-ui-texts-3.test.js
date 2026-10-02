@@ -109,7 +109,7 @@ test('숫자·목록 기본값: 연차·소명 숫자 5개와 연차 유형·근
   assert.match(hr,/<select id="lvType"><option>연차<\/option><option>반차<\/option><option>조퇴<\/option><option>기타<\/option><\/select>/,'신청 창 기본 선택칸(기존 시험이 이 줄을 찾음)');
   assert.equal(L('list.work_depts').addable,false);assert.equal(L('list.leave_types').addable,false);
   assert.ok(S('leave.same_day_limit').where.includes('DB에는 없어요'));
-  assert.match(hr,/hub-texts\.js\?v=2026100301/,'캐시 번호를 새 값으로 올림(차례 4에서 2026100109 → 2026100110, 차례 5에서 → 2026100111, 차례 6에서 → 2026100112, 차례 7에서 → 2026100113, 10-02 원장요청 5건에서 → 2026100221, 10-02 인박스 판에서 → 2026100223)');
+  assert.match(hr,/hub-texts\.js\?v=2026100308/,'캐시 번호를 새 값으로 올림(차례 4에서 2026100109 → 2026100110, 차례 5에서 → 2026100111, 차례 6에서 → 2026100112, 차례 7에서 → 2026100113, 10-02 원장요청 5건에서 → 2026100221, 10-02 인박스 판에서 → 2026100223)');
 });
 
 /* ───────────── 2. 기본값만 있을 때 옛 화면과 똑같음 ───────────── */
@@ -381,7 +381,7 @@ test('화면: 🔢 숫자·기준 — 연차·소명 기준 5개가 더 있고(�
   await t.render(OWNER);
   await t.click('[hub-subtab]=settings');
   const sec=t.section.innerHTML;
-  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,12+2+4+1+8+1,'근태 7 + 연차·소명 5 + 차례 4 결재 건수 2 + 차례 5 문의함·상담일지 4');
+  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,12+2+4+1+8+1+1,'근태 7 + 연차·소명 5 + 차례 4 결재 건수 2 + 차례 5 문의함·상담일지 4');
   assert.ok(sec.includes('🌿 연차 기준')&&sec.includes('🕘 근태 기준'));
   assert.match(sec,/id="hubSetIn_8" type="number" inputmode="numeric" min="1" max="30" value="2"/);
   assert.match(sec,/id="hubSetIn_10" type="number" inputmode="decimal" step="0\.1" min="0\.1" max="1" value="0\.5"/);
