@@ -7,7 +7,8 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const root=path.join(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p),'utf8');
 const js=read('hub-texts.js'),hrRaw=read('hr.html'),hr=hrRaw.replace(/\r\n/g,'\n');
 const {renderAll}=require('./fixtures/hub7-harness.cjs');
-const golden=JSON.parse(read('tests/fixtures/hub7-golden-f95b951.json'));
+// P7 6? ?? ??? ?? ?? ?? ?? ?? ? ???? ???. ?? ??? ? ???? ???.
+const golden=Object.assign(JSON.parse(read('tests/fixtures/hub7-golden-f95b951.json')),JSON.parse(read('tests/fixtures/billing-monthly-golden.json')));
 const clone=x=>JSON.parse(JSON.stringify(x));
 const CH7=/^(home|dep|cf|aic|mkt|aiu|ob|pay|slip|acct|jg|save|payreq|empdoc)\./;
 const COUNT=329+2;   // 차례 7 글 329 + 원장 보기판 넷째 판 「📥 인박스 경고」 2(ob.inbox_title·ob.inbox_desc, 2026-10-02)
@@ -381,7 +382,7 @@ test('급여 계산·산출식·엑셀 열 이름은 한 글자도 안 바뀜: �
   assert.equal(sha(hr.match(/const PAY_ALIASES=\[[\s\S]*?\]\.sort\(\(a,b\)=>b\[0\]\.length-a\[0\]\.length\);/)[0]),'6c4a0fb7fe1e80857737c7a48dc410755da9ec8e65eb855593db764f731dce54','엑셀 열 이름 매핑');
   assert.ok(!/hubT|h7T|hubN|h7N/.test(blk),'계산 구간에는 허브 설정 읽기가 없음');
   assert.ok(hr.includes('if(!/\\.xlsx?$/i.test(file.name)||file.size<1||file.size>20971520)'),'원본 20MB 제한은 코드에 그대로');
-  assert.ok(hr.includes("const AI_EXTERNAL_LABELS={")&&hr.includes("AI_EXTERNAL_COST_SINCE='2026-09-30'")&&hr.includes('.limit(1500)'),'마케팅 집계 입력 건수·외부 AI 금액 기록 시작일은 코드에 그대로');
+  assert.ok(hr.includes("const AI_EXTERNAL_LABELS={")&&hr.includes("AI_EXTERNAL_COST_SINCE='2026-09-30'")&&hr.includes("billingFetchAll(()=>sb.from('marketing_expense_events')"),'마케팅 집계 입력 건수·외부 AI 금액 기록 시작일은 코드에 그대로');
   // 글을 모두 고쳐도 명세서·대장 금액은 그대로
   const base=await run([],{}),over=await run(dynRows(ch7Defs()),{});
   const money=s=>[...String(s).matchAll(/\d{1,3}(?:,\d{3})+/g)].map(m=>m[0]);
@@ -554,7 +555,7 @@ test('안 옮긴 것: 엑셀 열 이름·급여 항목 이름·산출식 설명�
   assert.ok(hr.includes("['포괄휴일연장수당','fixed_holiday_ot']"));
   assert.ok(hr.includes('const PAYSLIP_FIELD_LABELS={health_ins:'));
   assert.ok(hr.includes("overlapMinutes(ci,co,22*60,24*60)+overlapMinutes(ci,co,0,6*60)"));
-  assert.ok(hr.includes('.limit(1500)'));assert.ok(hr.includes("const AICOST_PLATFORMS=['Claude','Codex(OpenAI)','Kimi','DeepSeek','StepFun','기타'];"));
+  assert.ok(hr.includes("billingFetchAll(()=>sb.from('marketing_expense_events')"));assert.ok(hr.includes("const AICOST_PLATFORMS=['Claude','Codex(OpenAI)','Kimi','DeepSeek','StepFun','기타'];"));
   assert.ok(!hr.includes("hubT('login."),'로그인 전 화면 글은 이번에도 안 옮김');
   assert.ok(!js.includes('push-dispatcher'),'푸시 문구(Edge)는 이번에도 안 옮김');
 });
