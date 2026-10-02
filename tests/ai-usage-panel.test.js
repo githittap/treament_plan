@@ -1,7 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const root=path.join(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p),'utf8'),html=read('hr.html');
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-function helpers(){const block=html.match(/\/\* ai-usage:test-start \*\/[\s\S]*?\/\* ai-usage:test-end \*\//)?.[0];assert.ok(block,'AI 사용량 순수 helper가 없습니다.');const c={esc};vm.createContext(c);vm.runInContext(block+';this.h={aiUsageWindow,aiUsageSummary,aiUsageCompact,aiUsagePanelHtml};',c);return c.h;}
+function helpers(){const block=html.match(/\/\* ai-usage:test-start \*\/[\s\S]*?\/\* ai-usage:test-end \*\//)?.[0];assert.ok(block,'AI 사용량 순수 helper가 없습니다.');const timeBlock=html.match(/\/\* hub-time:test-start \*\/[\s\S]*?\/\* hub-time:test-end \*\//)?.[0];assert.ok(timeBlock,'허브 시간 표시 공통 함수가 없습니다.');const c={esc};vm.createContext(c);vm.runInContext(timeBlock+'\n'+block+';this.h={aiUsageWindow,aiUsageSummary,aiUsageCompact,aiUsagePanelHtml};',c);return c.h;}
 const ROWS=[
   {usage_date:'2026-09-22',model:'Sol',tokens:400,turns:4,synced_at:'2026-09-22T03:00:00+00:00'},
   {usage_date:'2026-09-21',model:'Sol',tokens:100,turns:1,synced_at:'2026-09-22T03:00:00+00:00'},

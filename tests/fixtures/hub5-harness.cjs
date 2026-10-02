@@ -117,6 +117,7 @@ function makeSb(over){
 async function renderAll(html,opts){
   const o=opts||{};
   const text=lf(html);
+  const timeSrc=(text.match(/\/\* hub-time:test-start \*\/[\s\S]*?\/\* hub-time:test-end \*\//)||[''])[0]; /* 허브 시간 표시 공통 함수(이 작업 이후의 hr.html에만 있음 — 없으면 빈 글) */
   const out={};
   const hubHelpers=text.includes('function hubN(')?region(text,'function hubN(','/* hub-texts.js(원장이 고치는 허브 글·목록)를 못 불러와도',false):'';
   const hubTLine=text.match(/function hubT\(k,d,v\)\{[^\n]*\}/)[0];
@@ -154,7 +155,7 @@ async function renderAll(html,opts){
         await ctx.HubUi.load({from(){const api={select(){return api;},then(res,rej){return Promise.resolve(o.loadFail?{data:null,error:{message:'x'}}:{data:o.textRows,error:null}).then(res,rej);}};return api;}});
       }
     }else if(o.settings)Object.assign(ctx.SETTINGS,o.settings);
-    vm.runInContext(fmtSrc+'\n'+hubHelpers+'\n'+hubTLine+'\n'+consultSrc+'\n;this.api={renderInbox,inboxCardHtml,inboxLoad,inboxRenderList,inboxSelect,inboxMarkHandled,inboxDetailHandle,inboxFillEmptyAssignee,inboxLoadNotes,inboxSetDentwebEntered,inboxRecordReply,inboxSave,inboxConvert,inboxManualCreate,'
+    vm.runInContext(timeSrc+'\n'+fmtSrc+'\n'+hubHelpers+'\n'+hubTLine+'\n'+consultSrc+'\n;this.api={renderInbox,inboxCardHtml,inboxLoad,inboxRenderList,inboxSelect,inboxMarkHandled,inboxDetailHandle,inboxFillEmptyAssignee,inboxLoadNotes,inboxSetDentwebEntered,inboxRecordReply,inboxSave,inboxConvert,inboxManualCreate,'
       +'saveAiBillingRecipients,markAiBillingCharged,showAiBillingRaw,aiBillingAlertCard,aiBillingRecipientPanel,'
       +'renderConsultationJournal,consultationRenderList,consultationRenderActionQueue,consultationEdit,consultationResetForm,saveConsultationJournal,consultationRenderSourceFields,consultationOptions,consultationActionAssigneeOptions,consultationRequestError,'
       +'inboxStatusInfo,inboxStatusSummary,inboxGroupCounts,inboxSourceLabel,inboxGroupRows,inboxGroupSummary,inboxReplyLink,inboxKakaoBookingListLines,inboxKakaoBookingDetailHtml,inboxAssigneeOptions,'

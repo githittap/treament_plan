@@ -1,5 +1,6 @@
 // 옛 hr.html(허브 글 옮기기 전, 커밋 8829a7a)을 시험 도구로 돌려 「정답 파일」을 만든다.
 // (2026-10-02 문의함 처리 칸 변경: 이 정답 파일은 그 변경 직후의 hr.html로 다시 만듦 — 옛 정답과 키별로 대조해 바뀐 31개가 모두 의도한 변경인지 확인했고 새 시험 항목 inbox.handle.* 14개가 늘었음. 아래는 처음 만든 법)
+// 2026-10-02 시간 표시 통일(feat/req5-time): 시각이 나오는 키(하네스가 hub-time 구간을 같이 실행)는 새 꼴로 정답을 다시 만들었음 — 옛 정답과의 차이는 시각 꼴뿐임을 키별로 확인(시각 꼴을 가린 채 비교). 새 꼴 이후에 다시 만들 때는 옛 hr.html이 아니라 현재 hr.html 경로를 줌.
 // 쓰는 법: git show 8829a7a:hr.html > /tmp/hr-old.html && node tests/manual/make-hub5-golden.cjs /tmp/hr-old.html
 const fs=require('node:fs'),path=require('node:path');
 const {renderAll}=require('../fixtures/hub5-harness.cjs');

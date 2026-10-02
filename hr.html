@@ -433,7 +433,120 @@ let EMPLOYEE_CONTRACT_PREVIEWS={};
 const $=s=>document.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const today=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());};
-const md=s=>s?String(s).slice(5).replace('-','/'):'';
+const md=s=>{if(!s)return '';const t=String(s);if(/\dT\d|\d:\d{2}/.test(t)){const p=hubTimeParts(t);if(p&&p.h!=null)return hubFmtDateTime(t);}return t.slice(5).replace('-','/');};
+/* hub-time:test-start */
+/* 허브 시간 표시(원장 2026-10-02): 화면에 보이는 「기록된 시각」을 「2026.9.9 오전 9시 30분」 꼴로 통일 — 날짜+시각 · 시각만 「오후 3시 31분」 · 정각 「오후 3시」.
+   꼴 글은 ⚙️ 허브 설정 「⏰ 시간 표시」(time.* 키)에서 원장이 고침. hubT가 없는 시험 환경에서는 기본 글 그대로. 시간대는 항상 한국(Asia/Seoul) — 시간대 표시가 없는 글자는 한국 시각으로 읽음. */
+function hubTmT(k,d,v){return typeof hubT==='function'?hubT(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
+function HUB_NOW(){return new Date();}
+function hubTmFromEpoch(ms){
+  if(typeof ms!=='number'||!isFinite(ms))return null;
+  let f=hubTmFromEpoch.fmt;
+  if(!f){f=hubTmFromEpoch.fmt=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});}
+  let parts;try{parts=f.formatToParts(new Date(ms));}catch(_){return null;}
+  const g=function(t){const x=parts.find(function(p){return p.type===t;});return x?Number(x.value):NaN;};
+  const r={y:g('year'),m:g('month'),d:g('day'),h:g('hour')%24,mi:g('minute')};
+  return (isNaN(r.y)||isNaN(r.m)||isNaN(r.d)||isNaN(r.h)||isNaN(r.mi))?null:r;
+}
+/* value → 한국 시각 {y,m,d,h,mi}. 날짜만 있는 글자는 h·mi가 null. 못 읽으면 null.
+   받는 것: Date · 밀리초 숫자 · 'YYYY-MM-DD' · 'YYYY-MM-DD[ T]HH:MM[:SS[.sss]]' (뒤에 Z·±HH[:MM]이 있으면 그 시간대로 읽고, 없으면 한국 시각) */
+function hubTimeParts(value){
+  if(value==null||value==='')return null;
+  if(Object.prototype.toString.call(value)==='[object Date]')return hubTmFromEpoch(value.getTime());
+  if(typeof value==='number')return hubTmFromEpoch(value);
+  const m=/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?\s*(Z|[+-]\d{2}(?::?\d{2})?)?)?$/i.exec(String(value).trim());
+  if(!m)return null;
+  const y=Number(m[1]),mo=Number(m[2]),d=Number(m[3]);
+  if(mo<1||mo>12||d<1||d>new Date(Date.UTC(y,mo,0)).getUTCDate())return null;
+  if(m[4]==null)return {y:y,m:mo,d:d,h:null,mi:null};
+  const h=Number(m[4]),mi=Number(m[5]),sec=m[6]==null?0:Number(m[6]);
+  if(h>23||mi>59||sec>59)return null;
+  if(!m[8])return {y:y,m:mo,d:d,h:h,mi:mi};
+  let off=0;
+  if(m[8].toUpperCase()!=='Z'){const z=/^([+-])(\d{2})(?::?(\d{2}))?$/.exec(m[8]);if(!z)return null;off=(z[1]==='-'?-1:1)*(Number(z[2])*60+(z[3]?Number(z[3]):0));}
+  return hubTmFromEpoch(Date.UTC(y,mo-1,d,h,mi,sec)-off*60000);
+}
+function hubTmRaw(v){return v==null?'':String(v);}
+function hubTmDateText(p){return hubTmT('time.fmt_date','{y}.{m}.{d}',{y:p.y,m:p.m,d:p.d});}
+function hubTmTimeText(h,mi){
+  const ampm=h<12?hubTmT('time.am','오전'):hubTmT('time.pm','오후'),h12=h%12===0?12:h%12;
+  return mi===0?hubTmT('time.fmt_time_hour','{ampm} {h}시',{ampm:ampm,h:h12}):hubTmT('time.fmt_time','{ampm} {h}시 {mi}분',{ampm:ampm,h:h12,mi:mi});
+}
+/* 「2026.9.9」 — 날짜 */
+function hubFmtDate(v){const p=hubTimeParts(v);return p?hubTmDateText(p):hubTmRaw(v);}
+/* 「오전 9시 30분」 — 시각만. v는 시각 값·'HH:MM(:SS)' 글자·하루 분 수(예 570 = 오전 9시 30분) */
+function hubFmtTime(v){
+  if(v==null||v==='')return '';
+  let h=null,mi=null;
+  if(typeof v==='number'&&v>=0&&v<1e7&&Math.floor(v)===v){h=Math.floor(v/60)%24;mi=v%60;}
+  else if(typeof v==='string'){const m=/^\s*(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?\s*$/.exec(v);if(m&&Number(m[1])<24&&Number(m[2])<60){h=Number(m[1]);mi=Number(m[2]);}}
+  if(h==null){const p=hubTimeParts(v);if(!p||p.h==null)return hubTmRaw(v);h=p.h;mi=p.mi;}
+  return hubTmTimeText(h,mi);
+}
+/* 「2026.9.9 오전 9시 30분」 — 항상 날짜가 붙음(상세·문서·인쇄용). 날짜만 있는 값은 날짜만 */
+function hubFmtDateTime(v){
+  const p=hubTimeParts(v);if(!p)return hubTmRaw(v);
+  if(p.h==null)return hubTmDateText(p);
+  return hubTmT('time.fmt_datetime','{date} {time}',{date:hubTmDateText(p),time:hubTmTimeText(p.h,p.mi)});
+}
+/* 목록·로그 줄용 — 한국 날짜로 오늘이면 시각만(time.fmt_today), 아니면 날짜+시각 */
+function hubFmtWhen(v){
+  const p=hubTimeParts(v);if(!p)return hubTmRaw(v);
+  if(p.h==null)return hubTmDateText(p);
+  const n=hubTimeParts(HUB_NOW());
+  if(n&&n.y===p.y&&n.m===p.m&&n.d===p.d)return hubTmT('time.fmt_today','{time}',{time:hubTmTimeText(p.h,p.mi),date:hubTmDateText(p)});
+  return hubFmtDateTime(v);
+}
+/* 원장 보기판(PC에서 올라온 HTML)을 허브가 보여 줄 때만 시각 글자를 바꿈 — 원본은 안 고침 */
+function ownerBoardHumanizeText(t){
+  if(t.indexOf(':')<0&&t.indexOf('KST')<0)return t;
+  let r=t;
+  if(r.indexOf(':')>=0){
+    r=r.replace(/(^|[^\d-])(\d{4}-\d{2}-\d{2})([T ])(\d{2}:\d{2})(:\d{2}(?:\.\d+)?)?(\s*(?:Z|[+-]\d{2}(?::?\d{2})?))?(?:[ \t]*(?:\(KST\)|KST))?(?!\d)/g,function(m,pre,date,sep,hm,sec,tz){
+      let tzz=tz||'',keep='';
+      if(tzz&&sep!=='T'&&!sec&&tzz.trim().toUpperCase()!=='Z'){keep=tzz;tzz='';}   /* 「10:00-11:00」 같은 시간 범위의 뒤쪽을 시간대로 오해하지 않음 */
+      const raw=date+' '+hm+(sec||'')+tzz.trim(),p=hubTimeParts(raw);
+      return p&&p.h!=null?pre+hubFmtDateTime(raw)+keep:m;
+    });
+    r=r.replace(/(^|[^\d-])(\d{2})-(\d{2}) (\d{1,2}):(\d{2})(?::\d{2})?(?![\d:-])(?:[ \t]*(?:\(KST\)|KST))?/g,function(m,pre,mm,dd,h,mi){
+      const M=Number(mm),D=Number(dd),H=Number(h),MI=Number(mi);
+      if(M<1||M>12||D<1||D>31||H>23||MI>59)return m;
+      return pre+hubTmT('time.fmt_md_time','{m}.{d} {time}',{m:M,d:D,time:hubTmTimeText(H,MI)});
+    });
+    r=r.replace(/(^|[^\d:])(\d{1,2}):(\d{2})(?::\d{2})?[ \t]*(?:\(KST\)|KST)/g,function(m,pre,h,mi){
+      const H=Number(h),MI=Number(mi);
+      return H>23||MI>59?m:pre+hubTmTimeText(H,MI);
+    });
+  }
+  return r.replace(/[ \t ]*\(KST\)|[ \t ]*\bKST\b/g,'');
+}
+function ownerBoardHumanizeTimes(html){
+  const s=String(html==null?'':html),n=s.length;
+  if(!n||(s.indexOf(':')<0&&s.indexOf('KST')<0))return s;
+  const out=[];let i=0;
+  while(i<n){
+    const lt=s.indexOf('<',i);
+    if(lt<0){out.push(ownerBoardHumanizeText(s.slice(i)));break;}
+    if(lt>i)out.push(ownerBoardHumanizeText(s.slice(i,lt)));
+    if(s.startsWith('<!--',lt)){const e=s.indexOf('-->',lt+4),end=e<0?n:e+3;out.push(s.slice(lt,end));i=end;continue;}
+    const c=s.charCodeAt(lt+1),isLetter=(c>=65&&c<=90)||(c>=97&&c<=122);
+    if(!isLetter&&c!==47&&c!==33&&c!==63){out.push('<');i=lt+1;continue;}   /* 글자 속의 낱개 < */
+    let j=lt+1,q=0;
+    while(j<n){const ch=s.charCodeAt(j);if(q){if(ch===q)q=0;}else if(ch===34||ch===39)q=ch;else if(ch===62)break;j++;}   /* 따옴표 안의 > 는 태그 끝이 아님 */
+    let end=j<n?j+1:n;
+    out.push(s.slice(lt,end));
+    if(isLetter){
+      const nm=/^[a-zA-Z][a-zA-Z0-9]*/.exec(s.slice(lt+1,lt+12)),tag=nm?nm[0].toLowerCase():'';
+      if(tag==='script'||tag==='style'||tag==='textarea'){   /* 이 안은 글자가 아니라 코드·입력칸 값 — 그대로 */
+        const re=new RegExp('</'+tag+'\\s*>','ig');re.lastIndex=end;const cm=re.exec(s),ce=cm?cm.index+cm[0].length:n;
+        out.push(s.slice(end,ce));end=ce;
+      }
+    }
+    i=end;
+  }
+  return out.join('');
+}
+/* hub-time:test-end */
 const isLead=()=>['chief','owner'].includes(ME.role);
 const isMgr=()=>['manager','chief','owner'].includes(ME.role);
 const canViewDeposit=me=>me?.role==='owner'||me?.role==='chief'||me?.department==='데스크';
@@ -921,7 +1034,6 @@ async function renderDeposit(m){
   const {data:rows}=await sb.from('deposits').select('id,bank_dt,amount,payer_raw,is_card,account_tail')
     .gte('bank_dt',fromIso).lt('bank_dt',toIso).order('bank_dt',{ascending:false}).order('id',{ascending:false}).limit(hubN('dep.list_limit',300));
   if(TAB!==tabAtEntry||TAB!=='deposit')return;
-  const dtf=new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
   m.innerHTML=`
   <div class="card"><h2>${esc(hubT('dep.title','💰 입금'))}</h2>
     <div class="hint" style="color:var(--gold)">${esc(hubT('dep.warn','⚠ 미검증 자동 알림 · 회계 원장이 아니며 수기 대조용'))}</div>
@@ -931,7 +1043,7 @@ async function renderDeposit(m){
       <button class="mini ${DEP_RANGE==='month'?'stamp':''}" onclick="setDepRange('month')">${esc(hubT('dep.btn_month','이번달'))}</button>
     </div>
     ${(rows||[]).length?`<div class="tblwrap"><table><tr><th>${esc(hubT('dep.th_time','시각'))}</th><th style="text-align:right">${esc(hubT('dep.th_amount','금액'))}</th><th>${esc(hubT('dep.th_payer','입금자'))}</th><th>${esc(hubT('dep.th_account','계좌'))}</th></tr>
-    ${(rows||[]).map(r=>`<tr><td>${dtf.format(new Date(r.bank_dt))}</td><td style="text-align:right">₩${Number(r.amount).toLocaleString('ko-KR')}</td>
+    ${(rows||[]).map(r=>`<tr><td>${esc(hubFmtWhen(r.bank_dt))}</td><td style="text-align:right">₩${Number(r.amount).toLocaleString('ko-KR')}</td>
       <td>${r.is_card?esc(hubT('dep.card_est','💳 카드결제(추정)'))+' <span class="sub">'+esc(r.payer_raw||'')+'</span>':esc(r.payer_raw||'')}</td><td>${esc(r.account_tail||'')}</td></tr>`).join('')}</table></div>`
     :'<div class="empty">'+esc(hubT('dep.empty','입금 내역이 없습니다 (자동 수집 대기)'))+'</div>'}
   </div>`;
@@ -1007,8 +1119,8 @@ async function renderAtt(m){
         ${ME.role==='owner'?`<button class="mini" style="margin-left:8px" onclick="closeMonth('${month}')">${esc(hubT('att.close.btn','이번 달 확정'))}</button>`:''}</div>
     </div>
     ${manualAttendanceFormHtml(manualRows||[])}
-    <div class="card"><h2>${esc(hubT('att.resol.title','🧾 지문 오류 승인 인정 근태'))} <span class="sub">(${month})</span></h2>${(issueResolutions||[]).length?`<div class="tblwrap"><table><tr><th>${esc(hubT('att.th.person','직원'))}</th><th>${esc(hubT('att.th.date','날짜'))}</th><th>${esc(hubT('att.resol.th_time','인정 출퇴근'))}</th><th>${esc(hubT('att.th.status','상태'))}</th><th>${esc(hubT('att.resol.th_at','승인일'))}</th></tr>${issueResolutions.map(r=>`<tr><td>${esc(nameOf(r.user_id))}</td><td>${md(r.work_date)}</td><td>${r.clock_in||'-'} ~ ${r.clock_out||'-'}</td><td>${r.late_min||0}분 / ${r.early_min||0}분 / ${r.overtime_min||0}분</td><td>${r.approved_at?esc(new Date(r.approved_at).toLocaleDateString('ko-KR')):'-'}</td></tr>`).join('')}</table></div>`:'<div class="empty">'+esc(hubT('att.resol.empty','별도 인정 근태 없음'))+'</div>'}</div>
-    ${isLead()&&!manualError&&!fpError?`<div class="card"><h2>${esc(hubT('att.review.title','📝 수기 출퇴근 검토'))}</h2>${(manualRows||[]).length?`<div class="tblwrap"><table><tr><th>${esc(hubT('att.th.person','직원'))}</th><th>${esc(hubT('att.th.date','날짜'))}</th><th>${esc(hubT('att.review.th_manual','수기'))}</th><th>${esc(hubT('att.review.th_fp','지문'))}</th><th>${esc(hubT('att.th.status','상태'))}</th><th></th></tr>${manualRows.map(r=>{const fp=fpByKey.get(r.user_id+'|'+r.work_date);return `<tr><td>${esc(nameOf(r.user_id))}</td><td>${md(r.work_date)}</td><td>${r.clock_in||'-'} ~ ${r.clock_out||'-'}</td><td>${fp?`${fp.clock_in||'-'} ~ ${fp.clock_out||'-'}`:'-'}</td><td><span class="b ${r.status==='원장확정'?'ok':(r.status==='반려'?'no':'wait')}">${esc(r.status)}</span></td><td>${r.status==='대기'&&ME.role==='chief'?`<button class="mini stamp" onclick="reviewManualAttendance(${r.id},'approve')">${esc(hubT('att.btn.chief_ok','실장 승인'))}</button>`:''}${r.status==='실장승인'&&ME.role==='owner'?`<button class="mini stamp" onclick="reviewManualAttendance(${r.id},'approve')">${esc(hubT('att.btn.owner_ok','원장 확정'))}</button>`:''}${(r.status==='대기'||r.status==='실장승인')?` <button class="mini rej" onclick="reviewManualAttendance(${r.id},'reject')">${esc(hubT('att.btn.reject','반려'))}</button>`:''}</td></tr>`;}).join('')}</table></div>`:'<div class="empty">'+esc(hubT('att.review.empty','수기 입력 없음'))+'</div>'}</div>`:isLead()?`<div class="card"><h2>${esc(hubT('att.review.title','📝 수기 출퇴근 검토'))}</h2><div class="cal-error">${esc(hubT('att.review.err','수기 근태 조회 실패:'))} ${esc(manualError?.message||fpError?.message||hubT('att.review.err_draft','DB 초안이 아직 적용되지 않았습니다.'))}</div></div>`:''}
+    <div class="card"><h2>${esc(hubT('att.resol.title','🧾 지문 오류 승인 인정 근태'))} <span class="sub">(${month})</span></h2>${(issueResolutions||[]).length?`<div class="tblwrap"><table><tr><th>${esc(hubT('att.th.person','직원'))}</th><th>${esc(hubT('att.th.date','날짜'))}</th><th>${esc(hubT('att.resol.th_time','인정 출퇴근'))}</th><th>${esc(hubT('att.th.status','상태'))}</th><th>${esc(hubT('att.resol.th_at','승인일'))}</th></tr>${issueResolutions.map(r=>`<tr><td>${esc(nameOf(r.user_id))}</td><td>${md(r.work_date)}</td><td>${esc(hubFmtTime(r.clock_in)||'-')} ~ ${esc(hubFmtTime(r.clock_out)||'-')}</td><td>${r.late_min||0}분 / ${r.early_min||0}분 / ${r.overtime_min||0}분</td><td>${r.approved_at?esc(hubFmtDate(r.approved_at)):'-'}</td></tr>`).join('')}</table></div>`:'<div class="empty">'+esc(hubT('att.resol.empty','별도 인정 근태 없음'))+'</div>'}</div>
+    ${isLead()&&!manualError&&!fpError?`<div class="card"><h2>${esc(hubT('att.review.title','📝 수기 출퇴근 검토'))}</h2>${(manualRows||[]).length?`<div class="tblwrap"><table><tr><th>${esc(hubT('att.th.person','직원'))}</th><th>${esc(hubT('att.th.date','날짜'))}</th><th>${esc(hubT('att.review.th_manual','수기'))}</th><th>${esc(hubT('att.review.th_fp','지문'))}</th><th>${esc(hubT('att.th.status','상태'))}</th><th></th></tr>${manualRows.map(r=>{const fp=fpByKey.get(r.user_id+'|'+r.work_date);return `<tr><td>${esc(nameOf(r.user_id))}</td><td>${md(r.work_date)}</td><td>${esc(hubFmtTime(r.clock_in)||'-')} ~ ${esc(hubFmtTime(r.clock_out)||'-')}</td><td>${fp?`${esc(hubFmtTime(fp.clock_in)||'-')} ~ ${esc(hubFmtTime(fp.clock_out)||'-')}`:'-'}</td><td><span class="b ${r.status==='원장확정'?'ok':(r.status==='반려'?'no':'wait')}">${esc(r.status)}</span></td><td>${r.status==='대기'&&ME.role==='chief'?`<button class="mini stamp" onclick="reviewManualAttendance(${r.id},'approve')">${esc(hubT('att.btn.chief_ok','실장 승인'))}</button>`:''}${r.status==='실장승인'&&ME.role==='owner'?`<button class="mini stamp" onclick="reviewManualAttendance(${r.id},'approve')">${esc(hubT('att.btn.owner_ok','원장 확정'))}</button>`:''}${(r.status==='대기'||r.status==='실장승인')?` <button class="mini rej" onclick="reviewManualAttendance(${r.id},'reject')">${esc(hubT('att.btn.reject','반려'))}</button>`:''}</td></tr>`;}).join('')}</table></div>`:'<div class="empty">'+esc(hubT('att.review.empty','수기 입력 없음'))+'</div>'}</div>`:isLead()?`<div class="card"><h2>${esc(hubT('att.review.title','📝 수기 출퇴근 검토'))}</h2><div class="cal-error">${esc(hubT('att.review.err','수기 근태 조회 실패:'))} ${esc(manualError?.message||fpError?.message||hubT('att.review.err_draft','DB 초안이 아직 적용되지 않았습니다.'))}</div></div>`:''}
     ${absenceSettingsHtml()}
     <div class="card"><h2>${esc(hubT('att.absent.title','🚫 결근/미기록 후보'))} <span class="sub">(${month})</span></h2>
       <button class="mini" onclick="checkAbsent('${month}')">${esc(hubT('att.absent.btn','확인하기'))}</button>
@@ -1030,7 +1142,7 @@ async function renderAtt(m){
     ${manualError?`<div class="card"><div class="cal-error">${esc(hubT('att.my.err','수기 근태 조회 실패:'))} ${esc(manualError.message||hubT('att.my.err_draft','DB 초안이 아직 적용되지 않았습니다.'))}</div></div>`:''}
     <div class="card"><h2>${esc(hubT('att.my.title','🕘 내 출퇴근'))} <span class="sub">(${month})</span></h2>
       ${(effectiveAtt||[]).length?`<div class="tblwrap"><table><tr><th>${esc(hubT('att.th.date','날짜'))}</th><th>${esc(hubT('att.my.th_in','출근'))}</th><th>${esc(hubT('att.my.th_out','퇴근'))}</th><th>${esc(hubT('att.my.th_late','지각'))}</th><th>${esc(hubT('att.my.th_ot','연장'))}</th><th>${esc(hubT('att.my.th_basis','기준'))}</th></tr>
-      ${(effectiveAtt||[]).map(a=>`<tr class="${a.late_min>0?'warn':''}"><td>${md(a.work_date)}</td><td>${a.clock_in||'-'}${a.is_issue_adjustment?` <span class="sub">(${esc(hubT('att.my.orig','원 {v}',{v:a.original_clock_in||'-'}))})</span>`:''}</td><td>${a.clock_out||'-'}${a.is_issue_adjustment?` <span class="sub">(${esc(hubT('att.my.orig','원 {v}',{v:a.original_clock_out||'-'}))})</span>`:''}</td>
+      ${(effectiveAtt||[]).map(a=>`<tr class="${a.late_min>0?'warn':''}"><td>${md(a.work_date)}</td><td>${esc(hubFmtTime(a.clock_in)||'-')}${a.is_issue_adjustment?` <span class="sub">(${esc(hubT('att.my.orig','원 {v}',{v:hubFmtTime(a.original_clock_in)||'-'}))})</span>`:''}</td><td>${esc(hubFmtTime(a.clock_out)||'-')}${a.is_issue_adjustment?` <span class="sub">(${esc(hubT('att.my.orig','원 {v}',{v:hubFmtTime(a.original_clock_out)||'-'}))})</span>`:''}</td>
         <td>${a.late_min>0?'<span class="b no">'+esc(hubT('att.my.late','지각 {n}분',{n:a.late_min}))+'</span>':'-'}${a.is_issue_adjustment?` <span class="sub">(${esc(hubT('att.my.orig_min','원 {v}분',{v:a.original_late_min}))})</span>`:''}</td><td>${a.overtime_min>0?a.overtime_min+'분':'-'}${a.is_issue_adjustment?` <span class="sub">(${esc(hubT('att.my.orig_min','원 {v}분',{v:a.original_overtime_min}))})</span>`:''}</td><td>${a.is_issue_adjustment?'<span class="b ok">'+esc(hubT('att.my.basis_adj','승인 보정'))+'</span>':a.source==='manual'?'<span class="b wait">'+esc(hubT('att.my.basis_manual','수기 기록'))+'</span>':esc(hubT('att.my.basis_fp','지문 기록'))}</td></tr>`).join('')}</table></div>`
       :'<div class="empty">'+esc(hubT('att.my.empty','이번 달 기록 없음 (지문은 월말 일괄 입력)'))+'</div>'}
       ${(manualRows||[]).length?`<div class="hint">${esc(hubT('att.my.manual_list','수기 제출 내역:'))} ${manualRows.map(r=>`${md(r.work_date)} ${esc(r.status)}`).join(' · ')}</div>`:''}
@@ -1355,7 +1467,7 @@ function renderXlTable(){
   xlRows.map((r,i)=>{const c=calcRow(r);const bad=!r.user_id||r.single||(r.sched==='off');
     const schedTxt=r.sched?SHIFTS[r.sched].l:'<span class="sub">-</span>';
     const bigo=[];if(!r.user_id)bigo.push('<span class="b no">'+esc(hubT('att.xl.b_unmapped','미매핑'))+'</span>');if(r.single)bigo.push('<span class="b wait">'+esc(hubT('att.xl.b_single','단일인식(누락?)'))+'</span>');if(r.sched==='off')bigo.push('<span class="b no">'+esc(hubT('att.xl.b_off','휴무 출근'))+'</span>');
-    return `<tr class="${bad?'warn':''}"><td>${md(r.ds)}</td><td>${esc(r.name)}</td><td>${schedTxt}</td><td>${r.ci!=null?minToT(r.ci):'-'}</td><td>${r.co!=null?minToT(r.co):'-'}</td>
+    return `<tr class="${bad?'warn':''}"><td>${md(r.ds)}</td><td>${esc(r.name)}</td><td>${schedTxt}</td><td>${r.ci!=null?esc(hubFmtTime(r.ci)):'-'}</td><td>${r.co!=null?esc(hubFmtTime(r.co)):'-'}</td>
     <td>${c.late>0?'<span class="b no">'+c.late+'분</span>':'-'}</td><td>${c.early>0?'<span class="b wait">'+c.early+'분</span>':'-'}</td><td>${c.ot>0?c.ot+'분':'-'}</td>
     <td><input type="checkbox" ${r.evening?'checked':''} onchange="xlRows[${i}].evening=this.checked;renderXlTable()"></td>
     <td>${bigo.join(' ')||'-'}</td></tr>`;
@@ -2058,9 +2170,7 @@ function leaveCalendarMonthEnd(month){
 }
 function formatLeaveTimestamp(value){
   if(!value)return '';
-  const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false,hourCycle:'h23'}).formatToParts(new Date(value));
-  const get=type=>parts.find(part=>part.type===type)?.value||'';
-  return `${get('year')}.${get('month')}.${get('day')} ${get('hour')}:${get('minute')}`;
+  return hubFmtDateTime(value);
 }
 function formatLeaveMonth(value){
   if(!value)return '';
@@ -2592,7 +2702,7 @@ function inboxKakaoBookingDetailHtml(row){
   const action=canWriteInbox()?'<div class="inbox-booking-actions"><button class="mini stamp" onclick="inboxSetDentwebEntered()">'+esc(row.dentweb_entered_at?T('inbox.kb_btn_undo','↩️ 덴트웹 입력 표시 되돌리기'):T('inbox.kb_btn_set','✅ 덴트웹에 입력함'))+'</button>'+partnerLink+'</div>':'<div class="inbox-booking-actions">'+partnerLink+'</div>';
   return '<div class="hint">'+esc(T('inbox.kb_title','📅 카카오 예약'))+' · '+esc(inboxStatusInfo(row.status).label)+'</div><dl class="inbox-booking-fields">'+fields.map(([label,value])=>'<dt>'+esc(label)+'</dt><dd>'+esc(value)+'</dd>').join('')+'</dl><div class="hint">'+entered+'</div>'+action+'<div class="hint">'+esc(T('inbox.kb_confirm_hint','예약확정은 파트너센터에서'))+'</div><details><summary>'+esc(T('inbox.kb_original','받은 글 원문'))+'</summary><pre class="inbox-booking-original">'+esc(row.message||'')+'</pre></details><div id="inboxDentwebMsg" class="msg"></div>';
 }
-function formatKakaoDentwebStamp(value){const date=new Date(value);if(Number.isNaN(date.getTime()))return String(value||'');return new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(date).replace(/\. /g,'/').replace(/\.$/,'');}
+function formatKakaoDentwebStamp(value){return hubFmtDateTime(value);}
 async function inboxSetDentwebEntered(){
   const row=INBOX_SELECTED;if(!row||!canWriteInbox())return;if(!INBOX_DENTWEB_FIELDS_AVAILABLE){const msg=$('#inboxDentwebMsg');if(msg)msg.textContent=inboxT('inbox.m_dentweb_unavailable','완료 기록은 DB 변경을 적용한 뒤 사용할 수 있습니다.');return;}
   const undo=!!row.dentweb_entered_at;if(undo&&!confirm(inboxT('inbox.confirm_undo_dentweb','덴트웹 입력 완료 표시를 되돌릴까요?')))return;
@@ -3257,7 +3367,7 @@ function aiUsageSummary(rows,start,end){const per=new Map();let total=0,turns=0,
   const models=[...per.values()].sort((a,b)=>b.tokens-a.tokens||a.model.localeCompare(b.model)).map(x=>({...x,share:total?x.tokens/total*100:0,astra:x.model==='Astra'}));
   return {total,turns,models,astra:models.find(x=>x.astra)||{model:'Astra',tokens:0,turns:0,share:0,astra:true},lastSynced};}
 function aiUsageCompact(n){n=Number(n)||0;if(n>=1e8)return (n/1e8).toFixed(2).replace(/\.?0+$/,'')+'억';if(n>=1e4)return Math.round(n/1e4).toLocaleString('ko-KR')+'만';return n.toLocaleString('ko-KR');}
-function aiUsageSyncedLabel(iso){const d=new Date(iso),p=n=>String(n).padStart(2,'0');return Number.isNaN(d.getTime())?String(iso):`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;}
+function aiUsageSyncedLabel(iso){return hubFmtDateTime(iso);}
 function aiUsageModelSection({summary,start,end,error,days=7}){
   const pct=v=>v>0&&v<0.05?'&lt;0.1%':(Math.round(v*10)/10).toFixed(1)+'%',head=`<div data-ai-usage-model-section><h3>${esc(h7T('aiu.model_title','🤖 모델별 사용량(최근 {days}일)',{days:days}))} <span class="sub">${esc(h7T('aiu.model_sub','Codex 토큰'))}</span></h3><div class="hint">${esc(h7T('aiu.period','기간 {start} ~ {end}',{start:((start)??''),end:((end)??'')}))}${summary&&summary.lastSynced?` · ${esc(h7T('aiu.last_sync','마지막 동기화 {when}',{when:((aiUsageSyncedLabel(summary.lastSynced))??'')}))}`:''}</div>`;
   if(error)return head+`<div class="empty">${esc(h7T('aiu.model_err','AI 사용량을 불러오지 못했습니다: {detail}',{detail:((error)??'')}))}</div></div>`;
@@ -3279,7 +3389,7 @@ function aiCostSectionHtml({cost,error}){
   const monthUsd=cost.month_usd||{},months=Object.keys(monthUsd).filter(k=>k!=='?').sort().slice(-h7N('aiu.cost_months',6)),max=Math.max(1,...months.map(k=>Number(monthUsd[k])||0));
   const rows=agents.map(([k,a])=>{const cur=(a.months||[]).find(x=>x.m===thisM);return `<tr data-ai-cost-platform="${esc(k)}"><td>${esc(aiCostLabel(k))}</td><td style="white-space:nowrap"><b>${aiCostWon(cur?cur.usd:0,fx)}</b></td><td style="white-space:nowrap">${aiCostWon(a.cumUSD,fx)}</td><td class="sub" style="white-space:nowrap">${aiUsageCompact(a.inTok)} / ${aiUsageCompact(a.outTok)}</td></tr>`;}).join('');
   const bars=months.map(k=>{const v=Number(monthUsd[k])||0;return `<div data-ai-cost-month="${esc(k)}" style="margin:8px 0"><div class="rowflex" style="justify-content:space-between"><span>${esc(k)}</span><b>${aiCostWon(v,fx)}</b></div><div style="height:8px;background:var(--line);border-radius:4px;margin-top:4px"><div style="height:100%;width:${Math.round(v/max*100)}%;background:var(--mint);border-radius:4px"></div></div></div>`;}).join('');
-  return head+`<div class="hint">${esc(h7T('aiu.cost_basis','기준 {generated} · 환율 US$1 = ₩{fx}',{generated:((cost.generated)??''),fx:Math.round(fx).toLocaleString('ko-KR')}))}${cost.fx_src?` (${esc(cost.fx_src)})`:''}</div>
+  return head+`<div class="hint">${esc(h7T('aiu.cost_basis','기준 {generated} · 환율 US$1 = ₩{fx}',{generated:hubFmtDateTime(cost.generated),fx:Math.round(fx).toLocaleString('ko-KR')}))}${cost.fx_src?` (${esc(cost.fx_src)})`:''}</div>
     <div style="font-size:13px;color:var(--gray);margin-top:10px">${esc(h7T('aiu.cost_this_month','이번 달({month}) 정가 환산 · 청구액 아님',{month:((thisM||'-')??'')}))}</div><div style="font-size:24px;font-weight:800;color:var(--mint);margin:2px 0 12px">${aiCostWon(cost.this_usd,fx)} <span class="sub" style="font-size:13px;font-weight:400">${esc(h7T('aiu.cost_cum','· 누적 {won}',{won:aiCostWon(cost.total_usd,fx)}))}</span></div>
     <div class="tblwrap"><table><tr><th>${esc(h7T('aiu.cost_th_platform','플랫폼'))}</th><th>${esc(h7T('aiu.cost_th_month','이번 달'))}</th><th>${esc(h7T('aiu.cost_th_cum','누적'))}</th><th>${esc(h7T('aiu.cost_th_tokens','토큰(입력/출력)'))}</th></tr>${rows}</table></div>
     ${bars?`<div style="margin-top:12px"><b style="font-size:13px">${esc(h7T('aiu.cost_monthly','월별 합계(전 플랫폼)'))}</b>${bars}</div>`:''}
@@ -3301,7 +3411,7 @@ function aiExternalSectionHtml({external,error}){
   const totals=Object.entries(external.totals||{}).sort((a,b)=>(Number(b[1].calls)||0)-(Number(a[1].calls)||0)||a[0].localeCompare(b[0])),days=Object.entries(external.days).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,h7N('aiu.external_days',14));
   const cards=totals.map(([k,e])=>`<div data-ai-external-ai="${esc(k)}" style="flex:1 1 150px;min-width:140px;border:1px solid var(--line);border-radius:8px;padding:10px 12px"><div style="font-size:13px;color:var(--gray)">${esc(aiExternalLabel(k))}</div><div style="font-size:22px;font-weight:800;color:var(--mint);margin:2px 0">${aiExternalCount(e.calls)}건</div><div class="sub">${esc(h7T('aiu.ext_okfail','성공 {ok} · 실패 {fail}',{ok:aiExternalCount(e.ok),fail:aiExternalCount(e.fail)}))}</div><div style="margin-top:4px">${aiExternalMoney(e)}</div></div>`).join('');
   const rows=days.map(([day,ais])=>Object.entries(ais||{}).sort((a,b)=>(Number(b[1].calls)||0)-(Number(a[1].calls)||0)||a[0].localeCompare(b[0])).map(([k,e])=>`<tr data-ai-external-day="${esc(day)}" data-ai-external-row="${esc(k)}"><td style="white-space:nowrap">${esc(day)}</td><td>${esc(aiExternalLabel(k))}</td><td style="white-space:nowrap">${aiExternalCount(e.calls)}건</td><td style="white-space:nowrap">${aiExternalCount(e.ok)} / ${aiExternalCount(e.fail)}</td><td style="white-space:nowrap">${aiExternalMoney(e,day)}</td></tr>`).join('')).join('');
-  return head+`<div class="hint">${esc(h7T('aiu.ext_basis','기준 {generated} · 환율 US$1 = ₩{fx}(고정) · 누적은 전체 기간, 날짜별 표는 최근 {days}일',{generated:((external.generated)??''),fx:Math.round(Number(external.fx)||0).toLocaleString('ko-KR'),days:h7N('aiu.external_days',14)}))}</div>
+  return head+`<div class="hint">${esc(h7T('aiu.ext_basis','기준 {generated} · 환율 US$1 = ₩{fx}(고정) · 누적은 전체 기간, 날짜별 표는 최근 {days}일',{generated:hubFmtDateTime(external.generated),fx:Math.round(Number(external.fx)||0).toLocaleString('ko-KR'),days:h7N('aiu.external_days',14)}))}</div>
     ${cards?`<div class="rowflex" style="gap:10px;flex-wrap:wrap;margin:10px 0">${cards}</div>`:''}
     ${rows?`<div class="tblwrap"><table><tr><th>${esc(h7T('aiu.ext_th_date','날짜'))}</th><th>${esc(h7T('aiu.ext_th_ai','AI'))}</th><th>${esc(h7T('aiu.ext_th_calls','건수'))}</th><th>${esc(h7T('aiu.ext_th_okfail','성공 / 실패'))}</th><th>${esc(h7T('aiu.ext_th_money','금액'))}</th></tr>${rows}</table></div>`:'<div class="empty">'+esc(h7T('aiu.ext_rows_empty','날짜별 기록이 없습니다.'))+'</div>'}
     <div class="hint">${esc(h7T('aiu.ext_note','금액은 {since}부터 기록합니다(그 전 날짜는 금액 기록 전). 청구액이 아니라 쓴 토큰을 정가로 환산한 값입니다.',{since:AI_EXTERNAL_COST_SINCE}))}</div></div>`;
@@ -3310,7 +3420,7 @@ function aiSessionSectionHtml({sessions,error}){
   const head='<div data-ai-session-section style="margin-top:22px"><h3>'+esc(h7T('aiu.sess_title','🩺 Codex 대화 효율 점검'))+' <span class="sub">'+esc(h7T('aiu.sess_sub','오늘 · 돈이 새는 대화'))+'</span></h3>';
   if(error)return head+`<div class="empty">${esc(h7T('aiu.sess_err','점검 기록을 불러오지 못했습니다: {detail}',{detail:((error)??'')}))}</div></div>`;
   if(!sessions||!Array.isArray(sessions.flagged))return head+'<div class="empty">'+esc(h7T('aiu.sess_empty','아직 올라온 점검 기록이 없습니다.'))+'</div></div>';
-  const meta=`<div class="hint">${esc(h7T('aiu.sess_meta','기준 {generated} · 오늘 전체 약 ₩{won} · 🔴 지금 헛도는 중(멈추고 새 대화에서 #이어서) · 🟠 오늘 비쌈 · 추정 비용은 대략값',{generated:((sessions.generated)??''),won:Math.round(Number(sessions.won_today_total)||0).toLocaleString('ko-KR')}))}</div>`;
+  const meta=`<div class="hint">${esc(h7T('aiu.sess_meta','기준 {generated} · 오늘 전체 약 ₩{won} · 🔴 지금 헛도는 중(멈추고 새 대화에서 #이어서) · 🟠 오늘 비쌈 · 추정 비용은 대략값',{generated:hubFmtDateTime(sessions.generated),won:Math.round(Number(sessions.won_today_total)||0).toLocaleString('ko-KR')}))}</div>`;
   if(!sessions.flagged.length)return head+meta+'<div class="empty">'+esc(h7T('aiu.sess_none','지금 돈이 새는 대화 없음'))+'</div></div>';
   return head+meta+sessions.flagged.slice(0,h7N('aiu.session_limit',8)).map(f=>`<div data-ai-session="${esc(f.thread||'')}" style="border-top:1px solid var(--line);padding:6px 0"><div class="rowflex" style="justify-content:space-between;gap:8px;flex-wrap:nowrap"><span>${f.sev==='red'?'🔴':'🟠'} ${esc(f.name||f.thread||'')} <span class="sub">(${f.active?esc(h7T('aiu.sess_on','활성')):esc(h7T('aiu.sess_off','멈춤'))})</span></span><b style="white-space:nowrap">약 ₩${Math.round(Number(f.won_today)||0).toLocaleString('ko-KR')}</b></div><div class="sub">${esc((f.reasons||[]).join(' · '))}</div></div>`).join('')+'</div>';
 }
@@ -3346,7 +3456,7 @@ const OWNER_BOARDS=[
   {slug:'wordbook',title:'📖 박제 단어장',description:'원장이 알아 둘 말'}
 ];
 function ownerBoardTexts(board){const m={busd_ledger:{title:h7T('ob.busd_title','📒 뻐스디 장부'),description:h7T('ob.busd_desc','AI 일 장부')},pin_board:{title:h7T('ob.pin_title','📌 명심판'),description:h7T('ob.pin_desc','AI가 지킬 약속')},wordbook:{title:h7T('ob.word_title','📖 박제 단어장'),description:h7T('ob.word_desc','원장이 알아 둘 말')}};return m[board.slug]||{title:board.title,description:board.description};}
-function ownerBoardsTimestamp(value){if(!value)return '';const d=new Date(value),p=n=>String(n).padStart(2,'0');return Number.isNaN(d.getTime())?String(value):`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;}
+function ownerBoardsTimestamp(value){return value?hubFmtDateTime(value):'';}
 function ownerBoardsMissing(error){return !!error&&(error.code==='42P01'||error.code==='PGRST205'||Number(error.status)===404);}
 function ownerBoardsPanelHtml(rows,error){
   const bySlug=new Map((rows||[]).map(row=>[row.slug,row]));
@@ -3368,7 +3478,7 @@ async function openOwnerBoard(slug){
   const {data,error}=await sb.from('owner_boards').select('html,synced_at').eq('slug',board.slug).maybeSingle();
   if(error||!data){viewer.innerHTML=ownerBoardsMissing(error)?'<div class="hint">'+esc(h7T('ob.preparing','원장 보기판이 준비 중입니다.'))+'</div>':`<div class="cal-error">${esc(h7T('ob.view_err','판을 불러오지 못했습니다: {detail}',{detail:error?.message||h7T('ob.not_synced','아직 PC에서 올라오지 않음')}))}</div>`;return;}
   viewer.innerHTML=`<div class="owner-board-view-head"><div><strong>${esc(ownerBoardTexts(board).title)}</strong><div class="sub">${esc(h7T('ob.synced','마지막으로 올라온 때 {when}',{when:data.synced_at?ownerBoardsTimestamp(data.synced_at):h7T('ob.unknown_time','확인되지 않음')}))}</div><div class="sub">${esc(h7T('ob.png_note','PNG 저장은 PC 판에서만 됨 · 허브에서는 PDF 저장을 쓰세요'))}</div></div><button type="button" class="mini" onclick="closeOwnerBoard()">${esc(h7T('ob.btn_close','닫기'))}</button></div><div class="owner-board-frame-slot"></div>`;
-  const frame=document.createElement('iframe');frame.setAttribute('sandbox','allow-scripts allow-downloads allow-modals');frame.setAttribute('referrerpolicy','no-referrer');frame.setAttribute('title',h7T('ob.frame_title','{title} 보기',{title:ownerBoardTexts(board).title}));frame.style.width='100%';frame.style.maxWidth='100%';frame.style.height='max(480px, calc(100vh - 140px))';frame.style.border='1px solid var(--line)';frame.style.borderRadius='8px';frame.style.background='#fff';frame.srcdoc=ownerBoardSrcdoc(data.html);
+  const frame=document.createElement('iframe');frame.setAttribute('sandbox','allow-scripts allow-downloads allow-modals');frame.setAttribute('referrerpolicy','no-referrer');frame.setAttribute('title',h7T('ob.frame_title','{title} 보기',{title:ownerBoardTexts(board).title}));frame.style.width='100%';frame.style.maxWidth='100%';frame.style.height='max(480px, calc(100vh - 140px))';frame.style.border='1px solid var(--line)';frame.style.borderRadius='8px';frame.style.background='#fff';frame.srcdoc=ownerBoardSrcdoc(ownerBoardHumanizeTimes(data.html));
   viewer.querySelector('.owner-board-frame-slot').appendChild(frame);
 }
 /* owner-boards:test-end */
