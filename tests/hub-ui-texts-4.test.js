@@ -49,7 +49,7 @@ const staticKeys=()=>new Set([...STATIC_PART.matchAll(/\bdata-hubk="([a-z0-9_.]+
 /* ───────────── 1. 기본 글 목록 ───────────── */
 test('차례 4 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 12개(결재함 4 · 공지 3 · 캘린더 3 · 건의함 2)',()=>{
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH4.test(d.key));
-  assert.equal(defs.length,145,'차례 4 글 키 수');
+  assert.equal(defs.length,147,'차례 4 글 키 수(공지 내려받기·파일 없음 2개 포함)');
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
   for(const d of defs){
     assert.match(d.key,/^[a-z][a-z0-9_.]{1,80}$/,d.key);
@@ -164,7 +164,7 @@ test('표에 값이 있으면 그 글: 고쳐 쓰는 글이 모두 화면(제목
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH4.test(d.key));
   const stat=staticKeys();
   const dyn=defs.filter(d=>!stat.has(d.key));
-  assert.equal(dyn.length,145-19,'고정 모달 글 19개를 뺀 나머지');
+  assert.equal(dyn.length,147-19,'고정 모달 글 19개를 뺀 나머지');
   const out=await renderAll(hr,{engine:true,textRows:dynRows(dyn),settings:{}});
   const all=Object.values(out).join('\n');
   const missing=dyn.filter(d=>!all.includes('«'+d.key+'»')).map(d=>d.key);
@@ -280,7 +280,7 @@ test('결재 종류 이름: 보이는 이름만 바뀌고 저장되는 값(코�
   assert.equal(sel0.innerHTML,'원래');
   // (4) 새 이름으로 올려도 서버에 저장되는 값(코드)은 그대로
   const run=async(value,title)=>{const d=P.makeDom();d.$('#apKind').value=value;d.$('#apTitle').value=title;d.$('#apBody').value='내용';const ins=[];
-    const sb={from:t=>{if(t==='approval_docs')return {insert:pl=>{ins.push(pl);return {select:()=>({single:async()=>({data:{id:7},error:null})})};}};return {insert:async()=>({error:null})};}};
+    const sb={rpc:async(name,pl)=>{assert.equal(name,'submit_approval_document');ins.push({kind:pl.p_kind,title:pl.p_title,body:pl.p_body});return {data:7,error:null};}};
     const q=await P.asRole('staff',{$:d.$,sb});await q.api.submitApproval();return {ins,log:q.log};};
   let x=await run('보고','월간');assert.equal(x.ins[0].kind,'보고');
   x=await run('재직증명서 발급','발급 요청');assert.equal(x.ins[0].kind,'기타');assert.equal(x.ins[0].title,'[재직증명서 발급] 발급 요청');assert.match(x.ins[0].body,/^\[재직증명서 발급 요청\]/);

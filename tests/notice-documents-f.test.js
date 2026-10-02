@@ -101,7 +101,7 @@ test('실제 paste→submit이 본문 marker를 저장하고 renderNoticeBody가
 test('실제 이미지·PDF 미리보기 함수는 새 창 대신 허브 미리보기 영역을 채운다',async()=>{
   const box={innerHTML:'',style:{display:'none'}};const mask={classList:{add(){}}};
   const context={sb:{storage:{from:()=>({download:async()=>({data:new Blob(['x'],{type:'application/pdf'}),error:null})})}},$:id=>id==='#noticePreviewBody'?box:mask,URL:{createObjectURL:()=> 'blob:test'},setTimeout:()=>{},show:()=>{}};
-  const start=html.indexOf('async function previewNoticeAttachment');const end=html.indexOf('async function downloadNoticeAttachment',start);
+  const start=html.indexOf('async function previewNoticeAttachment');const end=html.indexOf('async function cleanupNoticeUploads',start);
   assert.ok(start>=0&&end>start);
   vm.runInNewContext('function documentPreviewMarkup(url,name,type){return type===\'application/pdf\'?`<iframe src="${url}"></iframe>`:`<img src="${url}">`;};'+html.slice(start,end)+'; this.previewNoticeAttachment=previewNoticeAttachment;',context);
   await context.previewNoticeAttachment('x.pdf','문서.pdf','application/pdf');
