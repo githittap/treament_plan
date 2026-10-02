@@ -247,7 +247,8 @@ async function renderAll(html,opts){
     const REPLIES=[{inbox_id:'a8',reply:'전화로 안내했음 <끝>',created_at:'2026-09-30T06:00:00Z',author_id:'u2'},{inbox_id:'a6',reply:'가'.repeat(60),created_at:'2026-09-30T07:00:00Z',author_id:'u3'},{inbox_id:'a6',reply:'먼저 쓴 메모',created_at:'2026-09-30T06:30:00Z',author_id:'u5'}];
     const VIEWS=[{inbox_id:'a1',viewer_id:'u2',viewed_at:'2026-09-30T05:10:00Z'},{inbox_id:'a1',viewer_id:'u3',viewed_at:'2026-09-30T05:20:00Z'},{inbox_id:'a1',viewer_id:'u5',viewed_at:'2026-09-30T05:30:00Z'},{inbox_id:'a1',viewer_id:'u2',viewed_at:'2026-09-30T05:40:00Z'},{inbox_id:'a4',viewer_id:'u3',viewed_at:'2026-09-30T05:50:00Z'}];
     for(const role of ['owner','manager','staff']){
-      const r=await asRole(role,null,{tables:{consultation_inbox_replies:{list:REPLIES},consultation_inbox_views:{list:VIEWS}}});
+      const HROWS=INBOX_ROWS.map(x=>x.id==='a8'?Object.assign({},x,{handled_by:'u2',handled_at:'2026-09-30T06:00:00Z'}):x.id==='a6'?Object.assign({},x,{handled_by:'u3',handled_at:'2026-09-30T07:00:00Z'}):x);
+      const r=await asRole(role,null,{tables:{consultation_inbox:{list:HROWS,count:2},consultation_inbox_replies:{list:REPLIES},consultation_inbox_views:{list:VIEWS}}});
       r.api.setState('INBOX_FILTER',{source:'',status:''});r.api.setState('INBOX_ONLY_RESERVATIONS',false);
       await r.api.renderInbox({innerHTML:''});await flush();
       out['inbox.handle.list.'+role]=r.dom.$('#inboxList').innerHTML;

@@ -826,7 +826,6 @@ function hubTextDefsChapter5(add){
   add('inbox.th_views',I2,'문의 목록 표 머리 — 열람(누가 열어 봤는지 · 원장 화면에만 보임)','열람');
   add('inbox.btn_handle',I2,'문의 목록 — 처리 칸의 「✅ 처리」 단추 글(누르면 처리 메모 입력칸이 펼쳐짐)','✅ 처리');
   add('inbox.handled_line',I2,'문의 목록 — 처리됨 줄의 처리한 사람·시각 글({who}=처리한 사람, {time}=처리 시각)','✅ {who} · {time}',['who','time']);
-  add('inbox.handled_by',I2,'문의 목록 — 처리됨 줄에 처리 시각을 모를 때 처리한 사람 글({who}=처리한 사람, 모르면 -)','✅ {who}',['who']);
   add('inbox.views_more',I2,'문의 목록 열람 칸 — 열람한 사람이 3명 이상일 때 이름 뒤에 붙는 글({n}=보여 주지 않은 사람 수)','외 {n}명',['n']);
   add('inbox.m_views',I2,'스마트폰 화면 문의 카드의 열람 글(원장 화면 · {names}=열람한 사람 이름)','열람 {names}',['names']);
   add('inbox.btn_detail',I2,'문의 한 줄 끝 「상세」 단추 글(카카오 예약 줄도 같음)','상세');
@@ -849,6 +848,7 @@ function hubTextDefsChapter5(add){
   add('inbox.d_handle_title',I3,'문의 상세 맨 위 처리 완료 상자의 제목','✅ 처리 완료');
   add('inbox.btn_back',I3,'문의 상세 맨 위 「목록으로」 단추 글(누르면 문의 목록 쪽으로 올라감)','↑ 목록으로');
   add('inbox.m_handle_fail',I3,'처리됨으로 저장하다 실패했을 때 입력칸 아래에 뜨는 글({msg}는 서버 오류)','처리 저장 실패: {msg}',['msg']);
+  add('inbox.m_handle_memo_fail',I3,'처리됨으로는 바뀌었는데 처리 메모만 저장하지 못했을 때 뜨는 글({msg}는 서버 오류)','처리됨으로 바꿨지만 메모는 저장하지 못했습니다: {msg} — 상세에서 「답변 기록」으로 다시 남겨 주세요',['msg']);
   add('inbox.m_handled',I3,'상세에서 처리됨으로 저장했을 때 상세 칸에 뜨는 글','처리됨으로 저장했습니다.');
   add('inbox.d_count',I3,'문의 상세 맨 위 줄 끝 건수({n}=이 사람의 문의 수)','{n}건',['n']);
   add('inbox.opt_unassigned',I3,'담당자 고르는 칸의 「담당 없음」 항목','미배정');

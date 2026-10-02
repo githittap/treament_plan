@@ -18,7 +18,7 @@ const PROFILES=[
 const row=(id,over)=>Object.assign({id,source:'phone',external_event_id:null,received_at:'2026-09-30T05:00:00Z',sender_name:'가짜'+id,contact:'01000000000',subject:'제목'+id,message:'내용'+id,status:'new',assigned_to:null,journal_id:null},over||{});
 const ROWS=[
   row('a1',{received_at:'2026-09-30T05:00:00Z'}),
-  row('b1',{received_at:'2026-09-30T04:00:00Z',status:'closed',assigned_to:'u2'}),
+  row('b1',{received_at:'2026-09-30T04:00:00Z',status:'closed',assigned_to:'u2',handled_by:'u3',handled_at:'2026-09-30T06:00:00Z'}),
   row('c1',{received_at:'2026-09-30T03:00:00Z',status:'closed',assigned_to:'u2'}),
   row('d1',{received_at:'2026-09-30T02:00:00Z',status:'closed'})
 ];
@@ -34,7 +34,9 @@ function makeSb(tables,log,over){
       if(k==='then')return (res,rej)=>{
         log.push(q);
         const spec=o.tables&&o.tables[table];
-        const out=spec&&spec.error?{data:null,error:spec.error}:{data:q.op==='select'?(tables[table]||[]):null,error:null,count:0};
+        const failed=o.failIf&&o.failIf(q);
+        const pick=(r,cols)=>{if(table!=='consultation_inbox'||!cols||cols==='*'||!/,/.test(cols))return r;const keep=cols.split(',');return Object.fromEntries(Object.entries(r).filter(([k])=>keep.includes(k)));};
+        const out=failed?{data:null,error:failed}:spec&&spec.error?{data:null,error:spec.error}:{data:q.op==='select'?(tables[table]||[]).map(r=>pick(r,q.cols)):null,error:null,count:0};
         return Promise.resolve(out).then(res,rej);
       };
       return (...a)=>{
@@ -71,43 +73,89 @@ const writes=log=>log.filter(q=>q.op&&q.op!=='select');
 const calls=log=>log.map(q=>q.rpc?'rpc:'+q.rpc:(q.op==='select'?'read:'+q.table:q.op+':'+q.table));
 const inFilter=q=>(q.filters.find(f=>f[0]==='in')||[])[2];
 
-/* ───────────── ⓐ~ⓒ 처리 저장 ───────────── */
-test('ⓐ 열린 묶음 「처리됨으로 저장」: 메모가 있으면 답변 기록(RPC)을 먼저 한 번, 그다음 처리 대상 전부 closed — 빈 담당만 지금 사람',async()=>{
+/* ───────────── ⓐ~ⓒ 처리 저장 — 순서: 상태 → 조건부 담당 → 메모 ───────────── */
+const seq=log=>log.filter(q=>q.rpc?q.rpc.startsWith('consultation_inbox_record_reply'):q.op==='update').map(q=>q.rpc?'memo':(q.payload&&q.payload.status?'status':'assign'));
+test('ⓐ 열린 묶음 「처리됨으로 저장」 순서: ①처리 대상 전부 상태 closed ②담당은 DB의 지금 값이 빈 줄만(.is assigned_to null) ③메모가 있으면 마지막에 답변 기록 한 번',async()=>{
   const t=boot('manager');
   t.ctx.inboxLoad=async()=>{t.log.push({rpc:'(목록 다시 읽기)'});};
   const rows=[row('x1',{status:'new',assigned_to:null}),row('x2',{status:'in_progress',assigned_to:'u2'}),row('x3',{status:'converted',journal_id:null}),row('x4',{status:'new',assigned_to:null,journal_id:'j9'})];
   const msg={textContent:''};
   const ok=await t.ctx.inboxMarkHandled(rows,'  전화로 안내함  ',msg);
   assert.equal(ok,true);
-  const rpc=t.log.filter(q=>q.rpc&&q.rpc.startsWith('consultation_inbox_record_reply'));
-  assert.equal(rpc.length,1,'답변 기록은 한 번');
-  assert.deepEqual(JSON.parse(JSON.stringify(rpc[0].args)),{p_inbox_id:'x2',p_reply:'전화로 안내함'},'답 대상 = 처리 대상 중 마지막 줄, 메모는 앞뒤 공백 제거');
+  assert.deepEqual(seq(t.log),['status','assign','memo'],'순서');
   const w=writes(t.log);
   assert.equal(w.length,2);
-  assert.equal(t.log.indexOf(rpc[0])<t.log.indexOf(w[0]),true,'기록 먼저, 상태는 그 뒤');
-  assert.deepEqual(JSON.parse(JSON.stringify(w[0].payload)),{status:'closed',assigned_to:'m1'});
-  assert.deepEqual(w[0].filters.find(f=>f[0]==='in').slice(1),['id',['x1']],'담당이 빈 줄만 지금 사람으로');
-  assert.deepEqual(JSON.parse(JSON.stringify(w[1].payload)),{status:'closed'},'이미 담당이 있는 줄은 담당 그대로');
-  assert.deepEqual(w[1].filters.find(f=>f[0]==='in').slice(1),['id',['x2']]);
+  assert.deepEqual(JSON.parse(JSON.stringify(w[0].payload)),{status:'closed'},'상태 update에는 담당·처리자 칸이 없음');
+  assert.deepEqual([...w[0].filters.find(f=>f[0]==='in')[2]],['x1','x2'],'처리 대상 전부(전환된 줄·상담일지에 묶인 줄 제외)');
+  assert.deepEqual(JSON.parse(JSON.stringify(w[1].payload)),{assigned_to:'m1'});
+  assert.deepEqual([...w[1].filters.find(f=>f[0]==='in')[2]],['x1','x2'],'대상은 모두 보내되 DB가 빈 줄만 고름');
+  assert.deepEqual(w[1].filters.find(f=>f[0]==='is').slice(1),['assigned_to',null],'화면에서 읽어 둔 값이 아니라 DB의 지금 값이 비어 있을 때만 담당을 채움');
+  const rpc=t.log.filter(q=>q.rpc==='consultation_inbox_record_reply');
+  assert.equal(rpc.length,1,'답변 기록은 한 번');
+  assert.deepEqual(JSON.parse(JSON.stringify(rpc[0].args)),{p_inbox_id:'x2',p_reply:'전화로 안내함'},'답 대상 = 처리 대상 중 마지막 줄, 메모는 앞뒤 공백 제거');
+  assert.ok(t.log.indexOf(rpc[0])>t.log.indexOf(w[1]),'메모는 마지막');
   assert.ok(t.log.some(q=>q.rpc==='(목록 다시 읽기)'),'성공하면 목록을 다시 읽음');
   assert.deepEqual(t.statuses,['saved']);
   assert.equal(msg.textContent,'');
+  assert.ok(!REGION.includes('INBOX_MEMO_SAVED'),'옛 메모 중복 방지 장치(전역 INBOX_MEMO_SAVED)는 없어짐');
 });
-test('ⓑ 메모가 없으면 답변 기록(RPC)을 부르지 않는다 — 공백뿐인 메모도 같음',async()=>{
+test('ⓑ 상태 저장이 실패하면 오류 글만 보이고 담당·메모는 아무것도 안 한다 · 메모가 없으면 답변 기록(RPC)을 부르지 않는다',async()=>{
+  const t=boot('manager',{sb:{tables:{consultation_inbox:{error:{message:'저장<실패>'}}}}});
+  let loaded=0;t.ctx.inboxLoad=async()=>{loaded++;};
+  const msg={textContent:''};
+  assert.equal(await t.ctx.inboxMarkHandled([row('x1')],'메모',msg),false);
+  assert.equal(msg.textContent,'처리 저장 실패: 저장<실패>');
+  assert.equal(t.log.filter(q=>q.rpc).length,0,'상태가 실패하면 메모 RPC를 부르지 않음');
+  assert.equal(writes(t.log).length,1,'담당 update도 안 함');assert.equal(loaded,0);
   for(const memo of ['','   ',undefined]){
-    const t=boot('manager');t.ctx.inboxLoad=async()=>{};
-    assert.equal(await t.ctx.inboxMarkHandled([row('x1')],memo,{textContent:''}),true);
-    assert.equal(t.log.filter(q=>q.rpc).length,0);
-    assert.equal(writes(t.log).length,1);
+    const u=boot('manager');u.ctx.inboxLoad=async()=>{};
+    assert.equal(await u.ctx.inboxMarkHandled([row('x1')],memo,{textContent:''}),true);
+    assert.equal(u.log.filter(q=>q.rpc).length,0);
+    assert.deepEqual(seq(u.log),['status','assign']);
   }
 });
-test('ⓒ 이미 담당이 있는 줄은 담당이 바뀌지 않는다(상태만 closed) · 처리 대상이 없거나 직원이면 아무것도 안 함',async()=>{
+test('ⓒ 메모 저장만 실패하면 「다시 남겨 주세요」 글을 보이고 상태는 이미 처리됨 · 목록은 다시 그린다 · 상세에서 눌렀으면 상세 칸에도 그 글',async()=>{
+  const fail={rpc:{consultation_inbox_record_reply:{error:{message:'기록<실패>'}}}};
+  const alerts=[];
+  const t=boot('manager',{sb:fail});t.ctx.alert=m=>alerts.push(m);
+  let loaded=0;t.ctx.inboxLoad=async()=>{loaded++;};
+  const msg={textContent:''};
+  assert.equal(await t.ctx.inboxMarkHandled([row('x1')],'메모',msg),true,'상태는 바뀌었으니 처리 자체는 성공');
+  const text='처리됨으로 바꿨지만 메모는 저장하지 못했습니다: 기록<실패> — 상세에서 「답변 기록」으로 다시 남겨 주세요';
+  assert.equal(msg.textContent,text);assert.deepEqual(alerts,[text]);
+  assert.deepEqual(seq(t.log),['status','assign','memo']);assert.equal(loaded,1,'목록 다시 그림');
+  const d=boot('manager',{sb:fail,tables:{consultation_inbox:[ROWS[0]]}});d.ctx.alert=()=>{};d.ctx.inboxLoad=async()=>{};
+  await d.ctx.inboxSelect(['a1']);d.dom.$('#inboxHandleMemo').value='상세 메모';
+  await d.ctx.inboxDetailHandle();
+  assert.equal(d.dom.$('#inboxDetail').innerHTML,esc(text));
+});
+test('ⓓ B2 재현: 상태 저장이 실패한 시도에서는 메모를 남기지 않으므로, 나중에 다시 눌러 성공해도 메모는 정확히 한 번 · 처리된 뒤에는 처리 단추가 다시 안 나온다',async()=>{
+  const tables={consultation_inbox:[row('r1',{sender_name:'재시도',status:'new'}),row('r2',{sender_name:'다른문의',status:'new',received_at:'2026-09-30T04:00:00Z'})]};
+  const spec={error:{message:'저장<실패>'}};
+  const t=boot('manager',{tables,sb:{tables:{consultation_inbox:spec}}});
+  t.ctx.inboxLoad=async()=>{};
+  const memos=()=>t.log.filter(q=>q.rpc==='consultation_inbox_record_reply').length;
+  const rows=[tables.consultation_inbox[0]],msg={textContent:''};
+  // 1) 상태 저장 실패 → 메모는 안 들어감(옛 순서에서는 메모가 먼저 들어가 있었음)
+  assert.equal(await t.ctx.inboxMarkHandled(rows,'같은 메모',msg),false);assert.equal(memos(),0);
+  // 2) 다른 문의를 먼저 처리한 뒤(새로고침과 같은 효과) 같은 메모로 다시 시도 → 이번엔 성공, 메모는 총 한 번
+  spec.error=null;
+  assert.equal(await t.ctx.inboxMarkHandled([tables.consultation_inbox[1]],'다른 메모',{textContent:''}),true);
+  assert.equal(memos(),1);
+  assert.equal(await t.ctx.inboxMarkHandled(rows,'같은 메모',msg),true);
+  assert.deepEqual(JSON.parse(JSON.stringify(t.log.filter(q=>q.rpc==='consultation_inbox_record_reply').map(q=>q.args))),[{p_inbox_id:'r2',p_reply:'다른 메모'},{p_inbox_id:'r1',p_reply:'같은 메모'}],'같은 메모는 r1에 한 번만');
+  // 3) 처리됨으로 읽히는 줄에는 처리 단추가 없다
+  tables.consultation_inbox[0].status='closed';
+  const u=boot('manager',{tables});await u.ctx.inboxLoad();
+  assert.ok(!u.dom.$('#inboxList').innerHTML.includes('data-inbox-handle="r1"'));
+});
+test('ⓒ-2 이미 담당이 있는 줄은 담당 update 대상에서 DB가 거른다(화면은 담당을 덮어쓰는 값을 보내지 않음) · 처리 대상이 없거나 직원이면 아무것도 안 함',async()=>{
   const t=boot('manager');t.ctx.inboxLoad=async()=>{};
   await t.ctx.inboxMarkHandled([row('x1',{assigned_to:'u2'}),row('x2',{assigned_to:'u3'})],'메모',{textContent:''});
   const w=writes(t.log);
-  assert.equal(w.length,1);
+  assert.equal(w.length,2);
   assert.deepEqual(JSON.parse(JSON.stringify(w[0].payload)),{status:'closed'});
-  assert.ok(!('assigned_to' in w[0].payload));
+  assert.ok(w[1].filters.some(f=>f[0]==='is'&&f[1]==='assigned_to'&&f[2]===null),'조건부 update');
   const s=boot('staff');s.ctx.inboxLoad=async()=>{};
   assert.equal(await s.ctx.inboxMarkHandled([row('x1')],'메모',{textContent:''}),false);
   assert.equal(s.log.length,0,'직원은 쓰기를 시도조차 안 함');
@@ -115,44 +163,47 @@ test('ⓒ 이미 담당이 있는 줄은 담당이 바뀌지 않는다(상태만
   assert.equal(await n.ctx.inboxMarkHandled([row('y1',{status:'converted'}),row('y2',{journal_id:'j1'})],'메모',{textContent:''}),false);
   assert.equal(n.log.length,0);
 });
-test('처리 저장이 실패하면 입력칸 아래에 오류 글을 보이고 목록은 건드리지 않는다 · 메모는 두 번 기록하지 않는다',async()=>{
-  const t=boot('manager',{sb:{rpc:{consultation_inbox_record_reply:{error:{message:'기록<실패>'}}}}});
-  let loaded=0;t.ctx.inboxLoad=async()=>{loaded++;};
-  const msg={textContent:''};
-  assert.equal(await t.ctx.inboxMarkHandled([row('x1')],'메모',msg),false);
-  assert.equal(msg.textContent,'처리 저장 실패: 기록<실패>');
-  assert.equal(writes(t.log).length,0,'메모 기록이 실패하면 상태는 안 바꿈');assert.equal(loaded,0);
-  // 상태 저장만 실패하는 경우: 다시 눌러도 같은 메모는 한 번만 기록
-  const u=boot('manager',{sb:{tables:{consultation_inbox:{error:{message:'저장<실패>'}}}}});u.ctx.inboxLoad=async()=>{};
-  const m2={textContent:''};
-  assert.equal(await u.ctx.inboxMarkHandled([row('x1')],'메모',m2),false);
-  assert.equal(m2.textContent,'처리 저장 실패: 저장<실패>');
-  assert.equal(await u.ctx.inboxMarkHandled([row('x1')],'메모',m2),false);
-  assert.equal(u.log.filter(q=>q.rpc==='consultation_inbox_record_reply').length,1);
-});
 
-/* ───────────── ⓓ 목록: 처리한 사람 ───────────── */
-test('ⓓ 닫힌 묶음 칸: 처리한 사람(마지막 메모를 쓴 사람)·시각 + 메모 한 줄, 메모가 없으면 담당자, 둘 다 없으면 -',async()=>{
+/* ───────────── 목록: 처리한 사람 ───────────── */
+test('ⓔ B3 재현: 처리한 사람·시각은 서버가 남긴 handled_by·handled_at — 박실장이 예전에 답변을 남긴 문의를 매니저가 메모 없이 처리하면 「✅ 매니저」, 예전 답변은 메모 줄로만',async()=>{
+  const rows=[row('h1',{status:'closed',assigned_to:'u2',received_at:'2026-09-30T05:00:00Z',handled_by:'m1',handled_at:'2026-10-01T01:30:00Z'})];
+  const t=boot('manager',{tables:{consultation_inbox:rows,consultation_inbox_replies:[{inbox_id:'h1',reply:'예전 답변',created_at:'2026-09-30T06:00:00Z',author_id:'u3'}]}});
+  await t.ctx.inboxLoad();
+  const list=t.dom.$('#inboxList').innerHTML;
+  assert.match(list,/<div>✅ 매니저가 · 2026\.10\.1 오전 10시 30분<\/div>/,'처리자 = handled_by, 시각 = handled_at');
+  assert.doesNotMatch(list,/✅ 박실장/,'답변 작성자를 처리자로 보이지 않음');
+  assert.match(list,/<div class="inbox-handled-memo" title="박실장 · 2026\.9\.30 오후 3시\n예전 답변">예전 답변<\/div>/,'메모 줄 title에 작성자·시각과 전문');
+  // 묶음에 처리된 줄이 여럿이면 handled_at이 가장 늦은 줄
+  const g=[row('g1',{sender_name:'같은사람',status:'closed',received_at:'2026-09-30T04:00:00Z',handled_by:'u2',handled_at:'2026-10-01T01:00:00Z'}),row('g2',{sender_name:'같은사람',status:'closed',received_at:'2026-09-30T04:10:00Z',handled_by:'o1',handled_at:'2026-10-01T02:00:00Z'})];
+  const u=boot('manager',{tables:{consultation_inbox:g,consultation_inbox_replies:[]}});await u.ctx.inboxLoad();
+  assert.match(u.dom.$('#inboxList').innerHTML,/<div>✅ 원장님 · 2026\.10\.1 오전 11시<\/div>/);
+});
+test('ⓕ handled_at이 없는 옛 처리됨 줄은 처리자·시각을 지어내지 않는다 — 메모도 없으면 -, 메모만 있으면 메모만(담당자·답변 작성자를 처리자로 쓰지 않음)',async()=>{
+  const rows=[row('o1x',{status:'closed',assigned_to:'u2',received_at:'2026-09-30T05:00:00Z'}),row('o2x',{status:'closed',assigned_to:'u2',received_at:'2026-09-30T04:00:00Z'})];
+  const t=boot('manager',{tables:{consultation_inbox:rows,consultation_inbox_replies:[{inbox_id:'o2x',reply:'옛 메모',created_at:'2026-09-29T06:00:00Z',author_id:'u3'}]}});
+  await t.ctx.inboxLoad();
+  const list=t.dom.$('#inboxList').innerHTML;
+  assert.doesNotMatch(list,/✅/,'처리한 사람 줄 없음');
+  assert.match(list,/<td><span class="b [^"]*">처리됨<\/span><\/td><td>-<\/td>/,'메모도 없으면 -');
+  assert.match(list,/<td><div class="inbox-handled-memo" title="박실장 · 2026\.9\.29 오후 3시\n옛 메모">옛 메모<\/div><\/td>/,'메모만 있으면 메모만');
+});
+test('ⓓ 처리 메모(마지막 답변 글)는 한 줄로 줄이고 전체는 title · 모바일 카드에도 같은 내용',async()=>{
   const t=boot('manager');
   await t.ctx.inboxLoad();
   const list=t.dom.$('#inboxList').innerHTML;
   assert.match(list,/<th>처리<\/th>/);
   assert.ok(list.indexOf('<th>상태</th>')<list.indexOf('<th>처리</th>')&&list.indexOf('<th>처리</th>')<list.indexOf('<th>담당</th>'),'「처리」 칸은 「상태」 바로 옆');
-  assert.match(list,/<div>✅ 박실장 · 2026\.9\.30 오후 3시<\/div><div class="inbox-handled-memo" title="전화로 안내함 &lt;끝&gt;">전화로 안내함 &lt;끝&gt;<\/div>/,'메모를 쓴 사람(박실장)·시각 + 메모');
-  assert.match(list,/<div>✅ 이매니저<\/div>/,'메모가 없으면 담당자');
-  assert.match(list,/<td><span class="b [^"]*">처리됨<\/span><\/td><td>-<\/td>/,'둘 다 없으면 처리 칸은 - 만');
-  assert.doesNotMatch(list,/✅ -/);
+  assert.match(list,/<div>✅ 박실장 · 2026\.9\.30 오후 3시<\/div><div class="inbox-handled-memo" title="박실장 · 2026\.9\.30 오후 3시\n전화로 안내함 &lt;끝&gt;">전화로 안내함 &lt;끝&gt;<\/div>/);
+  assert.match(list,/<td><span class="b [^"]*">처리됨<\/span><\/td><td>-<\/td>/,'기록이 없는 옛 처리됨은 처리 칸 -');
   assert.match(list,/<button class="mini stamp" data-inbox-handle="a1">✅ 처리<\/button>/,'열린 묶음은 처리 단추');
   const mobile=list.slice(list.indexOf('inbox-mobile-list'));
-  assert.match(mobile,/inbox-mobile-handled/,'모바일 카드에도 같은 내용');
-  assert.match(mobile,/✅ 박실장 · 2026\.9\.30 오후 3시/);
-  // 메모가 긴 경우 줄임 + 전체는 title
+  assert.match(mobile,/inbox-mobile-handled/);assert.match(mobile,/✅ 박실장 · 2026\.9\.30 오후 3시/);
   const long='가'.repeat(60);
   const l=boot('manager',{tables:{consultation_inbox_replies:[{inbox_id:'b1',reply:long,created_at:'2026-09-30T06:00:00Z',author_id:'u3'}]}});
   await l.ctx.inboxLoad();
-  assert.match(l.dom.$('#inboxList').innerHTML,new RegExp('title="'+long+'">'+'가'.repeat(40)+'…<'));
+  assert.match(l.dom.$('#inboxList').innerHTML,new RegExp('title="박실장 · [^"]*\\n'+long+'">'+'가'.repeat(40)+'…<'));
 });
-test('ⓓ-2 처리 메모를 읽는 요청은 목록에 보이는 묶음의 id를 한 번에(.in) 보내고, 읽기에 실패해도 목록은 그대로 그린다',async()=>{
+test('ⓓ-2 처리 메모를 읽는 요청은 목록에 보이는 묶음의 id를 한 번에(.in) 보내고, 읽기에 실패해도 목록은 그대로 그린다(처리한 사람은 목록 줄에서 옴)',async()=>{
   const t=boot('manager');
   await t.ctx.inboxLoad();
   const r=reads(t.log,'consultation_inbox_replies');
@@ -161,11 +212,40 @@ test('ⓓ-2 처리 메모를 읽는 요청은 목록에 보이는 묶음의 id�
   const f=boot('manager',{sb:{tables:{consultation_inbox_replies:{error:{message:'x'}}}}});
   await f.ctx.inboxLoad();
   const list=f.dom.$('#inboxList').innerHTML;
-  assert.match(list,/inbox-desktop-list/);assert.match(list,/<div>✅ 이매니저<\/div>/,'메모는 못 읽어도 담당자로 보임');
+  assert.match(list,/inbox-desktop-list/);assert.match(list,/<div>✅ 박실장 · 2026\.9\.30 오후 3시<\/div>/,'메모는 못 읽어도 처리자는 보임');
+});
+test('ⓖ 목록 읽기: handled_by·handled_at도 읽고, 그 칸이 DB에 아직 없으면(올리기 전·되돌린 뒤) 빼고 다시 읽어 목록을 그대로 그린다',async()=>{
+  const t=boot('manager');
+  await t.ctx.inboxLoad();
+  const first=reads(t.log,'consultation_inbox');
+  assert.match(first[0].cols,/handled_by,handled_at/);assert.match(first[0].cols,/dentweb_entered_at/);
+  const noHandled=boot('manager',{sb:{failIf:q=>q.table==='consultation_inbox'&&q.op==='select'&&/handled_by/.test(q.cols||'')?{code:'42703',message:'column consultation_inbox.handled_by does not exist'}:null}});
+  await noHandled.ctx.inboxLoad();
+  const rs=reads(noHandled.log,'consultation_inbox').map(q=>q.cols);
+  assert.equal(rs.length>=2,true);assert.match(rs[0],/handled_by/);assert.doesNotMatch(rs[1],/handled_by/);assert.match(rs[1],/dentweb_entered_at/,'덴트웹 칸은 그대로 읽음');
+  const list=noHandled.dom.$('#inboxList').innerHTML;
+  assert.match(list,/inbox-desktop-list/);assert.doesNotMatch(list,/cal-error/);
+  assert.doesNotMatch(list,/✅ 박실장/,'처리자 칸이 없으면 처리한 사람은 안 보임');
+  // 두 칸 다 없는 옛 DB
+  const old=boot('manager',{sb:{failIf:q=>q.table==='consultation_inbox'&&q.op==='select'&&/handled_by|dentweb_entered_at/.test(q.cols||'')?{code:'PGRST204',message:'Could not find the column in the schema cache'}:null}});
+  await old.ctx.inboxLoad();
+  assert.match(old.dom.$('#inboxList').innerHTML,/inbox-desktop-list/);
+  assert.doesNotMatch(reads(old.log,'consultation_inbox').pop().cols,/handled_by|dentweb/);
+});
+test('상태·담당 저장과 상담일지 전환은 처리 칸(handled_*)을 보내지 않는다 — 처리한 사람은 DB 트리거가 남김',async()=>{
+  const t=boot('manager');t.ctx.inboxLoad=async()=>{};
+  t.ctx.__sel={ids:['p1','p2'],messages:[row('p1'),row('p2')]};vm.runInContext('INBOX_SELECTED=__sel;',t.ctx);
+  t.dom.$('#inboxAssigned').value='u2';t.dom.$('#inboxStatus').value='closed';
+  await t.ctx.inboxSave();
+  await t.ctx.inboxConvert();
+  const w=writes(t.log);assert.ok(w.length>=2);
+  for(const q of w)assert.ok(!('handled_by' in q.payload)&&!('handled_at' in q.payload),JSON.stringify(q.payload));
+  assert.deepEqual(JSON.parse(JSON.stringify(w[0].payload)),{status:'closed',assigned_to:'u2'});
+  assert.ok(!/handled_(by|at)\s*:/.test(REGION.replace(/handled_by,handled_at/g,'')),'화면 코드가 handled_* 값을 써 넣지 않음');
 });
 
-/* ───────────── ⓔ 직원 ───────────── */
-test('ⓔ 직원(staff)은 「✅ 처리」 단추가 없고 처리 메모를 읽는 요청도 하지 않는다',async()=>{
+/* ───────────── 직원 ───────────── */
+test('ⓗ 직원(staff)은 「✅ 처리」 단추가 없고 처리 메모를 읽는 요청도 하지 않는다',async()=>{
   const t=boot('staff');
   await t.ctx.inboxLoad();
   const list=t.dom.$('#inboxList').innerHTML;
@@ -173,7 +253,8 @@ test('ⓔ 직원(staff)은 「✅ 처리」 단추가 없고 처리 메모를 �
   assert.ok(!list.includes('✅ 처리'));
   assert.equal(reads(t.log,'consultation_inbox_replies').length,0);
   assert.equal(reads(t.log,'consultation_inbox_views').length,0);
-  assert.match(list,/<div>✅ 이매니저<\/div>/,'닫힌 묶음의 담당자는 직원도 볼 수 있음');
+  assert.match(list,/<div>✅ 박실장 · 2026\.9\.30 오후 3시<\/div>/,'처리한 사람·시각은 직원도 볼 수 있음');
+  assert.ok(!list.includes('inbox-handled-memo'),'처리 메모는 직원에게 안 보임(읽지 않음)');
 });
 
 /* ───────────── ⓕ 열람(원장만) ───────────── */
@@ -228,7 +309,7 @@ test('상세의 처리 완료 상자로 저장하면 상세 칸을 비우고 목
   await t.ctx.inboxDetailHandle();
   assert.equal(t.dom.$('#inboxDetail').innerHTML,'처리됨으로 저장했습니다.');
   assert.equal(t.log.filter(q=>q.rpc==='consultation_inbox_record_reply').length,1);
-  const w=writes(t.log);assert.deepEqual(JSON.parse(JSON.stringify(w[0].payload)),{status:'closed',assigned_to:'o1'});
+  const w=writes(t.log);assert.deepEqual(JSON.parse(JSON.stringify(w[0].payload)),{status:'closed'});assert.deepEqual(JSON.parse(JSON.stringify(w[1].payload)),{assigned_to:'o1'});
   assert.ok(t.dom.$('#inboxList').scrolled.length>=1,'목록 쪽으로 돌아감');
 });
 
@@ -251,7 +332,7 @@ test('답변 기록 뒤 담당이 빈 처리 대상 줄은 지금 사람으로 �
   t.dom.$('#inboxReply').value='답';t.dom.$('#inboxReplyMsg');
   await t.ctx.inboxRecordReply();
   const w=writes(t.log);assert.equal(w.length,1);
-  assert.deepEqual(JSON.parse(JSON.stringify(w[0].payload)),{assigned_to:'m1'});assert.deepEqual(w[0].filters.find(f=>f[0]==='in').slice(1),['id',['x1']]);
+  assert.deepEqual(JSON.parse(JSON.stringify(w[0].payload)),{assigned_to:'m1'});assert.deepEqual(w[0].filters.find(f=>f[0]==='in').slice(1),['id',['x1']]);assert.deepEqual(w[0].filters.find(f=>f[0]==='is').slice(1),['assigned_to',null],'답변 기록 뒤 담당 채우기도 DB의 지금 값이 빈 줄만');
   // 전환
   const c=boot('manager');c.ctx.inboxLoad=async()=>{};
   const rows=[row('p1',{assigned_to:null}),row('p2',{assigned_to:'u2'}),row('p3',{assigned_to:null})];
@@ -261,11 +342,11 @@ test('답변 기록 뒤 담당이 빈 처리 대상 줄은 지금 사람으로 �
   assert.equal(c.log.filter(q=>q.rpc==='consultation_inbox_convert_to_journal').length,1);
   assert.deepEqual(JSON.parse(JSON.stringify(c.log.find(q=>q.rpc==='consultation_inbox_convert_to_journal').args)),{p_inbox_id:'p3'},'전환된 줄(최근 줄)은 건드리지 않음');
   assert.deepEqual(JSON.parse(JSON.stringify(cw[0].payload)),{status:'closed'},'남은 줄 종결 update는 그대로');
-  assert.deepEqual(JSON.parse(JSON.stringify(cw[1].payload)),{assigned_to:'m1'});assert.deepEqual(cw[1].filters.find(f=>f[0]==='in').slice(1),['id',['p1']]);
+  assert.deepEqual(JSON.parse(JSON.stringify(cw[1].payload)),{assigned_to:'m1'});assert.deepEqual(cw[1].filters.find(f=>f[0]==='in').slice(1),['id',['p1']]);assert.deepEqual(cw[1].filters.find(f=>f[0]==='is').slice(1),['assigned_to',null]);
   // 담당 채우기가 실패해도 전환 성공 흐름은 그대로
   const f=boot('manager');f.ctx.inboxLoad=async()=>{};
   let nth=0;const realFrom=f.ctx.sb.from;
-  f.ctx.sb.from=t2=>{const a=realFrom(t2);return new Proxy(a,{get(tg,k){if(k==='update')return p=>{const r=tg.update(p);if(p.assigned_to&&!p.status)return {in:()=>Promise.reject(new Error('채우기<실패>'))};return r;};return tg[k];}});};
+  f.ctx.sb.from=t2=>{const a=realFrom(t2);return new Proxy(a,{get(tg,k){if(k==='update')return p=>{const r=tg.update(p);if(p.assigned_to&&!p.status)return {in:()=>({is:()=>Promise.reject(new Error('채우기<실패>'))})};return r;};return tg[k];}});};
   f.ctx.__sel={ids:['p1','p3'],messages:[row('p1'),row('p3')]};vm.runInContext('INBOX_SELECTED=__sel;',f.ctx);
   await f.ctx.inboxConvert();
   assert.deepEqual(f.statuses,['saved']);assert.equal(f.dom.$('#inboxDetail').innerHTML,'상담일지로 전환했습니다. 나머지 처리 대상 문의는 처리됨 상태로 보존했습니다.');
@@ -294,13 +375,13 @@ test('목록의 「✅ 처리」를 누르면 그 줄에만 입력칸이 펼쳐�
   t.ctx.inboxLoad=async()=>{};
   await t.ctx.inboxListHandleSave(btn);
   assert.deepEqual(JSON.parse(JSON.stringify(t.log.filter(q=>q.rpc==='consultation_inbox_record_reply').map(q=>q.args))),[{p_inbox_id:'a1',p_reply:'목록에서 처리'}]);
-  assert.deepEqual(JSON.parse(JSON.stringify(writes(t.log).map(q=>q.payload))),[{status:'closed',assigned_to:'m1'}]);
+  assert.deepEqual(JSON.parse(JSON.stringify(writes(t.log).map(q=>q.payload))),[{status:'closed'},{assigned_to:'m1'}]);
 });
 
 /* ───────────── ⓘ 글(허브 설정) ───────────── */
 const NEW_KEYS={
   'inbox.th_handled':['처리',[]],'inbox.th_views':['열람',[]],'inbox.btn_handle':['✅ 처리',[]],
-  'inbox.handled_line':['✅ {who} · {time}',['who','time']],'inbox.handled_by':['✅ {who}',['who']],'inbox.views_more':['외 {n}명',['n']],'inbox.m_views':['열람 {names}',['names']],
+  'inbox.handled_line':['✅ {who} · {time}',['who','time']],'inbox.m_handle_memo_fail':['처리됨으로 바꿨지만 메모는 저장하지 못했습니다: {msg} — 상세에서 「답변 기록」으로 다시 남겨 주세요',['msg']],'inbox.views_more':['외 {n}명',['n']],'inbox.m_views':['열람 {names}',['names']],
   'inbox.ph_handle_memo':['어떻게 처리했나요?(선택)',[]],'inbox.btn_handle_save':['처리됨으로 저장',[]],'inbox.btn_handle_cancel':['취소',[]],
   'inbox.d_handle_title':['✅ 처리 완료',[]],'inbox.btn_back':['↑ 목록으로',[]],'inbox.m_handle_fail':['처리 저장 실패: {msg}',['msg']],'inbox.m_handled':['처리됨으로 저장했습니다.',[]]
 };

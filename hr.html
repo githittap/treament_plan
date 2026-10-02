@@ -504,7 +504,7 @@ function ownerBoardHumanizeText(t){
   if(r.indexOf(':')>=0){
     r=r.replace(/(^|[^\d-])(\d{4}-\d{2}-\d{2})([T ])(\d{2}:\d{2})(:\d{2}(?:\.\d+)?)?(\s*(?:Z|[+-]\d{2}(?::?\d{2})?))?(?:[ \t]*(?:\(KST\)|KST))?(?!\d)/g,function(m,pre,date,sep,hm,sec,tz){
       let tzz=tz||'',keep='';
-      if(tzz&&sep!=='T'&&!sec&&tzz.trim().toUpperCase()!=='Z'){keep=tzz;tzz='';}   /* 「10:00-11:00」 같은 시간 범위의 뒤쪽을 시간대로 오해하지 않음 */
+      if(tzz&&sep!=='T'&&!sec&&tzz.trim().charAt(0)==='-'){keep=tzz;tzz='';}   /* 「10:00-11:00」 같은 시간 범위의 뒤쪽을 시간대로 오해하지 않음 */
       const raw=date+' '+hm+(sec||'')+tzz.trim(),p=hubTimeParts(raw);
       return p&&p.h!=null?pre+hubFmtDateTime(raw)+keep:m;
     });
@@ -2536,13 +2536,13 @@ function inboxKakaoBookingDetails(row){
   return {firstLine,schedule,product,option,name,contact,recognized:!!(schedule||product||option||name||contact)};
 }
 function inboxKakaoBookingListLines(row){const d=inboxKakaoBookingDetails(row),fallback=hubFmtWhen(row?.received_at)||inboxT('inbox.kb_time_unknown','받은 시각 확인 필요');return {top:d.schedule||fallback,bottom:(d.product||d.option)?[d.product,d.option].filter(Boolean).join(' · '):d.firstLine};}
-let INBOX_NOTES={replies:[],views:[]},INBOX_HANDLING_OPEN=null,INBOX_LAST_ROWS=[],INBOX_LIST_GROUPS={},INBOX_HANDLE_BUSY=false,INBOX_MEMO_SAVED=null; /* 처리 칸: 목록에 보이는 묶음의 처리 메모(답변 기록)·열람 기록, 펼친 입력칸, 방금 읽은 문의 줄 */
+let INBOX_NOTES={replies:[],views:[]},INBOX_HANDLING_OPEN=null,INBOX_LAST_ROWS=[],INBOX_LIST_GROUPS={},INBOX_HANDLE_BUSY=false; /* 처리 칸: 목록에 보이는 묶음의 처리 메모(답변 기록)·열람 기록, 펼친 입력칸, 방금 읽은 문의 줄 */
 function inboxRole(){return typeof ME!=='undefined'&&ME?ME.role:'';}
 function inboxCanWriteNow(){return ['manager','chief','owner'].includes(inboxRole());}
 function inboxIsOpenStatus(status){return ['new','in_progress','recall_1','recall_2','recall_3'].includes(status);}
 function inboxGroupKey(group){return (group.ids||[group.id]).join(',');}
 function inboxHandleBoxHtml(key){return '<div class="inbox-handle-box"><textarea maxlength="4000" rows="2" data-inbox-handle-memo placeholder="'+esc(inboxT('inbox.ph_handle_memo','어떻게 처리했나요?(선택)'))+'"></textarea><div class="rowflex"><button class="mini stamp" data-inbox-handle-save="'+esc(key)+'">'+esc(inboxT('inbox.btn_handle_save','처리됨으로 저장'))+'</button><button class="mini" data-inbox-handle-cancel="1">'+esc(inboxT('inbox.btn_handle_cancel','취소'))+'</button></div><div class="msg" data-inbox-handle-msg></div></div>';}
-function inboxHandledInfo(group){const ids=new Set(group.ids||[group.id]),notes=(INBOX_NOTES.replies||[]).filter(r=>ids.has(r.inbox_id)).sort((a,b)=>Date.parse(a.created_at)-Date.parse(b.created_at)),last=notes[notes.length-1],assignee=group.assignee_name&&group.assignee_name!=='-'?group.assignee_name:'';return {who:last?nameOf(last.author_id):(assignee||'-'),time:last?(hubFmtWhen(last.created_at)||''):'',memo:last?String(last.reply||'').trim():''};} /* 처리한 사람 = 마지막 메모를 쓴 사람, 메모가 없으면 담당자, 둘 다 없으면 - */
+function inboxHandledInfo(group){const rows=group.messages||[group],ids=new Set(group.ids||[group.id]),done=rows.filter(r=>r&&r.handled_at&&!Number.isNaN(Date.parse(r.handled_at))).sort((a,b)=>Date.parse(a.handled_at)-Date.parse(b.handled_at)).pop(),notes=(INBOX_NOTES.replies||[]).filter(r=>ids.has(r.inbox_id)).sort((a,b)=>Date.parse(a.created_at)-Date.parse(b.created_at)),last=notes[notes.length-1];return {who:done&&done.handled_by?nameOf(done.handled_by):'-',time:done?(hubFmtWhen(done.handled_at)||''):'',memo:last?String(last.reply||'').trim():'',memoMeta:last?nameOf(last.author_id)+' · '+(hubFmtWhen(last.created_at)||''):''};} /* 처리한 사람·시각 = 그 묶음 줄 중 handled_at이 가장 늦은 줄의 handled_by·handled_at(서버 트리거가 기록). 옛 처리됨 줄처럼 기록이 없으면 지어내지 않음(답변 작성자·담당자를 처리자로 쓰지 않음). 메모 = 마지막 답변 글 */
 function inboxHandledHtml(group){
   if(inboxIsOpenStatus(group.status)){
     if(!inboxCanWriteNow()||!inboxReplyTarget(group.messages||[group]))return '-';
@@ -2550,14 +2550,14 @@ function inboxHandledHtml(group){
     return INBOX_HANDLING_OPEN===key?inboxHandleBoxHtml(key):'<button class="mini stamp" data-inbox-handle="'+esc(key)+'">'+esc(inboxT('inbox.btn_handle','✅ 처리'))+'</button>';
   }
   if(group.status==='closed'||group.status==='converted'){
-    const info=inboxHandledInfo(group);if(info.who==='-'&&!info.time&&!info.memo)return '-'; /* 처리한 사람·메모를 모르는 옛 처리됨 줄 */
-    const line=info.time?inboxT('inbox.handled_line','✅ {who} · {time}',{who:info.who,time:info.time}):inboxT('inbox.handled_by','✅ {who}',{who:info.who}),chars=Array.from(info.memo),short=chars.length>40?chars.slice(0,40).join('')+'…':info.memo;
-    return '<div>'+esc(line)+'</div>'+(info.memo?'<div class="inbox-handled-memo" title="'+esc(info.memo)+'">'+esc(short)+'</div>':'');
+    const info=inboxHandledInfo(group),known=info.who!=='-'||!!info.time;if(!known&&!info.memo)return '-'; /* 처리한 사람·메모를 모르는 옛 처리됨 줄 */
+    const line=inboxT('inbox.handled_line','✅ {who} · {time}',{who:info.who,time:info.time}),chars=Array.from(info.memo),short=chars.length>40?chars.slice(0,40).join('')+'…':info.memo;
+    return (known?'<div>'+esc(line)+'</div>':'')+(info.memo?'<div class="inbox-handled-memo" title="'+esc(info.memoMeta+'\n'+info.memo)+'">'+esc(short)+'</div>':'');
   }
   return '-';
 }
 function inboxViewsInfo(group){const ids=new Set(group.ids||[group.id]),latest=new Map();for(const v of INBOX_NOTES.views||[]){if(!ids.has(v.inbox_id))continue;const at=Date.parse(v.viewed_at)||0,cur=latest.get(v.viewer_id);if(cur===undefined||at>cur)latest.set(v.viewer_id,at);}const sorted=[...latest.entries()].sort((a,b)=>b[1]-a[1]);if(!sorted.length)return {text:'-',title:''};const names=sorted.map(([id])=>nameOf(id)),shown=names.slice(0,2).join(', ')+(names.length>2?' '+inboxT('inbox.views_more','외 {n}명',{n:names.length-2}):'');return {text:shown,title:sorted.map(([,at],i)=>names[i]+' '+formatLeaveTimestamp(at)).join('\n')};} /* 원장 전용: 서로 다른 열람자를 최근 순 2명 + 외 n명, 전체는 title */
-async function inboxFillEmptyAssignee(rows){try{const me=typeof ME!=='undefined'&&ME?ME.id:null,empty=(rows||[]).filter(row=>!row.assigned_to).map(row=>row.id);if(!me||!empty.length)return false;const {error}=await sb.from('consultation_inbox').update({assigned_to:me}).in('id',empty);if(error)return false;(rows||[]).forEach(row=>{if(!row.assigned_to)row.assigned_to=me;});return true;}catch(e){return false;}} /* 담당이 비어 있는 줄만 지금 사람으로 채움 — 이미 담당이 있으면 그대로, 실패해도 본 흐름을 막지 않음 */
+async function inboxFillEmptyAssignee(rows){try{const me=typeof ME!=='undefined'&&ME?ME.id:null,empty=(rows||[]).filter(row=>!row.assigned_to).map(row=>row.id);if(!me||!empty.length)return false;const {error}=await sb.from('consultation_inbox').update({assigned_to:me}).in('id',empty).is('assigned_to',null);if(error)return false;(rows||[]).forEach(row=>{if(!row.assigned_to)row.assigned_to=me;});return true;}catch(e){return false;}} /* 담당이 비어 있는 줄만 지금 사람으로 채움 — 그 사이 다른 사람이 배정했으면(DB의 지금 값이 비어 있지 않으면) 그대로, 실패해도 본 흐름을 막지 않음 */
 /* consultation-inbox:test-end */
 /* consultation-journal:test-end */
 const CONSULTATION_SHEETS=['교정','확정','미확정 및 부분확정','홈페이지','카카오,네이버예약,당근','원본'];
@@ -2628,8 +2628,9 @@ function inboxRenderList(rows){
 async function inboxLoad(){
   const columns='id,source,external_event_id,received_at,sender_name,contact,subject,message,status,assigned_to,journal_id';
   const load=fields=>{let q=sb.from('consultation_inbox').select(fields).order('received_at',{ascending:false}).limit(150);if(INBOX_FILTER.source)q=q.eq('source',INBOX_FILTER.source);if(INBOX_FILTER.status)q=q.eq('status',INBOX_FILTER.status);if(INBOX_ONLY_RESERVATIONS)q=q.eq('source','kakao').like('external_event_id','kbook-%');return q;};
-  let result=await load(columns+',dentweb_entered_at,dentweb_entered_by');INBOX_DENTWEB_FIELDS_AVAILABLE=!result.error;
-  if(result.error&&(['42703','PGRST204'].includes(result.error.code)||/column .* does not exist|could not find .* column/i.test(result.error.message||''))){result=await load(columns);INBOX_DENTWEB_FIELDS_AVAILABLE=false;}
+  const missingColumn=e=>!!e&&(['42703','PGRST204'].includes(e.code)||/column .* does not exist|could not find .* column/i.test(e.message||'')),handledCols=',handled_by,handled_at',dentwebCols=',dentweb_entered_at,dentweb_entered_by';
+  let result=await load(columns+handledCols+dentwebCols);INBOX_DENTWEB_FIELDS_AVAILABLE=!result.error;
+  if(missingColumn(result.error)){result=await load(columns+dentwebCols);INBOX_DENTWEB_FIELDS_AVAILABLE=!result.error;if(missingColumn(result.error)){result=await load(columns+handledCols);INBOX_DENTWEB_FIELDS_AVAILABLE=false;if(missingColumn(result.error))result=await load(columns);}} /* DB에 처리자 칸(handled_*)이나 덴트웹 칸이 아직 없을 때(올리기 전·되돌린 뒤)는 없는 칸만 빼고 다시 읽음 */
   if(result.error){const el=$('#inboxList');if(el)el.innerHTML='<div class="cal-error">'+esc(inboxT('inbox.err_load','문의함 불러오기 실패: {msg}',{msg:result.error.message}))+'</div>';return;}
   let countResult={count:null,error:null};if(INBOX_DENTWEB_FIELDS_AVAILABLE)countResult=await sb.from('consultation_inbox').select('id',{count:'exact',head:true}).eq('source','kakao').like('external_event_id','kbook-%').is('dentweb_entered_at',null);
   INBOX_UNENTERED_RESERVATION_COUNT=countResult.error||countResult.count==null?(result.data||[]).filter(row=>inboxIsKakaoBooking(row)&&!row.dentweb_entered_at).length:countResult.count;
@@ -2672,22 +2673,19 @@ async function inboxMarkHandled(messages,memo,msgEl){
   if(INBOX_HANDLE_BUSY||!canWriteInbox()||!processable.length||!target)return false;
   INBOX_HANDLE_BUSY=true;
   try{
-    const note=String(memo||'').trim();
-    if(note&&!(INBOX_MEMO_SAVED&&INBOX_MEMO_SAVED.id===target.id&&INBOX_MEMO_SAVED.note===note)){
-      const reply=await sb.rpc('consultation_inbox_record_reply',{p_inbox_id:target.id,p_reply:note});
-      if(reply.error){say(inboxT('inbox.m_handle_fail','처리 저장 실패: {msg}',{msg:reply.error.message}));return false;}
-      INBOX_MEMO_SAVED={id:target.id,note};
-    }
-    const me=ME&&ME.id?ME.id:null,ids=processable.map(row=>row.id),empty=me?processable.filter(row=>!row.assigned_to).map(row=>row.id):[],kept=ids.filter(id=>!empty.includes(id));
-    if(empty.length){const r=await sb.from('consultation_inbox').update({status:'closed',assigned_to:me}).in('id',empty);if(r.error){say(inboxT('inbox.m_handle_fail','처리 저장 실패: {msg}',{msg:r.error.message}));return false;}}
-    if(kept.length){const r=await sb.from('consultation_inbox').update({status:'closed'}).in('id',kept);if(r.error){say(inboxT('inbox.m_handle_fail','처리 저장 실패: {msg}',{msg:r.error.message}));return false;}}
-    INBOX_MEMO_SAVED=null;INBOX_HANDLING_OPEN=null;
+    const note=String(memo||'').trim(),me=ME&&ME.id?ME.id:null,ids=processable.map(row=>row.id);
+    const state=await sb.from('consultation_inbox').update({status:'closed'}).in('id',ids);
+    if(state.error){say(inboxT('inbox.m_handle_fail','처리 저장 실패: {msg}',{msg:state.error.message}));return false;}
+    if(me){try{await sb.from('consultation_inbox').update({assigned_to:me}).in('id',ids).is('assigned_to',null);}catch(e){}}
+    let memoFail='';
+    if(note){const reply=await sb.rpc('consultation_inbox_record_reply',{p_inbox_id:target.id,p_reply:note});if(reply.error){memoFail=inboxT('inbox.m_handle_memo_fail','처리됨으로 바꿨지만 메모는 저장하지 못했습니다: {msg} — 상세에서 「답변 기록」으로 다시 남겨 주세요',{msg:reply.error.message});say(memoFail);alert(memoFail);}}
+    INBOX_HANDLING_OPEN=null;
     const sel=INBOX_SELECTED,fromDetail=!!(sel&&Array.isArray(sel.ids)&&sel.ids.some(id=>ids.includes(id)));
-    if(fromDetail){INBOX_SELECTED=null;const detail=$('#inboxDetail');if(detail)detail.innerHTML=esc(inboxT('inbox.m_handled','처리됨으로 저장했습니다.'));}
+    if(fromDetail){INBOX_SELECTED=null;const detail=$('#inboxDetail');if(detail)detail.innerHTML=esc(memoFail||inboxT('inbox.m_handled','처리됨으로 저장했습니다.'));}
     await inboxLoad();setStatus('saved');if(fromDetail)inboxBackToList();
     return true;
   }finally{INBOX_HANDLE_BUSY=false;}
-} /* 「✅ 처리」: 메모가 있으면 먼저 답변 기록(RPC)을 남기고, 처리 대상 줄을 모두 처리됨으로 — 담당이 빈 줄만 지금 사람으로 채움(이미 담당이 있으면 그대로) */
+} /* 「✅ 처리」: ①처리 대상 줄을 모두 처리됨으로(실패하면 아무것도 안 바뀜) ②담당은 DB의 지금 값이 비어 있는 줄만 지금 사람으로(그 사이 배정된 담당은 그대로) ③메모가 있으면 마지막에 답변 기록 — 상태가 바뀐 뒤에만 메모가 한 번 들어가므로 중복되지 않음. 처리한 사람·시각은 DB 트리거가 기록 */
 async function inboxListHandleSave(button){
   const messages=INBOX_LIST_GROUPS[button.dataset.inboxHandleSave];if(!messages)return;
   const box=button.closest?button.closest('.inbox-handle-box'):null,memoEl=box?box.querySelector('[data-inbox-handle-memo]'):null,msgEl=box?box.querySelector('[data-inbox-handle-msg]'):null;
