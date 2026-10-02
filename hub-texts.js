@@ -59,6 +59,7 @@ function hubSetting(key,def){
   const v=HUB_SETTING_VALUES[key];
   return (typeof v==='string'&&v.trim()!=='')?v:def;
 }
+function hubSettingBoolean(key,def){return Object.prototype.hasOwnProperty.call(HUB_SETTING_VALUES,key)?HUB_SETTING_VALUES[key]==='true':def;}
 function hubSettingNumber(key,def){
   const n=Number(hubSetting(key,String(def)));
   return Number.isFinite(n)?n:def;
@@ -1316,6 +1317,8 @@ function hubTextDefsChapter7(add){
   add('mkt.owner_only',S6,'마케팅비 — 원장이 아닌 사람이 볼 때','원장 전용입니다.');
   add('mkt.title',S6,'마케팅비 카드 제목(오류 화면 포함)','📣 마케팅비');
   add('mkt.sub',S6,'마케팅비 카드 제목 옆 작은 글(오류 화면 포함)','(원장 전용)');
+  add('mkt.manager_sub',S6,'매니저 마케팅비 화면 제목 옆 설명','(마케팅 분류 내역만 · 읽기 전용)');
+  add('mkt.view_unavailable',S6,'매니저 보기 설정이 꺼져 있거나 열람할 수 없을 때','마케팅비 열람이 꺼져 있거나 사용할 수 없습니다.');
   add('mkt.err_storage',S6,'마케팅비 — 마케팅비 저장 공간을 못 읽었을 때','마케팅비 저장 공간을 아직 불러오지 못했습니다.');
   add('mkt.err_load',S6,'마케팅비 — 마케팅비를 못 불러왔을 때','마케팅비를 불러오지 못했습니다.');
   add('mkt.merchant_unknown',S6,'마케팅비 — 내역 한 줄: 가맹점 이름을 모를 때','가맹점 미확인');
@@ -1636,7 +1639,8 @@ const HUB_SETTING_DEFS=[
   {key:'aiu.model_days',screen:'💰 AI비용 기준',label:'사용량 현황판 「모델별 사용량」 기간',where:'AI비용 › 사용량 현황판 — 모델별 사용량을 최근 며칠치로 모아 보여 줄지(제목·합계 글의 일수도 같이 바뀌어요)',def:'7',kind:'int',min:3,max:30,unit:'일'},
   {key:'aiu.cost_months',screen:'💰 AI비용 기준',label:'사용량 현황판 「월별 합계」에 보이는 개월 수',where:'AI비용 › 사용량 현황판 › 정가 환산 — 월별 합계 막대를 몇 달치까지 보여 줄지(PC가 올린 달만 나와요)',def:'6',kind:'int',min:2,max:24,unit:'개월'},
   {key:'aiu.external_days',screen:'💰 AI비용 기준',label:'사용량 현황판 「외부 AI」 날짜별 표 일수',where:'AI비용 › 사용량 현황판 › 외부 AI — 날짜별 표에 최근 며칠치까지 보여 줄지(PC가 올린 날짜까지만 나와요 · 위쪽 작은 글의 일수도 같이 바뀌어요)',def:'14',kind:'int',min:3,max:60,unit:'일'},
-  {key:'aiu.session_limit',screen:'💰 AI비용 기준',label:'사용량 현황판 「대화 효율 점검」에 보이는 대화 수',where:'AI비용 › 사용량 현황판 › 대화 효율 점검 — 돈이 새는 대화를 최대 몇 개까지 보여 줄지',def:'8',kind:'int',min:3,max:30,unit:'건'}
+  {key:'aiu.session_limit',screen:'💰 AI비용 기준',label:'사용량 현황판 「대화 효율 점검」에 보이는 대화 수',where:'AI비용 › 사용량 현황판 › 대화 효율 점검 — 돈이 새는 대화를 최대 몇 개까지 보여 줄지',def:'8',kind:'int',min:3,max:30,unit:'건'},
+  {key:'marketing.manager_view_enabled',screen:'📣 마케팅비 기준',label:'마케팅비 매니저 보기',where:'켬이면 매니저가 마케팅 분류 내역만 읽을 수 있어요. 미분류·제외 내역과 수정은 원장만 가능해요.',def:'true',kind:'bool'}
 ];
 function hubSettingDefByKey(key){
   for(let i=0;i<HUB_SETTING_DEFS.length;i++)if(HUB_SETTING_DEFS[i].key===key)return HUB_SETTING_DEFS[i];
@@ -1645,6 +1649,7 @@ function hubSettingDefByKey(key){
 // 값 검사: 화면에서 막고, 읽을 때는 모양이 틀리면 기본값을 쓴다. 통과하면 {ok:true,value}, 아니면 {ok:false,reason}.
 function hubSettingValidate(def,raw){
   const v=String(raw==null?'':raw).trim();
+  if(def.kind==='bool')return v==='true'||v==='false'?{ok:true,value:v}:{ok:false,reason:'켬 또는 끔을 골라 주세요.'};
   if(def.kind==='time'){
     if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(v))return {ok:false,reason:'시각은 09:40 처럼 시:분(24시간)으로 적어 주세요.'};
     return {ok:true,value:v};
@@ -2110,6 +2115,7 @@ async function hubRenderSettingsSection(sec){
 }
 // 정수 목록은 화면에 「14, 30, 60」 모양으로 보여 주고, 기본값 비교도 같은 모양(검사를 거친 값)으로 한다.
 function hubSettingShow(d,raw){
+  if(d.kind==='bool')return raw==='true'?'켬':'끔';
   if(d.kind!=='intlist')return raw;
   const chk=hubSettingValidate(d,raw);
   return chk.ok?JSON.parse(chk.value).join(', '):String(raw);
@@ -2131,7 +2137,9 @@ function hubDrawSettingsSection(sec){
       return '<details class="hub-grp" open><summary>'+hubEsc(g.name)+' <span class="sub">('+g.items.length+'개)</span></summary>'+
         g.items.map(function(x){
           const d=x.d,i=x.i,cur=hubSetting(d.key,d.def);
-          const input=d.kind==='time'
+          const input=d.kind==='bool'
+            ?'<select id="hubSetIn_'+i+'"><option value="true"'+(cur==='true'?' selected':'')+'>켬</option><option value="false"'+(cur!=='true'?' selected':'')+'>끔</option></select>'
+            :d.kind==='time'
             ?'<input id="hubSetIn_'+i+'" type="time" value="'+hubEsc(cur)+'">'
             :d.kind==='intlist'
             ?'<input id="hubSetIn_'+i+'" type="text" inputmode="numeric" size="16" placeholder="14, 30, 60" value="'+hubEsc(hubSettingShow(d,cur))+'"> '+hubEsc(d.unit||'')+' (쉼표로 나눠 적어요)'
@@ -2356,6 +2364,7 @@ const HubUi={
 root.hubText=hubText;
 root.hubTextHtml=hubTextHtml;
 root.hubSetting=hubSetting;
+root.hubSettingBoolean=hubSettingBoolean;
 root.hubSettingNumber=hubSettingNumber;
 root.hubSettingChecked=hubSettingChecked;
 root.hubContractExpiryDays=hubContractExpiryDays;

@@ -40,6 +40,10 @@ try{
   assert.equal((await q('select * from public.marketing_month_budgets')).length,1);
   assert.ok((await q('select category from public.marketing_merchant_rules')).every(r=>r.category!=='not_marketing'));
   assert.equal((await q('select * from public.marketing_foreign_charge_links')).length,1);
+  await asUser('owner');await q("update public.app_settings set key='marketing.manager_view_saved' where key='marketing.manager_view_enabled'");
+  await asUser('manager');assert.equal((await visible()).length,5,'missing preference defaults to on');
+  await asUser('owner');await q("update public.app_settings set key='marketing.manager_view_enabled' where key='marketing.manager_view_saved'");
+  await asUser('manager');
   assert.equal((await q("update public.marketing_expense_events set category_override='meta' returning id")).length,0);
   assert.equal((await q('update public.marketing_month_budgets set amount_krw=1 returning month')).length,0);
   assert.equal((await q("update public.marketing_merchant_rules set category='meta' returning merchant_key")).length,0);

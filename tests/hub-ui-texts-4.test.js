@@ -107,7 +107,7 @@ test('숫자·목록 기본값: 결재 건수 2개와 결재 종류·일정 종�
   assert.match(read('db/hr_schema.sql'),/kind text default '이벤트'\s*check \(kind in \('이벤트', '단축근무', '면접'\)\)/);
   assert.match(read('db/hr_schema.sql'),/check \(kind in \('연차', '소명', '사직서', '보고', '기타'\)\)/);
   assert.equal(L('list.approval_kinds').addable,false);assert.equal(L('list.calendar_kinds').addable,false);
-  assert.match(hr,/hub-texts\.js\?v=2026100306/,'캐시 번호를 새 값으로 올림(차례 5에서 2026100110 → 2026100111, 차례 6에서 → 2026100112, 차례 7에서 → 2026100113, 10-02 원장요청 5건에서 → 2026100221, 10-02 인박스 판에서 → 2026100306)');
+  assert.match(hr,/hub-texts\.js\?v=2026100307/,'캐시 번호를 새 값으로 올림(차례 5에서 2026100110 → 2026100111, 차례 6에서 → 2026100112, 차례 7에서 → 2026100113, 10-02 원장요청 5건에서 → 2026100221, 10-02 인박스 판에서 → 2026100307)');
   // 이전 차례들이 쓰는 캐시 기대값이 남지 않음
   assert.ok(!/hub-texts\.js\?v=2026100109/.test(hr));
 });
@@ -388,7 +388,7 @@ test('화면: 🔢 숫자·기준 — 결재 건수 2개가 더 있고 잘못된
   await t.render(OWNER);
   await t.click('[hub-subtab]=settings');
   const sec=t.section.innerHTML;
-  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,14+4+1+8,'차례 5의 문의함·상담일지 숫자 4개가 더 있음');
+  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,14+4+1+8+1,'차례 5의 문의함·상담일지 숫자 4개가 더 있음');
   assert.ok(sec.includes('🖊 결재 기준'));
   assert.match(sec,/id="hubSetIn_12" type="number" inputmode="numeric" min="5" max="100" value="20"/);
   assert.match(sec,/id="hubSetIn_13" type="number" inputmode="numeric" min="10" max="200" value="50"/);

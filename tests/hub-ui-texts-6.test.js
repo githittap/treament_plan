@@ -92,12 +92,12 @@ test('화면 코드(hr.html)에 박힌 기본 글이 기본값 목록과 글자�
 
 test('숫자: 만료 알림 일수 하나(정수 목록) · 다른 숫자 18개는 그대로 · 캐시 번호 · DB에도 같은 일수가 없음',()=>{
   const h=helpers();
-  assert.equal(h.HUB_SETTING_DEFS.length,27);
+  assert.equal(h.HUB_SETTING_DEFS.length,28);
   const d=h.HUB_SETTING_DEFS[18];
   assert.deepEqual(clone([d.key,d.screen,d.def,d.kind,d.min,d.max,d.unit]),[EXPIRY,'📝 근로계약 기준','[14,30,60]','intlist',1,365,'일']);
   assert.ok(d.where.includes('가장 작은 수=긴급')&&d.where.includes('이미 저장된 계약서는 안 바뀌어요'));
   assert.match(hr,/typeof hubContractExpiryDays==='function'\?hubContractExpiryDays\(\):\[14,30,60\]/,'화면은 허브 설정 일수를 읽고 엔진이 없으면 14·30·60');
-  assert.match(hr,/hub-texts\.js\?v=2026100306/,'캐시 번호를 새 값으로 올림(차례 5에서 2026100111 → 2026100112, 차례 7에서 → 2026100113, 10-02 원장요청 5건에서 → 2026100221, 10-02 인박스 판에서 → 2026100306)');
+  assert.match(hr,/hub-texts\.js\?v=2026100307/,'캐시 번호를 새 값으로 올림(차례 5에서 2026100111 → 2026100112, 차례 7에서 → 2026100113, 10-02 원장요청 5건에서 → 2026100221, 10-02 인박스 판에서 → 2026100307)');
   assert.ok(!/hub-texts\.js\?v=2026100111/.test(hr));
   // 화면에만 있던 숫자라 옮김 — DB 함수·크론·Edge에 같은 일수가 있으면 안 옮겼어야 함
   const files=[];
@@ -370,7 +370,7 @@ test('화면: 🔢 숫자·기준에 「📝 근로계약 기준」 칸이 있�
   await t.render(OWNER);
   await t.click('[hub-subtab]=settings');
   const sec=t.section.innerHTML;
-  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,27);
+  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,28);
   assert.ok(sec.includes('📝 근로계약 기준'));
   assert.match(sec,/id="hubSetIn_18" type="text" inputmode="numeric" size="16" placeholder="14, 30, 60" value="14, 30, 60"> 일 \(쉼표로 나눠 적어요\)/);
   assert.match(sec,/처음 값 14, 30, 60 · 숫자 1~5개, 각각 1~365 사이/);

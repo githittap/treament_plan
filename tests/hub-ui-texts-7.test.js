@@ -54,7 +54,8 @@ function fakeSb(opts){
   return {sb:{from},state};
 }
 const dynRows=defs=>defs.map(d=>({key:d.key,value:'«'+d.key+'»'+(d.vars?' '+d.vars.map(v=>'{'+v+'}').join(' '):'')}));
-const ch7Defs=()=>helpers().hubTextDefs().filter(d=>CH7.test(d.key));
+// 기존 차례 7 화면 대조 범위. 새 매니저 전용 글은 marketing-manager-ui.test.js에서 실제 화면으로 확인함.
+const ch7Defs=()=>helpers().hubTextDefs().filter(d=>CH7.test(d.key)&&!['mkt.manager_sub','mkt.view_unavailable'].includes(d.key));
 const allOut=out=>Object.values(out).join('\n');
 const J=x=>JSON.parse(x);
 const run=(textRows,settings,o)=>renderAll(hr,Object.assign({engine:true,textRows:textRows||[],settings:settings||{}},o||{}));
@@ -82,7 +83,7 @@ test('차례 7 글 목록: 키 모양·중복 없음·{자리표시자} 일치·
   // 앞 차례 키와 겹치지 않음
   const h=helpers();
   const earlier=h.hubTextDefs().filter(d=>!CH7.test(d.key));
-  assert.equal(earlier.length+COUNT,h.hubTextDefs().length);
+  assert.equal(earlier.length+COUNT+2,h.hubTextDefs().length,'기존 차례 7 글과 매니저 전용 글 2개');
 });
 test('화면 코드(hr.html)에 박힌 기본 글이 기본값 목록과 글자까지 같고, 목록의 모든 키가 화면에서 쓰인다',()=>{
   const h=helpers(),found=new Map();
@@ -99,11 +100,11 @@ test('화면 코드(hr.html)에 박힌 기본 글이 기본값 목록과 글자�
     assert.equal(found.get(d.key),d.def,d.key+' 기본 글이 화면 코드와 다름');
   }
   for(const k of found.keys())assert.ok(h.hubTextDefByKey(k),k+' 는 화면에서 쓰는데 기본값 목록에 없음');
-  assert.equal(found.size,COUNT);
+  assert.equal(found.size,COUNT+2,'기존 글과 새 매니저 전용 글 2개가 실제 화면에서 쓰임');
 });
 test('숫자 8개·이름 목록 7개: 기본값이 화면 코드와 같고, 화면 표시용 숫자만(계산식 숫자는 없음) · 캐시 번호',()=>{
   const h=helpers();
-  assert.equal(h.HUB_SETTING_DEFS.length,27);
+  assert.equal(h.HUB_SETTING_DEFS.length,28);
   const S=k=>h.HUB_SETTING_DEFS.find(d=>d.key===k);
   const expect={'home.payslip_limit':['12',1,36,'개월'],'dep.list_limit':['300',50,1000,'건'],'aic.history_months':['6',1,24,'개월'],'aic.auto_limit':['20',5,100,'건'],'aiu.model_days':['7',3,30,'일'],'aiu.cost_months':['6',2,24,'개월'],'aiu.external_days':['14',3,60,'일'],'aiu.session_limit':['8',3,30,'건']};
   for(const k of NUM_KEYS){
@@ -131,7 +132,7 @@ test('숫자 8개·이름 목록 7개: 기본값이 화면 코드와 같고, 화
     assert.ok(d.where&&d.note&&d.screen);
     assert.equal(h.hubListValidate(d,d.def).ok,true,k+' 기본 목록은 저장 검사를 통과');
   }
-  assert.match(hr,/hub-texts\.js\?v=2026100306/,'월별 비용 정리의 새 문구 목록을 불러오도록 캐시 번호를 올림');
+  assert.match(hr,/hub-texts\.js\?v=2026100307/,'월별 비용 정리의 새 문구 목록을 불러오도록 캐시 번호를 올림');
   assert.ok(!/hub-texts\.js\?v=2026100112/.test(hr));
 });
 
@@ -492,7 +493,7 @@ test('화면: 🔢 숫자·기준에 새 숫자 8개(27개)가 있고 잘못된 
   await t.render(OWNER);
   await t.click('[hub-subtab]=settings');
   const sec=t.section.innerHTML;
-  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,27);
+  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,28);
   for(const s of ['🏠 홈·입금 기준','💰 AI비용 기준'])assert.ok(sec.includes(s),s);
   for(const k of NUM_KEYS)assert.ok(sec.includes('이름표: '+k),k);
   const idx=k=>t.ctx.window&&helpers().HUB_SETTING_DEFS.findIndex(d=>d.key===k);
