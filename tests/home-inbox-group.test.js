@@ -39,7 +39,7 @@ test('상세 줄은 시각·상태·내용을 escape하고 묶음 줄은 기존 
   assert.match(h.homeInboxRecentLine({receivedAt:'2026-10-01T00:00:00Z',source:'전화',name:'홍길동',message:'문의',status:'new',count:2},true),/\(2건\)$/);
   assert.match(html,/select\('id,source,received_at,sender_name,message,status'\)\.order\('received_at',\{ascending:false\}\)\.limit\(30\)/);
   assert.match(html,/recentRows=homeInboxRecentGroups\(recent\)/);assert.match(html,/row\.items\.map\(homeInboxRecentDetailLine\)/);
-  const cardStart=html.indexOf('homeInboxCard=`'),cardEnd=html.indexOf(';\n  }',cardStart),card=html.slice(cardStart,cardEnd);
+  const cardStart=html.indexOf('homeInboxCard=`'),cardMatch=html.slice(cardStart).match(/;\r?\n  }/),cardEnd=cardMatch?cardStart+cardMatch.index:-1,card=html.slice(cardStart,cardEnd);
   assert.ok(cardStart>=0&&cardEnd>cardStart,'홈 문의함 카드 템플릿이 있어야 한다');
   assert.match(card,/<details><summary class="hint" style="padding:5px 0;border-top:1px dashed var\(--line\);cursor:pointer">\$\{homeInboxRecentLine\(row,true\)\}<\/summary>/);
   assert.doesNotMatch(card,/<summary[^>]*>\s*<span/,'summary 글을 display:block span으로 감싸면 안 된다');
