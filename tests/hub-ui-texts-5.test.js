@@ -126,7 +126,7 @@ test('숫자·목록 기본값: 숫자 4개와 문의 출처·문의 상태·상
   assert.match(read('db/consultation_inbox_followup_draft.sql'),/status in \('new','in_progress','recall_1','recall_2','recall_3','closed','converted'\)/);
   assert.match(read('db/consultation_journal_draft.sql'),/source_sheet in \('교정', '확정', '미확정 및 부분확정', '홈페이지', '카카오,네이버예약,당근', '원본'\)/);
   assert.match(read('db/consultation_journal_draft.sql'),/status in \('대기', '미확정', '부분확정', '확정', '종결'\)/);
-  assert.match(hr,/hub-texts\.js\?v=2026100223/,'캐시 번호를 새 값으로 올림(차례 5에서 2026100110 → 2026100111, 차례 6에서 → 2026100112, 차례 7에서 → 2026100113, 10-02 원장요청 5건에서 → 2026100221, 10-02 인박스 판에서 → 2026100223)');
+  assert.match(hr,/hub-texts\.js\?v=2026100306/,'캐시 번호를 새 값으로 올림(차례 5에서 2026100110 → 2026100111, 차례 6에서 → 2026100112, 차례 7에서 → 2026100113, 10-02 원장요청 5건에서 → 2026100221, 10-02 인박스 판에서 → 2026100306)');
   assert.ok(!/hub-texts\.js\?v=2026100110/.test(hr));
 });
 
