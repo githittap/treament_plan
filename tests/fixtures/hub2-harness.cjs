@@ -54,7 +54,7 @@ async function renderAll(html,opts){
       isLead:()=>['chief','owner'].includes(ctx.ME.role),isMgr:()=>['manager','chief','owner'].includes(ctx.ME.role),isLeaveDocsLead:()=>['manager','chief','owner'].includes(ctx.ME.role),
       nameOf:uid=>{const p=PROFILES.find(x=>x.user_id===uid);return p?p.name:(uid||'').slice(0,6);},
       contractDate:s=>s?String(s).slice(0,10):'-',contractTitle:r=>r.title||'근로계약서',
-      setStatus(){},render(){},refreshBadges(){},show(){},hide(){},alert:m=>alerts.push(String(m)),prompt:()=>'사유입니다',confirm:()=>true,
+      today:()=>'2026-10-03',setStatus(){},render(){},refreshBadges(){},show(){},hide(){},alert:m=>alerts.push(String(m)),prompt:()=>'사유입니다',confirm:()=>true,
       documentPreviewMarkup:()=>'',previewStorageAttachmentStub:null,openLeave(){},
       crypto:{randomUUID:()=>'uuid-1'},URL:{createObjectURL:()=> 'blob:x',revokeObjectURL(){}},setTimeout:()=>0,
       document:{createElement:()=>({click(){}}),querySelector:()=>null},

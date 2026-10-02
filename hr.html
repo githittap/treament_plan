@@ -1952,7 +1952,14 @@ function hubT(k,d,v){return typeof hubText==='function'?hubText(k,d,v):(v?String
 const workDocuments=[
   {icon:'🩺',category:'진료 매뉴얼',title:'진료 매뉴얼',description:'진료실·상담 직무에 필요한 업무 안내를 확인합니다.',depts:['진료실','상담'],manual:true,url:'https://app.notion.com/p/1f7ba489f082806e9761e748524994bc?source=copy_link'}
 ];
-function workDocumentsForProfile(items,profile){const dept=String(profile?.dept||profile?.department||'').trim(),group=String(profile?.job_group||'').trim();return (items||[]).filter(item=>!item.manual||(group?group==='clinical_consult':!!item.depts&&item.depts.includes(dept)));}
+function workDocumentsForProfile(items,profile){
+  const dept=String(profile?.dept||profile?.department||'').trim(),group=String(profile?.job_group||'').trim();
+  const code=group||({'진료실':'clinical_consult','상담':'clinical_consult','데스크':'desk','기공팀':'lab','기공':'lab','소독·행정':'sterilization_admin','행정':'sterilization_admin','소독':'sterilization_admin'})[dept]||'';
+  const raw=typeof hubSetting==='function'?String(hubSetting('manual.url.'+code,'')).trim():'';
+  const url=/^https?:\/\/[^\s\/?#<>"'\\`@:]+(?::\d{1,5})?(?:[\/?#][^\s<>"'\\`]*)?$/i.test(raw)?raw:'';
+  if(url){const manual=(items||[]).find(item=>item.manual)||{icon:'📚',title:hubT('manual.card_title','업무 매뉴얼'),category:hubT('manual.card_title','업무 매뉴얼'),description:hubT('manual.card_hint','내 직무에 맞는 업무 안내를 확인합니다.'),manual:true};return [Object.assign({},manual,{url,title:hubT('manual.card_title','업무 매뉴얼'),category:hubT('manual.card_title','업무 매뉴얼'),description:hubT('manual.card_hint','내 직무에 맞는 업무 안내를 확인합니다.')}),...(items||[]).filter(item=>!item.manual)];}
+  return (items||[]).filter(item=>!item.manual||(group?group==='clinical_consult':!!item.depts&&item.depts.includes(dept)));
+}
 function filterWorkDocuments(items,query){const q=String(query||'').trim().toLocaleLowerCase();return (items||[]).filter(item=>!q||[item.title,item.description,item.category].some(value=>String(value||'').toLocaleLowerCase().includes(q)));}
 /* work-documents:test-end */
 /* work-documents:render-start */
@@ -1994,7 +2001,7 @@ async function unsubscribePushNotifications(){const msg=$('#pushMsg');try{if(!na
 function hubT(k,d,v){return typeof hubText==='function'?hubText(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
 function renderWorkDocuments(m){
   if(WORK_DOC_GUIDE_OPEN){m.innerHTML=`<div class="card">${workDocumentsGuideHtml()}</div>`;return;}
-  const visibleWorkDocuments=workDocumentsForProfile(workDocumentItems(),ME);
+  const visibleWorkDocuments=workDocumentsForProfile(workDocumentItems(),Object.assign({},ME,(typeof PROFILES!=='undefined'&&PROFILES.find(p=>p.user_id===ME.id))||{}));
   WORK_DOC_VISIBLE_ITEMS=visibleWorkDocuments;
   m.innerHTML=`<div class="card"><h2>${esc(hubT('workdoc.title','📚 업무자료'))}</h2><p class="hint">${esc(hubT('workdoc.hint','직원 업무에 필요한 공개 자료를 한곳에서 확인합니다.'))}</p><div class="workdocs-grid"><article class="workdoc-card"><div class="workdoc-icon">🧭</div><div class="sub">${esc(hubT('workdoc.guide_card.label','직원용 안내'))}</div><h3>${esc(hubT('workdoc.guide_card.title','직원 허브 사용 설명서'))}</h3><p>${esc(hubT('workdoc.guide_card.desc','홈·근무표·연차·결재·서류함을 처음 사용하는 방법을 확인합니다.'))}</p><button type="button" class="mini" onclick="showWorkDocumentsGuide()">${esc(hubT('workdoc.guide_card.button','업무자료 설명서 열기'))}</button></article></div><input id="workDocSearch" style="width:100%;margin-top:10px" type="search" placeholder="${esc(hubT('workdoc.search.placeholder','자료 검색'))}" value="${esc(WORK_DOC_QUERY)}" oninput="WORK_DOC_QUERY=this.value;renderWorkDocumentResults()"><div id="workDocResults" class="workdocs-grid">${workDocumentCards(visibleWorkDocuments)}</div></div>${pushNotificationCard()}`;
 }
@@ -2333,7 +2340,7 @@ async function deleteCalendarEvent(id){
 /* ── 온보딩 ── */
 /* onboarding-guide:test-start */
 function hubT(k,d,v){return typeof hubText==='function'?hubText(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
-const G_ONBOARDING_GUIDE_ITEMS=['병원 시설을 둘러보고 식당·출퇴근 기록 장치 등 기본 시설 사용법을 안내받는다.','조직도, 호칭, 기본 예절, 업무 분장, 근로계약과 복리후생 설명을 듣는다.','무전기를 지급받으면 담당자에게 사용법과 업무용 대화 범위를 확인한다.','소속 부서의 담당자, 보고 라인, 당일 교육 항목을 확인한다.','기본 도구와 오픈·마감 절차를 확인한다.','무전은 들었다는 뜻으로 최초 1회 응답한다.','진료실·데스크에서 큰 소리의 사담을 피하고, 환자 앞에서 치료계획 변경이나 내부 판단을 논의하지 않으며 필요한 설명과 양해를 먼저 제공한다.','환자가 언제 어떻게 납부하기로 했는지, 비급여 차감 등 금액 관련 사항이 있으면 상담·데스크 기록을 일치시킨다.','대기시간과 환자 동선을 안내하고 접수 후 어디에서 기다리는지 분명히 설명한다.','컴플레인은 말을 끊지 않고 듣고, 담당자에게 즉시 보고한 뒤 단독으로 확정 약속하지 않는다.','상담 전 최신 수가표와 내부 설명 자료의 사용 범위를 담당자에게 확인한다.','신환은 구강포토와 상담 차트를 준비하고 지정 위치에 기록·스캔한다.','임플란트 식립 후 1차 내원은 s/o 또는 드레싱, 2차 내원은 3주 후, 3차 내원은 6주 후로 안내한다.','사용한 기구와 재료는 원래 위치에 정리하고 오픈·마감 시 정리 항목을 체크한다.','치료 후 다음 계획 또는 정기검진·불편 시 내원 등 후속 계획을 기록한다.'];
+const G_ONBOARDING_GUIDE_ITEMS=['병원 시설을 둘러보고 식당·출퇴근 기록 장치 등 기본 시설 사용법을 안내받는다.','조직도, 호칭, 기본 예절, 업무 분장, 근로계약과 복리후생 설명을 듣는다.','무전기를 지급받으면 담당자에게 사용법과 업무용 대화 범위를 확인한다.','소속 부서의 담당자, 보고 라인, 당일 교육 항목을 확인한다.','기본 도구와 오픈·마감 절차를 확인한다.','무전은 들었다는 뜻으로 최초 1회 응답한다.','진료실·데스크에서 큰 소리의 사담을 피하고, 환자 앞에서 치료계획 변경이나 내부 판단을 논의하지 않으며 필요한 설명과 양해를 먼저 제공한다.','환자가 언제 어떻게 납부하기로 했는지, 비급여 차감 등 금액 관련 사항이 있으면 상담·데스크 기록을 일치시킨다.','대기시간과 환자 동선을 안내하고 접수 후 어디에서 기다리는지 분명히 설명한다.','컴플레인은 말을 끊지 않고 듣고, 담당자에게 즉시 보고한 뒤 단독으로 확정 약속하지 않는다.','상담 전 최신 수가표와 내부 설명 자료의 사용 범위를 담당자에게 확인한다.','신환은 구강포토와 상담 차트를 준비하고 지정 위치에 기록·스캔한다.','임플란트 식립 후 1차 내원은 s/o 또는 드레싱, 2차 내원은 3주 후, 3차 내원은 6주 후로 안내하며 이때 ISQ 측정 등을 가능하면 시행한다.','사용한 기구와 재료는 원래 위치에 정리하고 오픈·마감 시 체어·컴프레서·무전기·기구 정리 항목을 체크한다.','치료 후 다음 계획 또는 정기검진·불편 시 내원 등 후속 계획을 기록한다.'];
 function onboardingGuideItems(){const lines=String(hubT('onbo.guide.items',G_ONBOARDING_GUIDE_ITEMS.join('\n'))).split(/\r?\n/).map(x=>x.trim()).filter(Boolean);return lines.length?lines:[...G_ONBOARDING_GUIDE_ITEMS];} /* 원장이 허브 설정 › 글 고치기에서 줄을 고치면 그 줄들(한 줄=항목 하나) */
 function onboardingGuideVisibleForRole(role){return ['staff','manager','chief','owner'].includes(role);}
 function onboardingGuideCard({collapsed=false}={}){const items=onboardingGuideItems();return `<details class="card onboarding-guide-card"${collapsed?'':' open'}><summary class="onboarding-guide-summary">${esc(hubT('onbo.guide.title','🧭 신입 첫날 안내 ({n}개)',{n:items.length}))}</summary><div class="hint">${esc(hubT('onbo.guide.hint','가입 직후 확인하는 공통 안내입니다. 실장·매니저도 신규 직원에게 같은 내용을 안내합니다.'))}</div><ol class="onboarding-guide-items">${items.map(item=>`<li>${esc(item)}</li>`).join('')}</ol></details>`;}
@@ -2356,6 +2363,13 @@ function onboardingChecklistRows(evidence,documents,contracts=[],userId=null){
   return [['계좌',hubT('onbo.check.row1.label','급여 계좌'),hubT('onbo.check.row1.rule','은행명과 계좌번호'),onboardingEvidenceComplete('계좌',e,docs)],['Notion',hubT('onbo.check.row2.label','Notion'),hubT('onbo.check.row2.rule','ID·앱 설치·워크스페이스 로그인'),onboardingEvidenceComplete('Notion',e,docs)],['자격증',hubT('onbo.check.row3.label','자격증'),hubT('onbo.check.row3.rule','파일'),onboardingEvidenceComplete('자격증',e,docs)],['잠복결핵',hubT('onbo.check.row4.label','잠복결핵'),hubT('onbo.check.row4.rule','파일'),onboardingEvidenceComplete('잠복결핵',e,docs)],['보안서약',hubT('onbo.check.row5.label','보안서약'),hubT('onbo.check.row5.rule','파일 또는 허브 서명'),onboardingEvidenceComplete('보안서약',e,docs,contracts,userId)]];
 }
 /* onboarding-evidence:test-end */
+/* employment-lead:test-start */
+function employmentLeadTargets(profiles,me){return ['owner','chief','manager'].includes(me.role)?(profiles||[]).filter(p=>p.user_id!==me.id&&p.account_access_status!=='차단'&&(me.role==='owner'||p.role!=='owner')):[];}
+function employmentLeadPanel(){
+  const rows=employmentLeadTargets(PROFILES,ME),states=['재직','자진퇴사','계약만료','권고사직'];
+  return `<section class="card"><h2>${esc(hubT('p7.employment.title','직원 재직 상태 지정'))}</h2><div class="tblwrap"><table>${rows.map(p=>`<tr><th>${esc(p.name)}</th><td><select id="employment-${p.user_id}-status" aria-label="${esc(hubT('p7.employment.status','재직 상태'))}">${states.map(s=>`<option value="${s}" ${(p.employment_status||'재직')===s?'selected':''}>${esc(hubT('p7.employment.state.'+states.indexOf(s),s))}</option>`).join('')}</select><input id="employment-${p.user_id}-effective" type="date" value="${p.employment_effective_date||today()}" aria-label="${esc(hubT('p7.employment.date','유효일'))}"><input id="employment-${p.user_id}-reason" value="${esc(p.employment_reason||'')}" aria-label="${esc(hubT('p7.employment.reason','사유'))}"><button class="mini stamp" onclick="setEmploymentStatus('${p.user_id}')">${esc(hubT('p7.save','저장'))}</button></td></tr>`).join('')}</table></div></section>`;
+}
+/* employment-lead:test-end */
 async function renderOnbo(m){
   const contractQuery=(isMgr()?sb.from('contracts').select('id,user_id,template_id,fields,merged_html,sign_slots,signed_at,status'):sb.from('contracts').select('id,user_id,template_id,fields,merged_html,sign_slots,signed_at,status').eq('user_id',ME.id)).eq('status','서명완료');
   const [{data:items},{data:checks},{data:docs,error:docsError},{data:contracts,error:contractsError},{data:leaveDocs,error:leaveDocsError},{data:leaveRequests},{data:evidence},{data:signatures,error:signaturesError},{data:approvalDocs,error:approvalDocsError},{data:paymentRequests,error:paymentRequestsError},{data:paymentReceipts,error:paymentReceiptsError},{data:fingerprintRequests}]=await Promise.all([
@@ -2384,7 +2398,7 @@ async function renderOnbo(m){
       <td>${s==='미제출'?`<button class="mini" onclick="submitOnbo(${it.id})">${esc(hubT('onbo.items.btn_submit','제출함'))}</button>`:(s==='제출'&&isLead()?`<button class="mini stamp" onclick="confirmOnbo(${it.id})">${esc(hubT('onbo.items.btn_confirm','확인'))}</button>`:'')}</td></tr>`;}).join('')}
     </table>${isLead()?'<div style="margin-top:8px"><input id="oiNew" class="mini" placeholder="'+esc(hubT('onbo.items.new_placeholder','새 제출 항목'))+'"> <button class="mini" onclick="addOnboItem()">'+esc(hubT('onbo.items.btn_add','항목 추가'))+'</button></div>':''}
   </div>
-  ${onboardingGuideVisibleForRole(ME.role)?onboardingGuideCard():''}
+  ${onboardingGuideVisibleForRole(ME.role)?onboardingGuideCard():''}${['chief','manager'].includes(ME.role)?employmentLeadPanel():''}
   ${fingerprintRegistrationCard(fingerprintRequests||[])}
   ${employeeSignatureVaultCard(signatures||[],signaturesError)}
   ${onboardingChecklistCard(evidence,docs||[],contracts||[],ME.id)}
@@ -4202,6 +4216,7 @@ async function copyInviteMessage(){
 }
 async function setDept(uid,dept){const {error}=await sb.rpc('update_employee_profile_field',{p_user_id:uid,p_field:'dept',p_value:dept||''});if(error){setStatus('error');showScheduleRosterError('부서 변경 실패: '+error.message);return;}await loadProfiles();setStatus('saved');render();}
 async function setEmploymentStatus(uid){
+  if(!['owner','chief','manager'].includes(ME.role)){showScheduleRosterError(hubT('p7.employment.no_access','재직 상태를 지정할 권한이 없습니다.'));return;}
   const status=$(`#employment-${uid}-status`).value,effectiveDate=$(`#employment-${uid}-effective`).value,reason=$(`#employment-${uid}-reason`).value;
   if(!effectiveDate){setStatus('error');showScheduleRosterError('재직 상태 유효일을 입력하세요.');return;}
   setStatus('saving');

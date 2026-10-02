@@ -190,7 +190,7 @@ function hubTextDefsChapter2(add){
   add('workdoc.push.m_un_error',S3,'해제 중 예상 못 한 오류 — {detail}은 오류 이유','구독 해제 중 오류: {detail}',['detail']);
   add('onbo.guide.title',S4,'「신입 첫날 안내」 접힌 제목 — {n}은 항목 수(홈 화면에도 같은 제목)','🧭 신입 첫날 안내 ({n}개)',['n']);
   add('onbo.guide.hint',S4,'제목 아래 설명(홈 화면에도 같은 글)','가입 직후 확인하는 공통 안내입니다. 실장·매니저도 신규 직원에게 같은 내용을 안내합니다.');
-  add('onbo.guide.items',S4,'★ 신입 첫날 안내 항목들 — 한 줄이 항목 하나(번호는 화면이 붙임). 줄을 지우거나 더해도 됨(홈 화면에도 같은 글)','병원 시설을 둘러보고 식당·출퇴근 기록 장치 등 기본 시설 사용법을 안내받는다.\n조직도, 호칭, 기본 예절, 업무 분장, 근로계약과 복리후생 설명을 듣는다.\n무전기를 지급받으면 담당자에게 사용법과 업무용 대화 범위를 확인한다.\n소속 부서의 담당자, 보고 라인, 당일 교육 항목을 확인한다.\n기본 도구와 오픈·마감 절차를 확인한다.\n무전은 들었다는 뜻으로 최초 1회 응답한다.\n진료실·데스크에서 큰 소리의 사담을 피하고, 환자 앞에서 치료계획 변경이나 내부 판단을 논의하지 않으며 필요한 설명과 양해를 먼저 제공한다.\n환자가 언제 어떻게 납부하기로 했는지, 비급여 차감 등 금액 관련 사항이 있으면 상담·데스크 기록을 일치시킨다.\n대기시간과 환자 동선을 안내하고 접수 후 어디에서 기다리는지 분명히 설명한다.\n컴플레인은 말을 끊지 않고 듣고, 담당자에게 즉시 보고한 뒤 단독으로 확정 약속하지 않는다.\n상담 전 최신 수가표와 내부 설명 자료의 사용 범위를 담당자에게 확인한다.\n신환은 구강포토와 상담 차트를 준비하고 지정 위치에 기록·스캔한다.\n임플란트 식립 후 1차 내원은 s/o 또는 드레싱, 2차 내원은 3주 후, 3차 내원은 6주 후로 안내한다.\n사용한 기구와 재료는 원래 위치에 정리하고 오픈·마감 시 정리 항목을 체크한다.\n치료 후 다음 계획 또는 정기검진·불편 시 내원 등 후속 계획을 기록한다.');
+  add('onbo.guide.items',S4,'★ 신입 첫날 안내 항목들 — 한 줄이 항목 하나(번호는 화면이 붙임). 줄을 지우거나 더해도 됨(홈 화면에도 같은 글)','병원 시설을 둘러보고 식당·출퇴근 기록 장치 등 기본 시설 사용법을 안내받는다.\n조직도, 호칭, 기본 예절, 업무 분장, 근로계약과 복리후생 설명을 듣는다.\n무전기를 지급받으면 담당자에게 사용법과 업무용 대화 범위를 확인한다.\n소속 부서의 담당자, 보고 라인, 당일 교육 항목을 확인한다.\n기본 도구와 오픈·마감 절차를 확인한다.\n무전은 들었다는 뜻으로 최초 1회 응답한다.\n진료실·데스크에서 큰 소리의 사담을 피하고, 환자 앞에서 치료계획 변경이나 내부 판단을 논의하지 않으며 필요한 설명과 양해를 먼저 제공한다.\n환자가 언제 어떻게 납부하기로 했는지, 비급여 차감 등 금액 관련 사항이 있으면 상담·데스크 기록을 일치시킨다.\n대기시간과 환자 동선을 안내하고 접수 후 어디에서 기다리는지 분명히 설명한다.\n컴플레인은 말을 끊지 않고 듣고, 담당자에게 즉시 보고한 뒤 단독으로 확정 약속하지 않는다.\n상담 전 최신 수가표와 내부 설명 자료의 사용 범위를 담당자에게 확인한다.\n신환은 구강포토와 상담 차트를 준비하고 지정 위치에 기록·스캔한다.\n임플란트 식립 후 1차 내원은 s/o 또는 드레싱, 2차 내원은 3주 후, 3차 내원은 6주 후로 안내하며 이때 ISQ 측정 등을 가능하면 시행한다.\n사용한 기구와 재료는 원래 위치에 정리하고 오픈·마감 시 체어·컴프레서·무전기·기구 정리 항목을 체크한다.\n치료 후 다음 계획 또는 정기검진·불편 시 내원 등 후속 계획을 기록한다.');
   add('onbo.items.title',S5,'카드 제목','📋 내 입사 제출물');
   add('onbo.items.th_item',S5,'표 머리 — 첫 칸','항목');
   add('onbo.items.th_status',S5,'표 머리 — 둘째 칸','상태');
@@ -1588,6 +1588,7 @@ function hubTextDefs(){
   hubTextDefsChapter7(add);
   hubTextDefsTime(add);
   ((typeof globalThis!=='undefined'&&globalThis.HUB_INTRO_TEXT_DEFS)||[]).forEach(function(d){add(d[0],'🌌 첫 화면',d[1],d[2]);}); // hub-intro.js의 첫 화면 글
+  hubTextDefsP7(add);
   HUB_TEXT_DEFS_CACHE=defs;
   return defs;
 }
@@ -1961,6 +1962,33 @@ function hubWriteErrorMessage(what,error){
   if(code==='42501'||/row-level security|permission denied/i.test(msg))return what+'하지 못했어요 — 원장 계정으로 로그인했는지 확인해 주세요.';
   return what+'하지 못했어요'+(msg?': '+msg:'.');
 }
+const HUB_NOTIFY_ROWS=[['inquiry','문의'],['leave_request','연차 신청'],['leave_result','연차 결과'],['approval','결재'],['notice','공지'],['document','서류 승인'],['payment','결제 요청'],['advertising','광고']];
+const HUB_NOTIFY_COLS=[['owner','원장'],['chief','실장'],['manager','매니저'],['desk','데스크'],['applicant','신청자 본인']];
+const HUB_MANUAL_GROUPS=[['clinical_consult','진료·상담'],['sterilization_admin','소독·행정'],['lab','기공'],['desk','데스크']];
+function hubNotifyDefault(row,col){
+  return ({inquiry:['manager','desk'],leave_request:['owner','chief'],leave_result:['applicant'],approval:['owner','chief'],notice:['owner','chief','manager','desk'],document:['applicant'],payment:['owner','chief'],advertising:['owner','manager']})[row].includes(col);
+}
+function hubNotifyEnabled(row,col){const raw=hubSetting('notify.'+row+'.'+col,'');return raw==='true'?true:raw==='false'?false:hubNotifyDefault(row,col);}
+function hubTextDefsP7(add){
+  const S='⚙️ 허브 설정 › 알림·직무별 매뉴얼';
+  [['p7.notify.title','🔔 알림 받는 사람'],['p7.notify.hint','칸을 켜거나 끄면 다음 알림부터 반영됩니다. 결재·결제 요청의 기본 알림은 현재 처리 단계의 담당자에게 갑니다.'],['p7.manual.title','📚 직무별 매뉴얼 주소'],['p7.manual.hint','주소를 비우면 기존 공용 매뉴얼을 사용합니다.'],['p7.save','저장'],['p7.saved','저장했습니다.'],['p7.invalid_url','http:// 또는 https:// 주소를 입력해 주세요.'],['p7.employment.title','직원 재직 상태 지정'],['p7.employment.status','재직 상태'],['p7.employment.date','유효일'],['p7.employment.reason','사유'],['p7.employment.no_access','재직 상태를 지정할 권한이 없습니다.'],['manual.card_title','업무 매뉴얼'],['manual.card_hint','내 직무에 맞는 업무 안내를 확인합니다.']].forEach(it=>add(it[0],S,it[1],it[1]));
+  ['재직','자진퇴사','계약만료','권고사직'].forEach((label,i)=>add('p7.employment.state.'+i,S,'재직 상태 이름',label));
+  HUB_NOTIFY_ROWS.forEach(it=>add('p7.notify.row.'+it[0],S,'알림 종류 이름',it[1]));
+  HUB_NOTIFY_COLS.forEach(it=>add('p7.notify.col.'+it[0],S,'알림 대상 이름',it[1]));
+  HUB_MANUAL_GROUPS.forEach(it=>add('p7.manual.group.'+it[0],S,'매뉴얼 직무 이름',it[1]));
+}
+function hubP7SettingsHtml(){
+  return '<section><h3>'+hubEsc(hubText('p7.notify.title','🔔 알림 받는 사람'))+'</h3><p>'+hubEsc(hubText('p7.notify.hint','칸을 켜거나 끄면 다음 알림부터 반영됩니다. 결재·결제 요청의 기본 알림은 현재 처리 단계의 담당자에게 갑니다.'))+'</p><div class="tblwrap"><table><thead><tr><th></th>'+HUB_NOTIFY_COLS.map(c=>'<th>'+hubEsc(hubText('p7.notify.col.'+c[0],c[1]))+'</th>').join('')+'</tr></thead><tbody>'+HUB_NOTIFY_ROWS.map(r=>'<tr><th>'+hubEsc(hubText('p7.notify.row.'+r[0],r[1]))+'</th>'+HUB_NOTIFY_COLS.map(c=>'<td><input type="checkbox" data-hub-notify="notify.'+r[0]+'.'+c[0]+'" aria-label="'+hubEsc(hubText('p7.notify.row.'+r[0],r[1])+' '+hubText('p7.notify.col.'+c[0],c[1]))+'"'+(hubNotifyEnabled(r[0],c[0])?' checked':'')+'></td>').join('')+'</tr>').join('')+'</tbody></table></div><span id="hubNotifyMsg" role="status"></span></section><section><h3>'+hubEsc(hubText('p7.manual.title','📚 직무별 매뉴얼 주소'))+'</h3><p>'+hubEsc(hubText('p7.manual.hint','주소를 비우면 기존 공용 매뉴얼을 사용합니다.'))+'</p>'+HUB_MANUAL_GROUPS.map(g=>'<div class="hub-row"><label>'+hubEsc(hubText('p7.manual.group.'+g[0],g[1]))+' <input type="url" id="hubManual_'+g[0]+'" value="'+hubEsc(hubSetting('manual.url.'+g[0],''))+'"></label> <button class="mini stamp" data-hub-manual="'+g[0]+'">'+hubEsc(hubText('p7.save','저장'))+'</button><span id="hubManualMsg_'+g[0]+'" role="status"></span></div>').join('')+'</section>';
+}
+async function hubNotifyWrite(sb,key,enabled){
+  if(!HUB_NOTIFY_ROWS.some(r=>HUB_NOTIFY_COLS.some(c=>key==='notify.'+r[0]+'.'+c[0]))||typeof enabled!=='boolean')return {ok:false,reason:'invalid'};
+  return hubSettingWrite(sb,key,String(enabled));
+}
+async function hubManualWrite(sb,group,raw){
+  if(!HUB_MANUAL_GROUPS.some(g=>g[0]===group))return {ok:false,reason:'invalid'};
+  const value=String(raw||'').trim();if(value&&!hubCardUrlOk(value))return {ok:false,reason:'invalid_url'};
+  return hubSettingWrite(sb,'manual.url.'+group,value);
+}
 /* hub-texts:test-end */
 
 /* ── 화면: 「⚙️ 허브 설정」 탭(원장 전용) — 📝 글 고치기 · 🔢 숫자·기준 · 📋 목록 ── */
@@ -2127,7 +2155,7 @@ function hubDrawSettingsSection(sec){
     if(!g){g={name:d.screen,items:[]};groups.push(g);}
     g.items.push({d:d,i:i});
   });
-  sec.innerHTML='<div class="sub">출퇴근 계산·연차 신청이 쓰는 기준이에요. 출퇴근 기준은 지금까지 SQL로만 고쳤는데 여기서 바로 고쳐요. 저장하면 그 화면이 다음에 열릴 때부터 새 기준으로 움직여요(이미 저장된 지난 기록·신청은 안 바뀌어요).</div>'+
+  sec.innerHTML=hubP7SettingsHtml()+'<div class="sub">출퇴근 계산·연차 신청이 쓰는 기준이에요. 출퇴근 기준은 지금까지 SQL로만 고쳤는데 여기서 바로 고쳐요. 저장하면 그 화면이 다음에 열릴 때부터 새 기준으로 움직여요(이미 저장된 지난 기록·신청은 안 바뀌어요).</div>'+
     groups.map(function(g){
       return '<details class="hub-grp" open><summary>'+hubEsc(g.name)+' <span class="sub">('+g.items.length+'개)</span></summary>'+
         g.items.map(function(x){
@@ -2149,6 +2177,16 @@ function hubDrawSettingsSection(sec){
     }).join('');
   Array.prototype.forEach.call(sec.querySelectorAll('[data-hub-set-save]'),function(b){b.addEventListener('click',function(){return hubSaveSettingRow(sec,Number(b.getAttribute('data-hub-set-save')));});});
   Array.prototype.forEach.call(sec.querySelectorAll('[data-hub-set-reset]'),function(b){b.addEventListener('click',function(){return hubResetSettingRow(sec,Number(b.getAttribute('data-hub-set-reset')));});});
+  // 새 입력칸을 먼저 붙이고 기존 기준 입력칸의 이벤트도 한 번만 연결한다.
+  const panel=sec;
+  panel.querySelectorAll('[data-hub-notify]').forEach(function(input){input.addEventListener('change',async function(){
+    const enabled=input.checked;input.disabled=true;const r=await hubNotifyWrite(HUB_SB,input.getAttribute('data-hub-notify'),enabled);input.disabled=false;if(!r.ok)input.checked=!enabled;
+    panel.querySelector('#hubNotifyMsg').textContent=r.ok?hubText('p7.saved','저장했습니다.'):hubWriteErrorMessage('저장',r.error);
+  });});
+  panel.querySelectorAll('[data-hub-manual]').forEach(function(button){button.addEventListener('click',async function(){
+    const group=button.getAttribute('data-hub-manual'),input=panel.querySelector('#hubManual_'+group);button.disabled=true;const r=await hubManualWrite(HUB_SB,group,input.value);button.disabled=false;
+    panel.querySelector('#hubManualMsg_'+group).textContent=r.ok?hubText('p7.saved','저장했습니다.'):r.reason==='invalid_url'?hubText('p7.invalid_url','http:// 또는 https:// 주소를 입력해 주세요.'):hubWriteErrorMessage('저장',r.error);
+  });});
 }
 function hubAfterSettingWrite(sec,i,r){
   const d=HUB_SETTING_DEFS[i];
