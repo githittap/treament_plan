@@ -480,7 +480,7 @@ function hubTextDefsChapter3(add){
   add('att.issue.th_reason','🕘 출퇴근 › 결근 후보·지문누락 소명','소명 표 머리 — 사유','사유');
   add('att.issue.empty','🕘 출퇴근 › 결근 후보·지문누락 소명','지문누락 소명 카드 — 소명이 하나도 없을 때','소명 없음');
   add('att.issue.m_act_fail','🕘 출퇴근 › 결근 후보·지문누락 소명','지문누락 소명 승인·반려 실패({msg}는 서버 오류)','소명 처리 실패: {msg}',['msg']);
-  add('att.issue.p_date','🕘 출퇴근 › 결근 후보·지문누락 소명','소명 올리기 — 근무일을 묻는 창','소명할 근무일 (YYYY-MM-DD):');
+  add('att.issue.p_date','🕘 출퇴근 › 결근 후보·지문누락 소명','소명 올리기 — 근무일을 묻는 창','소명할 근무일');
   add('att.issueform.title','🕘 출퇴근 › 지문누락 소명 양식','소명 양식 창 제목','🙋 지문누락 소명');
   add('att.issueform.date','🕘 출퇴근 › 지문누락 소명 양식','소명 양식 근무일 칸','근무일');
   add('att.issueform.auto','🕘 출퇴근 › 지문누락 소명 양식','자동 감지 건에 표시하는 안내','{kind} 지문 없음(자동 감지)',['kind']);

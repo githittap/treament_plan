@@ -1,6 +1,11 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const root=path.join(__dirname,'..'),hr=fs.readFileSync(path.join(root,'hr.html'),'utf8'),texts=fs.readFileSync(path.join(root,'hub-texts.js'),'utf8');
 const hub3=require('./fixtures/hub3-harness.cjs');
+test('근무일 안내 기본 글은 날짜 형식을 중복 표기하지 않는다',()=>{
+  assert.ok(hr.includes("hubT('att.issue.p_date','소명할 근무일')"));
+  assert.ok(texts.includes("'소명할 근무일'"));
+  assert.ok(!hr.includes('소명할 근무일 (YYYY-MM-DD):'));
+});
 function helpers(){const block=hr.match(/\/\* attendance-issue-form:test-start \*\/[\s\S]*?\/\* attendance-issue-form:test-end \*\//)?.[0];assert.ok(block);const c={hubList:(key,def)=>def};vm.createContext(c);vm.runInContext(block+';this.h={attendanceIssueFormProblem,attendanceIssueStaffReason,attendanceIssueKindLabel,attendanceIssueInitialRpc,attendanceIssueUnlinkedUploads,attendanceIssueFailedFileCount};',c);return c.h;}
 const draft=(overrides={})=>({workDate:'2026-10-02',kind:'기타',reason:'기기가 꺼져 있어 출근 기록이 남지 않았습니다.',files:[],existingCount:0,reasonMin:10,evidenceMax:5,evidenceRequired:true,...overrides});
 function saveHarness({rpcImpl,uploadImpl=async()=>({}),removeImpl=async()=>({})}){
