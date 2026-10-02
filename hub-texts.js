@@ -1567,6 +1567,7 @@ function hubTextDefs(){
   hubTextDefsChapter6(add);
   hubTextDefsChapter7(add);
   hubTextDefsTime(add);
+  hubTextDefsP7(add);
   HUB_TEXT_DEFS_CACHE=defs;
   return defs;
 }
@@ -1935,6 +1936,33 @@ function hubWriteErrorMessage(what,error){
   if(code==='42501'||/row-level security|permission denied/i.test(msg))return what+'하지 못했어요 — 원장 계정으로 로그인했는지 확인해 주세요.';
   return what+'하지 못했어요'+(msg?': '+msg:'.');
 }
+const HUB_NOTIFY_ROWS=[['inquiry','문의'],['leave_request','연차 신청'],['leave_result','연차 결과'],['approval','결재'],['notice','공지'],['document','서류 승인'],['payment','결제 요청'],['advertising','광고']];
+const HUB_NOTIFY_COLS=[['owner','원장'],['chief','실장'],['manager','매니저'],['desk','데스크'],['applicant','신청자 본인']];
+const HUB_MANUAL_GROUPS=[['clinical_consult','진료·상담'],['sterilization_admin','소독·행정'],['lab','기공'],['desk','데스크']];
+function hubNotifyDefault(row,col){
+  return ({inquiry:['manager','desk'],leave_request:['owner','chief'],leave_result:['applicant'],approval:['owner','chief'],notice:['owner','chief','manager','desk'],document:['applicant'],payment:['owner','chief'],advertising:['owner','manager']})[row].includes(col);
+}
+function hubNotifyEnabled(row,col){const raw=hubSetting('notify.'+row+'.'+col,'');return raw==='true'?true:raw==='false'?false:hubNotifyDefault(row,col);}
+function hubTextDefsP7(add){
+  const S='⚙️ 허브 설정 › 알림·직무별 매뉴얼';
+  [['p7.notify.title','🔔 알림 받는 사람'],['p7.notify.hint','칸을 켜거나 끄면 다음 알림부터 반영됩니다. 결재·결제 요청의 기본 알림은 현재 처리 단계의 담당자에게 갑니다.'],['p7.manual.title','📚 직무별 매뉴얼 주소'],['p7.manual.hint','주소를 비우면 기존 공용 매뉴얼을 사용합니다.'],['p7.save','저장'],['p7.saved','저장했습니다.'],['p7.invalid_url','http:// 또는 https:// 주소를 입력해 주세요.'],['p7.employment.title','직원 재직 상태 지정'],['p7.employment.status','재직 상태'],['p7.employment.date','유효일'],['p7.employment.reason','사유'],['p7.employment.no_access','재직 상태를 지정할 권한이 없습니다.'],['manual.card_title','업무 매뉴얼'],['manual.card_hint','내 직무에 맞는 업무 안내를 확인합니다.']].forEach(it=>add(it[0],S,it[1],it[1]));
+  ['재직','자진퇴사','계약만료','권고사직'].forEach((label,i)=>add('p7.employment.state.'+i,S,'재직 상태 이름',label));
+  HUB_NOTIFY_ROWS.forEach(it=>add('p7.notify.row.'+it[0],S,'알림 종류 이름',it[1]));
+  HUB_NOTIFY_COLS.forEach(it=>add('p7.notify.col.'+it[0],S,'알림 대상 이름',it[1]));
+  HUB_MANUAL_GROUPS.forEach(it=>add('p7.manual.group.'+it[0],S,'매뉴얼 직무 이름',it[1]));
+}
+function hubP7SettingsHtml(){
+  return '<section><h3>'+hubEsc(hubText('p7.notify.title','🔔 알림 받는 사람'))+'</h3><p>'+hubEsc(hubText('p7.notify.hint','칸을 켜거나 끄면 다음 알림부터 반영됩니다. 결재·결제 요청의 기본 알림은 현재 처리 단계의 담당자에게 갑니다.'))+'</p><div class="tblwrap"><table><thead><tr><th></th>'+HUB_NOTIFY_COLS.map(c=>'<th>'+hubEsc(hubText('p7.notify.col.'+c[0],c[1]))+'</th>').join('')+'</tr></thead><tbody>'+HUB_NOTIFY_ROWS.map(r=>'<tr><th>'+hubEsc(hubText('p7.notify.row.'+r[0],r[1]))+'</th>'+HUB_NOTIFY_COLS.map(c=>'<td><input type="checkbox" data-hub-notify="notify.'+r[0]+'.'+c[0]+'" aria-label="'+hubEsc(hubText('p7.notify.row.'+r[0],r[1])+' '+hubText('p7.notify.col.'+c[0],c[1]))+'"'+(hubNotifyEnabled(r[0],c[0])?' checked':'')+'></td>').join('')+'</tr>').join('')+'</tbody></table></div><span id="hubNotifyMsg" role="status"></span></section><section><h3>'+hubEsc(hubText('p7.manual.title','📚 직무별 매뉴얼 주소'))+'</h3><p>'+hubEsc(hubText('p7.manual.hint','주소를 비우면 기존 공용 매뉴얼을 사용합니다.'))+'</p>'+HUB_MANUAL_GROUPS.map(g=>'<div class="hub-row"><label>'+hubEsc(hubText('p7.manual.group.'+g[0],g[1]))+' <input type="url" id="hubManual_'+g[0]+'" value="'+hubEsc(hubSetting('manual.url.'+g[0],''))+'"></label> <button class="mini stamp" data-hub-manual="'+g[0]+'">'+hubEsc(hubText('p7.save','저장'))+'</button><span id="hubManualMsg_'+g[0]+'" role="status"></span></div>').join('')+'</section>';
+}
+async function hubNotifyWrite(sb,key,enabled){
+  if(!HUB_NOTIFY_ROWS.some(r=>HUB_NOTIFY_COLS.some(c=>key==='notify.'+r[0]+'.'+c[0]))||typeof enabled!=='boolean')return {ok:false,reason:'invalid'};
+  return hubSettingWrite(sb,key,String(enabled));
+}
+async function hubManualWrite(sb,group,raw){
+  if(!HUB_MANUAL_GROUPS.some(g=>g[0]===group))return {ok:false,reason:'invalid'};
+  const value=String(raw||'').trim();if(value&&!hubCardUrlOk(value))return {ok:false,reason:'invalid_url'};
+  return hubSettingWrite(sb,'manual.url.'+group,value);
+}
 /* hub-texts:test-end */
 
 /* ── 화면: 「⚙️ 허브 설정」 탭(원장 전용) — 📝 글 고치기 · 🔢 숫자·기준 · 📋 목록 ── */
@@ -2101,7 +2129,7 @@ function hubDrawSettingsSection(sec){
     if(!g){g={name:d.screen,items:[]};groups.push(g);}
     g.items.push({d:d,i:i});
   });
-  sec.innerHTML='<div class="sub">출퇴근 계산·연차 신청이 쓰는 기준이에요. 출퇴근 기준은 지금까지 SQL로만 고쳤는데 여기서 바로 고쳐요. 저장하면 그 화면이 다음에 열릴 때부터 새 기준으로 움직여요(이미 저장된 지난 기록·신청은 안 바뀌어요).</div>'+
+  sec.innerHTML=hubP7SettingsHtml()+'<div class="sub">출퇴근 계산·연차 신청이 쓰는 기준이에요. 출퇴근 기준은 지금까지 SQL로만 고쳤는데 여기서 바로 고쳐요. 저장하면 그 화면이 다음에 열릴 때부터 새 기준으로 움직여요(이미 저장된 지난 기록·신청은 안 바뀌어요).</div>'+
     groups.map(function(g){
       return '<details class="hub-grp" open><summary>'+hubEsc(g.name)+' <span class="sub">('+g.items.length+'개)</span></summary>'+
         g.items.map(function(x){
@@ -2121,6 +2149,16 @@ function hubDrawSettingsSection(sec){
     }).join('');
   Array.prototype.forEach.call(sec.querySelectorAll('[data-hub-set-save]'),function(b){b.addEventListener('click',function(){return hubSaveSettingRow(sec,Number(b.getAttribute('data-hub-set-save')));});});
   Array.prototype.forEach.call(sec.querySelectorAll('[data-hub-set-reset]'),function(b){b.addEventListener('click',function(){return hubResetSettingRow(sec,Number(b.getAttribute('data-hub-set-reset')));});});
+  // 새 입력칸을 먼저 붙이고 기존 기준 입력칸의 이벤트도 한 번만 연결한다.
+  const panel=sec;
+  panel.querySelectorAll('[data-hub-notify]').forEach(function(input){input.addEventListener('change',async function(){
+    const enabled=input.checked;input.disabled=true;const r=await hubNotifyWrite(HUB_SB,input.getAttribute('data-hub-notify'),enabled);input.disabled=false;if(!r.ok)input.checked=!enabled;
+    panel.querySelector('#hubNotifyMsg').textContent=r.ok?hubText('p7.saved','저장했습니다.'):hubWriteErrorMessage('저장',r.error);
+  });});
+  panel.querySelectorAll('[data-hub-manual]').forEach(function(button){button.addEventListener('click',async function(){
+    const group=button.getAttribute('data-hub-manual'),input=panel.querySelector('#hubManual_'+group);button.disabled=true;const r=await hubManualWrite(HUB_SB,group,input.value);button.disabled=false;
+    panel.querySelector('#hubManualMsg_'+group).textContent=r.ok?hubText('p7.saved','저장했습니다.'):r.reason==='invalid_url'?hubText('p7.invalid_url','http:// 또는 https:// 주소를 입력해 주세요.'):hubWriteErrorMessage('저장',r.error);
+  });});
 }
 function hubAfterSettingWrite(sec,i,r){
   const d=HUB_SETTING_DEFS[i];
