@@ -378,7 +378,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 
 <footer>© 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지</footer>
 
-<script src="hub-texts.js?v=2026100113"></script>
+<script src="hub-texts.js?v=2026100221"></script>
 <script>
 /* ═══════ 설정 ═══════
    실제 값은 DB의 app_settings 표에서 읽어옵니다.
@@ -1112,7 +1112,7 @@ async function renderAtt(m){
     const {data:issueResolutions,error:resolutionError}=await fetchAttendancePages(()=>sb.from('attendance_issue_resolutions').select('user_id,work_date,clock_in,clock_out,late_min,early_min,overtime_min,source,approved_at').gte('work_date',bounds.start).lt('work_date',bounds.next).order('work_date',{ascending:false}));
     const fpByKey=new Map((fpRows||[]).map(r=>[r.user_id+'|'+r.work_date,r]));
     m.innerHTML=`
-    <div class="card"><h2>${esc(hubT('att.close.title','🗂 지문 근태 — 월 마감'))} <span class="sub">(${month})</span></h2>
+    <div class="card"><h2>${esc(hubT('att.close.title','🗂 근태 엑셀 올리기 · 월 마감'))} <span class="sub">(${month})</span></h2>
       <p class="sub">${esc(hubT('att.close.hint','지문인식기 엑셀(.xls/.xlsx)을 올리면 출근·퇴근·지각·연장을 자동 판정합니다. (하루 최초 인식=출근, 최후=퇴근)'))}</p>
       <div style="margin:10px 0"><input type="file" id="xlFile" accept=".xls,.xlsx" onchange="parseXls(event)"></div>
       <div class="sub">${esc(hubT('att.close.state','이번 달 상태:'))} <b class="${mrow&&mrow.status==='확정'?'':'b wait'}">${mrow?mrow.status:esc(hubT('att.close.state_none','미집계'))}</b>
@@ -4278,7 +4278,7 @@ enhanceFileDrops();
 boot();
 setInterval(loadSteps,1500);
 </script>
-<script src="ai-assistants.js?v=2026100106"></script>
+<script src="ai-assistants.js?v=2026100221"></script>
 <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}</script>
 </body>
 </html>
