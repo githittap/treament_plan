@@ -12,7 +12,7 @@ test('E장 연차 유형·시간 범위·저장 어휘·계약기간만료 표�
   assert.match(html, /id="lvTimeFrom"/);
   assert.match(html, /id="lvTimeTo"/);
   assert.match(html, /type==='반차'\|\|type==='조퇴'/);
-  assert.match(html, /onclick="grantLeave\(\)">저장<\/button>/);
+  assert.match(html, /onclick="saveLeaveBalance\(\$\{i\}\)">/);
   assert.match(html, />계약기간만료<\/option>/);
 });
 

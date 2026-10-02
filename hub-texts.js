@@ -596,17 +596,26 @@ function hubTextDefsChapter3(add){
   add('leave.form.btn_print','🌿 연차 › 휴가 신청서','휴가 신청서 창 — 1장 인쇄 단추','🖨️ 1장 인쇄');
   add('leave.form.stamp_ok','🌿 연차 › 휴가 신청서','휴가 신청서 오른쪽 위 결재칸 도장 위에 찍히는 말(실장·원장 승인 도장)','승인');
   add('leave.form.total','🌿 연차 › 휴가 신청서','휴가 신청서 기간 칸 — 총 일수 글({n}은 일수)','총 {n}일',['n']);
-  add('leave.grant.title','🌿 연차 › 연차 부여·자동 적립(원장)','연차 부여 카드 제목(원장)','➕ 연차 부여/절대 잔액 설정');
+  add('leave.grant.title','🌿 연차 › 연차 부여·자동 적립(원장)','연차 부여 카드 제목(원장)','👥 직원별 연차 현황');
   add('leave.owner_tag','🌿 연차 › 연차 부여·자동 적립(원장)','원장 전용 카드 제목 옆 작은 글(부여·자동 적립 공통)','원장');
   add('leave.grant.th_name','🌿 연차 › 연차 부여·자동 적립(원장)','연차 부여 표 머리 — 이름','이름');
   add('leave.grant.th_hire','🌿 연차 › 연차 부여·자동 적립(원장)','연차 부여 표 머리 — 입사일','입사일');
-  add('leave.grant.th_suggest','🌿 연차 › 연차 부여·자동 적립(원장)','연차 부여 표 머리 — 제안일수','제안일수');
-  add('leave.grant.btn_fill','🌿 연차 › 연차 부여·자동 적립(원장)','연차 부여 표 — 제안 일수 채우기 단추','이 값으로 채우기');
-  add('leave.grant.ph_days','🌿 연차 › 연차 부여·자동 적립(원장)','연차 부여 — 일수 칸 안에 흐리게 보이는 글','일수');
-  add('leave.grant.ph_note','🌿 연차 › 연차 부여·자동 적립(원장)','연차 부여 — 메모 칸 안에 흐리게 보이는 글','메모(예: 2026년 정기부여)');
-  add('leave.grant.hint','🌿 연차 › 연차 부여·자동 적립(원장)','연차 부여 카드 아래 안내','정기 부여는 아래 발생일별 미리보기에서 개근·재직을 확인한 뒤 적용합니다. 이 화면의 ‘부여’는 해당 확인 화면으로 이동합니다. ‘조정’은 목표 잔액을 설정합니다.');
-  add('leave.acc.title','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 카드 제목(원장)','📆 자동 연차 적립 확인');
-  add('leave.acc.hint','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 카드 설명','먼저 발생 예정 내역을 확인하고, 각 기간의 개근·재직을 원장이 확인한 뒤 적용합니다. 기존 수기 지급분은 중복 지급하지 않도록 반영됩니다.');
+  add('leave.grant.ph_note','🌿 연차 › 연차 부여·자동 적립(원장)','연차 부여 — 메모 칸 안에 흐리게 보이는 글','메모(예: 남은 연차 변경)');
+  add('leave.status.load_fail','🌿 연차 › 연차 부여·자동 적립(원장)','직원별 연차 현황 — 연차 현황을 불러오지 못했습니다: {msg}','연차 현황을 불러오지 못했습니다: {msg}',['msg']);
+  add('leave.status.balance','🌿 연차 › 연차 부여·자동 적립(원장)','직원별 연차 현황 — 지금 남은 연차','지금 남은 연차');
+  add('leave.status.earned','🌿 연차 › 연차 부여·자동 적립(원장)','직원별 연차 현황 — 올해 생긴','올해 생긴');
+  add('leave.status.used','🌿 연차 › 연차 부여·자동 적립(원장)','직원별 연차 현황 — 쓴','쓴');
+  add('leave.status.standard','🌿 연차 › 연차 부여·자동 적립(원장)','직원별 연차 현황 — 법정 기준 {days}일','법정 기준 {days}일',['days']);
+  add('leave.status.change','🌿 연차 › 연차 부여·자동 적립(원장)','직원별 연차 현황 — 바꾸기','바꾸기');
+  add('leave.status.target','🌿 연차 › 연차 부여·자동 적립(원장)','직원별 연차 현황 — 남은 연차를','남은 연차를');
+  add('leave.status.day','🌿 연차 › 연차 부여·자동 적립(원장)','직원별 연차 현황 — 일로','일로');
+  add('leave.status.save','🌿 연차 › 연차 부여·자동 적립(원장)','직원별 연차 현황 — 저장','저장');
+  add('leave.status.other','🌿 연차 › 연차 부여·자동 적립(원장)','직원별 연차 현황 — 그 밖의 계정 {n}개','그 밖의 계정 {n}개',['n']);
+  add('leave.status.invalid','🌿 연차 › 연차 부여·자동 적립(원장)','직원별 연차 현황 — 남은 연차는 0 이상, 0.5일 단위로 입력하세요.','남은 연차는 0 이상, 0.5일 단위로 입력하세요.');
+  add('leave.status.preview','🌿 연차 › 연차 부여·자동 적립(원장)','직원별 연차 현황 — 지금 {before}일 → 바꾸면 {after}일 ({delta}일)','지금 {before}일 → 바꾸면 {after}일 ({delta}일)',['before','after','delta']);
+  add('leave.status.note','🌿 연차 › 연차 부여·자동 적립(원장)','직원별 연차 현황 — 남은 연차 변경: {days}일','남은 연차 변경: {days}일',['days']);
+  add('leave.acc.title','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 카드 제목(원장)','📆 1년 된 직원의 연차 15일을 확인하고 넣기');
+  add('leave.acc.hint','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 카드 설명','1년 미만 월차는 매달 자동으로 생깁니다. 1년이 된 직원의 15일과 아직 확인되지 않은 지난 기간은 여기에서 개근·재직을 확인하고 넣습니다. 이미 넣은 연차는 두 번 넣지 않습니다.');
   add('leave.acc.f_asof','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 — 기준일 칸 이름','기준일');
   add('leave.acc.btn_preview','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 — 미리보기 단추','미리보기');
   add('leave.acc.btn_apply','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 — 확인한 항목 적용 단추','확인한 항목 적용');
@@ -1611,7 +1620,8 @@ const HUB_SETTING_DEFS=[
   {key:'aiu.model_days',screen:'💰 AI비용 기준',label:'사용량 현황판 「모델별 사용량」 기간',where:'AI비용 › 사용량 현황판 — 모델별 사용량을 최근 며칠치로 모아 보여 줄지(제목·합계 글의 일수도 같이 바뀌어요)',def:'7',kind:'int',min:3,max:30,unit:'일'},
   {key:'aiu.cost_months',screen:'💰 AI비용 기준',label:'사용량 현황판 「월별 합계」에 보이는 개월 수',where:'AI비용 › 사용량 현황판 › 정가 환산 — 월별 합계 막대를 몇 달치까지 보여 줄지(PC가 올린 달만 나와요)',def:'6',kind:'int',min:2,max:24,unit:'개월'},
   {key:'aiu.external_days',screen:'💰 AI비용 기준',label:'사용량 현황판 「외부 AI」 날짜별 표 일수',where:'AI비용 › 사용량 현황판 › 외부 AI — 날짜별 표에 최근 며칠치까지 보여 줄지(PC가 올린 날짜까지만 나와요 · 위쪽 작은 글의 일수도 같이 바뀌어요)',def:'14',kind:'int',min:3,max:60,unit:'일'},
-  {key:'aiu.session_limit',screen:'💰 AI비용 기준',label:'사용량 현황판 「대화 효율 점검」에 보이는 대화 수',where:'AI비용 › 사용량 현황판 › 대화 효율 점검 — 돈이 새는 대화를 최대 몇 개까지 보여 줄지',def:'8',kind:'int',min:3,max:30,unit:'건'}
+  {key:'aiu.session_limit',screen:'💰 AI비용 기준',label:'사용량 현황판 「대화 효율 점검」에 보이는 대화 수',where:'AI비용 › 사용량 현황판 › 대화 효율 점검 — 돈이 새는 대화를 최대 몇 개까지 보여 줄지',def:'8',kind:'int',min:3,max:30,unit:'건'},
+  {key:'leave.hidden_accounts',screen:'🌿 연차 기준',label:'연차 현황에서 접어 둘 계정 이름',where:'입사일 없는 계정은 항상 접음. 이름 목록은 JSON으로 적고 *는 어떤 글자든 뜻함. []면 이름으로 숨기지 않음',def:'["*_test","테스트","직원검토","abc","공용1","매니저"]',kind:'stringlist'}
 ];
 function hubSettingDefByKey(key){
   for(let i=0;i<HUB_SETTING_DEFS.length;i++)if(HUB_SETTING_DEFS[i].key===key)return HUB_SETTING_DEFS[i];
@@ -1620,6 +1630,10 @@ function hubSettingDefByKey(key){
 // 값 검사: 화면에서 막고, 읽을 때는 모양이 틀리면 기본값을 쓴다. 통과하면 {ok:true,value}, 아니면 {ok:false,reason}.
 function hubSettingValidate(def,raw){
   const v=String(raw==null?'':raw).trim();
+  if(def.kind==='stringlist'){
+    try{const a=JSON.parse(v);if(Array.isArray(a)&&a.length<=100&&a.every(x=>typeof x==='string'&&x.trim()&&x.length<=100))return {ok:true,value:JSON.stringify(a.map(x=>x.trim()))};}catch(e){}
+    return {ok:false,reason:'이름 목록은 ["*_test","테스트"] 모양으로 적어 주세요. 모두 표시하려면 []를 적어요.'};
+  }
   if(def.kind==='time'){
     if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(v))return {ok:false,reason:'시각은 09:40 처럼 시:분(24시간)으로 적어 주세요.'};
     return {ok:true,value:v};
@@ -2108,6 +2122,8 @@ function hubDrawSettingsSection(sec){
           const d=x.d,i=x.i,cur=hubSetting(d.key,d.def);
           const input=d.kind==='time'
             ?'<input id="hubSetIn_'+i+'" type="time" value="'+hubEsc(cur)+'">'
+            :d.kind==='stringlist'
+            ?'<input id="hubSetIn_'+i+'" type="text" size="40" value="'+hubEsc(cur)+'">'
             :d.kind==='intlist'
             ?'<input id="hubSetIn_'+i+'" type="text" inputmode="numeric" size="16" placeholder="14, 30, 60" value="'+hubEsc(hubSettingShow(d,cur))+'"> '+hubEsc(d.unit||'')+' (쉼표로 나눠 적어요)'
             :'<input id="hubSetIn_'+i+'" type="number" inputmode="'+(d.kind==='dec'?'decimal':'numeric')+'"'+(d.kind==='dec'?' step="0.1"':'')+' min="'+d.min+'" max="'+d.max+'" value="'+hubEsc(cur)+'"> '+hubEsc(d.unit||'');

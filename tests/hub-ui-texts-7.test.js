@@ -102,7 +102,7 @@ test('화면 코드(hr.html)에 박힌 기본 글이 기본값 목록과 글자�
 });
 test('숫자 8개·이름 목록 7개: 기본값이 화면 코드와 같고, 화면 표시용 숫자만(계산식 숫자는 없음) · 캐시 번호',()=>{
   const h=helpers();
-  assert.equal(h.HUB_SETTING_DEFS.length,27);
+  assert.equal(h.HUB_SETTING_DEFS.length,28);
   const S=k=>h.HUB_SETTING_DEFS.find(d=>d.key===k);
   const expect={'home.payslip_limit':['12',1,36,'개월'],'dep.list_limit':['300',50,1000,'건'],'aic.history_months':['6',1,24,'개월'],'aic.auto_limit':['20',5,100,'건'],'aiu.model_days':['7',3,30,'일'],'aiu.cost_months':['6',2,24,'개월'],'aiu.external_days':['14',3,60,'일'],'aiu.session_limit':['8',3,30,'건']};
   for(const k of NUM_KEYS){

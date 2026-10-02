@@ -154,7 +154,7 @@ async function renderAll(html,opts){
     }else if(o.settings)Object.assign(ctx.SETTINGS,o.settings);
     vm.runInContext(timeSrc+'\n'+helperSrc+'\n'+bigSrc+'\n;this.api={renderAtt,checkAbsent,issueBtns,issueAct,openIssue,closeMonth,reviewManualAttendance,manualAttendanceFormHtml,manualAttendanceDetailText,renderManualAttendanceDayDetail,submitManualAttendance,saveAbsenceSettings,absenceSettingsHtml,buildPreview,parseXls,saveAttendance,renderXlTable,'
       +'renderSched,renderScheduleMonth,scheduleRosterAdminCard,scheduleRoleCell,saveSchedulePerson,setSchedulePersonDepartment,setSchedulePersonIncluded,setSchedulePersonActive,copyPrevWeek,'
-      +'renderLeave,openLeaveForm,openLeaveEdit,openLeave,cancelPendingLeave,checkClash,submitLeave,leaveAct,cancelApprovedLeave,grantLeave,previewLeaveAccrual,applyLeaveAccrual,computeLeaveDays,leaveDisplayText,appStamp,'
+      +'renderEmployeeLeaveStatus,openLeaveBalanceEditor,updateLeaveBalancePreview,saveLeaveBalance,renderLeave,openLeaveForm,openLeaveEdit,openLeave,cancelPendingLeave,checkClash,submitLeave,leaveAct,cancelApprovedLeave,grantLeave,previewLeaveAccrual,applyLeaveAccrual,computeLeaveDays,leaveDisplayText,appStamp,'
       +'setState:(k,v)=>{if(k==="MANUAL_DETAIL_OPEN")MANUAL_DETAIL_OPEN=v;if(k==="SCHED_VIEW")SCHED_VIEW=v;if(k==="SCHED_WEEK")SCHED_WEEK=v;if(k==="SCHED_MONTH")SCHED_MONTH=v;if(k==="xlRows")xlRows=v;if(k==="LEAVE_EDIT_ID")LEAVE_EDIT_ID=v;if(k==="LEAVE_ARCHIVE_MONTH")LEAVE_ARCHIVE_MONTH=v;},getState:k=>k==="xlRows"?xlRows:undefined};'
       +'this.api2={leaveApplyModalPrepare:typeof leaveApplyModalPrepare==="function"?leaveApplyModalPrepare:null,leaveTypeItems:typeof leaveTypeItems==="function"?leaveTypeItems:null,leaveTypeLabel:typeof leaveTypeLabel==="function"?leaveTypeLabel:null,hubStaticFill:typeof hubStaticFill==="function"?hubStaticFill:null,hubN:typeof hubN==="function"?hubN:null};',ctx);
     return {ctx,dom,log,statuses,api:ctx.api,api2:ctx.api2};
@@ -371,6 +371,17 @@ async function renderAll(html,opts){
   ]){
     const sbOver=name.startsWith('cancelok')?{rpc,tables:{leave_requests:{single:{id:3,user_id:'u1',status:'승인',date_from:'2026-10-08',date_to:'2026-10-08'}}}}:{rpc};
     const r=await asMgr('chief',{__confirm:confirmOk},sbOver);await r.api[fn](...args);out['leave.'+name]=JSON.stringify([r.log,r.statuses]);
+  }
+  {
+    const r=await asMgr('owner');await r.api.renderEmployeeLeaveStatus();r.api.openLeaveBalanceEditor(0);
+    r.ctx.$('#leaveTarget_0').value='8';r.api.updateLeaveBalancePreview(0);
+    out['leave.status.preview']=r.ctx.$('#leavePreview_0').textContent;
+    r.ctx.$('#leaveTarget_0').value='';r.api.updateLeaveBalancePreview(0);
+    out['leave.status.invalid']=r.ctx.$('#leavePreview_0').textContent;
+    r.ctx.$('#leaveTarget_0').value='10';await r.api.saveLeaveBalance(0);
+    out['leave.status.note']=JSON.stringify(r.ctx.sb.rpcCalls);
+    const e=await asMgr('owner',null,{tables:{v_leave_balance:{error:{message:'조회오류'}}}});
+    out['leave.status.error']=await e.api.renderEmployeeLeaveStatus();
   }
   {
     const r0=await asMgr('chief',null,{tables:{leave_requests:{single:{id:3,user_id:'u1',status:'대기'}}}});await r0.api.cancelApprovedLeave(3);out['leave.cancelok_state']=JSON.stringify(r0.log);
