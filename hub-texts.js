@@ -821,20 +821,34 @@ function hubTextDefsChapter5(add){
   add('inbox.th_subject',I2,'문의 목록 표 머리 — 제목','제목');
   add('inbox.th_status',I2,'문의 목록 표 머리 — 상태','상태');
   add('inbox.th_assignee',I2,'문의 목록 표 머리 — 담당자','담당');
+  add('inbox.th_handled',I2,'문의 목록 표 머리 — 처리(「✅ 처리」 단추 또는 처리한 사람·시각이 보이는 칸)','처리');
+  add('inbox.th_views',I2,'문의 목록 표 머리 — 열람(누가 열어 봤는지 · 원장 화면에만 보임)','열람');
+  add('inbox.btn_handle',I2,'문의 목록 — 처리 칸의 「✅ 처리」 단추 글(누르면 처리 메모 입력칸이 펼쳐짐)','✅ 처리');
+  add('inbox.handled_line',I2,'문의 목록 — 처리됨 줄의 처리한 사람·시각 글({who}=처리한 사람, {time}=처리 시각)','✅ {who} · {time}',['who','time']);
+  add('inbox.handled_by',I2,'문의 목록 — 처리됨 줄에 처리 시각을 모를 때 처리한 사람 글({who}=처리한 사람, 모르면 -)','✅ {who}',['who']);
+  add('inbox.views_more',I2,'문의 목록 열람 칸 — 열람한 사람이 3명 이상일 때 이름 뒤에 붙는 글({n}=보여 주지 않은 사람 수)','외 {n}명',['n']);
+  add('inbox.m_views',I2,'스마트폰 화면 문의 카드의 열람 글(원장 화면 · {names}=열람한 사람 이름)','열람 {names}',['names']);
   add('inbox.btn_detail',I2,'문의 한 줄 끝 「상세」 단추 글(카카오 예약 줄도 같음)','상세');
   add('inbox.unknown_time',I2,'받은 시각을 알 수 없을 때 대신 보이는 글(상세 화면도 같음)','미상');
   add('inbox.neg_kw',I2,'불만·환불 같은 말이 들어 있는 문의 앞에 붙는 표시(어떤 말을 잡는지는 아직 코드에 있어요)','부정 키워드');
   add('inbox.m_assignee',I2,'스마트폰 화면 문의 카드의 담당자 글({name}=담당자 이름)','담당 {name}',['name']);
   add('inbox.group_count',I2,'같은 사람의 문의가 한 묶음일 때 이름 뒤에 붙는 건수({n}=묶음 속 문의 수)','({n}건)',['n']);
-  add('inbox.status_hint',I2,'문의 목록 맨 위 건수 줄 아래 상태 풀이 글(상태 이름을 고치면 이 글도 같이 고쳐 주세요)','NEW = 아직 아무도 처리 안 함 · 진행중 = 담당자가 답하는 중 · 리콜 = 다시 연락할 문의 · 종결 = 답변 끝 또는 광고 등 정리');
+  add('inbox.status_hint',I2,'문의 목록 맨 위 건수 줄 아래 상태 풀이 글(상태 이름을 고치면 이 글도 같이 고쳐 주세요)','NEW = 아직 아무도 처리 안 함 · 진행중 = 담당자가 답하는 중 · 리콜 = 다시 연락할 문의 · 처리됨 = 담당자가 처리를 끝냄(답변·예약·광고 정리 등)');
   add('inbox.sum_new',I2,'문의 목록 맨 위 건수 줄 — 새 문의(뒤에 건수가 붙음)','NEW');
   add('inbox.sum_progress',I2,'문의 목록 맨 위 건수 줄 — 진행 중(뒤에 건수가 붙음)','진행중');
   add('inbox.sum_recall',I2,'문의 목록 맨 위 건수 줄 — 리콜 1·2·3차를 합친 것(뒤에 건수가 붙음)','리콜');
-  add('inbox.sum_closed',I2,'문의 목록 맨 위 건수 줄 — 종결(뒤에 건수가 붙음)','종결');
+  add('inbox.sum_closed',I2,'문의 목록 맨 위 건수 줄 — 처리됨(뒤에 건수가 붙음)','처리됨');
   add('inbox.sum_converted',I2,'문의 목록 맨 위 건수 줄 — 상담일지로 넘어간 것(뒤에 건수가 붙음)','전환');
   add('inbox.empty',I2,'조건에 맞는 문의가 하나도 없을 때 뜨는 글','조건에 맞는 문의가 없습니다.');
   add('inbox.btn_call',I2,'전화 문의 줄에 뜨는 전화 걸기 링크 글','전화 걸기');
   add('inbox.btn_reply_go',I2,'채팅·홈페이지 문의 줄에 뜨는 「답하러 가기」 링크 글(눌러서 가는 주소는 코드에 있어요)','답하러 가기');
+  add('inbox.ph_handle_memo',I3,'처리 메모 입력칸의 안내 글(목록의 처리 칸·상세의 처리 완료 상자 모두)','어떻게 처리했나요?(선택)');
+  add('inbox.btn_handle_save',I3,'처리 메모 입력칸의 저장 단추 글(저장하면 그 문의가 처리됨으로 바뀜)','처리됨으로 저장');
+  add('inbox.btn_handle_cancel',I3,'목록의 처리 메모 입력칸을 접는 「취소」 단추 글','취소');
+  add('inbox.d_handle_title',I3,'문의 상세 맨 위 처리 완료 상자의 제목','✅ 처리 완료');
+  add('inbox.btn_back',I3,'문의 상세 맨 위 「목록으로」 단추 글(누르면 문의 목록 쪽으로 올라감)','↑ 목록으로');
+  add('inbox.m_handle_fail',I3,'처리됨으로 저장하다 실패했을 때 입력칸 아래에 뜨는 글({msg}는 서버 오류)','처리 저장 실패: {msg}',['msg']);
+  add('inbox.m_handled',I3,'상세에서 처리됨으로 저장했을 때 상세 칸에 뜨는 글','처리됨으로 저장했습니다.');
   add('inbox.d_count',I3,'문의 상세 맨 위 줄 끝 건수({n}=이 사람의 문의 수)','{n}건',['n']);
   add('inbox.opt_unassigned',I3,'담당자 고르는 칸의 「담당 없음」 항목','미배정');
   add('inbox.btn_save',I3,'문의 상세 — 상태·담당을 저장하는 단추 글','상태·담당 저장');
@@ -848,8 +862,8 @@ function hubTextDefsChapter5(add){
   add('inbox.m_reply_empty',I3,'답변 기록 — 답변을 안 적고 눌렀을 때 뜨는 글','실제 답변 내용을 입력하세요.');
   add('inbox.m_reply_fail',I3,'답변 기록 저장 실패({msg}는 서버 오류)','기록 실패: {msg}',['msg']);
   add('inbox.m_convert_fail',I3,'상담일지 전환 실패 알림창({msg}는 서버 오류)','상담일지 전환 실패: {msg}',['msg']);
-  add('inbox.m_convert_close_fail',I3,'상담일지 전환은 됐는데 나머지 문의를 종결 처리하다 실패했을 때 알림창({msg}는 서버 오류)','상담일지 전환은 됐지만 나머지 문의 종결에는 실패했습니다: {msg}',['msg']);
-  add('inbox.m_converted',I3,'상담일지 전환이 끝났을 때 상세 칸에 뜨는 글','상담일지로 전환했습니다. 나머지 처리 대상 문의는 종결 상태로 보존했습니다.');
+  add('inbox.m_convert_close_fail',I3,'상담일지 전환은 됐는데 나머지 문의를 처리됨으로 바꾸다 실패했을 때 알림창({msg}는 서버 오류)','상담일지 전환은 됐지만 나머지 문의를 처리됨으로 바꾸지 못했습니다: {msg}',['msg']);
+  add('inbox.m_converted',I3,'상담일지 전환이 끝났을 때 상세 칸에 뜨는 글','상담일지로 전환했습니다. 나머지 처리 대상 문의는 처리됨 상태로 보존했습니다.');
   add('inbox.kb_title',I4,'카카오 예약 줄·상세의 맨 앞 글(뒤에 일정이나 상태가 이어 붙음)','📅 카카오 예약');
   add('inbox.kb_entered',I4,'카카오 예약 — 덴트웹에 입력을 마친 표시(상세 글 앞부분도 같음)','✅ 덴트웹 입력함');
   add('inbox.kb_not_entered',I4,'카카오 예약 목록 줄 — 덴트웹에 아직 안 넣은 표시','덴트웹 입력 전');
@@ -1665,8 +1679,8 @@ const HUB_LIST_DEFS=[
    def:[{code:'daangn',label:'당근'},{code:'kakao',label:'카카오'},{code:'naver_email',label:'네이버메일'},{code:'naver_talktalk',label:'네이버 톡톡'},{code:'homepage',label:'홈페이지'},{code:'phone',label:'전화'},{code:'manual',label:'수기'},{code:'other',label:'기타'}]},
   {key:'list.inquiry_status',screen:'📥 문의함',label:'문의 상태 이름',addable:false,
    where:'문의함 › 목록 맨 위 「상태」 고르는 칸 · 문의 목록의 상태 표시 · 문의 상세의 상태 고르는 칸 · 카카오 예약 상세 맨 위 줄',
-   note:'문의 상태는 서버가 허락하는 7가지로 정해져 있고 문의 처리 흐름(새 문의 → 진행중 → 리콜 → 종결, 상담일지 전환)이 이 코드로 움직여서 코드는 못 바꾸고 새 상태도 못 늘려요. 보이는 이름만 고칠 수 있어요. 이름을 고치면 목록·필터·상세 어디서든 그 이름으로 보이고, 안 고치면 지금처럼(필터·목록은 NEW(미처리)·진행중·종결, 상세 고르는 칸은 신규·확인 중·완료)으로 보여요. 목록 맨 위 건수 줄과 풀이 글은 📝 글 고치기에서 따로 고쳐요.',
-   def:[{code:'new',label:'NEW(미처리)'},{code:'in_progress',label:'진행중'},{code:'recall_1',label:'리콜 1차'},{code:'recall_2',label:'리콜 2차'},{code:'recall_3',label:'리콜 3차'},{code:'closed',label:'종결'},{code:'converted',label:'상담일지 전환'}]},
+   note:'문의 상태는 서버가 허락하는 7가지로 정해져 있고 문의 처리 흐름(새 문의 → 진행중 → 리콜 → 처리됨, 상담일지 전환)이 이 코드로 움직여서 코드는 못 바꾸고 새 상태도 못 늘려요. 보이는 이름만 고칠 수 있어요. 이름을 고치면 목록·필터·상세 어디서든 그 이름으로 보이고, 안 고치면 지금처럼(필터·목록은 NEW(미처리)·진행중·처리됨, 상세 고르는 칸은 신규·확인 중·처리됨)으로 보여요. 목록 맨 위 건수 줄과 풀이 글은 📝 글 고치기에서 따로 고쳐요.',
+   def:[{code:'new',label:'NEW(미처리)'},{code:'in_progress',label:'진행중'},{code:'recall_1',label:'리콜 1차'},{code:'recall_2',label:'리콜 2차'},{code:'recall_3',label:'리콜 3차'},{code:'closed',label:'처리됨'},{code:'converted',label:'상담일지 전환'}]},
   {key:'list.consult_kinds',screen:'🗂 상담일지',label:'상담 구분 이름',addable:false,
    where:'상담일지 › 검색의 「전체 상담 구분」 고르는 칸 · 새 기록의 「상담 구분」 고르는 칸 · 목록 표의 구분 글',
    note:'상담 구분은 원본 엑셀의 시트 이름 6가지로 정해져 있고 서버가 이 값만 저장하며 시트별 추가 칸도 이 구분으로 움직여서 코드는 못 바꾸고 새 구분도 못 늘려요. 보이는 이름만 고칠 수 있어요. 이미 저장된 기록은 그대로예요.',

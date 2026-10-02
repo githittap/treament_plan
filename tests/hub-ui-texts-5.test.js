@@ -10,7 +10,7 @@ const golden=JSON.parse(read('tests/fixtures/hub5-golden-8829a7a.json'));
 const clone=x=>JSON.parse(JSON.stringify(x));
 const CH5=/^(inbox|cj)\./;
 const DYN_KEYS={'inbox.f_all_source':'전체 출처','inbox.f_all_status':'전체 상태'}; // inboxCardFill이 option 글을 보고 키를 고르는 두 항목
-const COUNT=152;
+const COUNT=166;
 
 function helpers(){
   const block=js.match(/\/\* hub-texts:test-start \*\/[\s\S]*?\/\* hub-texts:test-end \*\//)?.[0];
@@ -52,7 +52,7 @@ const RENAMED={'list.inquiry_status':JSON.stringify(STATUS_SET),'list.inquiry_so
 const NUM_KEYS=['inbox.group_window_min','inbox.alert_limit','consult.page_size','consult.action_limit'];
 
 /* ───────────── 1. 기본 글 목록 ───────────── */
-test('차례 5 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 9개(문의함 6 · 상담일지 3)·152개',()=>{
+test('차례 5 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 9개(문의함 6 · 상담일지 3)·166개',()=>{
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH5.test(d.key));
   assert.equal(defs.length,COUNT,'차례 5 글 키 수');
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
@@ -197,7 +197,7 @@ test('표에 값이 있으면 그 글: 구체적인 예(문의함 제목·건수
   const out=await renderAll(hr,{engine:true,textRows:rows,settings:{}});
   assert.match(out['inbox.render.manager'],/<h2 style="margin:0">📥 우리 문의 &lt;진짜&gt;<\/h2>/);
   assert.ok(!out['inbox.render.manager'].includes('<진짜>'));
-  assert.match(out['inbox.render.manager'],/<strong>새것 \d+ · 진행중 \d+ · 다시연락 \d+ · 종결 \d+ · 전환 \d+<\/strong>/);
+  assert.match(out['inbox.render.manager'],/<strong>새것 \d+ · 진행중 \d+ · 다시연락 \d+ · 처리됨 \d+ · 전환 \d+<\/strong>/);
   assert.match(out['inbox.render.manager'],/<option value="" selected>모든 출처<\/option>/);
   assert.match(out['inbox.render.manager'],/<option value="" selected>모든 상태<\/option>/);
   assert.match(out['inbox.render.manager'],/data-inbox-ids="a1">열기<\/button>/);

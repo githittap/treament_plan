@@ -154,11 +154,11 @@ async function renderAll(html,opts){
         await ctx.HubUi.load({from(){const api={select(){return api;},then(res,rej){return Promise.resolve(o.loadFail?{data:null,error:{message:'x'}}:{data:o.textRows,error:null}).then(res,rej);}};return api;}});
       }
     }else if(o.settings)Object.assign(ctx.SETTINGS,o.settings);
-    vm.runInContext(fmtSrc+'\n'+hubHelpers+'\n'+hubTLine+'\n'+consultSrc+'\n;this.api={renderInbox,inboxCardHtml,inboxLoad,inboxRenderList,inboxSelect,inboxSetDentwebEntered,inboxRecordReply,inboxSave,inboxConvert,inboxManualCreate,'
+    vm.runInContext(fmtSrc+'\n'+hubHelpers+'\n'+hubTLine+'\n'+consultSrc+'\n;this.api={renderInbox,inboxCardHtml,inboxLoad,inboxRenderList,inboxSelect,inboxMarkHandled,inboxDetailHandle,inboxFillEmptyAssignee,inboxLoadNotes,inboxSetDentwebEntered,inboxRecordReply,inboxSave,inboxConvert,inboxManualCreate,'
       +'saveAiBillingRecipients,markAiBillingCharged,showAiBillingRaw,aiBillingAlertCard,aiBillingRecipientPanel,'
       +'renderConsultationJournal,consultationRenderList,consultationRenderActionQueue,consultationEdit,consultationResetForm,saveConsultationJournal,consultationRenderSourceFields,consultationOptions,consultationActionAssigneeOptions,consultationRequestError,'
       +'inboxStatusInfo,inboxStatusSummary,inboxGroupCounts,inboxSourceLabel,inboxGroupRows,inboxGroupSummary,inboxReplyLink,inboxKakaoBookingListLines,inboxKakaoBookingDetailHtml,inboxAssigneeOptions,'
-      +'setState:(k,v)=>{if(k==="INBOX_FILTER")INBOX_FILTER=v;if(k==="INBOX_ONLY_RESERVATIONS")INBOX_ONLY_RESERVATIONS=v;if(k==="INBOX_SELECTED")INBOX_SELECTED=v;if(k==="CONSULTATION_FILTERS")CONSULTATION_FILTERS=v;if(k==="CONSULTATION_PAGE")CONSULTATION_PAGE=v;if(k==="CONSULTATION_EDIT_ID")CONSULTATION_EDIT_ID=v;if(k==="CONSULTATION_SOURCE_SAVED_FIELDS")CONSULTATION_SOURCE_SAVED_FIELDS=v;if(k==="INBOX_DENTWEB_FIELDS_AVAILABLE")INBOX_DENTWEB_FIELDS_AVAILABLE=v;if(k==="AI_BILLING_RECIPIENT_ERROR")AI_BILLING_RECIPIENT_ERROR=v;if(k==="AI_BILLING_ALERT_ROWS")AI_BILLING_ALERT_ROWS=v;if(k==="AI_BILLING_RECIPIENT_SETTINGS")AI_BILLING_RECIPIENT_SETTINGS=v;},'
+      +'setState:(k,v)=>{if(k==="INBOX_FILTER")INBOX_FILTER=v;if(k==="INBOX_HANDLING_OPEN")INBOX_HANDLING_OPEN=v;if(k==="INBOX_ONLY_RESERVATIONS")INBOX_ONLY_RESERVATIONS=v;if(k==="INBOX_SELECTED")INBOX_SELECTED=v;if(k==="CONSULTATION_FILTERS")CONSULTATION_FILTERS=v;if(k==="CONSULTATION_PAGE")CONSULTATION_PAGE=v;if(k==="CONSULTATION_EDIT_ID")CONSULTATION_EDIT_ID=v;if(k==="CONSULTATION_SOURCE_SAVED_FIELDS")CONSULTATION_SOURCE_SAVED_FIELDS=v;if(k==="INBOX_DENTWEB_FIELDS_AVAILABLE")INBOX_DENTWEB_FIELDS_AVAILABLE=v;if(k==="AI_BILLING_RECIPIENT_ERROR")AI_BILLING_RECIPIENT_ERROR=v;if(k==="AI_BILLING_ALERT_ROWS")AI_BILLING_ALERT_ROWS=v;if(k==="AI_BILLING_RECIPIENT_SETTINGS")AI_BILLING_RECIPIENT_SETTINGS=v;},'
       +'getState:k=>({INBOX_SELECTED:typeof INBOX_SELECTED!=="undefined"?INBOX_SELECTED:null,CONSULTATION_EDIT_ID:CONSULTATION_EDIT_ID,CONSULTATION_PAGE_SIZE:CONSULTATION_PAGE_SIZE})[k]};'
       +'this.api2={hubFillHtml:typeof hubFillHtml==="function"?hubFillHtml:null,hubN:typeof hubN==="function"?hubN:null,'
       +'inboxSourceItems:typeof inboxSourceItems==="function"?inboxSourceItems:null,inboxStatusItems:typeof inboxStatusItems==="function"?inboxStatusItems:null,inboxStatusName:typeof inboxStatusName==="function"?inboxStatusName:null,'
@@ -241,6 +241,48 @@ async function renderAll(html,opts){
     await sel('rpc_fail','manager',['a1'],{rpc:{consultation_inbox_record_view:fail('x')}});
     await sel('replies_error','owner',['a2'],{tables:{consultation_inbox_replies:{error:{message:'답변<오류>'}},consultation_inbox_views:{error:{message:'열람<오류>'}}}});
     await sel('replies_empty','manager',['a1'],{tables:{consultation_inbox_replies:{list:[]}}});
+  }
+  { // 처리 칸(목록의 「✅ 처리」 · 처리한 사람·메모 · 열람 칸 · 상세의 처리 완료 상자) — 이번 변경에서 새로 생긴 화면
+    const REPLIES=[{inbox_id:'a8',reply:'전화로 안내했음 <끝>',created_at:'2026-09-30T06:00:00Z',author_id:'u2'},{inbox_id:'a6',reply:'가'.repeat(60),created_at:'2026-09-30T07:00:00Z',author_id:'u3'},{inbox_id:'a6',reply:'먼저 쓴 메모',created_at:'2026-09-30T06:30:00Z',author_id:'u5'}];
+    const VIEWS=[{inbox_id:'a1',viewer_id:'u2',viewed_at:'2026-09-30T05:10:00Z'},{inbox_id:'a1',viewer_id:'u3',viewed_at:'2026-09-30T05:20:00Z'},{inbox_id:'a1',viewer_id:'u5',viewed_at:'2026-09-30T05:30:00Z'},{inbox_id:'a1',viewer_id:'u2',viewed_at:'2026-09-30T05:40:00Z'},{inbox_id:'a4',viewer_id:'u3',viewed_at:'2026-09-30T05:50:00Z'}];
+    for(const role of ['owner','manager','staff']){
+      const r=await asRole(role,null,{tables:{consultation_inbox_replies:{list:REPLIES},consultation_inbox_views:{list:VIEWS}}});
+      r.api.setState('INBOX_FILTER',{source:'',status:''});r.api.setState('INBOX_ONLY_RESERVATIONS',false);
+      await r.api.renderInbox({innerHTML:''});await flush();
+      out['inbox.handle.list.'+role]=r.dom.$('#inboxList').innerHTML;
+    }
+    { // 입력칸이 펼쳐진 줄(한 번에 한 줄만)
+      const r=await asRole('manager');r.api.setState('INBOX_FILTER',{source:'',status:''});r.api.setState('INBOX_ONLY_RESERVATIONS',false);
+      r.api.setState('INBOX_HANDLING_OPEN','a1');await r.api.renderInbox({innerHTML:''});await flush();
+      out['inbox.handle.list.open']=r.dom.$('#inboxList').innerHTML;
+    }
+    const runHandle=async(name,role,rows,memo,sbOver)=>{
+      const q=await asRole(role,null,sbOver),msg={textContent:''};
+      const ok=await q.api.inboxMarkHandled(rows.map(x=>Object.assign({},x)),memo,msg);await flush();
+      out['inbox.handle.save.'+name]=JSON.stringify([ok,msg.textContent,q.log,q.statuses,q.ctx.sb.rpcCalls,q.ctx.sb.writes]);
+    };
+    await runHandle('memo_ok','manager',[INBOX_ROWS[0]],'  전화로 안내함  ');
+    await runHandle('mixed_rows','owner',[INBOX_ROWS[1],INBOX_ROWS[6]],'');
+    await runHandle('all_assigned','manager',[INBOX_ROWS[1],INBOX_ROWS[3]],'메모');
+    await runHandle('rpc_fail','manager',[INBOX_ROWS[0]],'메모',{rpc:{consultation_inbox_record_reply:fail('기록<실패>')}});
+    await runHandle('update_fail','manager',[INBOX_ROWS[0]],'',{tables:{consultation_inbox:{error:{message:'저장<실패>'}}}});
+    await runHandle('staff','staff',[INBOX_ROWS[0]],'메모');
+    await runHandle('nothing_to_do','manager',[INBOX_ROWS[5]],'메모');
+    { // 상세에서 처리
+      const d=makeDom();
+      const q=await asRole('owner',{$:d.$},{tables:{consultation_inbox:{list:INBOX_ROWS.filter(x=>x.id==='a1')}}});
+      await q.api.inboxSelect(['a1']);d.$('#inboxHandleMemo').value='상세에서 처리함';await q.api.inboxDetailHandle();await flush();
+      out['inbox.handle.detail_ok']=JSON.stringify([d.$('#inboxDetail').innerHTML,q.log,q.statuses,q.ctx.sb.rpcCalls,q.ctx.sb.writes]);
+    }
+    { // 답변 기록 뒤 빈 담당 채우기 · 상담일지 전환 뒤 남은 줄의 빈 담당 채우기
+      const d=makeDom();d.$('#inboxReply').value='기록';
+      const q=await asRole('manager',{$:d.$});q.api.setState('INBOX_SELECTED',{id:'a1',ids:['a1','a7'],processable:[Object.assign({},INBOX_ROWS[0]),Object.assign({},INBOX_ROWS[6],{status:'new'})]});
+      await q.api.inboxRecordReply();await flush();
+      out['inbox.handle.reply_fill']=JSON.stringify([d.$('#inboxReplyMsg').textContent,q.log,q.ctx.sb.rpcCalls,q.ctx.sb.writes]);
+      const q2=await asRole('manager');const rows=[INBOX_ROWS[0],INBOX_ROWS[6]].map(x=>Object.assign({},x,{status:'new'}));
+      q2.api.setState('INBOX_SELECTED',{ids:rows.map(x=>x.id),messages:rows});await q2.api.inboxConvert();await flush();
+      out['inbox.handle.convert_fill']=JSON.stringify([q2.log,q2.statuses,q2.ctx.sb.rpcCalls,q2.ctx.sb.writes]);
+    }
   }
   { // 덴트웹 입력 표시
     const run=async(name,sel,opts)=>{
