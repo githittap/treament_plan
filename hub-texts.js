@@ -1294,6 +1294,8 @@ function hubTextDefsChapter7(add){
   add('ob.pin_desc',S5,'원장 보기판 — 둘째 판 카드 설명','AI가 지킬 약속');
   add('ob.word_title',S5,'원장 보기판 — 셋째 판 카드·보기 화면 제목','📖 박제 단어장');
   add('ob.word_desc',S5,'원장 보기판 — 셋째 판 카드 설명','원장이 알아 둘 말');
+  add('ob.inbox_title',S5,'원장 보기판 — 넷째 판(총괄 인박스 맨 위 경고·대기 줄) 카드·보기 화면 제목','📥 인박스 경고');
+  add('ob.inbox_desc',S5,'원장 보기판 — 넷째 판 카드 설명','AI가 남긴 최근 경고·대기');
   add('ob.frame_title',S5,'원장 보기판 — 판 화면 안쪽 창의 읽어 주는 이름(화면에는 안 보임). {title}은 판 제목','{title} 보기',['title']);
   add('ob.synced',S5,'원장 보기판 — 판 카드·보기 화면의 마지막 올라온 시각 글. {when}은 시각','마지막으로 올라온 때 {when}',['when']);
   add('ob.not_synced',S5,'원장 보기판 — 판이 아직 PC에서 안 올라왔을 때 카드 글(판 보기 오류 글에도 같이 씀)','아직 PC에서 올라오지 않음');

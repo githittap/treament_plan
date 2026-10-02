@@ -378,7 +378,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 
 <footer>© 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지</footer>
 
-<script src="hub-texts.js?v=2026100221"></script>
+<script src="hub-texts.js?v=2026100223"></script>
 <script>
 /* ═══════ 설정 ═══════
    실제 값은 DB의 app_settings 표에서 읽어옵니다.
@@ -3460,9 +3460,10 @@ if(typeof TABS!=='undefined'&&typeof MENU!=='undefined')installOwnerBoardsTab(TA
 const OWNER_BOARDS=[
   {slug:'busd_ledger',title:'📒 뻐스디 장부',description:'AI 일 장부'},
   {slug:'pin_board',title:'📌 명심판',description:'AI가 지킬 약속'},
-  {slug:'wordbook',title:'📖 박제 단어장',description:'원장이 알아 둘 말'}
+  {slug:'wordbook',title:'📖 박제 단어장',description:'원장이 알아 둘 말'},
+  {slug:'inbox',title:'📥 인박스 경고',description:'AI가 남긴 최근 경고·대기'}
 ];
-function ownerBoardTexts(board){const m={busd_ledger:{title:h7T('ob.busd_title','📒 뻐스디 장부'),description:h7T('ob.busd_desc','AI 일 장부')},pin_board:{title:h7T('ob.pin_title','📌 명심판'),description:h7T('ob.pin_desc','AI가 지킬 약속')},wordbook:{title:h7T('ob.word_title','📖 박제 단어장'),description:h7T('ob.word_desc','원장이 알아 둘 말')}};return m[board.slug]||{title:board.title,description:board.description};}
+function ownerBoardTexts(board){const m={busd_ledger:{title:h7T('ob.busd_title','📒 뻐스디 장부'),description:h7T('ob.busd_desc','AI 일 장부')},pin_board:{title:h7T('ob.pin_title','📌 명심판'),description:h7T('ob.pin_desc','AI가 지킬 약속')},wordbook:{title:h7T('ob.word_title','📖 박제 단어장'),description:h7T('ob.word_desc','원장이 알아 둘 말')},inbox:{title:h7T('ob.inbox_title','📥 인박스 경고'),description:h7T('ob.inbox_desc','AI가 남긴 최근 경고·대기')}};return m[board.slug]||{title:board.title,description:board.description};}
 function ownerBoardsTimestamp(value){return value?hubFmtDateTime(value):'';}
 function ownerBoardsMissing(error){return !!error&&(error.code==='42P01'||error.code==='PGRST205'||Number(error.status)===404);}
 function ownerBoardsPanelHtml(rows,error){

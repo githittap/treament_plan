@@ -46,5 +46,32 @@ try{
   assert.equal((await q("select to_regclass('public.owner_boards') is null gone"))[0].gone,true);
   assert.equal((await q("select count(*)::int n from pg_proc where pronamespace='public'::regnamespace and proname='owner_board_put'"))[0].n,0);
   await db.exec(migration);assert.equal((await q("select to_regclass('public.owner_boards') is not null back"))[0].back,true);
+  // 2026-10-02 넷째 판 inbox: 새로 만든 표는 바로 받고, 운영처럼 세 판 검사만 있는 표에는 owner_boards_inbox.sql을 돌려야 받는다.
+  const slugCheck=async()=>(await q("select pg_get_constraintdef(oid) d from pg_constraint where conrelid='public.owner_boards'::regclass and conname='owner_boards_slug_check'")).map(r=>r.d);
+  await db.exec('set role service_role;');
+  await q(`select public.owner_board_put('inbox','<!doctype html><html>인박스</html>','${hash}',now())`);
+  await db.exec('reset role;');
+  await db.exec("delete from public.owner_boards;alter table public.owner_boards drop constraint owner_boards_slug_check;alter table public.owner_boards add constraint owner_boards_slug_check check(slug in('busd_ledger','pin_board','wordbook'));");
+  for(const s of ['busd_ledger','pin_board','wordbook'])await q(`insert into public.owner_boards(slug,html,sha256) values('${s}','<html>${s}</html>','${hash}')`);
+  await db.exec('set role service_role;');
+  await assert.rejects(q(`select public.owner_board_put('inbox','<html>x</html>','${hash}',null)`),/owner_boards_slug_check/,'운영과 같은 세 판 표는 inbox를 거절');await db.exec('rollback');
+  await db.exec('reset role;');
+  const inboxMigration=fs.readFileSync(path.join(root,'db/owner_boards_inbox.sql'),'utf8');
+  assert.doesNotMatch(inboxMigration,/\b(begin|commit|delete|drop table|truncate)\b/i,'제약 바꾸기만 — 트랜잭션 묶음·자료 지우기 없음');
+  await db.exec(inboxMigration);await db.exec(inboxMigration);
+  assert.deepEqual(await slugCheck(),["CHECK ((slug = ANY (ARRAY['busd_ledger'::text, 'pin_board'::text, 'wordbook'::text, 'inbox'::text])))"]);
+  assert.equal((await q('select count(*)::int n from public.owner_boards'))[0].n,3,'기존 세 판 자료는 그대로');
+  await db.exec('set role service_role;');
+  await q(`select public.owner_board_put('inbox','<!doctype html><html>인박스</html>','${hash}',now())`);
+  await assert.rejects(q(`select public.owner_board_put('other','<html>x</html>','${hash}',null)`),/owner_boards_slug_check/);await db.exec('rollback');
+  await db.exec('reset role;');
+  await setUser(owner);assert.deepEqual((await q('select slug from public.owner_boards order by slug')).map(r=>r.slug),['busd_ledger','inbox','pin_board','wordbook']);
+  await setUser(staff);assert.equal((await q("select * from public.owner_boards where slug='inbox'")).length,0,'직원은 인박스 판도 못 봄');
+  await db.exec('reset role;');
+  const inboxRollback=fs.readFileSync(path.join(root,'db/owner_boards_inbox_rollback.sql'),'utf8');
+  await db.exec(inboxRollback);
+  assert.deepEqual(await slugCheck(),["CHECK ((slug = ANY (ARRAY['busd_ledger'::text, 'pin_board'::text, 'wordbook'::text])))"]);
+  assert.deepEqual((await q('select slug from public.owner_boards order by slug')).map(r=>r.slug),['busd_ledger','pin_board','wordbook'],'되돌리기는 인박스 행만 지움');
+  await db.exec(inboxMigration);assert.equal((await slugCheck())[0].includes("'inbox'::text"),true,'되돌린 뒤 다시 적용 가능');
   console.log('PGLITE_OWNER_BOARDS_PASS');
 }finally{await db.close();}

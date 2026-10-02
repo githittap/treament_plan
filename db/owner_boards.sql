@@ -1,6 +1,6 @@
 -- 원장 전용 보기판의 읽기 전용 HTML 스냅샷. PC 업로더만 service_role RPC로 갱신한다.
 create table if not exists public.owner_boards (
-  slug text primary key check(slug in('busd_ledger','pin_board','wordbook')),
+  slug text primary key constraint owner_boards_slug_check check(slug in('busd_ledger','pin_board','wordbook','inbox')),
   html text not null check(octet_length(html) between 1 and 4194304),
   sha256 text not null check(sha256 ~ '^[0-9a-f]{64}$'),
   source_mtime timestamptz,

@@ -10,7 +10,13 @@ const {renderAll}=require('./fixtures/hub7-harness.cjs');
 const golden=JSON.parse(read('tests/fixtures/hub7-golden-f95b951.json'));
 const clone=x=>JSON.parse(JSON.stringify(x));
 const CH7=/^(home|dep|cf|aic|mkt|aiu|ob|pay|slip|acct|jg|save|payreq|empdoc)\./;
-const COUNT=329;
+const COUNT=329+2;   // 차례 7 글 329 + 원장 보기판 넷째 판 「📥 인박스 경고」 2(ob.inbox_title·ob.inbox_desc, 2026-10-02)
+/* 2026-10-02 원장 보기판에 넷째 판(📥 인박스 경고)을 더함 — 옛 화면(f95b951)과의 차이는 기본 글 카드 한 장뿐이어야 한다.
+   옛 화면 대조는 그 카드(그대로·JSON 한 번·두 번 감싼 꼴)만 빼고 글자 하나까지 같은지 본다. 카드가 실제로 붙는지는 아래 따로 시험. */
+const INBOX_CARD='<button type="button" class="card owner-board-card" data-owner-board="inbox" onclick="openOwnerBoard(\'inbox\')"><strong>📥 인박스 경고</strong><span>AI가 남긴 최근 경고·대기</span><small>아직 PC에서 올라오지 않음</small></button>';
+const esc1=s=>JSON.stringify(s).slice(1,-1);
+const INBOX_FORMS=[INBOX_CARD,esc1(INBOX_CARD),esc1(esc1(INBOX_CARD))];
+const dropInbox=out=>Object.fromEntries(Object.entries(out).map(([k,v])=>[k,typeof v==='string'&&k.startsWith('ob.')?INBOX_FORMS.reduce((s,f)=>s.split(f).join(''),v):v]));
 const NUM_KEYS=['home.payslip_limit','dep.list_limit','aic.history_months','aic.auto_limit','aiu.model_days','aiu.cost_months','aiu.external_days','aiu.session_limit'];
 const LIST_KEYS=['list.approval_status','list.contract_status','list.pay_wage_types','list.marketing_categories','list.ai_billing_platforms','list.ai_cost_platforms','list.ai_external_names'];
 const sha=s=>crypto.createHash('sha256').update(s).digest('hex');
@@ -51,9 +57,10 @@ const ch7Defs=()=>helpers().hubTextDefs().filter(d=>CH7.test(d.key));
 const allOut=out=>Object.values(out).join('\n');
 const J=x=>JSON.parse(x);
 const run=(textRows,settings,o)=>renderAll(hr,Object.assign({engine:true,textRows:textRows||[],settings:settings||{}},o||{}));
+const runOld=(textRows,settings,o)=>run(textRows,settings,o).then(dropInbox);
 
 /* ───────────── 1. 기본 글 목록 ───────────── */
-test('차례 7 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 14개·329개 · 명세서 서식·위험 확인창은 ⚠️ 안내로 시작',()=>{
+test('차례 7 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 14개·331개(차례 7 329 + 인박스 판 2) · 명세서 서식·위험 확인창은 ⚠️ 안내로 시작',()=>{
   const defs=ch7Defs();
   assert.equal(defs.length,COUNT,'차례 7 글 키 수');
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
@@ -123,45 +130,58 @@ test('숫자 8개·이름 목록 7개: 기본값이 화면 코드와 같고, 화
     assert.ok(d.where&&d.note&&d.screen);
     assert.equal(h.hubListValidate(d,d.def).ok,true,k+' 기본 목록은 저장 검사를 통과');
   }
-  assert.match(hr,/hub-texts\.js\?v=2026100221/,'캐시 번호를 새 값으로 올림(차례 6에서 2026100112 → 2026100113, 10-02 원장요청 5건에서 → 2026100221)');
+  assert.match(hr,/hub-texts\.js\?v=2026100223/,'캐시 번호를 새 값으로 올림(차례 6에서 2026100112 → 2026100113, 10-02 원장요청 5건에서 → 2026100221, 10-02 인박스 판에서 → 2026100223)');
   assert.ok(!/hub-texts\.js\?v=2026100112/.test(hr));
 });
 
 /* ───────────── 2. 기본값만 있을 때 옛 화면과 똑같음 ───────────── */
 test('기본값만 있을 때: 허브 설정 엔진이 아예 없어도 모든 화면·메시지·알림창·확인창이 옛 화면(f95b951)과 글자 하나까지 같다',async()=>{
-  const out=await renderAll(hr,{engine:false});
+  const out=dropInbox(await renderAll(hr,{engine:false}));
   assert.deepEqual(Object.keys(out).sort(),Object.keys(golden).sort());
   assert.ok(Object.keys(golden).length>=140,'대조 항목 수');
   for(const k of Object.keys(golden))assert.equal(out[k],golden[k],k);
 });
+test('원장 보기판 넷째 판(📥 인박스 경고): 기본 글 카드가 판 목록 끝에 한 장씩 붙고, 옛 화면과 다른 곳은 그 카드뿐이다',async()=>{
+  const out=await renderAll(hr,{engine:false});
+  const panels=J(out['ob.panel']);
+  assert.equal(panels.length,6);
+  for(const p of panels){
+    assert.equal(p.split(INBOX_CARD).length-1,1,'판 목록마다 인박스 카드 한 장');
+    assert.ok(p.includes(INBOX_CARD+'</div><div id="ownerBoardViewer" hidden></div>'),'세 판 다음(목록 끝)');
+  }
+  for(const k of ['ob.render.owner','ob.render.owner_missing','ob.render.owner_err'])assert.equal(out[k].split(esc1(INBOX_CARD)).length-1,1,k+' 원장 화면에 한 장');
+  assert.ok(!out['ob.render.nonowner'].includes('inbox'),'원장이 아니면 카드 없음');
+  const changed=Object.keys(golden).filter(k=>out[k]!==golden[k]).sort();
+  assert.deepEqual(changed,['ob.panel','ob.render.owner','ob.render.owner_err','ob.render.owner_missing'],'카드가 붙는 곳 말고는 그대로');
+});
 test('기본값만 있을 때: 엔진을 못 불러와 hr.html의 대비책(shim)만 있어도 옛 화면과 같다',async()=>{
-  const out=await renderAll(hr,{engine:false,shim:true});
+  const out=dropInbox(await renderAll(hr,{engine:false,shim:true}));
   for(const k of Object.keys(golden))assert.equal(out[k],golden[k],k);
 });
 test('기본값만 있을 때: 엔진이 있고 표가 비어 있어도 옛 화면과 같다',async()=>{
-  const out=await run([],{});
+  const out=await runOld([],{});
   for(const k of Object.keys(golden))assert.equal(out[k],golden[k],k);
 });
 test('표를 못 읽어도(읽기 실패) 옛 화면과 같다 — 기본값으로 조용히 동작',async()=>{
-  const out=await run(null,{},{loadFail:true,textRows:undefined});
+  const out=await runOld(null,{},{loadFail:true,textRows:undefined});
   for(const k of Object.keys(golden))assert.equal(out[k],golden[k],k);
 });
 test('잘못된 값이 들어 있어도(숫자가 글자·범위 밖·소수, 목록이 깨짐·코드 빠짐·이름 빔, 글이 공백뿐) 옛 화면과 같다',async()=>{
   for(const bad of ['abc','0','-1','1.5','99999','','  ','[]','1e3']){
     const settings=Object.fromEntries(NUM_KEYS.map(k=>[k,bad]));
-    const out=await run([],settings);
+    const out=await runOld([],settings);
     for(const k of Object.keys(golden))assert.equal(out[k],golden[k],k+' ← 숫자 '+JSON.stringify(bad));
   }
   const badLists=['깨짐','[]','{"a":1}','[{"code":"zzz","label":"새 코드만"}]','[{"code":"진행","label":""}]','[{"code":"monthly","label":"월급"}]','[1,2]','null'];
   for(const bad of badLists){
     const settings=Object.fromEntries(LIST_KEYS.map(k=>[k,bad]));
-    const out=await run([],settings);
+    const out=await runOld([],settings);
     for(const k of Object.keys(golden))assert.equal(out[k],golden[k],k+' ← 목록 '+bad);
   }
   const blanks=ch7Defs().map(d=>({key:d.key,value:'  \n '}));
-  const out=await run(blanks,{});
+  const out=await runOld(blanks,{});
   for(const k of Object.keys(golden))assert.equal(out[k],golden[k],k+' ← 글이 공백뿐');
-  const same=await run([],Object.fromEntries(NUM_KEYS.map(k=>[k,' '+({'home.payslip_limit':'12','dep.list_limit':'300','aic.history_months':'6','aic.auto_limit':'20','aiu.model_days':'7','aiu.cost_months':'6','aiu.external_days':'14','aiu.session_limit':'8'})[k]+' '])));
+  const same=await runOld([],Object.fromEntries(NUM_KEYS.map(k=>[k,' '+({'home.payslip_limit':'12','dep.list_limit':'300','aic.history_months':'6','aic.auto_limit':'20','aiu.model_days':'7','aiu.cost_months':'6','aiu.external_days':'14','aiu.session_limit':'8'})[k]+' '])));
   for(const k of Object.keys(golden))assert.equal(same[k],golden[k],k+' 기본 숫자를 공백 섞어 적음');
 });
 test('시험이 실제로 잡는지: 화면 글을 한 글자만 바꾸면 대조가 실패한다(홈·입금·진료기록·AI비용·보기판·급여·명세서·확인창·직무 분류·상태 글 각각)',async()=>{
@@ -176,7 +196,7 @@ test('시험이 실제로 잡는지: 화면 글을 한 글자만 바꾸면 대�
 });
 
 /* ───────────── 3. 표에 값이 있으면 그 글 ───────────── */
-test('표에 값이 있으면 그 글: 고쳐 쓰는 글 329개가 모두 화면에서 나오고, {자리표시자}가 채워진다',async()=>{
+test('표에 값이 있으면 그 글: 고쳐 쓰는 글 331개(차례 7 329 + 인박스 판 2)가 모두 화면에서 나오고, {자리표시자}가 채워진다',async()=>{
   const defs=ch7Defs();
   const out=await run(dynRows(defs),{});
   const all=allOut(out);
@@ -425,7 +445,7 @@ function ui(opts){
     async render(me){await ctx.window.HubUi.renderSettings(rootEl,{sb,me});await settle();}};
 }
 const OWNER={id:'o1',role:'owner'};
-test('화면: 글 고치기에 새 묶음 14개(329개)가 접혀 나오고, 검색칸은 새 글의 화면 낱말·글·키로도 찾고 맞는 줄이 없는 묶음은 숨긴다',async()=>{
+test('화면: 글 고치기에 새 묶음 14개(331개 — 차례 7 329 + 인박스 판 2)가 접혀 나오고, 검색칸은 새 글의 화면 낱말·글·키로도 찾고 맞는 줄이 없는 묶음은 숨긴다',async()=>{
   const t=ui({});
   await t.render(OWNER);
   const sec=t.section.innerHTML;
