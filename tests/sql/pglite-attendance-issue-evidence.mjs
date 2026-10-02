@@ -25,12 +25,13 @@ try{
     grant execute on function public.employee_hub_access_allowed(),public.my_role() to authenticated,anon;
     create table public.attendance_issues(id bigint generated always as identity primary key,user_id uuid not null,work_date date not null,type text,reason text,rule_label text,status text not null default '대기',chief_by text,chief_at timestamptz,owner_by text,owner_at timestamptz,created_at timestamptz default now());
     
-    grant select,delete,references,trigger,truncate on public.attendance_issues to authenticated;
+    grant select,delete,references,trigger,truncate on public.attendance_issues to anon,authenticated;
     alter table public.attendance_issues enable row level security;
     create policy attendance_issues_select on public.attendance_issues for select to authenticated using(user_id=auth.uid() or public.my_role() in('manager','chief','owner'));
     create policy attendance_issues_insert on public.attendance_issues for insert to authenticated with check((user_id=auth.uid() and rule_label<>'자동') or (rule_label='자동' and public.my_role() in('manager','chief','owner')));
     create policy attendance_issues_update on public.attendance_issues for update to authenticated using(public.my_role() in('chief','owner')) with check(public.my_role() in('chief','owner'));
     create policy deputy_contract_only_block on public.attendance_issues as restrictive for all to authenticated using(public.my_role()<>'deputy') with check(public.my_role()<>'deputy');
+    create policy deputy_contract_only_v4_block on public.attendance_issues as restrictive for all to authenticated using(public.my_role()<>'deputy') with check(public.my_role()<>'deputy');
     create policy employee_hub_access_gate on public.attendance_issues as restrictive for all to authenticated using(public.employee_hub_access_allowed()) with check(public.employee_hub_access_allowed());
     create schema storage;
     create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
@@ -45,18 +46,26 @@ try{
       ('${inactive}','staff',false,true,'활성'),('${unapproved}','staff',true,false,'활성'),('${blocked}','staff',true,true,'차단');
   `);
   await db.exec(functionSql('guard_attendance_issue_insert')+`create trigger guard_attendance_issue_insert before insert on public.attendance_issues for each row execute function public.guard_attendance_issue_insert();`+functionSql('submit_attendance_issue')+functionSql('record_auto_attendance_issue')+functionSql('review_attendance_issue'));
+  for(const role of ['anon','authenticated']){
+    for(const privilege of ['SELECT','DELETE','REFERENCES','TRIGGER','TRUNCATE']) assert.equal((await q(`select has_table_privilege('${role}','public.attendance_issues','${privilege}') ok`))[0].ok,true,`${role} must retain ${privilege}`);
+    for(const privilege of ['INSERT','UPDATE']) assert.equal((await q(`select has_table_privilege('${role}','public.attendance_issues','${privilege}') ok`))[0].ok,false,`${role} must not have ${privilege}`);
+  }
   const baseline=await q(`select
     (select string_agg(policyname||':'||permissive||':'||cmd||':'||coalesce(qual,'')||':'||coalesce(with_check,''),',' order by policyname) from pg_policies where schemaname='public' and tablename='attendance_issues') policies,
     (select string_agg(t.tgname||':'||pg_get_triggerdef(t.oid),',' order by t.tgname) from pg_trigger t where t.tgrelid='public.attendance_issues'::regclass and not t.tgisinternal) triggers,
     (select string_agg(p.oid::regprocedure::text||':'||pg_get_functiondef(p.oid),',' order by p.oid::regprocedure::text) from pg_proc p where p.oid in ('public.submit_attendance_issue(date,text,text,text)'::regprocedure,'public.record_auto_attendance_issue(uuid,date,text,text)'::regprocedure,'public.review_attendance_issue(bigint,text)'::regprocedure)) functions,
-    (select string_agg(privilege_type,',' order by privilege_type) from information_schema.role_table_grants where table_schema='public' and table_name='attendance_issues' and grantee='authenticated') grants`);
+    (select string_agg(grantee||':'||privilege_type,',' order by grantee,privilege_type) from information_schema.role_table_grants where table_schema='public' and table_name='attendance_issues' and grantee in ('anon','authenticated')) grants`);
   await db.exec(fs.readFileSync('db/attendance_issue_evidence.sql','utf8'));
   const after=await q(`select
     (select string_agg(policyname||':'||permissive||':'||cmd||':'||coalesce(qual,'')||':'||coalesce(with_check,''),',' order by policyname) from pg_policies where schemaname='public' and tablename='attendance_issues') policies,
     (select string_agg(t.tgname||':'||pg_get_triggerdef(t.oid),',' order by t.tgname) from pg_trigger t where t.tgrelid='public.attendance_issues'::regclass and not t.tgisinternal) triggers,
     (select string_agg(p.oid::regprocedure::text||':'||pg_get_functiondef(p.oid),',' order by p.oid::regprocedure::text) from pg_proc p where p.oid in ('public.submit_attendance_issue(date,text,text,text)'::regprocedure,'public.record_auto_attendance_issue(uuid,date,text,text)'::regprocedure,'public.review_attendance_issue(bigint,text)'::regprocedure)) functions,
-    (select string_agg(privilege_type,',' order by privilege_type) from information_schema.role_table_grants where table_schema='public' and table_name='attendance_issues' and grantee='authenticated') grants`);
+    (select string_agg(grantee||':'||privilege_type,',' order by grantee,privilege_type) from information_schema.role_table_grants where table_schema='public' and table_name='attendance_issues' and grantee in ('anon','authenticated')) grants`);
   assert.deepEqual(after,baseline,'기존 소명 정책·트리거·함수·권한은 그대로여야 한다');
+  for(const role of ['anon','authenticated']){
+    for(const privilege of ['SELECT','DELETE','REFERENCES','TRIGGER','TRUNCATE']) assert.equal((await q(`select has_table_privilege('${role}','public.attendance_issues','${privilege}') ok`))[0].ok,true,`${role} ${privilege} must remain after migration`);
+    for(const privilege of ['INSERT','UPDATE']) assert.equal((await q(`select has_table_privilege('${role}','public.attendance_issues','${privilege}') ok`))[0].ok,false,`${role} ${privilege} must remain absent after migration`);
+  }
   assert.deepEqual((await q(`select public,file_size_limit,allowed_mime_types from storage.buckets where id='attendance-evidence'`))[0],{public:false,file_size_limit:10485760,allowed_mime_types:['image/jpeg','image/png','image/webp','application/pdf']});
 
   await as(staff);
@@ -85,7 +94,12 @@ try{
   await as(chief);await call('review_attendance_issue',`${auto},'approve'`);await as(staff);
   await denied(`select public.respond_attendance_issue(${auto},'기타','승인 뒤 수정 시도 사유')`);
   const invalidUsers=[inactive,unapproved,blocked,deputy];
-  for(const id of invalidUsers){await as(id);await denied(`select public.submit_attendance_issue_v2('2026-10-02','기타','권한 검증용 충분한 사유')`);}
+  for(const id of invalidUsers){
+    await as(id);
+    await denied(`select public.submit_attendance_issue_v2('2026-10-02','기타','권한 검증용 충분한 사유')`);
+    await denied(`select public.respond_attendance_issue(${issueId},'기타','권한 검증용 충분한 사유')`);
+    await denied(`select public.attendance_issue_add_evidence(${issueId},'${id}/${issueId}/Abcdefgh.pdf','권한.pdf','application/pdf',100)`);
+  }
   await as(staff);
   assert.equal((await q(`select count(*)::int n from public.attendance_issue_evidence`))[0].n,0);
   assert.equal((await q(`select count(*)::int n from public.attendance_issues where id=${issueId}`))[0].n,1);
@@ -104,6 +118,12 @@ try{
   await denied(`select public.attendance_issue_add_evidence(${issueId},'${wrongSize}','wrong-size.pdf','application/pdf',100)`);
   await denied(`select public.attendance_issue_add_evidence(${issueId},'${firstPath}','bad-name.pdf','application/zip',100)`);
   await denied(`select public.attendance_issue_add_evidence(${issueId},'${firstPath}','bad-size.pdf','application/pdf',10485761)`);
+  await denied(`select public.attendance_issue_add_evidence(${issueId},null,'null-path.pdf','application/pdf',100)`);
+  await denied(`select public.attendance_issue_add_evidence(${issueId},'${firstPath}',null,'application/pdf',100)`);
+  await denied(`select public.attendance_issue_add_evidence(${issueId},'${firstPath}','null-type.pdf',null,100)`);
+  await denied(`select public.attendance_issue_add_evidence(${issueId},'${firstPath}','null-size.pdf','application/pdf',null)`);
+  const typeMismatch=evidencePath(issueId,102);await addObject(typeMismatch,'{"mimetype":"image/png","size":100}');
+  await denied(`select public.attendance_issue_add_evidence(${issueId},'${typeMismatch}','wrong-extension.pdf','image/png',100)`);
   for(let i=2;i<=10;i++){
     const name=evidencePath(issueId,i);await addObject(name);
     await call('attendance_issue_add_evidence',`${issueId},'${name}','evidence-${i}.pdf','application/pdf',100`);
@@ -112,11 +132,17 @@ try{
   assert.equal((await q(`select count(*)::int n from public.attendance_issue_evidence where issue_id=${issueId}`))[0].n,10);
 
   const orphan=evidencePath(issueId,77);await addObject(orphan);
+  assert.equal((await q(`select count(*)::int n from storage.objects where bucket_id='attendance-evidence' and name='${orphan}'`))[0].n,1,'직원은 연결 전 본인 폴더의 orphan도 조회할 수 있어야 한다');
   const orphanDeleted=await q(`delete from storage.objects where bucket_id='attendance-evidence' and name='${orphan}' returning id`);
   await q('reset role');
   const orphanRemaining=(await q(`select count(*)::int n from storage.objects where bucket_id='attendance-evidence' and name='${orphan}'`))[0].n;
   assert.equal(orphanDeleted.length,1,`본인 미연결 파일 삭제가 실제 1행을 지워야 한다 (DELETE=${orphanDeleted.length}, 삭제 뒤 객체=${orphanRemaining})`);
   assert.equal(orphanRemaining,0,'관리자 조회로 실제 삭제를 확인해야 한다');
+  const otherOrphan=evidencePath(issueId,78).replace(staff,other);await q(`insert into storage.objects(bucket_id,name,owner_id,metadata) values('attendance-evidence','${otherOrphan}','${other}','{"mimetype":"application/pdf","size":100}'::jsonb)`);
+  await as(staff);
+  assert.equal((await q(`delete from storage.objects where bucket_id='attendance-evidence' and name='${otherOrphan}' returning id`)).length,0,'직원은 타인 orphan을 삭제할 수 없어야 한다');
+  await q('reset role');
+  assert.equal((await q(`select count(*)::int n from storage.objects where bucket_id='attendance-evidence' and name='${otherOrphan}'`))[0].n,1,'권한 우회 조회로 타인 orphan이 남았음을 확인해야 한다');
   await as(staff);
   assert.equal((await q(`delete from storage.objects where bucket_id='attendance-evidence' and name='${firstPath}' returning id`)).length,0,'연결 파일 삭제는 RLS로 0행이어야 한다');
   await q('reset role');assert.equal((await q(`select count(*)::int n from storage.objects where bucket_id='attendance-evidence' and name='${firstPath}'`))[0].n,1,'권한 우회 조회에서도 연결 파일이 보존돼야 한다');
@@ -129,13 +155,15 @@ try{
   await as(owner);
   assert.equal((await q(`select count(*)::int n from public.attendance_issue_evidence where issue_id=${issueId}`))[0].n,10);
   assert.equal((await q(`select count(*)::int n from storage.objects where bucket_id='attendance-evidence' and name like '${staff}/${issueId}/%'`))[0].n,10);
+  assert.equal((await q(`select count(*)::int n from storage.objects where bucket_id='attendance-evidence' and name='${otherOrphan}'`))[0].n,0,'실장·원장은 연결되지 않은 타인 orphan을 볼 수 없어야 한다');
   await as(manager);
   assert.equal((await q(`select count(*)::int n from public.attendance_issues where id=${issueId}`))[0].n,1,'기존 소명 표 권한은 원래처럼 유지됨');
   assert.equal((await q(`select count(*)::int n from public.attendance_issue_evidence where issue_id=${issueId}`))[0].n,0);
-  assert.equal((await q(`select count(*)::int n from storage.objects where bucket_id='attendance-evidence'`))[0].n,0);
+  assert.equal((await q(`select count(*)::int n from storage.objects where bucket_id='attendance-evidence'`))[0].n,0,'매니저는 연결 전 파일을 볼 수 없어야 한다');
   await as(other);
   assert.equal((await q(`select count(*)::int n from public.attendance_issue_evidence`))[0].n,0);
-  assert.equal((await q(`select count(*)::int n from storage.objects where bucket_id='attendance-evidence'`))[0].n,0);
+  assert.equal((await q(`select count(*)::int n from storage.objects where bucket_id='attendance-evidence'`))[0].n,1,'다른 직원은 본인 orphan만 볼 수 있어야 한다');
+  assert.equal((await q(`select count(*)::int n from storage.objects where bucket_id='attendance-evidence' and name like '${staff}/%'`))[0].n,0,'다른 직원은 staff 소유 파일을 볼 수 없어야 한다');
   await as(deputy);
   assert.equal((await q(`select count(*)::int n from public.attendance_issue_evidence`))[0].n,0);
   assert.equal((await q(`select count(*)::int n from storage.objects where bucket_id='attendance-evidence'`))[0].n,0);
@@ -151,11 +179,15 @@ try{
   assert.match(responseRollback,/attendance issues contain staff response data; rollback stopped/i);
   assert.ok((await q(`select staff_kind from public.attendance_issues where id=${issueId}`))[0].staff_kind,'직원 답 데이터가 있으면 열과 값을 보존해야 한다');
   await q(`update public.attendance_issues set staff_kind=null,staff_reason=null,staff_responded_at=null`);
+  let objectRollback='';try{await db.exec(fs.readFileSync('db/attendance_issue_evidence_rollback.sql','utf8'));}catch(error){objectRollback=String(error);await db.exec('rollback');}
+  assert.match(objectRollback,/attendance evidence bucket contains objects; rollback stopped/i);
+  assert.equal((await q(`select count(*)::int n from storage.objects where bucket_id='attendance-evidence'`))[0].n,15,'객체가 있을 때 rollback은 storage 객체와 버킷을 보존해야 한다');
   await q(`delete from storage.objects where bucket_id='attendance-evidence'`);
   await db.exec(fs.readFileSync('db/attendance_issue_evidence_rollback.sql','utf8'));
   assert.equal((await q(`select to_regclass('public.attendance_issue_evidence') is null gone`))[0].gone,true);
   assert.equal((await q(`select not exists(select 1 from information_schema.columns where table_schema='public' and table_name='attendance_issues' and column_name like 'staff_%') gone`))[0].gone,true);
   assert.equal((await q(`select count(*)::int n from storage.buckets where id='attendance-evidence'`))[0].n,0);
+  await db.exec(fs.readFileSync('db/attendance_issue_evidence_rollback.sql','utf8'));
   await db.exec(fs.readFileSync('db/attendance_issue_evidence_rollback.sql','utf8'));
   await db.exec(fs.readFileSync('db/attendance_issue_evidence.sql','utf8'));
   assert.equal((await q(`select count(*)::int n from storage.buckets where id='attendance-evidence'`))[0].n,1);

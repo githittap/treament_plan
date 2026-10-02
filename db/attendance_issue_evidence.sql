@@ -106,9 +106,12 @@ create policy attendance_evidence_insert_own_pending on storage.objects for inse
 );
 drop policy if exists attendance_evidence_select_scoped on storage.objects;
 create policy attendance_evidence_select_scoped on storage.objects for select to authenticated using (
-  bucket_id='attendance-evidence' and public.employee_hub_access_allowed() and exists(
-    select 1 from public.attendance_issue_evidence e join public.attendance_issues i on i.id=e.issue_id
-    where e.storage_path=name and (i.user_id=auth.uid() or public.my_role() in ('chief','owner'))
+  bucket_id='attendance-evidence' and public.employee_hub_access_allowed() and (
+    split_part(name,'/',1)=auth.uid()::text or (
+      public.my_role() in ('chief','owner') and exists(
+        select 1 from public.attendance_issue_evidence e where e.storage_path=name
+      )
+    )
   )
 );
 drop policy if exists attendance_evidence_delete_unlinked_own on storage.objects;

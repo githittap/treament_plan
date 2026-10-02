@@ -42,7 +42,7 @@ test('세 RPC는 보안 정의자·고정 search_path·활성 승인 프로필�
 test('Storage는 비공개 10MB 허용형식 버킷과 범위 제한 정책을 둔다',()=>{
   assert.match(sql,/values\('attendance-evidence','attendance-evidence',false,10485760,array\['image\/jpeg','image\/png','image\/webp','application\/pdf'\]\)/i);
   assert.match(sql,/attendance_evidence_insert_own_pending[\s\S]*bucket_id='attendance-evidence'[\s\S]*employee_hub_access_allowed\(\)[\s\S]*status='대기'/i);
-  assert.match(sql,/attendance_evidence_select_scoped[\s\S]*attendance_issue_evidence e join public\.attendance_issues i[\s\S]*my_role\(\) in \('chief','owner'\)/i);
+  assert.match(sql,/attendance_evidence_select_scoped[\s\S]*bucket_id='attendance-evidence'[\s\S]*employee_hub_access_allowed\(\)[\s\S]*split_part\(name,'\/',1\)=auth\.uid\(\)::text[\s\S]*my_role\(\) in \('chief','owner'\)[\s\S]*attendance_issue_evidence e where e\.storage_path=name/i);
   assert.match(sql,/attendance_evidence_delete_unlinked_own[\s\S]*split_part\(name,'\/',1\)=auth\.uid\(\)::text[\s\S]*not exists/i);
   assert.match(sql,/attendance_evidence_deputy_block on storage\.objects as restrictive/i);
   assert.doesNotMatch(sql,/create policy attendance_evidence[^;]*for update/i);
@@ -53,8 +53,25 @@ test('rollback은 데이터 유무를 모두 검사한 뒤에만 변경하며 �
   assert.match(rollback,/attendance issue evidence contains data; rollback stopped/i);
   assert.match(rollback,/attendance issues contain staff response data; rollback stopped/i);
   assert.match(rollback,/attendance evidence bucket contains objects; rollback stopped/i);
+  assert.match(rollback,/to_regclass\('public\.attendance_issue_evidence'\)[\s\S]*information_schema\.columns[\s\S]*execute format\('select exists\(select 1 from %s\)'/i);
+  assert.match(rollback,/information_schema\.columns[\s\S]*column_name=v_column[\s\S]*execute format\('select exists\(select 1 from %s where %I is not null\)'/i);
+  assert.doesNotMatch(rollback,/exists\s*\(select 1 from public\.attendance_issue_evidence\)|exists\s*\(select 1 from storage\.objects/i,'존재 검사보다 먼저 정적 테이블 참조로 데이터를 세면 안 된다');
   const checks=[rollback.indexOf('attendance issue evidence contains data'),rollback.indexOf('attendance issues contain staff response data'),rollback.indexOf('attendance evidence bucket contains objects')];
   const firstDrop=rollback.search(/drop policy/i);assert.ok(checks.every(i=>i>=0&&i<firstDrop),'모든 보존 검사 뒤에만 정책 삭제가 와야 한다');
-  assert.ok(rollback.indexOf('lock table public.attendance_issues')<checks[0]&&rollback.indexOf('lock table storage.objects')<checks[0]&&rollback.indexOf('lock table public.attendance_issue_evidence')<checks[0]&&rollback.indexOf('lock table storage.buckets')<checks[0],'동시 변경을 막는 잠금을 데이터 검사 전에 잡아야 한다');
+  const lockRelations=[
+    'public.attendance_issues',
+    'storage.objects',
+    'public.attendance_issue_evidence',
+    'storage.buckets'
+  ];
+  const lockPositions=lockRelations.map(relation=>{
+    const marker="v_relation:=to_regclass('"+relation+"')";
+    const start=rollback.indexOf(marker);if(start<0)return -1;
+    const next=rollback.indexOf('v_relation:=to_regclass(',start+marker.length);
+    const relationBlock=rollback.slice(start,next<0?rollback.length:next);
+    const lock=relationBlock.search(/if\s+v_relation\s+is\s+not\s+null\s+then\s+execute\s+format\('lock table %s in access exclusive mode',\s*v_relation\);/i);
+    return lock<0?-1:start+lock;
+  });
+  assert.ok(lockPositions.every(i=>i>=0)&&lockPositions.every((i,index)=>index===0||i>lockPositions[index-1])&&lockPositions.at(-1)<checks[0],'각 기존 관계 잠금을 정해진 순서로 검사 전에 잡아야 한다');
   assert.match(rollback,/^commit;\s*$/im);
 });
