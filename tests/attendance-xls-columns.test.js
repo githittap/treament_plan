@@ -4,7 +4,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
-const hr=fs.readFileSync(path.join(__dirname,'..','hr.html'),'utf8');
+const hr=fs.readFileSync(path.join(__dirname,'..','hr.html'),'utf8').replace(/\r\n/g,'\n');
 const grab=name=>{const i=hr.indexOf('function '+name+'(');assert.ok(i>=0,name);const end=name==='excelToDate'?hr.indexOf('\n}\n',i)+2:hr.indexOf('\n',i);return hr.slice(i,end);};
 const {attXlColumns,excelToDate}=new Function(['findCol','findColPref','excelToDate','attXlColumns'].map(grab).join('\n')+';return {attXlColumns,excelToDate};')();
 
