@@ -583,6 +583,13 @@ function employeeJobGroupModel(person, profileById = new Map()) {
     ? { kind: 'job', ...group }
     : { kind: 'unassigned', code: null, label: '미지정', color: null, order: 4 };
 }
+function scheduleRoleGroupModel(person,profilesById=new Map((typeof PROFILES==='undefined'?[]:PROFILES||[]).map(profile=>[profile.user_id,profile]))){
+  const model=employeeJobGroupModel(person,profilesById);
+  if(model.kind!=='unassigned')return model;
+  const legacy={진료실:'clinical_consult',상담:'clinical_consult',소독:'sterilization_admin',소독실:'sterilization_admin',행정:'sterilization_admin',기공실:'lab',데스크:'desk'}[person?.department];
+  const group=EMPLOYEE_JOB_GROUPS.find(item=>item.code===legacy);
+  return group?{kind:'job',...group}:model;
+}
 
 function isCurrentJobGroupMember(person, profileById, asOfDate) {
   if (!person || person.department === 'Dr.' || person.active === false) return false;
@@ -724,7 +731,7 @@ async function saveEmployeeJobGroupPreview() {
   }
 }
 function schedulePersonName(person){return person&&person.department==='Dr.'?'Dr. '+person.name:person&&person.name||'';}
-function schedulePersonLabel(person,profilesById=new Map((typeof PROFILES==='undefined'?[]:PROFILES||[]).map(profile=>[profile.user_id,profile]))){const base=schedulePersonName(person),model=employeeJobGroupModel(person,profilesById);return model.kind==='doctor'?base:base+' · '+model.label;}
+function schedulePersonLabel(person,profilesById=new Map((typeof PROFILES==='undefined'?[]:PROFILES||[]).map(profile=>[profile.user_id,profile]))){const base=schedulePersonName(person),model=scheduleRoleGroupModel(person,profilesById);return model.kind==='doctor'?base:base+' · '+model.label;}
 function schedulePeopleForWeek(people,rows){
   const scheduled=new Set((rows||[]).map(r=>r.person_id).filter(Boolean));
   return (people||[]).filter(p=>p.included_in_schedule!==false&&(p.active===true||scheduled.has(p.id)));
@@ -751,7 +758,7 @@ function scheduleCalendarIndex(rows,people,weeks,profilesById=new Map()){
     }
     if(seen[date].has(person.id))return;
     seen[date].add(person.id);
-    const group=employeeJobGroupModel(person,profilesById),label=schedulePersonName(person),department=group.kind==='doctor'?'Dr.':group.label;
+    const group=scheduleRoleGroupModel(person,profilesById),label=schedulePersonName(person),department=group.kind==='doctor'?'Dr.':group.label;
     if(row.shift==='work'||row.shift==='evening')index[date].departments[department].push({person,label});
     if(row.shift==='evening')index[date].evening.push({person,label});
     if(row.shift==='off')index[date].off.push({person,label});
@@ -1216,14 +1223,6 @@ async function renderScheduleMonthLegacy(m){
   const groups=['Dr.','진료실','데스크','기공실','미지정'].map(label=>({label,members:staff.filter(p=>(['Dr.','진료실','데스크','기공실'].includes(p.department)?p.department:'미지정')===label)})).filter(g=>g.members.length);
   const grid=`<div class="tblwrap"><table><tr><th style="min-width:105px">직원</th>${dates.map(c=>`<th>${c.ds.slice(-2)}<br><span class="sub">${['일','월','화','수','목','금','토'][c.dd]}</span></th>`).join('')}</tr>`+groups.map(g=>`<tr><td colspan="${days+1}" style="font-weight:800;background:var(--panel);color:var(--gray)">${g.label}</td></tr>`+g.members.map(p=>`<tr><td>${esc(schedulePersonLabel(p))}</td>${dates.map(c=>{const cur=rowMap.get(p.id+'|'+c.ds)||'',onLeave=p.profile_user_id&&leaveSet.get(p.profile_user_id+'|'+c.ds),cellCanEdit=isLead()||weekStatusByStart.get(scheduleWeekForDate(c.ds))!=='공표';return `<td>${cellCanEdit?`<select class="mini ${cur==='evening'?'shift-evening':''}" data-prev-value="${esc(cur)}" onchange="applyScheduleShift(this,'${p.id}','${p.profile_user_id||''}',${scheduleDayForDate(c.ds)},'${scheduleWeekForDate(c.ds)}',this.value);this.classList.toggle('shift-evening',this.value==='evening')"><option value="">-</option>${scheduleShiftOptions(cur)}</select>`:`<span class="b ${cur==='off'?'no':(cur==='evening'?'no':'ok')}">${cur?SHIFTS[cur].l:'-'}</span>`}${onLeave?`<span class="b ok">${esc(onLeave)}</span>`:''}</td>`;}).join('')}</tr>`).join('')).join('')+'</table></div>';
   m.innerHTML=`<div class="card"><h2>🗓 근무표 <span class="b ${publishedWeeks.size===weeks.length?'ok':'wait'}">${publishedWeeks.size===weeks.length?'공표됨':'월간 초안 포함'}</span></h2><div class="rowflex" style="align-items:center;margin-bottom:8px;gap:8px"><button class="mini ${SCHED_VIEW==='week'?'stamp':''}" onclick="SCHED_VIEW='week';render()">주간 편집</button><button class="mini ${SCHED_VIEW==='month'?'stamp':''}" onclick="SCHED_VIEW='month';render()">월간 편집</button><label>대상 월 <input class="mini" type="month" value="${SCHED_MONTH}" onchange="SCHED_MONTH=this.value;render()"></label></div>${staff.length?grid:'<div class="empty">근무표에 포함된 인원이 아직 없습니다.</div>'}<div class="hint">월간 편집도 기존 주차별 근무표에 저장됩니다. 공표된 주차는 원장·실장만 수정할 수 있습니다.</div></div>${isMgr()?scheduleRosterAdminCard():''}`;
-}
-function scheduleRoleGroupModel(person){
-  const profilesById=new Map((PROFILES||[]).map(profile=>[profile.user_id,profile]));
-  const model=employeeJobGroupModel(person,profilesById);
-  if(model.kind!=='unassigned')return model;
-  const legacy={진료실:'clinical_consult',상담:'clinical_consult',소독:'sterilization_admin',소독실:'sterilization_admin',행정:'sterilization_admin',기공실:'lab',데스크:'desk'}[person?.department];
-  const group=EMPLOYEE_JOB_GROUPS.find(item=>item.code===legacy);
-  return group?{kind:'job',...group}:model;
 }
 function scheduleHasUnassignedRole(people,rows){return (people||[]).some(person=>((person.active===true&&person.included_in_schedule!==false)||(rows||[]).some(row=>row.person_id===person.id))&&scheduleRoleGroupModel(person).kind==='unassigned');}
 function scheduleRolePeople(role,people,rows,weekStart,day){
@@ -1955,7 +1954,7 @@ function renderCalendarDayDetail(date,roster,leaveItems){
   return `<div class="calendar-day-detail" role="dialog" aria-modal="true" aria-labelledby="calendarDayTitle" tabindex="-1" onclick="if(event.target===event.currentTarget)closeCalendarDayDetail()" onkeydown="if(event.key==='Escape'){event.preventDefault();closeCalendarDayDetail()}else if(event.key==='Tab'){event.preventDefault();document.getElementById('calendarDayClose')?.focus()}"><div class="calendar-day-detail-card"><div class="calendar-day-detail-head"><h3 id="calendarDayTitle">${esc(hubT('cal.detail.title','{date} 상세',{date:date}))}</h3><button type="button" class="mini" id="calendarDayClose" autofocus aria-label="${esc(hubT('cal.detail.aria_close','날짜 상세 닫기'))}" onclick="closeCalendarDayDetail()">${esc(hubT('cal.detail.close','닫기'))}</button></div>${sections.join('')}</div></div>`;
 }
 function selectCalendarDay(date,event){
-  if(event&&event.target&&event.target.closest&&event.target.closest('a,button,input,select'))return;
+  if(event&&event.target&&event.target.closest){const control=event.target.closest('a,button,input,select');if(control&&control!==event.currentTarget)return;}
   CAL_SELECTED_DATE=date;CAL_DETAIL_DATE=date;render();
 }
 function closeCalendarDayDetail(){CAL_DETAIL_DATE=null;render();}
@@ -2040,8 +2039,8 @@ async function renderCalendar(m){
   const day=ds=>byDate[ds]||(byDate[ds]={holidays:[],events:[]});
   for(const h of holidays||[])day(h.date).holidays.push(h);
   for(const e of events||[])day(e.date).events.push(e);
-  const dow=['일','월','화','수','목','금','토'];
-  const cells=CAL_PERIOD==='week'?calendarWeekDates(from).map(ds=>({d:Number(ds.slice(-2)),out:false,ds})):(()=>{const firstDow=new Date(cy,cm-1,1).getDay(),prevDaysInMonth=new Date(cy,cm-1,0).getDate(),monthCells=[];for(let i=firstDow-1;i>=0;i--)monthCells.push({d:prevDaysInMonth-i,out:true});for(let d=1;d<=daysInMonth;d++)monthCells.push({d,out:false,ds:CAL_MONTH+'-'+String(d).padStart(2,'0')});let nextD=1;while(monthCells.length%7!==0)monthCells.push({d:nextD++,out:true});return monthCells;})();
+  const dow=['월','화','수','목','금','토','일'];
+  const cells=CAL_PERIOD==='week'?calendarWeekDates(from).map(ds=>({d:Number(ds.slice(-2)),out:false,ds})):(()=>{const firstDow=(new Date(cy,cm-1,1).getDay()+6)%7,prevDaysInMonth=new Date(cy,cm-1,0).getDate(),monthCells=[];for(let i=firstDow-1;i>=0;i--)monthCells.push({d:prevDaysInMonth-i,out:true});for(let d=1;d<=daysInMonth;d++)monthCells.push({d,out:false,ds:CAL_MONTH+'-'+String(d).padStart(2,'0')});let nextD=1;while(monthCells.length%7!==0)monthCells.push({d:nextD++,out:true});return monthCells;})();
   const todayStr=today();
   if(!CAL_SELECTED_DATE||CAL_SELECTED_DATE<from||CAL_SELECTED_DATE>to)CAL_SELECTED_DATE=CAL_PERIOD==='week'&&todayStr>=from&&todayStr<=to?todayStr:from;
   const cellsHtml=cells.map((c,idx)=>{
@@ -2068,7 +2067,7 @@ async function renderCalendar(m){
   const selectedRoster=scheduleByDate[CAL_SELECTED_DATE]||emptyCalendarRoster();
   const selectedLeaves=leaveByDate[CAL_SELECTED_DATE]||[];
   const calendarBody=CAL_PERIOD==='week'?renderCalendarWeekTable(calendarWeekDates(from),scheduleByDate,leaveByDate,byDate,weekByStart):`<div class="calendar-layout">${renderCalendarDayPanel(CAL_SELECTED_DATE,selectedRoster,selectedLeaves)}<div class="cal-grid">
-      ${dow.map((w,i)=>`<div class="cal-dow ${i===0?'sun':(i===6?'sat':'')}">${w}</div>`).join('')}
+      ${dow.map((w,i)=>`<div class="cal-dow ${i===6?'sun':(i===5?'sat':'')}">${w}</div>`).join('')}
       ${cellsHtml}
     </div></div>`;
   const periodControls=CAL_PERIOD==='week'?`<button class="mini" onclick="shiftCalendarPeriod(-1)">${esc(hubT('cal.prev_week','◀ 지난주'))}</button><b>${esc(from)} ~ ${esc(to)}</b><button class="mini" onclick="shiftCalendarPeriod(1)">${esc(hubT('cal.next_week','다음주 ▶'))}</button><label>${esc(hubT('cal.f_date','날짜'))} <input class="mini" type="date" value="${CAL_SELECTED_DATE}" onchange="CAL_SELECTED_DATE=this.value;CAL_WEEK_START=mondayStr(this.value);CAL_MONTH=this.value.slice(0,7);CAL_DETAIL_DATE=null;render()"></label>`:`<button class="mini" onclick="shiftCalendarPeriod(-1)">${esc(hubT('cal.prev_month','◀ 지난달'))}</button><label>${esc(hubT('cal.f_month','대상 월'))} <input class="mini" type="month" value="${CAL_MONTH}" onchange="CAL_MONTH=this.value;CAL_SELECTED_DATE=this.value+'-01';CAL_DETAIL_DATE=null;render()"></label><button class="mini" onclick="shiftCalendarPeriod(1)">${esc(hubT('cal.next_month','다음달 ▶'))}</button>`;

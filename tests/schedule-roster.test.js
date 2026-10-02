@@ -170,7 +170,7 @@ if (block) {
 
   test('의사 부서는 표시 이름에만 Dr. 접두사를 붙인다', () => {
     assert.equal(context.schedulePersonLabel({ name: '홍길동', department: 'Dr.' }), 'Dr. 홍길동');
-    assert.equal(context.schedulePersonLabel({ name: '홍길동', department: '진료실' }), '홍길동 · 미지정');
+    assert.equal(context.schedulePersonLabel({ name: '홍길동', department: '진료실' }), '홍길동 · 진료·상담');
     assert.equal(context.schedulePersonLabel({ name: '홍길동', department: 'Dr' }), '홍길동 · 미지정');
   });
 
@@ -258,7 +258,8 @@ if (block) {
     const day = context.scheduleCalendarIndex(rows, people, [], profiles)['2026-09-15'];
     assert.deepEqual(JSON.parse(JSON.stringify(day.departments['기공'])), ['연결직원']);
     assert.deepEqual(JSON.parse(JSON.stringify(day.departments['데스크'])), ['비로그인직원']);
-    assert.deepEqual(JSON.parse(JSON.stringify(day.departments['미지정'])), ['미지정직원']);
+    assert.deepEqual(JSON.parse(JSON.stringify(day.departments['진료·상담'])), ['미지정직원']);
+    assert.deepEqual(JSON.parse(JSON.stringify(day.departments['미지정'])), []);
     assert.deepEqual(JSON.parse(JSON.stringify(day.departments['Dr.'])), ['Dr. 의사']);
     assert.deepEqual(JSON.parse(JSON.stringify(day.evening)), ['Dr. 의사']);
   });
@@ -323,7 +324,7 @@ if (block) {
     const scheduleIndex = context.scheduleCalendarIndex(filtered, people, []);
     const leaveIndex = context.calendarLeaveIndex(leave, people, '2026-09-01', '2026-09-30', value => value);
     assert.deepEqual(JSON.parse(JSON.stringify(scheduleIndex['2026-09-14'].departments['Dr.'])), []);
-    assert.deepEqual(JSON.parse(JSON.stringify(scheduleIndex['2026-09-14'].departments['미지정'])), ['근무직원']);
+    assert.deepEqual(JSON.parse(JSON.stringify(scheduleIndex['2026-09-14'].departments['진료·상담'])), ['근무직원']);
     assert.deepEqual(JSON.parse(JSON.stringify(scheduleIndex['2026-09-14'].evening)), []);
     assert.deepEqual(JSON.parse(JSON.stringify(leaveIndex['2026-09-14'])), ['Dr. 연차의사']);
     assert.deepEqual(JSON.parse(JSON.stringify(scheduleIndex['2026-09-15'].off)), ['Dr. 연차의사']);
