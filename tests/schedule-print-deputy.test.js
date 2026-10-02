@@ -93,6 +93,7 @@ test('schedule cells mark selected names and keep empty and leave summaries', ()
   assert.notEqual(end, -1);
   const context = {
     scheduleDayForDate: () => 1,
+    scheduleNamesVisible: () => false,
     scheduleRolePeople: (_role, people) => people,
     scheduleRoleColor: () => 'role-dr',
     schedulePersonLabel: person => person.name,

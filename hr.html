@@ -218,6 +218,11 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
   @media(max-width:640px){#inboxList .inbox-desktop-list{display:none}#inboxList .inbox-mobile-list{display:block}#inboxList .inbox-mobile-card{width:100%;box-sizing:border-box}}
 .inbox-handle-box{min-width:180px}.inbox-handle-box textarea,.inbox-handle-detail textarea{width:100%;box-sizing:border-box;min-height:54px}.inbox-handle-detail{border:1px solid var(--line);border-radius:9px;padding:10px;margin:0 0 10px}.inbox-handled-memo{font-weight:400;font-size:12px;color:var(--gray);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   @media print{@page employment-certificate{size:A4 portrait;margin:12mm}body.certificate-printing{background:#fff!important;color:#111!important}body.certificate-printing #certificateMask{page:employment-certificate;break-after:avoid!important;page-break-after:avoid!important;background:#fff!important}body.certificate-printing #certificateMask .modal{box-sizing:border-box;padding:0!important;background:#fff!important;color:#111!important}body.certificate-printing #certificateBody{break-inside:avoid;page-break-inside:avoid}body.certificate-printing #certificateBody>div{padding:0!important;min-height:0!important;line-height:1.5!important;break-inside:avoid;page-break-inside:avoid}body.certificate-printing #certificateBody>div h1{margin:8mm 0 16mm!important}body.certificate-printing #certificateBody>div p{margin:6mm 0!important}body.certificate-printing #certificateBody>div p:nth-of-type(1){margin-top:12mm!important}body.certificate-printing #certificateBody>div p:nth-of-type(2){margin-top:8mm!important}body.certificate-printing #certificateBody>div p:nth-of-type(4){margin-top:6mm!important}body.certificate-printing #certificateBody>div p:nth-of-type(5){margin-top:8mm!important}body.certificate-printing #certificateBody>div img{max-width:96px!important;max-height:96px!important;object-fit:contain!important}body.certificate-printing #certificateBody>*{max-width:100%!important;box-sizing:border-box!important}}
+.schedule-cell-names,.calendar-cell-names{display:block;white-space:normal;overflow-wrap:anywhere;line-height:1.6}
+.schedule-names-visible .schedule-check-list{max-height:none;overflow:visible}
+.calendar-names-visible .cal-cell{max-height:none;height:auto;overflow:visible}
+.calendar-names-visible .cal-tag.cal-roster{display:block;white-space:normal;max-height:none}
+.calendar-names-visible .cal-tag.cal-roster .cal-names{display:block;max-height:none;overflow:visible}
 </style>
 </head>
 <body>
@@ -573,6 +578,10 @@ const EMPLOYEE_JOB_GROUPS = [
   { code: 'lab', label: '기공', color: '#0891b2', order: 2 },
   { code: 'desk', label: '데스크', color: '#059669', order: 3 },
 ];
+let SCHEDULE_NAMES_VISIBLE=null;
+function scheduleNamesVisible(){if(SCHEDULE_NAMES_VISIBLE===null){try{SCHEDULE_NAMES_VISIBLE=localStorage.getItem('hub.schedule.names.v1')==='1';}catch(_){SCHEDULE_NAMES_VISIBLE=false;}}return SCHEDULE_NAMES_VISIBLE;}
+function toggleScheduleNames(){SCHEDULE_NAMES_VISIBLE=!scheduleNamesVisible();try{localStorage.setItem('hub.schedule.names.v1',SCHEDULE_NAMES_VISIBLE?'1':'0');}catch(_){}render();}
+function scheduleNamesToggleButton(){const T=typeof hubT==='function'?hubT:(k,d)=>d;return `<button type="button" class="mini ${scheduleNamesVisible()?'stamp':''}" aria-pressed="${scheduleNamesVisible()}" onclick="toggleScheduleNames()">${esc(T('sched.btn_names','👤 이름 보기'))}</button>`;}
 
 function employeeJobGroupModel(person, profileById = new Map()) {
   if (person?.department === 'Dr.') return { kind: 'doctor', code: null, label: 'Dr.', color: null, order: -1 };
@@ -1237,7 +1246,8 @@ function scheduleRoleCell(role,weekStart,ds,people,rows,leaveByUser,canEdit){
   const day=scheduleDayForDate(ds),selected=new Set((rows||[]).filter(r=>r.week_start===weekStart&&r.day===day&&((role==='야간'&&r.shift==='evening')||(role==='OFF'&&r.shift==='off')||(role!=='야간'&&role!=='OFF'&&(r.shift==='work'||r.shift==='evening')))).map(r=>r.person_id));
   if(role==='연차·반차'){const names=Object.values(leaveByUser||{}).filter(v=>v.date===ds).map(v=>v.label);return names.length?'<div class="schedule-leave-list">'+names.map(esc).join('<br>')+'</div>':'-';}
   const items=scheduleRolePeople(role,people,rows,weekStart,day);if(!items.length)return '<div class="schedule-role-empty">등록된 대상 없음</div>';const html=items.map(p=>{const leave=leaveByUser[(p.profile_user_id||'')+'|'+p.id+'|'+ds],historical=p.active!==true||p.included_in_schedule===false,disabled=!!leave||historical,checked=selected.has(p.id);return '<label class="schedule-check '+scheduleRoleColor(p)+(checked?' schedule-selected':'')+(historical?' schedule-historical':'')+'"><input type="checkbox" '+(checked?'checked ':'')+(disabled?'disabled ':'')+' onchange="toggleScheduleRoleMember(\''+role+'\',\''+p.id+'\',\''+(p.profile_user_id||'')+'\',\''+ds+'\',this.checked,this)"><span>'+esc(schedulePersonLabel(p))+(historical?' · '+esc(T('sched.cell.past','과거 기록')):disabled&&leave?' · '+esc(leave.label):'')+'</span></label>';}).join('');
-  return '<details class="schedule-role-cell"><summary>'+role+' · '+items.filter(p=>selected.has(p.id)).length+'명</summary><div class="schedule-check-list">'+(canEdit?html:html.replace(/<input /g,'<input disabled '))+'</div></details>';
+  const names=scheduleNamesVisible()?'<div class="schedule-cell-names">'+items.filter(p=>selected.has(p.id)).map(p=>esc(schedulePersonName(p))).join('<br>')+'</div>':'';
+  return names+'<details class="schedule-role-cell"><summary>'+role+' · '+items.filter(p=>selected.has(p.id)).length+'명</summary><div class="schedule-check-list">'+(canEdit?html:html.replace(/<input /g,'<input disabled '))+'</div></details>';
 }
 async function toggleScheduleRoleMember(role,personId,profileUserId,ds,checked,input){
   const key=personId+'|'+ds,shift=checked?(role==='야간'?'evening':role==='OFF'?'off':'work'):role==='야간'?'work':null;
@@ -1265,7 +1275,7 @@ async function renderScheduleMonth(m){
   for(const ws of weeks){const status=(weekRows||[]).find(w=>w.week_start===ws)?.status||'초안';const canEdit=status!=='공표'||isLead();const dates=Array.from({length:7},(_,i)=>addDays(ws,i));html+='<section class="schedule-week-block"><h3>'+md(ws)+' ~ '+md(addDays(ws,6))+' <span class="b '+(status==='공표'?'ok':'wait')+'">'+(status==='공표'?esc(T('sched.st_confirmed','확정')):esc(T('sched.st_writing','작성 중')))+'</span></h3><div class="tblwrap"><table class="schedule-role-table"><tr><th>'+esc(T('sched.th_role','직무·상태'))+'</th>'+dates.map(ds=>'<th>'+['월','화','수','목','금','토','일'][scheduleDayForDate(ds)-1<0?6:scheduleDayForDate(ds)-1]+'<br><span class="sub">'+md(ds)+'</span></th>').join('')+'</tr>';
     for(const role of roles){html+='<tr><th class="schedule-role-label">'+role+'</th>'+dates.map(ds=>'<td>'+scheduleRoleCell(role,ws,ds,SCHEDULE_PEOPLE,rows||[],leaveByUser,canEdit)+'</td>').join('')+'</tr>';}
     html+='</table></div>'+scheduleMobileRoleDays(ws,dates,roles,SCHEDULE_PEOPLE,rows||[],leaveByUser,canEdit)+'</section>';}
-  html+='<div class="hint">'+esc(T('sched.hint','직무·상태 셀을 열어 여러 명을 선택합니다. 승인 연차자는 근무·야간 선택이 잠깁니다. 모든 승인 직원은 초안을 편집할 수 있고, 공표는 실장·원장만 가능합니다.'))+'</div></div>'+(isMgr()?scheduleRosterAdminCard():'');m.innerHTML=html;
+  html+='<div class="hint">'+esc(T('sched.hint','직무·상태 셀을 열어 여러 명을 선택합니다. 승인 연차자는 근무·야간 선택이 잠깁니다. 모든 승인 직원은 초안을 편집할 수 있고, 공표는 실장·원장만 가능합니다.'))+'</div></div>'+(isMgr()?scheduleRosterAdminCard():'');m.innerHTML=html.replace('<div class="rowflex schedule-actions">','<div class="rowflex schedule-actions">'+scheduleNamesToggleButton()).replace('<div class="card">','<div class="card'+(scheduleNamesVisible()?' schedule-names-visible':'')+'">');
 }
 async function applyScheduleShift(el,personId,profileUserId,day,ws,shift){const previous=el&&el.dataset?el.dataset.prevValue||'':'';const key=personId+'|'+ws+'|'+day;if(!Object.hasOwn(SCHEDULE_CELL_VALUES,key))SCHEDULE_CELL_VALUES[key]=previous;const seq=(SCHEDULE_WRITE_SEQ[key]||0)+1;SCHEDULE_WRITE_SEQ[key]=seq;const previousTail=SCHEDULE_WRITE_TAIL[key]||Promise.resolve();const operation=previousTail.catch(()=>{}).then(()=>setShift(personId,profileUserId,day,ws,shift)).catch(()=>{if(SCHEDULE_WRITE_SEQ[key]===seq)setStatus('error');return false;});const queued=operation.finally(()=>{if(SCHEDULE_WRITE_TAIL[key]===queued)delete SCHEDULE_WRITE_TAIL[key];});SCHEDULE_WRITE_TAIL[key]=queued;const ok=await operation;const latest=SCHEDULE_WRITE_SEQ[key]===seq;if(ok)SCHEDULE_CELL_VALUES[key]=shift;if(!latest)return null;if(!ok&&el){el.value=SCHEDULE_CELL_VALUES[key]??previous;}else if(ok&&el?.dataset)el.dataset.prevValue=shift;return ok;}
 function setShiftByDate(personId,profileUserId,ds,shift){return applyScheduleShift(null,personId,profileUserId,scheduleDayForDate(ds),scheduleWeekForDate(ds),shift);}
@@ -1296,10 +1306,12 @@ async function renderSched(m){
       <button class="mini" onclick="printSchedule('pdf')">${esc(T('sched.btn_pdf','PDF 저장'))}</button><button class="mini" onclick="printSchedule('print')">${esc(T('sched.btn_print','인쇄'))}</button>
       ${canEdit?`<button class="mini" onclick="copyPrevWeek('${ws}')">${esc(T('sched.btn_copy','지난주 복사'))}</button>`:''}
       ${isLead()?`<button class="mini stamp" onclick="publishSched('${ws}')">${esc(T('sched.btn_publish','공표(확정)'))}</button>`:''}
+      ${scheduleNamesToggleButton()}
     </div>
     ${staff.length?grid:'<div class="empty">'+esc(T('sched.empty','근무표에 포함된 인원이 아직 없습니다.'))+'</div>'}
     <div class="hint">${esc(T('sched.hint','직무·상태 셀을 열어 여러 명을 선택합니다. 승인 연차자는 근무·야간 선택이 잠깁니다. 모든 승인 직원은 초안을 편집할 수 있고, 공표는 실장·원장만 가능합니다.'))}</div>
   </div>${isMgr()?scheduleRosterAdminCard():''}`;
+  if(scheduleNamesVisible())m.innerHTML=m.innerHTML.replace('<div class="card">','<div class="card schedule-names-visible">');
 }
 /* schedule-roster-admin:test-start */
 function hubT(k,d,v){return typeof hubText==='function'?hubText(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
@@ -1910,8 +1922,8 @@ function calendarDepartmentGroups(roster){
 }
 function calendarRosterTag(label,names,kind){
   if(!names.length)return '';
-  const detail=names.join(', ');
-  return `<span class="cal-tag ${kind} cal-roster"><span class="cal-summary">${esc(hubT('cal.roster_count','{label} {n}명',{label:label,n:names.length}))}</span><span class="cal-names" title="${esc(label)}: ${esc(detail)}">${esc(detail)}</span></span>`;
+  const detail=names.join(', '),showNames=typeof scheduleNamesVisible==='function'&&scheduleNamesVisible();
+  return `<span class="cal-tag ${kind} cal-roster"><span class="cal-summary">${esc(hubT('cal.roster_count','{label} {n}명',{label:label,n:names.length}))}</span><span class="cal-names" title="${esc(label)}: ${esc(detail)}">${showNames?names.map(esc).join('<br>'):esc(detail)}</span></span>`;
 }
 function calendarWeekRoleRows(roster,leaveItems){
   const departments=roster&&roster.departments||{},rows=[['Dr.','dr',departments['Dr.']||[]]];
@@ -1926,13 +1938,13 @@ function calendarWeekRoleRows(roster,leaveItems){
 }
 function renderCalendarWeekTable(dates,scheduleByDate,leaveByDate,byDate,weekByStart){
   const dayRows=dates.map(date=>calendarWeekRoleRows(scheduleByDate[date]||emptyCalendarRoster(),leaveByDate[date]||[])),rows=dayRows[0]||calendarWeekRoleRows(emptyCalendarRoster(),[]);
-  const rowHtml=rows.map(([label,color],index)=>`<tr class="${color}"><th class="calendar-week-role">${esc(label)}</th>${dates.map((date,dayIndex)=>{const count=dayRows[dayIndex][index][2].length;return `<td><button type="button" class="${count?'':'zero'}" aria-label="${esc(date)} ${esc(label)} ${esc(hubT('cal.week.aria_count','{n}명 상세 보기',{n:count}))}" onclick="selectCalendarDay('${date}',event)">${count}</button></td>`;}).join('')}</tr>`).join('');
+  const rowHtml=rows.map(([label,color],index)=>`<tr class="${color}"><th class="calendar-week-role">${esc(label)}</th>${dates.map((date,dayIndex)=>{const members=dayRows[dayIndex][index][2],count=members.length,names=typeof scheduleNamesVisible==='function'&&scheduleNamesVisible()?`<span class="calendar-cell-names">${members.map(item=>esc(typeof item==='string'?item:item.label)).join('<br>')}</span>`:'';return `<td><button type="button" class="${count?'':'zero'}" aria-label="${esc(date)} ${esc(label)} ${esc(hubT('cal.week.aria_count','{n}명 상세 보기',{n:count}))}" onclick="selectCalendarDay('${date}',event)">${count}${names}</button></td>`;}).join('')}</tr>`).join('');
   const headers=dates.map(date=>{const info=byDate[date]||{holidays:[],events:[]},week=weekByStart.get(mondayStr(date)),status=week&&week.status==='공표'?hubT('cal.status_pub','확정'):week&&week.status==='초안'?hubT('cal.status_draft','작성 중'):'';const notes=[...(info.holidays||[]).map(item=>item.name),...(info.events||[]).map(item=>item.title),status].filter(Boolean);const d=new Date(date+'T00:00:00'),label=['일','월','화','수','목','금','토'][d.getDay()];return `<th><span class="calendar-week-date">${label} ${Number(date.slice(-2))}</span>${notes.length?`<span class="calendar-week-note">${esc(notes.join(' · '))}</span>`:''}</th>`;}).join('');
   return `<div class="calendar-week-wrap"><table class="calendar-week-table"><thead><tr><th>${esc(hubT('cal.week.th_role','직무'))}</th>${headers}</tr></thead><tbody>${rowHtml}</tbody></table></div>`;
 }
 function calendarLeaveTags(items){
   const grouped=new Map();for(const item of items||[]){const label=leaveDisplayText(item.type,item.type_note),names=grouped.get(label)||[];names.push(item.label);grouped.set(label,names);}
-  return [...grouped].map(([label,names])=>`<span class="cal-tag lv cal-roster"><span class="cal-summary">${esc(label)}:</span><span class="cal-names" title="${esc(label)}">${esc(names.join(', '))}</span></span>`);
+  return [...grouped].map(([label,names])=>`<span class="cal-tag lv cal-roster"><span class="cal-summary">${esc(label)}:</span><span class="cal-names" title="${esc(label)}">${typeof scheduleNamesVisible==='function'&&scheduleNamesVisible()?names.map(esc).join('<br>'):esc(names.join(', '))}</span></span>`);
 }
 function renderCalendarDayPanel(date,roster,leaveNames){
   const groups=calendarDepartmentGroups(roster),tags=groups.map(([label,names,kind])=>calendarRosterTag(label,names,kind)).filter(Boolean);
@@ -2074,10 +2086,11 @@ async function renderCalendar(m){
   m.innerHTML=hubFillHtml(`<div class="card" id="calendarCard"><h2 data-hubk="cal.title">📅 캘린더</h2>
     <div class="rowflex"><button class="mini ${CAL_VIEW==='all'?'stamp':''}" data-hubk="cal.view_all" onclick="setCalendarView('all')">전체</button><button class="mini ${CAL_VIEW==='work'?'stamp':''}" data-hubk="cal.view_work" onclick="setCalendarView('work')">근무</button><button class="mini ${CAL_VIEW==='leave'?'stamp':''}" data-hubk="cal.view_leave" onclick="setCalendarView('leave')">연차</button></div>
     <div class="rowflex"><button class="mini ${CAL_PERIOD==='week'?'stamp':''}" data-hubk="cal.period_week" onclick="setCalendarPeriod('week')">주간</button><button class="mini ${CAL_PERIOD==='month'?'stamp':''}" data-hubk="cal.period_month" onclick="setCalendarPeriod('month')">월간</button></div>
-    <div class="rowflex calendar-actions">${periodControls}<button class="mini" onclick="saveCalendarPng()">${esc(hubT('cal.btn_png','PNG로 저장'))}</button><button class="mini" onclick="printCalendar()">${esc(hubT('cal.btn_pdf','PDF로 저장'))}</button></div>
+    <div class="rowflex calendar-actions">${periodControls}${scheduleNamesToggleButton()}<button class="mini" onclick="saveCalendarPng()">${esc(hubT('cal.btn_png','PNG로 저장'))}</button><button class="mini" onclick="printCalendar()">${esc(hubT('cal.btn_pdf','PDF로 저장'))}</button></div>
     ${calendarBody}
     ${isLead()?`<div class="rowflex" style="margin-top:10px"><input class="mini" type="date" id="calDate" value="${today()}"><input class="mini" id="calTitle" placeholder="${esc(hubT('cal.ph_title','제목'))}"><select class="mini" id="calKind">${calendarKindItems().map(i=>hubOptionHtml(i.code,i.label)).join('')}</select><button class="mini" onclick="addCalendarEvent()">${esc(hubT('cal.btn_add','추가'))}</button></div>`:''}
   </div>${CAL_DETAIL_DATE?renderCalendarDayDetail(CAL_DETAIL_DATE,scheduleByDate[CAL_DETAIL_DATE]||emptyCalendarRoster(),leaveByDate[CAL_DETAIL_DATE]||[]):''}`);
+  if(scheduleNamesVisible())m.innerHTML=m.innerHTML.replace('class="card" id="calendarCard"','class="card calendar-names-visible" id="calendarCard"');
   if(CAL_DETAIL_DATE)document.getElementById('calendarDayClose')?.focus();
 }
 /* ── 건의함 ── */
