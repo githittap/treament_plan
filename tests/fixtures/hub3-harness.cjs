@@ -215,7 +215,7 @@ async function renderAll(html,opts){
   {
     const set=(vals)=>{const d=makeDom();Object.entries(vals).forEach(([k,v])=>{d.$(k).value=v;});d.$('#manualReasonRequired').checked=false;return d.$;};
     const base={'#manualWorkDate':'2026-10-01','#manualLunchOvertimeRaw':'','#manualClockoutOvertimeRaw':'','#manualEveningOvertimeRaw':'','#manualReason':'','#manualNote':'','#manualLate':'0','#manualEarly':'0','#manualHalfDay':'없음'};
-    const run=async(name,vals,rpc)=>{const r=await asMgr('staff',{$:set(Object.assign({},base,vals))},{rpc});await r.api.submitManualAttendance();out['att.submitManual.'+name]=JSON.stringify([r.ctx.$('#manualAttMsg').textContent,r.log]);};
+    const run=async(name,vals,rpc)=>{const r=await asMgr('staff',{$:set(Object.assign({},base,vals))},{rpc});if(typeof r.ctx.loadManualAttendanceDate==='function'){await r.ctx.loadManualAttendanceDate(base['#manualWorkDate']);r.ctx.$=set(Object.assign({},base,vals));}await r.api.submitManualAttendance();out['att.submitManual.'+name]=JSON.stringify([r.ctx.$('#manualAttMsg').textContent,r.log]);};
     await run('bad_format',{'#manualLunchOvertimeRaw':'abc'},{});
     await run('fail',{},{submit_manual_attendance_d:fail('제출<실패>')});
     await run('ok',{},{submit_manual_attendance_d:{error:null}});
