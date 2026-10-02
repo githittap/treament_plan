@@ -59,6 +59,7 @@ function hubSetting(key,def){
   const v=HUB_SETTING_VALUES[key];
   return (typeof v==='string'&&v.trim()!=='')?v:def;
 }
+function hubSettingBoolean(key,def){return Object.prototype.hasOwnProperty.call(HUB_SETTING_VALUES,key)?HUB_SETTING_VALUES[key]==='true':def;}
 function hubSettingNumber(key,def){
   const n=Number(hubSetting(key,String(def)));
   return Number.isFinite(n)?n:def;
@@ -1336,6 +1337,8 @@ function hubTextDefsChapter7(add){
   add('mkt.owner_only',S6,'마케팅비 — 원장이 아닌 사람이 볼 때','원장 전용입니다.');
   add('mkt.title',S6,'마케팅비 카드 제목(오류 화면 포함)','📣 마케팅비');
   add('mkt.sub',S6,'마케팅비 카드 제목 옆 작은 글(오류 화면 포함)','(원장 전용)');
+  add('mkt.manager_sub',S6,'매니저 마케팅비 화면 제목 옆 설명','(마케팅 분류 내역만 · 읽기 전용)');
+  add('mkt.view_unavailable',S6,'매니저 보기 설정이 꺼져 있거나 열람할 수 없을 때','마케팅비 열람이 꺼져 있거나 사용할 수 없습니다.');
   add('mkt.err_storage',S6,'마케팅비 — 마케팅비 저장 공간을 못 읽었을 때','마케팅비 저장 공간을 아직 불러오지 못했습니다.');
   add('mkt.err_load',S6,'마케팅비 — 마케팅비를 못 불러왔을 때','마케팅비를 불러오지 못했습니다.');
   add('mkt.merchant_unknown',S6,'마케팅비 — 내역 한 줄: 가맹점 이름을 모를 때','가맹점 미확인');
@@ -1374,6 +1377,31 @@ function hubTextDefsChapter7(add){
   add('aic.load_err',S7,'AI비용 — 청구액을 못 불러왔을 때. {detail}은 오류 글','AI 비용을 불러오지 못했습니다: {detail}',['detail']);
   add('aic.title',S7,'AI비용 화면 맨 위 제목','💰 AI비용');
   add('aic.sub',S7,'AI비용 화면 제목 옆 작은 글','(원장 전용)');
+  add('bill.prev',S7,'월별 비용 정리 — 이전 달',"이전 달");
+  add('bill.next',S7,'월별 비용 정리 — 다음 달',"다음 달");
+  add('bill.month',S7,'월별 비용 정리 — {year}년 {month}월',"{year}년 {month}월",["year", "month"]);
+  add('bill.zero_budget',S7,'월별 비용 정리 — 예산이 0원이라 사용 비율을 계산하지 않음',"예산이 0원이라 사용 비율을 계산하지 않음");
+  add('bill.budget_used',S7,'월별 비용 정리 — 예산 {budget}원 중 {pct}% 사용',"예산 {budget}원 중 {pct}% 사용",["budget", "pct"]);
+  add('bill.export_month',S7,'월별 비용 정리 — ⬇ 이 달 엑셀',"⬇ 이 달 엑셀");
+  add('bill.export_year',S7,'월별 비용 정리 — ⬇ 1년 요약 엑셀',"⬇ 1년 요약 엑셀");
+  add('bill.excel_unavailable',S7,'월별 비용 정리 — 엑셀 도구를 불러오지 못했습니다. 다시 열어 주세요.',"엑셀 도구를 불러오지 못했습니다. 다시 열어 주세요.");
+  add('bill.budget_invalid',S7,'월별 비용 정리 — 예산은 0원 이상의 정수로 입력해 주세요.',"예산은 0원 이상의 정수로 입력해 주세요.");
+  add('bill.budget_fail',S7,'월별 비용 정리 — 예산을 저장하지 못했습니다.',"예산을 저장하지 못했습니다.");
+  add('bill.budget',S7,'월별 비용 정리 — 이번 달 예산',"이번 달 예산");
+  add('bill.save_budget',S7,'월별 비용 정리 — 예산 저장',"예산 저장");
+  add('bill.col_date',S7,'월별 비용 정리 — 날짜',"날짜");
+  add('bill.col_merchant',S7,'월별 비용 정리 — 가맹점',"가맹점");
+  add('bill.col_category',S7,'월별 비용 정리 — 분류',"분류");
+  add('bill.col_amount',S7,'월별 비용 정리 — 금액(원)',"금액(원)");
+  add('bill.col_month',S7,'월별 비용 정리 — 월',"월");
+  add('bill.col_total',S7,'월별 비용 정리 — 합계(원)',"합계(원)");
+  add('bill.col_currency',S7,'월별 비용 정리 — 통화',"통화");
+  add('bill.col_native',S7,'월별 비용 정리 — 외화 원금액',"외화 원금액");
+  add('bill.col_source',S7,'월별 비용 정리 — 입력 구분',"입력 구분");
+  add('bill.source_manual',S7,'월별 비용 정리 — 직접 입력(월 합계)',"직접 입력(월 합계)");
+  add('bill.source_auto',S7,'월별 비용 정리 — 자동감지',"자동감지");
+  add('bill.sheet_month',S7,'월별 비용 정리 — 월 내역',"월 내역");
+  add('bill.sheet_year',S7,'월별 비용 정리 — 연간 요약',"연간 요약");
   add('aic.f_month',S7,'AI비용 — 조회 월 칸 이름','조회 월');
   add('aic.total_label',S7,'AI비용 — 큰 숫자 위 작은 글','이번 달 실제 청구액 (직접 입력 + 자동감지 문자 합계)');
   add('aic.th_platform',S7,'AI비용 — 청구액 표 머리: 플랫폼 칸','플랫폼');
@@ -1634,7 +1662,8 @@ const HUB_SETTING_DEFS=[
   {key:'aiu.cost_months',screen:'💰 AI비용 기준',label:'사용량 현황판 「월별 합계」에 보이는 개월 수',where:'AI비용 › 사용량 현황판 › 정가 환산 — 월별 합계 막대를 몇 달치까지 보여 줄지(PC가 올린 달만 나와요)',def:'6',kind:'int',min:2,max:24,unit:'개월'},
   {key:'aiu.external_days',screen:'💰 AI비용 기준',label:'사용량 현황판 「외부 AI」 날짜별 표 일수',where:'AI비용 › 사용량 현황판 › 외부 AI — 날짜별 표에 최근 며칠치까지 보여 줄지(PC가 올린 날짜까지만 나와요 · 위쪽 작은 글의 일수도 같이 바뀌어요)',def:'14',kind:'int',min:3,max:60,unit:'일'},
   {key:'aiu.session_limit',screen:'💰 AI비용 기준',label:'사용량 현황판 「대화 효율 점검」에 보이는 대화 수',where:'AI비용 › 사용량 현황판 › 대화 효율 점검 — 돈이 새는 대화를 최대 몇 개까지 보여 줄지',def:'8',kind:'int',min:3,max:30,unit:'건'},
-  {key:'leave.hidden_accounts',screen:'🌿 연차 기준',label:'연차 현황에서 접어 둘 계정 이름',where:'입사일 없는 계정은 항상 접음. 이름 목록은 JSON으로 적고 *는 어떤 글자든 뜻함. []면 이름으로 숨기지 않음',def:'["*_test","테스트","직원검토","abc","공용1","매니저"]',kind:'stringlist'}
+  {key:'leave.hidden_accounts',screen:'🌿 연차 기준',label:'연차 현황에서 접어 둘 계정 이름',where:'입사일 없는 계정은 항상 접음. 이름 목록은 JSON으로 적고 *는 어떤 글자든 뜻함. []면 이름으로 숨기지 않음',def:'["*_test","테스트","직원검토","abc","공용1","매니저"]',kind:'stringlist'},
+  {key:'marketing.manager_view_enabled',screen:'📣 마케팅비 기준',label:'마케팅비 매니저 보기',where:'켬이면 매니저가 마케팅 분류 내역만 읽을 수 있어요. 미분류·제외 내역과 수정은 원장만 가능해요.',def:'true',kind:'bool'}
 ];
 function hubSettingDefByKey(key){
   for(let i=0;i<HUB_SETTING_DEFS.length;i++)if(HUB_SETTING_DEFS[i].key===key)return HUB_SETTING_DEFS[i];
@@ -1647,6 +1676,7 @@ function hubSettingValidate(def,raw){
     try{const a=JSON.parse(v);if(Array.isArray(a)&&a.length<=100&&a.every(x=>typeof x==='string'&&x.trim()&&x.length<=100))return {ok:true,value:JSON.stringify(a.map(x=>x.trim()))};}catch(e){}
     return {ok:false,reason:'이름 목록은 ["*_test","테스트"] 모양으로 적어 주세요. 모두 표시하려면 []를 적어요.'};
   }
+  if(def.kind==='bool')return v==='true'||v==='false'?{ok:true,value:v}:{ok:false,reason:'켬 또는 끔을 골라 주세요.'};
   if(def.kind==='time'){
     if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(v))return {ok:false,reason:'시각은 09:40 처럼 시:분(24시간)으로 적어 주세요.'};
     return {ok:true,value:v};
@@ -2139,6 +2169,7 @@ async function hubRenderSettingsSection(sec){
 }
 // 정수 목록은 화면에 「14, 30, 60」 모양으로 보여 주고, 기본값 비교도 같은 모양(검사를 거친 값)으로 한다.
 function hubSettingShow(d,raw){
+  if(d.kind==='bool')return raw==='true'?'켬':'끔';
   if(d.kind!=='intlist')return raw;
   const chk=hubSettingValidate(d,raw);
   return chk.ok?JSON.parse(chk.value).join(', '):String(raw);
@@ -2160,7 +2191,9 @@ function hubDrawSettingsSection(sec){
       return '<details class="hub-grp" open><summary>'+hubEsc(g.name)+' <span class="sub">('+g.items.length+'개)</span></summary>'+
         g.items.map(function(x){
           const d=x.d,i=x.i,cur=hubSetting(d.key,d.def);
-          const input=d.kind==='time'
+          const input=d.kind==='bool'
+            ?'<select id="hubSetIn_'+i+'"><option value="true"'+(cur==='true'?' selected':'')+'>켬</option><option value="false"'+(cur!=='true'?' selected':'')+'>끔</option></select>'
+            :d.kind==='time'
             ?'<input id="hubSetIn_'+i+'" type="time" value="'+hubEsc(cur)+'">'
             :d.kind==='stringlist'
             ?'<input id="hubSetIn_'+i+'" type="text" size="40" value="'+hubEsc(cur)+'">'
@@ -2398,6 +2431,7 @@ const HubUi={
 root.hubText=hubText;
 root.hubTextHtml=hubTextHtml;
 root.hubSetting=hubSetting;
+root.hubSettingBoolean=hubSettingBoolean;
 root.hubSettingNumber=hubSettingNumber;
 root.hubSettingChecked=hubSettingChecked;
 root.hubContractExpiryDays=hubContractExpiryDays;
