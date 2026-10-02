@@ -10,6 +10,7 @@ test('근태 소명 증거 SQL은 기존 소명 함수·트리거·정책·권�
   assert.doesNotMatch(sql,/alter\s+table\s+public\.attendance_issues\s+(?:enable|disable|force|no\s+force)\s+row\s+level\s+security/i);
   assert.doesNotMatch(sql,/grant\s+[^;]*(?:insert|update)[^;]*\s+on\s+(?:table\s+)?public\.attendance_issues/i);
   assert.match(sql,/add column if not exists staff_kind text/i);
+  assert.match(sql,/set rule_label=p_kind,staff_kind=p_kind,staff_reason=v_reason,staff_responded_at=now\(\)/i);
   assert.match(sql,/add column if not exists staff_reason text/i);
   assert.match(sql,/add column if not exists staff_responded_at timestamptz/i);
 });

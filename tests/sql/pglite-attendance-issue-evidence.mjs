@@ -86,7 +86,7 @@ try{
   const auto=(await call('record_auto_attendance_issue',`'${staff}','2026-09-30','시업누락','자동 감지'`))[0].id;
   await as(staff);
   const answered=(await call('respond_attendance_issue',`${auto},'입력오류',' 출근 기록이 남아 있고 당시 기기가 꺼져 있었음 '`))[0];
-  assert.equal(answered.staff_kind,'입력오류');assert.equal(answered.staff_reason,'출근 기록이 남아 있고 당시 기기가 꺼져 있었음');assert.equal(answered.type,'시업누락');assert.equal(answered.rule_label,'자동');assert.equal(answered.status,'대기');
+  assert.equal(answered.staff_kind,'입력오류');assert.equal(answered.staff_reason,'출근 기록이 남아 있고 당시 기기가 꺼져 있었음');assert.equal(answered.type,'시업누락');assert.equal(answered.rule_label,'입력오류');assert.equal(answered.status,'대기');
   await denied(`select public.respond_attendance_issue(${auto},null,'충분히 긴 사유 내용')`);
   await denied(`select public.respond_attendance_issue(${auto},'기타','   ')`);
   await as(other);await denied(`select public.respond_attendance_issue(${auto},'기타','충분히 긴 사유 내용')`); // 다른 직원의 행

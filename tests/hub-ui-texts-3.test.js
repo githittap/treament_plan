@@ -46,7 +46,7 @@ const dynRows=defs=>defs.map(d=>({key:d.key,value:'«'+d.key+'»'+(d.vars?' '+d.
 /* ───────────── 1. 기본 글 목록 ───────────── */
 test('차례 3 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 14개(출퇴근·근태차이 8 · 근무표 2 · 연차 4)',()=>{
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
-  assert.equal(defs.length,424,'차례 3 글 키 수(기존 313 + 소명·증거 UI 글 + 근태차이 화면·엑셀 글 + 직원 차이 한 줄·부호 분 글)');
+  assert.equal(defs.length,426,'차례 3 글 키 수(기존 313 + 소명·증거 UI 글 + 근태차이 화면·엑셀 글 + 직원 차이 한 줄·부호 분 글 + 저장 결과·화면 갱신 글 2개)');
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
   for(const d of defs){
     assert.match(d.key,/^[a-z][a-z0-9_.]{1,80}$/,d.key);
@@ -157,7 +157,7 @@ test('표에 값이 있으면 그 글: 고쳐 쓰는 글 355개가 모두 화면
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
   const stat=new Set([...hr.matchAll(/\bdata-hub(?:k|ph)="([a-z0-9_.]+)"/g)].map(m=>m[1]));
   const dyn=defs.filter(d=>!stat.has(d.key));
-  assert.equal(dyn.length,405,'기존 동적 글과 B2·C 단계 신규 글 중 화면에 쓰이는 동적 글 수');
+  assert.equal(dyn.length,407,'기존 동적 글과 B2·C 단계 신규 글 중 화면에 쓰이는 동적 글 수');
   const out=await renderAll(hr,{engine:true,textRows:dynRows(dyn),settings:{}});
   const b2Defs=defs.filter(d=>/^att\.issue\.p_date$|^att\.issueform\.|^att\.myissue\.|^att\.issue\.(?:evidence_|admin_evidence|awaiting_staff|auto_clock_)/.test(d.key));
   const b2Observed=await require('./fixtures/hub3-harness.cjs').observeAttendanceIssueB2(hr,{textRows:dynRows(b2Defs)});

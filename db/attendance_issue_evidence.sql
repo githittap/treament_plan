@@ -57,7 +57,7 @@ begin
   if p_kind is null or p_kind not in ('지문인식오류','입력오류','기타') or char_length(v_reason) not between 1 and 2000 then raise exception 'attendance issue response fields invalid'; end if;
   select * into v_issue from public.attendance_issues where id=p_id for update;
   if not found or v_issue.user_id<>auth.uid() or v_issue.status<>'대기' then raise exception 'attendance issue response not allowed'; end if;
-  update public.attendance_issues set staff_kind=p_kind,staff_reason=v_reason,staff_responded_at=now() where id=p_id returning * into v_issue;
+  update public.attendance_issues set rule_label=p_kind,staff_kind=p_kind,staff_reason=v_reason,staff_responded_at=now() where id=p_id returning * into v_issue;
   return v_issue;
 end $$;
 

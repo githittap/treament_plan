@@ -35,8 +35,9 @@ async function observeAttendanceIssueB2(html,opts={}){
   }
   // Execute validation, save, and evidence error branches so dynamic messages are observed from real handlers.
   const validFile={name:'proof.pdf',type:'application/pdf',size:1024};
-  async function formCase(name,{date='2026-10-02',kind='기타',reason='충분히 자세한 사유 내용입니다',files=[],existing=[],rpc={},storage,mode='answer'}={}){
+  async function formCase(name,{date='2026-10-02',kind='기타',reason='충분히 자세한 사유 내용입니다',files=[],existing=[],rpc={},storage,mode='answer',refreshFail=false}={}){
     const r=await P.makeCtx({open:()=>null,renderNav:()=>{},crypto:{randomUUID:()=> '00000000-0000-4000-8000-000000000001'}},{rpc,storage});r.ctx.ME={id:'u1',name:'김직원',role:'staff'};
+    if(refreshFail)r.ctx.refreshBadges=()=>{throw Error('refresh failed');};
     r.api.setState('ATT_ISSUE_FORM',{mode,issue:mode==='new'?null:{...issue,id:71,status:'대기'},existingFiles:existing,presetDate:null,busy:false});
     r.dom.$('#attIssueKind').value=kind;r.dom.$('#attIssueReason').value=reason;r.dom.$('#attIssueFiles').files=files;
     if(date)r.dom.$('#attIssueDate').value=date;
@@ -50,7 +51,9 @@ async function observeAttendanceIssueB2(html,opts={}){
   await formCase('type',{files:[{name:'proof.txt',type:'text/plain',size:10}],existing:[file]});
   await formCase('size',{files:[{name:'proof.pdf',type:'application/pdf',size:10*1024*1024+1}],existing:[file]});
   await formCase('save_fail',{existing:[file],rpc:{respond_attendance_issue:{error:{message:'save failed'}}}});
-  await formCase('partial',{files:[validFile],storage:{from:()=>({upload:async()=>({error:{message:'upload failed'}})})}});
+  await formCase('partial',{files:[validFile],rpc:{attendance_issue_add_evidence:{error:{code:'P0001',message:'attach failed'}}}});
+  await formCase('uncertain',{files:[validFile],storage:{from:()=>({upload:async()=>({error:{code:'FETCH_ERROR',message:'upload response lost'}})})}});
+  await formCase('refresh_fail',{existing:[file],refreshFail:true});
   await formCase('saved',{existing:[file]});
   for(const [name,tables] of [['not_found',{attendance_issues:{single:null}}],['not_editable',{attendance_issues:{single:{...issue,status:'원장확정'}}}],['evidence_load_fail',{attendance_issues:{single:issue},attendance_issue_evidence:{error:{message:'read failed'}}}]]){
     const r=await P.asMgr('staff',null,{tables});await r.api.openIssue(71,'edit');views.push(name+':'+r.log.join('|'));
@@ -62,6 +65,7 @@ async function observeAttendanceIssueB2(html,opts={}){
   {
     const r=await P.makeCtx({open:()=>({opener:null,close(){},location:null})},{storage:{from:()=>({createSignedUrl:async()=>({data:null,error:null})})}});
     r.api.setState('ATT_ISSUE_EVIDENCE',{71:[file]});await r.api.openAttendanceIssueEvidenceFile(71,0);views.push('evidence_missing:'+r.log.join('|'));
+    r.api.setState('ATT_ISSUE_EVIDENCE',{});await r.api.openAttendanceIssueEvidenceFile(71,0);views.push('evidence_file_missing:'+r.log.join('|'));
     r.api.setState('ATT_ISSUE_EVIDENCE',{});await r.api.openAttendanceIssueEvidence(72);views.push('evidence_empty:'+r.dom.$('#attEvidenceList').innerHTML);
     const blocked=await P.makeCtx({open:()=>null});blocked.api.setState('ATT_ISSUE_EVIDENCE',{71:[file]});await blocked.api.openAttendanceIssueEvidenceFile(71,0);views.push('evidence_open_blocked:'+blocked.log.join('|'));
   }

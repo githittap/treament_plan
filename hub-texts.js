@@ -509,6 +509,8 @@ function hubTextDefsChapter3(add){
   add('att.issueform.m_not_editable','🕘 출퇴근 › 지문누락 소명 양식','대기 상태가 아닌 소명을 고치려 할 때','대기 중인 소명만 고칠 수 있습니다.');
   add('att.issue.evidence_missing','🕘 출퇴근 › 소명 증거','증거 파일이 없을 때','파일 없음');
   add('att.issueform.m_partial','🕘 출퇴근 › 지문누락 소명 양식','소명은 저장됐지만 파일이 일부 실패({n}은 연결되지 않은 파일 수)','소명은 저장됐고 파일 {n}개가 안 올라갔습니다. 「내 소명」의 고치기로 다시 올려 주세요.',['n']);
+  add('att.issueform.m_uncertain','🕘 출퇴근 › 지문누락 소명 양식','연결 응답이 끊겨 파일 처리 결과가 불명일 때({n}은 결과 불명 수)','소명은 저장됐지만 파일 {n}개의 처리 결과를 확인하지 못했습니다. 파일이 남아 있을 수 있어 삭제하지 않았습니다. 내 소명에서 상태를 확인해 주세요.',['n']);
+  add('att.issueform.m_refresh_fail','🕘 출퇴근 › 지문누락 소명 양식','저장 성공 뒤 화면 갱신 실패','소명은 저장됐지만 화면 갱신에 실패했습니다. 다시 열어 저장 상태를 확인해 주세요.');
   add('att.issueform.m_saved','🕘 출퇴근 › 지문누락 소명 양식','저장 성공','소명을 저장했습니다.');
   add('att.issueform.mode_new','🕘 출퇴근 › 지문누락 소명 양식','새 소명 설명','새 소명을 올립니다.');
   add('att.issueform.mode_answer','🕘 출퇴근 › 지문누락 소명 양식','자동 감지 건 답변 설명','자동 감지된 소명에 사유를 적습니다.');
@@ -530,7 +532,7 @@ function hubTextDefsChapter3(add){
   add('att.issue.evidence_none','🕘 출퇴근 › 소명 검토 표','필수 증거가 빠진 소명 상태','증거 없음');
   add('att.issue.evidence_count','🕘 출퇴근 › 소명 검토 표','증거 파일 개수 단추({n}은 개수)','📎 {n}',['n']);
   add('att.issue.evidence_view','🕘 출퇴근 › 소명 증거 보기','증거 파일 목록 창 제목','소명 증거 파일');
-  add('att.issue.evidence_open_fail','🕘 출퇴근 › 소명 증거 보기','서명 주소를 만들지 못했을 때({detail}은 서버 오류)','파일 주소를 만들지 못했습니다: {detail}',['detail']);
+  add('att.issue.evidence_open_fail','🕘 출퇴근 › 소명 증거 보기','서명 주소를 만들지 못했을 때','파일 주소를 만들지 못했습니다. 파일이 삭제됐거나 접근할 수 없습니다.');
   add('att.issue.evidence_open_blocked','🕘 출퇴근 › 소명 증거 보기','새 탭을 열지 못했을 때','새 탭이 막혔습니다. 팝업 허용 후 다시 눌러 주세요.');
   add('att.issue.evidence_empty','🕘 출퇴근 › 소명 증거 보기','증거 파일이 없을 때','연결된 증거 파일이 없습니다.');
   add('att.issue.auto_clock_in','🕘 출퇴근 › 소명 유형','출근 지문 누락 유형','출근 지문 없음(자동 감지)');
