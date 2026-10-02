@@ -1846,7 +1846,14 @@ function hubT(k,d,v){return typeof hubText==='function'?hubText(k,d,v):(v?String
 const workDocuments=[
   {icon:'🩺',category:'진료 매뉴얼',title:'진료 매뉴얼',description:'진료실·상담 직무에 필요한 업무 안내를 확인합니다.',depts:['진료실','상담'],manual:true,url:'https://app.notion.com/p/1f7ba489f082806e9761e748524994bc?source=copy_link'}
 ];
-function workDocumentsForProfile(items,profile){const dept=String(profile?.dept||profile?.department||'').trim(),group=String(profile?.job_group||'').trim();return (items||[]).filter(item=>!item.manual||(group?group==='clinical_consult':!!item.depts&&item.depts.includes(dept)));}
+function workDocumentsForProfile(items,profile){
+  const dept=String(profile?.dept||profile?.department||'').trim(),group=String(profile?.job_group||'').trim();
+  const code=group||({'진료실':'clinical_consult','상담':'clinical_consult','데스크':'desk','기공팀':'lab','기공':'lab','소독·행정':'sterilization_admin','행정':'sterilization_admin','소독':'sterilization_admin'})[dept]||'';
+  const raw=typeof hubSetting==='function'?String(hubSetting('manual.url.'+code,'')).trim():'';
+  const url=/^https?:\/\/[^\s]+$/i.test(raw)?raw:'';
+  if(url){const manual=(items||[]).find(item=>item.manual)||{icon:'📚',title:hubT('manual.card_title','업무 매뉴얼'),category:hubT('manual.card_title','업무 매뉴얼'),description:hubT('manual.card_hint','내 직무에 맞는 업무 안내를 확인합니다.'),manual:true};return [Object.assign({},manual,{url}),...(items||[]).filter(item=>!item.manual)];}
+  return (items||[]).filter(item=>!item.manual||(group?group==='clinical_consult':!!item.depts&&item.depts.includes(dept)));
+}
 function filterWorkDocuments(items,query){const q=String(query||'').trim().toLocaleLowerCase();return (items||[]).filter(item=>!q||[item.title,item.description,item.category].some(value=>String(value||'').toLocaleLowerCase().includes(q)));}
 /* work-documents:test-end */
 /* work-documents:render-start */
@@ -2226,7 +2233,7 @@ async function deleteCalendarEvent(id){
 /* ── 온보딩 ── */
 /* onboarding-guide:test-start */
 function hubT(k,d,v){return typeof hubText==='function'?hubText(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
-const G_ONBOARDING_GUIDE_ITEMS=['병원 시설을 둘러보고 식당·출퇴근 기록 장치 등 기본 시설 사용법을 안내받는다.','조직도, 호칭, 기본 예절, 업무 분장, 근로계약과 복리후생 설명을 듣는다.','무전기를 지급받으면 담당자에게 사용법과 업무용 대화 범위를 확인한다.','소속 부서의 담당자, 보고 라인, 당일 교육 항목을 확인한다.','기본 도구와 오픈·마감 절차를 확인한다.','무전은 들었다는 뜻으로 최초 1회 응답한다.','진료실·데스크에서 큰 소리의 사담을 피하고, 환자 앞에서 치료계획 변경이나 내부 판단을 논의하지 않으며 필요한 설명과 양해를 먼저 제공한다.','환자가 언제 어떻게 납부하기로 했는지, 비급여 차감 등 금액 관련 사항이 있으면 상담·데스크 기록을 일치시킨다.','대기시간과 환자 동선을 안내하고 접수 후 어디에서 기다리는지 분명히 설명한다.','컴플레인은 말을 끊지 않고 듣고, 담당자에게 즉시 보고한 뒤 단독으로 확정 약속하지 않는다.','상담 전 최신 수가표와 내부 설명 자료의 사용 범위를 담당자에게 확인한다.','신환은 구강포토와 상담 차트를 준비하고 지정 위치에 기록·스캔한다.','임플란트 식립 후 1차 내원은 s/o 또는 드레싱, 2차 내원은 3주 후, 3차 내원은 6주 후로 안내한다.','사용한 기구와 재료는 원래 위치에 정리하고 오픈·마감 시 정리 항목을 체크한다.','치료 후 다음 계획 또는 정기검진·불편 시 내원 등 후속 계획을 기록한다.'];
+const G_ONBOARDING_GUIDE_ITEMS=['병원 시설을 둘러보고 식당·출퇴근 기록 장치 등 기본 시설 사용법을 안내받는다.','조직도, 호칭, 기본 예절, 업무 분장, 근로계약과 복리후생 설명을 듣는다.','무전기를 지급받으면 담당자에게 사용법과 업무용 대화 범위를 확인한다.','소속 부서의 담당자, 보고 라인, 당일 교육 항목을 확인한다.','기본 도구와 오픈·마감 절차를 확인한다.','무전은 들었다는 뜻으로 최초 1회 응답한다.','진료실·데스크에서 큰 소리의 사담을 피하고, 환자 앞에서 치료계획 변경이나 내부 판단을 논의하지 않으며 필요한 설명과 양해를 먼저 제공한다.','환자가 언제 어떻게 납부하기로 했는지, 비급여 차감 등 금액 관련 사항이 있으면 상담·데스크 기록을 일치시킨다.','대기시간과 환자 동선을 안내하고 접수 후 어디에서 기다리는지 분명히 설명한다.','컴플레인은 말을 끊지 않고 듣고, 담당자에게 즉시 보고한 뒤 단독으로 확정 약속하지 않는다.','상담 전 최신 수가표와 내부 설명 자료의 사용 범위를 담당자에게 확인한다.','신환은 구강포토와 상담 차트를 준비하고 지정 위치에 기록·스캔한다.','임플란트 식립 후 1차 내원은 s/o 또는 드레싱, 2차 내원은 3주 후, 3차 내원은 6주 후로 안내하며 이때 ISQ 측정 등을 가능하면 시행한다.','사용한 기구와 재료는 원래 위치에 정리하고 오픈·마감 시 체어·컴프레서·무전기·기구 정리 항목을 체크한다.','치료 후 다음 계획 또는 정기검진·불편 시 내원 등 후속 계획을 기록한다.'];
 function onboardingGuideItems(){const lines=String(hubT('onbo.guide.items',G_ONBOARDING_GUIDE_ITEMS.join('\n'))).split(/\r?\n/).map(x=>x.trim()).filter(Boolean);return lines.length?lines:[...G_ONBOARDING_GUIDE_ITEMS];} /* 원장이 허브 설정 › 글 고치기에서 줄을 고치면 그 줄들(한 줄=항목 하나) */
 function onboardingGuideVisibleForRole(role){return ['staff','manager','chief','owner'].includes(role);}
 function onboardingGuideCard({collapsed=false}={}){const items=onboardingGuideItems();return `<details class="card onboarding-guide-card"${collapsed?'':' open'}><summary class="onboarding-guide-summary">${esc(hubT('onbo.guide.title','🧭 신입 첫날 안내 ({n}개)',{n:items.length}))}</summary><div class="hint">${esc(hubT('onbo.guide.hint','가입 직후 확인하는 공통 안내입니다. 실장·매니저도 신규 직원에게 같은 내용을 안내합니다.'))}</div><ol class="onboarding-guide-items">${items.map(item=>`<li>${esc(item)}</li>`).join('')}</ol></details>`;}
