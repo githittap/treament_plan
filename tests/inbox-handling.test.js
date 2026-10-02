@@ -5,6 +5,7 @@ const root=path.join(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p),'
 const html=read('hr.html'),js=read('hub-texts.js');
 const REGION=html.slice(html.indexOf('/* ── 상담일지:'),html.indexOf('/* ── 근로계약서 ── */'));
 const FMT=html.match(/function formatLeaveTimestamp\(value\)\{[\s\S]*?\n\}/)[0];
+const TIME=(html.match(/\/\* hub-time:test-start \*\/[\s\S]*?\/\* hub-time:test-end \*\//)||[''])[0]; // 허브 시간 표시 공통 함수(formatLeaveTimestamp가 부름)
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 const PROFILES=[
@@ -62,7 +63,7 @@ function boot(role,over){
     nameOf:uid=>{const p=PROFILES.find(x=>x.user_id===uid);return p?p.name:String(uid||'').slice(0,6);},
     setStatus:s=>statuses.push(s),alert:()=>{},confirm:()=>true,sb:makeSb(tables,log,o.sb)};
   vm.createContext(ctx);
-  vm.runInContext(FMT+'\n'+REGION+';0',ctx);
+  vm.runInContext(TIME+'\n'+FMT+'\n'+REGION+';0',ctx);
   return {ctx,log,dom,statuses};
 }
 const reads=(log,table)=>log.filter(q=>q.table===table&&q.op==='select');
@@ -137,13 +138,14 @@ test('ⓓ 닫힌 묶음 칸: 처리한 사람(마지막 메모를 쓴 사람)·�
   const list=t.dom.$('#inboxList').innerHTML;
   assert.match(list,/<th>처리<\/th>/);
   assert.ok(list.indexOf('<th>상태</th>')<list.indexOf('<th>처리</th>')&&list.indexOf('<th>처리</th>')<list.indexOf('<th>담당</th>'),'「처리」 칸은 「상태」 바로 옆');
-  assert.match(list,/<div>✅ 박실장 · 2026\.09\.30 15:00<\/div><div class="inbox-handled-memo" title="전화로 안내함 &lt;끝&gt;">전화로 안내함 &lt;끝&gt;<\/div>/,'메모를 쓴 사람(박실장)·시각 + 메모');
+  assert.match(list,/<div>✅ 박실장 · 2026\.9\.30 오후 3시<\/div><div class="inbox-handled-memo" title="전화로 안내함 &lt;끝&gt;">전화로 안내함 &lt;끝&gt;<\/div>/,'메모를 쓴 사람(박실장)·시각 + 메모');
   assert.match(list,/<div>✅ 이매니저<\/div>/,'메모가 없으면 담당자');
-  assert.match(list,/<div>✅ -<\/div>/,'둘 다 없으면 -');
+  assert.match(list,/<td><span class="b [^"]*">처리됨<\/span><\/td><td>-<\/td>/,'둘 다 없으면 처리 칸은 - 만');
+  assert.doesNotMatch(list,/✅ -/);
   assert.match(list,/<button class="mini stamp" data-inbox-handle="a1">✅ 처리<\/button>/,'열린 묶음은 처리 단추');
   const mobile=list.slice(list.indexOf('inbox-mobile-list'));
   assert.match(mobile,/inbox-mobile-handled/,'모바일 카드에도 같은 내용');
-  assert.match(mobile,/✅ 박실장 · 2026\.09\.30 15:00/);
+  assert.match(mobile,/✅ 박실장 · 2026\.9\.30 오후 3시/);
   // 메모가 긴 경우 줄임 + 전체는 title
   const long='가'.repeat(60);
   const l=boot('manager',{tables:{consultation_inbox_replies:[{inbox_id:'b1',reply:long,created_at:'2026-09-30T06:00:00Z',author_id:'u3'}]}});
@@ -184,7 +186,7 @@ test('ⓕ 원장만 열람 칸이 있고 열람 기록(views)을 읽는다 — �
   assert.equal(v.length,1);assert.deepEqual([...inFilter(v[0])].sort(),['a1','b1','c1','d1']);
   // 최근 순: 이매니저(05:40) → 김직원(05:30) → 박실장(05:20). 이매니저는 두 번 열었어도 한 번만
   assert.match(list,/<td title="[^"]*">이매니저, 김직원 외 1명<\/td>/);
-  assert.match(list,/title="이매니저 2026\.09\.30 14:40\n김직원 2026\.09\.30 14:30\n박실장 2026\.09\.30 14:20"/);
+  assert.match(list,/title="이매니저 2026\.9\.30 오후 2시 40분\n김직원 2026\.9\.30 오후 2시 30분\n박실장 2026\.9\.30 오후 2시 20분"/);
   assert.match(list,/<td>-<\/td><td><button class="mini" data-inbox-ids="b1"/,'아무도 안 본 묶음은 -');
   assert.match(list.slice(list.indexOf('inbox-mobile-list')),/<div[^>]*>열람 이매니저, 김직원 외 1명<\/div>/,'모바일 카드에도 한 줄');
   const m=boot('manager');
