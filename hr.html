@@ -2668,16 +2668,13 @@ function inboxDetailTopHtml(editable,groupStatus){
   const box=canWriteInbox()&&editable&&inboxIsOpenStatus(groupStatus)?'<div class="inbox-handle-detail"><label>'+esc(inboxT('inbox.d_handle_title','✅ 처리 완료'))+'</label><textarea id="inboxHandleMemo" maxlength="4000" rows="2" placeholder="'+esc(inboxT('inbox.ph_handle_memo','어떻게 처리했나요?(선택)'))+'"></textarea><div class="rowflex"><button class="mini stamp" onclick="inboxDetailHandle()">'+esc(inboxT('inbox.btn_handle_save','처리됨으로 저장'))+'</button></div><div id="inboxHandleMsg" class="msg"></div></div>':'';
   return back+box;
 }
-/* 답변·처리 메모를 한 번만 기록(Astra 2차 B2): 응답이 끊겨 오류로 보여도 실제로는 저장됐을 수 있으므로, 기록 전후로 「이 문의·지금 사람·같은 글」 개수를 세어
-   늘었으면 저장된 것으로 본다(시계 차이·예전에 같은 글을 남긴 기록과 상관없음). 셀 수 없으면 「확인 못 함」으로 알려 다시 남기기 전에 새로 열어 보게 함 */
+/* 답변·처리 메모 기록 결과 가리기(Astra 2차 B2 · Sol 3차): 서버가 DB 오류 번호(SQLSTATE 5자리·PGRST…)를 돌려줬으면 함수 전체가 되돌려져 확실히 안 들어간 것 → 「저장 못 함」.
+   응답 자체가 끊겼으면(번호 없음 — 인터넷 끊김·시간 초과) 들어갔는지 알 수 없으므로 「확인 못 함 — 새로 열어 없을 때만 다시」로만 알린다. 짐작으로 저장됐다고 보지 않음 */
+function inboxReplyErrorKnown(error){const code=String(error&&error.code||'');return /^(?:[0-9A-Z]{5}|PGRST\d+)$/.test(code);}
 async function inboxRecordReplyOnce(inboxId,note){
-  const me=typeof ME!=='undefined'&&ME&&ME.id?ME.id:null;
-  const count=async()=>{if(!me)return null;try{const r=await sb.from('consultation_inbox_replies').select('id',{count:'exact',head:true}).eq('inbox_id',inboxId).eq('author_id',me).eq('reply',note);return r.error||typeof r.count!=='number'?null:r.count;}catch(e){return null;}};
-  const before=await count(),res=await sb.rpc('consultation_inbox_record_reply',{p_inbox_id:inboxId,p_reply:note});
+  const res=await sb.rpc('consultation_inbox_record_reply',{p_inbox_id:inboxId,p_reply:note});
   if(!res.error)return {ok:true};
-  const after=before==null?null:await count();
-  if(after!=null&&after>before)return {ok:true,recovered:true};
-  return {ok:false,unknown:after==null,error:res.error};
+  return {ok:false,unknown:!inboxReplyErrorKnown(res.error),error:res.error};
 }
 async function inboxMarkHandled(messages,memo,msgEl){
   const say=text=>{if(msgEl)msgEl.textContent=text;},processable=inboxProcessableRows(messages),target=inboxReplyTarget(messages);

@@ -95,7 +95,7 @@ function hundred(){const out=[];for(let i=0;i<100;i++)out.push({id:'00000000-000
 function tablesFor(name){
   const T={
     consultation_inbox:{list:INBOX_ROWS,count:2},
-    consultation_inbox_replies:{list:[{inbox_id:'a2',reply:'답변<1>',created_at:'2026-09-30T05:00:00Z',author_id:'u2'}],count:0},
+    consultation_inbox_replies:{list:[{inbox_id:'a2',reply:'답변<1>',created_at:'2026-09-30T05:00:00Z',author_id:'u2'}]},
     consultation_inbox_views:{list:[{inbox_id:'a2',viewer_id:'u3',viewed_at:'2026-09-30T05:30:00Z'}]},
     ai_billing_events:{list:BILLING_ROWS,count:3},
     ai_billing_alert_recipients:{list:[{user_id:'u2',enabled:false}]},
@@ -169,7 +169,7 @@ async function renderAll(html,opts){
   }
   const flush=()=>new Promise(res=>setImmediate(res));
   const asRole=async(role,extra,sbOver)=>{const r=await makeCtx(extra,sbOver);r.ctx.ME={id:'u1',name:'김직원',role,department:'진료실'};return r;};
-  const fail=m=>({error:{message:m}});
+  const fail=m=>({error:{message:m}}),failDb=m=>({error:{code:'P0001',message:m}}); // fail = 번호 없는 오류(응답이 끊김) · failDb = 서버가 DB 오류 번호를 돌려준 확실한 실패
   if(o.probe)return {makeCtx,asRole,fail,flush,makeDom,chain,makeSb,text};
 
   /* ───────── 순수 함수(상태 배지·요약·출처 이름) ───────── */
@@ -266,9 +266,9 @@ async function renderAll(html,opts){
     await runHandle('memo_ok','manager',[INBOX_ROWS[0]],'  전화로 안내함  ');
     await runHandle('mixed_rows','owner',[INBOX_ROWS[1],INBOX_ROWS[6]],'');
     await runHandle('all_assigned','manager',[INBOX_ROWS[1],INBOX_ROWS[3]],'메모');
-    await runHandle('rpc_fail','manager',[INBOX_ROWS[0]],'메모',{rpc:{consultation_inbox_record_reply:fail('기록<실패>')}});
+    await runHandle('rpc_fail','manager',[INBOX_ROWS[0]],'메모',{rpc:{consultation_inbox_record_reply:failDb('기록<실패>')}});
     await runHandle('update_fail','manager',[INBOX_ROWS[0]],'',{tables:{consultation_inbox:{error:{message:'저장<실패>'}}}});
-    await runHandle('memo_unknown','manager',[INBOX_ROWS[0]],'메모',{rpc:{consultation_inbox_record_reply:fail('기록<실패>')},tables:{consultation_inbox_replies:{list:[]}}}); // 같은 메모 개수를 셀 수 없음(count 없음) → 저장됐는지 확인 못 함
+    await runHandle('memo_unknown','manager',[INBOX_ROWS[0]],'메모',{rpc:{consultation_inbox_record_reply:fail('기록<실패>')}}); // 오류 번호 없음(응답이 끊김) → 저장됐는지 확인 못 함
     await runHandle('staff','staff',[INBOX_ROWS[0]],'메모');
     await runHandle('nothing_to_do','manager',[INBOX_ROWS[5]],'메모');
     { // 상세에서 처리
@@ -305,8 +305,8 @@ async function renderAll(html,opts){
   { // 답변 기록·상태 저장·전환·수기 접수
     const runReply=async(name,sel,reply,sbOver)=>{const d=makeDom();d.$('#inboxReply').value=reply;const q=await asRole('manager',{$:d.$},sbOver);q.api.setState('INBOX_SELECTED',sel);await q.api.inboxRecordReply();await flush();out['inbox.reply.'+name]=JSON.stringify([d.$('#inboxReplyMsg').textContent,d.$('#inboxReply').value,q.ctx.sb.rpcCalls]);};
     await runReply('empty',{id:'a1',ids:['a1']},'  ');
-    await runReply('fail',{id:'a1',ids:['a1']},'답변',{rpc:{consultation_inbox_record_reply:fail('기록<실패>')}});
-    await runReply('unknown',{id:'a1',ids:['a1']},'답변',{rpc:{consultation_inbox_record_reply:fail('기록<실패>')},tables:{consultation_inbox_replies:{list:[]}}}); // 개수를 셀 수 없음 → 기록됐는지 확인 못 함
+    await runReply('fail',{id:'a1',ids:['a1']},'답변',{rpc:{consultation_inbox_record_reply:failDb('기록<실패>')}});
+    await runReply('unknown',{id:'a1',ids:['a1']},'답변',{rpc:{consultation_inbox_record_reply:fail('기록<실패>')}}); // 오류 번호 없음(응답이 끊김) → 기록됐는지 확인 못 함
     await runReply('ok',{id:'a1',ids:['a1']},'답변 내용');
     await runReply('no_selected',null,'답변');
     const runSave=async(name,sel,vals,sbOver)=>{const d=makeDom();Object.entries(vals).forEach(([k,v])=>{d.$(k).value=v;});const q=await asRole('manager',{$:d.$},sbOver);q.api.setState('INBOX_SELECTED',sel);await q.api.inboxSave();await flush();out['inbox.save.'+name]=JSON.stringify([q.log,q.statuses,q.ctx.sb.writes]);};
