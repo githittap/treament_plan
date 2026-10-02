@@ -41,3 +41,9 @@ test('숨길 계정 목록을 설정에서 바꾸며 글 변경과 조회 실패
   const e=setup({loadError:true});assert.match(await e.api.renderEmployeeLeaveStatus(),/조회실패/);assert.doesNotMatch(await e.api.renderEmployeeLeaveStatus(),/onclick="openLeaveBalanceEditor/);
   const s=setup({role:'staff'});assert.equal(await s.api.renderEmployeeLeaveStatus(),'');await s.api.saveLeaveBalance(0);assert.equal(s.calls.length,0);
 });
+test('숨김 설정은 빈 목록과 와일드카드를 지원하고 잘못된 목록은 기본값으로 돌아간다',()=>{
+  const code=fs.readFileSync('hub-texts.js','utf8').match(/\/\* hub-texts:test-start \*\/[\s\S]*?\/\* hub-texts:test-end \*\//)[0];
+  const c={};vm.createContext(c);vm.runInContext(code+';this.validate=hubSettingValidate;this.def=hubSettingDefByKey("leave.hidden_accounts");',c);
+  for(const value of ['[]','["*_test","공용1"]'])assert.equal(c.validate(c.def,value).ok,true);
+  for(const value of ['oops','[1]','[""]','null','{}'])assert.equal(c.validate(c.def,value).ok,false);
+});

@@ -130,7 +130,7 @@ test('숫자 8개·이름 목록 7개: 기본값이 화면 코드와 같고, 화
     assert.ok(d.where&&d.note&&d.screen);
     assert.equal(h.hubListValidate(d,d.def).ok,true,k+' 기본 목록은 저장 검사를 통과');
   }
-  assert.match(hr,/hub-texts\.js\?v=2026100223/,'캐시 번호를 새 값으로 올림(차례 6에서 2026100112 → 2026100113, 10-02 원장요청 5건에서 → 2026100221, 10-02 인박스 판에서 → 2026100223)');
+  assert.match(hr,/hub-texts\.js\?v=2026100302/,'캐시 번호를 새 값으로 올림(차례 6에서 2026100112 → 2026100113, 10-02 원장요청 5건에서 → 2026100221, 10-02 인박스 판에서 → 2026100223)');
   assert.ok(!/hub-texts\.js\?v=2026100112/.test(hr));
 });
 
@@ -491,7 +491,7 @@ test('화면: 🔢 숫자·기준에 새 숫자 8개(27개)가 있고 잘못된 
   await t.render(OWNER);
   await t.click('[hub-subtab]=settings');
   const sec=t.section.innerHTML;
-  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,27);
+  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,28);
   for(const s of ['🏠 홈·입금 기준','💰 AI비용 기준'])assert.ok(sec.includes(s),s);
   for(const k of NUM_KEYS)assert.ok(sec.includes('이름표: '+k),k);
   const idx=k=>t.ctx.window&&helpers().HUB_SETTING_DEFS.findIndex(d=>d.key===k);

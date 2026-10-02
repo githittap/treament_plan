@@ -378,7 +378,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 
 <footer>© 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지</footer>
 
-<script src="hub-texts.js?v=2026100223"></script>
+<script src="hub-texts.js?v=2026100302"></script>
 <script>
 /* ═══════ 설정 ═══════
    실제 값은 DB의 app_settings 표에서 읽어옵니다.
@@ -1587,7 +1587,8 @@ async function saveLeaveBalance(index){
     if(!result.data||!result.data.length){alert(hubT('leave.m_grant_unknown','잔액 설정 결과를 확인하지 못했습니다.'));return;}
     row.balance=Number(result.data[0].target_balance??days);$('#leaveBalance_'+index).textContent=row.balance+'일';
     updateLeaveBalancePreview(index);$('#leaveEditRow_'+index).hidden=true;setStatus('saved');
-  }finally{button.disabled=false;}
+  }catch(error){alert(hubT('leave.m_grant_fail','연차 기록 실패: {msg}',{msg:error.message}));setStatus('error');}
+  finally{button.disabled=false;}
 }
 /* leave-status:test-end */
 async function renderLeave(m){
