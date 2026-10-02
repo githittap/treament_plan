@@ -106,7 +106,11 @@ try{
 
   const firstPath=evidencePath(issueId,1);
   const addObject=async(name,metadata='{"mimetype":"application/pdf","size":100}')=>q(`insert into storage.objects(bucket_id,name,owner_id,metadata) values('attendance-evidence','${name}','${staff}','${metadata}'::jsonb)`);
-  await addObject(firstPath);
+  await addObject(firstPath,'{"mimetype":"application/pdf","contentLength":100}');
+  assert.equal((await q(`select metadata ? 'size' present from storage.objects where name='${firstPath}'`))[0].present,false,'업로드 전 권한 시험 INSERT에는 metadata.size가 없어야 한다');
+  await q('reset role');
+  await q(`update storage.objects set metadata='{"size":100,"mimetype":"application/pdf"}'::jsonb where name='${firstPath}'`);
+  await as(staff);
   const evidenceId=(await call('attendance_issue_add_evidence',`${issueId},'${firstPath}',' 근무기록.pdf ','application/pdf',100`))[0].attendance_issue_add_evidence;
   assert.equal((await q(`select count(*)::int n from public.attendance_issue_evidence where id=${evidenceId}`))[0].n,1);
   await denied(`select public.attendance_issue_add_evidence(${issueId},'${staff}/${issueId}/badpath.pdf','bad.pdf','application/pdf',100)`);

@@ -42,6 +42,9 @@ test('세 RPC는 보안 정의자·고정 search_path·활성 승인 프로필�
 test('Storage는 비공개 10MB 허용형식 버킷과 범위 제한 정책을 둔다',()=>{
   assert.match(sql,/values\('attendance-evidence','attendance-evidence',false,10485760,array\['image\/jpeg','image\/png','image\/webp','application\/pdf'\]\)/i);
   assert.match(sql,/attendance_evidence_insert_own_pending[\s\S]*bucket_id='attendance-evidence'[\s\S]*employee_hub_access_allowed\(\)[\s\S]*status='대기'/i);
+  const insertPolicy=sql.match(/create policy attendance_evidence_insert_own_pending[\s\S]*?\n\);/i)?.[0]||'';
+  assert.match(insertPolicy,/metadata->>'mimetype'[\s\S]*image\/jpeg[\s\S]*application\/pdf/i);
+  assert.doesNotMatch(insertPolicy,/metadata->>'size'/i,'업로드 전 storage 권한 시험 INSERT에는 metadata.size가 없다');
   assert.match(sql,/attendance_evidence_select_scoped[\s\S]*bucket_id='attendance-evidence'[\s\S]*employee_hub_access_allowed\(\)[\s\S]*split_part\(name,'\/',1\)=auth\.uid\(\)::text[\s\S]*my_role\(\) in \('chief','owner'\)[\s\S]*attendance_issue_evidence e where e\.storage_path=name/i);
   assert.match(sql,/attendance_evidence_delete_unlinked_own[\s\S]*split_part\(name,'\/',1\)=auth\.uid\(\)::text[\s\S]*not exists/i);
   assert.match(sql,/attendance_evidence_deputy_block on storage\.objects as restrictive/i);

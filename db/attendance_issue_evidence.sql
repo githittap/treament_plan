@@ -102,7 +102,6 @@ create policy attendance_evidence_insert_own_pending on storage.objects for inse
   and name ~ ('^'||auth.uid()::text||'/[0-9]+/[A-Za-z0-9_-]{8,64}\.(jpg|jpeg|png|webp|pdf)$')
   and exists(select 1 from public.attendance_issues i where i.id::text=split_part(name,'/',2) and i.user_id=auth.uid() and i.status='대기')
   and coalesce(metadata->>'mimetype','') in ('image/jpeg','image/png','image/webp','application/pdf')
-  and case when coalesce(metadata->>'size','') ~ '^[0-9]+$' then (metadata->>'size')::bigint else 10485761 end between 1 and 10485760
 );
 drop policy if exists attendance_evidence_select_scoped on storage.objects;
 create policy attendance_evidence_select_scoped on storage.objects for select to authenticated using (
