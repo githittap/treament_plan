@@ -5,7 +5,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const root=path.join(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p),'utf8');
 const js=read('hub-texts.js'),hrRaw=read('hr.html'),hr=hrRaw.replace(/\r\n/g,'\n');
 const {renderAll,tablesFor}=require('./fixtures/hub3-harness.cjs');
-const golden=JSON.parse(read('tests/fixtures/hub3-golden-84053a7.json'));
+const golden={...JSON.parse(read('tests/fixtures/hub3-golden-84053a7.json')),...JSON.parse(read('tests/fixtures/p7-leave-golden.json'))}; // P7가 정한 연차 원장 카드만 새 기준, 그 밖은 옛 기준 유지
 const clone=x=>JSON.parse(JSON.stringify(x));
 const CH3=/^(att|sched|leave)\./;
 
@@ -46,7 +46,7 @@ const dynRows=defs=>defs.map(d=>({key:d.key,value:'«'+d.key+'»'+(d.vars?' '+d.
 /* ───────────── 1. 기본 글 목록 ───────────── */
 test('차례 3 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 11개(출퇴근 5 · 근무표 2 · 연차 4)',()=>{
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
-  assert.equal(defs.length,314,'차례 3 글 키 수(고쳐 쓰는 글 295 + 모달 속 고정 글 19 · P7 이름 보기 추가)');
+  assert.equal(defs.length,323,'차례 3 글 키 수(고쳐 쓰는 글 295 + 모달 속 고정 글 19 · P7 이름 보기 추가)');
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
   for(const d of defs){
     assert.match(d.key,/^[a-z][a-z0-9_.]{1,80}$/,d.key);
@@ -144,7 +144,7 @@ test('표에 값이 있으면 그 글: 고쳐 쓰는 글 294개가 모두 화면
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
   const stat=new Set([...hr.matchAll(/\bdata-hub(?:k|ph)="([a-z0-9_.]+)"/g)].map(m=>m[1]));
   const dyn=defs.filter(d=>!stat.has(d.key));
-  assert.equal(dyn.length,295);
+  assert.equal(dyn.length,304);
   const out=await renderAll(hr,{engine:true,textRows:dynRows(dyn),settings:{}});
   const all=Object.values(out).join('\n');
   const missing=dyn.filter(d=>!all.includes('«'+d.key+'»')).map(d=>d.key);
@@ -366,14 +366,14 @@ test('화면: 글 고치기에 출퇴근·근무표·연차 묶음 11개가 접�
   const h=helpers(),hits=q=>h.hubTextDefs().filter(d=>h.hubTextMatches(d,q,null)).map(d=>d.key);
   assert.ok(hits('특별사정').includes('leave.apply.special')&&hits('특별사정').includes('leave.m_need_reason')&&hits('특별사정').includes('leave.form.special'));
   assert.ok(hits('근무명부 관리').includes('sched.rt.title')&&hits('지문 엑셀').includes('att.xl.modal_title'));
-  assert.ok(hits('절대 잔액').includes('leave.grant.title'));
+  assert.ok(hits('직원별 연차').includes('leave.grant.title'));
 });
 test('화면: 🔢 숫자·기준 — 연차·소명 기준 5개가 더 있고(반차 값은 소수 입력), 잘못된 값은 DB 호출 없이 거절, 저장·되돌리기',async()=>{
   const t=ui({});
   await t.render(OWNER);
   await t.click('[hub-subtab]=settings');
   const sec=t.section.innerHTML;
-  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,12+2+4+1+8,'근태 7 + 연차·소명 5 + 차례 4 결재 건수 2 + 차례 5 문의함·상담일지 4');
+  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,12+2+4+1+8+1,'근태 7 + 연차·소명 5 + 차례 4 결재 건수 2 + 차례 5 문의함·상담일지 4');
   assert.ok(sec.includes('🌿 연차 기준')&&sec.includes('🕘 근태 기준'));
   assert.match(sec,/id="hubSetIn_8" type="number" inputmode="numeric" min="1" max="30" value="2"/);
   assert.match(sec,/id="hubSetIn_10" type="number" inputmode="decimal" step="0\.1" min="0\.1" max="1" value="0\.5"/);
