@@ -279,6 +279,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
     <span id="saveTag">✓ 자동 저장</span>
     <span id="meName"></span><span class="rolechip" id="meRole"></span>
     <a class="hbtn" href="ortho.html">🦷 교정보드</a>
+    <button class="hbtn" id="introBtn" title="첫 화면 다시 보기">🌌</button>
     <button class="hbtn" id="logoutBtn">로그아웃</button>
   </span>
   <nav class="nav nav2" id="nav2"></nav>
@@ -378,6 +379,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 
 <footer>© 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지</footer>
 
+<script src="hub-intro.js?v=2026100301"></script>
 <script src="hub-texts.js?v=2026100223"></script>
 <script>
 /* ═══════ 설정 ═══════
@@ -4174,6 +4176,7 @@ async function onAuthed(session){
         ME.confidAccess=!!ca||ME.role==='owner';
       }catch(e){ME.confidAccess=false;} // 조회 실패 시 fail closed — 탭을 숨기는 쪽으로
       if(typeof HubUi!=='undefined')await HubUi.load(sb);setStatus('idle'); // 원장이 고친 허브 글(hub_ui_texts)을 한 번 읽어 둠 — 실패하면 기본 글 그대로
+      if(typeof HubIntro!=='undefined'&&HubIntro.shouldShow({userId:ME.id}))HubIntro.show(hubIntroOptions()); // 첫 화면(3D) — 밑에서 허브는 그대로 그려 둠
       const requestedTab=typeof location!=='undefined'&&typeof URLSearchParams==='function'?new URLSearchParams(location.search).get('tab'):null;
       if(requestedTab&&visibleTabKeys().has(requestedTab))TAB=requestedTab;
       $('#meName').textContent=ME.name;$('#meRole').textContent=ME.role;
@@ -4189,6 +4192,30 @@ async function onAuthed(session){
     }finally{_initPromise=null;}
   })();
   return _initPromise;
+}
+/* 첫 화면(hub-intro.js)에 넘길 정보·저장 함수 — 실패한 칸은 —로 보임 */
+function hubIntroOptions(){
+  return {userId:ME.id,name:ME.name,isOwner:ME.role==='owner',
+    info:async()=>{
+      const d=new Date(),ymd=x=>x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');
+      const to=new Date(d);to.setDate(to.getDate()+14);const from=ymd(d),until=ymd(to);
+      const safe=p=>p.then(r=>r,()=>({data:null,error:true}));
+      const [bal,nt,rd,oi,oc,ev,hol,st]=await Promise.all([
+        safe(sb.from('v_leave_balance').select('balance').eq('user_id',ME.id).maybeSingle()),
+        safe(sb.from('notices').select('id')),
+        safe(sb.from('notice_reads').select('notice_id').eq('user_id',ME.id)),
+        safe(sb.from('onboarding_items').select('id').eq('active',true)),
+        safe(sb.from('onboarding_checks').select('item_id,status').eq('user_id',ME.id)),
+        safe(sb.from('calendar_events').select('date,title').gte('date',from).lte('date',until).order('date')),
+        safe(sb.from('holidays').select('date,name').gte('date',from).lte('date',until).order('date')),
+        isLead()?safe(sb.from('approval_steps').select('id').eq('status','대기').eq('approver_role',ME.role)):Promise.resolve(null)
+      ]);
+      const read=new Set((rd.data||[]).map(r=>r.notice_id)),done=new Set((oc.data||[]).filter(c=>c.status!=='미제출').map(c=>c.item_id));
+      const soon=[...(ev.data||[]).map(e=>({date:e.date,title:e.title})),...(hol.data||[]).map(h=>({date:h.date,title:h.name,holiday:true}))].sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+      return {leave:bal.error?null:(bal.data?bal.data.balance:0),notice:nt.error||rd.error?null:(nt.data||[]).filter(n=>!read.has(n.id)).length,
+        docs:oi.error||oc.error?null:(oi.data||[]).filter(i=>!done.has(i.id)).length,appr:st?(st.error?null:(st.data||[]).length):null,soon};
+    },
+    saveText:(k,v)=>HubUi.saveText(sb,k,v),resetText:k=>HubUi.resetText(sb,k)};
 }
 async function doLogin(){
   const msg=$('#lgMsg'),email=$('#lgEmail').value.trim(),pw=$('#lgPw').value;
@@ -4258,6 +4285,7 @@ async function boot(){
   $('#suPw2').addEventListener('keydown',e=>{if(e.key==='Enter')doSignup();});
   $('#toSignup').addEventListener('click',e=>{e.preventDefault();showAuth('signup');});
   $('#toLogin').addEventListener('click',e=>{e.preventDefault();showAuth('login');});
+  $('#introBtn').addEventListener('click',()=>{if(typeof HubIntro!=='undefined'&&ME.approved)HubIntro.open(hubIntroOptions());});
   $('#logoutBtn').addEventListener('click',async()=>{try{await sb.auth.signOut();}catch(e){}location.reload();});
   if(!sb){$('#gate').style.display='';$('#lgMsg').textContent='인터넷 연결 후 새로고침하세요.';return;}
   sb.auth.onAuthStateChange((event,s)=>{if(event==='PASSWORD_RECOVERY'){showRecoveryView();return;}if(s&&!recoveryInProgress&&!passwordRecoveryMode)onAuthed(s);});

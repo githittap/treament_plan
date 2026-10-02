@@ -1567,6 +1567,7 @@ function hubTextDefs(){
   hubTextDefsChapter6(add);
   hubTextDefsChapter7(add);
   hubTextDefsTime(add);
+  ((typeof globalThis!=='undefined'&&globalThis.HUB_INTRO_TEXT_DEFS)||[]).forEach(function(d){add(d[0],'🌌 첫 화면',d[1],d[2]);}); // hub-intro.js의 첫 화면 글
   HUB_TEXT_DEFS_CACHE=defs;
   return defs;
 }
@@ -2325,6 +2326,7 @@ const HubUi={
   load:function(sb){return hubTextsLoadInto(sb);},
   setSettings:hubSettingSetValues,
   renderSettings:renderHubSettings,
+  saveText:hubTextsSave,resetText:hubTextsReset, // 첫 화면(hub-intro.js) 「문구 고치기」가 씀
   applyTextFilter:hubApplyTextFilter, // 검색칸 동작(시험용으로도 공개)
   helpers:{hubText:hubText,hubSetting:hubSetting,hubSettingChecked:hubSettingChecked,hubSettingIntList:hubSettingIntList,hubContractExpiryDays:hubContractExpiryDays,hubList:hubList,hubCards:hubCards}
 };
