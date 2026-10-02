@@ -74,7 +74,7 @@ test('관측 하네스가 직원·관리자 화면, 세 양식 상태, 실제 �
   assert.match(fresh,/새 소명을 올립니다\./);assert.match(fresh,/id="attIssueDate"/);
   assert.match(answer,/자동 감지된 소명에 사유를 적습니다\./);assert.match(answer,/퇴근 지문 없음\(자동 감지\)/);
   assert.match(edit,/대기 중인 내 소명을 고칩니다\./);assert.match(edit,/value="2026-10-02" readonly/);assert.match(edit,/퇴근기록\.pdf/);
-  const staff=await P.makeCtx();staff.ctx.ME={id:'u1',name:'김직원',role:'staff'};assert.match(staff.api.attendanceIssueMyCardHtml([issue]),/사유 쓰기/);
+  const staff=await P.makeCtx();staff.ctx.ME={id:'u1',name:'김직원',role:'staff'};staff.api.setState('ATT_ISSUE_EVIDENCE',{71:[file]});const staffCard=staff.api.attendanceIssueMyCardHtml([{...issue,staff_kind:'기타',staff_reason:'기기 오류로 기록되지 않았습니다.',status:'대기'}]);assert.match(staffCard,/<div class="att-myissue-list"><div class="att-myissue-item"><div class="att-myissue-main">/);assert.doesNotMatch(staffCard,/<table[^>]*att-myissue/,'내 소명은 표 대신 세 줄 목록으로 렌더함');assert.match(staffCard,/종류 ·<\/strong> .*기타/);assert.match(staffCard,/사유 ·<\/strong> 기기 오류로 기록되지 않았습니다/);assert.match(staffCard,/📎 1/);assert.match(staffCard,/고치기/);assert.match(staff.api.attendanceIssueMyCardHtml([issue]),/사유 쓰기/);
   const manager=await P.makeCtx();manager.ctx.ME={id:'u1',name:'김직원',role:'manager'};assert.match(manager.api.attendanceIssueMyCardHtml([issue]),/내 소명/);
   const owner=await P.makeCtx();owner.ctx.ME={id:'u1',name:'원장',role:'owner'};assert.equal(owner.api.attendanceIssueMyCardHtml([issue]),'');
   const observed=await P.makeCtx();observed.ctx.ME={id:'u1',name:'김직원',role:'staff'};

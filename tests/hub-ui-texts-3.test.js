@@ -46,7 +46,7 @@ const dynRows=defs=>defs.map(d=>({key:d.key,value:'«'+d.key+'»'+(d.vars?' '+d.
 /* ───────────── 1. 기본 글 목록 ───────────── */
 test('차례 3 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 14개(출퇴근·근태차이 8 · 근무표 2 · 연차 4)',()=>{
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
-  assert.equal(defs.length,422,'차례 3 글 키 수(기존 313 + 소명·증거 UI 글 + 근태차이 화면·엑셀 글 - 미사용 구 소명 문구 5개)');
+  assert.equal(defs.length,424,'차례 3 글 키 수(기존 313 + 소명·증거 UI 글 + 근태차이 화면·엑셀 글 + 직원 차이 한 줄·부호 분 글)');
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
   for(const d of defs){
     assert.match(d.key,/^[a-z][a-z0-9_.]{1,80}$/,d.key);
@@ -77,6 +77,7 @@ test('화면 코드(hr.html)에 박힌 기본 글이 기본값 목록과 글자�
   for(const sm of hr.matchAll(/<[a-z0-9]+\b[^>]*\bdata-hubph="([a-z0-9_.]+)"[^>]*>/g)){const ph=/placeholder="([^"]*)"/.exec(sm[0]);assert.ok(ph,sm[1]+' 흐린 글 칸');if(CH3.test(sm[1]))stat.set(sm[1],ph[1]);}
   const defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
   for(const d of defs){
+    if(d.key==='att.myissue.th_evidence'){assert.equal(d.def,'증거');assert.ok(!found.has(d.key),'내 소명 목록을 두 줄로 바꾸며 증거 열 머리는 더 이상 표시하지 않음');continue;}
     if(['att.issueform.mode_new','att.issueform.mode_answer','att.issueform.mode_edit','att.issue.auto_clock_in','att.issue.auto_clock_out'].includes(d.key)){
       assert.match(hr,/hubT\(form\.mode==='new'\?'att\.issueform\.mode_new':form\.mode==='answer'\?'att\.issueform\.mode_answer':'att\.issueform\.mode_edit'/,'실제 양식 렌더는 세 모드 글 키를 선택함');
       assert.match(hr,/att\.myissue\.pending/,'실제 내 소명 카드가 자동 감지 글을 선택함');
@@ -156,24 +157,24 @@ test('표에 값이 있으면 그 글: 고쳐 쓰는 글 355개가 모두 화면
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
   const stat=new Set([...hr.matchAll(/\bdata-hub(?:k|ph)="([a-z0-9_.]+)"/g)].map(m=>m[1]));
   const dyn=defs.filter(d=>!stat.has(d.key));
-  assert.equal(dyn.length,403,'기존 동적 글과 B2·C 단계 신규 글 중 화면에 쓰이는 동적 글 수');
+  assert.equal(dyn.length,405,'기존 동적 글과 B2·C 단계 신규 글 중 화면에 쓰이는 동적 글 수');
   const out=await renderAll(hr,{engine:true,textRows:dynRows(dyn),settings:{}});
   const b2Defs=defs.filter(d=>/^att\.issue\.p_date$|^att\.issueform\.|^att\.myissue\.|^att\.issue\.(?:evidence_|admin_evidence|awaiting_staff|auto_clock_)/.test(d.key));
   const b2Observed=await require('./fixtures/hub3-harness.cjs').observeAttendanceIssueB2(hr,{textRows:dynRows(b2Defs)});
   const cDefs=defs.filter(d=>d.key.startsWith('att.diff.'));
   const P=await renderAll(hr,{probe:true,engine:true,textRows:dynRows(cDefs),settings:{'att.diff.gap_min':'1','att.diff.show_staff':'1'}}),c=await P.makeCtx();
   c.ctx.ME={id:'u1',name:'김직원',role:'chief'};
-  vm.runInContext('this.api.attDiffCardHtml=attDiffCardHtml;this.api.attDiffRenderRows=attDiffRenderRows;this.api.attDiffExportModel=attDiffExportModel;this.api.attDiffLabel=attDiffLabel;this.api.attDiffGapText=attDiffGapText;this.api.attDiffWeekday=attDiffWeekday;this.api.attendanceStaffDiffHtml=attendanceStaffDiffHtml',c.ctx);
+  vm.runInContext('this.api.attDiffCardHtml=attDiffCardHtml;this.api.attDiffRenderRows=attDiffRenderRows;this.api.attDiffExportModel=attDiffExportModel;this.api.attDiffLabel=attDiffLabel;this.api.attDiffSignedMinutes=attDiffSignedMinutes;this.api.attDiffGapText=attDiffGapText;this.api.attDiffStaffMissingKinds=attDiffStaffMissingKinds;this.api.attDiffWeekday=attDiffWeekday;this.api.attendanceStaffDiffHtml=attendanceStaffDiffHtml',c.ctx);
   const sample={userId:'u1',name:'김직원',workDate:'2026-10-02',kinds:'출근 · 퇴근',manualIn:'09:02',manualOut:'18:02',fpIn:'09:00',fpOut:'18:00',diffInMin:2,diffOutMin:2,manualStatus:'대기',manualReason:'사유',issueStatus:'',issueReason:''};
   const cObserved=[c.api.attDiffCardHtml(),c.api.attDiffRenderRows({rows:[sample],month:'2026-10',coverageEnd:'2026-10-31'}),c.api.attDiffRenderRows({rows:[],month:'2026-10',coverageEnd:null}),c.api.attDiffRenderRows({rows:[],month:'2026-10',error:{message:'query fail'}})];
   c.ctx.ME.role='staff';cObserved.push(c.api.attendanceStaffDiffHtml([sample]),c.api.attendanceStaffDiffHtml([]),c.api.attendanceStaffDiffHtml({error:'query fail'}));
-  cObserved.push(JSON.stringify(c.api.attDiffExportModel([sample],{month:'2026-10',thresholdMin:1,coverageEnd:'2026-10-31',createdAt:'2026-10-03T10:00:00Z'})),JSON.stringify(c.api.attDiffExportModel([],{month:'2026-10',thresholdMin:1,coverageEnd:null,createdAt:'2026-10-03T10:00:00Z'})),c.api.attDiffLabel('출근 · 퇴근 · 지문 출근 없음 · 지문 퇴근 없음 · 지문 없음'),c.api.attDiffGapText(sample.diffInMin,sample.diffOutMin),...['2026-10-04','2026-10-05','2026-10-06','2026-10-07','2026-10-08','2026-10-09','2026-10-10'].map(d=>c.api.attDiffWeekday(d)));
+  cObserved.push(JSON.stringify(c.api.attDiffExportModel([sample],{month:'2026-10',thresholdMin:1,coverageEnd:'2026-10-31',createdAt:'2026-10-03T10:00:00Z'})),JSON.stringify(c.api.attDiffExportModel([],{month:'2026-10',thresholdMin:1,coverageEnd:null,createdAt:'2026-10-03T10:00:00Z'})),c.api.attDiffLabel('출근 · 퇴근 · 지문 출근 없음 · 지문 퇴근 없음 · 지문 없음'),c.api.attDiffSignedMinutes(sample.diffInMin),c.api.attDiffSignedMinutes(sample.diffOutMin),c.api.attDiffGapText(2,2),c.api.attDiffStaffMissingKinds('출근 · 퇴근 · 지문 출근 없음 · 지문 퇴근 없음 · 지문 없음'),...['2026-10-04','2026-10-05','2026-10-06','2026-10-07','2026-10-08','2026-10-09','2026-10-10'].map(d=>c.api.attDiffWeekday(d)));
   const cObservedText=cObserved.join('\n');
   const cObservedMissing=cDefs.filter(d=>!cObservedText.includes('«'+d.key+'»')).map(d=>d.key);
   assert.equal(cObservedMissing.length,0,'C 차이 글은 관리자·직원·오류·빈 상태·엑셀의 실제 렌더에 모두 나타남 '+cObservedMissing.join(', '));
   const all=Object.values(out).join('\n')+'\n'+b2Observed+'\n'+cObservedText;
   const legacyMissing=dyn.filter(d=>!b2Defs.some(x=>x.key===d.key)&&!all.includes('«'+d.key+'»')).map(d=>d.key);
-  const visibleMissing=b2Defs.filter(d=>!all.includes('«'+d.key+'»')).map(d=>d.key);
+  const visibleMissing=b2Defs.filter(d=>d.key!=='att.myissue.th_evidence'&&!all.includes('«'+d.key+'»')).map(d=>d.key);
   assert.equal(legacyMissing.length,0,'기존 화면 글은 기존 관측 그대로 검사: '+legacyMissing.join(', '));
   assert.equal(visibleMissing.length,0,'B2 양식·카드·관리자 표·증거 목록은 실제 관측 렌더로 검사: '+visibleMissing.join(', '));
   // 자리표시자는 화면이 채워 넣음

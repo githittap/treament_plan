@@ -414,9 +414,11 @@ function hubTextDefsChapter3(add){
   add('att.diff.th_gap','🕘 출퇴근 › 지문·수기 차이','차이 표 차이 열','차이');
   add('att.diff.th_status','🕘 출퇴근 › 지문·수기 차이','차이 표 수기 상태 열','수기 상태');
   add('att.diff.th_issue','🕘 출퇴근 › 지문·수기 차이','차이 표 소명 열','소명');
+  add('att.diff.staff_gap','🕘 출퇴근 › 내 지문·수기 차이','직원 본인 화면의 출근·퇴근 차이 분({in}과 {out}은 분 차이, 없으면 -) 표시','차이: 출근 {in}분 · 퇴근 {out}분',['in','out']);
   add('att.diff.staff_title','🕘 출퇴근 › 내 지문·수기 차이','직원 본인 차이 목록 제목','지문·수기가 다른 날');
   add('att.diff.staff_issue','🕘 출퇴근 › 내 지문·수기 차이','직원이 차이 날짜 소명 양식을 여는 단추','소명 쓰기');
-  add('att.diff.staff_gap','🕘 출퇴근 › 내 지문·수기 차이','직원 본인 화면의 출근·퇴근 차이 분({in}과 {out}은 분 차이, 없으면 -) 표시','차이: 출근 {in}분 · 퇴근 {out}분',['in','out']);
+  add('att.diff.signed_minute','🕘 출퇴근 › 지문·수기 차이','부호가 있는 수기−지문 분 차이({value}는 부호와 숫자)','{value}분',['value']);
+  add('att.diff.staff_line','🕘 출퇴근 › 내 지문·수기 차이','직원 본인 차이 한 줄({date} 날짜, {manual_in}~{manual_out} 수기, {fp_in}~{fp_out} 지문, {in_delta}/{out_delta}분 차이, {missing}은 지문 누락 종류)','{date} · 수기 {manual_in}~{manual_out} · 지문 {fp_in}~{fp_out} · 출근 {in_delta} · 퇴근 {out_delta}{missing}',['date','manual_in','manual_out','fp_in','fp_out','in_delta','out_delta','missing']);
   add('att.diff.staff_none','🕘 출퇴근 › 내 지문·수기 차이','직원 본인 차이가 없을 때','다른 날이 없습니다.');
   add('att.diff.staff_error','🕘 출퇴근 › 내 지문·수기 차이','직원 본인 차이 자료 조회 실패({msg}는 오류 내용)','차이를 불러오지 못했습니다: {msg}',['msg']);
   add('att.diff.kind_in','🕘 출퇴근 › 지문·수기 차이','출근 시각 차이 종류','출근');
