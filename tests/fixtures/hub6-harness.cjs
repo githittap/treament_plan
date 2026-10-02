@@ -421,6 +421,17 @@ async function renderAll(html,opts){
       const r2=await asRole('staff',{$:d.$,document:doc});r2.api.set('CONTRACT_ROWS',[rowNoPdf]);await r2.api.completeIntegratedContract(17);await flush();
       out['sign.int.rpc_ok']=jj([r2.log,r2.statuses,r2.ctx.sb.rpcCalls.map(c=>c[0])]); }
   }
+  // P7: 실제 직원·관리자 렌더 경로로 계약/직원 직무 충돌 안내를 확인함.
+  if(text.includes('function contractJobGroupWarning(')){
+    const profile=Object.assign({},PROFILES[0],{job_group:'desk'});
+    const rows=[Object.assign({},CONTRACT_ROWS[2],{fields:{직종:'위생사',계약종료:'2026-10-20'}})];
+    for(const role of ['staff','owner']){
+      const r=await makeCtx({PROFILES:[profile],ME:{id:profile.user_id,name:profile.name,role}},{tables:{contracts:{list:rows}}});
+      const m={innerHTML:''};
+      if(role==='staff')await r.api.renderContractEmployee(m);else await r.api.renderContractOwner(m);
+      out['p7.job_conflict.'+role]=m.innerHTML;
+    }
+  }
   return out;
 }
 module.exports={renderAll,region,chain,lf,makeSb,FakeDate,PROFILES,TEMPLATE,CONTRACT_ROWS,TERMS,SCHED_ROWS};

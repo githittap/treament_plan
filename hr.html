@@ -175,6 +175,8 @@ tr.new td{background:var(--mint-dk)}
 .calendar-week-table tr.dr td button,.calendar-week-table tr.evening td button{color:#f0b8ff}
 .calendar-week-table tr.job-0 td button{color:#7fd8ff}.calendar-week-table tr.job-1 td button{color:#ffd477}.calendar-week-table tr.job-2 td button{color:#9ee6a9}.calendar-week-table tr.job-3 td button{color:#e4b6ff}
 .calendar-week-table .calendar-week-date{display:block;color:var(--ink);font-size:12px}
+.calendar-week-table button.calendar-week-date{width:100%;border:0;border-radius:5px;background:transparent;font-weight:800;cursor:pointer;padding:4px}
+.calendar-week-table button.calendar-week-date:hover,.calendar-week-table button.calendar-week-date:focus-visible{outline:2px solid var(--mint);outline-offset:-2px}
 .calendar-week-table .calendar-week-note{display:block;margin-top:3px;font-size:10px;color:var(--gray);font-weight:500;white-space:normal}
 .calendar-week-wrap{overflow-x:auto}
 .cal-tag.evening{background:var(--purple-bg);color:var(--purple)}
@@ -223,6 +225,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 .calendar-names-visible .cal-cell{max-height:none;height:auto;overflow:visible}
 .calendar-names-visible .cal-tag.cal-roster{display:block;white-space:normal;max-height:none}
 .calendar-names-visible .cal-tag.cal-roster .cal-names{display:block;max-height:none;overflow:visible}
+.contract-job-group-warning{color:var(--gold)}
 </style>
 </head>
 <body>
@@ -1244,7 +1247,7 @@ function scheduleRoleColor(person){const group=scheduleRoleGroupModel(person);re
 function scheduleRoleCell(role,weekStart,ds,people,rows,leaveByUser,canEdit){
   const T=typeof hubT==='function'?hubT:function(k,d,v){return v?String(d).replace(/\{([a-z_]+)\}/g,function(x,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):x;}):String(d);};
   const day=scheduleDayForDate(ds),selected=new Set((rows||[]).filter(r=>r.week_start===weekStart&&r.day===day&&((role==='야간'&&r.shift==='evening')||(role==='OFF'&&r.shift==='off')||(role!=='야간'&&role!=='OFF'&&(r.shift==='work'||r.shift==='evening')))).map(r=>r.person_id));
-  if(role==='연차·반차'){const names=Object.values(leaveByUser||{}).filter(v=>v.date===ds).map(v=>v.label);return names.length?'<div class="schedule-leave-list">'+names.map(esc).join('<br>')+'</div>':'-';}
+  if(role==='연차·반차'){const names=Object.entries(leaveByUser||{}).filter(([,v])=>v.date===ds).map(([key,v])=>{const person=(people||[]).find(p=>p.id===key.split('|')[1]);return scheduleNamesVisible()&&person?schedulePersonName(person)+' · '+v.label:v.label;});return names.length?'<div class="schedule-leave-list">'+names.map(esc).join('<br>')+'</div>':'-';}
   const items=scheduleRolePeople(role,people,rows,weekStart,day);if(!items.length)return '<div class="schedule-role-empty">등록된 대상 없음</div>';const html=items.map(p=>{const leave=leaveByUser[(p.profile_user_id||'')+'|'+p.id+'|'+ds],historical=p.active!==true||p.included_in_schedule===false,disabled=!!leave||historical,checked=selected.has(p.id);return '<label class="schedule-check '+scheduleRoleColor(p)+(checked?' schedule-selected':'')+(historical?' schedule-historical':'')+'"><input type="checkbox" '+(checked?'checked ':'')+(disabled?'disabled ':'')+' onchange="toggleScheduleRoleMember(\''+role+'\',\''+p.id+'\',\''+(p.profile_user_id||'')+'\',\''+ds+'\',this.checked,this)"><span>'+esc(schedulePersonLabel(p))+(historical?' · '+esc(T('sched.cell.past','과거 기록')):disabled&&leave?' · '+esc(leave.label):'')+'</span></label>';}).join('');
   const names=scheduleNamesVisible()?'<div class="schedule-cell-names">'+items.filter(p=>selected.has(p.id)).map(p=>esc(schedulePersonName(p))).join('<br>')+'</div>':'';
   return names+'<details class="schedule-role-cell"><summary>'+role+' · '+items.filter(p=>selected.has(p.id)).length+'명</summary><div class="schedule-check-list">'+(canEdit?html:html.replace(/<input /g,'<input disabled '))+'</div></details>';
@@ -1939,7 +1942,7 @@ function calendarWeekRoleRows(roster,leaveItems){
 function renderCalendarWeekTable(dates,scheduleByDate,leaveByDate,byDate,weekByStart){
   const dayRows=dates.map(date=>calendarWeekRoleRows(scheduleByDate[date]||emptyCalendarRoster(),leaveByDate[date]||[])),rows=dayRows[0]||calendarWeekRoleRows(emptyCalendarRoster(),[]);
   const rowHtml=rows.map(([label,color],index)=>`<tr class="${color}"><th class="calendar-week-role">${esc(label)}</th>${dates.map((date,dayIndex)=>{const members=dayRows[dayIndex][index][2],count=members.length,names=typeof scheduleNamesVisible==='function'&&scheduleNamesVisible()?`<span class="calendar-cell-names">${members.map(item=>esc(typeof item==='string'?item:item.label)).join('<br>')}</span>`:'';return `<td><button type="button" class="${count?'':'zero'}" aria-label="${esc(date)} ${esc(label)} ${esc(hubT('cal.week.aria_count','{n}명 상세 보기',{n:count}))}" onclick="selectCalendarDay('${date}',event)">${count}${names}</button></td>`;}).join('')}</tr>`).join('');
-  const headers=dates.map(date=>{const info=byDate[date]||{holidays:[],events:[]},week=weekByStart.get(mondayStr(date)),status=week&&week.status==='공표'?hubT('cal.status_pub','확정'):week&&week.status==='초안'?hubT('cal.status_draft','작성 중'):'';const notes=[...(info.holidays||[]).map(item=>item.name),...(info.events||[]).map(item=>item.title),status].filter(Boolean);const d=new Date(date+'T00:00:00'),label=['일','월','화','수','목','금','토'][d.getDay()];return `<th><span class="calendar-week-date">${label} ${Number(date.slice(-2))}</span>${notes.length?`<span class="calendar-week-note">${esc(notes.join(' · '))}</span>`:''}</th>`;}).join('');
+  const headers=dates.map(date=>{const info=byDate[date]||{holidays:[],events:[]},week=weekByStart.get(mondayStr(date)),status=week&&week.status==='공표'?hubT('cal.status_pub','확정'):week&&week.status==='초안'?hubT('cal.status_draft','작성 중'):'';const notes=[...(info.holidays||[]).map(item=>item.name),...(info.events||[]).map(item=>item.title),status].filter(Boolean);const d=new Date(date+'T00:00:00'),label=['일','월','화','수','목','금','토'][d.getDay()];return `<th><button type="button" class="calendar-week-date" aria-label="${esc(hubT('cal.detail.title','{date} 상세',{date:date}))}" onclick="selectCalendarDay('${date}',event)">${label} ${Number(date.slice(-2))}</button>${notes.length?`<span class="calendar-week-note">${esc(notes.join(' · '))}</span>`:''}</th>`;}).join('');
   return `<div class="calendar-week-wrap"><table class="calendar-week-table"><thead><tr><th>${esc(hubT('cal.week.th_role','직무'))}</th>${headers}</tr></thead><tbody>${rowHtml}</tbody></table></div>`;
 }
 function calendarLeaveTags(items){
@@ -2971,6 +2974,27 @@ function currentContractDraft(){
   const fields=contractFormValues();if($('#contractNoEnd')&&$('#contractNoEnd').checked)fields['계약종료']='기간의 정함 없음';
   return {template,employeeId,due:$('#contractDue')?$('#contractDue').value:'',fields};
 }
+function contractJobGroupMappings(){return [
+  {code:'clinical_consult',label:'진료·상담',aliases:ctT('contract_job.alias_clinical_consult','진료·상담,진료실,상담,치과위생사,위생사')},
+  {code:'sterilization_admin',label:'소독·행정',aliases:ctT('contract_job.alias_sterilization_admin','소독·행정,소독,소독실,행정')},
+  {code:'lab',label:'기공',aliases:ctT('contract_job.alias_lab','기공,기공실,치과기공사,기공사')},
+  {code:'desk',label:'데스크',aliases:ctT('contract_job.alias_desk','데스크,코디,코디네이터')}
+];}
+function contractJobGroupFromFields(fields){
+  const f=contractObject(fields),title=[f.job_group,f['직무'],f['직무분류'],f['직종']].map(value=>String(value||'').trim()).find(Boolean);
+  if(!title)return null;
+  const mappings=contractJobGroupMappings(),explicit=mappings.find(group=>group.code===title);
+  if(explicit)return explicit;
+  const matches=mappings.filter(group=>group.aliases.split(',').some(alias=>alias.trim()===title));
+  return matches.length===1?matches[0]:null;
+}
+function contractJobGroupWarning(employeeId,fields){
+  const employee=(PROFILES||[]).find(profile=>profile.user_id===employeeId),contractGroup=contractJobGroupFromFields(fields);
+  if(!employee||!employee.job_group||!contractGroup||employee.job_group===contractGroup.code||employee.dept==='Dr.'
+    ||(typeof SCHEDULE_PEOPLE!=='undefined'&&SCHEDULE_PEOPLE.some(person=>person.profile_user_id===employeeId&&person.department==='Dr.')))return '';
+  const profileGroup=contractJobGroupMappings().find(group=>group.code===employee.job_group);
+  return `<div class="hint contract-job-group-warning" role="status">${esc(ctT('contract_job.conflict','{employee}: 계약 직무 {contract} · 직원 직무 {profile} — 직원 직무는 그대로 유지됩니다.',{employee:employee.name||'',contract:contractGroup.label,profile:profileGroup?.label||employee.job_group}))}</div>`;
+}
 function contractEmployeeJobGroupInfo(employeeId){
   const employee=(PROFILES||[]).find(profile=>profile.user_id===employeeId);
   if(!employee)return '';
@@ -2983,7 +3007,7 @@ function contractEmployeeJobGroupInfo(employeeId){
 function previewContract(){
   const d=currentContractDraft(),box=$('#contractPreview');
   if(!d.template||!box)return;
-  box.innerHTML=`<h3>${esc(ctT('contract.preview_h','미리보기'))}</h3>${contractEmployeeJobGroupInfo(d.employeeId)}<div class="contract-doc">${mergeContractHtml(d.template,d.fields)}</div>`;
+  box.innerHTML=`<h3>${esc(ctT('contract.preview_h','미리보기'))}</h3>${contractEmployeeJobGroupInfo(d.employeeId)}${contractJobGroupWarning(d.employeeId,d.fields)}<div class="contract-doc">${mergeContractHtml(d.template,d.fields)}</div>`;
   box.scrollIntoView({behavior:'smooth',block:'start'});
 }
 async function sendContract(){
@@ -3127,7 +3151,7 @@ async function renderContractOwner(m){
   ${employmentTermsCard()}
   ${contractAlertsCard(CONTRACT_ALERTS)}
   <div class="card"><h2>${esc(ctT('contract.list_title','📚 계약 목록'))}</h2><label class="sub"><input type="checkbox" ${CONTRACT_SHOW_CANCELLED?'checked':''} onchange="setContractShowCancelled(this.checked)"> ${esc(ctT('contract.show_cancelled','취소된 계약 보기'))}</label>${visibleRows.length?`<div class="tblwrap"><table><tr><th>${esc(ctT('contract.th_employee','직원'))}</th><th>${esc(ctT('contract.th_template','서식'))}</th><th>${esc(ctT('contract.th_status','상태'))}</th><th>${esc(ctT('contract.th_end','계약종료'))}</th><th>${esc(ctT('contract.th_sent','발송일'))}</th><th>${esc(ctT('contract.th_signed','서명일'))}</th><th>${esc(ctT('contract.th_due','서명기한'))}</th><th></th></tr>
-    ${visibleRows.map(r=>`<tr><td>${esc(nameOf(r.user_id))}</td><td>${esc(contractTitle(r))}</td><td><span class="b ${contractStatusClass(r.status)}">${esc(contractDisplayStatus(r))}</span></td><td>${esc(contractEndValue(r)||ctT('contract.al_review','관리자 확인 필요'))}</td><td>${contractDate(r.sent_at)}</td><td>${contractDate(r.signed_at)}</td><td>${contractDate(r.due_at)}</td><td><button class="mini" onclick="viewContract(${r.id})">${esc(ctT('contract.btn_view','보기'))}</button> ${r.signed_pdf_path?`<button class="mini" onclick="downloadContractPdf(${r.id})">${esc(ctT('contract.btn_pdf','완료 PDF'))}</button>`:''} <button class="mini" onclick="openContractEnd(${r.id})">${esc(ctT('contract.btn_set_end','종료일 설정'))}</button>${r.status==='대기'?` <button class="mini rej" onclick="cancelContract(${r.id})">${esc(ctT('contract.btn_cancel','취소'))}</button>`:''}</td></tr>`).join('')}</table></div>`:CONTRACT_ROWS.length?`<div class="empty">${esc(ctT('contract.list_hidden','취소된 계약은 숨겨져 있습니다.'))}</div>`:`<div class="empty">${esc(ctT('contract.list_empty','계약이 없습니다.'))}</div>`}</div>`);
+    ${visibleRows.map(r=>`<tr><td>${esc(nameOf(r.user_id))}${contractJobGroupWarning(r.user_id,r.fields)}</td><td>${esc(contractTitle(r))}</td><td><span class="b ${contractStatusClass(r.status)}">${esc(contractDisplayStatus(r))}</span></td><td>${esc(contractEndValue(r)||ctT('contract.al_review','관리자 확인 필요'))}</td><td>${contractDate(r.sent_at)}</td><td>${contractDate(r.signed_at)}</td><td>${contractDate(r.due_at)}</td><td><button class="mini" onclick="viewContract(${r.id})">${esc(ctT('contract.btn_view','보기'))}</button> ${r.signed_pdf_path?`<button class="mini" onclick="downloadContractPdf(${r.id})">${esc(ctT('contract.btn_pdf','완료 PDF'))}</button>`:''} <button class="mini" onclick="openContractEnd(${r.id})">${esc(ctT('contract.btn_set_end','종료일 설정'))}</button>${r.status==='대기'?` <button class="mini rej" onclick="cancelContract(${r.id})">${esc(ctT('contract.btn_cancel','취소'))}</button>`:''}</td></tr>`).join('')}</table></div>`:CONTRACT_ROWS.length?`<div class="empty">${esc(ctT('contract.list_hidden','취소된 계약은 숨겨져 있습니다.'))}</div>`:`<div class="empty">${esc(ctT('contract.list_empty','계약이 없습니다.'))}</div>`}</div>`);
   if(contractFlash){const ft=contractFlashText(contractFlash),fe=$('#contractMsg');if(fe&&ft!==contractFlash)fe.textContent=ft;} /* 발송 결과 안내: 기존 시험이 찾는 줄(contractFlash)은 그대로 두고, 고쳤을 때만 바꿔 넣음 */
 }
 function employmentTermsCard(){
@@ -3250,7 +3274,7 @@ async function renderContractEmployee(m,options={}){
   if(!CONTRACT_TEMPLATES.length)CONTRACT_TEMPLATES=templates||[];
   const html=`<div class="card"><h2>${esc(ctT('contract.mine_title','📝 내 근로계약서'))}</h2><label class="sub"><input type="checkbox" ${CONTRACT_SHOW_CANCELLED?'checked':''} onchange="setContractShowCancelled(this.checked)"> ${esc(ctT('contract.show_cancelled','취소된 계약 보기'))}</label>${visibleRows.length?`<div class="sub">${esc(ctT('contract.mine_hint','계약 내용을 확인한 뒤 서명란에 직접 서명하세요.'))}</div>`:ownRows.length?`<div class="empty">${esc(ctT('contract.list_hidden','취소된 계약은 숨겨져 있습니다.'))}</div>`:`<div class="empty">${esc(ctT('contract.mine_empty','받은 근로계약서가 없습니다.'))}</div>`}</div>`+
     visibleRows.map(r=>{const expired=r.status==='대기'&&contractExpired(r),signed=r.status==='서명완료';return `<div class="card" id="integratedContract-${r.id}"><h2>${esc(contractTitle(r))} <span class="b ${contractStatusClass(r.status)}">${esc(contractDisplayStatus(r))}</span></h2>
-      <div class="sub">${esc(ctT('contract.meta_sent','발송 {date}',{date:contractDate(r.sent_at)}))} · ${esc(ctT('contract.meta_due','서명기한 {date}',{date:contractDate(r.due_at)}))}${r.signed_at?' · '+esc(ctT('contract.meta_signed','서명 {date}',{date:contractDate(r.signed_at)})):''}</div>
+      <div class="sub">${esc(ctT('contract.meta_sent','발송 {date}',{date:contractDate(r.sent_at)}))} · ${esc(ctT('contract.meta_due','서명기한 {date}',{date:contractDate(r.due_at)}))}${r.signed_at?' · '+esc(ctT('contract.meta_signed','서명 {date}',{date:contractDate(r.signed_at)})):''}</div>${contractJobGroupWarning(r.user_id,r.fields)}
       ${(r.status==='대기'||signed)&&!r.source_pdf_path&&(!integratedContract(r)||signed)?`<div class="contract-doc" style="margin-top:10px">${r.merged_html||''}</div>`:''}
       ${r.status==='대기'&&!expired&&integratedContract(r)?integratedContractPage(r):''}
       ${r.source_pdf_path?`<div class="hint">${esc(ctT('contract.pdf_base','이 계약의 기준 문서는 원본 PDF이며, HTML 계약 본문과 별도 보관됩니다.'))}${signed&&r.signed_pdf_path?` <button class="mini" onclick="downloadContractPdf(${r.id})">${esc(ctT('contract.btn_pdf_down','완료 PDF 다운로드'))}</button>`:''}</div>`:''}
