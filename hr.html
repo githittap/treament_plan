@@ -1283,17 +1283,18 @@ function parseXls(ev){
   rd.readAsArrayBuffer(f);
 }
 function findCol(hdr,keys){return hdr.findIndex(h=>h&&keys.some(k=>String(h).replace(/\s/g,'').includes(k)));}
+// 앞 낱말부터 차례로 찾는다 — 타임북 내보내기처럼 「출입일」과 「생성일자」(기록이 만들어진 때)가 같이 있으면 출입일을 고른다.
+function findColPref(hdr,keys,skip=[]){for(const k of keys){const i=hdr.findIndex(h=>{const s=String(h??'').replace(/\s/g,'');return !!s&&s.includes(k)&&!skip.some(x=>s.includes(x));});if(i>=0)return i;}return -1;}
 function excelToDate(v){ // v = Date(cellDates) or serial number
   if(v instanceof Date) return v;
-  if(typeof v==='number'){const d=new Date(Date.UTC(1899,11,30)+v*864e5);return d;}
+  // 서식 없는 숫자 칸도 적힌 날짜·시각 그대로(예전엔 UTC로 읽어 한국 시각이 9시간 밀렸음)
+  if(typeof v==='number'&&Number.isFinite(v)){const days=Math.floor(v),mins=Math.floor((v-days)*1440+1e-6),day=new Date(Date.UTC(1899,11,30)+days*864e5);return new Date(day.getUTCFullYear(),day.getUTCMonth(),day.getUTCDate(),Math.floor(mins/60),mins%60);}
   return null;
 }
+function attXlColumns(hdr){const skip=['생성','수정','등록','변경'];return {cName:findCol(hdr,['성명','이름','사원명','직원']),cId:findCol(hdr,['사번','USERID','USER ID','아이디']),cDate:findColPref(hdr,['출입일','발생일','근무일','일자','날짜'],skip),cTime:findColPref(hdr,['출입시간','입실시간','발생시각','시간','시각'],skip)};}
 async function buildPreview(aoa){
   const hdr=aoa[0]||[];
-  const cName=findCol(hdr,['성명','이름','사원명','직원']);
-  const cId=findCol(hdr,['사번','USERID','USER ID','아이디']);
-  const cDate=findCol(hdr,['발생일','일자','날짜']);
-  const cTime=findCol(hdr,['입실시간','발생시각','시간','시각']);
+  const {cName,cId,cDate,cTime}=attXlColumns(hdr);
   if((cId<0&&cName<0)||cDate<0){alert(hubT('att.xl.m_no_col','열을 찾지 못했습니다(직원 식별/발생일). 지문기 원본을 그대로 올려보세요.'));return;}
   // 이름 또는 사번(fp_id) 어느 쪽이든 직원 명부와 대조
   const resolve=tok=>{const t=String(tok).trim();return PROFILES.find(p=>(p.name&&p.name===t)||(p.fp_id&&String(p.fp_id).trim()===t))||null;};
