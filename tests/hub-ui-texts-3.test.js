@@ -8,6 +8,14 @@ const {renderAll,tablesFor}=require('./fixtures/hub3-harness.cjs');
 const golden=JSON.parse(read('tests/fixtures/hub3-golden-84053a7.json'));
 const clone=x=>JSON.parse(JSON.stringify(x));
 const CH3=/^(att|sched|leave)\./;
+// P7에서 허용된 시간 입력 연결 속성과 숨긴 모바일 입력만 제외해 PC의 기존 글·배치를 계속 대조한다.
+function attendanceLegacyLayout(value){return String(value)
+  .replace(/ class="rowflex manual-clock-desktop"/g,' class="rowflex"')
+  .replace(/ onchange="syncManualClock\('(In|Out)',false\)"/g,'')
+  .replace(/<input type="time" class="manual-clock-mobile" id="manualClock(In|Out)Time"[^>]*>/g,'')
+  .replace(/ id="manualAttendanceSubmit"/g,'');}
+const P7_DATE_TEXT_KEYS=new Set(['att.manual.confirm_discard','att.manual.m_loading','att.manual.m_load_fail']);
+
 
 function helpers(){
   const block=js.match(/\/\* hub-texts:test-start \*\/[\s\S]*?\/\* hub-texts:test-end \*\//)?.[0];
@@ -46,7 +54,7 @@ const dynRows=defs=>defs.map(d=>({key:d.key,value:'«'+d.key+'»'+(d.vars?' '+d.
 /* ───────────── 1. 기본 글 목록 ───────────── */
 test('차례 3 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 11개(출퇴근 5 · 근무표 2 · 연차 4)',()=>{
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
-  assert.equal(defs.length,313,'차례 3 글 키 수(고쳐 쓰는 글 294 + 모달 속 고정 글 19)');
+  assert.equal(defs.length,316,'차례 3 글 키 수(기존 동적 글 294 + 날짜 전환 글 3 + 모달 속 고정 글 19)');
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
   for(const d of defs){
     assert.match(d.key,/^[a-z][a-z0-9_.]{1,80}$/,d.key);
@@ -101,7 +109,7 @@ test('숫자·목록 기본값: 연차·소명 숫자 5개와 연차 유형·근
   assert.match(hr,/<select id="lvType"><option>연차<\/option><option>반차<\/option><option>조퇴<\/option><option>기타<\/option><\/select>/,'신청 창 기본 선택칸(기존 시험이 이 줄을 찾음)');
   assert.equal(L('list.work_depts').addable,false);assert.equal(L('list.leave_types').addable,false);
   assert.ok(S('leave.same_day_limit').where.includes('DB에는 없어요'));
-  assert.match(hr,/hub-texts\.js\?v=2026100223/,'캐시 번호를 새 값으로 올림(차례 4에서 2026100109 → 2026100110, 차례 5에서 → 2026100111, 차례 6에서 → 2026100112, 차례 7에서 → 2026100113, 10-02 원장요청 5건에서 → 2026100221, 10-02 인박스 판에서 → 2026100223)');
+  assert.match(hr,/hub-texts\.js\?v=2026100301/,'캐시 번호를 새 값으로 올림(차례 4에서 2026100109 → 2026100110, 차례 5에서 → 2026100111, 차례 6에서 → 2026100112, 차례 7에서 → 2026100113, 10-02 원장요청 5건에서 → 2026100221, 10-02 인박스 판에서 → 2026100223, P7 출퇴근 수정에서 → 2026100301)');
 });
 
 /* ───────────── 2. 기본값만 있을 때 옛 화면과 똑같음 ───────────── */
@@ -109,23 +117,23 @@ test('기본값만 있을 때: 허브 설정 엔진이 아예 없어도 세 화�
   const out=await renderAll(hr,{engine:false});
   assert.deepEqual(Object.keys(out).sort(),Object.keys(golden).sort());
   assert.ok(Object.keys(golden).length>=140,'대조 항목 수');
-  for(const k of Object.keys(golden))assert.equal(out[k],golden[k],k);
+  for(const k of Object.keys(golden))assert.equal(attendanceLegacyLayout(out[k]),golden[k],k);
 });
 test('기본값만 있을 때: 엔진을 못 불러와 hr.html의 대비책(shim)만 있어도 옛 화면과 같다',async()=>{
   const out=await renderAll(hr,{engine:false,shim:true});
-  for(const k of Object.keys(golden))assert.equal(out[k],golden[k],k);
+  for(const k of Object.keys(golden))assert.equal(attendanceLegacyLayout(out[k]),golden[k],k);
 });
 test('기본값만 있을 때: 엔진이 있고 표가 비어 있어도 옛 화면과 같다',async()=>{
   const out=await renderAll(hr,{engine:true,textRows:[],settings:{}});
-  for(const k of Object.keys(golden))assert.equal(out[k],golden[k],k);
+  for(const k of Object.keys(golden))assert.equal(attendanceLegacyLayout(out[k]),golden[k],k);
 });
 test('표를 못 읽어도(읽기 실패) 옛 화면과 같다 — 기본값으로 조용히 동작',async()=>{
   const out=await renderAll(hr,{engine:true,loadFail:true,settings:{}});
-  for(const k of Object.keys(golden))assert.equal(out[k],golden[k],k);
+  for(const k of Object.keys(golden))assert.equal(attendanceLegacyLayout(out[k]),golden[k],k);
 });
 test('숫자·목록 값이 모양이 틀려도(깨진 JSON·범위 밖·글자) 옛 화면과 같다',async()=>{
   const out=await renderAll(hr,{engine:true,textRows:[],settings:{'list.leave_types':'not json','list.work_depts':'[{"code":"x"}]','leave.same_day_limit':'abc','leave.same_day_reason_from':'0','leave.half_day_value':'9','leave.my_list_limit':'1','att.issue_list_limit':'999'}});
-  for(const k of Object.keys(golden))assert.equal(out[k],golden[k],k);
+  for(const k of Object.keys(golden))assert.equal(attendanceLegacyLayout(out[k]),golden[k],k);
 });
 test('시험이 실제로 잡는지: 화면 글을 한 글자만 바꾸면 대조가 실패한다',async()=>{
   const changed=hr.split("T('sched.title','🗓 근무표')").join("T('sched.title','🗓 근무표!')");
@@ -143,7 +151,7 @@ test('시험이 실제로 잡는지: 화면 글을 한 글자만 바꾸면 대�
 test('표에 값이 있으면 그 글: 고쳐 쓰는 글 294개가 모두 화면(제목·표 머리·단추·알림창·확인창·메시지)에 나온다',async()=>{
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
   const stat=new Set([...hr.matchAll(/\bdata-hub(?:k|ph)="([a-z0-9_.]+)"/g)].map(m=>m[1]));
-  const dyn=defs.filter(d=>!stat.has(d.key));
+  const dyn=defs.filter(d=>!stat.has(d.key)&&!P7_DATE_TEXT_KEYS.has(d.key)); // 날짜 전환 글 3개는 attendance-date-switch.test.js의 실제 호출로 확인함
   assert.equal(dyn.length,294);
   const out=await renderAll(hr,{engine:true,textRows:dynRows(dyn),settings:{}});
   const all=Object.values(out).join('\n');
@@ -172,7 +180,7 @@ test('표에 값이 있으면 그 글: 구체적인 예(근무표 제목·내 �
 });
 test('표에 값이 있어도 글이 비어 있거나 공백뿐이면 무시하고 기본 글',async()=>{
   const out=await renderAll(hr,{engine:true,textRows:[{key:'sched.title',value:'   '},{key:'leave.my.title',value:''}],settings:{}});
-  for(const k of Object.keys(golden))assert.equal(out[k],golden[k],k);
+  for(const k of Object.keys(golden))assert.equal(attendanceLegacyLayout(out[k]),golden[k],k);
 });
 
 /* ───────────── 4. 고정 HTML(모달) 속 글 ───────────── */
