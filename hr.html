@@ -890,6 +890,9 @@ const INBOX_FIRST_EXTRA_IDS=['212cef7e-8aab-4f72-b78d-4dfca59581e0'];
 function isInboxFirstUser(){return ['chief','manager'].includes(ME.role)||ME.department==='데스크'||INBOX_FIRST_EXTRA_IDS.includes(ME.id);}
 function homeInboxCardEligible(me){return me.role==='owner'||['chief','manager'].includes(me.role)||me.department==='데스크'||INBOX_FIRST_EXTRA_IDS.includes(me.id);}
 function homeInboxRecentRows(rows){return (rows||[]).map(row=>({receivedAt:row.received_at,source:inboxSourceLabel(row.source),name:inboxDisplayName(row),message:row.message||'',status:row.status}));}
+function homeInboxRecentGroups(rows){return inboxGroupRows(rows).slice(0,3).map(group=>({receivedAt:group.received_at,source:inboxSourceLabel(group.source),name:inboxDisplayName(group),message:group.message||'',status:group.status,count:group.groupCount,items:group.messages.map(item=>({receivedAt:item.received_at,status:item.status,message:item.message||''}))}));}
+function homeInboxRecentLine(row,showCount){const status=inboxStatusInfo(row.status);return `${esc(hubFmtWhen(row.receivedAt)||hubT('home.inbox_unknown','미상'))} · ${esc(row.source)} · ${esc(row.name)} · <span class="b ${status.className}">${esc(status.label)}</span>${row.message?` · ${esc(row.message)}`:''}${showCount&&row.count>1?` ${esc(hubT('inbox.group_count','({n}건)',{n:row.count}))}`:''}`;}
+function homeInboxRecentDetailLine(item){const status=inboxStatusInfo(item.status);return `<div class="hint" style="padding:5px 0;border-top:1px dashed var(--line)">${esc(hubFmtWhen(item.receivedAt)||hubT('home.inbox_unknown','미상'))} · <span class="b ${status.className}">${esc(status.label)}</span>${item.message?` · ${esc(item.message)}`:''}</div>`;}
 function applyInboxFirst(){
   const inbox=TABS.find(t=>t.key==='inbox');
   if(!isInboxFirstUser()||!inbox||!tabVisible(inbox)||MENU.some(e=>e.kind==='tab'&&e.key==='inbox'))return false;
@@ -999,12 +1002,12 @@ async function renderHome(m){
     try{
       const [{count,error:countError},{data:recent,error:recentError}]=await Promise.all([
         sb.from('consultation_inbox').select('id',{count:'exact',head:true}).eq('status','new'),
-        sb.from('consultation_inbox').select('id,source,received_at,sender_name,message,status').order('received_at',{ascending:false}).limit(3)
+        sb.from('consultation_inbox').select('id,source,received_at,sender_name,message,status').order('received_at',{ascending:false}).limit(30)
       ]);
       if(countError||recentError)inboxError='문의함 요약을 불러오지 못했습니다.';
-      else{newCount=count||0;recentRows=homeInboxRecentRows(recent);}
+      else{newCount=count||0;recentRows=homeInboxRecentGroups(recent);}
     }catch{inboxError='문의함 요약을 불러오지 못했습니다.';}
-    homeInboxCard=`<div class="card"><div class="rowflex" style="justify-content:space-between;align-items:center;gap:10px"><div><h2 style="margin:0">${esc(hubT('home.inbox_title','📥 문의함'))} <span class="big" style="font-size:20px">${inboxError?'—':newCount}</span></h2><div class="hint">${inboxError?esc(hubT('home.inbox_count_err','미처리 개수를 확인할 수 없습니다.')):`NEW(미처리) 문의 ${newCount}건`}</div></div><button class="mini" onclick="go('inbox')">문의함 열기</button></div>${inboxError?`<div class="hint" style="color:var(--gold)">${esc(inboxError)}</div>`:recentRows.length?`<div style="margin-top:8px">${recentRows.map(row=>`<div class="hint" style="padding:5px 0;border-top:1px dashed var(--line)">${esc(hubFmtWhen(row.receivedAt)||hubT('home.inbox_unknown','미상'))} · ${esc(row.source)} · ${esc(row.name)} · <span class="b ${inboxStatusInfo(row.status).className}">${esc(inboxStatusInfo(row.status).label)}</span>${row.message?` · ${esc(row.message)}`:''}</div>`).join('')}</div>`:'<div class="hint" style="margin-top:8px">'+esc(hubT('home.inbox_recent_empty','최근 문의가 없습니다.'))+'</div>'}</div>`;
+    homeInboxCard=`<div class="card"><div class="rowflex" style="justify-content:space-between;align-items:center;gap:10px"><div><h2 style="margin:0">${esc(hubT('home.inbox_title','📥 문의함'))} <span class="big" style="font-size:20px">${inboxError?'—':newCount}</span></h2><div class="hint">${inboxError?esc(hubT('home.inbox_count_err','미처리 개수를 확인할 수 없습니다.')):`NEW(미처리) 문의 ${newCount}건`}</div></div><button class="mini" onclick="go('inbox')">문의함 열기</button></div>${inboxError?`<div class="hint" style="color:var(--gold)">${esc(inboxError)}</div>`:recentRows.length?`<div style="margin-top:8px">${recentRows.map(row=>row.count>1?`<details><summary><span class="hint" style="display:block;padding:5px 0;border-top:1px dashed var(--line)">${homeInboxRecentLine(row,true)}</span></summary><div style="padding-left:12px">${row.items.map(homeInboxRecentDetailLine).join('')}</div></details>`:`<div class="hint" style="padding:5px 0;border-top:1px dashed var(--line)">${homeInboxRecentLine(row)}</div>`).join('')}</div>`:'<div class="hint" style="margin-top:8px">'+esc(hubT('home.inbox_recent_empty','최근 문의가 없습니다.'))+'</div>'}</div>`;
   }
   m.innerHTML=homeFillLiteral(`
   <div class="card"><h2>${esc(hubT('home.greeting','안녕하세요, {name}님',{name:((ME.name)??'')}))}</h2>

@@ -268,7 +268,7 @@ test('표에 값이 있으면 그 글: 계약서 미리보기·결재·상태 �
     "onclick=\"go('inbox')\">문의함 열기</button>",
     "catch{inboxError='문의함 요약을 불러오지 못했습니다.'",
     "NEW(미처리) 문의 ${newCount}건",
-    ".limit(3)",
+    ".limit(30)",
     "<h2>🔒 진료기록</h2>",
     "class=\"hint\">매니저·실장·원장만 상담 기록을 입력·조회·수정합니다.</div>",
     "row.event_kind==='cancellation'?' · 취소'",
@@ -294,7 +294,7 @@ test('숫자: 홈 명세서 개월 수·입금 목록 건수는 조회 건수로
   assert.deepEqual(set.filter(l=>l[0]==='payslips'),[['payslips',5]]);assert.deepEqual(set.filter(l=>l[0]==='deposits'),[['deposits',50]]);
   const bad=await lim({'home.payslip_limit':'0','dep.list_limit':'5000'});
   assert.deepEqual(bad.filter(l=>l[0]==='payslips'),[['payslips',12]]);assert.deepEqual(bad.filter(l=>l[0]==='deposits'),[['deposits',300]]);
-  assert.deepEqual(base.filter(l=>l[0]==='consultation_inbox'),[['consultation_inbox',3]],'홈 최근 문의 3건은 기존 시험이 줄 모양을 찾아 그대로(옮기지 않음)');
+  assert.deepEqual(base.filter(l=>l[0]==='consultation_inbox'),[['consultation_inbox',30]],'홈은 최근 문의 30건을 가져와 묶음 계산에 쓴다');
 });
 test('숫자: AI비용 화면의 개월 수·건수·일수·대화 수가 반영되고(제목의 숫자도 같이), 청구액·환산 금액은 그대로',async()=>{
   const BILL=[{ym:'2026-10',platform:'Claude',amount_krw:30000,note:null},{ym:'2026-09',platform:'Claude',amount_krw:20000,note:null},{ym:'2026-08',platform:'Claude',amount_krw:10000,note:null},{ym:'2026-07',platform:'Claude',amount_krw:5000,note:null}];
