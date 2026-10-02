@@ -36,11 +36,12 @@ function makeSb(tables,log,over){
         const spec=o.tables&&o.tables[table];
         const failed=o.failIf&&o.failIf(q);
         const pick=(r,cols)=>{if(table!=='consultation_inbox'||!cols||cols==='*'||!/,/.test(cols))return r;const keep=cols.split(',');return Object.fromEntries(Object.entries(r).filter(([k])=>keep.includes(k)));};
-        const out=failed?{data:null,error:failed}:spec&&spec.error?{data:null,error:spec.error}:{data:q.op==='select'?(tables[table]||[]).map(r=>pick(r,q.cols)):null,error:null,count:0};
+        const counted=q.countOpt&&o.count?o.count(q):undefined;
+        const out=counted==='error'?{data:null,error:{message:'개수<확인불가>'}}:counted!==undefined?{data:null,count:counted,error:null}:failed?{data:null,error:failed}:spec&&spec.error?{data:null,error:spec.error}:{data:q.op==='select'?(tables[table]||[]).map(r=>pick(r,q.cols)):null,error:null,count:0};
         return Promise.resolve(out).then(res,rej);
       };
       return (...a)=>{
-        if(k==='select'){q.cols=a[0];}
+        if(k==='select'){q.cols=a[0];q.countOpt=!!(a[1]&&a[1].count);}
         else if(k==='update'||k==='insert'||k==='upsert'||k==='delete'){q.op=k;q.payload=a[0];}
         else q.filters.push([k,...a]);
         return api;
@@ -48,7 +49,7 @@ function makeSb(tables,log,over){
     }});
     return api;
   };
-  return {from,rpc:(name,args)=>{log.push({rpc:name,args});const r=o.rpc&&o.rpc[name];return Promise.resolve(r||{data:null,error:null});}};
+  return {from,rpc:(name,args)=>{log.push({rpc:name,args});const r=o.rpc&&o.rpc[name];return Promise.resolve((typeof r==='function'?r(args):r)||{data:null,error:null});}};
 }
 function makeDom(){
   const reg={};
@@ -383,7 +384,7 @@ const NEW_KEYS={
   'inbox.th_handled':['처리',[]],'inbox.th_views':['열람',[]],'inbox.btn_handle':['✅ 처리',[]],
   'inbox.handled_line':['✅ {who} · {time}',['who','time']],'inbox.m_handle_memo_fail':['처리됨으로 바꿨지만 메모는 저장하지 못했습니다: {msg} — 상세에서 「답변 기록」으로 다시 남겨 주세요',['msg']],'inbox.views_more':['외 {n}명',['n']],'inbox.m_views':['열람 {names}',['names']],
   'inbox.ph_handle_memo':['어떻게 처리했나요?(선택)',[]],'inbox.btn_handle_save':['처리됨으로 저장',[]],'inbox.btn_handle_cancel':['취소',[]],
-  'inbox.d_handle_title':['✅ 처리 완료',[]],'inbox.btn_back':['↑ 목록으로',[]],'inbox.m_handle_fail':['처리 저장 실패: {msg}',['msg']],'inbox.m_handled':['처리됨으로 저장했습니다.',[]]
+  'inbox.d_handle_title':['✅ 처리 완료',[]],'inbox.btn_back':['↑ 목록으로',[]],'inbox.m_handle_fail':['처리 저장 실패: {msg}',['msg']],'inbox.m_handled':['처리됨으로 저장했습니다.',[]],'inbox.m_memo_unknown':['처리됨으로 바꿨지만 메모가 저장됐는지 확인하지 못했습니다: {msg} — 문의함을 새로 열어 메모가 없을 때만 상세에서 다시 남겨 주세요',['msg']],'inbox.m_reply_unknown':['답변이 기록됐는지 확인하지 못했습니다: {msg} — 문의를 다시 열어 아래 답변 이력에 없을 때만 다시 눌러 주세요',['msg']]
 };
 function hubHelpers(){
   const block=js.match(/\/\* hub-texts:test-start \*\/[\s\S]*?\/\* hub-texts:test-end \*\//)[0];
@@ -433,4 +434,64 @@ test('같은 사람의 문의가 한 묶음이면 목록에서 처리해도 답�
   assert.deepEqual(JSON.parse(JSON.stringify(t.log.filter(q=>q.rpc==='consultation_inbox_record_reply').map(q=>q.args))),[{p_inbox_id:'g2',p_reply:'묶음 처리'}],'전환된 줄(g3)은 빼고 남은 줄 중 가장 최근(g2)');
   const w=writes(t.log);
   assert.deepEqual([...w[0].filters.find(f=>f[0]==='in')[2]].sort(),['g1','g2']);
+});
+
+/* ───────────── 응답 유실 뒤 메모·답변 중복 방지(inboxRecordReplyOnce) ───────────── */
+const MEMO_FAIL='처리됨으로 바꿨지만 메모는 저장하지 못했습니다: 기록<실패> — 상세에서 「답변 기록」으로 다시 남겨 주세요';
+const MEMO_UNKNOWN='처리됨으로 바꿨지만 메모가 저장됐는지 확인하지 못했습니다: 기록<실패> — 문의함을 새로 열어 메모가 없을 때만 상세에서 다시 남겨 주세요';
+const REPLY_UNKNOWN='답변이 기록됐는지 확인하지 못했습니다: 기록<실패> — 문의를 다시 열어 아래 답변 이력에 없을 때만 다시 눌러 주세요';
+// 저장 여부를 흉내: store.n = 지금 저장된 같은 메모 개수. saveBefore면 RPC가 저장한 뒤 오류(응답 유실)
+function replySb(mode){
+  const store={n:0,rpcCalls:0};
+  const sb={count:()=>mode.count==='error'?'error':store.n,rpc:{consultation_inbox_record_reply:()=>{store.rpcCalls++;if(mode.saves)store.n++;return {error:{message:'기록<실패>'}};}}};
+  return {store,sb};
+}
+test('ⓐ 처리 메모 RPC가 오류여도 같은 메모 개수가 늘었으면 저장된 것 — 실패 글도 알림창도 없다 · 개수는 같은 문의·같은 작성자·같은 글로 센다',async()=>{
+  const {store,sb}=replySb({saves:true});
+  const t=boot('manager',{sb});const alerts=[];t.ctx.alert=m=>alerts.push(m);t.ctx.inboxLoad=async()=>{};
+  const msg={textContent:''};
+  assert.equal(await t.ctx.inboxMarkHandled([row('x1')],'메모',msg),true);
+  assert.equal(msg.textContent,'');assert.deepEqual(alerts,[]);assert.equal(store.n,1);assert.equal(store.rpcCalls,1);
+  const counts=reads(t.log,'consultation_inbox_replies');
+  assert.equal(counts.length,2,'RPC 전후로 두 번 셈');
+  for(const c of counts){assert.equal(c.cols,'id');assert.equal(c.countOpt,true);
+    assert.deepEqual(c.filters.filter(f=>f[0]==='eq').map(f=>f.slice(1)),[['inbox_id','x1'],['author_id','m1'],['reply','메모']]);}
+});
+test('ⓑ 처리 메모 RPC가 오류이고 개수가 그대로면 「저장하지 못했습니다」',async()=>{
+  const {sb}=replySb({saves:false});
+  const t=boot('manager',{sb});const alerts=[];t.ctx.alert=m=>alerts.push(m);t.ctx.inboxLoad=async()=>{};
+  const msg={textContent:''};
+  assert.equal(await t.ctx.inboxMarkHandled([row('x1')],'메모',msg),true,'상태는 이미 처리됨');
+  assert.equal(msg.textContent,MEMO_FAIL);assert.deepEqual(alerts,[MEMO_FAIL]);
+});
+test('ⓒ 개수를 셀 수 없으면 「확인하지 못했습니다」(inbox.m_memo_unknown) — 저장됐다고도 안 됐다고도 하지 않는다',async()=>{
+  const {sb}=replySb({saves:true,count:'error'});
+  const t=boot('manager',{sb});const alerts=[];t.ctx.alert=m=>alerts.push(m);t.ctx.inboxLoad=async()=>{};
+  const msg={textContent:''};
+  assert.equal(await t.ctx.inboxMarkHandled([row('x1')],'메모',msg),true);
+  assert.equal(msg.textContent,MEMO_UNKNOWN);assert.deepEqual(alerts,[MEMO_UNKNOWN]);
+  // 상세에서 눌렀으면 상세 칸에도 그 글
+  const d=boot('manager',{sb:replySb({saves:false,count:'error'}).sb,tables:{consultation_inbox:[ROWS[0]]}});d.ctx.alert=()=>{};d.ctx.inboxLoad=async()=>{};
+  await d.ctx.inboxSelect(['a1']);d.dom.$('#inboxHandleMemo').value='상세 메모';await d.ctx.inboxDetailHandle();
+  assert.equal(d.dom.$('#inboxDetail').innerHTML,esc(MEMO_UNKNOWN));
+});
+test('ⓓ 답변 기록(inboxRecordReply)도 같은 세 경우: 저장됨(오류인데 개수가 늘어남) · 저장 안 됨 · 확인 못 함 — 확인 못 함·실패일 때 입력칸 글은 지우지 않는다',async()=>{
+  const run=async mode=>{
+    const {store,sb}=replySb(mode);const t=boot('manager',{sb});let history=0;t.ctx.inboxLoadHistory=async()=>{history++;};t.ctx.inboxLoad=async()=>{};
+    t.ctx.__sel={id:'a1',ids:['a1'],processable:[]};vm.runInContext('INBOX_SELECTED=__sel;',t.ctx);
+    const reply=t.dom.$('#inboxReply'),msg=t.dom.$('#inboxReplyMsg');reply.value='  답변 내용  ';
+    await t.ctx.inboxRecordReply();return {reply:reply.value,msg:msg.textContent,history,store};
+  };
+  const saved=await run({saves:true});assert.equal(saved.msg,'');assert.equal(saved.reply,'');assert.equal(saved.history,1);assert.equal(saved.store.n,1);
+  const failed=await run({saves:false});assert.equal(failed.msg,'기록 실패: 기록<실패>');assert.equal(failed.reply,'  답변 내용  ','입력칸 글은 지우지 않음');assert.equal(failed.history,0);
+  const unknown=await run({saves:true,count:'error'});assert.equal(unknown.msg,REPLY_UNKNOWN);assert.notEqual(unknown.reply,'','입력칸 글은 지우지 않음');assert.equal(unknown.history,0);
+});
+test('ⓔ Astra 2차 재현: 첫 RPC는 서버에 저장된 뒤 응답이 유실(오류) — 실패 안내가 안 나오므로 다시 기록할 일이 없어 메모는 한 개',async()=>{
+  const {store,sb}=replySb({saves:true});
+  const t=boot('manager',{sb});const alerts=[];t.ctx.alert=m=>alerts.push(m);t.ctx.inboxLoad=async()=>{};
+  const msg={textContent:''};
+  await t.ctx.inboxMarkHandled([row('x1')],'전화로 안내함',msg);
+  assert.equal(msg.textContent,'',' 「다시 남겨 주세요」 안내가 없음');assert.deepEqual(alerts,[]);
+  assert.equal(store.n,1,'저장된 메모는 한 개');assert.equal(store.rpcCalls,1,'다시 기록하러 가지 않음');
+  assert.ok(!REGION.includes('INBOX_MEMO_SAVED'));
 });

@@ -48,10 +48,21 @@ await rejectsUnchanged("update public.onboarding_items set label=(select label f
 await rejectsUnchanged("update public.onboarding_items set order_no=case order_no when 101 then 102 else 101 end where order_no in (101,102)",/found 14 pairs/,'N2: 101·102 순번이 뒤바뀜');
 await rejectsUnchanged("insert into public.onboarding_items(label,required,order_no) values('범위 안에 원장이 더한 줄',true,108)",/found 16 pairs among 17 rows/,'101~116 범위에 다른 줄이 있음');
 await rejectsUnchanged("update public.onboarding_items set active=false where order_no=101",/mixed state \(15 of 16 active\)/,'N3: 적용 전부터 101번만 꺼져 있음(섞임)');
+const dupPair="delete from public.onboarding_items where order_no=102; insert into public.onboarding_items(label,required,order_no,active) select label,true,101,active from public.onboarding_items where order_no=101";
+await rejectsUnchanged(dupPair,/found 15 pairs among 16 rows/,'Astra 2차 N2: 102번이 빠지고 101번과 순번·문장이 같은 줄이 하나 더 있음(범위 줄 수는 16)');
 {
  const db=await fresh();
  await db.exec("update public.onboarding_items set label=label||' (고침)' where order_no=103");
  await assert.rejects(db.exec(down),/rollback: expected 16 exact \(order_no, label\) pairs, found 15/,'되돌리기도 짝이 안 맞으면 멈춤');
+ await db.close();
+}
+{
+ const db=await fresh();
+ await db.exec(up);
+ await db.exec(dupPair);
+ const before=await snapshot(db);
+ await assert.rejects(db.exec(down),/rollback: expected 16 exact \(order_no, label\) pairs, found 15/,'되돌리기: 한 쌍이 빠지고 다른 쌍이 두 줄이면 멈춤');
+ assert.equal(await snapshot(db),before,'되돌리기가 멈추면 하나도 안 바뀜');
  await db.close();
 }
 console.log('PGlite onboarding guide split PASS');

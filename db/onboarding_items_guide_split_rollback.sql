@@ -22,14 +22,17 @@ declare
     '상담 전 최신 수가표와 내부 설명 자료의 사용 범위를 담당자에게 확인한다.',
     '환자 앞에서 필요한 설명과 양해를 먼저 제공한다.'
   ];
+  v_rows int;
+  v_pairs int;
   v_matched int;
   v_changed int;
 begin
-  select count(distinct i.id) into v_matched
+  -- 기대 순번 16개가 저마다 정확히 한 줄과 짝지어져야 함(한 쌍이 빠지고 다른 쌍이 두 줄이면 멈춤)
+  select count(*),count(distinct e.ord),count(distinct i.id) into v_rows,v_pairs,v_matched
     from unnest(v_expected) with ordinality as e(label,ord)
     join public.onboarding_items i on i.order_no=100+e.ord::int and i.label=e.label;
-  if v_matched<>16 then
-    raise exception 'onboarding guide split rollback: expected 16 exact (order_no, label) pairs, found % — nothing changed', v_matched;
+  if v_rows<>16 or v_pairs<>16 or v_matched<>16 then
+    raise exception 'onboarding guide split rollback: expected 16 exact (order_no, label) pairs, found % — nothing changed', v_pairs;
   end if;
   update public.onboarding_items i set active=true
     from unnest(v_expected) with ordinality as e(label,ord)

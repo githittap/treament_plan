@@ -27,16 +27,19 @@ declare
     '환자 앞에서 필요한 설명과 양해를 먼저 제공한다.'
   ];
   v_in_range int;
+  v_rows int;
+  v_pairs int;
   v_matched int;
   v_active int;
   v_changed int;
 begin
   select count(*) into v_in_range from public.onboarding_items where order_no between 101 and 116;
-  select count(distinct i.id),count(distinct i.id) filter(where i.active) into v_matched,v_active
+  -- 기대 순번 16개가 저마다 정확히 한 줄과 짝지어져야 함(Astra 2차: 한 쌍이 빠지고 다른 쌍이 두 줄이면 행 수만으로는 못 거름)
+  select count(*),count(distinct e.ord),count(distinct i.id),count(distinct i.id) filter(where i.active) into v_rows,v_pairs,v_matched,v_active
     from unnest(v_expected) with ordinality as e(label,ord)
     join public.onboarding_items i on i.order_no=100+e.ord::int and i.label=e.label;
-  if v_in_range<>16 or v_matched<>16 then
-    raise exception 'onboarding guide split: expected 16 exact (order_no, label) pairs in 101~116, found % pairs among % rows — nothing changed', v_matched, v_in_range;
+  if v_in_range<>16 or v_rows<>16 or v_pairs<>16 or v_matched<>16 then
+    raise exception 'onboarding guide split: expected 16 exact (order_no, label) pairs in 101~116, found % pairs among % rows — nothing changed', v_pairs, v_in_range;
   end if;
   if v_active=0 then
     raise notice 'onboarding guide split: already applied (16 rows inactive) — nothing changed';
