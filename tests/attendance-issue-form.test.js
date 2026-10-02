@@ -1,5 +1,6 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const root=path.join(__dirname,'..'),hr=fs.readFileSync(path.join(root,'hr.html'),'utf8'),texts=fs.readFileSync(path.join(root,'hub-texts.js'),'utf8');
+const hub3=require('./fixtures/hub3-harness.cjs');
 function helpers(){const block=hr.match(/\/\* attendance-issue-form:test-start \*\/[\s\S]*?\/\* attendance-issue-form:test-end \*\//)?.[0];assert.ok(block);const c={hubList:(key,def)=>def};vm.createContext(c);vm.runInContext(block+';this.h={attendanceIssueFormProblem,attendanceIssueStaffReason,attendanceIssueKindLabel,attendanceIssueInitialRpc,attendanceIssueUnlinkedUploads,attendanceIssueFailedFileCount};',c);return c.h;}
 const draft=(overrides={})=>({workDate:'2026-10-02',kind:'기타',reason:'기기가 꺼져 있어 출근 기록이 남지 않았습니다.',files:[],existingCount:0,reasonMin:10,evidenceMax:5,evidenceRequired:true,...overrides});
 function saveHarness({rpcImpl,uploadImpl=async()=>({}),removeImpl=async()=>({})}){
@@ -56,7 +57,25 @@ test('소명 화면의 저장 순서·정리·배지와 설정·글 등록을 �
   assert.match(submit,/\.remove\(cleanup\)/,'업로드됐지만 연결 실패한 파일을 정리해야 함');
   const badge=hr.slice(hr.indexOf('async function refreshBadges(){'),hr.indexOf('\n}',hr.indexOf('async function refreshBadges(){'))+2);
   assert.match(badge,/count:'exact',head:true/);assert.match(badge,/eq\('rule_label','자동'\)[\s\S]*eq\('status','대기'\)[\s\S]*is\('staff_responded_at',null\)/);assert.doesNotMatch(badge,/limit\(/);
-  for(const key of ['att.diff.threshold_min','att.diff.show_staff','att.issue.reason_min','att.issue.evidence_required','att.issue.evidence_max','att.myissue_list_limit'])assert.match(texts,new RegExp("key:'"+key.replaceAll('.','\\.')+"'"));
+  for(const key of ['att.diff.gap_min','att.diff.show_staff','att.issue.reason_min','att.issue.evidence_required','att.issue.evidence_max','att.myissue_list_limit'])assert.match(texts,new RegExp("key:'"+key.replaceAll('.','\\.')+"'"));
   assert.match(texts,/key:'list\.att_issue_kinds'[\s\S]*addable:false[\s\S]*code:'지문인식오류'[\s\S]*code:'입력오류'[\s\S]*code:'기타'/);
   assert.match(hr,/createSignedUrl\(file\.storage_path,600\)/);assert.match(hr,/\$\{attendanceIssueMyCardHtml\(myIssueRows\|\|\[\]\)\}/);
+});
+
+test('관측 하네스가 직원·관리자 화면, 세 양식 상태, 실제 증거 행을 렌더한다',async()=>{
+  const P=await hub3.renderAll(hr,{probe:true}),issue={id:71,user_id:'u1',work_date:'2026-10-02',type:'종업누락',rule_label:'자동',reason:'지문 단일 인식(자동 감지)',status:'대기',staff_kind:null,staff_reason:null,staff_responded_at:null},file={id:8,issue_id:71,storage_path:'u1/71/abcdefgh1234.pdf',original_name:'퇴근기록.pdf',mime_type:'application/pdf',size_bytes:1024};
+  const makeForm=async(mode,formIssue,files=[])=>{const r=await P.makeCtx();r.ctx.ME={id:'u1',name:'김직원',role:'staff',department:'진료실'};r.api.setState('ATT_ISSUE_FORM',{mode,issue:formIssue,existingFiles:files,presetDate:'2026-10-02',busy:false});return r.api.attendanceIssueFormHtml();};
+  const fresh=await makeForm('new',null),answer=await makeForm('answer',issue),edit=await makeForm('edit',{...issue,rule_label:'기타',type:'정정',staff_kind:'기타',staff_reason:'기기가 꺼져 있어 기록되지 않았습니다.'},[file]);
+  assert.match(fresh,/새 소명을 올립니다\./);assert.match(fresh,/id="attIssueDate"/);
+  assert.match(answer,/자동 감지된 소명에 사유를 적습니다\./);assert.match(answer,/퇴근 지문 없음\(자동 감지\)/);
+  assert.match(edit,/대기 중인 내 소명을 고칩니다\./);assert.match(edit,/value="2026-10-02" readonly/);assert.match(edit,/퇴근기록\.pdf/);
+  const staff=await P.makeCtx();staff.ctx.ME={id:'u1',name:'김직원',role:'staff'};assert.match(staff.api.attendanceIssueMyCardHtml([issue]),/사유 쓰기/);
+  const manager=await P.makeCtx();manager.ctx.ME={id:'u1',name:'김직원',role:'manager'};assert.match(manager.api.attendanceIssueMyCardHtml([issue]),/내 소명/);
+  const owner=await P.makeCtx();owner.ctx.ME={id:'u1',name:'원장',role:'owner'};assert.equal(owner.api.attendanceIssueMyCardHtml([issue]),'');
+  const observed=await P.makeCtx();observed.ctx.ME={id:'u1',name:'김직원',role:'staff'};
+  const clockIn=observed.api.attendanceIssueMyCardHtml([{...issue,type:'시업누락'}]);assert.match(clockIn,/출근 지문 없음\(자동 감지\)/);
+  for(const role of ['manager','chief','owner','staff']){const r=await P.asMgr(role);assert.equal(r.ctx.ME.role,role,'실제 역할 컨텍스트');}
+  const r=await P.asMgr('chief',null,{tables:{attendance_manual_entries:{list:[]},attendance:{list:[]},attendance_issues:{list:[issue]},attendance_issue_evidence:{list:[file]},attendance_issue_resolutions:{list:[]}}});
+  const view={innerHTML:''};await r.api.renderAtt(view);assert.match(view.innerHTML,/퇴근기록\.pdf|onclick="openAttendanceIssueEvidence\(71\)"|📎 1/);
+  r.api.setState('ATT_ISSUE_EVIDENCE',{71:[file]});await r.api.openAttendanceIssueEvidence(71);assert.match(r.ctx.$('#attEvidenceList').innerHTML,/퇴근기록\.pdf/);
 });

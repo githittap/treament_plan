@@ -227,7 +227,7 @@ async function renderAll(html,opts){
     await mkCert('ok',null);
   }
   {
-    const modalText=id=>{const a=text.indexOf('<div class="mask" id="'+id+'"');const b=text.indexOf('\n\n',a);const blk=text.slice(a,b);return JSON.stringify({text:blk.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim(),placeholders:[...blk.matchAll(/placeholder="([^"]*)"/g)].map(m=>m[1])});};
+    const modalText=id=>{const a=text.indexOf('<div class="mask" id="'+id+'"');let b;if(id==='certificateMask'){let depth=0;b=-1;for(const m of text.slice(a).matchAll(/<div\b[^>]*>|<\/div>/g)){depth+=m[0][1]==='/'?-1:1;if(depth===0){b=a+m.index+m[0].length;break;}}if(b<0)throw new Error('certificateMask closing boundary missing');}else{const next=text.indexOf('\n\n',a);b=next<0?text.length:next;}const blk=text.slice(a,b);return JSON.stringify({text:blk.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim(),placeholders:[...blk.matchAll(/placeholder="([^"]*)"/g)].map(m=>m[1])});};
     for(const id of ['apMask','ntMask','certificateMask'])out['static.modal.'+id]=modalText(id);
   }
 

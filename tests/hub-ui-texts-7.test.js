@@ -102,7 +102,7 @@ test('화면 코드(hr.html)에 박힌 기본 글이 기본값 목록과 글자�
 });
 test('숫자 8개·이름 목록 7개: 기본값이 화면 코드와 같고, 화면 표시용 숫자만(계산식 숫자는 없음) · 캐시 번호',()=>{
   const h=helpers();
-  assert.equal(h.HUB_SETTING_DEFS.length,33);
+  assert.equal(h.HUB_SETTING_DEFS.length,33,'전체 숫자 기준 33개');
   const S=k=>h.HUB_SETTING_DEFS.find(d=>d.key===k);
   const expect={'home.payslip_limit':['12',1,36,'개월'],'dep.list_limit':['300',50,1000,'건'],'aic.history_months':['6',1,24,'개월'],'aic.auto_limit':['20',5,100,'건'],'aiu.model_days':['7',3,30,'일'],'aiu.cost_months':['6',2,24,'개월'],'aiu.external_days':['14',3,60,'일'],'aiu.session_limit':['8',3,30,'건']};
   for(const k of NUM_KEYS){
@@ -452,7 +452,7 @@ test('화면: 글 고치기에 새 묶음 14개(331개 — 차례 7 329 + 인박
   const names=[...sec.matchAll(/<details class="hub-grp" data-hub-group="([^"]*)"/g)].map(m=>m[1]);
   const h=helpers(),defs=h.hubTextDefs();
   const screens7=[...new Set(defs.filter(d=>CH7.test(d.key)).map(d=>d.screen))];
-  assert.equal(names.length,66,'기존 65묶음 + ⏰ 시간 표시 1묶음');
+  assert.equal(names.length,72,'기존 65묶음 + ⏰ 시간 표시 1묶음 + B2 출퇴근 소명 6묶음');
   for(const s of screens7)assert.ok(sec.includes(s.replace(/&/g,'&amp;')),'묶음 이름이 화면에 있음: '+s);
   assert.match(sec,/이름표: pay\.m_xls_read/);assert.match(sec,/이름표: slip\.doc_title/);assert.match(sec,/이름표: acct\.c_delete/);
   assert.match(sec,/⚠ 명세서를 발행할 때 이 글이 본문에 박혀서 저장돼요/);
@@ -463,7 +463,7 @@ test('화면: 글 고치기에 새 묶음 14개(331개 — 차례 7 329 + 인박
     const rows=defs.map((d,i)=>d.screen===sc?{idx:i,hidden:false,getAttribute(){return String(i);}}:null).filter(Boolean);
     groups.push({name:sc,hidden:false,open:false,rows,querySelectorAll(){return this.rows;}});
   }
-  assert.equal(groups.length,66);
+  assert.equal(groups.length,72,'B2 소명 글 화면 묶음 6개 추가');
   const fsec={querySelectorAll(sel){return sel==='[data-hub-group]'?groups:[];}};
   const visible=()=>groups.filter(g=>!g.hidden).map(g=>g.name);
   const shown=()=>groups.reduce((n,g)=>n+g.rows.filter(r=>!r.hidden).length,0);
@@ -476,7 +476,7 @@ test('화면: 글 고치기에 새 묶음 14개(331개 — 차례 7 329 + 인박
   filter(fsec,'acct.c_delete');assert.deepEqual(visible(),['🛡️ 계정·권한 관리 › 위험 작업 확인창'],'이름표(키)로도 찾음');
   filter(fsec,'영구히 삭제합니다');assert.deepEqual(visible(),['🛡️ 계정·권한 관리 › 위험 작업 확인창'],'기본 글로도 찾음');
   filter(fsec,'zzzz없는낱말');assert.equal(visible().length,0);assert.equal(shown(),0);
-  filter(fsec,'');assert.equal(visible().length,66);assert.equal(shown(),defs.length,'검색어를 지우면 전부 보임');
+  filter(fsec,'');assert.equal(visible().length,72);assert.equal(shown(),defs.length,'검색어를 지우면 전부 보임');
   filter(fsec,'원본 보관 실패');assert.ok(visible().includes('💰 급여 › 급여대장·시급설정'));
   filter(fsec,'');
   // 고친 글은 지금 글로도 찾아진다
@@ -514,7 +514,7 @@ test('화면: 📋 목록에 새 이름 목록 7개가 있고, 코드는 회색(
   await t.click('[hub-subtab]=lists');
   const sec=t.section.innerHTML;
   for(const k of LIST_KEYS)assert.ok(sec.includes('이름표: '+k),k);
-  assert.equal((sec.match(/<span class="hub-code">/g)||[]).length,4+6+3+4+4+7+6+3+8+7+6+5+32);
+  assert.equal((sec.match(/<span class="hub-code">/g)||[]).length,4+6+3+4+4+7+6+3+8+7+6+5+32+3,'B2 소명 종류 코드 3개');
   const h=helpers(),di=h.HUB_LIST_DEFS.findIndex(d=>d.key==='list.approval_status');
   assert.ok(di>=0);
   assert.ok(!sec.includes('data-hub-list-add="'+di+'"'),'새 항목 추가 단추 없음');

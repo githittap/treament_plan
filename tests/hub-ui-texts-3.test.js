@@ -46,7 +46,7 @@ const dynRows=defs=>defs.map(d=>({key:d.key,value:'«'+d.key+'»'+(d.vars?' '+d.
 /* ───────────── 1. 기본 글 목록 ───────────── */
 test('차례 3 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 11개(출퇴근 5 · 근무표 2 · 연차 4)',()=>{
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
-  assert.equal(defs.length,365,'차례 3 글 키 수(기존 313 + 신규 소명·증거 UI 글)');
+  assert.equal(defs.length,360,'차례 3 글 키 수(기존 313 + 신규 소명·증거 UI 글 - 미사용 구 소명 문구 5개)');
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
   for(const d of defs){
     assert.match(d.key,/^[a-z][a-z0-9_.]{1,80}$/,d.key);
@@ -55,8 +55,8 @@ test('차례 3 글 목록: 키 모양·중복 없음·{자리표시자} 일치·
     assert.deepEqual([...new Set(ph)].sort(),clone(d.vars||[]).sort(),d.key+' 자리표시자');
   }
   const screens=[...new Set(defs.map(d=>d.screen))];
-  assert.equal(screens.length,11);
-  assert.equal(screens.filter(s=>s.startsWith('🕘 출퇴근')).length,5);
+  assert.equal(screens.length,17,'B2 소명 카드·표·양식의 화면 묶음 6개 추가');
+  assert.equal(screens.filter(s=>s.startsWith('🕘 출퇴근')).length,11,'B2 출퇴근 소명 묶음 6개 추가');
   assert.equal(screens.filter(s=>s.startsWith('🗓 근무표')).length,2);
   assert.equal(screens.filter(s=>s.startsWith('🌿 연차')).length,4);
 });
@@ -77,6 +77,18 @@ test('화면 코드(hr.html)에 박힌 기본 글이 기본값 목록과 글자�
   for(const sm of hr.matchAll(/<[a-z0-9]+\b[^>]*\bdata-hubph="([a-z0-9_.]+)"[^>]*>/g)){const ph=/placeholder="([^"]*)"/.exec(sm[0]);assert.ok(ph,sm[1]+' 흐린 글 칸');if(CH3.test(sm[1]))stat.set(sm[1],ph[1]);}
   const defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
   for(const d of defs){
+    if(['att.issueform.mode_new','att.issueform.mode_answer','att.issueform.mode_edit','att.issue.auto_clock_in','att.issue.auto_clock_out'].includes(d.key)){
+      assert.match(hr,/hubT\(form\.mode==='new'\?'att\.issueform\.mode_new':form\.mode==='answer'\?'att\.issueform\.mode_answer':'att\.issueform\.mode_edit'/,'실제 양식 렌더는 세 모드 글 키를 선택함');
+      assert.match(hr,/att\.myissue\.pending/,'실제 내 소명 카드가 자동 감지 글을 선택함');
+      const mode=hr.match(/hubT\(form\.mode==='new'\?'att\.issueform\.mode_new':form\.mode==='answer'\?'att\.issueform\.mode_answer':'att\.issueform\.mode_edit',form\.mode==='new'\?'([^']*)':form\.mode==='answer'\?'([^']*)':'([^']*)'\)/);
+      assert.ok(mode,"form mode fallback literals present");
+      const clocks=[...hr.matchAll(/hubT\(i\.type==='[^']+'\?'att\.issue\.auto_clock_out':'att\.issue\.auto_clock_in',i\.type==='[^']+'\?'([^']*)':'([^']*)'\)/g)];
+      assert.equal(clocks.length,3,'자동 출퇴근 글의 대기 카드·내 표·관리자 표 세 callsite');
+      for(const call of clocks)assert.deepEqual(call.slice(1),clocks[0].slice(1),'세 callsite의 기본 글이 서로 같음');
+      const fallback={'att.issueform.mode_new':mode[1],'att.issueform.mode_answer':mode[2],'att.issueform.mode_edit':mode[3],'att.issue.auto_clock_out':clocks[0][1],'att.issue.auto_clock_in':clocks[0][2]};
+      assert.equal(d.def,fallback[d.key],d.key+" default text equals hr.html fallback");
+      continue;
+    }
     if(stat.has(d.key)){assert.equal(stat.get(d.key),d.def,d.key+' 고정 글이 기본값과 다름');assert.ok(!found.has(d.key),d.key+' 고정 글과 호출이 겹침');continue;}
     assert.ok(found.has(d.key),d.key+' 키가 hr.html에서 안 쓰임');
     assert.equal(found.get(d.key),d.def,d.key+' 기본 글이 화면 코드와 다름');
@@ -144,11 +156,15 @@ test('표에 값이 있으면 그 글: 고쳐 쓰는 글 294개가 모두 화면
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
   const stat=new Set([...hr.matchAll(/\bdata-hub(?:k|ph)="([a-z0-9_.]+)"/g)].map(m=>m[1]));
   const dyn=defs.filter(d=>!stat.has(d.key));
-  assert.equal(dyn.length,346,'기존 294개 + 신규 소명 UI 글 52개');
+  assert.equal(dyn.length,341,'기존 동적 글 수 + 신규 소명 UI - 미사용 구 소명 문구 5개');
   const out=await renderAll(hr,{engine:true,textRows:dynRows(dyn),settings:{}});
-  const all=Object.values(out).join('\n');
-  const missing=dyn.filter(d=>!all.includes('«'+d.key+'»')).map(d=>d.key);
-  assert.equal(missing.length,0,'값을 넣었는데 화면에 안 나오는 키: '+missing.join(', '));
+  const b2Defs=defs.filter(d=>/^att\.issue\.p_date$|^att\.issueform\.|^att\.myissue\.|^att\.issue\.(?:evidence_|admin_evidence|awaiting_staff|auto_clock_)/.test(d.key));
+  const b2Observed=await require('./fixtures/hub3-harness.cjs').observeAttendanceIssueB2(hr,{textRows:dynRows(b2Defs)});
+  const all=Object.values(out).join('\n')+'\n'+b2Observed;
+  const legacyMissing=dyn.filter(d=>!b2Defs.some(x=>x.key===d.key)&&!all.includes('«'+d.key+'»')).map(d=>d.key);
+  const visibleMissing=b2Defs.filter(d=>!all.includes('«'+d.key+'»')).map(d=>d.key);
+  assert.equal(legacyMissing.length,0,'기존 화면 글은 기존 관측 그대로 검사: '+legacyMissing.join(', '));
+  assert.equal(visibleMissing.length,0,'B2 양식·카드·관리자 표·증거 목록은 실제 관측 렌더로 검사: '+visibleMissing.join(', '));
   // 자리표시자는 화면이 채워 넣음
   assert.match(all,/«att\.close\.confirm»/);
   assert.ok(!/«[a-z0-9_.]+»[^"\\]*\{[a-z_]+\}/.test(all.replace(/\\"/g,'"')),'{자리표시자}가 채워지지 않고 남음');

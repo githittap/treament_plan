@@ -419,11 +419,6 @@ function hubTextDefsChapter3(add){
   add('att.issue.empty','🕘 출퇴근 › 결근 후보·지문누락 소명','지문누락 소명 카드 — 소명이 하나도 없을 때','소명 없음');
   add('att.issue.m_act_fail','🕘 출퇴근 › 결근 후보·지문누락 소명','지문누락 소명 승인·반려 실패({msg}는 서버 오류)','소명 처리 실패: {msg}',['msg']);
   add('att.issue.p_date','🕘 출퇴근 › 결근 후보·지문누락 소명','소명 올리기 — 근무일을 묻는 창','소명할 근무일 (YYYY-MM-DD):');
-  add('att.issue.p_type','🕘 출퇴근 › 결근 후보·지문누락 소명','소명 올리기 — 오류 유형을 묻는 창(고르는 값 3개는 서버 규칙이라 못 바꿈)','오류 유형을 입력하세요: 지문인식오류 / 입력오류 / 기타');
-  add('att.issue.m_type','🕘 출퇴근 › 결근 후보·지문누락 소명','소명 올리기 — 오류 유형을 잘못 적었을 때','오류 유형은 지문인식오류, 입력오류, 기타 중 하나여야 합니다.');
-  add('att.issue.p_reason','🕘 출퇴근 › 결근 후보·지문누락 소명','소명 올리기 — 사유를 묻는 창','사유 (예: 지문 찍었으나 인식 누락):');
-  add('att.issue.m_save_fail','🕘 출퇴근 › 결근 후보·지문누락 소명','소명 올리기 실패({msg}는 서버 오류)','소명 저장 실패: {msg}',['msg']);
-  add('att.issue.m_saved','🕘 출퇴근 › 결근 후보·지문누락 소명','소명을 올렸을 때 뜨는 글','소명을 올렸습니다. 실장 승인 후 반영됩니다.');
   add('att.issueform.title','🕘 출퇴근 › 지문누락 소명 양식','소명 양식 창 제목','🙋 지문누락 소명');
   add('att.issueform.date','🕘 출퇴근 › 지문누락 소명 양식','소명 양식 근무일 칸','근무일');
   add('att.issueform.auto','🕘 출퇴근 › 지문누락 소명 양식','자동 감지 건에 표시하는 안내','{kind} 지문 없음(자동 감지)',['kind']);
@@ -1665,7 +1660,7 @@ const HUB_SETTING_DEFS=[
   {key:'aiu.cost_months',screen:'💰 AI비용 기준',label:'사용량 현황판 「월별 합계」에 보이는 개월 수',where:'AI비용 › 사용량 현황판 › 정가 환산 — 월별 합계 막대를 몇 달치까지 보여 줄지(PC가 올린 달만 나와요)',def:'6',kind:'int',min:2,max:24,unit:'개월'},
   {key:'aiu.external_days',screen:'💰 AI비용 기준',label:'사용량 현황판 「외부 AI」 날짜별 표 일수',where:'AI비용 › 사용량 현황판 › 외부 AI — 날짜별 표에 최근 며칠치까지 보여 줄지(PC가 올린 날짜까지만 나와요 · 위쪽 작은 글의 일수도 같이 바뀌어요)',def:'14',kind:'int',min:3,max:60,unit:'일'},
   {key:'aiu.session_limit',screen:'💰 AI비용 기준',label:'사용량 현황판 「대화 효율 점검」에 보이는 대화 수',where:'AI비용 › 사용량 현황판 › 대화 효율 점검 — 돈이 새는 대화를 최대 몇 개까지 보여 줄지',def:'8',kind:'int',min:3,max:30,unit:'건'},
-  {key:'att.diff.threshold_min',screen:'🕘 근태 기준',label:'지문·수기 차이를 보여 줄 분',where:'출퇴근 차이 비교 — 수기와 지문 시각 차이가 이 분 이상이면 차이로 보여 줌',def:'1',kind:'int',min:1,max:120,unit:'분'},
+  {key:'att.diff.gap_min',screen:'🕘 근태 기준',label:'지문·수기 차이를 보여 줄 분',where:'출퇴근 차이 비교 — 수기와 지문 시각 차이가 이 분 이상이면 차이로 보여 줌',def:'1',kind:'int',min:1,max:120,unit:'분'},
   {key:'att.diff.show_staff',screen:'🕘 근태 기준',label:'직원에게 지문·수기 차이 보이기',where:'출퇴근 — 1이면 직원에게 본인 차이를 보여 주고 0이면 숨김',def:'1',kind:'int',min:0,max:1,unit:'1=보임 · 0=숨김'},
   {key:'att.issue.reason_min',screen:'🕘 근태 기준',label:'소명 사유 최소 글자 수',where:'지문누락 소명 — 직원이 직접 적어야 하는 사유의 최소 길이',def:'10',kind:'int',min:1,max:200,unit:'자'},
   {key:'att.issue.evidence_required',screen:'🕘 근태 기준',label:'소명 증거 파일 제출',where:'지문누락 소명 — 1이면 파일을 꼭 내고 0이면 생략 가능',def:'1',kind:'int',min:0,max:1,unit:'1=꼭 냄 · 0=안 내도 됨'},

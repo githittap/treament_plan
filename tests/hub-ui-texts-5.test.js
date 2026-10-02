@@ -102,7 +102,7 @@ test('화면 코드(hr.html)에 박힌 기본 글이 기본값 목록과 글자�
 test('숫자·목록 기본값: 숫자 4개와 문의 출처·문의 상태·상담 구분·상담 상태 목록이 hr.html·DB와 같다 · 캐시 번호',()=>{
   const h=helpers(),S=k=>h.HUB_SETTING_DEFS.find(d=>d.key===k),L=k=>h.HUB_LIST_DEFS.find(d=>d.key===k);
   assert.deepEqual(clone(h.HUB_SETTING_DEFS.slice(14,18).map(d=>[d.key,d.def,d.kind,d.min,d.max])),[['inbox.group_window_min','30','int',5,180],['inbox.alert_limit','20','int',5,100],['consult.page_size','20','int',10,100],['consult.action_limit','100','int',20,300]]);
-  assert.equal(h.HUB_SETTING_DEFS.length,33);
+  assert.equal(h.HUB_SETTING_DEFS.length,33,'전체 숫자 기준 33개');
   assert.match(hr,/hubSettingChecked\('inbox\.group_window_min',30\)/);
   assert.match(hr,/limit\(hubN\('inbox\.alert_limit',20\)\)/);
   assert.match(hr,/CONSULTATION_PAGE_SIZE=hubN\('consult\.page_size',20\)/);
@@ -489,14 +489,14 @@ test('화면: 📋 목록에 문의 출처·문의 상태·상담 구분·상담
   await t.click('[hub-subtab]=lists');
   const sec=t.section.innerHTML;
   assert.ok(sec.includes('문의 출처 이름')&&sec.includes('문의 상태 이름')&&sec.includes('상담 구분 이름')&&sec.includes('상담 상태 이름'));
-  assert.equal((sec.match(/<span class="hub-code">/g)||[]).length,37+8+7+6+5+32);
+  assert.equal((sec.match(/<span class="hub-code">/g)||[]).length,37+8+7+6+5+32+3);
   assert.equal((sec.match(/data-hub-list-add=/g)||[]).length,2,'새 항목을 늘릴 수 있는 목록은 직원 부서·서류 종류뿐');
-  assert.match(sec,/<span class="hub-code">naver_talktalk<\/span><input id="hubLstLbl_8_3" type="text" maxlength="20" value="네이버 톡톡"/);
-  assert.match(sec,/<span class="hub-code">recall_1<\/span><input id="hubLstLbl_9_2" type="text" maxlength="20" value="리콜 1차"/);
-  assert.match(sec,/<span class="hub-code">카카오,네이버예약,당근<\/span><input id="hubLstLbl_10_4" type="text" maxlength="20" value="카카오,네이버예약,당근"/);
-  assert.match(sec,/<span class="hub-code">확정<\/span><input id="hubLstLbl_11_3" type="text" maxlength="20" value="확정"/);
-  ['NEW(미처리)','진행중','1차 연락','리콜 2차','리콜 3차','종결','상담일지 전환'].forEach((v,i)=>{t.el('#hubLstLbl_9_'+i).value=v;});
-  await t.click('[hub-list-save]=9');
+  assert.match(sec,/<span class="hub-code">naver_talktalk<\/span><input id="hubLstLbl_9_3" type="text" maxlength="20" value="네이버 톡톡"/);
+  assert.match(sec,/<span class="hub-code">recall_1<\/span><input id="hubLstLbl_10_2" type="text" maxlength="20" value="리콜 1차"/);
+  assert.match(sec,/<span class="hub-code">카카오,네이버예약,당근<\/span><input id="hubLstLbl_11_4" type="text" maxlength="20" value="카카오,네이버예약,당근"/);
+  assert.match(sec,/<span class="hub-code">확정<\/span><input id="hubLstLbl_12_3" type="text" maxlength="20" value="확정"/);
+  ['NEW(미처리)','진행중','1차 연락','리콜 2차','리콜 3차','종결','상담일지 전환'].forEach((v,i)=>{t.el('#hubLstLbl_10_'+i).value=v;});
+  await t.click('[hub-list-save]=10');
   const up=t.state.calls.filter(c=>c.table==='app_settings'&&c.op==='upsert');
   assert.equal(up.length,1);assert.equal(up[0].payload.key,'list.inquiry_status');
   assert.deepEqual(clone(JSON.parse(up[0].payload.value)),[{code:'new',label:'NEW(미처리)'},{code:'in_progress',label:'진행중'},{code:'recall_1',label:'1차 연락'},{code:'recall_2',label:'리콜 2차'},{code:'recall_3',label:'리콜 3차'},{code:'closed',label:'종결'},{code:'converted',label:'상담일지 전환'}]);
@@ -506,6 +506,7 @@ test('화면: 📋 목록에 문의 출처·문의 상태·상담 구분·상담
 test('DB에도 같은 값이 있어 안 옮김: 광고 알림 기준 금액 100,000원(DB 함수) · 기존 시험이 줄 모양을 찾는 것: 불러오는 건수 150·선택칸 option 줄·라벨 줄',()=>{
   const h=helpers();
   assert.ok(!h.HUB_SETTING_DEFS.some(d=>/threshold|100000|load_limit/.test(d.key)),'광고 기준 금액·불러오는 건수 키는 만들지 않음');
+  assert.equal(h.HUB_SETTING_DEFS.some(d=>d.key==='att.diff.threshold_min'),false,'옛 threshold 키는 쓰지 않음');
   assert.match(hr,/Number\(row\.threshold_krw\|\|100000\)/);
   assert.match(read('db/ai_billing_alerts_draft.sql'),/coalesce\(new\.threshold_krw,100000\)/);
   assert.match(hr,/\.order\('received_at',\{ascending:false\}\)\.limit\(150\);/);
