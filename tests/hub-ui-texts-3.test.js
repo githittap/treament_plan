@@ -46,7 +46,7 @@ const dynRows=defs=>defs.map(d=>({key:d.key,value:'«'+d.key+'»'+(d.vars?' '+d.
 /* ───────────── 1. 기본 글 목록 ───────────── */
 test('차례 3 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 11개(출퇴근 5 · 근무표 2 · 연차 4)',()=>{
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
-  assert.equal(defs.length,313,'차례 3 글 키 수(고쳐 쓰는 글 294 + 모달 속 고정 글 19)');
+  assert.equal(defs.length,314,'차례 3 글 키 수(고쳐 쓰는 글 295 + 모달 속 고정 글 19 · P7 이름 보기 추가)');
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
   for(const d of defs){
     assert.match(d.key,/^[a-z][a-z0-9_.]{1,80}$/,d.key);
@@ -144,7 +144,7 @@ test('표에 값이 있으면 그 글: 고쳐 쓰는 글 294개가 모두 화면
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
   const stat=new Set([...hr.matchAll(/\bdata-hub(?:k|ph)="([a-z0-9_.]+)"/g)].map(m=>m[1]));
   const dyn=defs.filter(d=>!stat.has(d.key));
-  assert.equal(dyn.length,294);
+  assert.equal(dyn.length,295);
   const out=await renderAll(hr,{engine:true,textRows:dynRows(dyn),settings:{}});
   const all=Object.values(out).join('\n');
   const missing=dyn.filter(d=>!all.includes('«'+d.key+'»')).map(d=>d.key);

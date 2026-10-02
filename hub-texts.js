@@ -462,6 +462,7 @@ function hubTextDefsChapter3(add){
   add('sched.err_month','🗓 근무표 › 주간·월간 화면','월간 근무표를 못 불러왔을 때 앞 글(뒤에 오류 내용이 붙음)','월간 근무표를 불러오지 못했습니다:');
   add('sched.err_unknown','🗓 근무표 › 주간·월간 화면','근무표를 못 불러왔을 때 오류 내용이 없으면 쓰는 글','알 수 없는 오류');
   add('sched.btn_week','🗓 근무표 › 주간·월간 화면','근무표 단추 — 주간 편집(주간·월간 화면 공통)','주간 편집');
+  add('sched.btn_names','🗓 근무표 › 주간·월간 화면','근무표·캘린더 공통 — 날짜 칸 안의 이름을 모두 표시하는 단추','👤 이름 보기');
   add('sched.btn_month_role','🗓 근무표 › 주간·월간 화면','월간 화면의 단추 — 월간 직무표','월간 직무표');
   add('sched.btn_pdf','🗓 근무표 › 주간·월간 화면','근무표 단추 — PDF 저장(주간·월간 공통)','PDF 저장');
   add('sched.btn_print','🗓 근무표 › 주간·월간 화면','근무표 단추 — 인쇄(주간·월간 공통)','인쇄');
@@ -986,6 +987,11 @@ function hubTextDefsChapter6(add){
   const C3='📝 근로계약서 › 계약 목록·계약기간·만료 알림';
   const C4='📝 근로계약서 › 직원 서명 화면';
   const C5='📝 근로계약서 › 계약서 본문 기본 문구';
+  add('contract_job.alias_clinical_consult',C1,'진료·상담에 연결할 계약 직무·직종 이름(쉼표로 구분, 다른 분류와 겹치면 자동 채우지 않음)','진료·상담,진료실,상담,치과위생사,위생사');
+  add('contract_job.alias_sterilization_admin',C1,'소독·행정에 연결할 계약 직무·직종 이름(쉼표로 구분)','소독·행정,소독,소독실,행정');
+  add('contract_job.alias_lab',C1,'기공에 연결할 계약 직무·직종 이름(쉼표로 구분)','기공,기공실,치과기공사,기공사');
+  add('contract_job.alias_desk',C1,'데스크에 연결할 계약 직무·직종 이름(쉼표로 구분)','데스크,코디,코디네이터');
+  add('contract_job.conflict',C1,'계약 직무와 기존 직원 직무가 다를 때 보여 주는 안내','{employee}: 계약 직무 {contract} · 직원 직무 {profile} — 직원 직무는 그대로 유지됩니다.',['employee','contract','profile']);
   add('contract.new_title',C1,'근로계약서 화면 맨 위 「새 계약서」 칸 제목(원장·실장·매니저)','📝 새 근로계약서');
   add('contract.new_hint',C1,'새 계약서 칸 제목 아래 안내','✓ 작성 중인 내용은 이 PC에 자동 저장됨(주민번호·생년월일·주소 제외)');
   add('contract.btn_clear',C1,'새 계약서 칸 — 작성 중인 내용을 비우는 단추 글','새로 쓰기');

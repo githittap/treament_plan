@@ -170,7 +170,7 @@ if (block) {
 
   test('의사 부서는 표시 이름에만 Dr. 접두사를 붙인다', () => {
     assert.equal(context.schedulePersonLabel({ name: '홍길동', department: 'Dr.' }), 'Dr. 홍길동');
-    assert.equal(context.schedulePersonLabel({ name: '홍길동', department: '진료실' }), '홍길동 · 미지정');
+    assert.equal(context.schedulePersonLabel({ name: '홍길동', department: '진료실' }), '홍길동 · 진료·상담');
     assert.equal(context.schedulePersonLabel({ name: '홍길동', department: 'Dr' }), '홍길동 · 미지정');
   });
 
@@ -258,7 +258,8 @@ if (block) {
     const day = context.scheduleCalendarIndex(rows, people, [], profiles)['2026-09-15'];
     assert.deepEqual(JSON.parse(JSON.stringify(day.departments['기공'])), ['연결직원']);
     assert.deepEqual(JSON.parse(JSON.stringify(day.departments['데스크'])), ['비로그인직원']);
-    assert.deepEqual(JSON.parse(JSON.stringify(day.departments['미지정'])), ['미지정직원']);
+    assert.deepEqual(JSON.parse(JSON.stringify(day.departments['진료·상담'])), ['미지정직원']);
+    assert.deepEqual(JSON.parse(JSON.stringify(day.departments['미지정'])), []);
     assert.deepEqual(JSON.parse(JSON.stringify(day.departments['Dr.'])), ['Dr. 의사']);
     assert.deepEqual(JSON.parse(JSON.stringify(day.evening)), ['Dr. 의사']);
   });
@@ -323,7 +324,7 @@ if (block) {
     const scheduleIndex = context.scheduleCalendarIndex(filtered, people, []);
     const leaveIndex = context.calendarLeaveIndex(leave, people, '2026-09-01', '2026-09-30', value => value);
     assert.deepEqual(JSON.parse(JSON.stringify(scheduleIndex['2026-09-14'].departments['Dr.'])), []);
-    assert.deepEqual(JSON.parse(JSON.stringify(scheduleIndex['2026-09-14'].departments['미지정'])), ['근무직원']);
+    assert.deepEqual(JSON.parse(JSON.stringify(scheduleIndex['2026-09-14'].departments['진료·상담'])), ['근무직원']);
     assert.deepEqual(JSON.parse(JSON.stringify(scheduleIndex['2026-09-14'].evening)), []);
     assert.deepEqual(JSON.parse(JSON.stringify(leaveIndex['2026-09-14'])), ['Dr. 연차의사']);
     assert.deepEqual(JSON.parse(JSON.stringify(scheduleIndex['2026-09-15'].off)), ['Dr. 연차의사']);
@@ -505,6 +506,7 @@ function scheduleMonthRenderHarness({ role = 'staff', leaveRows = [] } = {}) {
   const weekRows = [{ week_start: '2028-01-31', status: '초안' }, { week_start: '2028-02-07', status: '공표' }, { week_start: '2028-02-14', status: '초안' }, { week_start: '2028-02-21', status: '공표' }, { week_start: '2028-02-28', status: '초안' }];
   const context = {
     SCHED_MONTH: '2028-02', SCHED_VIEW: 'month', EMPLOYEE_JOB_GROUPS: null, PROFILES: [{ user_id: 'user-1', job_group: 'clinical_consult' }, { user_id: 'user-2', job_group: 'clinical_consult' }, { user_id: 'user-3', job_group: 'desk' }], SCHEDULE_STATUS_OVERRIDES: {}, SCHEDULE_WRITE_SEQ: {}, SCHEDULE_WRITE_TAIL: {}, SCHEDULE_CELL_VALUES: {}, SCHEDULE_ROLE_WRITE_SEQ: {}, SCHEDULE_ROLE_WRITE_TAIL: {}, SCHEDULE_PEOPLE: [{ id: 'person-1', profile_user_id: 'user-1', name: '직원', department: '진료실', active: true, included_in_schedule: true }, { id: 'evening-1', profile_user_id: 'user-2', name: '저녁 직원', department: '진료실', active: true, included_in_schedule: true }, { id: 'work-1', profile_user_id: 'user-3', name: '주간 직원', department: '데스크', active: true, included_in_schedule: true }, { id: 'guest-1', profile_user_id: null, name: 'Dr 비로그인', department: 'Dr.', active: true, included_in_schedule: true }, { id: 'old-1', profile_user_id: null, name: '과거 직원', department: '진료실', active: false, included_in_schedule: false }],
+    scheduleNamesVisible: () => false, scheduleNamesToggleButton: () => '',
     SHIFTS: { work: { l: '근무' }, off: { l: 'off' }, evening: { l: '야간' }, etc: { l: '기타' } },
     today: () => '2028-02-15', md: value => value.slice(5), mondayStr: value => { const d = new Date(value+'T00:00:00'); const g=d.getDay(); d.setDate(d.getDate()+(g===0?-6:1-g)); return d.toISOString().slice(0,10); },
     addDays: (value,n) => { const d=new Date(value+'T00:00:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); },
