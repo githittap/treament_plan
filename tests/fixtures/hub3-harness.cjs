@@ -4,6 +4,7 @@
 const vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const lf=s=>String(s).replace(/\r\n/g,'\n');
 function legacyAttendanceIssueView(html){
+  const diffTitle=html.indexOf('<h2>📊 지문·수기 차이</h2>'),diff=diffTitle<0?-1:html.lastIndexOf('<div class="card">',diffTitle);if(diff>=0){const tags=[...html.slice(diff).matchAll(/<\/?div\b[^>]*>/g)];let depth=0,end=-1;for(const tag of tags){if(tag[0].startsWith('</'))depth--;else depth++;if(depth===0){end=diff+tag.index+tag[0].length;break;}}if(end>diff)html=html.slice(0,diff)+html.slice(end);}
   const card=html.indexOf('<div class="card"><h2>🙋 내 지문누락 소명');if(card>=0)html=html.slice(0,card).trimEnd();
   const title=html.indexOf('<h2>🙋 지문누락 소명'),start=title<0?-1:html.indexOf('<table>',title),end=start<0?-1:html.indexOf('</table>',start);
   if(start>=0&&end>=0){const table=html.slice(start,end+8).replace(/<tr>([\s\S]*?)<\/tr>/g,(_row,body)=>{const cells=[...body.matchAll(/<(th|td)\b[^>]*>[\s\S]*?<\/\1>/g)].map(m=>m[0]);if(cells.length===7)cells.splice(4,1);return '<tr>'+cells.join('')+'</tr>';});html=html.slice(0,start)+table+html.slice(end+8);}

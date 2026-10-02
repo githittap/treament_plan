@@ -394,9 +394,9 @@ test('화면: 원장에게는 「📝 글 고치기 · 🔢 숫자·기준 · �
   assert.match(html,/📝 글 고치기/);assert.match(html,/🔢 숫자·기준/);assert.match(html,/📋 목록/);
   const sec=t.section.innerHTML;
   assert.match(sec,/<input id="hubTxtSearch"/);
-  assert.equal((sec.match(/<details class="hub-grp" data-hub-group="/g)||[]).length,3+11+17+12+9+5+14+1,'화면별 접기: 기존 묶음 + B2 출퇴근 소명 묶음 6개');
+  assert.equal((sec.match(/<details class="hub-grp" data-hub-group="/g)||[]).length,3+11+17+12+9+5+14+1+3,'화면별 접기: 기존 묶음 + B2 소명 6개 + C 차이 화면 3개');
   const n=(sec.match(/data-hub-text-save="\d+"/g)||[]).length;
-  assert.equal(n,21+4+19+192+360+145+168+188+329+8+2,'키마다 저장 단추(탭 21 + 묶음 4 + 계정·권한 19 + 차례 2 글 192 + 차례 3 글 362 + 차례 4 글 145 + 차례 5 글 168 + 차례 6 글 188 + 차례 7 글 329 + 시간 표시 글 8 + 원장 보기판 인박스 판 2)');
+  assert.equal(n,21+4+19+192+422+145+168+188+329+8+2,'키마다 저장 단추(탭 21 + 묶음 4 + 계정·권한 19 + 차례 2 글 192 + 차례 3 글 422 + 차례 4 글 145 + 차례 5 글 168 + 차례 6 글 188 + 차례 7 글 329 + 시간 표시 글 8 + 원장 보기판 인박스 판 2)');
   assert.equal((sec.match(/data-hub-text-reset="\d+"/g)||[]).length,n);
   assert.match(sec,/고친 것 1개/);assert.match(sec,/<span class="b ok">고침<\/span>/);
   assert.match(sec,/이름표: tab\.home/);

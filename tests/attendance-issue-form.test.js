@@ -59,7 +59,7 @@ test('소명 화면의 저장 순서·정리·배지와 설정·글 등록을 �
   assert.match(badge,/count:'exact',head:true/);assert.match(badge,/eq\('rule_label','자동'\)[\s\S]*eq\('status','대기'\)[\s\S]*is\('staff_responded_at',null\)/);assert.doesNotMatch(badge,/limit\(/);
   for(const key of ['att.diff.gap_min','att.diff.show_staff','att.issue.reason_min','att.issue.evidence_required','att.issue.evidence_max','att.myissue_list_limit'])assert.match(texts,new RegExp("key:'"+key.replaceAll('.','\\.')+"'"));
   assert.match(texts,/key:'list\.att_issue_kinds'[\s\S]*addable:false[\s\S]*code:'지문인식오류'[\s\S]*code:'입력오류'[\s\S]*code:'기타'/);
-  assert.match(hr,/createSignedUrl\(file\.storage_path,600\)/);assert.match(hr,/\$\{attendanceIssueMyCardHtml\(myIssueRows\|\|\[\]\)\}/);
+  assert.match(hr,/createSignedUrl\(file\.storage_path,600\)/);assert.match(hr,/attendanceIssueMyCardHtml\(myIssueRows\|\|\[\],ME\.role==='owner'\?\[\]:await fetchStaffAttDiff\(\)\)/);assert.match(hr,/attendanceIssueMyCardHtml\(myIssueRows\|\|\[\],await fetchStaffAttDiff\(\)\)/);
 });
 
 test('관측 하네스가 직원·관리자 화면, 세 양식 상태, 실제 증거 행을 렌더한다',async()=>{

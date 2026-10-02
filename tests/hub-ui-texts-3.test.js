@@ -44,9 +44,9 @@ function fakeSb(opts){
 const dynRows=defs=>defs.map(d=>({key:d.key,value:'«'+d.key+'»'+(d.vars?' '+d.vars.map(v=>'{'+v+'}').join(' '):'')}));
 
 /* ───────────── 1. 기본 글 목록 ───────────── */
-test('차례 3 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 11개(출퇴근 5 · 근무표 2 · 연차 4)',()=>{
+test('차례 3 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 14개(출퇴근·근태차이 8 · 근무표 2 · 연차 4)',()=>{
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
-  assert.equal(defs.length,360,'차례 3 글 키 수(기존 313 + 신규 소명·증거 UI 글 - 미사용 구 소명 문구 5개)');
+  assert.equal(defs.length,422,'차례 3 글 키 수(기존 313 + 소명·증거 UI 글 + 근태차이 화면·엑셀 글 - 미사용 구 소명 문구 5개)');
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
   for(const d of defs){
     assert.match(d.key,/^[a-z][a-z0-9_.]{1,80}$/,d.key);
@@ -55,8 +55,8 @@ test('차례 3 글 목록: 키 모양·중복 없음·{자리표시자} 일치·
     assert.deepEqual([...new Set(ph)].sort(),clone(d.vars||[]).sort(),d.key+' 자리표시자');
   }
   const screens=[...new Set(defs.map(d=>d.screen))];
-  assert.equal(screens.length,17,'B2 소명 카드·표·양식의 화면 묶음 6개 추가');
-  assert.equal(screens.filter(s=>s.startsWith('🕘 출퇴근')).length,11,'B2 출퇴근 소명 묶음 6개 추가');
+  assert.equal(screens.length,20,'B2 소명 화면 6개와 C 근태차이 화면 3개 추가');
+  assert.equal(screens.filter(s=>s.startsWith('🕘 출퇴근')).length,14,'B2·C의 출퇴근 소명·차이 화면 9개 추가');
   assert.equal(screens.filter(s=>s.startsWith('🗓 근무표')).length,2);
   assert.equal(screens.filter(s=>s.startsWith('🌿 연차')).length,4);
 });
@@ -152,15 +152,26 @@ test('시험이 실제로 잡는지: 화면 글을 한 글자만 바꾸면 대�
 });
 
 /* ───────────── 3. 표에 값이 있으면 그 글 ───────────── */
-test('표에 값이 있으면 그 글: 고쳐 쓰는 글 294개가 모두 화면(제목·표 머리·단추·알림창·확인창·메시지)에 나온다',async()=>{
+test('표에 값이 있으면 그 글: 고쳐 쓰는 글 355개가 모두 화면(제목·표 머리·단추·알림창·확인창·메시지)에 나온다',async()=>{
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
   const stat=new Set([...hr.matchAll(/\bdata-hub(?:k|ph)="([a-z0-9_.]+)"/g)].map(m=>m[1]));
   const dyn=defs.filter(d=>!stat.has(d.key));
-  assert.equal(dyn.length,341,'기존 동적 글 수 + 신규 소명 UI - 미사용 구 소명 문구 5개');
+  assert.equal(dyn.length,403,'기존 동적 글과 B2·C 단계 신규 글 중 화면에 쓰이는 동적 글 수');
   const out=await renderAll(hr,{engine:true,textRows:dynRows(dyn),settings:{}});
   const b2Defs=defs.filter(d=>/^att\.issue\.p_date$|^att\.issueform\.|^att\.myissue\.|^att\.issue\.(?:evidence_|admin_evidence|awaiting_staff|auto_clock_)/.test(d.key));
   const b2Observed=await require('./fixtures/hub3-harness.cjs').observeAttendanceIssueB2(hr,{textRows:dynRows(b2Defs)});
-  const all=Object.values(out).join('\n')+'\n'+b2Observed;
+  const cDefs=defs.filter(d=>d.key.startsWith('att.diff.'));
+  const P=await renderAll(hr,{probe:true,engine:true,textRows:dynRows(cDefs),settings:{'att.diff.gap_min':'1','att.diff.show_staff':'1'}}),c=await P.makeCtx();
+  c.ctx.ME={id:'u1',name:'김직원',role:'chief'};
+  vm.runInContext('this.api.attDiffCardHtml=attDiffCardHtml;this.api.attDiffRenderRows=attDiffRenderRows;this.api.attDiffExportModel=attDiffExportModel;this.api.attDiffLabel=attDiffLabel;this.api.attDiffGapText=attDiffGapText;this.api.attDiffWeekday=attDiffWeekday;this.api.attendanceStaffDiffHtml=attendanceStaffDiffHtml',c.ctx);
+  const sample={userId:'u1',name:'김직원',workDate:'2026-10-02',kinds:'출근 · 퇴근',manualIn:'09:02',manualOut:'18:02',fpIn:'09:00',fpOut:'18:00',diffInMin:2,diffOutMin:2,manualStatus:'대기',manualReason:'사유',issueStatus:'',issueReason:''};
+  const cObserved=[c.api.attDiffCardHtml(),c.api.attDiffRenderRows({rows:[sample],month:'2026-10',coverageEnd:'2026-10-31'}),c.api.attDiffRenderRows({rows:[],month:'2026-10',coverageEnd:null}),c.api.attDiffRenderRows({rows:[],month:'2026-10',error:{message:'query fail'}})];
+  c.ctx.ME.role='staff';cObserved.push(c.api.attendanceStaffDiffHtml([sample]),c.api.attendanceStaffDiffHtml([]),c.api.attendanceStaffDiffHtml({error:'query fail'}));
+  cObserved.push(JSON.stringify(c.api.attDiffExportModel([sample],{month:'2026-10',thresholdMin:1,coverageEnd:'2026-10-31',createdAt:'2026-10-03T10:00:00Z'})),JSON.stringify(c.api.attDiffExportModel([],{month:'2026-10',thresholdMin:1,coverageEnd:null,createdAt:'2026-10-03T10:00:00Z'})),c.api.attDiffLabel('출근 · 퇴근 · 지문 출근 없음 · 지문 퇴근 없음 · 지문 없음'),c.api.attDiffGapText(sample.diffInMin,sample.diffOutMin),...['2026-10-04','2026-10-05','2026-10-06','2026-10-07','2026-10-08','2026-10-09','2026-10-10'].map(d=>c.api.attDiffWeekday(d)));
+  const cObservedText=cObserved.join('\n');
+  const cObservedMissing=cDefs.filter(d=>!cObservedText.includes('«'+d.key+'»')).map(d=>d.key);
+  assert.equal(cObservedMissing.length,0,'C 차이 글은 관리자·직원·오류·빈 상태·엑셀의 실제 렌더에 모두 나타남 '+cObservedMissing.join(', '));
+  const all=Object.values(out).join('\n')+'\n'+b2Observed+'\n'+cObservedText;
   const legacyMissing=dyn.filter(d=>!b2Defs.some(x=>x.key===d.key)&&!all.includes('«'+d.key+'»')).map(d=>d.key);
   const visibleMissing=b2Defs.filter(d=>!all.includes('«'+d.key+'»')).map(d=>d.key);
   assert.equal(legacyMissing.length,0,'기존 화면 글은 기존 관측 그대로 검사: '+legacyMissing.join(', '));
