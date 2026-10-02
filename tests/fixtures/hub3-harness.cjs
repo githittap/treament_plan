@@ -114,6 +114,7 @@ function makeSb(over){
 async function renderAll(html,opts){
   const o=opts||{};
   const text=lf(html);
+  const timeSrc=(text.match(/\/\* hub-time:test-start \*\/[\s\S]*?\/\* hub-time:test-end \*\//)||[''])[0]; /* 허브 시간 표시 공통 함수(이 작업 이후의 hr.html에만 있음 — 없으면 빈 글) */
   const out={};
   const hubHelpers=text.includes('function hubN(')?region(text,'function hubN(','/* hub-texts.js(원장이 고치는 허브 글·목록)를 못 불러와도',false):''; // 옛 화면에는 없음
   const helperSrc=hubHelpers+'\n'+region(text,'function jongeop(','\n}\n',true)+'\n'+region(text,'const nameOf=uid=>','const SHIFTS={work:',false)+text.slice(text.indexOf('const SHIFTS={work:'),text.indexOf('\n',text.indexOf('const SHIFTS={work:'))+1);
@@ -151,7 +152,7 @@ async function renderAll(html,opts){
         await ctx.HubUi.load({from(){const api={select(){return api;},then(res,rej){return Promise.resolve(o.loadFail?{data:null,error:{message:'x'}}:{data:o.textRows,error:null}).then(res,rej);}};return api;}});
       }
     }else if(o.settings)Object.assign(ctx.SETTINGS,o.settings);
-    vm.runInContext(helperSrc+'\n'+bigSrc+'\n;this.api={renderAtt,checkAbsent,issueBtns,issueAct,openIssue,closeMonth,reviewManualAttendance,manualAttendanceFormHtml,manualAttendanceDetailText,renderManualAttendanceDayDetail,submitManualAttendance,saveAbsenceSettings,absenceSettingsHtml,buildPreview,parseXls,saveAttendance,renderXlTable,'
+    vm.runInContext(timeSrc+'\n'+helperSrc+'\n'+bigSrc+'\n;this.api={renderAtt,checkAbsent,issueBtns,issueAct,openIssue,closeMonth,reviewManualAttendance,manualAttendanceFormHtml,manualAttendanceDetailText,renderManualAttendanceDayDetail,submitManualAttendance,saveAbsenceSettings,absenceSettingsHtml,buildPreview,parseXls,saveAttendance,renderXlTable,'
       +'renderSched,renderScheduleMonth,scheduleRosterAdminCard,scheduleRoleCell,saveSchedulePerson,setSchedulePersonDepartment,setSchedulePersonIncluded,setSchedulePersonActive,copyPrevWeek,'
       +'renderLeave,openLeaveForm,openLeaveEdit,openLeave,cancelPendingLeave,checkClash,submitLeave,leaveAct,cancelApprovedLeave,grantLeave,previewLeaveAccrual,applyLeaveAccrual,computeLeaveDays,leaveDisplayText,appStamp,'
       +'setState:(k,v)=>{if(k==="MANUAL_DETAIL_OPEN")MANUAL_DETAIL_OPEN=v;if(k==="SCHED_VIEW")SCHED_VIEW=v;if(k==="SCHED_WEEK")SCHED_WEEK=v;if(k==="SCHED_MONTH")SCHED_MONTH=v;if(k==="xlRows")xlRows=v;if(k==="LEAVE_EDIT_ID")LEAVE_EDIT_ID=v;if(k==="LEAVE_ARCHIVE_MONTH")LEAVE_ARCHIVE_MONTH=v;},getState:k=>k==="xlRows"?xlRows:undefined};'

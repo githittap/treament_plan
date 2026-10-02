@@ -5,6 +5,7 @@
    · 글  → 표 hub_ui_texts(db/hub_ui_texts.sql) · 숫자·목록 → 이미 있는 표 app_settings(키만 더함, 표·정책은 안 고침)
    hr.html은 이 파일을 main 스크립트보다 먼저 <script src="hub-texts.js?v=…"> 로 불러온다(함수는 전역 hubText·hubSetting·hubList·HubUi).
    로그인 전 화면 글은 표를 읽을 수 없어 이 엔진을 쓰지 않는다(설계서 5장).
+   시간 표시: 허브 전체의 날짜·시각 꼴 8개(hubTextDefsTime · time.* — 「2026.9.9 오전 9시 30분」·「오후 3시」) — hr.html 공통 함수 hubFmtDate·hubFmtTime·hubFmtDateTime·hubFmtWhen이 읽음.
    차례 7: 급여·AI비용·원장 보기판·진료기록·입금·홈 글(hubTextDefsChapter7) + 계정·권한 위험 작업 확인창 3개·직무 분류 관리 글·저장 상태 글 + 화면 표시 건수·일수 숫자 8개 + 결재·계약 상태 이름·급여형태·마케팅 분류·AI 플랫폼 이름 목록 7개.
      계산식에 들어가는 숫자(세율·식대 한도·4대보험 절사·야간 시간대)와 엑셀 열 이름·급여 항목 이름·산출식 설명은 안 옮김. 명세서 서식 글은 새로 발행하는 명세서에만 적용(이미 발행한 명세서는 저장된 본문 그대로).
    차례 6: 근로계약서 글(hubTextDefsChapter6 — 화면 글 + 계약서 본문 기본 문구) + 계약 만료 알림 일수(app_settings contract.expiry_alert_days — 정수 1~365 · 1~5개 · 중복 없음, 틀리면 기본 14·30·60. 화면에만 있던 숫자라 옮김 · DB 함수·크론·Edge에는 같은 숫자 없음). 이미 발송·서명한 계약서는 저장된 본문(merged_html)을 그대로 보여 줘서 글을 고쳐도 안 바뀜.
@@ -1504,6 +1505,17 @@ function hubTextDefsChapter7(add){
   add('empdoc.preview_title',S14,'내 서류함 › 직원 서류함 — 근로계약서 미리보기 창의 읽어 주는 이름(화면에는 안 보임)','근로계약서 미리보기');
   add('empdoc.preview_name',S14,'내 서류함 › 직원 서류함 — 근로계약서 미리보기 위 제목: 파일 이름이 없을 때 대신 보이는 글','근로계약서');
 }
+function hubTextDefsTime(add){
+  const S='⏰ 시간 표시';
+  add('time.am',S,'오전·오후 표시 — 낮 12시 전에 붙는 말(「오전 9시 30분」의 「오전」). 밤 12시는 「오전 12시」','오전');
+  add('time.pm',S,'오전·오후 표시 — 낮 12시부터 붙는 말(「오후 3시 31분」의 「오후」). 낮 12시는 「오후 12시」','오후');
+  add('time.fmt_date',S,'날짜 꼴 — {y}는 해, {m}는 달, {d}는 일(앞에 0을 안 붙임). 예 「2026.9.9」 · 허브에서 날짜가 보이는 모든 곳(문의함·연차·결재·AI비용·입금·출퇴근·원장 보기판 안 날짜 글자 등)','{y}.{m}.{d}',['y','m','d']);
+  add('time.fmt_time',S,'시각 꼴(분이 있을 때) — {ampm}은 위 오전·오후, {h}는 시(1~12), {mi}는 분(앞에 0을 안 붙임). 예 「오후 3시 31분」 · 출퇴근에 찍힌 시각, 문의 받은 시각 등 허브에서 시각이 보이는 모든 곳','{ampm} {h}시 {mi}분',['ampm','h','mi']);
+  add('time.fmt_time_hour',S,'시각 꼴(정각일 때, 분이 0) — {ampm}은 오전·오후, {h}는 시. 예 「오후 3시」','{ampm} {h}시',['ampm','h']);
+  add('time.fmt_datetime',S,'날짜와 시각을 같이 보여 줄 때의 꼴 — {date}는 위 날짜 꼴, {time}은 위 시각 꼴. 예 「2026.9.9 오전 9시 30분」 · 문의 받은 시각·연차 신청·승인 시각·원장 보기판 올라온 때 등','{date} {time}',['date','time']);
+  add('time.fmt_today',S,'목록·로그 줄에서 「오늘」 기록의 꼴 — 기본은 시각만 보임({time}). 오늘 기록에도 날짜를 붙이려면 「{date} {time}」으로 바꾸세요(입금 목록·AI 도우미 대화록 목록 등)','{time}',['time','date']);
+  add('time.fmt_md_time',S,'원장 보기판 안에 「10-02 20:13」처럼 해가 없이 적힌 시각을 바꿔 보여 줄 때의 꼴 — {m}은 달, {d}는 일, {time}은 위 시각 꼴. 예 「10.2 오후 8시 13분」(보기판 원본 글은 안 바뀜)','{m}.{d} {time}',['m','d','time']);
+}
 function hubTextDefs(){
   if(HUB_TEXT_DEFS_CACHE)return HUB_TEXT_DEFS_CACHE;
   const defs=[];
@@ -1536,6 +1548,7 @@ function hubTextDefs(){
   hubTextDefsChapter5(add);
   hubTextDefsChapter6(add);
   hubTextDefsChapter7(add);
+  hubTextDefsTime(add);
   HUB_TEXT_DEFS_CACHE=defs;
   return defs;
 }

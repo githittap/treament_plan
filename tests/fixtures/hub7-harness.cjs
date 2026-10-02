@@ -143,6 +143,7 @@ function makeSb(over,rec){
 async function renderAll(html,opts){
   const o=opts||{};
   const text=lf(html);
+  const timeSrc=(text.match(/\/\* hub-time:test-start \*\/[\s\S]*?\/\* hub-time:test-end \*\//)||[''])[0]; /* 허브 시간 표시 공통 함수(이 작업 이후의 hr.html에만 있음 — 없으면 빈 글) */
   const out={};
   const hubTLine=text.match(/function hubT\(k,d,v\)\{[^\n]*\}/)[0];
   const hubNLine=text.match(/function hubN\(k,d\)\{[^\n]*\}/)[0];
@@ -201,7 +202,7 @@ async function renderAll(html,opts){
       }
     }
     vm.runInContext('let BADGE={notice:2};let MY_PAYSLIPS=[];let DEP_RANGE="month";let PAY_VIEW="ledger",PAY_MONTH="",PAY_ROWS=[],PAY_COLUMNS=[],PAY_MESSAGE="",PAY_WAGE_LATEST={},PAY_SOURCE_FILE=null;let PAY_SLIP_USER="",PAY_SLIP_HTML="";let SETTINGS={};let PAYMENT_RECEIPT_PREVIEWS=[];let EMPLOYEE_CONTRACT_PREVIEWS={};let CONTRACT_SHOW_CANCELLED=false;\n'
-      +hubTLine+'\n'+hubNLine+'\n'+hubTELine+'\n'+helperSrc+'\n'+setStatusSrc+'\n'
+      +hubTLine+'\n'+hubNLine+'\n'+hubTELine+'\n'+timeSrc+'\n'+helperSrc+'\n'+setStatusSrc+'\n'
       +homeSrc+'\n'+confSrc+'\n'+aiPaySrc+'\n'+ownerSrc+'\n'+jgSrc+'\n'+contractStatusSrc+'\n'+payReqSrc+'\n'+prevEmpSrc+'\n'+docCardSrc+'\n'
       +';this.api={renderHome,renderDeposit,renderConfid,filterConfid,submitConfidRecord,aiUsagePanelHtml,aiCostSectionHtml,aiExternalSectionHtml,aiSessionSectionHtml,aiUsageSummary,aiUsageWindow,'
       +'ownerBoardsPanelHtml,renderOwnerBoards,openOwnerBoard,renderAicost,saveAicost,saveMarketingBudget,renderMarketingExpensePanel,marketingCategoryOptions,'

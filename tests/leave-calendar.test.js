@@ -6,13 +6,14 @@ const vm = require('node:vm');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'hr.html'), 'utf8');
 const leaveBlock = html.match(/\/\* leave-calendar:test-start \*\/([\s\S]*?)\/\* leave-calendar:test-end \*\//);
+const timeBlock = html.match(/\/\* hub-time:test-start \*\/[\s\S]*?\/\* hub-time:test-end \*\//)?.[0];
 const leaveRender = html.match(/\/\* leave-calendar:render-start \*\/([\s\S]*?)\/\* leave-calendar:render-end \*\//);
 
 function loadLeaveContext() {
   assert.ok(leaveBlock, '연차캘린더 테스트 경계가 없습니다.');
   const context = {};
   vm.createContext(context);
-  vm.runInContext(`${leaveBlock[1]};this.buildLeaveCalendarIndex=buildLeaveCalendarIndex;this.leaveCalendarLabel=leaveCalendarLabel;this.compareLeaveRowsByCreatedAtThenId=compareLeaveRowsByCreatedAtThenId;this.leaveCalendarMonthEnd=leaveCalendarMonthEnd;this.formatLeaveTimestamp=formatLeaveTimestamp;`, context);
+  vm.runInContext(`${timeBlock};${leaveBlock[1]};this.buildLeaveCalendarIndex=buildLeaveCalendarIndex;this.leaveCalendarLabel=leaveCalendarLabel;this.compareLeaveRowsByCreatedAtThenId=compareLeaveRowsByCreatedAtThenId;this.leaveCalendarMonthEnd=leaveCalendarMonthEnd;this.formatLeaveTimestamp=formatLeaveTimestamp;`, context);
   return context;
 }
 
@@ -73,7 +74,7 @@ test('선택 월의 실제 말일을 윤년과 평년 기준으로 계산한다'
 
 test('owner 시각은 Asia/Seoul 기준 한국 시간으로 포맷한다', () => {
   const context = loadLeaveContext();
-  assert.equal(context.formatLeaveTimestamp('2026-09-01T09:00:00Z'), '2026.09.01 18:00');
+  assert.equal(context.formatLeaveTimestamp('2026-09-01T09:00:00Z'), '2026.9.1 오후 6시');
 });
 
 test('비원장 라벨은 순번과 이름만, 원장 라벨은 승인 상세를 포함한다', () => {
@@ -126,5 +127,6 @@ test('owner 목록 시각도 한국시간 포맷과 미상 fallback을 사용한
   assert.ok(leaveRender, 'renderLeaveStatus 함수를 찾을 수 없습니다.');
   assert.match(leaveRender[1], /formatLeaveTimestamp\(row\.created_at\)\|\|'미상'/);
   assert.match(leaveRender[1], /formatLeaveTimestamp\(row\.owner_at\)\|\|formatLeaveTimestamp\(row\.chief_at\)\|\|'미상'/);
-  assert.match(leaveBlock[1], /hourCycle:'h23'/);
+  assert.match(timeBlock, /timeZone:'Asia\/Seoul'/);
+  assert.match(leaveBlock[1], /return hubFmtDateTime\(value\)/);
 });

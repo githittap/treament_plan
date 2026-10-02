@@ -211,7 +211,7 @@ test('표에 값이 있으면 그 글: 구체적인 예(홈·입금·진료기�
   assert.match(J(out['dep.owner_month'])[0],/<h2>💰 입금 내역 &lt;표&gt;<\/h2>/);assert.ok(J(out['dep.owner_month'])[0].includes('>일주일</button>'));assert.ok(J(out['dep.owner_month'])[0].includes('💳 카드 <span class="sub">카드사&lt;x&gt;</span>'));
   assert.match(J(out['conf.owner'])[0],/<h2>🔒 기록<\/h2>/);assert.match(J(out['conf.submit_fail'])[0].join('|'),/권한<없음> 때문에 못 저장/);
   assert.ok(out['ob.panel'].includes('📒 장부 &lt;판&gt;'));assert.ok(!out['ob.panel'].includes('📒 장부 <판>'));
-  assert.ok(J(out['ob.open.ok_busd'])[0][1].includes('올라온 시각 2026-09-30 10:02'));
+  assert.ok(J(out['ob.open.ok_busd'])[0][1].includes('올라온 시각 2026.9.30 오전 10시 2분'));
   assert.ok(J(out['ob.open.err'])[0].join('').includes('판을 불러오지 못했습니다: 판&lt;오류&gt;'),'안 고친 글은 그대로');
   assert.ok(J(out['ob.open.ok_pin_nosynced'])[0][1].includes('올라온 시각 확인되지 않음'));
   // AI비용
@@ -219,7 +219,7 @@ test('표에 값이 있으면 그 글: 구체적인 예(홈·입금·진료기�
   assert.match(ai,/<h2>💰 AI 비용 &lt;표&gt; <span class="sub">\(원장 전용\)<\/span><\/h2>/);assert.ok(ai.includes('지난 6달 청구액'));
   assert.ok(ai.includes('<div class="hint">"직접"은 원장 값 &amp; 설명</div>'),'따옴표는 그대로 · &는 이스케이프');
   assert.ok(ai.includes('📣 광고비')&&ai.includes('모델 사용량(7일)'));assert.ok(/\d+ 건<\/span>/.test(ai));
-  assert.match(ai,/기준 2026-10-01 10:00 \/ 환율 1,376/);
+  assert.match(ai,/기준 2026\.10\.1 오전 10시 \/ 환율 1,376/);
   // 급여·명세서
   assert.ok(out['pay.top.ledger'].includes('💰 월급 &lt;관리&gt;'));assert.ok(out['pay.top.ledger'].includes('onclick="setPayView(\'wage\')">시급</button>'));
   assert.ok(J(out['pay.preview.ok'])[1]==='엑셀 2줄 읽음 열 매핑도 저장했습니다.');
@@ -432,7 +432,7 @@ test('화면: 글 고치기에 새 묶음 14개(329개)가 접혀 나오고, 검
   const names=[...sec.matchAll(/<details class="hub-grp" data-hub-group="([^"]*)"/g)].map(m=>m[1]);
   const h=helpers(),defs=h.hubTextDefs();
   const screens7=[...new Set(defs.filter(d=>CH7.test(d.key)).map(d=>d.screen))];
-  assert.equal(names.length,65);
+  assert.equal(names.length,66,'기존 65묶음 + ⏰ 시간 표시 1묶음');
   for(const s of screens7)assert.ok(sec.includes(s.replace(/&/g,'&amp;')),'묶음 이름이 화면에 있음: '+s);
   assert.match(sec,/이름표: pay\.m_xls_read/);assert.match(sec,/이름표: slip\.doc_title/);assert.match(sec,/이름표: acct\.c_delete/);
   assert.match(sec,/⚠ 명세서를 발행할 때 이 글이 본문에 박혀서 저장돼요/);
@@ -443,7 +443,7 @@ test('화면: 글 고치기에 새 묶음 14개(329개)가 접혀 나오고, 검
     const rows=defs.map((d,i)=>d.screen===sc?{idx:i,hidden:false,getAttribute(){return String(i);}}:null).filter(Boolean);
     groups.push({name:sc,hidden:false,open:false,rows,querySelectorAll(){return this.rows;}});
   }
-  assert.equal(groups.length,65);
+  assert.equal(groups.length,66);
   const fsec={querySelectorAll(sel){return sel==='[data-hub-group]'?groups:[];}};
   const visible=()=>groups.filter(g=>!g.hidden).map(g=>g.name);
   const shown=()=>groups.reduce((n,g)=>n+g.rows.filter(r=>!r.hidden).length,0);
@@ -456,7 +456,7 @@ test('화면: 글 고치기에 새 묶음 14개(329개)가 접혀 나오고, 검
   filter(fsec,'acct.c_delete');assert.deepEqual(visible(),['🛡️ 계정·권한 관리 › 위험 작업 확인창'],'이름표(키)로도 찾음');
   filter(fsec,'영구히 삭제합니다');assert.deepEqual(visible(),['🛡️ 계정·권한 관리 › 위험 작업 확인창'],'기본 글로도 찾음');
   filter(fsec,'zzzz없는낱말');assert.equal(visible().length,0);assert.equal(shown(),0);
-  filter(fsec,'');assert.equal(visible().length,65);assert.equal(shown(),defs.length,'검색어를 지우면 전부 보임');
+  filter(fsec,'');assert.equal(visible().length,66);assert.equal(shown(),defs.length,'검색어를 지우면 전부 보임');
   filter(fsec,'원본 보관 실패');assert.ok(visible().includes('💰 급여 › 급여대장·시급설정'));
   filter(fsec,'');
   // 고친 글은 지금 글로도 찾아진다
