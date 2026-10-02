@@ -933,16 +933,19 @@ async function loadSchedulePeople(){
   if(recovered)setStatus();
   return SCHEDULE_PEOPLE;
 }
-async function refreshBadges(){
-  BADGE={};
+async function refreshBadges(propagateAttendanceError=false){
+  const previousAttBadge=BADGE.att;
+  let attendanceError=null;
+  BADGE=ME.role==='owner'?{}:{att:previousAttBadge};
   // 내 미읽음 공지
   const {data:nt}=await sb.from('notices').select('id');
   const {data:rd}=await sb.from('notice_reads').select('notice_id').eq('user_id',ME.id);
   const readset=new Set((rd||[]).map(r=>r.notice_id));
   BADGE.notice=(nt||[]).filter(n=>!readset.has(n.id)).length||0;
   if(ME.role!=='owner'){
-  const {count}=await sb.from('attendance_issues').select('id',{count:'exact',head:true}).eq('user_id',ME.id).in('type',['시업누락','종업누락']).eq('status','대기').is('staff_responded_at',null);
-    BADGE.att=count||0;
+  const {count,error}=await sb.from('attendance_issues').select('id',{count:'exact',head:true}).eq('user_id',ME.id).in('type',['시업누락','종업누락']).eq('status','대기').is('staff_responded_at',null);
+    if(error)attendanceError=error;
+    else BADGE.att=count||0;
   }
   // 결재 대기(내가 처리자)
   if(isLead()){
@@ -963,6 +966,7 @@ async function refreshBadges(){
     BADGE.contract=CONTRACT_ALERTS.length||0;
   }else CONTRACT_ALERTS=[];
   renderNav();
+  if(propagateAttendanceError&&attendanceError)throw attendanceError;
 }
 
 /* ── 렌더 라우터 ── */
@@ -1189,7 +1193,7 @@ async function submitAttendanceIssueForm(){
     ATT_ISSUE_FORM.existingFiles=existing.concat(linked);ATT_ISSUE_EVIDENCE[Number(row.id)]=ATT_ISSUE_FORM.existingFiles;$('#attIssueFiles').value='';
     if(failed){msg.textContent=uncertain?hubT('att.issueform.m_uncertain','소명은 저장됐지만 파일 {n}개의 처리 결과를 확인하지 못했습니다. 파일이 남아 있을 수 있어 삭제하지 않았습니다. 내 소명에서 상태를 확인해 주세요.',{n:uncertain}):hubT('att.issueform.m_partial','소명은 저장됐고 파일 {n}개가 안 올라갔습니다. 「내 소명」의 고치기로 다시 올려 주세요.',{n:failed});setStatus('error');}
     else {msg.textContent=hubT('att.issueform.m_saved','소명을 저장했습니다.');setStatus('saved');saveComplete=true;}
-    try{await refreshBadges();renderNav();}catch(refreshError){refreshFailed=true;msg.textContent=hubT('att.issueform.m_refresh_fail','소명은 저장됐지만 화면 갱신에 실패했습니다. 다시 열어 저장 상태를 확인해 주세요.');setStatus('error');}
+    try{await refreshBadges(true);renderNav();}catch(refreshError){refreshFailed=true;msg.textContent=hubT('att.issueform.m_refresh_fail','소명은 저장됐지만 화면 갱신에 실패했습니다. 다시 열어 저장 상태를 확인해 주세요.');setStatus('error');}
     if(saveComplete&&!refreshFailed){hide('attIssueMask');render();}
   }catch(error){msg.textContent=hubT('att.issueform.m_fail','소명 저장 실패: {detail}',{detail:error?.message||String(error)});setStatus('error');}
   finally{ATT_ISSUE_FORM.busy=false;button.disabled=false;}
