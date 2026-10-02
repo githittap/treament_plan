@@ -718,6 +718,8 @@ function hubTextDefsChapter4(add){
   add('notice.preview.title',N3,'첨부 미리보기 창 맨 위 제목(내 서류함에서 서류를 미리 볼 때도 같은 창)','📎 첨부 미리보기');
   add('notice.preview_unsupported',N3,'미리보기가 안 되는 형식의 파일을 열었을 때 뜨는 글(내 서류함 미리보기도 같음)','이 형식은 미리보기를 지원하지 않습니다. 다운로드하여 확인하세요.');
   add('notice.m_open_fail',N3,'첨부 파일을 못 열었을 때 알림창({msg}는 서버 오류)','첨부 열기 실패: {msg}',['msg']);
+  add('notice.btn_download',N3,'미리보기를 지원하지 않는 첨부의 내려받기 단추','⬇ 내려받기');
+  add('notice.m_no_file',N3,'첨부 서명 주소가 없을 때 오류 이유','파일 없음');
   const C1='📅 캘린더 › 월·주간 화면';
   const C2='📅 캘린더 › 날짜 상세·일정 추가';
   const C3='📅 캘린더 › 연차 캘린더 보기';

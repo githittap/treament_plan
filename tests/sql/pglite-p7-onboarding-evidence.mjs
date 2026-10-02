@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
+const {PGlite}=await import(pathToFileURL(path.join(process.env.PGLITE_PACKAGE_ROOT,'dist/index.js')).href);
+const db=new PGlite(),uid='11111111-1111-1111-1111-111111111111';
+const insert=item=>db.query("insert into onboarding_checks(user_id,item_id,status) values($1,$2,'제출')",[uid,item]);
+try{
+  await db.exec(`create table onboarding_items(id bigint primary key,label text);
+  create table onboarding_checks(user_id uuid,item_id bigint references onboarding_items(id),status text,unique(user_id,item_id));
+  create table onboarding_evidence_completion(user_id uuid primary key,bank_complete boolean,notion_complete boolean);
+  insert into onboarding_items values (1,'급여 계좌번호 제출'),(2,'노션 가입'),(3,'일반 항목'),(4,'Notion 가입');`);
+  await db.exec(fs.readFileSync('db/p7_onboarding_evidence_gate_20261003.sql','utf8'));
+  await db.exec(`create role authenticated;grant usage on schema public to authenticated;
+  grant select on onboarding_items,onboarding_evidence_completion to authenticated;grant insert,update,select on onboarding_checks to authenticated;
+  alter table onboarding_evidence_completion enable row level security;alter table onboarding_checks enable row level security;
+  create policy completion_self on onboarding_evidence_completion to authenticated using(user_id='${uid}'::uuid);
+  create policy checks_self on onboarding_checks to authenticated using(user_id='${uid}'::uuid) with check(user_id='${uid}'::uuid);
+  set role authenticated;`);
+  for(const item of [1,2,4])await assert.rejects(insert(item),/onboarding evidence is required/);
+  await insert(3);
+  await db.exec('reset role');
+  await db.query('insert into onboarding_evidence_completion values($1,true,false)',[uid]);
+  await db.exec('set role authenticated');
+  await insert(1);await assert.rejects(insert(2),/onboarding evidence is required/);
+  await db.exec('reset role');await db.query('update onboarding_evidence_completion set notion_complete=true');await db.exec('set role authenticated');
+  await insert(2);await insert(4);
+  await db.exec('reset role');await db.query('update onboarding_evidence_completion set bank_complete=false');await db.exec('set role authenticated');
+  await assert.rejects(db.query("update onboarding_checks set status='확인' where item_id=1"),/onboarding evidence is required/);
+  assert.equal((await db.query('select count(*)::int n from onboarding_checks')).rows[0].n,4);
+  await db.exec('reset role');await db.exec(fs.readFileSync('db/p7_onboarding_evidence_gate_20261003_rollback.sql','utf8'));
+  assert.equal((await db.query('select count(*)::int n from onboarding_checks')).rows[0].n,4);
+  console.log('PGLITE_P7_ONBOARDING_EVIDENCE_PASS: 증빙 없는 직접 INSERT·UPDATE 거절, 계좌·Notion 완료 후 제출, 일반 항목 유지, rollback 기록 보존');
+}finally{await db.close();}

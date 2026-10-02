@@ -1864,12 +1864,11 @@ async function apprAct(docId,act){
 }
 async function submitApproval(){
   const label=$('#apKind').value,title=$('#apTitle').value.trim();
+  if(label==='연차 신청'||label==='연차'){hide('apMask');openLeave();return;}
   if(!title){$('#apMsg').textContent=hubT('appr.m_title_required','제목을 입력하세요.');return;}
-  if(label==='연차 신청'){hide('apMask');openLeave();return;}
   const kind=approvalKindValue(label),storedTitle=approvalRequestTitle(label,title),storedBody=approvalRequestBody(label,$('#apBody').value);
-  const {data:doc,error}=await sb.from('approval_docs').insert({kind,title:storedTitle,body:storedBody,author:ME.id}).select().single();
+  const {error}=await sb.rpc('submit_approval_document',{p_kind:kind,p_title:storedTitle,p_body:storedBody});
   if(error){$('#apMsg').textContent=hubT('appr.m_fail','실패: {msg}',{msg:error.message});return;}
-  await sb.from('approval_steps').insert([{doc_id:doc.id,seq:1,approver_role:'chief'},{doc_id:doc.id,seq:2,approver_role:'owner'}]);
   hide('apMask');$('#apTitle').value='';$('#apBody').value='';setStatus('saved');render();
 }
 
@@ -1899,7 +1898,7 @@ function printEmploymentCertificate(){document.body.classList.add('certificate-p
 function approvalKindItems(){const def=[{code:'연차 신청',label:'연차 신청'},{code:'사직서',label:'사직서'},{code:'재직증명서 발급',label:'재직증명서 발급'},{code:'보고',label:'보고'},{code:'소명',label:'소명'},{code:'기타',label:'기타'}];if(typeof hubList!=='function')return def;const codes=new Set(def.map(d=>d.code));return hubList('list.approval_kinds',def).filter(i=>codes.has(i.code));} /* 결재 종류 이름: 허브 설정 › 목록에서 이름만 고침(코드는 저장 규칙·재직증명서 발급 흐름과 묶여 고정, 새 종류 못 늘림) */
 function approvalStatusLabel(c){const def=[{code:'진행',label:'진행'},{code:'완결',label:'완결'},{code:'반려',label:'반려'},{code:'취소',label:'취소'}];const items=typeof hubList==='function'?hubList('list.approval_status',def):def;const it=items.find(function(i){return i.code===c;});return it?it.label:c;} /* 결재 문서 상태 이름: 허브 설정 › 목록에서 이름만 고침(코드는 결재 흐름·DB 값이라 고정) */
 function approvalKindDisplay(doc){const kind=String(doc&&doc.kind!=null?doc.kind:'');let code=null;if(kind==='기타')code=isEmploymentCertificateRequest(doc)?'재직증명서 발급':'기타';else for(const c in APPROVAL_KIND_VALUES){if(APPROVAL_KIND_VALUES[c]===kind&&c!=='재직증명서 발급'){code=c;break;}}const it=code?approvalKindItems().find(i=>i.code===code):null;return it&&it.label!==code?it.label:kind;} /* 문서 카드의 [종류]: 원장이 이름을 고친 종류만 새 이름, 안 고쳤으면 저장된 종류 그대로(옛 화면과 같음) */
-function apprKindSelectFill(){try{const sel=$('#apKind');if(!sel)return;const items=approvalKindItems(),want=items.map(i=>i.code+'|'+i.label).join('\n'),have=Array.from(sel.options||[]).map(o=>o.value+'|'+o.textContent).join('\n');if(want===have)return;const cur=sel.value;sel.innerHTML=items.map(i=>hubOptionHtml(i.code,i.label)).join('');if(items.some(i=>i.code===cur))sel.value=cur;}catch(e){}} /* 결재 올리기 창의 종류 고르는 칸: 값은 코드, 글은 허브 설정의 이름 */
+function apprKindSelectFill(){try{const sel=$('#apKind');if(!sel)return;sel.onchange=()=>{if(sel.value==='연차 신청'||sel.value==='연차'){hide('apMask');openLeave();}};const items=approvalKindItems(),want=items.map(i=>i.code+'|'+i.label).join('\n'),have=Array.from(sel.options||[]).map(o=>o.value+'|'+o.textContent).join('\n');if(want===have)return;const cur=sel.value;sel.innerHTML=items.map(i=>hubOptionHtml(i.code,i.label)).join('');if(items.some(i=>i.code===cur))sel.value=cur;}catch(e){}} /* 결재 올리기 창의 종류 고르는 칸: 값은 코드, 글은 허브 설정의 이름 */
 /* ── 공지 ── */
 let NOTICE_INLINE_OBJECT_URLS=[];
 function revokeNoticeInlineObjectUrls(){for(const url of NOTICE_INLINE_OBJECT_URLS.splice(0))URL.revokeObjectURL(url);}
@@ -1930,10 +1929,12 @@ async function renderNotice(m){
   for(const n of (list||[])) sb.from('notice_reads').upsert({notice_id:n.id,user_id:ME.id},{onConflict:'notice_id,user_id',ignoreDuplicates:true}).then(()=>{});
   refreshBadges();
 }
-function noticeAttachmentLinks(notice){const attachments=Array.isArray(notice.attachments)?notice.attachments:[];if(!attachments.length)return '<div class="sub">'+esc(hubT('notice.attach_none','첨부 없음'))+'</div>';return `<div class="sub">${esc(hubT('notice.attach_label','첨부:'))} ${attachments.map(a=>`<button class="mini" data-notice-attachment-path="${esc(a.path||'')}" data-notice-attachment-name="${esc(a.name||hubT('notice.attach_default_name','첨부파일'))}" data-notice-attachment-type="${esc(a.type||'')}" onclick="previewNoticeAttachment(this.dataset.noticeAttachmentPath,this.dataset.noticeAttachmentName,this.dataset.noticeAttachmentType)">${esc(a.name||hubT('notice.attach_default_name','첨부파일'))}</button>`).join(' ')}</div>`;}
+function noticeAttachmentLinks(notice){const attachments=Array.isArray(notice.attachments)?notice.attachments:[];if(!attachments.length)return '<div class="sub">'+esc(hubT('notice.attach_none','첨부 없음'))+'</div>';return `<div class="sub">${esc(hubT('notice.attach_label','첨부:'))} ${attachments.map(a=>`<button class="mini" data-notice-attachment-path="${esc(a.path||'')}" data-notice-attachment-name="${esc(a.name||hubT('notice.attach_default_name','첨부파일'))}" data-notice-attachment-type="${esc(a.type||'')}" onclick="return openNoticeAttachment(this.dataset.noticeAttachmentPath,this.dataset.noticeAttachmentName,this.dataset.noticeAttachmentType)">${esc(a.name||hubT('notice.attach_default_name','첨부파일'))}${noticeAttachmentPreviewable(a.name,a.type)?'':' · '+esc(hubT('notice.btn_download','⬇ 내려받기'))}</button>`).join(' ')}</div>`;}
+function noticeAttachmentPreviewable(name,type){return String(type||'').startsWith('image/')||type==='application/pdf'||/\.pdf$/i.test(name||'');}
+async function downloadNoticeAttachment(path,name){if(!path)return;const {data,error}=await sb.storage.from('notice-attachments').createSignedUrl(path,60,{download:name||hubT('notice.attach_default_name','첨부파일')});if(error||!data?.signedUrl){alert(hubT('notice.m_open_fail','첨부 열기 실패: {msg}',{msg:error?.message||hubT('notice.m_no_file','파일 없음')}));return;}window.location.assign(data.signedUrl);}
+async function openNoticeAttachment(path,name,type){return noticeAttachmentPreviewable(name,type)?previewNoticeAttachment(path,name,type):downloadNoticeAttachment(path,name);}
 function documentPreviewMarkup(url,name,type){if(String(type||'').startsWith('image/'))return `<img src="${url}" alt="${esc(name)}" style="max-width:100%;max-height:70vh;display:block;margin:auto">`;if(type==='application/pdf'||/\.pdf$/i.test(name||''))return `<iframe title="${esc(name)}" src="${url}" style="width:100%;height:70vh;border:1px solid var(--line);background:#fff"></iframe>`;return `<div class="empty">${esc(hubT('notice.preview_unsupported','이 형식은 미리보기를 지원하지 않습니다. 다운로드하여 확인하세요.'))}</div>`;}
 async function previewNoticeAttachment(path,name,type){if(!path)return;const {data,error}=await sb.storage.from('notice-attachments').download(path);if(error){alert(hubT('notice.m_open_fail','첨부 열기 실패: {msg}',{msg:error.message}));return;}const url=URL.createObjectURL(data),box=$('#noticePreviewBody');if(box){box.innerHTML=documentPreviewMarkup(url,name,type||data.type);box.style.display='block';show('noticePreviewMask');}setTimeout(()=>URL.revokeObjectURL(url),60000);}
-async function downloadNoticeAttachment(path,name){return previewNoticeAttachment(path,name,'');}
 async function cleanupNoticeUploads(paths){if(paths.length)await sb.storage.from('notice-attachments').remove(paths);}
 async function submitNotice(){
   const title=$('#ntTitle').value.trim();if(!title){$('#ntMsg').textContent=hubT('notice.m_title_required','제목을 입력하세요.');return;}
@@ -2340,6 +2341,7 @@ function onboardingGuideCard({collapsed=false}={}){const items=onboardingGuideIt
 /* onboarding-evidence:test-start */
 function hubT(k,d,v){return typeof hubText==='function'?hubText(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
 function isAllowedLatentTuberculosisEvidenceMime(mime){return ['application/pdf','image/png','image/jpeg','image/gif'].includes(String(mime||'').trim().toLowerCase());}
+function onboardingItemEvidenceKind(label){if(/계좌/.test(label||''))return '계좌';if(/notion|노션/i.test(label||''))return 'Notion';return null;}
 function onboardingEvidenceComplete(kind,profile,documents,contracts=[],userId=null){
   const p=profile||{},docs=documents||[];
   if(kind==='계좌')return !!(String(p.bank_name||'').trim()&&String(p.account_number||'').trim());
@@ -2509,12 +2511,32 @@ function paymentRequestCard(rows,error,receipts,receiptsError){
   return `<div class="card" id="paymentRequestBox"><h2>${esc(hubT('onbo.pay.title','💳 결제 요청'))}</h2><div class="hint">${esc(hubT('onbo.pay.hint','금액·계좌·영수증은 요청자와 결재선(실장 → 원장)만 볼 수 있습니다.'))}</div>${errorText}${list}<div class="grid" style="margin-top:10px"><div class="fld w2"><label>${esc(hubT('onbo.pay.f_item','결제건(사유) *'))}</label><input id="paymentItem" maxlength="500"></div><div class="fld"><label>${esc(hubT('onbo.pay.f_amount','결제금액 *'))}</label><input id="paymentAmount" type="number" min="1" inputmode="numeric"></div><div class="fld"><label>${esc(hubT('onbo.pay.f_deadline','결제마감일'))}</label><input id="paymentDeadline" type="date"></div><div class="fld"><label>${esc(hubT('onbo.pay.f_bank','결제은행 *'))}</label><input id="paymentBank" maxlength="100"></div><div class="fld"><label>${esc(hubT('onbo.pay.f_holder','예금주 *'))}</label><input id="paymentHolder" maxlength="100"></div><div class="fld"><label>${esc(hubT('onbo.pay.f_account','계좌번호 *'))}</label><input id="paymentAccount" maxlength="100"></div><div class="fld w2"><label>${esc(hubT('onbo.pay.f_files','영수증·파일'))}</label><input id="paymentFiles" type="file" multiple accept="application/pdf,image/jpeg,image/png,.doc,.docx,.hwp,.hwpx"></div></div><button class="hbtn pri" style="margin-top:10px" onclick="submitPaymentRequest()">${esc(hubT('onbo.pay.btn_submit','실장·원장에게 결제 요청'))}</button><div class="msg" id="paymentMsg"></div></div>`;
 }
 function hubT(k,d,v){return typeof hubText==='function'?hubText(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
+let PAYMENT_REQUEST_RETRY=null,PAYMENT_REQUEST_SUBMITTING=false;
 async function submitPaymentRequest(){
+  if(PAYMENT_REQUEST_SUBMITTING)return;
   const msg=$('#paymentMsg'),item=$('#paymentItem').value.trim(),amount=Number($('#paymentAmount').value),bank=$('#paymentBank').value.trim(),holder=$('#paymentHolder').value.trim(),account=$('#paymentAccount').value.trim(),deadline=$('#paymentDeadline').value||null,files=[...($('#paymentFiles').files||[])];
   if(!item||!Number.isSafeInteger(amount)||amount<=0||!bank||!holder||!account){msg.textContent=hubT('onbo.pay.m_missing','결제건·금액·은행·예금주·계좌번호를 입력하세요.');return;}for(const file of files){const problem=validateGeneralDocument(file);if(problem){msg.textContent=problem;return;}}
-  setStatus('saving');msg.textContent=hubT('onbo.pay.m_saving','결제 요청 저장 중…');const {data:requestId,error}=await sb.rpc('submit_payment_request',{p_payment_item:item,p_deadline_date:deadline,p_bank_name:bank,p_account_holder:holder,p_account_number:account,p_amount_krw:amount});if(error){msg.textContent=hubT('onbo.pay.m_fail','결제 요청 실패: {detail}',{detail:error.message});setStatus('error');return;}
-  const uploaded=[];for(const file of files){const path=`${ME.id}/${requestId}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`,upload=await sb.storage.from('payment-receipts').upload(path,file,{contentType:file.type,upsert:false});if(upload.error){await sb.storage.from('payment-receipts').remove(uploaded);msg.textContent=hubT('onbo.pay.m_receipt_up_fail','영수증 업로드 실패: {detail}',{detail:upload.error.message});setStatus('error');return;}uploaded.push(path);const attached=await sb.rpc('payment_request_add_receipt',{p_request_id:Number(requestId),p_storage_path:path,p_original_name:file.name,p_mime_type:file.type,p_size_bytes:file.size});if(attached.error){await sb.storage.from('payment-receipts').remove(uploaded);msg.textContent=hubT('onbo.pay.m_receipt_link_fail','영수증 연결 실패: {detail}',{detail:attached.error.message});setStatus('error');return;}}
-  setStatus('saved');render();
+  const payload={p_payment_item:item,p_deadline_date:deadline,p_bank_name:bank,p_account_holder:holder,p_account_number:account,p_amount_krw:amount},signature=JSON.stringify([ME.id,payload]);
+  PAYMENT_REQUEST_SUBMITTING=true;
+  try{
+    setStatus('saving');msg.textContent=hubT('onbo.pay.m_saving','결제 요청 저장 중…');
+    if(!PAYMENT_REQUEST_RETRY||PAYMENT_REQUEST_RETRY.signature!==signature){
+      const {data:requestId,error}=await sb.rpc('submit_payment_request',payload);
+      if(error){msg.textContent=hubT('onbo.pay.m_fail','결제 요청 실패: {detail}',{detail:error.message});setStatus('error');return;}
+      PAYMENT_REQUEST_RETRY={signature,id:requestId,linkedFiles:new Set()};
+    }
+    const pending=PAYMENT_REQUEST_RETRY;
+    for(const file of files){
+      if(pending.linkedFiles.has(file))continue;
+      const path=`${ME.id}/${pending.id}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`,upload=await sb.storage.from('payment-receipts').upload(path,file,{contentType:file.type,upsert:false});
+      if(upload.error){msg.textContent=hubT('onbo.pay.m_receipt_up_fail','영수증 업로드 실패: {detail}',{detail:upload.error.message});setStatus('error');return;}
+      const attached=await sb.rpc('payment_request_add_receipt',{p_request_id:Number(pending.id),p_storage_path:path,p_original_name:file.name,p_mime_type:file.type,p_size_bytes:file.size});
+      if(attached.error){await sb.storage.from('payment-receipts').remove([path]);msg.textContent=hubT('onbo.pay.m_receipt_link_fail','영수증 연결 실패: {detail}',{detail:attached.error.message});setStatus('error');return;}
+      pending.linkedFiles.add(file);
+    }
+    setStatus('saved');await render();PAYMENT_REQUEST_RETRY=null;
+  }catch(error){msg.textContent=hubT('onbo.pay.m_fail','결제 요청 실패: {detail}',{detail:error.message});setStatus('error');}
+  finally{PAYMENT_REQUEST_SUBMITTING=false;}
 }
 async function paymentRequestAct(id,action){const reason=action==='reject'?prompt(hubT('onbo.pay.p_reject_reason','반려 사유를 입력하세요.'))||'':null;if(action==='reject'&&!reason)return;const {error}=await sb.rpc('payment_request_act',{p_request_id:Number(id),p_action:action,p_reason:reason});if(error){alert(hubT('onbo.pay.a_act_fail','결재 처리 실패: {detail}',{detail:error.message}));return;}setStatus('saved');render();}
 function empdocPreviewFill(h){return String(h).replace('title="근로계약서 미리보기"',()=>'title="'+esc(hubT('empdoc.preview_title','근로계약서 미리보기'))+'"');} /* 직원 서류함 계약서 미리보기 창 이름: 기존 시험이 이 줄 모양을 찾으므로 원문은 그대로 두고, 고쳤을 때만 바꿔 넣음 */
@@ -2563,7 +2585,19 @@ async function onboOverview(){
     ${rows.map(r=>`<tr class="warn"><td>${esc(r.name)}</td><td>${esc(r.common)}</td><td>${r.miss.map(i=>esc(i.label)).join(', ')||'-'}</td></tr>`).join('')}</table>`:'<div class="empty">'+esc(hubT('onbo.over.all_done','전원 제출 완료'))+'</div>'}
     <div class="hint">${esc(hubT('onbo.over.hint','chief·manager는 완료 여부를 안내·점검하며 계좌번호 원문은 보지 않습니다.'))}</div></div>`;
 }
-async function submitOnbo(itemId){await sb.from('onboarding_checks').upsert({user_id:ME.id,item_id:itemId,status:'제출',submitted_at:new Date().toISOString()},{onConflict:'user_id,item_id'});setStatus('saved');render();refreshBadges();}
+async function submitOnbo(itemId){
+  const {data:item,error:itemError}=await sb.from('onboarding_items').select('label').eq('id',itemId).maybeSingle();
+  if(itemError||!item){alert(hubT('onbo.check.m_save_fail','체크리스트 저장 실패: {detail}',{detail:itemError?.message||hubT('onbo.check.state_need','확인 필요')}));return;}
+  const kind=onboardingItemEvidenceKind(item.label);
+  if(kind){
+    const {data:evidence,error}=await sb.from('onboarding_evidence').select('*').eq('user_id',ME.id).maybeSingle();
+    if(error){alert(hubT('onbo.check.m_save_fail','체크리스트 저장 실패: {detail}',{detail:error.message}));return;}
+    if(!onboardingEvidenceComplete(kind,evidence,[])){alert(hubT('onbo.check.hint','계좌번호는 은행명과 계좌번호가 모두 있어야 완료입니다. Notion은 ID, 앱 설치, 워크스페이스 로그인 확인이 모두 있어야 완료입니다. 잠복결핵·자격증·보안서약은 파일을 올리면 완료됩니다.'));return;}
+  }
+  const {error}=await sb.from('onboarding_checks').upsert({user_id:ME.id,item_id:itemId,status:'제출',submitted_at:new Date().toISOString()},{onConflict:'user_id,item_id'});
+  if(error){alert(hubT('onbo.check.m_save_fail','체크리스트 저장 실패: {detail}',{detail:error.message}));return;}
+  setStatus('saved');render();refreshBadges();
+}
 async function confirmOnbo(itemId){await sb.from('onboarding_checks').update({status:'확인',checked_by:ME.name,checked_at:new Date().toISOString()}).eq('item_id',itemId).eq('user_id',ME.id);setStatus('saved');render();}
 async function addOnboItem(){const l=$('#oiNew').value.trim();if(!l)return;await sb.from('onboarding_items').insert({label:l});setStatus('saved');render();}
 

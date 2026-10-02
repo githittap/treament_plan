@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
+const {PGlite}=await import(pathToFileURL(path.join(process.env.PGLITE_PACKAGE_ROOT,'dist/index.js')).href);
+const db=new PGlite();
+try{
+  await db.exec(`create schema auth; create function auth.uid() returns uuid language sql as $$ select '11111111-1111-1111-1111-111111111111'::uuid $$;
+  create table approval_docs(id bigint generated always as identity primary key,kind text,title text,body text,author uuid);
+  create table approval_steps(doc_id bigint references approval_docs(id),seq int,approver_role text);
+  create function force_step_failure() returns trigger language plpgsql as $$ begin if new.approver_role='owner' then raise exception 'forced approval step failure'; end if; return new; end $$;
+  create trigger force_step_failure before insert on approval_steps for each row execute function force_step_failure();`);
+  await db.exec(`create role authenticated;grant usage on schema public,auth to authenticated;
+  grant insert,select on approval_docs,approval_steps to authenticated;grant usage on sequence approval_docs_id_seq to authenticated;
+  alter table approval_docs enable row level security;alter table approval_steps enable row level security;
+  create policy docs_self on approval_docs to authenticated using(author=auth.uid()) with check(author=auth.uid());
+  create policy steps_self on approval_steps to authenticated using(exists(select 1 from approval_docs d where d.id=doc_id and d.author=auth.uid())) with check(exists(select 1 from approval_docs d where d.id=doc_id and d.author=auth.uid()));`);
+  await db.exec(fs.readFileSync('db/p7_approval_atomic_20261003.sql','utf8'));
+  await db.exec('set role authenticated');
+  await assert.rejects(db.query("select submit_approval_document('보고','제목','내용')"),/forced approval step failure/);
+  assert.equal((await db.query('select count(*)::int n from approval_docs')).rows[0].n,0);
+  assert.equal((await db.query('select count(*)::int n from approval_steps')).rows[0].n,0);
+  await db.exec('reset role;drop trigger force_step_failure on approval_steps;set role authenticated');
+  const id=(await db.query("select submit_approval_document('보고','제목','내용') id")).rows[0].id;
+  assert.equal((await db.query('select count(*)::int n from approval_docs')).rows[0].n,1);
+  assert.deepEqual((await db.query('select seq,approver_role from approval_steps where doc_id=$1 order by seq',[id])).rows,[{seq:1,approver_role:'chief'},{seq:2,approver_role:'owner'}]);
+  assert.equal((await db.query('select author from approval_docs')).rows[0].author,'11111111-1111-1111-1111-111111111111');
+  await db.exec('reset role');
+  await db.exec(fs.readFileSync('db/p7_approval_atomic_20261003_rollback.sql','utf8'));
+  assert.equal((await db.query('select count(*)::int n from approval_docs')).rows[0].n,1);
+  console.log('PGLITE_P7_APPROVAL_ATOMIC_PASS: 결재선 실패 시 문서·단계 0개, 성공 시 문서 1개·단계 2개, rollback 문서 보존');
+}finally{await db.close();}

@@ -396,7 +396,7 @@ test('화면: 원장에게는 「📝 글 고치기 · 🔢 숫자·기준 · �
   assert.match(sec,/<input id="hubTxtSearch"/);
   assert.equal((sec.match(/<details class="hub-grp" data-hub-group="/g)||[]).length,3+11+11+12+9+5+14+1,'화면별 접기: 탭 이름·메뉴 묶음 이름·계정·권한 + 차례 2(내 서류함 8 · 업무자료 3) + 차례 3(출퇴근 5 · 근무표 2 · 연차 4) + 차례 4(결재함 4 · 공지 3 · 캘린더 3 · 건의함 2) + 차례 5(문의함 6 · 상담일지 3) + 시간 표시 1(⏰ 시간 표시 · 2026-10-02)');
   const n=(sec.match(/data-hub-text-save="\d+"/g)||[]).length;
-  assert.equal(n,21+4+19+192+326+145+168+188+329+8+2+5,'키마다 저장 단추(P7 이름 보기·계약 직무 별칭·충돌 안내 키를 포함함)');
+  assert.equal(n,21+4+19+192+326+147+168+188+329+8+2+5,'키마다 저장 단추(P7 이름 보기·계약 직무 별칭·충돌 안내 키를 포함함)');
   assert.equal((sec.match(/data-hub-text-reset="\d+"/g)||[]).length,n);
   assert.match(sec,/고친 것 1개/);assert.match(sec,/<span class="b ok">고침<\/span>/);
   assert.match(sec,/이름표: tab\.home/);

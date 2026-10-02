@@ -84,8 +84,8 @@ test('표시 라벨은 approval_docs CHECK 허용값으로 매핑되고 재직�
 });
 
 test('연차 신청 라벨은 별도 연차 신청 흐름으로 전환되고 실제 approval_docs 저장은 허용값만 사용한다', () => {
-  assert.match(html, /if\(label==='연차 신청'\)\{hide\('apMask'\);openLeave\(\);return;\}/);
-  assert.match(html, /insert\(\{kind,title:storedTitle,body:storedBody,author:ME\.id\}\)/);
+  assert.match(html, /if\(label==='연차 신청'\|\|label==='연차'\)\{hide\('apMask'\);openLeave\(\);return;\}/);
+  assert.match(html, /rpc\('submit_approval_document',\{p_kind:kind,p_title:storedTitle,p_body:storedBody\}\)/);
 });
 
 test('작성자 표시와 approval_docs 권한 경계가 실제 필드·정책과 맞는다', () => {
@@ -152,16 +152,17 @@ test('실제 submitApproval은 연차 흐름과 재직증명서 저장 payload�
     $: selector => values[selector],
     hide: () => calls.push(['hide']), openLeave: () => calls.push(['openLeave']), setStatus: () => {}, render: () => {},
     refreshBadges: () => {}, ME: { id: 'staff-1' },
-    sb: { from: table => { calls.push(['from', table]); return { insert: payload => { calls.push(['insert', payload]); return { select: () => ({ single: async () => ({ data: { id: 7 }, error: null }) }) }; } }; } }
+    sb: { rpc: async (name,payload) => { calls.push(['rpc',name,payload]); return { data: 7, error: null }; } }
   };
   vm.runInNewContext(`${helperBlock[1]};${submitSource};this.submitApproval=submitApproval;`, context);
   await context.submitApproval();
-  assert.equal(calls.filter(call => call[0] === 'insert').length, 0);
+  assert.equal(calls.filter(call => call[0] === 'rpc').length, 0);
   assert.deepEqual(calls.filter(call => call[0] === 'openLeave'), [['openLeave']]);
 
   calls.length = 0; values['#apKind'].value = '재직증명서 발급'; values['#apTitle'].value = '발급 요청'; values['#apBody'].value = '2026년 재직 확인';
   await context.submitApproval();
-  const docInsert = calls.find(call => call[0] === 'insert')[1];
-  assert.deepEqual(JSON.parse(JSON.stringify(docInsert)), { kind: '기타', title: '[재직증명서 발급] 발급 요청', body: '[재직증명서 발급 요청]\n2026년 재직 확인', author: 'staff-1' });
-  assert.equal(calls.filter(call => call[0] === 'insert').length, 2);
+  const docInsert = calls.find(call => call[0] === 'rpc');
+  assert.equal(docInsert[1],'submit_approval_document');
+  assert.deepEqual(JSON.parse(JSON.stringify(docInsert[2])), { p_kind: '기타', p_title: '[재직증명서 발급] 발급 요청', p_body: '[재직증명서 발급 요청]\n2026년 재직 확인' });
+  assert.equal(calls.filter(call => call[0] === 'rpc').length, 1);
 });

@@ -115,6 +115,7 @@ function makeSb(over){
     storage:{from(){return {
       upload:async()=>({error:o.uploadError||null}),
       download:async()=>(o.downloadError?{data:null,error:{message:o.downloadError}}:{data:{type:'image/png'},error:null}),
+      createSignedUrl:async()=>({data:null,error:null}),
       remove:async()=>({error:null})};}}
   };
   sb.rpcCalls=rpcCalls;sb.ups=ups;
@@ -170,7 +171,7 @@ async function renderAll(html,opts){
       }
     }else if(o.settings)Object.assign(ctx.SETTINGS,o.settings);
     vm.runInContext(timeSrc+'\n'+helperSrc+'\n'+hubTLine+'\n'+apprSrc+'\n'+calSrc+'\n;this.api={renderAppr,docCard,loadSteps,apprAct,submitApproval,cancelApprovalDoc,openEmploymentCertificate,'
-      +'renderNotice,renderNoticeBody,noticeAttachmentLinks,documentPreviewMarkup,previewNoticeAttachment,submitNotice,delNotice,renderNoticePastePreview,'
+      +'renderNotice,renderNoticeBody,noticeAttachmentLinks,documentPreviewMarkup,previewNoticeAttachment,downloadNoticeAttachment,submitNotice,delNotice,renderNoticePastePreview,'
       +'renderCalendar,renderCalendarDayPanel,renderCalendarDayDetail,renderCalendarWeekTable,saveCalendarPng,addCalendarEvent,deleteCalendarEvent,renderLeaveStatus,'
       +'renderSuggestions,saveSuggestion,deleteSuggestion,toggleSuggestionLikeRemote,saveSuggestionReview,saveSuggestionCampaign,'
       +'setState:(k,v)=>{if(k==="CAL_VIEW")CAL_VIEW=v;if(k==="CAL_PERIOD")CAL_PERIOD=v;if(k==="CAL_MONTH")CAL_MONTH=v;if(k==="CAL_WEEK_START")CAL_WEEK_START=v;if(k==="CAL_SELECTED_DATE")CAL_SELECTED_DATE=v;if(k==="CAL_DETAIL_DATE")CAL_DETAIL_DATE=v;if(k==="LVSTATUS_VIEW")LVSTATUS_VIEW=v;if(k==="LVSTATUS_MONTH")LVSTATUS_MONTH=v;if(k==="SUGGESTION_EDIT_ID")SUGGESTION_EDIT_ID=v;if(k==="NOTICE_PASTED_IMAGES")NOTICE_PASTED_IMAGES=v;}};'
@@ -214,7 +215,7 @@ async function renderAll(html,opts){
     const runSub=async(name,vals,sbOver)=>{const d=makeDom();Object.entries(vals).forEach(([k,v])=>{d.$(k).value=v;});const r=await asRole('staff',{$:d.$},sbOver);await r.api.submitApproval();out['appr.submit.'+name]=JSON.stringify([d.$('#apMsg').textContent,r.log,r.statuses,d.$('#apTitle').value]);};
     await runSub('no_title',{'#apKind':'보고','#apTitle':' ','#apBody':''});
     await runSub('leave',{'#apKind':'연차 신청','#apTitle':'휴가','#apBody':''});
-    await runSub('insert_fail',{'#apKind':'보고','#apTitle':'제목','#apBody':'내용'},{tables:{approval_docs:{error:{message:'저장<실패>'}}}});
+    await runSub('insert_fail',{'#apKind':'보고','#apTitle':'제목','#apBody':'내용'},{tables:{approval_docs:{error:{message:'저장<실패>'}}},rpc:{submit_approval_document:{data:null,error:{message:'저장<실패>'}}}});
     await runSub('ok',{'#apKind':'재직증명서 발급','#apTitle':'제목','#apBody':'내용'},{tables:{approval_docs:{single:{id:7}}}});
     const mkCancel=async(name,single,confirmOk)=>{const r=await asRole('chief',{__confirm:confirmOk},{tables:{approval_docs:{single}}});await r.api.cancelApprovalDoc(2);out['appr.cancel.'+name]=JSON.stringify([r.log,r.statuses]);};
     await mkCancel('bad_state',{id:2,kind:'기타',title:'t',status:'진행'},true);
@@ -240,6 +241,7 @@ async function renderAll(html,opts){
     const r2=await asRole('staff',null,{downloadError:'x'});out['notice.body.download_err']=await r2.api.renderNoticeBody('앞[[notice-image:u1/tmp/a.png]]뒤',[{path:'u1/tmp/a.png',name:'a.png',type:'image/png'}]);
     out['notice.body.plain']=await r2.api.renderNoticeBody('<b>글</b> [[notice-image:zz]]',[]);
     out['notice.attachLinks']=JSON.stringify([r2.api.noticeAttachmentLinks({}),r2.api.noticeAttachmentLinks({attachments:[]}),r2.api.noticeAttachmentLinks({attachments:[{path:'p/1',name:'<n>.pdf',type:'application/pdf'},{path:'',name:'',type:''}]})]);
+    const missingFile=await asRole('staff');await missingFile.api.downloadNoticeAttachment('p/1','n.docx');out['notice.download.no_file']=JSON.stringify(missingFile.log);
     out['notice.preview.markup']=JSON.stringify([r2.api.documentPreviewMarkup('blob:u','그림.png','image/png'),r2.api.documentPreviewMarkup('blob:u','문서.pdf',''),r2.api.documentPreviewMarkup('blob:u','표.xlsx','application/vnd.ms-excel')]);
     out['notice.pastePreview']=await (async()=>{const d=makeDom();const q=await asRole('staff',{$:d.$});q.api.setState('NOTICE_PASTED_IMAGES',[{name:'a.png'},{name:''},{}]);q.api.renderNoticePastePreview();return d.$('#ntPastePreview').innerHTML;})();
     for(const [name,sbOver] of [['err',{downloadError:'열기<오류>'}],['ok',null]]){
