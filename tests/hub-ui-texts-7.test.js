@@ -131,7 +131,7 @@ test('숫자 8개·이름 목록 7개: 기본값이 화면 코드와 같고, 화
     assert.ok(d.where&&d.note&&d.screen);
     assert.equal(h.hubListValidate(d,d.def).ok,true,k+' 기본 목록은 저장 검사를 통과');
   }
-  assert.match(hr,/hub-texts\.js\?v=2026100223/,'캐시 번호를 새 값으로 올림(차례 6에서 2026100112 → 2026100113, 10-02 원장요청 5건에서 → 2026100221, 10-02 인박스 판에서 → 2026100223)');
+  assert.match(hr,/hub-texts\.js\?v=2026100306/,'월별 비용 정리의 새 문구 목록을 불러오도록 캐시 번호를 올림');
   assert.ok(!/hub-texts\.js\?v=2026100112/.test(hr));
 });
 

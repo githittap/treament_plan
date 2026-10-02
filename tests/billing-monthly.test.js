@@ -54,3 +54,22 @@ test('workbook download creates real xlsx sheets and preserves numeric refund am
  const h=context({XLSX}).h;h.billingWriteWorkbook('billing.xlsx',[{name:'month',rows:[['date','amount'],['2026-10-01',-1000]]}]);
  assert.equal(calls[0].ws[1][1],-1000);assert.equal(calls[1].name,'billing.xlsx');
 });
+test('download handler selects only the displayed month and produces a twelve-month annual sheet',()=>{
+ const sheets=[],files=[],c=context({ME:{role:'owner'},AICOST_MONTH:'2026-10',XLSX:{utils:{book_new:()=>({}),aoa_to_sheet:rows=>rows,book_append_sheet:(wb,rows)=>sheets.push(clone(rows))},writeFile:(wb,name)=>files.push(name)}});
+ vm.runInContext(html.slice(html.indexOf('let BILLING_EXPORT_DATA='),html.indexOf('/* marketing-expenses:test-start */')),c);
+ vm.runInContext("BILLING_EXPORT_DATA.ai={month:'2026-10',rows:[{date:'2026-10-01',merchant:'Claude',category:'Claude',amount:100,source:'manual'}],yearRows:[{date:'2026-09-01',category:'Claude',amount:50},{date:'2026-10-01',category:'Claude',amount:100}]};",c);
+ c.aicostPlatformLabel=p=>p;c.exportBilling('ai',false);assert.equal(sheets[0].length,2);assert.equal(sheets[0][1][3],100);assert.match(files[0],/2026-10.*\.xlsx$/);
+ c.exportBilling('ai',true);assert.equal(sheets[1].length,13);assert.equal(sheets[1][9][1],50);assert.equal(sheets[1][10][1],100);
+ c.AICOST_MONTH='2026-11';c.exportBilling('ai',false);assert.equal(files.length,2);
+});
+test('failed AI budget writes preserve saved values and successful writes keep different months separate',async()=>{
+ let error={message:'denied'},c=context({ME:{role:'owner'},AICOST_MONTH:'2026-10',SETTINGS:{'aic.budget.2026-09':'900'},$:()=>({value:'1200'}),setStatus:()=>{},render:()=>{},alert:()=>{},sb:{from:()=>({upsert:async()=>({error})})}});
+ await c.h.saveAiMonthBudget();assert.equal(c.SETTINGS['aic.budget.2026-10'],undefined);assert.equal(c.SETTINGS['aic.budget.2026-09'],'900');
+ error=null;await c.h.saveAiMonthBudget();assert.equal(c.SETTINGS['aic.budget.2026-10'],'1200');assert.equal(c.SETTINGS['aic.budget.2026-09'],'900');
+});
+test('all new monthly billing labels are registered in the owner-editable text catalog',()=>{
+ const js=fs.readFileSync('hub-texts.js','utf8'),block=js.match(/\/\* hub-texts:test-start \*\/[\s\S]*?\/\* hub-texts:test-end \*\//)[0],c={};vm.createContext(c);vm.runInContext(block+';this.defs=hubTextDefs();this.text=hubText;this.set=hubTextSetOverrides;',c);
+ const defs=c.defs.filter(d=>d.key.startsWith('bill.'));assert.equal(defs.length,25);assert.equal(new Set(defs.map(d=>d.key)).size,25);
+ c.set([{key:'bill.export_month',value:'월 내역 받기'},{key:'bill.month',value:'{year} / {month}'}]);
+ assert.equal(c.text('bill.export_month','default'),'월 내역 받기');assert.equal(c.text('bill.month','default',{year:2026,month:10}),'2026 / 10');
+});
