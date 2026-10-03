@@ -318,7 +318,8 @@ begin
   prior_mode:=current_setting('app.contract_pdf_mutation',true);
   perform set_config('app.contract_pdf_mutation','pdf_record',true);
   update public.contracts set signed_pdf_path=p_signed_path,signed_pdf_sha256=p_signed_sha256,pdf_signed_at=now(),signed_at=now(),status='서명완료' where id=p_contract_id returning * into c;
-  perform set_config('app.contract_pdf_mutation',coalesce(prior_mode,''),true);
+  -- The integrated wrapper still updates its three sign_slots in this transaction.
+  -- Direct browser UPDATE remains blocked by the invoker-aware P9 trigger.
   insert into public.contract_pdf_signature_audits(contract_id,user_id,action,source_sha256,signed_sha256,signature_sha256,page_no,x,y,width,height)
     values(p_contract_id,p_user_id,'signed_pdf_created',p_source_sha256,p_signed_sha256,p_signature_sha256,p_page_no,p_x,p_y,p_width,p_height);
   return c;

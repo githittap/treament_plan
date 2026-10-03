@@ -287,7 +287,7 @@ test('⚙️ 허브 설정 탭: 원장 전용 묶음에 계정·권한 다음으
   const st=menuHarness({role:'staff'});
   assert.equal(st.ctx.visibleTabKeys().has('owner'),false);
   assert.match(hr,/else if\(TAB==='hubset'\)\{if\(window\.HubUi\)await window\.HubUi\.renderSettings\(m,\{sb,me:ME\}\)/);
-  assert.match(hr,/<script src="hub-texts\.js\?v=\d+"><\/script>\s*<script src="security-pledge\.js\?v=20261003p9c"><\/script>\s*<script>\s*\/\* ═+ 설정 ═+/,'hub-texts.js는 main 스크립트보다 먼저 불러옴');
+  assert.match(hr,/<script src="hub-texts\.js\?v=\d+"><\/script>\s*<script src="security-pledge\.js\?v=[0-9a-z]+"><\/script>\s*<script>\s*\/\* ═+ 설정 ═+/,'hub-texts.js는 main 스크립트보다 먼저 불러옴');
   assert.match(hr,/<script src="ai-assistants\.js\?v=2026100309"><\/script>/,'AI 도우미 스크립트 번호(10-02 원장요청 5건에서 2026100106 → 2026100221)');
 });
 

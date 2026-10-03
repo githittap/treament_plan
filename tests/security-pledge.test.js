@@ -101,6 +101,8 @@ test('서약 PNG 청크·CRC·끝·압축 디코딩 실패는 검증 증명을 �
   }
   const invalid=await edgeSigningAttempt(undefined,false,{validateSignature:true,signaturePng:'data:image/png;base64,'+idat.toString('base64'),invalidImage:true});
   assert.equal(invalid.status,400);assert.equal(invalid.rpcCalls.length,0);
+  const oldInvalid=await edgeSigningAttempt(undefined,false,{pledgeRequired:true,pledge:{signature_png:'data:image/png;base64,'+idat.toString('base64')}});
+  assert.equal(oldInvalid.status,400);assert.equal(oldInvalid.rpcCalls.length,0);assert.equal(oldInvalid.uploadedBytes,null);
   const valid=await edgeSigningAttempt(undefined,false,{validateSignature:true});
   assert.equal(valid.status,200,JSON.stringify(valid.response));assert.deepEqual(valid.rpcCalls.map(c=>c.name),['validate_contract_security_pledge_signature']);
   assert.equal(valid.uploadedBytes,null);

@@ -47,6 +47,32 @@ function dataUrlBytes(value: string) {
   return bytes;
 }
 
+async function validatePngCompression(bytes: Uint8Array) {
+  // Reject broken zlib before entering pdf-lib's synchronous PNG decoder.
+  // Bound expanded data even when a tiny, valid IDAT is highly compressed.
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), chunks: Uint8Array[] = [];
+  let offset = 8, total = 0;
+  while (offset < bytes.length) {
+    const length = view.getUint32(offset);
+    if (new TextDecoder().decode(bytes.slice(offset + 4, offset + 8)) === 'IDAT') {
+      const chunk = bytes.slice(offset + 8, offset + 8 + length); chunks.push(chunk); total += length;
+    }
+    offset += length + 12;
+  }
+  const compressed = new Uint8Array(total); offset = 0;
+  for (const chunk of chunks) { compressed.set(chunk, offset); offset += chunk.length; }
+  const reader = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('deflate')).getReader();
+  let expanded = 0;
+  try {
+    for (;;) {
+      const { value, done } = await reader.read(); if (done) break;
+      expanded += value.length;
+      if (expanded > 40 * 1024 * 1024) throw new Error('signature PNG expanded size is invalid');
+    }
+    if (expanded === 0) throw new Error('signature PNG has no pixels');
+  } finally { await reader.cancel(); }
+}
+
 async function appendSecurityPledge(pdf: any, pledge: any, kit: any, fontData: string) {
   const contractPages = pdf.getPages().slice();
   pdf.registerFontkit(kit);
@@ -74,7 +100,9 @@ async function appendSecurityPledge(pdf: any, pledge: any, kit: any, fontData: s
   paragraph(pledge.document["pledge.body.rules"]);
   paragraph(String(pledge.document['pledge.signed_meta'] || '{date} · {version}').replace('{date}',pledge.signed_at||'').replace('{version}',pledge.version));
   if (y < 130) { page = newPage(); y = 800; }
-  const image = await pdf.embedPng(dataUrlBytes(pledge.signature_png));
+  const pledgeBytes = dataUrlBytes(pledge.signature_png);
+  await validatePngCompression(pledgeBytes);
+  const image = await pdf.embedPng(pledgeBytes);
   page.drawImage(image, { x: margin, y: y - 60, width: 240, height: 60 });
   const pledgePages = pdf.getPages().slice(contractPages.length);
   for (let i = pdf.getPageCount() - 1; i >= 0; i--) pdf.removePage(i);
@@ -110,12 +138,13 @@ export function createContractPdfSignHandler(deps: { createClient?: any; PDFDocu
       const { data: pledge, error } = await admin.from('contract_security_pledges').select('*').eq('contract_id', contractId).maybeSingle();
       if (error || !pledge || pledge.user_id !== user.id || pledge.version !== body.version) throw new Error('own pledge version required');
       const image = dataUrlBytes(body.signature_png), proofPdf = await PdfDocument.create();
+      await validatePngCompression(image);
       await proofPdf.embedPng(image);
       await proofPdf.save();
       let previousInvalid = false;
       if (body.recover === true) {
         if (!pledge.signed_at) throw new Error('signed pledge required for recovery');
-        try { await proofPdf.embedPng(dataUrlBytes(pledge.signature_png)); }
+        try { const previous = dataUrlBytes(pledge.signature_png); await validatePngCompression(previous); await proofPdf.embedPng(previous); }
         catch { previousInvalid = true; }
         if (!previousInvalid) throw new Error('signed pledge image is valid and immutable');
       }
@@ -177,6 +206,7 @@ export function createContractPdfSignHandler(deps: { createClient?: any; PDFDocu
       if (page.getRotation().angle !== 0) throw new Error("rotated PDF pages require manual review");
       const pageWidth = page.getWidth(), pageHeight = page.getHeight();
       if (![pageWidth, pageHeight].every((v) => Number.isFinite(v) && v > 0) || entry.x + entry.width > pageWidth || entry.y + entry.height > pageHeight || entry.width > pageWidth * 0.8 || entry.height > pageHeight * 0.5) throw new Error("signature rectangle is outside the PDF page");
+      await validatePngCompression(entry.bytes);
       const signature = await pdf.embedPng(entry.bytes);
       page.drawImage(signature, { x: entry.x, y: entry.y, width: entry.width, height: entry.height });
     }

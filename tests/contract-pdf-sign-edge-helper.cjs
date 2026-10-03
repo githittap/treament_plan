@@ -19,7 +19,7 @@ const source = fs.readFileSync('supabase/functions/contract-pdf-sign/index.ts', 
   .replace(/^import .*;\r?\n/gm, '')
   .replace(/^if \(import\.meta\.main\).*;\r?\n?/m, '')
   .replace('export function createContractPdfSignHandler', 'function createContractPdfSignHandler');
-const context = { crypto: webcrypto, TextEncoder, TextDecoder, Request, Response, atob, Uint8Array, DataView, Date, Blob, Error };
+const context = { crypto: webcrypto, TextEncoder, TextDecoder, Request, Response, atob, Uint8Array, DataView, Date, Blob, Error,DecompressionStream };
 vm.runInNewContext(`${stripTypeScriptTypes(source)}\nthis.createHandler=createContractPdfSignHandler;`, context);
 
 async function edgeSigningAttempt(confirmed = [true, true, true], integrated = true, options = {}) {
