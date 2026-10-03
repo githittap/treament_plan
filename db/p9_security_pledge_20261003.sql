@@ -176,8 +176,8 @@ begin
       perform public.apply_integrated_contract_signatures(p_contract_id,r.contract_signatures);
     else
       item:=r.contract_signatures->0;
-      if c.merged_html !~ '<span\M[^>]*data-sign-slot="employee"[^>]*>' then raise exception 'employee signature slot missing'; end if;
-      html:=regexp_replace(c.merged_html,'<span\M[^>]*data-sign-slot="employee"[^>]*>[^<]*</span>',
+      if c.merged_html !~* $slot$<span\M[^>]*\mdata-sign-slot\s*=\s*("employee"|'employee')[^>]*>.*?</span>$slot$ then raise exception 'employee signature slot missing'; end if;
+      html:=regexp_replace(c.merged_html,$slot$<span\M[^>]*\mdata-sign-slot\s*=\s*("employee"|'employee')[^>]*>.*?</span>$slot$,
         '<img src="'||(item->>'signature_png')||'" alt="employee" style="height:60px"> <span>'||r.signed_at::text||'</span>','i');
       select coalesce(jsonb_agg(case when value->>'who'='employee' then value||jsonb_build_object('signed',true,'signed_at',r.signed_at) else value end),'[]'::jsonb)
         into slots from jsonb_array_elements(coalesce(c.sign_slots,'[]'::jsonb));

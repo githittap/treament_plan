@@ -71,3 +71,13 @@ test('서약 서명 뒤 좌표를 고쳐 미리 검사할 때 기존 서명을 �
   assert.equal(r.status,200,JSON.stringify(r.response));
   assert.equal(r.rpcCalls[0].params.p_coordinates[0].x,90);assert.equal(r.uploadedBytes,null);
 });
+
+test('서약 완료 PDF 재시도는 기존 파일 해시가 같을 때만 기록한다',async()=>{
+  for(const integrated of [false,true]){
+    const same=await edgeSigningAttempt(undefined,integrated,{pledgeRequired:true,uploadConflict:true});
+    assert.equal(same.status,200,JSON.stringify(same.response));assert.equal(same.rpcCalls.length,2);
+    const different=await edgeSigningAttempt(undefined,integrated,{pledgeRequired:true,uploadConflict:true,existingPdfMismatch:true});
+    assert.equal(different.status,400);assert.match(different.response.error,/existing signed PDF differs/);
+    assert.equal(different.rpcCalls.length,1);
+  }
+});

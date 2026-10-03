@@ -1287,7 +1287,7 @@ function hubTextDefsChapter6(add){
   add('contract.m_not_pdf',C4,'PDF 서명 — PDF 서명 대상이 아닌 계약일 때 뜨는 글','PDF 서명 대상이 아닙니다.');
   add('contract.m_pdf_conf_fail',C4,'PDF 서명 — 원본 확인 기록 실패({msg}는 서버 오류)','원본 PDF 확인 기록 실패: {msg}',['msg']);
   add('contract.m_pdf_pos',C4,'PDF 서명 — 서명 위치 값이 잘못됐을 때 뜨는 글','PDF 서명 위치 값을 확인하세요.');
-  add('contract.m_pdf_pos3',C4,'세 구역 PDF 서명 — 서명 위치 값이 잘못됐을 때 뜨는 글','PDF 서명 위치를 확인하세요.');
+  add('contract.m_pdf_pos3',C4,'세 구역 PDF 서명 — 서명 위치 값이 잘못됐을 때 뜨는 글','세 PDF 서명 위치를 확인하세요.');
   add('contract.m_pdf_making',C4,'PDF 서명 — 완료 PDF를 만드는 동안 뜨는 글','완료 PDF 생성 중…');
   add('contract.m_pdf_sign_fail',C4,'PDF 서명 실패({msg}는 서버 오류)','PDF 서명 실패: {msg}',['msg']);
   add('contract.m_no_func',C4,'PDF 서명 실패인데 오류 글이 없을 때 {msg} 자리에 대신 들어가는 글','함수 미배포');

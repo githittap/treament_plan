@@ -50,7 +50,7 @@ async function appendSecurityPledge(pdf: any, pledge: any, kit: any, fontData: s
   paragraph(pledge.document["pledge.body.title"]);
   for (let i = 1; i <= 14; i++) paragraph(`${i}. ${pledge.document[`pledge.body.clause.${i}`]}`);
   paragraph(pledge.document["pledge.body.rules"]);
-  paragraph(String(pledge.document['pledge.signed_meta'] || '').replace('{date}',pledge.signed_at||'').replace('{version}',pledge.version));
+  paragraph(String(pledge.document['pledge.signed_meta'] || '{date} · {version}').replace('{date}',pledge.signed_at||'').replace('{version}',pledge.version));
   if (y < 130) { page = newPage(); y = 800; }
   const image = await pdf.embedPng(dataUrlBytes(pledge.signature_png));
   page.drawImage(image, { x: margin, y: y - 60, width: 240, height: 60 });

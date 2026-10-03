@@ -58,7 +58,7 @@ async function setup(seed=false){
     const b=(await query('select body_html from doc_templates where id=1'))[0].body_html;
     await query(`insert into contracts(id,user_id,merged_html,status,due_at) values(20,'${uid}',${qstr(b)},'대기',now()+interval '1 day'),(21,'${uid}',${qstr(template)},'대기',now()+interval '1 day'),(22,'${uid}',${qstr(template)},'발송요청',now()+interval '1 day')`);
   }
-  await db.exec(fs.readFileSync('db/p9_security_pledge_20261003.sql','utf8'));
+  await db.exec(fs.readFileSync(process.env.P9_BASELINE_SQL||'db/p9_security_pledge_20261003.sql','utf8'));
   await db.exec(fs.readFileSync('db/p9_push_status_20261003.sql','utf8'));
 }
 const qstr=s=>"'"+s.replaceAll("'","''")+"'";
@@ -66,8 +66,9 @@ const qstr=s=>"'"+s.replaceAll("'","''")+"'";
 const cases=[];
 const add=(name,fn)=>cases.push({name,fn});
 async function employee(){await db.exec('set role authenticated');await query(`select set_config('app.test_uid','${uid}',false)`);}
-async function pending(id, pdf=false){
-  await query(`insert into contracts(id,user_id,merged_html,status,due_at) values(${id},'${uid}',${qstr(template)},'대기',now()+interval '1 day')`);
+async function pending(id, pdf=false,integrated=false){
+  const html=integrated?(await query('select body_html from doc_templates where id=1'))[0].body_html:template;
+  await query(`insert into contracts(id,user_id,merged_html,status,due_at) values(${id},'${uid}',${qstr(html)},'대기',now()+interval '1 day')`);
   if(pdf){await query("select set_config('app.contract_pdf_mutation','source_register',false)");await query(`update contracts set source_pdf_path='contracts/${id}/source.pdf',source_pdf_sha256=repeat('a',64) where id=${id}`);await query("select set_config('app.contract_pdf_mutation','',false)");}
 }
 const coords=[{part:'employment',page_no:1,x:72,y:72,width:150,height:50}];
@@ -109,6 +110,20 @@ add('pdf-pledge-requires-server-prevalidation',async()=>{
   assert.equal((await query('select status from contracts where id=31'))[0].status,'대기');
   await assert.rejects(()=>query(`select validate_contract_pledge_pdf(31,'${uid}',${qjson(single)},${qjson(coords)},repeat('a',64),'data:image/png;base64,${png}')`),/permission denied/);
 });
+add('single-html-original-slot-quote-compatibility',async()=>{
+  await setup();await pending(34);
+  await query(`update contracts set merged_html=${qstr(template.replace('data-sign-slot="employee"',"data-sign-slot = 'employee'"))} where id=34`);
+  await employee();const p=await stage(34);await query(submit(34,p));
+  assert.ok(!(await query('select merged_html from contracts where id=34'))[0].merged_html.includes("data-sign-slot = 'employee'"));
+});
+add('unvalidated-integrated-pdf-pledge-rejected',async()=>{
+  await setup();await pending(33,true,true);await employee();
+  const bad=['employment','medical','privacy'].map(part=>({part,page_no:999,x:999999,y:72,width:150,height:50}));
+  await query(`select stage_contract_pledge_signatures(33,'${all}'::jsonb,${qjson(bad)})`);
+  const p=(await query('select * from contract_security_pledges where contract_id=33'))[0];
+  await assert.rejects(()=>query(submit(33,p)),/PDF prevalidation required/);
+  assert.equal((await query('select signed_at from contract_security_pledges where contract_id=33'))[0].signed_at,null);
+});
 add('signed-pledge-coordinate-correction-preserves-evidence',async()=>{
   await setup();await pending(32,true);await employee();const p=await stage(32,coords);await validate(32);await query(submit(32,p));
   const before=(await query('select * from contract_security_pledges where contract_id=32'))[0];
@@ -124,7 +139,14 @@ add('pending-apply-rollback-reapply-preserves-evidence',async()=>{
   assert.deepEqual((await query('select * from contract_security_pledges where contract_id=21'))[0],before);
   await query("update contracts set status='대기' where id=22");await employee();const again=await stage(22);assert.ok(again.staged_at);
 });
+add('empty-pending-rollback-reapply',async()=>{
+  await setup();
+  await db.exec(fs.readFileSync('db/p9_security_pledge_20261003_rollback.sql','utf8'));
+  await db.exec(fs.readFileSync(process.env.P9_BASELINE_SQL||'db/p9_security_pledge_20261003.sql','utf8'));
+  assert.equal((await query('select count(*)::int n from contract_security_pledges'))[0].n,0);
+});
 let failures=0;
-for(const {name,fn} of cases){try{await fn();console.log('PASS '+name);}catch(e){failures++;console.log('FAIL '+name+': '+e.message);if(e.internalQuery)console.log(e.internalQuery,e.internalPosition);}finally{if(db)await db.close();}}
-console.log(`PGLITE_P9_REGRESSIONS: ${cases.length-failures}/${cases.length} scenarios passed`);
+const selected=process.env.P9_CASE?cases.filter(c=>c.name===process.env.P9_CASE):cases;
+for(const {name,fn} of selected){try{await fn();console.log('PASS '+name);}catch(e){failures++;console.log('FAIL '+name+': '+e.message);if(e.internalQuery)console.log(e.internalQuery,e.internalPosition);}finally{if(db)await db.close();}}
+console.log(`PGLITE_P9_REGRESSIONS: ${selected.length-failures}/${selected.length} scenarios passed`);
 if(failures)process.exitCode=1;

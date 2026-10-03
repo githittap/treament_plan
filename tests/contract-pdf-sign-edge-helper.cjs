@@ -53,7 +53,7 @@ async function edgeSigningAttempt(confirmed = [true, true, true], integrated = t
   };
   const admin = {
     from: () => ({select:()=>({eq:()=>({maybeSingle:async()=>({data:pledge,error:null})})})}),
-    storage: { from: () => ({ download: async () => ({ data: new Blob([sourceBytes]), error: null }), upload: async (_path,bytes) => {uploadedBytes=bytes;return {error:null};} }) },
+    storage: { from: () => ({ download: async (path) => ({ data: new Blob([path.endsWith('/signed.pdf')&&options.uploadConflict?(options.existingPdfMismatch?new TextEncoder().encode('%PDF-corrupt'):uploadedBytes):sourceBytes]), error: null }), upload: async (_path,bytes) => {uploadedBytes=bytes;return {error:options.uploadConflict?{message:'already exists'}:null};} }) },
     rpc: async (name, params) => { rpcCalls.push({ name, params }); return { error: null }; },
   };
   let appendedPages=0;
