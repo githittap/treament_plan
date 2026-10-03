@@ -1,5 +1,6 @@
 /* Separate security pledge, frozen server document, and owner notification aggregates. */
 let P9_PLEDGES=new Map();
+let P9_REPLACING=new Set();
 function p9T(key,values){return hubText(key,typeof HubUi!=='undefined'?HubUi.helpers.hubTextDefByKey(key)?.def||key:key,values);}
 function pledgeCanSubmit(signed,read,rules){return signed===true&&read===true&&rules===true;}
 function pledgeProgress(row){
@@ -18,6 +19,10 @@ async function loadContractPledges(){
 async function stageContractPledge(row,signatures){
   const coordinates=row.source_pdf_path?signatures.map(({part})=>{const suffix=integratedContract(row)?`${row.id}-${part}`:String(row.id),n=k=>Number(document.querySelector(`[data-pdf-${k}="${suffix}"]`)?.value);return {part,page_no:n('page'),x:n('x'),y:n('y'),width:n('width'),height:n('height')};}):null;
   if(coordinates?.some(c=>!Number.isInteger(c.page_no)||c.page_no<1||![c.x,c.y,c.width,c.height].every(Number.isFinite)||c.x<0||c.y<0||c.width<=0||c.height<=0))throw Error(p9T('pledge.coordinates'));
+  if(row.pdf_signing_attempt_id){
+    const {error}=await sb.rpc('recover_contract_pdf_signing_attempt',{p_contract_id:row.id,p_reason:'Employee collected new coordinates after an unfinished PDF attempt'});
+    if(error)throw error;row.pdf_signing_attempt_id=null;
+  }
   const {data,error}=await sb.rpc('stage_contract_pledge_signatures',{p_contract_id:row.id,p_signatures:signatures,p_coordinates:coordinates});
   if(error)throw error;
   P9_PLEDGES.set(Number(row.id),Array.isArray(data)?data[0]:data);
@@ -29,6 +34,7 @@ async function openSecurityPledge(id){
   if(error){alert(error.message);return;}
   const pledge=Array.isArray(data)?data[0]:data;
   P9_PLEDGES.set(Number(id),pledge);
+  if(pledge.signed_at)P9_REPLACING.add(Number(id));
   const target=document.querySelector(`#pledge-${id}`);
   if(target){target.innerHTML=securityPledgeCard(pledge);initPledgeCanvas();target.scrollIntoView({block:'start'});}
 }
@@ -44,7 +50,7 @@ function contractPledgeCard(row){
 function securityPledgeCard(pledge){
   const id=Number(pledge.contract_id);
   const coordinates=pledge.signed_at?pledgePdfCoordinatesHtml(pledge):'';
-  if(pledge.signed_at)return `${pledgeDocumentHtml(pledge)}<button class="mini" onclick="printPledgeDocument(${id})">${esc(p9T('pledge.print'))}</button>${CONTRACT_ROWS.some(r=>Number(r.id)===id&&r.status==='대기'&&r.source_pdf_path)&&pledge.staged_at?`${coordinates}<button class="hbtn pri" onclick="retryPledgePdf(${id})">${esc(p9T('pledge.retry_pdf'))}</button><div class="msg" id="pledgeMsg-${id}" role="status"></div>`:''}`;
+  if(pledge.signed_at&&!P9_REPLACING.has(id))return `${pledgeDocumentHtml(pledge)}<button class="mini" onclick="printPledgeDocument(${id})">${esc(p9T('pledge.print'))}</button> <button class="mini" onclick="openSecurityPledge(${id})">${esc(p9T('pledge.signature'))}</button>${CONTRACT_ROWS.some(r=>Number(r.id)===id&&r.status==='대기'&&r.source_pdf_path)&&pledge.staged_at?`${coordinates}<button class="hbtn pri" onclick="retryPledgePdf(${id})">${esc(p9T('pledge.retry_pdf'))}</button><div class="msg" id="pledgeMsg-${id}" role="status"></div>`:''}`;
   return `${pledgeDocumentHtml(pledge)}<label style="display:block;margin:12px 0"><input type="checkbox" id="pledgeRead-${id}" onchange="updatePledgeButton(${id})"> ${esc(p9T('pledge.read'))}</label><label style="display:block;margin:12px 0"><input type="checkbox" id="pledgeRules-${id}" onchange="updatePledgeButton(${id})"> ${esc(pledge.document['pledge.body.rules'])}</label><h3>${esc(p9T('pledge.signature'))}</h3><canvas class="contract-signature" width="720" height="180" data-pledge-signature="${id}" data-dirty="false"></canvas><button class="mini" onclick="clearPledgeCanvas(${id})">${esc(p9T('pledge.clear'))}</button> <button class="hbtn pri" id="pledgeSubmit-${id}" disabled onclick="submitSecurityPledge(${id})">${esc(p9T('pledge.submit'))}</button><div class="msg" id="pledgeMsg-${id}" role="status"></div>`;
 }
 function pledgePdfCoordinatesHtml(pledge){
@@ -81,9 +87,16 @@ async function submitSecurityPledge(id){
   const button=document.querySelector(`#pledgeSubmit-${id}`);button.disabled=true;setStatus('saving');
   try{
     const row=CONTRACT_ROWS.find(r=>Number(r.id)===Number(id)),signaturePng=canvas.toDataURL('image/png');
+    const {data:validation,error:validationError}=await sb.functions.invoke('contract-pdf-sign',{body:{action:'validate_pledge_signature',contract_id:id,signature_png:signaturePng,version:P9_PLEDGES.get(Number(id)).version,recover:P9_REPLACING.has(Number(id))}});
+    if(validationError||validation?.error||validation?.validated!==true)throw Error(validation?.error||validationError?.message||p9T('pledge.signature'));
+    if(P9_REPLACING.has(Number(id))){
+      const {error:recoveryError}=await sb.rpc('recover_contract_security_pledge',{p_contract_id:id,p_reason:'Edge PNG decode failed; employee signed a replacement'});
+      if(recoveryError)throw recoveryError;
+    }
     const {data,error}=await sb.rpc('submit_contract_security_pledge',{p_contract_id:id,p_signature_png:signaturePng,p_read_confirmed:read,p_rules_confirmed:rules,p_version:P9_PLEDGES.get(Number(id)).version});
     if(error)throw error;
     P9_PLEDGES.set(Number(id),Array.isArray(data)?data[0]:data);
+    P9_REPLACING.delete(Number(id));
     setStatus('saved');await render();
   }catch(e){if(P9_PLEDGES.get(Number(id))?.signed_at)await render();const target=document.querySelector(`#pledgeMsg-${id}`)||msg;if(target)target.textContent=p9T('pledge.failed',{msg:e.message});setStatus('error');button.disabled=false;}
 }
@@ -95,7 +108,13 @@ async function finishPledgePdf(id,rerender=true){
   if(rerender)await render();
 }
 async function retryPledgePdf(id){
-  setStatus('saving');try{await validatePledgePdf(id,P9_PLEDGES.get(Number(id)).signature_png);await finishPledgePdf(id);setStatus('saved');}
+  setStatus('saving');try{
+    const row=CONTRACT_ROWS.find(r=>Number(r.id)===Number(id));
+    if(row?.pdf_signing_attempt_id){
+      const {error}=await sb.rpc('recover_contract_pdf_signing_attempt',{p_contract_id:id,p_reason:'Employee corrected PDF signature coordinates after an unfinished attempt'});
+      if(error)throw error;row.pdf_signing_attempt_id=null;
+    }
+    await validatePledgePdf(id,P9_PLEDGES.get(Number(id)).signature_png);await finishPledgePdf(id);setStatus('saved');}
   catch(e){const msg=document.querySelector(`#pledgeMsg-${id}`);if(msg)msg.textContent=p9T('pledge.failed',{msg:e.message});setStatus('error');}
 }
 function printPledgeDocument(id){

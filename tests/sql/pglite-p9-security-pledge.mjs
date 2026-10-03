@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {createRequire} from 'node:module';
-const {edgeSigningAttempt}=createRequire(import.meta.url)('../contract-pdf-sign-edge-helper.cjs');
+const {edgeSigningAttempt,signaturePng}=createRequire(import.meta.url)('../contract-pdf-sign-edge-helper.cjs');
 
 const packageRoot=process.env.PGLITE_PACKAGE_ROOT;
 if(!packageRoot){console.log('PGLITE_INTEGRATED_CONTRACT_SKIP: package path missing');process.exit(2);}
@@ -12,18 +12,23 @@ const db=new PGlite();
 const query=sql=>db.query(sql).then(result=>result.rows);
 const uid='11111111-1111-1111-1111-111111111111';
 const template='<div>사직 희망일로부터 3주 전, 퇴사일 이후 돌아오는 익월 임금지급일<div class="signrow"><span data-sign-slot="employee">(직원 서명)</span></div></div>';
-const png=Buffer.concat([Buffer.from('89504e470d0a1a0a','hex'),Buffer.alloc(120)]).toString('base64');
+const png=signaturePng.split(',')[1];
 const sign=part=>({part,signature_png:`data:image/png;base64,${png}`,signature_id:null,confirmed:true});
 const all=JSON.stringify(['employment','medical','privacy'].map(sign));
 const qjson=value=>`'${JSON.stringify(value).replaceAll("'","''")}'::jsonb`;
 const draft=fs.readFileSync(path.resolve('db/integrated_contract_three_signatures_draft.sql'),'utf8');
 const policies=fs.readFileSync(path.resolve('db/hr_policies.sql'),'utf8');
 const pdfGuard=fs.readFileSync(path.resolve('db/contract_pdf_signing_production_snapshot.sql'),'utf8');
+async function attest(id,version){
+  await db.exec('reset role;set role service_role');
+  await query(`select validate_contract_security_pledge_signature(${id},'${uid}',${"'"+signaturePng+"'"},'${version}')`);
+  await db.exec('reset role;set role authenticated');
+}
 try{
   await db.exec(`
     create role anon;create role authenticated;create role service_role bypassrls;create schema auth;
     create or replace function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('app.test_uid',true),'')::uuid$$;
-    create table public.profiles(user_id uuid primary key,role text);
+    create table public.profiles(user_id uuid primary key,role text,active boolean default true,approved boolean default true);
     create or replace function public.my_role() returns text language sql stable as $$select role from public.profiles where user_id=auth.uid()$$;
     create table public.employee_signature_vault(id bigint primary key,user_id uuid,revoked_at timestamptz);
     create table public.employee_signature_uses(id bigint generated always as identity primary key,contract_id bigint,signature_id bigint,document_kind text,confirmed_at timestamptz,used_by uuid);
@@ -34,7 +39,9 @@ try{
       perform set_config('app.contract_pdf_mutation','pdf_record',true);
       update public.contracts set status='서명완료',signed_at=now(),signed_pdf_path=p_signed_path,signed_pdf_sha256=p_signed_sha256 where id=p_contract_id and user_id=p_user_id and status='대기' returning * into r;
       if not found then raise exception 'not pending';end if;return r;end$$;
-    insert into public.profiles values('${uid}','staff');
+    alter table public.contracts add column sent_at timestamptz default now();
+    create table public.contract_pdf_signature_audits(contract_id bigint,user_id uuid,action text,source_sha256 text,signed_sha256 text,signature_sha256 text,page_no integer,x numeric,y numeric,width numeric,height numeric);
+    insert into public.profiles(user_id,role) values('${uid}','staff');
     insert into public.doc_templates values(1,'${template}','[]'::jsonb,'[]'::jsonb);
     grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;
     grant select,update on public.contracts to authenticated;grant select on public.employee_signature_vault,public.profiles to authenticated;
@@ -50,7 +57,7 @@ try{
   await db.exec(`create function public.employee_hub_access_allowed() returns boolean language sql as $$select exists(select 1 from public.profiles where user_id=auth.uid())$$;
   create table public.hub_ui_texts(key text primary key,value text);
   create table public.push_subscriptions(id uuid primary key,user_id uuid,endpoint text,subscription jsonb,created_at timestamptz,updated_at timestamptz);
-  insert into public.profiles values('22222222-2222-2222-2222-222222222222','owner'),('33333333-3333-3333-3333-333333333333','staff');
+  insert into public.profiles(user_id,role) values('22222222-2222-2222-2222-222222222222','owner'),('33333333-3333-3333-3333-333333333333','staff');
   insert into public.contracts(id,user_id,merged_html,status,due_at) values(9,'${uid}','legacy completed original','서명완료',now()+interval '1 day');`);
   await db.exec(fs.readFileSync('db/p9_pledge_texts_20261003.sql','utf8'));
   await db.exec(fs.readFileSync('db/p9_security_pledge_20261003.sql','utf8'));
@@ -70,6 +77,9 @@ try{
   await denied(submit(false,true),/both pledge confirmations/);await denied(submit(true,false),/both pledge confirmations/);await denied(submit(true,true,'wrong'),/version changed/);
   await denied('update contracts set pledge_required=false where id=10',/immutable/);
   await denied(`update contract_security_pledges set rules_confirmed=true where contract_id=10`,/permission denied/);
+  await denied(submit(true,true),/server validated/);
+  await denied(`select validate_contract_security_pledge_signature(10,'${uid}','data:image/png;base64,${png}','${prepared.version}')`,/permission denied/);
+  await attest(10,prepared.version);
   await query(submit(true,true));
   const signed=(await query('select signed_at,signature_png from contract_security_pledges where contract_id=10'))[0];
   assert.ok(signed.signed_at);count++;assert.equal((await query('select status from contracts where id=10'))[0].status,'대기');count++;
@@ -84,6 +94,7 @@ try{
   assert.ok(completed.merged_html.indexOf('data-contract-part="privacy"')<completed.merged_html.indexOf('사직 희망일'));count++;
   assert.equal((await query('select count(*)::int n from contract_part_signatures where contract_id=10'))[0].n,3);count++;
   await query('select prepare_contract_security_pledge(9)');const legacy=(await query('select version from contract_security_pledges where contract_id=9'))[0];
+  await attest(9,legacy.version);
   await query(`select submit_contract_security_pledge(9,'data:image/png;base64,${png}',true,true,'${legacy.version}')`);
   assert.equal((await query('select merged_html from contracts where id=9'))[0].merged_html,'legacy completed original');count++;
   await denied('select get_employee_phone_notification_status()',/owner access/);
@@ -97,16 +108,18 @@ try{
   await db.exec('reset role');await query(`insert into contracts(id,user_id,merged_html,status,due_at) values(12,'${uid}',${"'"+template.replaceAll("'","''")+"'"},'대기',now()+interval '1 day')`);
   await query("select set_config('app.contract_pdf_mutation','source_register',false)");await query("update contracts set source_pdf_path='contracts/12/source.pdf',source_pdf_sha256=repeat('a',64) where id=12");await query("select set_config('app.contract_pdf_mutation','',false)");
   await db.exec('set role authenticated');await query(`select set_config('app.test_uid','${uid}',false)`);await query('select prepare_contract_security_pledge(12)');const pdfPledge=(await query('select version from contract_security_pledges where contract_id=12'))[0];
+  await attest(12,pdfPledge.version);
   await query(`select submit_contract_security_pledge(12,'data:image/png;base64,${png}',true,true,'${pdfPledge.version}')`);
   assert.equal((await query('select status from contracts where id=12'))[0].status,'대기');count++;
   const single=[sign('employment')],coordinates=[{part:'employment',page_no:1,x:72,y:72,width:150,height:50}];
   await denied(`select stage_contract_pledge_signatures(12,${qjson(single)},null)`,/PDF coordinates/);
   await query(`select stage_contract_pledge_signatures(12,${qjson(single)},${qjson(coordinates)})`);
-  await denied(`select validate_contract_pledge_pdf(12,'${uid}',${qjson(single)},${qjson(coordinates)},repeat('a',64),'data:image/png;base64,${png}')`,/permission denied/);
-  await db.exec('reset role;set role service_role');await query(`select validate_contract_pledge_pdf(12,'${uid}',${qjson(single)},${qjson(coordinates)},repeat('a',64),'data:image/png;base64,${png}')`);
+  await denied(`select validate_contract_pledge_pdf(12,'${uid}',${qjson(single)},${qjson(coordinates)},repeat('a',64),'data:image/png;base64,${png}',repeat('c',64))`,/permission denied/);
+  await db.exec('reset role;set role service_role');await query(`select validate_contract_pledge_pdf(12,'${uid}',${qjson(single)},${qjson(coordinates)},repeat('a',64),'data:image/png;base64,${png}',repeat('c',64))`);
   await db.exec('reset role;set role authenticated');assert.equal((await query('select signed_pdf_path from contracts where id=12'))[0].signed_pdf_path,null);count++;
   await db.exec('reset role');await query(`insert into contracts(id,user_id,merged_html,status,due_at) values(13,'${uid}',${"'"+template.replaceAll("'","''")+"'"},'대기',now()+interval '1 day')`);
   await db.exec('set role authenticated');await query('select prepare_contract_security_pledge(13)');const singlePledge=(await query('select version from contract_security_pledges where contract_id=13'))[0];
+  await attest(13,singlePledge.version);
   await query(`select submit_contract_security_pledge(13,'data:image/png;base64,${png}',true,true,'${singlePledge.version}')`);await query(`select stage_contract_pledge_signatures(13,${qjson(single)},null)`);
   const singleCompletedHtml=(await query('select merged_html from contracts where id=13'))[0].merged_html;assert.ok(singleCompletedHtml.indexOf('security-pledge')<singleCompletedHtml.indexOf('사직 희망일'));count++;
   if(process.env.P9_FIXTURE_OUT)fs.writeFileSync(process.env.P9_FIXTURE_OUT,JSON.stringify({body,document:prepared.document,version:prepared.version,completedHtml:completed.merged_html,singleBody:template,singleCompletedHtml},null,2));

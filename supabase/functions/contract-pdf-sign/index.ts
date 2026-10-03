@@ -23,6 +23,27 @@ function dataUrlBytes(value: string) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const imageWidth = view.getUint32(16), imageHeight = view.getUint32(20);
   if (!imageWidth || !imageHeight || imageWidth > 2048 || imageHeight > 2048) throw new Error("signature PNG dimensions are invalid");
+  let offset = 8, hasIdat = false, hasEnd = false;
+  while (offset < bytes.length) {
+    if (offset + 12 > bytes.length) throw new Error('invalid signature PNG chunks');
+    const length = view.getUint32(offset), end = offset + 12 + length;
+    if (end > bytes.length) throw new Error('invalid signature PNG chunk length');
+    const type = new TextDecoder().decode(bytes.slice(offset + 4, offset + 8));
+    if ((offset === 8 && (type !== 'IHDR' || length !== 13)) || (offset > 8 && type === 'IHDR')) throw new Error('invalid signature PNG IHDR');
+    let crc = 0xffffffff;
+    for (let i = offset + 4; i < offset + 8 + length; i++) {
+      crc ^= bytes[i];
+      for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+    }
+    if (((crc ^ 0xffffffff) >>> 0) !== view.getUint32(offset + 8 + length)) throw new Error('invalid signature PNG CRC');
+    if (type === 'IDAT' && length > 0) hasIdat = true;
+    if (type === 'IEND') {
+      if (length !== 0 || end !== bytes.length || !hasIdat) throw new Error('invalid signature PNG IEND');
+      hasEnd = true;
+    }
+    offset = end;
+  }
+  if (!hasEnd) throw new Error('invalid signature PNG: missing IEND');
   return bytes;
 }
 
@@ -79,9 +100,32 @@ export function createContractPdfSignHandler(deps: { createClient?: any; PDFDocu
     if (userError || !user) throw new Error("authenticated employee required");
     const body = await req.json();
     const validatePledge = body.action === 'validate_pledge';
-    if (body.action && !validatePledge) throw new Error('unknown signing action');
+    const validatePledgeSignature = body.action === 'validate_pledge_signature';
+    if (body.action && !validatePledge && !validatePledgeSignature) throw new Error('unknown signing action');
     const contractId = Number(body.contract_id);
     if (!Number.isInteger(contractId) || contractId < 1) throw new Error("invalid contract id");
+    if (validatePledgeSignature) {
+      // Legacy completed contracts may be outside the contracts SELECT time window.
+      // The own pledge record and the service RPC enforce identity without exposing a body.
+      const { data: pledge, error } = await admin.from('contract_security_pledges').select('*').eq('contract_id', contractId).maybeSingle();
+      if (error || !pledge || pledge.user_id !== user.id || pledge.version !== body.version) throw new Error('own pledge version required');
+      const image = dataUrlBytes(body.signature_png), proofPdf = await PdfDocument.create();
+      await proofPdf.embedPng(image);
+      await proofPdf.save();
+      let previousInvalid = false;
+      if (body.recover === true) {
+        if (!pledge.signed_at) throw new Error('signed pledge required for recovery');
+        try { await proofPdf.embedPng(dataUrlBytes(pledge.signature_png)); }
+        catch { previousInvalid = true; }
+        if (!previousInvalid) throw new Error('signed pledge image is valid and immutable');
+      }
+      const { error: validationError } = await admin.rpc('validate_contract_security_pledge_signature', {
+        p_contract_id: contractId, p_user_id: user.id, p_signature_png: body.signature_png, p_version: body.version,
+        p_previous_signature_png: previousInvalid ? pledge.signature_png : null, p_previous_invalid: previousInvalid,
+      });
+      if (validationError) throw new Error(validationError.message);
+      return json({ contract_id: contractId, validated: true, previous_invalid: previousInvalid });
+    }
     const { data: preflight, error: preflightError } = await userClient.from("contracts").select("*").eq("id", contractId).maybeSingle();
     if (preflightError || !preflight || preflight.user_id !== user.id) throw new Error(preflightError?.message || "contract access denied");
     if (preflight.status === "서명완료" && preflight.signed_pdf_path && preflight.signed_pdf_sha256) return json({ contract_id: contractId, signed_pdf_path: preflight.signed_pdf_path, signed_pdf_sha256: preflight.signed_pdf_sha256, idempotent: true });
@@ -144,6 +188,7 @@ export function createContractPdfSignHandler(deps: { createClient?: any; PDFDocu
       const {error: validationError} = await admin.rpc('validate_contract_pledge_pdf', {
         p_contract_id:contractId,p_user_id:user.id,p_signatures:body.signatures,p_coordinates:body.coordinates,
         p_source_sha256:sourceHash,p_pledge_signature_png:securityPledge.signature_png,
+        p_signature_sha256:signatureHash,
       });
       if (validationError) throw new Error(validationError.message);
       return json({contract_id:contractId,validated:true});
