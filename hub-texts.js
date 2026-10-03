@@ -1287,7 +1287,7 @@ function hubTextDefsChapter6(add){
   add('contract.m_not_pdf',C4,'PDF 서명 — PDF 서명 대상이 아닌 계약일 때 뜨는 글','PDF 서명 대상이 아닙니다.');
   add('contract.m_pdf_conf_fail',C4,'PDF 서명 — 원본 확인 기록 실패({msg}는 서버 오류)','원본 PDF 확인 기록 실패: {msg}',['msg']);
   add('contract.m_pdf_pos',C4,'PDF 서명 — 서명 위치 값이 잘못됐을 때 뜨는 글','PDF 서명 위치 값을 확인하세요.');
-  add('contract.m_pdf_pos3',C4,'세 구역 PDF 서명 — 서명 위치 값이 잘못됐을 때 뜨는 글','세 PDF 서명 위치를 확인하세요.');
+  add('contract.m_pdf_pos3',C4,'세 구역 PDF 서명 — 서명 위치 값이 잘못됐을 때 뜨는 글','PDF 서명 위치를 확인하세요.');
   add('contract.m_pdf_making',C4,'PDF 서명 — 완료 PDF를 만드는 동안 뜨는 글','완료 PDF 생성 중…');
   add('contract.m_pdf_sign_fail',C4,'PDF 서명 실패({msg}는 서버 오류)','PDF 서명 실패: {msg}',['msg']);
   add('contract.m_no_func',C4,'PDF 서명 실패인데 오류 글이 없을 때 {msg} 자리에 대신 들어가는 글','함수 미배포');
@@ -2133,7 +2133,7 @@ function hubTextDefsP9(add){
   "pledge.body.rules": "본인은 취업규칙 등 원내 규정이 근로기준법 제14조에 따라 원내에 게시되어 언제든지 자유롭게 열람할 수 있음을 안내받았으며, 이를 열람하지 않아 생기는 불이익은 본인이 감수함을 확인합니다.",
   "pledge.pending": "대기",
   "pledge.waiting": "서약 서명 대기",
-  "pledge.progress": "계약 3곳 {contract} · 서약 {pledge}",
+  "pledge.progress": "계약 {n}곳 {contract} · 서약 {pledge}",
   "pledge.signature": "보안서약 별도 서명",
   "pledge.signed_meta": "서명 일시 {date} · 버전 {version}",
   "pledge.read": "조항을 모두 읽었음",
@@ -2144,10 +2144,10 @@ function hubTextDefsP9(add){
   "pledge.card_title": "보안서약 서명",
   "pledge.overview": "직원별 보안서약 서명 현황",
   "pledge.finish_pdf": "계약·서약 묶음 완료 PDF 만들기",
-  "pledge.stage": "계약 3서명 저장 후 보안서약으로",
-  "pledge.stage_confirm": "계약 세 구역의 서명을 저장하고 별도 보안서약 서명으로 이어갑니다.",
+  "pledge.stage": "계약 {n}서명 저장 후 보안서약으로",
+  "pledge.stage_confirm": "계약 {n}곳의 서명을 저장하고 별도 보안서약 서명으로 이어갑니다.",
   "pledge.failed": "서약 처리 실패: {msg}",
-  "pledge.coordinates": "세 PDF 서명 위치를 확인하세요.",
+  "pledge.coordinates": "PDF 서명 위치를 확인하세요.",
   "phone.title": "폰 알림",
   "phone.on": "켬 (기기 {n}대 · 마지막 {date})",
   "phone.off": "안 켬",

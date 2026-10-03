@@ -112,6 +112,10 @@ try{
   await denied(`select stage_contract_pledge_signatures(12,'${all}'::jsonb,${qjson(coordinates.map(c=>({...c,width:0})))})`,/unique PDF coordinate/);
   await query(`select stage_contract_pledge_signatures(12,'${all}'::jsonb,${qjson(coordinates)})`);
   const pdfPledge=(await query('select version from contract_security_pledges where contract_id=12'))[0];
+  await denied(`select submit_contract_security_pledge(12,'data:image/png;base64,${png}',true,true,'${pdfPledge.version}')`,/PDF prevalidation required/);
+  await db.exec('reset role;set role service_role');
+  await query(`select validate_contract_pledge_pdf(12,'${uid}','${all}'::jsonb,${qjson(coordinates)},repeat('a',64),'data:image/png;base64,${png}')`);
+  await db.exec('reset role;set role authenticated');
   await query(`select submit_contract_security_pledge(12,'data:image/png;base64,${png}',true,true,'${pdfPledge.version}')`);
   assert.equal((await query('select status from contracts where id=12'))[0].status,'대기');count++;
   assert.equal((await query('select signed_pdf_path from contracts where id=12'))[0].signed_pdf_path,null);count++;

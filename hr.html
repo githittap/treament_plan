@@ -3516,7 +3516,7 @@ function updateIntegratedContractButton(id){if(!id)return;const button=$(`#contr
 async function completeIntegratedContract(id){
   const row=CONTRACT_ROWS.find(r=>Number(r.id)===Number(id)),msg=$(`#contractSignMsg-${id}`);
   if(!row||row.status!=='대기'||!integratedContract(row)||contractExpired(row)||!integratedContractReady(id)){if(msg)msg.textContent=ctT('contract.m_int_need','세 구역의 내용을 확인하고 각각 서명하세요.');return;}
-  if(row.pledge_required){if(!confirm(p9T('pledge.stage_confirm')))return;}
+  if(row.pledge_required){if(!confirm(p9T('pledge.stage_confirm',{n:3})))return;}
   else if(!confirm('근로계약·의료정보 보안·개인정보 취급자 서약을 각각 확인하고 세 서명을 완료합니까?'))return;
   const signatures=integratedContractPayload(id);setStatus('saving');if(msg)msg.textContent=ctT('contract.m_int_saving','세 서명 저장 중…');
   if(row.pledge_required){
@@ -3545,7 +3545,7 @@ function integratedContractPage(row){
   if(row.pledge_required&&pledge?.staged_at)return `<div id="pledge-${Number(row.id)}">${securityPledgeCard(pledge)}</div>`;
   const html=String(row.merged_html||''),med=html.indexOf('<section class="contract-part" data-contract-part="medical"'),privacy=html.indexOf('<section class="contract-part" data-contract-part="privacy"');
   if(med<0||privacy<=med)return `<div class="cal-error">${esc(ctT('contract.int_bad','통합 계약 본문 구성을 확인할 수 없습니다.'))}</div>`;
-  return `<div class="contract-signature-group"><div class="contract-doc" style="margin-top:10px">${html.slice(0,med)}</div>${integratedSignatureCard(row,'employment')}</div><div class="contract-signature-group"><div class="contract-doc">${html.slice(med,privacy)}</div>${integratedSignatureCard(row,'medical')}</div><div class="contract-signature-group"><div class="contract-doc">${html.slice(privacy)}</div>${integratedSignatureCard(row,'privacy')}</div>${row.pledge_required?'':`<button class="hbtn mini" onclick="printIntegratedContract(${row.id})">${esc(ctT('contract.btn_print','🖨️ 인쇄·PDF 저장'))}</button>`}<button class="hbtn pri" id="contractComplete-${row.id}" disabled onclick="completeIntegratedContract(${row.id})">${esc(row.pledge_required?p9T('pledge.stage'):ctT('contract.btn_int_done','3개 모두 서명 후 완료'))}</button><div class="msg" id="contractSignMsg-${row.id}"></div>`;
+  return `<div class="contract-signature-group"><div class="contract-doc" style="margin-top:10px">${html.slice(0,med)}</div>${integratedSignatureCard(row,'employment')}</div><div class="contract-signature-group"><div class="contract-doc">${html.slice(med,privacy)}</div>${integratedSignatureCard(row,'medical')}</div><div class="contract-signature-group"><div class="contract-doc">${html.slice(privacy)}</div>${integratedSignatureCard(row,'privacy')}</div>${row.pledge_required?'':`<button class="hbtn mini" onclick="printIntegratedContract(${row.id})">${esc(ctT('contract.btn_print','🖨️ 인쇄·PDF 저장'))}</button>`}<button class="hbtn pri" id="contractComplete-${row.id}" disabled onclick="completeIntegratedContract(${row.id})">${esc(row.pledge_required?p9T('pledge.stage',{n:3}):ctT('contract.btn_int_done','3개 모두 서명 후 완료'))}</button><div class="msg" id="contractSignMsg-${row.id}"></div>`;
 }
 function printIntegratedContract(id){
   const row=CONTRACT_ROWS.find(r=>Number(r.id)===Number(id));if(row?.pledge_required&&row.status!=='서명완료')return;
@@ -3559,6 +3559,13 @@ async function saveContractSignature(id){
   if(!row||row.status!=='대기'){if(msg)msg.textContent=ctT('contract.m_processed','이미 처리된 계약입니다.');return;}
   if(contractExpired(row)){if(msg)msg.textContent=ctT('contract.m_expired','서명 기간이 만료되었습니다. 원장에게 문의하세요.');return;}
   if(!canvas||canvas.dataset.dirty!=='true'){if(msg)msg.textContent=ctT('contract.m_sign_first','서명을 먼저 작성하세요.');return;}
+  if(row.pledge_required){
+    if(!confirm(p9T('pledge.stage_confirm',{n:1})))return;
+    setStatus('saving');
+    try{await stageContractPledge(row,[{part:'employment',signature_png:canvas.toDataURL('image/png'),signature_id:canvas.dataset.signatureId?Number(canvas.dataset.signatureId):null,confirmed:true}]);setStatus('saved');}
+    catch(e){if(msg)msg.textContent=p9T('pledge.failed',{msg:e.message});setStatus('error');}
+    return;
+  }
   const signature=canvas.toDataURL('image/png'),now=new Date().toISOString();
   const slot=/<span\b(?=[^>]*\bdata-sign-slot=(['"])employee\1)[^>]*>[\s\S]*?<\/span>/i;
   if(!slot.test(row.merged_html||'')){if(msg)msg.textContent=ctT('contract.m_no_slot','직원 서명 위치를 찾지 못했습니다. 원장에게 문의하세요.');return;}
@@ -3574,6 +3581,13 @@ async function signContractPdf(id){
   if(!row||row.status!=='대기'||!row.source_pdf_path){if(msg)msg.textContent=ctT('contract.m_not_pdf','PDF 서명 대상이 아닙니다.');return;}
   if(contractExpired(row)){if(msg)msg.textContent=ctT('contract.m_expired','서명 기간이 만료되었습니다. 원장에게 문의하세요.');return;}
   if(!canvas||canvas.dataset.dirty!=='true'){if(msg)msg.textContent=ctT('contract.m_sign_first','서명을 먼저 작성하세요.');return;}
+  if(row.pledge_required){
+    if(!confirm(p9T('pledge.stage_confirm',{n:1})))return;
+    setStatus('saving');
+    try{await stageContractPledge(row,[{part:'employment',signature_png:canvas.toDataURL('image/png'),signature_id:canvas.dataset.signatureId?Number(canvas.dataset.signatureId):null,confirmed:true}]);setStatus('saved');}
+    catch(e){if(msg)msg.textContent=p9T('pledge.failed',{msg:e.message});setStatus('error');}
+    return;
+  }
   if(!confirm('원본 PDF를 확인했고, 아래 좌표에 본인 서명을 넣어 완료 PDF를 만드는 것에 동의합니까?'))return;
   const {error:confirmationError}=await sb.rpc('confirm_contract_pdf_source',{p_contract_id:id});
   if(confirmationError){if(msg)msg.textContent=ctT('contract.m_pdf_conf_fail','원본 PDF 확인 기록 실패: {msg}',{msg:confirmationError.message});setStatus('error');return;}
@@ -3604,8 +3618,9 @@ async function renderContractEmployee(m,options={}){
       ${r.source_pdf_path?`<div class="hint">${esc(ctT('contract.pdf_base','이 계약의 기준 문서는 원본 PDF이며, HTML 계약 본문과 별도 보관됩니다.'))}${signed&&r.signed_pdf_path?` <button class="mini" onclick="downloadContractPdf(${r.id})">${esc(ctT('contract.btn_pdf_down','완료 PDF 다운로드'))}</button>`:''}</div>`:''}
       ${expired?`<div class="hint" style="color:var(--red)">${esc(ctT('contract.expired','서명 기간 만료, 원장에게 문의'))}</div>`:''}
       ${r.status==='대기'&&!expired&&integratedContract(r)&&r.source_pdf_path?`<div class="hint">${esc(ctT('contract.pdf_pos3','원본 PDF의 세 서명 위치를 확인하세요. 좌표 기준은 PDF 왼쪽 아래입니다.'))}</div><button class="mini" onclick="openContractPdfSource(${r.id})">${esc(ctT('contract.btn_pdf_open','원본 PDF 확인'))}</button>`:''}
-      ${r.status==='대기'&&!expired&&!integratedContract(r)?`<h3>${esc(ctT('contract.sign_h','직원 서명'))}</h3>${r.source_pdf_path?`<div class="hint">${esc(ctT('contract.pdf_pos1','원본 PDF를 먼저 확인하세요. 좌표 기준은 PDF 왼쪽 아래이며, 실제 페이지에 맞게 조정합니다.'))}</div><div class="rowflex" style="margin:8px 0"><button class="mini" onclick="openContractPdfSource(${r.id})">${esc(ctT('contract.btn_pdf_open','원본 PDF 확인'))}</button><label class="mini">${esc(ctT('contract.f_page','페이지'))} <input class="mini" type="number" min="1" value="1" data-pdf-page="${r.id}" style="width:60px"></label><label class="mini">X <input class="mini" type="number" min="0" value="72" data-pdf-x="${r.id}" style="width:70px"></label><label class="mini">Y <input class="mini" type="number" min="0" value="72" data-pdf-y="${r.id}" style="width:70px"></label><label class="mini">${esc(ctT('contract.f_w','가로'))} <input class="mini" type="number" min="1" value="150" data-pdf-width="${r.id}" style="width:70px"></label><label class="mini">${esc(ctT('contract.f_h','세로'))} <input class="mini" type="number" min="1" value="50" data-pdf-height="${r.id}" style="width:70px"></label></div>`:''}<canvas class="contract-signature" width="720" height="180" data-contract-signature="${r.id}" data-dirty="false"></canvas>
+      ${r.status==='대기'&&!expired&&!integratedContract(r)&&!(r.pledge_required&&P9_PLEDGES.get(Number(r.id))?.staged_at)?`<h3>${esc(ctT('contract.sign_h','직원 서명'))}</h3>${r.source_pdf_path?`<div class="hint">${esc(ctT('contract.pdf_pos1','원본 PDF를 먼저 확인하세요. 좌표 기준은 PDF 왼쪽 아래이며, 실제 페이지에 맞게 조정합니다.'))}</div><div class="rowflex" style="margin:8px 0"><button class="mini" onclick="openContractPdfSource(${r.id})">${esc(ctT('contract.btn_pdf_open','원본 PDF 확인'))}</button><label class="mini">${esc(ctT('contract.f_page','페이지'))} <input class="mini" type="number" min="1" value="1" data-pdf-page="${r.id}" style="width:60px"></label><label class="mini">X <input class="mini" type="number" min="0" value="72" data-pdf-x="${r.id}" style="width:70px"></label><label class="mini">Y <input class="mini" type="number" min="0" value="72" data-pdf-y="${r.id}" style="width:70px"></label><label class="mini">${esc(ctT('contract.f_w','가로'))} <input class="mini" type="number" min="1" value="150" data-pdf-width="${r.id}" style="width:70px"></label><label class="mini">${esc(ctT('contract.f_h','세로'))} <input class="mini" type="number" min="1" value="50" data-pdf-height="${r.id}" style="width:70px"></label></div>`:''}<canvas class="contract-signature" width="720" height="180" data-contract-signature="${r.id}" data-dirty="false"></canvas>
         <div class="rowflex" style="margin-top:8px"><button class="mini" onclick="clearContractSignature(${r.id})">${esc(ctT('contract.btn_clear_sig','지우기'))}</button><button class="mini" onclick="useStoredContractSignature(${r.id})">${esc(ctT('contract.btn_use_sig','보관 서명 사용'))}</button>${r.source_pdf_path?`<button class="hbtn pri" onclick="signContractPdf(${r.id})">${esc(ctT('contract.btn_sign_pdf','원본 확인 후 PDF 서명'))}</button>`:`<button class="hbtn pri" onclick="saveContractSignature(${r.id})">${esc(ctT('contract.btn_sign_save','원문 확인 후 서명 저장'))}</button>`}</div><div class="msg" id="contractSignMsg-${r.id}"></div>`:''}
+      ${r.status==='대기'&&!expired&&!integratedContract(r)&&r.pledge_required&&P9_PLEDGES.get(Number(r.id))?.staged_at?`<div id="pledge-${r.id}">${securityPledgeCard(P9_PLEDGES.get(Number(r.id)))}</div>`:''}
       ${signed&&r.source_pdf_path&&r.pledge_required&&P9_PLEDGES.get(Number(r.id))?.signed_at?pledgeDocumentHtml(P9_PLEDGES.get(Number(r.id))):''}${signed&&!r.source_pdf_path&&r.pledge_required?`<button class="mini" onclick="printIntegratedContract(${r.id})">${esc(p9T('pledge.finish_pdf'))}</button>`:''}${signed?`<div class="hint" style="color:var(--mint)">${esc(ctT('contract.signed_ok','✓ 서명 완료'))}</div>`:''}</div>`;}).join('');
   if(append)m.insertAdjacentHTML('beforeend',html);else m.innerHTML=html;
   initContractSignatures();autoLoadStoredContractSignatures(ownRows);initPledgeCanvas();

@@ -2,7 +2,6 @@
 begin;
 alter table public.contracts add column if not exists pledge_required boolean not null default false;
 -- Existing completed contracts retain their original content and completion state.
-update public.contracts set pledge_required=true where status in ('대기','발송요청') and integrated_signature_required;
 alter table public.contracts alter column pledge_required set default true;
 
 create table if not exists public.contract_security_pledges (
@@ -18,17 +17,21 @@ create table if not exists public.contract_security_pledges (
   rules_confirmed boolean not null default false,
   signed_at timestamptz
 );
+alter table public.contract_security_pledges
+  add column if not exists pdf_validation jsonb,
+  add column if not exists coordinate_corrections jsonb not null default '[]'::jsonb;
 alter table public.contract_security_pledges enable row level security;
 revoke all on public.contract_security_pledges from public,anon,authenticated;
 grant select on public.contract_security_pledges to authenticated,service_role;
+drop policy if exists contract_security_pledges_read on public.contract_security_pledges;
 create policy contract_security_pledges_read on public.contract_security_pledges for select to authenticated
   using (public.employee_hub_access_allowed() and (user_id=auth.uid() or public.my_role() in ('owner','chief','manager')));
 
-create function public.p9_pledge_document() returns jsonb
+create or replace function public.p9_pledge_document() returns jsonb
 language plpgsql security definer set search_path=public,pg_temp as $$
 declare d jsonb; n integer;
 begin
-  select jsonb_object_agg(key,value) into d from public.hub_ui_texts where key like 'pledge.body.%';
+  select jsonb_object_agg(key,value) into d from public.hub_ui_texts where key like 'pledge.body.%' or key='pledge.signed_meta';
   for n in 1..14 loop
     if coalesce(d->>('pledge.body.clause.'||n),'')='' then raise exception 'pledge clause % missing',n; end if;
   end loop;
@@ -37,7 +40,7 @@ begin
 end $$;
 revoke all on function public.p9_pledge_document() from public,anon,authenticated;
 
-create function public.prepare_contract_security_pledge(p_contract_id bigint) returns public.contract_security_pledges
+create or replace function public.prepare_contract_security_pledge(p_contract_id bigint) returns public.contract_security_pledges
 language plpgsql security definer set search_path=public,pg_temp as $$
 declare c public.contracts; r public.contract_security_pledges; d jsonb;
 begin
@@ -53,15 +56,16 @@ end $$;
 revoke all on function public.prepare_contract_security_pledge(bigint) from public,anon,authenticated;
 grant execute on function public.prepare_contract_security_pledge(bigint) to authenticated;
 
-create function public.stage_contract_pledge_signatures(p_contract_id bigint,p_signatures jsonb,p_coordinates jsonb default null)
+create or replace function public.stage_contract_pledge_signatures(p_contract_id bigint,p_signatures jsonb,p_coordinates jsonb default null)
 returns public.contract_security_pledges language plpgsql security definer set search_path=public,pg_temp as $$
-declare c public.contracts; r public.contract_security_pledges; part text; item jsonb; coord jsonb; b bytea; sid bigint;
+declare c public.contracts; r public.contract_security_pledges; part text; item jsonb; coord jsonb; b bytea; sid bigint; parts text[];
 begin
   r:=public.prepare_contract_security_pledge(p_contract_id);
   select * into c from public.contracts where id=p_contract_id and user_id=auth.uid() for update;
-  if c.status<>'대기' or not c.integrated_signature_required or c.due_at<now() or r.signed_at is not null then raise exception 'contract is not signable'; end if;
-  if jsonb_typeof(p_signatures) is distinct from 'array' or jsonb_array_length(p_signatures)<>3 then raise exception 'three signatures required'; end if;
-  foreach part in array array['employment','medical','privacy'] loop
+  if c.status<>'대기' or c.due_at<now() or r.signed_at is not null or c.pdf_signing_attempt_id is not null then raise exception 'contract is not signable'; end if;
+  parts:=case when c.integrated_signature_required then array['employment','medical','privacy'] else array['employment'] end;
+  if jsonb_typeof(p_signatures) is distinct from 'array' or jsonb_array_length(p_signatures)<>cardinality(parts) then raise exception 'one or three signatures required for contract kind'; end if;
+  foreach part in array parts loop
     select value into item from jsonb_array_elements(p_signatures) where value->>'part'=part;
     if not found or (select count(*) from jsonb_array_elements(p_signatures) where value->>'part'=part)<>1 or item->>'confirmed' is distinct from 'true' then raise exception 'one confirmed signature per part required'; end if;
     if coalesce(item->>'signature_png','') !~ '^data:image/png;base64,[A-Za-z0-9+/]+={0,2}$' or length(item->>'signature_png')>1400000 then raise exception 'invalid PNG signature'; end if;
@@ -70,9 +74,9 @@ begin
     sid:=nullif(item->>'signature_id','')::bigint;
     if sid is not null and not exists(select 1 from public.employee_signature_vault where id=sid and user_id=auth.uid() and revoked_at is null) then raise exception 'stored signature unavailable'; end if;
   end loop;
-  if c.source_pdf_path is not null and (jsonb_typeof(p_coordinates) is distinct from 'array' or jsonb_array_length(p_coordinates)<>3) then raise exception 'three PDF coordinates required'; end if;
+  if c.source_pdf_path is not null and (jsonb_typeof(p_coordinates) is distinct from 'array' or jsonb_array_length(p_coordinates)<>cardinality(parts)) then raise exception 'one or three PDF coordinates required for contract kind'; end if;
   if c.source_pdf_path is not null then
-    foreach part in array array['employment','medical','privacy'] loop
+    foreach part in array parts loop
       select value into coord from jsonb_array_elements(p_coordinates) where value->>'part'=part;
       if not found or (select count(*) from jsonb_array_elements(p_coordinates) where value->>'part'=part)<>1
         or coalesce(coord->>'page_no','') !~ '^[1-9][0-9]*$'
@@ -83,14 +87,53 @@ begin
       end if;
     end loop;
   end if;
-  update public.contract_security_pledges set contract_signatures=p_signatures,pdf_coordinates=p_coordinates,staged_at=now()
+  update public.contract_security_pledges set contract_signatures=p_signatures,pdf_coordinates=p_coordinates,staged_at=now(),pdf_validation=null
     where contract_id=p_contract_id returning * into r;
   return r;
 end $$;
 revoke all on function public.stage_contract_pledge_signatures(bigint,jsonb,jsonb) from public,anon,authenticated;
 grant execute on function public.stage_contract_pledge_signatures(bigint,jsonb,jsonb) to authenticated;
 
-create function public.p9_pledge_html(p_pledge public.contract_security_pledges) returns text
+-- Only card metadata; the contracts SELECT policy and old contract body access stay unchanged.
+create or replace function public.get_my_contract_security_pledges()
+returns table(contract_id bigint,staged_at timestamptz,signed_at timestamptz)
+language plpgsql security definer set search_path=public,pg_temp as $$
+begin
+  if not public.employee_hub_access_allowed() then raise exception 'employee access required'; end if;
+  return query select c.id,p.staged_at,p.signed_at from public.contracts c
+    left join public.contract_security_pledges p on p.contract_id=c.id and p.user_id=auth.uid()
+    where c.user_id=auth.uid() and c.status='서명완료' order by c.id desc;
+end $$;
+revoke all on function public.get_my_contract_security_pledges() from public,anon,authenticated;
+grant execute on function public.get_my_contract_security_pledges() to authenticated;
+
+-- Edge calls this only after loading the real source PDF and embedding every PNG.
+-- Coordinates may be corrected without replacing the signed pledge evidence.
+create or replace function public.validate_contract_pledge_pdf(
+  p_contract_id bigint,p_user_id uuid,p_signatures jsonb,p_coordinates jsonb,p_source_sha256 text,p_pledge_signature_png text
+) returns public.contract_security_pledges
+language plpgsql security definer set search_path=public,pg_temp as $$
+declare c public.contracts; r public.contract_security_pledges;
+begin
+  select * into c from public.contracts where id=p_contract_id and user_id=p_user_id for update;
+  if not found or c.status<>'대기' or c.due_at<now() or c.source_pdf_path is null
+    or c.source_pdf_sha256 is distinct from p_source_sha256 then raise exception 'contract PDF is not signable'; end if;
+  select * into r from public.contract_security_pledges where contract_id=p_contract_id and user_id=p_user_id for update;
+  if not found or r.staged_at is null or r.contract_signatures is distinct from p_signatures
+    or (r.signed_at is not null and r.signature_png is distinct from p_pledge_signature_png) then raise exception 'staged contract signatures differ'; end if;
+  if c.pdf_signing_attempt_id is not null and r.pdf_coordinates is distinct from p_coordinates then raise exception 'PDF signing already started; coordinates are locked'; end if;
+  update public.contract_security_pledges set
+    coordinate_corrections=case when pdf_coordinates is distinct from p_coordinates then
+      coordinate_corrections||jsonb_build_array(jsonb_build_object('at',now(),'user_id',p_user_id,'before',pdf_coordinates,'after',p_coordinates)) else coordinate_corrections end,
+    pdf_coordinates=p_coordinates,
+    pdf_validation=jsonb_build_object('at',now(),'source_sha256',p_source_sha256,'signatures',p_signatures,'coordinates',p_coordinates,'pledge_signature_md5',md5(p_pledge_signature_png))
+    where contract_id=p_contract_id returning * into r;
+  return r;
+end $$;
+revoke all on function public.validate_contract_pledge_pdf(bigint,uuid,jsonb,jsonb,text,text) from public,anon,authenticated;
+grant execute on function public.validate_contract_pledge_pdf(bigint,uuid,jsonb,jsonb,text,text) to service_role;
+
+create or replace function public.p9_pledge_html(p_pledge public.contract_security_pledges) returns text
 language plpgsql immutable set search_path=public,pg_temp as $$
 declare out_html text; item text; n integer;
 begin
@@ -103,9 +146,9 @@ begin
 end $$;
 revoke all on function public.p9_pledge_html(public.contract_security_pledges) from public,anon,authenticated;
 
-create function public.submit_contract_security_pledge(p_contract_id bigint,p_signature_png text,p_read_confirmed boolean,p_rules_confirmed boolean,p_version text)
+create or replace function public.submit_contract_security_pledge(p_contract_id bigint,p_signature_png text,p_read_confirmed boolean,p_rules_confirmed boolean,p_version text)
 returns public.contract_security_pledges language plpgsql security definer set search_path=public,pg_temp as $$
-declare c public.contracts; r public.contract_security_pledges; b bytea;
+declare c public.contracts; r public.contract_security_pledges; b bytea; item jsonb; html text; slots jsonb;
 begin
   if not public.employee_hub_access_allowed() then raise exception 'employee access required'; end if;
   select * into c from public.contracts where id=p_contract_id and user_id=auth.uid() for update;
@@ -114,15 +157,32 @@ begin
   if not found or r.version is distinct from p_version then raise exception 'pledge version changed'; end if;
   if r.signed_at is not null then return r; end if;
   if p_read_confirmed is distinct from true or p_rules_confirmed is distinct from true then raise exception 'both pledge confirmations required'; end if;
-  if c.status='대기' and (c.due_at<now() or r.staged_at is null or jsonb_array_length(r.contract_signatures)<>3) then raise exception 'three contract signatures required before pledge'; end if;
+  if c.status='대기' and (c.due_at<now() or r.staged_at is null or jsonb_array_length(r.contract_signatures)<>(case when c.integrated_signature_required then 3 else 1 end)) then raise exception 'contract signatures required before pledge'; end if;
   if coalesce(p_signature_png,'') !~ '^data:image/png;base64,[A-Za-z0-9+/]+={0,2}$' or length(p_signature_png)>1400000 then raise exception 'invalid pledge PNG'; end if;
   b:=decode(substr(p_signature_png,23),'base64');
   if octet_length(b)<100 or octet_length(b)>1048576 or substring(b from 1 for 8)<>decode('89504e470d0a1a0a','hex') then raise exception 'invalid pledge PNG bytes'; end if;
+  if c.status='대기' and c.source_pdf_path is not null and
+    (r.pdf_validation is null or r.pdf_validation->'signatures' is distinct from r.contract_signatures
+     or r.pdf_validation->'coordinates' is distinct from r.pdf_coordinates
+     or r.pdf_validation->>'source_sha256' is distinct from c.source_pdf_sha256
+     or r.pdf_validation->>'pledge_signature_md5' is distinct from md5(p_signature_png)) then
+    raise exception 'PDF prevalidation required';
+  end if;
   update public.contract_security_pledges set signature_png=p_signature_png,read_confirmed=true,rules_confirmed=true,signed_at=now()
     where contract_id=p_contract_id returning * into r;
   -- PDF completion is performed by the existing server signer after this record commits.
   if c.status='대기' and c.source_pdf_path is null then
-    perform public.apply_integrated_contract_signatures(p_contract_id,r.contract_signatures);
+    if c.integrated_signature_required then
+      perform public.apply_integrated_contract_signatures(p_contract_id,r.contract_signatures);
+    else
+      item:=r.contract_signatures->0;
+      if c.merged_html !~ '<span\M[^>]*data-sign-slot="employee"[^>]*>' then raise exception 'employee signature slot missing'; end if;
+      html:=regexp_replace(c.merged_html,'<span\M[^>]*data-sign-slot="employee"[^>]*>[^<]*</span>',
+        '<img src="'||(item->>'signature_png')||'" alt="employee" style="height:60px"> <span>'||r.signed_at::text||'</span>','i');
+      select coalesce(jsonb_agg(case when value->>'who'='employee' then value||jsonb_build_object('signed',true,'signed_at',r.signed_at) else value end),'[]'::jsonb)
+        into slots from jsonb_array_elements(coalesce(c.sign_slots,'[]'::jsonb));
+      perform public.apply_employee_contract_signature(p_contract_id,html,slots,r.signed_at,nullif(item->>'signature_id','')::bigint);
+    end if;
     update public.contracts set merged_html=merged_html||public.p9_pledge_html(r) where id=p_contract_id;
   end if;
   return r;
@@ -130,7 +190,7 @@ end $$;
 revoke all on function public.submit_contract_security_pledge(bigint,text,boolean,boolean,text) from public,anon,authenticated;
 grant execute on function public.submit_contract_security_pledge(bigint,text,boolean,boolean,text) to authenticated;
 
-create function public.p9_guard_contract_pledge() returns trigger
+create or replace function public.p9_guard_contract_pledge() returns trigger
 language plpgsql security definer set search_path=public,pg_temp as $$
 declare r public.contract_security_pledges;
 begin
@@ -140,12 +200,15 @@ begin
     if old.pledge_required and not new.pledge_required then raise exception 'pledge requirement is immutable'; end if;
     if old.pledge_required and ((new.status='서명완료' and old.status<>'서명완료') or (new.signed_pdf_path is not null and old.signed_pdf_path is null)) then
       select * into r from public.contract_security_pledges where contract_id=new.id and user_id=new.user_id;
-      if not found or r.signed_at is null or not r.read_confirmed or not r.rules_confirmed or r.staged_at is null or jsonb_array_length(r.contract_signatures)<>3 then raise exception 'signed security pledge and confirmations required'; end if;
+      if not found or r.signed_at is null or not r.read_confirmed or not r.rules_confirmed or r.staged_at is null or jsonb_array_length(r.contract_signatures)<>(case when old.integrated_signature_required then 3 else 1 end) then raise exception 'signed security pledge and confirmations required'; end if;
     end if;
   end if;
   return new;
 end $$;
 revoke all on function public.p9_guard_contract_pledge() from public,anon,authenticated;
+drop trigger if exists p9_contract_pledge_guard on public.contracts;
 create trigger p9_contract_pledge_guard before insert or update on public.contracts
   for each row execute function public.p9_guard_contract_pledge();
+-- Run data changes after all ALTERs: existing deferred contract events must not precede DDL.
+update public.contracts set pledge_required=true where status in ('대기','발송요청') and not pledge_required;
 commit;

@@ -50,7 +50,7 @@ async function appendSecurityPledge(pdf: any, pledge: any, kit: any, fontData: s
   paragraph(pledge.document["pledge.body.title"]);
   for (let i = 1; i <= 14; i++) paragraph(`${i}. ${pledge.document[`pledge.body.clause.${i}`]}`);
   paragraph(pledge.document["pledge.body.rules"]);
-  paragraph(`서명 일시: ${pledge.signed_at} · 버전: ${pledge.version}`);
+  paragraph(String(pledge.document['pledge.signed_meta'] || '').replace('{date}',pledge.signed_at||'').replace('{version}',pledge.version));
   if (y < 130) { page = newPage(); y = 800; }
   const image = await pdf.embedPng(dataUrlBytes(pledge.signature_png));
   page.drawImage(image, { x: margin, y: y - 60, width: 240, height: 60 });
@@ -74,6 +74,8 @@ export function createContractPdfSignHandler(deps: { createClient?: any; PDFDocu
     const { data: { user }, error: userError } = await userClient.auth.getUser();
     if (userError || !user) throw new Error("authenticated employee required");
     const body = await req.json();
+    const validatePledge = body.action === 'validate_pledge';
+    if (body.action && !validatePledge) throw new Error('unknown signing action');
     const contractId = Number(body.contract_id);
     if (!Number.isInteger(contractId) || contractId < 1) throw new Error("invalid contract id");
     const { data: preflight, error: preflightError } = await userClient.from("contracts").select("*").eq("id", contractId).maybeSingle();
@@ -82,20 +84,24 @@ export function createContractPdfSignHandler(deps: { createClient?: any; PDFDocu
     if (preflight.status !== "대기" || preflight.signed_at || preflight.signed_pdf_path || !preflight.source_pdf_path || !preflight.source_pdf_sha256) throw new Error("contract is not signable");
     if (!preflight.source_pdf_confirmed_at || !preflight.sent_at || !preflight.source_pdf_version || !preflight.due_at || new Date(preflight.due_at).getTime() < Date.now()) throw new Error("employee must confirm the source PDF and final send first");
     const integrated = preflight.integrated_signature_required === true || ["employment", "medical", "privacy"].every((part) => String(preflight.merged_html || "").includes(`data-sign-slot="${part}"`));
+    const parts = integrated ? ["employment", "medical", "privacy"] : ["employment"];
+    const structured = integrated || preflight.pledge_required === true;
+    if (validatePledge && preflight.pledge_required !== true) throw new Error('pledge is not required');
     let securityPledge: any = null;
     if (preflight.pledge_required === true) {
       const { data: pledge, error: pledgeError } = await admin.from("contract_security_pledges").select("*").eq("contract_id", contractId).maybeSingle();
-      if (pledgeError || !pledge || pledge.user_id !== user.id || !pledge.signed_at || pledge.read_confirmed !== true || pledge.rules_confirmed !== true || !pledge.staged_at) throw new Error("signed security pledge and confirmations required");
-      for (const part of ["employment", "medical", "privacy"]) {
+      if (pledgeError || !pledge || pledge.user_id !== user.id || !pledge.staged_at || (!validatePledge && (!pledge.signed_at || pledge.read_confirmed !== true || pledge.rules_confirmed !== true))) throw new Error("signed security pledge and confirmations required");
+      if (!Array.isArray(pledge.contract_signatures) || pledge.contract_signatures.length !== parts.length) throw new Error('staged contract signatures differ');
+      for (const part of parts) {
         const stored = pledge.contract_signatures?.find((s: any) => s.part === part), supplied = body.signatures?.find((s: any) => s.part === part);
         const coord = pledge.pdf_coordinates?.find((c: any) => c.part === part), suppliedCoord = body.coordinates?.find((c: any) => c.part === part);
-        if (!stored || !supplied || stored.signature_png !== supplied.signature_png || (stored.signature_id ?? null) !== (supplied.signature_id ?? null) || stored.confirmed !== supplied.confirmed || !coord || !suppliedCoord || ["page_no", "x", "y", "width", "height"].some(k => coord[k] !== suppliedCoord[k])) throw new Error("staged contract signatures differ");
+        if (!stored || !supplied || stored.signature_png !== supplied.signature_png || (stored.signature_id ?? null) !== (supplied.signature_id ?? null) || stored.confirmed !== supplied.confirmed || !suppliedCoord || (!validatePledge && (!coord || ["page_no", "x", "y", "width", "height"].some(k => coord[k] !== suppliedCoord[k])))) throw new Error("staged contract signatures differ");
       }
-      securityPledge = pledge;
+      if (validatePledge && pledge.signed_at && body.pledge_signature_png !== pledge.signature_png) throw new Error('signed pledge evidence is immutable');
+      securityPledge = validatePledge ? {...pledge,signature_png:body.pledge_signature_png} : pledge;
     }
-    const parts = ["employment", "medical", "privacy"];
-    if (integrated && (!Array.isArray(body.signatures) || body.signatures.length !== 3 || !Array.isArray(body.coordinates) || body.coordinates.length !== 3)) throw new Error("three independent signatures and coordinates required");
-    const entries = integrated ? parts.map((part) => {
+    if (structured && (!Array.isArray(body.signatures) || body.signatures.length !== parts.length || !Array.isArray(body.coordinates) || body.coordinates.length !== parts.length)) throw new Error("one or three independent signatures and coordinates required");
+    const entries = structured ? parts.map((part) => {
       const s = Array.isArray(body.signatures) ? body.signatures.find((item: any) => item?.part === part) : null;
       const c = Array.isArray(body.coordinates) ? body.coordinates.find((item: any) => item?.part === part) : null;
       if (!s || !c || body.signatures.filter((item: any) => item?.part === part).length !== 1 || body.coordinates.filter((item: any) => item?.part === part).length !== 1) throw new Error("three independent signatures and coordinates required");
@@ -130,6 +136,14 @@ export function createContractPdfSignHandler(deps: { createClient?: any; PDFDocu
     const signedBytes = await pdf.save();
     if (signedBytes.length > 30 * 1024 * 1024) throw new Error("signed PDF is too large");
     const signedHash = await sha256(signedBytes);
+    if (validatePledge) {
+      const {error: validationError} = await admin.rpc('validate_contract_pledge_pdf', {
+        p_contract_id:contractId,p_user_id:user.id,p_signatures:body.signatures,p_coordinates:body.coordinates,
+        p_source_sha256:sourceHash,p_pledge_signature_png:securityPledge.signature_png,
+      });
+      if (validationError) throw new Error(validationError.message);
+      return json({contract_id:contractId,validated:true});
+    }
     const { data: started, error: startError } = await userClient.rpc("begin_contract_pdf_signing", { p_contract_id: contractId, p_signature_sha256: signatureHash, p_page_no: pageNo, p_x: x, p_y: y, p_width: width, p_height: height });
     if (startError || !started) throw new Error(startError?.message || "contract PDF is not ready for signing");
     const contract = Array.isArray(started) ? started[0] : started;

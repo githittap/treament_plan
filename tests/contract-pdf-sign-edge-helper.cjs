@@ -23,10 +23,10 @@ async function edgeSigningAttempt(confirmed = [true, true, true], integrated = t
   png.writeUInt32BE(20, 20);
   const signaturePng = options.signaturePng || `data:image/png;base64,${png.toString('base64')}`;
   const parts = ['employment', 'medical', 'privacy'];
-  const body = integrated ? {
+  const body = integrated || options.pledgeRequired ? {
     contract_id: 3,
-    signatures: parts.map((part, i) => ({ part, signature_png: signaturePng, signature_id: null, ...(confirmed[i] === undefined ? {} : { confirmed: confirmed[i] }) })),
-    coordinates: parts.map(part => ({ part, page_no: 1, x: 72, y: 72, width: 150, height: 50 })),
+    signatures: (integrated ? parts : ['employment']).map((part, i) => ({ part, signature_png: signaturePng, signature_id: null, ...(confirmed[i] === undefined ? {} : { confirmed: confirmed[i] }) })),
+    coordinates: (integrated ? parts : ['employment']).map(part => ({ part, page_no: 1, x: 72, y: 72, width: 150, height: 50 })),
   } : { contract_id: 3, signature_png: signaturePng, signature_id: null, page_no: 1, x: 72, y: 72, width: 150, height: 50 };
   const mergedHtml = integrated ? parts.map(part => `<span data-sign-slot="${part}"></span>`).join('') : '<span data-sign-slot="employee"></span>';
   const rpcCalls = [];
@@ -39,6 +39,8 @@ async function edgeSigningAttempt(confirmed = [true, true, true], integrated = t
     ...(options.pledgeRequired ? {pledge_required:true} : {}),
   };
   const pledge=options.pledge===null?null:{contract_id:3,user_id:userId,document:options.document||{},version:'fixture-v1',staged_at:'2026-10-03',signed_at:'2026-10-03',read_confirmed:true,rules_confirmed:true,signature_png:signaturePng,contract_signatures:JSON.parse(JSON.stringify(body.signatures||[])),pdf_coordinates:JSON.parse(JSON.stringify(body.coordinates||[])),...(options.pledge||{})};
+  Object.assign(body,options.body||{});
+  if(options.validate)Object.assign(body,{action:'validate_pledge',pledge_signature_png:signaturePng});
   if(options.tamperSignature)body.signatures[0].signature_png='data:image/png;base64,invalid';
   let uploadedBytes=null;
   const userClient = {
@@ -54,10 +56,12 @@ async function edgeSigningAttempt(confirmed = [true, true, true], integrated = t
     storage: { from: () => ({ download: async () => ({ data: new Blob([sourceBytes]), error: null }), upload: async (_path,bytes) => {uploadedBytes=bytes;return {error:null};} }) },
     rpc: async (name, params) => { rpcCalls.push({ name, params }); return { error: null }; },
   };
-  const pdf = { getPageCount: () => 1, getPage: () => ({ getRotation: () => ({ angle: 0 }), getWidth: () => 600, getHeight: () => 800, drawImage: () => {} }), embedPng: async () => ({}), save: async () => sourceBytes };
-  const handler = context.createHandler({ createClient: (_url, key) => key === 'service' ? admin : userClient, PDFDocument: options.PDFDocument||{ load: async () => pdf }, fontkit:options.fontkit,pledgeFont:options.pledgeFont,env: name => ({ SUPABASE_URL: 'https://example.invalid', SUPABASE_SERVICE_ROLE_KEY: 'service', SUPABASE_ANON_KEY: 'anon' })[name] });
+  let appendedPages=0;
+  const page = { getRotation: () => ({ angle: 0 }), getWidth: () => 600, getHeight: () => 800, drawImage: () => {},setSize:()=>{},drawText:()=>{} };
+  const pdf = { getPageCount: () => 1, getPage: () => page, embedPng: async () => {if(options.invalidImage)throw Error('PNG cannot be decoded');return {};},save: async () => sourceBytes,registerFontkit:()=>{},embedFont:async()=>({widthOfTextAtSize:s=>String(s).length*5}),addPage:()=>{appendedPages++;return page;} };
+  const handler = context.createHandler({ createClient: (_url, key) => key === 'service' ? admin : userClient, PDFDocument: options.PDFDocument||{ load: async () => pdf }, fontkit:options.fontkit||{},pledgeFont:options.pledgeFont||'AA==',env: name => ({ SUPABASE_URL: 'https://example.invalid', SUPABASE_SERVICE_ROLE_KEY: 'service', SUPABASE_ANON_KEY: 'anon' })[name] });
   const response = await handler(new Request('https://example.invalid/sign', { method: 'POST', headers: { Authorization: 'Bearer test' }, body: JSON.stringify(body) }));
-  return { response: await response.json(), status: response.status, rpcCalls: JSON.parse(JSON.stringify(rpcCalls)), body,uploadedBytes };
+  return { response: await response.json(), status: response.status, rpcCalls: JSON.parse(JSON.stringify(rpcCalls)), body,uploadedBytes,appendedPages };
 }
 
 module.exports = { edgeSigningAttempt };

@@ -39,3 +39,35 @@ test('휴대폰 비용 표는 보이는 내용 높이만큼 자리를 차지한�
   const html=fs.readFileSync('hr.html','utf8');
   assert.match(html,/#aiBillingMonthly \.tblwrap\{max-height:none;overflow:visible\}/);
 });
+
+test('단일·통합 PDF 계약 모두 서약 페이지를 붙이고 각 기록 함수로 완료한다',async()=>{
+  for(const integrated of [false,true]){
+    const r=await edgeSigningAttempt(undefined,integrated,{pledgeRequired:true});
+    assert.equal(r.status,200,JSON.stringify(r.response));
+    assert.ok(r.appendedPages>0);
+    assert.equal(r.rpcCalls.at(-1).name,integrated?'record_integrated_contract_pdf_signatures':'record_contract_pdf_signature_with_use');
+  }
+});
+
+test('PDF 미리 검사는 서약 서명 전 실제 페이지·경계·PNG를 검사하고 완료본을 만들지 않는다',async()=>{
+  for(const integrated of [false,true]){
+    const valid=await edgeSigningAttempt(undefined,integrated,{pledgeRequired:true,pledge:{signed_at:null},validate:true});
+    assert.equal(valid.status,200,JSON.stringify(valid.response));
+    assert.equal(valid.response.validated,true);
+    assert.deepEqual(valid.rpcCalls.map(c=>c.name),['validate_contract_pledge_pdf']);
+    assert.equal(valid.uploadedBytes,null);
+    for(const change of [{page_no:999},{x:999999}]){
+      const base=valid.body.coordinates.map(c=>({...c,...change}));
+      const bad=await edgeSigningAttempt(undefined,integrated,{pledgeRequired:true,pledge:{signed_at:null},validate:true,body:{coordinates:base}});
+      assert.equal(bad.status,400);assert.equal(bad.rpcCalls.length,0);assert.equal(bad.uploadedBytes,null);
+    }
+    const png=await edgeSigningAttempt(undefined,integrated,{pledgeRequired:true,pledge:{signed_at:null},validate:true,invalidImage:true});
+    assert.equal(png.status,400);assert.equal(png.rpcCalls.length,0);
+  }
+});
+
+test('서약 서명 뒤 좌표를 고쳐 미리 검사할 때 기존 서명을 보존한다',async()=>{
+  const r=await edgeSigningAttempt(undefined,false,{pledgeRequired:true,validate:true,body:{coordinates:[{part:'employment',page_no:1,x:90,y:72,width:150,height:50}]}});
+  assert.equal(r.status,200,JSON.stringify(r.response));
+  assert.equal(r.rpcCalls[0].params.p_coordinates[0].x,90);assert.equal(r.uploadedBytes,null);
+});
