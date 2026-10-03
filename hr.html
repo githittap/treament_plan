@@ -231,7 +231,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 @media(max-width:640px){
   #aiBillingMonthly,#marketingExpenses{min-width:0;overflow-wrap:anywhere}
   #marketingExpenses .rowflex{flex-wrap:wrap}
-  #aiBillingMonthly .tblwrap{overflow:visible}
+  #aiBillingMonthly .tblwrap{max-height:none;overflow:visible}
   #aiBillingMonthly table,#aiBillingMonthly tbody,#aiBillingMonthly tr,#aiBillingMonthly td{display:block;width:100%;box-sizing:border-box}
   #aiBillingMonthly tr{border-top:1px solid var(--line);padding:8px 0}
   #aiBillingMonthly tr:first-child{display:none}
@@ -410,7 +410,8 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 <footer>© 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지</footer>
 
 <script src="hub-intro.js?v=2026100302"></script>
-<script src="hub-texts.js?v=2026100310"></script>
+<script src="hub-texts.js?v=20261003p9"></script>
+<script src="security-pledge.js?v=20261003p9"></script>
 <script>
 /* ═══════ 설정 ═══════
    실제 값은 DB의 app_settings 표에서 읽어옵니다.
@@ -2577,6 +2578,7 @@ async function renderOnbo(m){
   ${onboardingChecklistCard(evidence,docs||[],contracts||[],ME.id)}
   ${isMgr()?await onboOverview():''}`;
   bindPaymentReceiptPreviewHandlers(m);
+  await renderSecurityPledgeDocuments(m);
 }
 function onboardingChecklistCard(evidence,docs,contracts=[],userId=null){
   const e=evidence||{},rows=onboardingChecklistRows(e,docs,contracts,userId);
@@ -3219,7 +3221,7 @@ function fixedTermClause(fields){return /^\d{4}-\d{2}-\d{2}$/.test(String(fields
 /* contract-integrated-terms:test-end */
 function contractIsRejected(row){return !!row&&row.status==='취소'&&!!row.reviewed_at&&!row.sent_at;}
 function contractStatusLabel(c){const def=[{code:'발송요청',label:'발송요청'},{code:'대기',label:'대기'},{code:'서명완료',label:'서명완료'},{code:'취소',label:'취소'},{code:'반려됨',label:'반려됨'}];const items=typeof hubList==='function'?hubList('list.contract_status',def):def;const it=items.find(function(i){return i.code===c;});return it?it.label:c;} /* 계약 상태 이름: 허브 설정 › 목록에서 이름만 고침(코드는 계약 흐름·DB 값이라 고정. 「반려됨」은 취소된 발송 요청을 화면이 따로 부르는 이름) */
-function contractDisplayStatus(row){return contractIsRejected(row)?contractStatusLabel('반려됨'):contractStatusLabel(row&&row.status||'');}
+function contractDisplayStatus(row){if(row?.pledge_required&&row.status==='대기'&&P9_PLEDGES.get(Number(row.id))?.staged_at)return p9T('pledge.waiting');return contractIsRejected(row)?contractStatusLabel('반려됨'):contractStatusLabel(row&&row.status||'');}
 function contractVisibleRows(rows){return CONTRACT_SHOW_CANCELLED?(rows||[]):(rows||[]).filter(r=>r&&r.status!=='취소');}
 function setContractShowCancelled(checked){CONTRACT_SHOW_CANCELLED=!!checked;render();}
 function mergeContractHtml(template,values){
@@ -3439,6 +3441,7 @@ async function renderContractOwner(m){
   ]);
   if(templateError||contractError||termError){m.innerHTML=`<div class="card"><div class="empty">${esc(ctT('contract.err_load','계약 정보를 불러오지 못했습니다: {msg}',{msg:(templateError||contractError||termError).message}))}</div></div>`;return;}
   CONTRACT_TEMPLATES=templates||[];CONTRACT_ROWS=rows||[];EMPLOYMENT_TERMS=terms||[];
+  await loadContractPledges();
   CONTRACT_ALERTS=contractExpiryRows(employmentTermAlertRows(EMPLOYMENT_TERMS,CONTRACT_ROWS),today());BADGE.contract=CONTRACT_ALERTS.length||0;renderNav();
   if(!CONTRACT_TEMPLATES.some(t=>Number(t.id)===Number(CONTRACT_TEMPLATE_ID)))CONTRACT_TEMPLATE_ID=CONTRACT_TEMPLATES.some(t=>Number(t.id)===1)?1:(CONTRACT_TEMPLATES[0]?CONTRACT_TEMPLATES[0].id:null);
   if(!CONTRACT_EDIT_ID&&!CONTRACT_DRAFT_FIELDS){CONTRACT_DRAFT_FIELDS=contractStorageRead('Draft');if(CONTRACT_DRAFT_FIELDS&&CONTRACT_DRAFT_FIELDS.templateId)CONTRACT_TEMPLATE_ID=Number(CONTRACT_DRAFT_FIELDS.templateId);if(CONTRACT_DRAFT_FIELDS&&CONTRACT_DRAFT_FIELDS.employeeId)CONTRACT_EMPLOYEE_ID=CONTRACT_DRAFT_FIELDS.employeeId;}
@@ -3463,7 +3466,7 @@ async function renderContractOwner(m){
   ${employmentTermsCard()}
   ${contractAlertsCard(CONTRACT_ALERTS)}
   <div class="card"><h2>${esc(ctT('contract.list_title','📚 계약 목록'))}</h2><label class="sub"><input type="checkbox" ${CONTRACT_SHOW_CANCELLED?'checked':''} onchange="setContractShowCancelled(this.checked)"> ${esc(ctT('contract.show_cancelled','취소된 계약 보기'))}</label>${visibleRows.length?`<div class="tblwrap"><table><tr><th>${esc(ctT('contract.th_employee','직원'))}</th><th>${esc(ctT('contract.th_template','서식'))}</th><th>${esc(ctT('contract.th_status','상태'))}</th><th>${esc(ctT('contract.th_end','계약종료'))}</th><th>${esc(ctT('contract.th_sent','발송일'))}</th><th>${esc(ctT('contract.th_signed','서명일'))}</th><th>${esc(ctT('contract.th_due','서명기한'))}</th><th></th></tr>
-    ${visibleRows.map(r=>`<tr><td>${esc(nameOf(r.user_id))}${contractJobGroupWarning(r.user_id,r.fields)}</td><td>${esc(contractTitle(r))}</td><td><span class="b ${contractStatusClass(r.status)}">${esc(contractDisplayStatus(r))}</span></td><td>${esc(contractEndValue(r)||ctT('contract.al_review','관리자 확인 필요'))}</td><td>${contractDate(r.sent_at)}</td><td>${contractDate(r.signed_at)}</td><td>${contractDate(r.due_at)}</td><td><button class="mini" onclick="viewContract(${r.id})">${esc(ctT('contract.btn_view','보기'))}</button> ${r.signed_pdf_path?`<button class="mini" onclick="downloadContractPdf(${r.id})">${esc(ctT('contract.btn_pdf','완료 PDF'))}</button>`:''} <button class="mini" onclick="openContractEnd(${r.id})">${esc(ctT('contract.btn_set_end','종료일 설정'))}</button>${r.status==='대기'?` <button class="mini rej" onclick="cancelContract(${r.id})">${esc(ctT('contract.btn_cancel','취소'))}</button>`:''}</td></tr>`).join('')}</table></div>`:CONTRACT_ROWS.length?`<div class="empty">${esc(ctT('contract.list_hidden','취소된 계약은 숨겨져 있습니다.'))}</div>`:`<div class="empty">${esc(ctT('contract.list_empty','계약이 없습니다.'))}</div>`}</div>`);
+    ${visibleRows.map(r=>`<tr><td>${esc(nameOf(r.user_id))}${contractJobGroupWarning(r.user_id,r.fields)}</td><td>${esc(contractTitle(r))}</td><td><span class="b ${contractStatusClass(r.status)}">${esc(contractDisplayStatus(r))}</span><div class="sub">${esc(pledgeProgress(r))}</div></td><td>${esc(contractEndValue(r)||ctT('contract.al_review','관리자 확인 필요'))}</td><td>${contractDate(r.sent_at)}</td><td>${contractDate(r.signed_at)}</td><td>${contractDate(r.due_at)}</td><td><button class="mini" onclick="viewContract(${r.id})">${esc(ctT('contract.btn_view','보기'))}</button> ${r.signed_pdf_path?`<button class="mini" onclick="downloadContractPdf(${r.id})">${esc(ctT('contract.btn_pdf','완료 PDF'))}</button>`:''} <button class="mini" onclick="openContractEnd(${r.id})">${esc(ctT('contract.btn_set_end','종료일 설정'))}</button>${r.status==='대기'?` <button class="mini rej" onclick="cancelContract(${r.id})">${esc(ctT('contract.btn_cancel','취소'))}</button>`:''}</td></tr>`).join('')}</table></div>`:CONTRACT_ROWS.length?`<div class="empty">${esc(ctT('contract.list_hidden','취소된 계약은 숨겨져 있습니다.'))}</div>`:`<div class="empty">${esc(ctT('contract.list_empty','계약이 없습니다.'))}</div>`}</div>`);
   if(contractFlash){const ft=contractFlashText(contractFlash),fe=$('#contractMsg');if(fe&&ft!==contractFlash)fe.textContent=ft;} /* 발송 결과 안내: 기존 시험이 찾는 줄(contractFlash)은 그대로 두고, 고쳤을 때만 바꿔 넣음 */
 }
 function employmentTermsCard(){
@@ -3513,8 +3516,12 @@ function updateIntegratedContractButton(id){if(!id)return;const button=$(`#contr
 async function completeIntegratedContract(id){
   const row=CONTRACT_ROWS.find(r=>Number(r.id)===Number(id)),msg=$(`#contractSignMsg-${id}`);
   if(!row||row.status!=='대기'||!integratedContract(row)||contractExpired(row)||!integratedContractReady(id)){if(msg)msg.textContent=ctT('contract.m_int_need','세 구역의 내용을 확인하고 각각 서명하세요.');return;}
-  if(!confirm('근로계약·의료정보 보안·개인정보 취급자 서약을 각각 확인하고 세 서명을 완료합니까?'))return;
+  if(!confirm(row.pledge_required?p9T('pledge.stage_confirm'):'근로계약·의료정보 보안·개인정보 취급자 서약을 각각 확인하고 세 서명을 완료합니까?'))return;
   const signatures=integratedContractPayload(id);setStatus('saving');if(msg)msg.textContent=ctT('contract.m_int_saving','세 서명 저장 중…');
+  if(row.pledge_required){
+    try{await stageContractPledge(row,signatures);setStatus('saved');}catch(e){if(msg)msg.textContent=p9T('pledge.failed',{msg:e.message});setStatus('error');}
+    return;
+  }
   if(row.source_pdf_path){
     const coordinates=CONTRACT_PARTS.map(([part])=>{const n=key=>Number(document.querySelector(`[data-pdf-${key}="${id}-${part}"]`)?.value);return {part,page_no:n('page'),x:n('x'),y:n('y'),width:n('width'),height:n('height')};});
     if(coordinates.some(c=>!Number.isInteger(c.page_no)||c.page_no<1||[c.x,c.y,c.width,c.height].some(n=>!Number.isFinite(n))||c.x<0||c.y<0||c.width<=0||c.height<=0)){if(msg)msg.textContent=ctT('contract.m_pdf_pos3','세 PDF 서명 위치를 확인하세요.');setStatus('error');return;}
@@ -3533,9 +3540,11 @@ function integratedSignatureCard(row,part){
   return `<section class="card" style="margin:12px 0"><h3>${esc(ctT('contract.int_sig_h','{part} 서명',{part:label}))}</h3>${row.source_pdf_path?`<div class="rowflex" style="margin:8px 0"><label>${esc(ctT('contract.f_page','페이지'))} <input class="mini" type="number" min="1" placeholder="${esc(ctT('contract.ph_page','쪽'))}" data-pdf-page="${row.id}-${part}" style="width:60px"></label><label>X <input class="mini" type="number" min="0" placeholder="X" data-pdf-x="${row.id}-${part}" style="width:70px"></label><label>Y <input class="mini" type="number" min="0" placeholder="Y" data-pdf-y="${row.id}-${part}" style="width:70px"></label><label>${esc(ctT('contract.f_w','가로'))} <input class="mini" type="number" min="1" placeholder="${esc(ctT('contract.f_w','가로'))}" data-pdf-width="${row.id}-${part}" style="width:70px"></label><label>${esc(ctT('contract.f_h','세로'))} <input class="mini" type="number" min="1" placeholder="${esc(ctT('contract.f_h','세로'))}" data-pdf-height="${row.id}-${part}" style="width:70px"></label></div>`:''}<canvas class="contract-signature" width="720" height="180" data-contract-signature="${row.id}-${part}" data-contract-id="${row.id}" data-part="${part}" data-dirty="false" data-confirmed="false" aria-label="${esc(ctT('contract.int_sig_h','{part} 서명',{part:label}))}"></canvas><div class="rowflex" style="margin-top:8px"><button class="mini" onclick="clearContractSignature('${row.id}-${part}')">${esc(ctT('contract.btn_clear_sig','지우기'))}</button><button class="mini" onclick="useStoredContractSignature('${row.id}-${part}')">${esc(ctT('contract.btn_use_sig','보관 서명 사용'))}</button></div><label><input type="checkbox" data-contract-confirm="${row.id}-${part}" onchange="confirmIntegratedContractPart(${row.id},'${part}',this.checked)"> ${esc(ctT('contract.int_confirm','{part} 내용을 읽고 이 서명을 확인함',{part:label}))}</label></section>`;
 }
 function integratedContractPage(row){
+  const pledge=P9_PLEDGES.get(Number(row.id));
+  if(row.pledge_required&&pledge?.staged_at)return `<div id="pledge-${Number(row.id)}">${securityPledgeCard(pledge)}</div>`;
   const html=String(row.merged_html||''),med=html.indexOf('<section class="contract-part" data-contract-part="medical"'),privacy=html.indexOf('<section class="contract-part" data-contract-part="privacy"');
   if(med<0||privacy<=med)return `<div class="cal-error">${esc(ctT('contract.int_bad','통합 계약 본문 구성을 확인할 수 없습니다.'))}</div>`;
-  return `<div class="contract-signature-group"><div class="contract-doc" style="margin-top:10px">${html.slice(0,med)}</div>${integratedSignatureCard(row,'employment')}</div><div class="contract-signature-group"><div class="contract-doc">${html.slice(med,privacy)}</div>${integratedSignatureCard(row,'medical')}</div><div class="contract-signature-group"><div class="contract-doc">${html.slice(privacy)}</div>${integratedSignatureCard(row,'privacy')}</div><button class="hbtn mini" onclick="printIntegratedContract(${row.id})">${esc(ctT('contract.btn_print','🖨️ 인쇄·PDF 저장'))}</button><button class="hbtn pri" id="contractComplete-${row.id}" disabled onclick="completeIntegratedContract(${row.id})">${esc(ctT('contract.btn_int_done','3개 모두 서명 후 완료'))}</button><div class="msg" id="contractSignMsg-${row.id}"></div>`;
+  return `<div class="contract-signature-group"><div class="contract-doc" style="margin-top:10px">${html.slice(0,med)}</div>${integratedSignatureCard(row,'employment')}</div><div class="contract-signature-group"><div class="contract-doc">${html.slice(med,privacy)}</div>${integratedSignatureCard(row,'medical')}</div><div class="contract-signature-group"><div class="contract-doc">${html.slice(privacy)}</div>${integratedSignatureCard(row,'privacy')}</div>${row.pledge_required?'':`<button class="hbtn mini" onclick="printIntegratedContract(${row.id})">${esc(ctT('contract.btn_print','🖨️ 인쇄·PDF 저장'))}</button>`}<button class="hbtn pri" id="contractComplete-${row.id}" disabled onclick="completeIntegratedContract(${row.id})">${esc(row.pledge_required?p9T('pledge.stage'):ctT('contract.btn_int_done','3개 모두 서명 후 완료'))}</button><div class="msg" id="contractSignMsg-${row.id}"></div>`;
 }
 function printIntegratedContract(id){
   const target=document.getElementById(`integratedContract-${id}`);if(!target)return;
@@ -3581,6 +3590,7 @@ async function renderContractEmployee(m,options={}){
   ]);
   if(error){const html=`<div class="card"><div class="empty">${esc(ctT('contract.err_mine','내 계약서를 불러오지 못했습니다: {msg}',{msg:error.message}))}</div></div>`;if(append)m.insertAdjacentHTML('beforeend',html);else m.innerHTML=html;return;}
   const ownRows=rows||[];if(onlyIfAny&&!ownRows.length)return;
+  await loadContractPledges();
   const visibleRows=contractVisibleRows(ownRows);
   if(!append)CONTRACT_ROWS=ownRows;
   if(!CONTRACT_TEMPLATES.length)CONTRACT_TEMPLATES=templates||[];
@@ -3594,9 +3604,10 @@ async function renderContractEmployee(m,options={}){
       ${r.status==='대기'&&!expired&&integratedContract(r)&&r.source_pdf_path?`<div class="hint">${esc(ctT('contract.pdf_pos3','원본 PDF의 세 서명 위치를 확인하세요. 좌표 기준은 PDF 왼쪽 아래입니다.'))}</div><button class="mini" onclick="openContractPdfSource(${r.id})">${esc(ctT('contract.btn_pdf_open','원본 PDF 확인'))}</button>`:''}
       ${r.status==='대기'&&!expired&&!integratedContract(r)?`<h3>${esc(ctT('contract.sign_h','직원 서명'))}</h3>${r.source_pdf_path?`<div class="hint">${esc(ctT('contract.pdf_pos1','원본 PDF를 먼저 확인하세요. 좌표 기준은 PDF 왼쪽 아래이며, 실제 페이지에 맞게 조정합니다.'))}</div><div class="rowflex" style="margin:8px 0"><button class="mini" onclick="openContractPdfSource(${r.id})">${esc(ctT('contract.btn_pdf_open','원본 PDF 확인'))}</button><label class="mini">${esc(ctT('contract.f_page','페이지'))} <input class="mini" type="number" min="1" value="1" data-pdf-page="${r.id}" style="width:60px"></label><label class="mini">X <input class="mini" type="number" min="0" value="72" data-pdf-x="${r.id}" style="width:70px"></label><label class="mini">Y <input class="mini" type="number" min="0" value="72" data-pdf-y="${r.id}" style="width:70px"></label><label class="mini">${esc(ctT('contract.f_w','가로'))} <input class="mini" type="number" min="1" value="150" data-pdf-width="${r.id}" style="width:70px"></label><label class="mini">${esc(ctT('contract.f_h','세로'))} <input class="mini" type="number" min="1" value="50" data-pdf-height="${r.id}" style="width:70px"></label></div>`:''}<canvas class="contract-signature" width="720" height="180" data-contract-signature="${r.id}" data-dirty="false"></canvas>
         <div class="rowflex" style="margin-top:8px"><button class="mini" onclick="clearContractSignature(${r.id})">${esc(ctT('contract.btn_clear_sig','지우기'))}</button><button class="mini" onclick="useStoredContractSignature(${r.id})">${esc(ctT('contract.btn_use_sig','보관 서명 사용'))}</button>${r.source_pdf_path?`<button class="hbtn pri" onclick="signContractPdf(${r.id})">${esc(ctT('contract.btn_sign_pdf','원본 확인 후 PDF 서명'))}</button>`:`<button class="hbtn pri" onclick="saveContractSignature(${r.id})">${esc(ctT('contract.btn_sign_save','원문 확인 후 서명 저장'))}</button>`}</div><div class="msg" id="contractSignMsg-${r.id}"></div>`:''}
+      ${signed&&r.pledge_required&&P9_PLEDGES.get(Number(r.id))?.signed_at?pledgeDocumentHtml(P9_PLEDGES.get(Number(r.id))):''}
       ${signed?`<div class="hint" style="color:var(--mint)">${esc(ctT('contract.signed_ok','✓ 서명 완료'))}</div>`:''}</div>`;}).join('');
   if(append)m.insertAdjacentHTML('beforeend',html);else m.innerHTML=html;
-  initContractSignatures();autoLoadStoredContractSignatures(ownRows);
+  initContractSignatures();autoLoadStoredContractSignatures(ownRows);initPledgeCanvas();
 }
 async function renderContract(m){
   const isLead=['owner','chief','manager'].includes(ME.role);
@@ -4402,6 +4413,8 @@ let BULK_ROLE_SELECTED=new Set();
 async function renderOwner(m){
   const {unlinkedRoster,pendingApproval}=accountFillingLists(SCHEDULE_PEOPLE,PROFILES);
   const deptItems=hubList('list.profile_depts',[{code:'진료실',label:'진료실'},{code:'데스크',label:'데스크'},{code:'기공팀',label:'기공팀'},{code:'기타',label:'기타'}]); // 원장이 허브 설정 › 목록에서 이름을 고침(코드 고정)
+  const {data:phoneRows,error:phoneError}=ME.role==='owner'?await sb.rpc('get_employee_phone_notification_status'):{data:[],error:null};
+  const phoneByUser=new Map((phoneRows||[]).map(r=>[r.user_id,r]));
   const {data:accessRows}=await sb.from('confidential_access').select('user_id');
   const accessSet=new Set((accessRows||[]).map(r=>r.user_id));
   m.innerHTML=`<div class="card"><h2>${esc(hubText('owner.title','🛡️ 계정·권한 관리'))}</h2>
@@ -4421,14 +4434,14 @@ async function renderOwner(m){
       <td>${p.account_access_status==='차단'?'<span class="sub">계정 차단됨</span>':'<button class="mini stamp" onclick="approveProfile(\''+p.user_id+'\')">승인</button>'}</td></tr>`).join('')}</table></div>`:''}`:''}
     <h3>${esc(hubText('owner.members.title','직원 권한 관리'))} <span class="sub">${esc(hubText('owner.members.sub','(입퇴사·승진 시 여기서 변경)'))}</span></h3>
     <div class="msg" id="rosterMsg"></div>
-    <div class="tblwrap"><table><tr><th></th><th>이름</th><th>부서</th><th>근무부서</th><th>근무표·집계 포함</th><th>근무명부</th><th>재직 상태·유효일·사유</th><th>입사</th><th>권한</th><th>승인</th></tr>
+    <div class="tblwrap"><table><tr><th></th><th>이름</th><th>부서</th><th>근무부서</th><th>근무표·집계 포함</th><th>근무명부</th><th>재직 상태·유효일·사유</th><th>입사</th><th>권한</th><th>승인</th>${ME.role==='owner'?`<th>${esc(p9T('phone.title'))}</th>`:''}</tr>
     ${PROFILES.map(p=>{const dept=p.dept||'',roster=SCHEDULE_PEOPLE.find(x=>x.profile_user_id===p.user_id),rosterDept=roster&&(SCHEDULE_DEPARTMENTS.includes(roster.department)?roster.department:'미지정'),blocked=p.account_access_status==='차단',acctState=accountDeleteRowState(p,ME.id);return `<tr><td>${p.user_id===ME.id?'':`<input type="checkbox" ${BULK_ROLE_SELECTED.has(p.user_id)?'checked':''} onchange="toggleBulkRoleSelect('${p.user_id}',this.checked)">`}</td><td>${esc(p.name)}</td><td><select class="mini" onchange="setDept('${p.user_id}',this.value)"><option value="" ${dept===''?'selected':''}>-</option>${deptItems.map(it=>`<option value="${esc(it.code)}" ${dept===it.code?'selected':''}>${esc(it.label)}</option>`).join('')}${dept&&!deptItems.some(it=>it.code===dept)?`<option value="${esc(dept)}" selected>${esc(dept)}</option>`:''}</select></td>
       <td>${roster?`<select class="mini" onchange="setSchedulePersonDepartment('${roster.id}',this.value)">${SCHEDULE_DEPARTMENTS.map(d=>`<option value="${d}" ${rosterDept===d?'selected':''}>${d}</option>`).join('')}</select>`:'<span class="sub">미연결</span>'}</td>
       <td>${roster?`<input type="checkbox" ${roster.included_in_schedule!==false?'checked':''} onchange="setSchedulePersonIncluded('${roster.id}',this.checked)">`:'—'}</td>
       <td>${roster?`<span class="b ${roster.active===true?'ok':'no'}">${roster.active===true?'재직':'비활성'}</span> <button class="mini ${roster.active===true?'rej':'stamp'}" onclick="setSchedulePersonActive('${roster.id}',${roster.active===true?'false':'true'})">${roster.active===true?'비활성화':'재활성화'}</button>`:'—'}</td>
       <td><select id="employment-${p.user_id}-status" class="mini" ${blocked?'disabled':''}><option value="재직" ${(p.employment_status||'재직')==='재직'?'selected':''}>재직</option><option value="자진퇴사" ${p.employment_status==='자진퇴사'?'selected':''}>자진퇴사</option><option value="계약만료" ${p.employment_status==='계약만료'?'selected':''}>계약기간만료</option><option value="권고사직" ${p.employment_status==='권고사직'?'selected':''}>권고사직</option></select><br><input id="employment-${p.user_id}-effective" class="mini" type="date" value="${p.employment_effective_date||today()}" aria-label="재직 상태 유효일" ${blocked?'disabled':''}><br><input id="employment-${p.user_id}-reason" class="mini" value="${esc(p.employment_reason||'')}" placeholder="사유" aria-label="재직 상태 사유" ${blocked?'disabled':''}><br><button class="mini stamp" onclick="setEmploymentStatus('${p.user_id}')" ${blocked?'disabled':''}>상태 저장</button>${p.user_id!==ME.id&&!blocked?` <button class="mini rej" onclick="disableEmployeeAccountPreserveRecords('${p.user_id}')">접속 영구 차단(인사기록 보존)</button>`:''}${acctState.show==='blocked-deletable'?`<div class="sub">계정 차단됨</div> <button class="mini rej" onclick="hardDeleteAccountPreserveRecords('${p.user_id}')">로그인 계정 영구 삭제</button>`:acctState.show==='deleted'?`<div class="sub">로그인 계정 삭제됨(${md(acctState.authDeletedAt)})</div>`:acctState.show==='blocked'?'<div class="sub">계정 차단됨</div>':''}</td><td>${p.hire_date||''}</td>
       <td><select class="mini" onchange="setRole('${p.user_id}',this.value)">${['staff','manager','chief','owner','deputy'].map(r=>`<option ${p.role===r?'selected':''}>${r}</option>`).join('')}</select></td>
-      <td><span class="b ${p.approved!==false?'ok':'wait'}">${p.approved!==false?'승인됨':'대기'}</span>${p.approved!==false&&p.user_id!==ME.id?` <button class="mini rej" onclick="revokeApproval('${p.user_id}')">승인취소</button>`:''}</td></tr>`}).join('')}</table></div>
+      <td><span class="b ${p.approved!==false?'ok':'wait'}">${p.approved!==false?'승인됨':'대기'}</span>${p.approved!==false&&p.user_id!==ME.id?` <button class="mini rej" onclick="revokeApproval('${p.user_id}')">승인취소</button>`:''}</td>${ME.role==='owner'?`<td>${phoneNotificationCell(phoneByUser.get(p.user_id),phoneError)}</td>`:''}</tr>`}).join('')}</table></div>
     <div class="rowflex" style="margin-top:6px">
       <select id="bulkRoleSelect" class="mini">${BULK_ROLE_ALLOWED_ROLES.map(r=>`<option value="${r}">${r}</option>`).join('')}</select>
       <button class="mini stamp" onclick="applyBulkRole()">선택한 사람에게 적용</button>

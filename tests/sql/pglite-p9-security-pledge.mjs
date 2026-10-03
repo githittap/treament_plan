@@ -1,0 +1,103 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
+import {createRequire} from 'node:module';
+const {edgeSigningAttempt}=createRequire(import.meta.url)('../contract-pdf-sign-edge-helper.cjs');
+
+const packageRoot=process.env.PGLITE_PACKAGE_ROOT;
+if(!packageRoot){console.log('PGLITE_INTEGRATED_CONTRACT_SKIP: package path missing');process.exit(2);}
+const {PGlite}=await import(pathToFileURL(path.join(packageRoot,'dist/index.js')).href);
+const db=new PGlite();
+const query=sql=>db.query(sql).then(result=>result.rows);
+const uid='11111111-1111-1111-1111-111111111111';
+const template='<div>사직 희망일로부터 3주 전, 퇴사일 이후 돌아오는 익월 임금지급일<div class="signrow"><span data-sign-slot="employee">(직원 서명)</span></div></div>';
+const png=Buffer.concat([Buffer.from('89504e470d0a1a0a','hex'),Buffer.alloc(120)]).toString('base64');
+const sign=part=>({part,signature_png:`data:image/png;base64,${png}`,signature_id:null,confirmed:true});
+const all=JSON.stringify(['employment','medical','privacy'].map(sign));
+const qjson=value=>`'${JSON.stringify(value).replaceAll("'","''")}'::jsonb`;
+const draft=fs.readFileSync(path.resolve('db/integrated_contract_three_signatures_draft.sql'),'utf8');
+const policies=fs.readFileSync(path.resolve('db/hr_policies.sql'),'utf8');
+const pdfGuard=fs.readFileSync(path.resolve('db/contract_pdf_signing_production_snapshot.sql'),'utf8');
+try{
+  await db.exec(`
+    create role anon;create role authenticated;create role service_role bypassrls;create schema auth;
+    create or replace function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('app.test_uid',true),'')::uuid$$;
+    create table public.profiles(user_id uuid primary key,role text);
+    create or replace function public.my_role() returns text language sql stable as $$select role from public.profiles where user_id=auth.uid()$$;
+    create table public.employee_signature_vault(id bigint primary key,user_id uuid,revoked_at timestamptz);
+    create table public.employee_signature_uses(id bigint generated always as identity primary key,contract_id bigint,signature_id bigint,document_kind text,confirmed_at timestamptz,used_by uuid);
+    create table public.doc_templates(id bigint primary key,body_html text,sign_slots jsonb,fields jsonb);
+    create table public.contracts(id bigint primary key,user_id uuid,merged_html text,sign_slots jsonb,status text,signed_at timestamptz,due_at timestamptz,source_pdf_path text,source_pdf_sha256 text,source_pdf_version text,source_pdf_registered_at timestamptz,source_pdf_registered_by uuid,source_pdf_confirmed_at timestamptz,pdf_signing_attempt_id uuid,pdf_signing_started_at timestamptz,pdf_signing_signature_sha256 text,pdf_signing_page_no integer,pdf_signing_x numeric,pdf_signing_y numeric,pdf_signing_width numeric,pdf_signing_height numeric,signed_pdf_path text,signed_pdf_sha256 text,pdf_signed_at timestamptz,updated_at timestamptz);
+    create or replace function public.record_contract_pdf_signature(p_contract_id bigint,p_user_id uuid,p_attempt_id uuid,p_source_sha256 text,p_signed_path text,p_signed_sha256 text,p_signature_sha256 text,p_page_no integer,p_x numeric,p_y numeric,p_width numeric,p_height numeric)
+    returns public.contracts language plpgsql security definer set search_path=public,pg_temp as $$declare r public.contracts;begin
+      perform set_config('app.contract_pdf_mutation','pdf_record',true);
+      update public.contracts set status='서명완료',signed_at=now(),signed_pdf_path=p_signed_path,signed_pdf_sha256=p_signed_sha256 where id=p_contract_id and user_id=p_user_id and status='대기' returning * into r;
+      if not found then raise exception 'not pending';end if;return r;end$$;
+    insert into public.profiles values('${uid}','staff');
+    insert into public.doc_templates values(1,'${template}','[]'::jsonb,'[]'::jsonb);
+    grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;
+    grant select,update on public.contracts to authenticated;grant select on public.employee_signature_vault,public.profiles to authenticated;
+    grant select on public.contracts to service_role;
+  `);
+  await db.exec('alter table public.contracts enable row level security');
+  await db.exec(policies.match(/drop policy if exists contracts_update_scoped[\s\S]*?(?=-- approval_docs)/)[0]);
+  await db.exec('create policy contracts_select_scoped on public.contracts for select to authenticated using (user_id=auth.uid())');
+  await db.exec(pdfGuard.match(/create or replace function public\.guard_contract_pdf_immutability\(\)[\s\S]*?(?=-- Production registers)/)[0]);
+  await db.exec(pdfGuard.match(/drop trigger if exists contracts_pdf_immutability_guard[\s\S]*?execute function public\.guard_contract_pdf_immutability\(\);/)[0]);
+  await db.exec(draft);
+
+  await db.exec(`create function public.employee_hub_access_allowed() returns boolean language sql as $$select exists(select 1 from public.profiles where user_id=auth.uid())$$;
+  create table public.hub_ui_texts(key text primary key,value text);
+  create table public.push_subscriptions(id uuid primary key,user_id uuid,endpoint text,subscription jsonb,created_at timestamptz,updated_at timestamptz);
+  insert into public.profiles values('22222222-2222-2222-2222-222222222222','owner'),('33333333-3333-3333-3333-333333333333','staff');
+  insert into public.contracts(id,user_id,merged_html,status,due_at) values(9,'${uid}','legacy completed original','서명완료',now()+interval '1 day');`);
+  await db.exec(fs.readFileSync('db/p9_pledge_texts_20261003.sql','utf8'));
+  await db.exec(fs.readFileSync('db/p9_security_pledge_20261003.sql','utf8'));
+  await db.exec(fs.readFileSync('db/p9_push_status_20261003.sql','utf8'));
+  const body=(await query('select body_html from doc_templates where id=1'))[0].body_html;
+  await query(`insert into public.contracts(id,user_id,merged_html,status,due_at) values(10,'${uid}',${"'"+body.replaceAll("'","''")+"'"},'대기',now()+interval '1 day')`);
+  let count=0;
+  async function denied(sql,pattern){await assert.rejects(()=>query(sql),pattern);count++;}
+  await denied(`insert into public.contracts(id,user_id,merged_html,status,pledge_required) values(11,'${uid}','bypass','서명완료',false)`,/requires security pledge/);
+  await denied(`update contracts set status='서명완료' where id=10`,/security pledge/);
+  await db.exec('set role authenticated');await query(`select set_config('app.test_uid','${uid}',false)`);
+  await denied(`select apply_integrated_contract_signatures(10,'${all}'::jsonb)`,/security pledge/);
+  await denied(`select stage_contract_pledge_signatures(10,${qjson([sign('employment'),sign('medical')])},null)`,/three signatures/);
+  await denied(`select stage_contract_pledge_signatures(10,${qjson([sign('employment'),sign('medical'),{...sign('privacy'),confirmed:false}])},null)`,/confirmed signature/);
+  await query(`select stage_contract_pledge_signatures(10,'${all}'::jsonb,null)`);
+  const staged=(await query('select * from contract_security_pledges where contract_id=10'))[0];
+  assert.equal((await query('select status from contracts where id=10'))[0].status,'대기');count++;
+  assert.equal((await query('select signed_pdf_path from contracts where id=10'))[0].signed_pdf_path,null);count++;
+  const submit=(read,rules,version=staged.version)=>`select submit_contract_security_pledge(10,'data:image/png;base64,${png}',${read},${rules},'${version}')`;
+  await denied(submit(false,true),/both pledge confirmations/);
+  await denied(submit(true,false),/both pledge confirmations/);
+  await denied(submit(true,true,'wrong'),/version changed/);
+  await denied('update contracts set pledge_required=false where id=10',/immutable/);
+  await denied(`update contract_security_pledges set rules_confirmed=true where contract_id=10`,/permission denied/);
+  await query(submit(true,true));
+  const completed=(await query('select * from contracts where id=10'))[0];
+  assert.equal(completed.status,'서명완료');count++;
+  assert.ok(completed.merged_html.includes('data-contract-part="security-pledge"'));count++;
+  assert.ok(completed.merged_html.includes(staged.document['pledge.body.rules']));count++;
+  assert.equal((await query('select count(*)::int n from contract_part_signatures where contract_id=10'))[0].n,3);count++;
+  const signed=(await query('select signed_at,signature_png from contract_security_pledges where contract_id=10'))[0];
+  await query(submit(true,true));assert.deepEqual((await query('select signed_at,signature_png from contract_security_pledges where contract_id=10'))[0],signed);count++;
+  await query('select prepare_contract_security_pledge(9)');
+  const legacyPledge=(await query('select version from contract_security_pledges where contract_id=9'))[0];
+  await query(`select submit_contract_security_pledge(9,'data:image/png;base64,${png}',true,true,'${legacyPledge.version}')`);
+  assert.equal((await query('select merged_html from contracts where id=9'))[0].merged_html,'legacy completed original');count++;
+  await denied(`select get_employee_phone_notification_status()`,/owner access/);
+  await query(`select set_config('app.test_uid','33333333-3333-3333-3333-333333333333',false)`);
+  await denied('select prepare_contract_security_pledge(9)',/own contract/);
+  assert.equal((await query('select * from contract_security_pledges')).length,0);count++;
+  await db.exec('reset role');
+  await query(`insert into push_subscriptions values('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','${uid}','https://invalid.test/secret-endpoint','{"keys":{"auth":"fixture-private"}}',now(),now())`);
+  await db.exec('set role authenticated');await query(`select set_config('app.test_uid','22222222-2222-2222-2222-222222222222',false)`);
+  const phones=await query('select * from get_employee_phone_notification_status()');
+  assert.equal(Number(phones.find(r=>r.user_id===uid).device_count),1);count++;
+  assert.equal(Number(phones.find(r=>r.user_id==='33333333-3333-3333-3333-333333333333').device_count),0);count++;
+  assert.deepEqual(Object.keys(phones[0]).sort(),['device_count','last_enabled_at','user_id']);count++;
+  assert.ok(!JSON.stringify(phones).includes('secret-endpoint')&&!JSON.stringify(phones).includes('fixture-private'));count++;
+  console.log(`PGLITE_P9_PASS: ${count} executed checks; staging, both confirmations, bypass denial, original preservation, own access, owner aggregate and no endpoint`);
+}finally{await db.close();}

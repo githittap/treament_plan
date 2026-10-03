@@ -1,0 +1,1 @@
+-- Owner text edits and signed-document snapshots are retained; no data is removed.

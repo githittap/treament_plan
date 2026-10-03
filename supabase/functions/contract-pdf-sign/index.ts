@@ -1,5 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { PDFDocument } from "npm:pdf-lib@1.17.1";
+import fontkit from "npm:@pdf-lib/fontkit@1.1.1";
+import pledgeFont from "./pledge-font.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
@@ -24,7 +26,36 @@ function dataUrlBytes(value: string) {
   return bytes;
 }
 
-export function createContractPdfSignHandler(deps: { createClient?: any; PDFDocument?: any; env?: (name: string) => string | undefined } = {}) {
+async function appendSecurityPledge(pdf: any, pledge: any, kit: any, fontData: string) {
+  pdf.registerFontkit(kit);
+  const font = await pdf.embedFont(Uint8Array.from(atob(fontData), c => c.charCodeAt(0)), { subset: true });
+  const size = 10, lineHeight = 16, margin = 42, maxWidth = 511;
+  let page = pdf.addPage([595, 842]), y = 800;
+  const line = (value: string) => {
+    if (y < 65) { page = pdf.addPage([595, 842]); y = 800; }
+    page.drawText(value, { x: margin, y, size, font }); y -= lineHeight;
+  };
+  const paragraph = (text: string) => {
+    for (const raw of String(text).split(/\r?\n/)) {
+      let current = "";
+      for (const c of raw) {
+        if (font.widthOfTextAtSize(current + c, size) > maxWidth) { line(current); current = ""; }
+        current += c;
+      }
+      line(current);
+    }
+    y -= 8;
+  };
+  paragraph(pledge.document["pledge.body.title"]);
+  for (let i = 1; i <= 14; i++) paragraph(`${i}. ${pledge.document[`pledge.body.clause.${i}`]}`);
+  paragraph(pledge.document["pledge.body.rules"]);
+  paragraph(`서명 일시: ${pledge.signed_at} · 버전: ${pledge.version}`);
+  if (y < 130) { page = pdf.addPage([595, 842]); y = 800; }
+  const image = await pdf.embedPng(dataUrlBytes(pledge.signature_png));
+  page.drawImage(image, { x: margin, y: y - 60, width: 240, height: 60 });
+}
+
+export function createContractPdfSignHandler(deps: { createClient?: any; PDFDocument?: any; fontkit?: any; pledgeFont?: string; env?: (name: string) => string | undefined } = {}) {
   const supabaseCreateClient = deps.createClient ?? createClient;
   const PdfDocument = deps.PDFDocument ?? PDFDocument;
   const readEnv = deps.env ?? ((name: string) => Deno.env.get(name));
@@ -50,6 +81,17 @@ export function createContractPdfSignHandler(deps: { createClient?: any; PDFDocu
     if (preflight.status !== "대기" || preflight.signed_at || preflight.signed_pdf_path || !preflight.source_pdf_path || !preflight.source_pdf_sha256) throw new Error("contract is not signable");
     if (!preflight.source_pdf_confirmed_at || !preflight.sent_at || !preflight.source_pdf_version || !preflight.due_at || new Date(preflight.due_at).getTime() < Date.now()) throw new Error("employee must confirm the source PDF and final send first");
     const integrated = preflight.integrated_signature_required === true || ["employment", "medical", "privacy"].every((part) => String(preflight.merged_html || "").includes(`data-sign-slot="${part}"`));
+    let securityPledge: any = null;
+    if (preflight.pledge_required === true) {
+      const { data: pledge, error: pledgeError } = await admin.from("contract_security_pledges").select("*").eq("contract_id", contractId).maybeSingle();
+      if (pledgeError || !pledge || pledge.user_id !== user.id || !pledge.signed_at || pledge.read_confirmed !== true || pledge.rules_confirmed !== true || !pledge.staged_at) throw new Error("signed security pledge and confirmations required");
+      for (const part of ["employment", "medical", "privacy"]) {
+        const stored = pledge.contract_signatures?.find((s: any) => s.part === part), supplied = body.signatures?.find((s: any) => s.part === part);
+        const coord = pledge.pdf_coordinates?.find((c: any) => c.part === part), suppliedCoord = body.coordinates?.find((c: any) => c.part === part);
+        if (!stored || !supplied || stored.signature_png !== supplied.signature_png || (stored.signature_id ?? null) !== (supplied.signature_id ?? null) || stored.confirmed !== supplied.confirmed || !coord || !suppliedCoord || ["page_no", "x", "y", "width", "height"].some(k => coord[k] !== suppliedCoord[k])) throw new Error("staged contract signatures differ");
+      }
+      securityPledge = pledge;
+    }
     const parts = ["employment", "medical", "privacy"];
     if (integrated && (!Array.isArray(body.signatures) || body.signatures.length !== 3 || !Array.isArray(body.coordinates) || body.coordinates.length !== 3)) throw new Error("three independent signatures and coordinates required");
     const entries = integrated ? parts.map((part) => {
@@ -83,6 +125,7 @@ export function createContractPdfSignHandler(deps: { createClient?: any; PDFDocu
       const signature = await pdf.embedPng(entry.bytes);
       page.drawImage(signature, { x: entry.x, y: entry.y, width: entry.width, height: entry.height });
     }
+    if (securityPledge) await appendSecurityPledge(pdf, securityPledge, deps.fontkit ?? fontkit, deps.pledgeFont ?? pledgeFont);
     const signedBytes = await pdf.save();
     if (signedBytes.length > 30 * 1024 * 1024) throw new Error("signed PDF is too large");
     const signedHash = await sha256(signedBytes);
