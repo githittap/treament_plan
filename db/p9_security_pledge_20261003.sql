@@ -55,7 +55,7 @@ grant execute on function public.prepare_contract_security_pledge(bigint) to aut
 
 create function public.stage_contract_pledge_signatures(p_contract_id bigint,p_signatures jsonb,p_coordinates jsonb default null)
 returns public.contract_security_pledges language plpgsql security definer set search_path=public,pg_temp as $$
-declare c public.contracts; r public.contract_security_pledges; part text; item jsonb; b bytea; sid bigint;
+declare c public.contracts; r public.contract_security_pledges; part text; item jsonb; coord jsonb; b bytea; sid bigint;
 begin
   r:=public.prepare_contract_security_pledge(p_contract_id);
   select * into c from public.contracts where id=p_contract_id and user_id=auth.uid() for update;
@@ -71,6 +71,18 @@ begin
     if sid is not null and not exists(select 1 from public.employee_signature_vault where id=sid and user_id=auth.uid() and revoked_at is null) then raise exception 'stored signature unavailable'; end if;
   end loop;
   if c.source_pdf_path is not null and (jsonb_typeof(p_coordinates) is distinct from 'array' or jsonb_array_length(p_coordinates)<>3) then raise exception 'three PDF coordinates required'; end if;
+  if c.source_pdf_path is not null then
+    foreach part in array array['employment','medical','privacy'] loop
+      select value into coord from jsonb_array_elements(p_coordinates) where value->>'part'=part;
+      if not found or (select count(*) from jsonb_array_elements(p_coordinates) where value->>'part'=part)<>1
+        or coalesce(coord->>'page_no','') !~ '^[1-9][0-9]*$'
+        or coalesce((coord->>'x')::numeric,-1)<0 or coalesce((coord->>'y')::numeric,-1)<0
+        or coalesce((coord->>'width')::numeric,0)<=0 or (coord->>'width')::numeric>1200
+        or coalesce((coord->>'height')::numeric,0)<=0 or (coord->>'height')::numeric>800 then
+        raise exception 'valid unique PDF coordinate per part required';
+      end if;
+    end loop;
+  end if;
   update public.contract_security_pledges set contract_signatures=p_signatures,pdf_coordinates=p_coordinates,staged_at=now()
     where contract_id=p_contract_id returning * into r;
   return r;

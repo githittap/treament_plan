@@ -2,6 +2,19 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
+const {edgeSigningAttempt}=require('./contract-pdf-sign-edge-helper.cjs');
+
+test('Edge는 서약 미서명·확인 누락·다른 직원·단계 서명 바꿔치기에서 PDF를 만들지 않는다',async()=>{
+  for(const options of [
+    {pledge:null},{pledge:{signed_at:null}},{pledge:{read_confirmed:false}},
+    {pledge:{rules_confirmed:false}},{pledge:{user_id:'other-user'}},{tamperSignature:true},
+  ]){
+    const r=await edgeSigningAttempt(undefined,true,{pledgeRequired:true,...options});
+    assert.equal(r.status,400);
+    assert.equal(r.rpcCalls.length,0);
+    assert.equal(r.uploadedBytes,null);
+  }
+});
 
 test('서약은 별도 서명과 읽음·규정 열람 확인이 모두 필요하다',()=>{
   const context={};

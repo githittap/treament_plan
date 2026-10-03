@@ -30,9 +30,10 @@ async function appendSecurityPledge(pdf: any, pledge: any, kit: any, fontData: s
   pdf.registerFontkit(kit);
   const font = await pdf.embedFont(Uint8Array.from(atob(fontData), c => c.charCodeAt(0)), { subset: true });
   const size = 10, lineHeight = 16, margin = 42, maxWidth = 511;
-  let page = pdf.addPage([595, 842]), y = 800;
+  const newPage = () => { const p = pdf.addPage(); p.setSize(595, 842); return p; };
+  let page = newPage(), y = 800;
   const line = (value: string) => {
-    if (y < 65) { page = pdf.addPage([595, 842]); y = 800; }
+    if (y < 65) { page = newPage(); y = 800; }
     page.drawText(value, { x: margin, y, size, font }); y -= lineHeight;
   };
   const paragraph = (text: string) => {
@@ -50,7 +51,7 @@ async function appendSecurityPledge(pdf: any, pledge: any, kit: any, fontData: s
   for (let i = 1; i <= 14; i++) paragraph(`${i}. ${pledge.document[`pledge.body.clause.${i}`]}`);
   paragraph(pledge.document["pledge.body.rules"]);
   paragraph(`서명 일시: ${pledge.signed_at} · 버전: ${pledge.version}`);
-  if (y < 130) { page = pdf.addPage([595, 842]); y = 800; }
+  if (y < 130) { page = newPage(); y = 800; }
   const image = await pdf.embedPng(dataUrlBytes(pledge.signature_png));
   page.drawImage(image, { x: margin, y: y - 60, width: 240, height: 60 });
 }

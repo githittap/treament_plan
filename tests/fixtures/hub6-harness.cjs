@@ -122,7 +122,7 @@ async function renderAll(html,opts){
   async function makeCtx(extra,sbOver){
     const dom=makeDom(),log=[],statuses=[];
     const doc={querySelector:()=>null,querySelectorAll:()=>[],getElementById:()=>null,addEventListener(){},createElement:()=>({click(){}}),body:{classList:{add(){},remove(){}}}};
-    const ctx={console,esc,$:dom.$,Date:FakeDate,Intl,Promise,Math,JSON,Set,Map,Number,String,Array,Object,parseInt,parseFloat,isNaN,RegExp,Blob,URL,Image:function(){},CSS:{escape:s=>s},crypto:nodeCrypto.webcrypto,
+    const ctx={P9_PLEDGES:new Map(),loadContractPledges:async()=>{},initPledgeCanvas(){},renderSecurityPledgeDocuments:async()=>{},console,esc,$:dom.$,Date:FakeDate,Intl,Promise,Math,JSON,Set,Map,Number,String,Array,Object,parseInt,parseFloat,isNaN,RegExp,Blob,URL,Image:function(){},CSS:{escape:s=>s},crypto:nodeCrypto.webcrypto,
       PROFILES:PROFILES.map(p=>Object.assign({},p)),SCHEDULE_PEOPLE:[{profile_user_id:'u1'}],
       employeeJobGroupModel:()=>({kind:'staff',label:'진료·상담'}),
       CLINIC_SEAL:'data:image/png;base64,SEAL',

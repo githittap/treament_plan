@@ -99,5 +99,23 @@ try{
   assert.equal(Number(phones.find(r=>r.user_id==='33333333-3333-3333-3333-333333333333').device_count),0);count++;
   assert.deepEqual(Object.keys(phones[0]).sort(),['device_count','last_enabled_at','user_id']);count++;
   assert.ok(!JSON.stringify(phones).includes('secret-endpoint')&&!JSON.stringify(phones).includes('fixture-private'));count++;
+  await db.exec('reset role');
+  await query(`insert into contracts(id,user_id,merged_html,status,due_at) values(12,'${uid}',${"'"+body.replaceAll("'","''")+"'"},'대기',now()+interval '1 day')`);
+  await query("select set_config('app.contract_pdf_mutation','source_register',false)");
+  await query("update contracts set source_pdf_path='contracts/12/source.pdf',source_pdf_sha256=repeat('a',64) where id=12");
+  await denied("update contracts set status='서명완료',signed_pdf_path='contracts/12/signed.pdf' where id=12",/security pledge/);
+  await query("select set_config('app.contract_pdf_mutation','',false)");
+  await db.exec('set role authenticated');await query(`select set_config('app.test_uid','${uid}',false)`);
+  await denied(`select stage_contract_pledge_signatures(12,'${all}'::jsonb,null)`,/three PDF coordinates/);
+  const coordinates=['employment','medical','privacy'].map(part=>({part,page_no:1,x:72,y:72,width:150,height:50}));
+  await denied(`select stage_contract_pledge_signatures(12,'${all}'::jsonb,${qjson([coordinates[0],coordinates[0],coordinates[2]])})`,/unique PDF coordinate/);
+  await denied(`select stage_contract_pledge_signatures(12,'${all}'::jsonb,${qjson(coordinates.map(c=>({...c,width:0})))})`,/unique PDF coordinate/);
+  await query(`select stage_contract_pledge_signatures(12,'${all}'::jsonb,${qjson(coordinates)})`);
+  const pdfPledge=(await query('select version from contract_security_pledges where contract_id=12'))[0];
+  await query(`select submit_contract_security_pledge(12,'data:image/png;base64,${png}',true,true,'${pdfPledge.version}')`);
+  assert.equal((await query('select status from contracts where id=12'))[0].status,'대기');count++;
+  assert.equal((await query('select signed_pdf_path from contracts where id=12'))[0].signed_pdf_path,null);count++;
+  assert.ok((await query('select signed_at from contract_security_pledges where contract_id=12'))[0].signed_at);count++;
+  if(process.env.P9_FIXTURE_OUT)fs.writeFileSync(process.env.P9_FIXTURE_OUT,JSON.stringify({body,document:staged.document,version:staged.version,completedHtml:completed.merged_html},null,2));
   console.log(`PGLITE_P9_PASS: ${count} executed checks; staging, both confirmations, bypass denial, original preservation, own access, owner aggregate and no endpoint`);
 }finally{await db.close();}

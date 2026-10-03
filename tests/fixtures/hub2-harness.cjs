@@ -50,7 +50,7 @@ async function renderAll(html,opts){
 
   async function makeCtx(srcs,extra){
     const dom=makeDom(),alerts=[];
-    const ctx={console,esc,md,$:dom.$,PROFILES,ME:{id:'u1',name:'김직원',role:'staff',dept:'진료실'},
+    const ctx={P9_PLEDGES:new Map(),loadContractPledges:async()=>{},initPledgeCanvas(){},renderSecurityPledgeDocuments:async()=>{},console,esc,md,$:dom.$,PROFILES,ME:{id:'u1',name:'김직원',role:'staff',dept:'진료실'},
       isLead:()=>['chief','owner'].includes(ctx.ME.role),isMgr:()=>['manager','chief','owner'].includes(ctx.ME.role),isLeaveDocsLead:()=>['manager','chief','owner'].includes(ctx.ME.role),
       nameOf:uid=>{const p=PROFILES.find(x=>x.user_id===uid);return p?p.name:(uid||'').slice(0,6);},
       contractDate:s=>s?String(s).slice(0,10):'-',contractTitle:r=>r.title||'근로계약서',

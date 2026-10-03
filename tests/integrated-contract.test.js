@@ -68,6 +68,7 @@ test('서로 다른 원본의 기간·임금은 직원별 입력으로 남고 �
 test('통합 계약 완료는 서버의 3건 원자적 기록과 PDF 세 위치를 거친다',()=>{
   assert.match(html,/apply_integrated_contract_signatures/);
   assert.match(html,/id="contractComplete-\$\{row\.id\}" disabled/);
+  assert.match(html,/pledge\.stage_confirm/);
   assert.match(html,/confirm\('근로계약·의료정보 보안·개인정보 취급자 서약/);
   assert.match(sql,/create constraint trigger integrated_contract_parts_complete[\s\S]*deferrable initially deferred/);
   assert.match(sql,/if jsonb_typeof\(p_signatures\) is distinct from 'array' or jsonb_array_length\(p_signatures\)<>3/);
@@ -108,7 +109,7 @@ test('employee sees signed integrated HTML read-only while pending and legacy co
     {id:'pending-legacy',status:'\uB300\uAE30',merged_html:'<article>legacy pending body</article>'}
   ];
   const makeQuery=table=>{const result=table==='contracts'?{data:rows,error:null}:{data:[],error:null};const q={select(){return q;},eq(){return q;},order(){return q;},then(resolve,reject){return Promise.resolve(result).then(resolve,reject);}};return q;};
-  const c={sb:{from:makeQuery},ME:{id:'staff'},CONTRACT_ROWS:[],CONTRACT_TEMPLATES:[],CONTRACT_SHOW_CANCELLED:false,esc:v=>String(v??''),contractVisibleRows:r=>r,contractExpired:()=>false,contractTitle:r=>r.id,contractStatusClass:()=>'',contractDisplayStatus:r=>r.status,contractDate:()=>'',integratedContractPage:()=>'<canvas data-contract-signature="pending"></canvas><button id="contractComplete-pending">sign</button>',initContractSignatures(){},autoLoadStoredContractSignatures(){}};
+  const c={P9_PLEDGES:new Map(),loadContractPledges:async()=>{},initPledgeCanvas(){},sb:{from:makeQuery},ME:{id:'staff'},CONTRACT_ROWS:[],CONTRACT_TEMPLATES:[],CONTRACT_SHOW_CANCELLED:false,esc:v=>String(v??''),contractVisibleRows:r=>r,contractExpired:()=>false,contractTitle:r=>r.id,contractStatusClass:()=>'',contractDisplayStatus:r=>r.status,contractDate:()=>'',integratedContractPage:()=>'<canvas data-contract-signature="pending"></canvas><button id="contractComplete-pending">sign</button>',initContractSignatures(){},autoLoadStoredContractSignatures(){}};
   c.contractJobGroupWarning=()=>''; // 직무 충돌 표시는 P7 화면 시험에서 별도로 실행함.
   vm.createContext(c);vm.runInContext(block[1]+';'+render+';this.render=renderContractEmployee;this.isIntegrated=integratedContract;',c);assert.equal(c.isIntegrated(rows[0]),true);const target={innerHTML:''};await c.render(target);
   const signedStart=target.innerHTML.indexOf('id="integratedContract-signed-integrated"'),pendingStart=target.innerHTML.indexOf('id="integratedContract-pending-integrated"',signedStart),signedIntegrated=target.innerHTML.slice(signedStart,pendingStart);

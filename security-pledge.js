@@ -1,6 +1,6 @@
 /* Separate security pledge, frozen server document, and owner notification aggregates. */
 let P9_PLEDGES=new Map();
-function p9T(key,values){return hubT(key,key,values);}
+function p9T(key,values){return hubText(key,typeof HubUi!=='undefined'?HubUi.helpers.hubTextDefByKey(key)?.def||key:key,values);}
 function pledgeCanSubmit(signed,read,rules){return signed===true&&read===true&&rules===true;}
 function pledgeProgress(row){
   const pledge=P9_PLEDGES.get(Number(row.id));
@@ -34,7 +34,7 @@ async function openSecurityPledge(id){
 }
 function securityPledgeCard(pledge){
   const id=Number(pledge.contract_id);
-  if(pledge.signed_at)return `${pledgeDocumentHtml(pledge)}<button class="mini" onclick="printPledgeDocument(${id})">${esc(p9T('pledge.print'))}</button>${CONTRACT_ROWS.some(r=>Number(r.id)===id&&r.status==='대기'&&r.source_pdf_path)?`<button class="hbtn pri" onclick="finishPledgePdf(${id})">${esc(p9T('pledge.finish_pdf'))}</button>`:''}`;
+  if(pledge.signed_at)return `${pledgeDocumentHtml(pledge)}<button class="mini" onclick="printPledgeDocument(${id})">${esc(p9T('pledge.print'))}</button>${CONTRACT_ROWS.some(r=>Number(r.id)===id&&r.status==='대기'&&r.source_pdf_path)?`<button class="hbtn pri" onclick="retryPledgePdf(${id})">${esc(p9T('pledge.finish_pdf'))}</button><div class="msg" id="pledgeMsg-${id}" role="status"></div>`:''}`;
   return `${pledgeDocumentHtml(pledge)}<label style="display:block;margin:12px 0"><input type="checkbox" id="pledgeRead-${id}" onchange="updatePledgeButton(${id})"> ${esc(p9T('pledge.read'))}</label><label style="display:block;margin:12px 0"><input type="checkbox" id="pledgeRules-${id}" onchange="updatePledgeButton(${id})"> ${esc(pledge.document['pledge.body.rules'])}</label><h3>${esc(p9T('pledge.signature'))}</h3><canvas class="contract-signature" width="720" height="180" data-pledge-signature="${id}" data-dirty="false"></canvas><button class="mini" onclick="clearPledgeCanvas(${id})">${esc(p9T('pledge.clear'))}</button> <button class="hbtn pri" id="pledgeSubmit-${id}" disabled onclick="submitSecurityPledge(${id})">${esc(p9T('pledge.submit'))}</button><div class="msg" id="pledgeMsg-${id}" role="status"></div>`;
 }
 function updatePledgeButton(id){
@@ -70,6 +70,10 @@ async function finishPledgePdf(id,rerender=true){
   const {data,error}=await sb.functions.invoke('contract-pdf-sign',{body:{contract_id:id,signatures:pledge.contract_signatures,coordinates:pledge.pdf_coordinates}});
   if(error||data?.error)throw Error(data?.error||error.message);
   if(rerender)await render();
+}
+async function retryPledgePdf(id){
+  setStatus('saving');try{await finishPledgePdf(id);setStatus('saved');}
+  catch(e){const msg=document.querySelector(`#pledgeMsg-${id}`);if(msg)msg.textContent=p9T('pledge.failed',{msg:e.message});setStatus('error');}
 }
 function printPledgeDocument(id){
   const pledge=P9_PLEDGES.get(Number(id));if(!pledge?.signed_at)return;

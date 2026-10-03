@@ -2614,7 +2614,7 @@ const HubUi={
   renderSettings:renderHubSettings,
   saveText:hubTextsSave,resetText:hubTextsReset, // 첫 화면(hub-intro.js) 「문구 고치기」가 씀
   applyTextFilter:hubApplyTextFilter, // 검색칸 동작(시험용으로도 공개)
-  helpers:{hubText:hubText,hubSetting:hubSetting,hubSettingChecked:hubSettingChecked,hubSettingIntList:hubSettingIntList,hubContractExpiryDays:hubContractExpiryDays,hubList:hubList,hubCards:hubCards}
+  helpers:{hubText:hubText,hubTextDefByKey:hubTextDefByKey,hubSetting:hubSetting,hubSettingChecked:hubSettingChecked,hubSettingIntList:hubSettingIntList,hubContractExpiryDays:hubContractExpiryDays,hubList:hubList,hubCards:hubCards}
 };
 root.hubText=hubText;
 root.hubTextHtml=hubTextHtml;
