@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 
-const packageRoot=process.env.PGLITE_PACKAGE_ROOT;
-if(!packageRoot)throw new Error('PGLITE_PACKAGE_ROOT required');
+const packageRoot=process.env.PGLITE_PACKAGE_ROOT||'Z:\\09_claude-output\\_tmp\\pglite-0.5.8\\node_modules\\@electric-sql\\pglite';
+if(!fs.existsSync(path.join(packageRoot,'dist/index.js')))throw new Error('STOPPED reason=pglite_missing');
 const {PGlite}=await import(pathToFileURL(path.join(packageRoot,'dist/index.js')).href);
 const db=new PGlite(),q=sql=>db.query(sql).then(result=>result.rows);
 const ids={staff:'11111111-1111-1111-1111-111111111111',manager:'22222222-2222-2222-2222-222222222222',chief:'33333333-3333-3333-3333-333333333333',owner:'44444444-4444-4444-4444-444444444444',other:'55555555-5555-5555-5555-555555555555',deputy:'66666666-6666-6666-6666-666666666666',blocked:'77777777-7777-7777-7777-777777777777'};
@@ -31,7 +31,7 @@ try{
     create function public.my_role()returns text language sql stable security definer set search_path='' as $$select case when public.employee_hub_access_allowed() then coalesce((select p.role from public.profiles p where p.user_id=auth.uid()),'staff') else 'pending' end$$;
     grant execute on function public.employee_hub_access_allowed(),public.my_role() to authenticated;
     create schema storage;create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
-    create table storage.objects(id bigint generated always as identity primary key,bucket_id text,name text,owner_id text,metadata jsonb default '{}'::jsonb);
+    create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text,name text,owner_id text,metadata jsonb default '{}'::jsonb);
     grant usage on schema storage to authenticated;grant select,insert,delete on storage.objects to authenticated;alter table storage.objects enable row level security;
     insert into public.profiles(user_id,role,account_access_status) values
     ('${ids.staff}','staff','활성'),('${ids.manager}','manager','활성'),('${ids.chief}','chief','활성'),('${ids.owner}','owner','활성'),('${ids.other}','staff','활성'),('${ids.deputy}','deputy','활성'),('${ids.blocked}','staff','차단');`);
