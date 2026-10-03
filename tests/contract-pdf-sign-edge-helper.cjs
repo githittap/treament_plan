@@ -37,6 +37,7 @@ async function edgeSigningAttempt(confirmed = [true, true, true], integrated = t
     source_pdf_confirmed_at: '2026-09-25', sent_at: '2026-09-25',
     source_pdf_version: 'v1', due_at: '2099-01-01',
     ...(options.pledgeRequired ? {pledge_required:true} : {}),
+    ...(options.preflight || {}),
   };
   const pledge=options.pledge===null?null:{contract_id:3,user_id:userId,document:options.document||{},version:'fixture-v1',staged_at:'2026-10-03',signed_at:'2026-10-03',read_confirmed:true,rules_confirmed:true,signature_png:signaturePng,contract_signatures:JSON.parse(JSON.stringify(body.signatures||[])),pdf_coordinates:JSON.parse(JSON.stringify(body.coordinates||[])),...(options.pledge||{})};
   Object.assign(body,options.body||{});

@@ -94,7 +94,7 @@ export function createContractPdfSignHandler(deps: { createClient?: any; PDFDocu
     let securityPledge: any = null;
     if (preflight.pledge_required === true) {
       const { data: pledge, error: pledgeError } = await admin.from("contract_security_pledges").select("*").eq("contract_id", contractId).maybeSingle();
-      if (pledgeError || !pledge || pledge.user_id !== user.id || !pledge.staged_at || !pledge.signed_at || pledge.read_confirmed !== true || pledge.rules_confirmed !== true) throw new Error("signed security pledge and confirmations required");
+      if (pledgeError || !pledge || pledge.user_id !== user.id || !pledge.staged_at || !pledge.signed_at || new Date(pledge.staged_at).getTime() < new Date(pledge.signed_at).getTime() || pledge.read_confirmed !== true || pledge.rules_confirmed !== true) throw new Error("signed security pledge and confirmations required");
       if (!Array.isArray(pledge.contract_signatures) || pledge.contract_signatures.length !== parts.length) throw new Error('staged contract signatures differ');
       for (const part of parts) {
         const stored = pledge.contract_signatures?.find((s: any) => s.part === part), supplied = body.signatures?.find((s: any) => s.part === part);

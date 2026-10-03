@@ -7,7 +7,7 @@ const {edgeSigningAttempt}=require('./contract-pdf-sign-edge-helper.cjs');
 test('Edge는 서약 미서명·확인 누락·다른 직원·단계 서명 바꿔치기에서 PDF를 만들지 않는다',async()=>{
   for(const options of [
     {pledge:null},{pledge:{signed_at:null}},{pledge:{read_confirmed:false}},
-    {pledge:{rules_confirmed:false}},{pledge:{user_id:'other-user'}},{tamperSignature:true},
+    {pledge:{rules_confirmed:false}},{pledge:{user_id:'other-user'}},{pledge:{staged_at:'2026-10-02'}},{tamperSignature:true},
   ]){
     const r=await edgeSigningAttempt(undefined,true,{pledgeRequired:true,...options});
     assert.equal(r.status,400);
@@ -97,4 +97,11 @@ test('서약 카드 준비 상태는 서명과 두 확인 모두 필요하다',(
     vm.runInNewContext('P9_PLEDGES.set(1,'+JSON.stringify(p)+')',context);assert.equal(context.contractPledgeReady({id:1,pledge_required:true}),false);
   }
   vm.runInNewContext('P9_PLEDGES.set(1,{signed_at:"fixture",read_confirmed:true,rules_confirmed:true})',context);assert.equal(context.contractPledgeReady({id:1,pledge_required:true}),true);
+});
+
+test('기한 지난 계약은 Edge 계약 서명과 좌표 검사 모두 거절한다',async()=>{
+  for(const integrated of [false,true])for(const validate of [false,true]){
+    const r=await edgeSigningAttempt(undefined,integrated,{pledgeRequired:true,validate,preflight:{due_at:'2000-01-01'}});
+    assert.equal(r.status,400);assert.equal(r.rpcCalls.length,0);assert.equal(r.uploadedBytes,null);
+  }
 });

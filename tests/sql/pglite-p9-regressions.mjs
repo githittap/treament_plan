@@ -97,7 +97,19 @@ add('03-pledge-only-does-not-complete-four-contract-kinds',async()=>{
     await db.exec('reset role');await pending(id,pdf,integrated);await employee();
     const p=await pledgeFirst(id),c=(await query(`select * from contracts where id=${id}`))[0];
     assert.ok(p.signed_at);assert.equal(p.staged_at,null);assert.equal(c.status,'대기');assert.equal(c.signed_pdf_path,null);
-    if(pdf)await query(`select stage_contract_pledge_signatures(${id},${integrated?"'"+all+"'::jsonb":qjson(single)},${qjson(integrated?['employment','medical','privacy'].map(part=>({...coords[0],part})):coords)})`);
+    if(pdf){
+      const signatures=integrated?JSON.parse(all):single,coordinates=integrated?['employment','medical','privacy'].map(part=>({...coords[0],part})):coords;
+      await query(`select stage_contract_pledge_signatures(${id},${qjson(signatures)},${qjson(coordinates)})`);
+      assert.equal((await query(`select status from contracts where id=${id}`))[0].status,'대기');
+      await db.exec('reset role;set role service_role');
+      await query(`select validate_contract_pledge_pdf(${id},'${uid}',${qjson(signatures)},${qjson(coordinates)},repeat('a',64),'data:image/png;base64,${png}')`);
+      const hashRecords=signatures.map(v=>({part:v.part,signature_hash:'c'.repeat(64),signature_id:null,confirmed:true}));
+      await query(`select ${integrated?'record_integrated_contract_pdf_signatures':'record_contract_pdf_signature'}(${id},'${uid}',null,repeat('a',64),'contracts/${id}/signed.pdf',repeat('b',64),repeat('c',64),1,72,72,150,50${integrated?','+qjson(hashRecords):''})`);
+      const done=(await query(`select * from contracts where id=${id}`))[0];assert.equal(done.status,'서명완료');assert.equal(done.signed_pdf_path,`contracts/${id}/signed.pdf`);
+      await db.exec('reset role');
+      if(integrated)assert.equal((await query(`select count(*)::int n from contract_part_signatures where contract_id=${id}`))[0].n,3);
+      await employee();
+    }
     else{
       await query(`select stage_contract_pledge_signatures(${id},${integrated?"'"+all+"'::jsonb":qjson(single)},null)`);
       const done=(await query(`select * from contracts where id=${id}`))[0];assert.equal(done.status,'서명완료');
@@ -160,6 +172,15 @@ add('signed-pledge-restaging-preserves-evidence-and-coordinate-history',async()=
   await setup();await pending(32,true);await employee();await pledgeFirst(32);await stage(32,[{...coords[0],page_no:999}]);
   const before=(await query('select * from contract_security_pledges where contract_id=32'))[0];await stage(32,coords);
   const after=(await query('select * from contract_security_pledges where contract_id=32'))[0];for(const k of ['signature_png','signed_at','document','version'])assert.deepEqual(after[k],before[k]);assert.equal(after.coordinate_corrections.length,1);
+});
+add('old-order-staged-signatures-must-be-collected-after-pledge',async()=>{
+  await setup();await pending(35);await employee();const p=await prepare(35);await db.exec('reset role');
+  await query(`update contract_security_pledges set staged_at=now()-interval '1 hour',contract_signatures=${qjson(single)} where contract_id=35`);await employee();await query(submit(35,p));
+  assert.equal((await query('select staged_at from contract_security_pledges where contract_id=35'))[0].staged_at,null);
+  await assert.rejects(()=>query(`select apply_employee_contract_signature(35,'bypass','[]',now(),null)`),/security pledge/);
+  await db.exec('reset role');await query("update contract_security_pledges set staged_at=signed_at-interval '1 hour' where contract_id=35");await employee();
+  await assert.rejects(()=>query(`select apply_employee_contract_signature(35,'bypass','[]',now(),null)`),/security pledge/);
+  await stage(35);assert.equal((await query('select status from contracts where id=35'))[0].status,'서명완료');
 });
 add('empty-pending-rollback-reapply',async()=>{
   await setup();await db.exec(fs.readFileSync('db/p9_security_pledge_20261003_rollback.sql','utf8'));await db.exec(fs.readFileSync('db/p9_security_pledge_20261003.sql','utf8'));assert.equal((await query('select count(*)::int n from contract_security_pledges'))[0].n,0);

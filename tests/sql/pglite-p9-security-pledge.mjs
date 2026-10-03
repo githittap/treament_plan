@@ -105,6 +105,10 @@ try{
   await denied(`select validate_contract_pledge_pdf(12,'${uid}',${qjson(single)},${qjson(coordinates)},repeat('a',64),'data:image/png;base64,${png}')`,/permission denied/);
   await db.exec('reset role;set role service_role');await query(`select validate_contract_pledge_pdf(12,'${uid}',${qjson(single)},${qjson(coordinates)},repeat('a',64),'data:image/png;base64,${png}')`);
   await db.exec('reset role;set role authenticated');assert.equal((await query('select signed_pdf_path from contracts where id=12'))[0].signed_pdf_path,null);count++;
-  if(process.env.P9_FIXTURE_OUT)fs.writeFileSync(process.env.P9_FIXTURE_OUT,JSON.stringify({body,document:prepared.document,version:prepared.version,completedHtml:completed.merged_html,singleBody:template},null,2));
+  await db.exec('reset role');await query(`insert into contracts(id,user_id,merged_html,status,due_at) values(13,'${uid}',${"'"+template.replaceAll("'","''")+"'"},'대기',now()+interval '1 day')`);
+  await db.exec('set role authenticated');await query('select prepare_contract_security_pledge(13)');const singlePledge=(await query('select version from contract_security_pledges where contract_id=13'))[0];
+  await query(`select submit_contract_security_pledge(13,'data:image/png;base64,${png}',true,true,'${singlePledge.version}')`);await query(`select stage_contract_pledge_signatures(13,${qjson(single)},null)`);
+  const singleCompletedHtml=(await query('select merged_html from contracts where id=13'))[0].merged_html;assert.ok(singleCompletedHtml.indexOf('security-pledge')<singleCompletedHtml.indexOf('사직 희망일'));count++;
+  if(process.env.P9_FIXTURE_OUT)fs.writeFileSync(process.env.P9_FIXTURE_OUT,JSON.stringify({body,document:prepared.document,version:prepared.version,completedHtml:completed.merged_html,singleBody:template,singleCompletedHtml},null,2));
   console.log(`PGLITE_P9_PASS: ${count} executed checks; pledge-first, final contract signature, confirmations, bypass denial, original preservation, own access, owner aggregate and no endpoint`);
 }finally{await db.close();}

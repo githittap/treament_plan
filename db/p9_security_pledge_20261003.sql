@@ -145,7 +145,7 @@ begin
     or c.source_pdf_sha256 is distinct from p_source_sha256 then raise exception 'contract PDF is not signable'; end if;
   select * into r from public.contract_security_pledges where contract_id=p_contract_id and user_id=p_user_id for update;
   if not found or r.signed_at is null or not r.read_confirmed or not r.rules_confirmed then raise exception 'signed security pledge and confirmations required'; end if;
-  if r.staged_at is null or r.contract_signatures is distinct from p_signatures or r.signature_png is distinct from p_pledge_signature_png then raise exception 'staged contract signatures differ'; end if;
+  if r.staged_at is null or r.staged_at<r.signed_at or r.contract_signatures is distinct from p_signatures or r.signature_png is distinct from p_pledge_signature_png then raise exception 'staged contract signatures differ'; end if;
   if c.pdf_signing_attempt_id is not null and r.pdf_coordinates is distinct from p_coordinates then raise exception 'PDF signing already started; coordinates are locked'; end if;
   update public.contract_security_pledges set
     coordinate_corrections=case when pdf_coordinates is distinct from p_coordinates then
@@ -186,7 +186,7 @@ begin
   if coalesce(p_signature_png,'') !~ '^data:image/png;base64,[A-Za-z0-9+/]+={0,2}$' or length(p_signature_png)>1400000 then raise exception 'invalid pledge PNG'; end if;
   b:=decode(substr(p_signature_png,23),'base64');
   if octet_length(b)<100 or octet_length(b)>1048576 or substring(b from 1 for 8)<>decode('89504e470d0a1a0a','hex') then raise exception 'invalid pledge PNG bytes'; end if;
-  update public.contract_security_pledges set signature_png=p_signature_png,read_confirmed=true,rules_confirmed=true,signed_at=now()
+  update public.contract_security_pledges set signature_png=p_signature_png,read_confirmed=true,rules_confirmed=true,signed_at=now(),staged_at=null,pdf_validation=null
     where contract_id=p_contract_id returning * into r;
   -- Preserve evidence only. Contract signatures are collected afterward.
   return r;
@@ -204,7 +204,7 @@ begin
     if old.pledge_required and not new.pledge_required then raise exception 'pledge requirement is immutable'; end if;
     if old.pledge_required and ((new.status='서명완료' and old.status<>'서명완료') or (new.signed_pdf_path is not null and old.signed_pdf_path is null)) then
       select * into r from public.contract_security_pledges where contract_id=new.id and user_id=new.user_id;
-      if not found or r.signed_at is null or not r.read_confirmed or not r.rules_confirmed or r.staged_at is null or jsonb_array_length(r.contract_signatures)<>(case when old.integrated_signature_required then 3 else 1 end) then raise exception 'signed security pledge and confirmations required'; end if;
+      if not found or r.signed_at is null or not r.read_confirmed or not r.rules_confirmed or r.staged_at is null or r.staged_at<r.signed_at or jsonb_typeof(r.contract_signatures) is distinct from 'array' or jsonb_array_length(r.contract_signatures) is distinct from (case when old.integrated_signature_required then 3 else 1 end) then raise exception 'signed security pledge and confirmations required'; end if;
       if old.status='대기' and old.due_at<now() then raise exception 'contract expired'; end if;
       if new.status='서명완료' and old.status<>'서명완료' and new.source_pdf_path is null then
         -- Existing integrated bodies put employment first. Move its entire body and signature last.
