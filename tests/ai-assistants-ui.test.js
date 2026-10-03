@@ -445,7 +445,7 @@ test('v2 화면 글: 영어 안내가 없고 한국어 라벨이며, 파일 맨 
   assert.match(js,/🔎 웹검색/);
   assert.match(js,/💬 대화 시작 문장/);
   assert.notEqual(fs.readFileSync(path.join(root,'ai-assistants.js'))[0],0xEF,'맨 앞 BOM 없음');
-  assert.match(read('hr.html'),/<script src="ai-assistants\.js\?v=2026100308"><\/script>/);
+  assert.match(read('hr.html'),/<script src="ai-assistants\.js\?v=2026100309"><\/script>/);
   assert.doesNotMatch(read('hr.html'),/ai-assistants\.js\?v=20260929/);
   assert.match(js,/data-ai-toggle-images/,'모델마다 사진 읽기 켜고 끄기');
   assert.match(js,/action:'provider_status'/,'회사 목록이 서버에 열쇠 등록 여부를 물음');

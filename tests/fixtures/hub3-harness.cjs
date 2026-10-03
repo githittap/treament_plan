@@ -3,6 +3,13 @@
 // 옛 코드의 결과는 tests/fixtures/hub3-golden-84053a7.json 에 저장돼 있다(만든 법: node tests/manual/make-hub3-golden.cjs <옛 hr.html 경로>).
 const vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const lf=s=>String(s).replace(/\r\n/g,'\n');
+function legacyAttendanceIssueView(html){
+  const diffTitle=html.indexOf('<h2>📊 지문·수기 차이</h2>'),diff=diffTitle<0?-1:html.lastIndexOf('<div class="card">',diffTitle);if(diff>=0){const tags=[...html.slice(diff).matchAll(/<\/?div\b[^>]*>/g)];let depth=0,end=-1;for(const tag of tags){if(tag[0].startsWith('</'))depth--;else depth++;if(depth===0){end=diff+tag.index+tag[0].length;break;}}if(end>diff)html=html.slice(0,diff)+html.slice(end);}
+  const card=html.indexOf('<div class="card"><h2>🙋 내 지문누락 소명');if(card>=0)html=html.slice(0,card).trimEnd();
+  const title=html.indexOf('<h2>🙋 지문누락 소명'),start=title<0?-1:html.indexOf('<table>',title),end=start<0?-1:html.indexOf('</table>',start);
+  if(start>=0&&end>=0){const table=html.slice(start,end+8).replace(/<tr>([\s\S]*?)<\/tr>/g,(_row,body)=>{const cells=[...body.matchAll(/<(th|td)\b[^>]*>[\s\S]*?<\/\1>/g)].map(m=>m[0]);if(cells.length===7)cells.splice(4,1);return '<tr>'+cells.join('')+'</tr>';});html=html.slice(0,start)+table+html.slice(end+8);}
+  return html;
+}
 
 function region(html,startMarker,endMarker,includeEnd){
   const a=html.indexOf(startMarker);
@@ -10,6 +17,59 @@ function region(html,startMarker,endMarker,includeEnd){
   const b=html.indexOf(endMarker,a);
   if(b<0)throw new Error('끝 표시를 못 찾음: '+endMarker);
   return html.slice(a,b+(includeEnd?endMarker.length:0));
+}
+async function observeAttendanceIssueB2(html,opts={}){
+  const P=await renderAll(html,Object.assign({},opts,{probe:true,engine:true})),issue={id:71,user_id:'u1',work_date:'2026-10-02',type:'종업누락',rule_label:'자동',reason:'지문 단일 인식(자동 감지)',status:'대기',staff_kind:null,staff_reason:null,staff_responded_at:null},issueIn={id:72,user_id:'u1',work_date:'2026-10-01',type:'시업누락',rule_label:'자동',reason:'지문 단일 인식(자동 감지)',status:'대기',staff_kind:null,staff_reason:null,staff_responded_at:null},file={id:8,issue_id:71,storage_path:'u1/71/abcdefgh1234.pdf',original_name:'퇴근기록.pdf',mime_type:'application/pdf',size_bytes:1024},views=[];
+  for(const role of ['staff','manager','chief','owner']){
+    const r=await P.asMgr(role,null,{tables:{attendance_manual_entries:{list:[]},attendance:{list:[]},attendance_issues:{list:[issue,issueIn]},attendance_issue_evidence:{list:[file]},attendance_issue_resolutions:{list:[]}}}),m={innerHTML:''};
+    await r.api.renderAtt(m);views.push(m.innerHTML);
+    if(role==='chief'){
+      r.api.setState('ATT_ISSUE_EVIDENCE',{71:[file]});await r.api.openAttendanceIssueEvidence(71);views.push(r.ctx.$('#attEvidenceTitle').textContent,r.ctx.$('#attEvidenceList').innerHTML);
+    }
+  }
+  const empty=await P.makeCtx();empty.ctx.ME={id:'u1',role:'staff'};views.push(empty.api.attendanceIssueMyCardHtml([]));
+  for(const [role,mode,row,files] of [['staff','new',null,[]],['staff','answer',issue,[]],['staff','edit',{...issue,rule_label:'기타',type:'정정',staff_kind:'기타',staff_reason:'사유'},[file]]]){
+    const r=await P.makeCtx();r.ctx.ME={id:'u1',name:'김직원',role};r.api.setState('ATT_ISSUE_FORM',{mode,issue:row,existingFiles:files,presetDate:'2026-10-02',busy:false});views.push(r.api.attendanceIssueFormHtml());
+    if(mode==='new'){await r.api.openIssue();views.push(r.dom.$('#attIssueFormTitle').textContent,r.dom.$('#attIssueSaveBtn').textContent,r.dom.$('#attIssueCloseBtn').title);}
+    if(mode==='edit')views.push(r.api.attendanceIssueMyCardHtml([{...row,id:72,status:'대기'}]));
+  }
+  // Execute validation, save, and evidence error branches so dynamic messages are observed from real handlers.
+  const validFile={name:'proof.pdf',type:'application/pdf',size:1024};
+  async function formCase(name,{date='2026-10-02',kind='기타',reason='충분히 자세한 사유 내용입니다',files=[],existing=[],rpc={},storage,mode='answer',refreshFail=false}={}){
+    const r=await P.makeCtx({open:()=>null,renderNav:()=>{},crypto:{randomUUID:()=> '00000000-0000-4000-8000-000000000001'}},{rpc,storage});r.ctx.ME={id:'u1',name:'김직원',role:'staff'};
+    if(refreshFail)r.ctx.refreshBadges=()=>{throw Error('refresh failed');};
+    r.api.setState('ATT_ISSUE_FORM',{mode,issue:mode==='new'?null:{...issue,id:71,status:'대기'},existingFiles:existing,presetDate:null,busy:false});
+    r.dom.$('#attIssueKind').value=kind;r.dom.$('#attIssueReason').value=reason;r.dom.$('#attIssueFiles').files=files;
+    if(date)r.dom.$('#attIssueDate').value=date;
+    const pending=r.api.submitAttendanceIssueForm();views.push(name+':'+r.dom.$('#attIssueFormMsg').textContent);await pending;views.push(name+':'+r.dom.$('#attIssueFormMsg').textContent);
+  }
+  await formCase('date',{date:'',mode:'new'});
+  await formCase('kind',{kind:''});
+  await formCase('reason',{reason:'짧음'});
+  await formCase('count',{files:Array(6).fill(validFile),existing:[file]});
+  await formCase('required',{existing:[]});
+  await formCase('type',{files:[{name:'proof.txt',type:'text/plain',size:10}],existing:[file]});
+  await formCase('size',{files:[{name:'proof.pdf',type:'application/pdf',size:10*1024*1024+1}],existing:[file]});
+  await formCase('save_fail',{existing:[file],rpc:{respond_attendance_issue:{error:{message:'save failed'}}}});
+  await formCase('partial',{files:[validFile],rpc:{attendance_issue_add_evidence:{error:{code:'P0001',message:'attach failed'}}}});
+  await formCase('uncertain',{files:[validFile],storage:{from:()=>({upload:async()=>({error:{code:'FETCH_ERROR',message:'upload response lost'}})})}});
+  await formCase('refresh_fail',{existing:[file],refreshFail:true});
+  await formCase('saved',{existing:[file]});
+  for(const [name,tables] of [['not_found',{attendance_issues:{single:null}}],['not_editable',{attendance_issues:{single:{...issue,status:'원장확정'}}}],['evidence_load_fail',{attendance_issues:{single:issue},attendance_issue_evidence:{error:{message:'read failed'}}}]]){
+    const r=await P.asMgr('staff',null,{tables});await r.api.openIssue(71,'edit');views.push(name+':'+r.log.join('|'));
+  }
+  {
+    const r=await P.makeCtx({open:()=>({opener:null,close(){},location:null})},{storage:{from:()=>({createSignedUrl:async()=>({data:null,error:{message:'sign failed'}})})}});
+    r.api.setState('ATT_ISSUE_EVIDENCE',{71:[file]});await r.api.openAttendanceIssueEvidenceFile(71,0);views.push('evidence_open_fail:'+r.log.join('|'));
+  }
+  {
+    const r=await P.makeCtx({open:()=>({opener:null,close(){},location:null})},{storage:{from:()=>({createSignedUrl:async()=>({data:null,error:null})})}});
+    r.api.setState('ATT_ISSUE_EVIDENCE',{71:[file]});await r.api.openAttendanceIssueEvidenceFile(71,0);views.push('evidence_missing:'+r.log.join('|'));
+    r.api.setState('ATT_ISSUE_EVIDENCE',{});await r.api.openAttendanceIssueEvidenceFile(71,0);views.push('evidence_file_missing:'+r.log.join('|'));
+    r.api.setState('ATT_ISSUE_EVIDENCE',{});await r.api.openAttendanceIssueEvidence(72);views.push('evidence_empty:'+r.dom.$('#attEvidenceList').innerHTML);
+    const blocked=await P.makeCtx({open:()=>null});blocked.api.setState('ATT_ISSUE_EVIDENCE',{71:[file]});await blocked.api.openAttendanceIssueEvidenceFile(71,0);views.push('evidence_open_blocked:'+blocked.log.join('|'));
+  }
+  return views.join('\n');
 }
 // supabase 흉내: 어떤 메서드 사슬이든 받아서 표마다 정해진 결과를 돌려준다. single/maybeSingle로 끝나면 spec.single, 아니면 spec.list.
 function chain(spec){
@@ -105,7 +165,7 @@ function makeSb(over){
   const sb={
     from(t){const spec=Object.prototype.hasOwnProperty.call(o.tables||{},t)?o.tables[t]:tablesFor(t);return chain(spec||{list:[],single:null});},
     rpc(name,args){rpcCalls.push([name,args]);const r=(o.rpc||{})[name];return Promise.resolve(r!==undefined?(typeof r==='function'?r(args):r):{data:[{}],error:null});},
-    storage:{from(){return {upload:async()=>({error:null})};}}
+    storage:{from(bucket){return (o.storage&&o.storage.from?o.storage.from(bucket):null)||{upload:async()=>({error:null}),createSignedUrl:async()=>({data:{signedUrl:'https://example.invalid/file'},error:null})};}}
   };
   sb.rpcCalls=rpcCalls;
   return sb;
@@ -152,10 +212,10 @@ async function renderAll(html,opts){
         await ctx.HubUi.load({from(){const api={select(){return api;},then(res,rej){return Promise.resolve(o.loadFail?{data:null,error:{message:'x'}}:{data:o.textRows,error:null}).then(res,rej);}};return api;}});
       }
     }else if(o.settings)Object.assign(ctx.SETTINGS,o.settings);
-    vm.runInContext(timeSrc+'\n'+helperSrc+'\n'+bigSrc+'\n;this.api={renderAtt,checkAbsent,issueBtns,issueAct,openIssue,closeMonth,reviewManualAttendance,manualAttendanceFormHtml,manualAttendanceDetailText,renderManualAttendanceDayDetail,submitManualAttendance,saveAbsenceSettings,absenceSettingsHtml,buildPreview,parseXls,saveAttendance,renderXlTable,'
+    vm.runInContext(timeSrc+'\n'+helperSrc+'\n'+bigSrc+'\n;this.api={renderAtt,checkAbsent,issueBtns,issueAct,openIssue,closeMonth,reviewManualAttendance,manualAttendanceFormHtml,manualAttendanceDetailText,renderManualAttendanceDayDetail,submitManualAttendance,submitAttendanceIssueForm,saveAbsenceSettings,absenceSettingsHtml,attendanceIssueFormHtml,attendanceIssueMyCardHtml,openAttendanceIssueEvidence,openAttendanceIssueEvidenceFile,buildPreview,parseXls,saveAttendance,renderXlTable,'
       +'renderSched,renderScheduleMonth,scheduleRosterAdminCard,scheduleRoleCell,saveSchedulePerson,setSchedulePersonDepartment,setSchedulePersonIncluded,setSchedulePersonActive,copyPrevWeek,'
       +'renderEmployeeLeaveStatus,openLeaveBalanceEditor,updateLeaveBalancePreview,saveLeaveBalance,renderLeave,openLeaveForm,openLeaveEdit,openLeave,cancelPendingLeave,checkClash,submitLeave,leaveAct,cancelApprovedLeave,grantLeave,previewLeaveAccrual,applyLeaveAccrual,computeLeaveDays,leaveDisplayText,appStamp,'
-      +'setState:(k,v)=>{if(k==="MANUAL_DETAIL_OPEN")MANUAL_DETAIL_OPEN=v;if(k==="SCHED_VIEW")SCHED_VIEW=v;if(k==="SCHED_WEEK")SCHED_WEEK=v;if(k==="SCHED_MONTH")SCHED_MONTH=v;if(k==="xlRows")xlRows=v;if(k==="LEAVE_EDIT_ID")LEAVE_EDIT_ID=v;if(k==="LEAVE_ARCHIVE_MONTH")LEAVE_ARCHIVE_MONTH=v;},getState:k=>k==="xlRows"?xlRows:undefined};'
+      +'setState:(k,v)=>{if(k==="MANUAL_DETAIL_OPEN")MANUAL_DETAIL_OPEN=v;if(k==="SCHED_VIEW")SCHED_VIEW=v;if(k==="SCHED_WEEK")SCHED_WEEK=v;if(k==="SCHED_MONTH")SCHED_MONTH=v;if(k==="xlRows")xlRows=v;if(k==="LEAVE_EDIT_ID")LEAVE_EDIT_ID=v;if(k==="LEAVE_ARCHIVE_MONTH")LEAVE_ARCHIVE_MONTH=v;if(k==="ATT_ISSUE_FORM")ATT_ISSUE_FORM=v;if(k==="ATT_ISSUE_EVIDENCE")ATT_ISSUE_EVIDENCE=v;},getState:k=>k==="xlRows"?xlRows:undefined};'
       +'this.api2={leaveApplyModalPrepare:typeof leaveApplyModalPrepare==="function"?leaveApplyModalPrepare:null,leaveTypeItems:typeof leaveTypeItems==="function"?leaveTypeItems:null,leaveTypeLabel:typeof leaveTypeLabel==="function"?leaveTypeLabel:null,hubStaticFill:typeof hubStaticFill==="function"?hubStaticFill:null,hubN:typeof hubN==="function"?hubN:null};',ctx);
     return {ctx,dom,log,statuses,api:ctx.api,api2:ctx.api2};
   }
@@ -168,13 +228,13 @@ async function renderAll(html,opts){
   for(const role of ['manager','chief','owner']){
     const r=await asMgr(role,null,role==='owner'?{tables:{att_months:{single:{status:'확정'}}}}:(role==='chief'?{tables:{att_months:{single:{status:'집계중'}}}}:null));
     const m={innerHTML:''};await r.api.renderAtt(m);
-    out['att.render.'+role]=m.innerHTML;out['att.render.'+role+'.calendar']=r.dom.$('#manualAttendanceCalendar').innerHTML;out['att.render.'+role+'.detail']=r.dom.$('#manualAttendanceDayDetailText').innerHTML;
+    out['att.render.'+role]=legacyAttendanceIssueView(m.innerHTML);out['att.render.'+role+'.calendar']=r.dom.$('#manualAttendanceCalendar').innerHTML;out['att.render.'+role+'.detail']=r.dom.$('#manualAttendanceDayDetailText').innerHTML;
   }
   for(const [name,tables] of [['err_msg',{attendance_manual_entries:fail('수기<조회>실패')}],['err_none',{attendance_manual_entries:{error:{}}}],['empty',{attendance_manual_entries:{list:[]},attendance_issues:{list:[]},attendance_issue_resolutions:{list:[]}}]]){
-    const r=await asMgr('chief',null,{tables});const m={innerHTML:''};await r.api.renderAtt(m);out['att.render.chief.'+name]=m.innerHTML;
+    const r=await asMgr('chief',null,{tables});const m={innerHTML:''};await r.api.renderAtt(m);out['att.render.chief.'+name]=legacyAttendanceIssueView(m.innerHTML);
   }
   for(const [name,tables] of [['data',null],['empty',{attendance:{list:[]},attendance_manual_entries:{list:[]},attendance_issue_resolutions:{list:[]}}],['err',{attendance_manual_entries:fail('개인<오류>')}],['err_none',{attendance_manual_entries:{error:{}}}]]){
-    const r=await asMgr('staff',null,tables?{tables}:null);const m={innerHTML:''};await r.api.renderAtt(m);out['att.render.staff.'+name]=m.innerHTML;
+    const r=await asMgr('staff',null,tables?{tables}:null);const m={innerHTML:''};await r.api.renderAtt(m);out['att.render.staff.'+name]=legacyAttendanceIssueView(m.innerHTML);
   }
   {
     const r=await asMgr('owner');
@@ -420,4 +480,4 @@ async function renderAll(html,opts){
   }
   return out;
 }
-module.exports={renderAll,region,chain,lf,makeSb,tablesFor,FakeDate,PROFILES,PEOPLE};
+module.exports={renderAll,observeAttendanceIssueB2,region,chain,lf,makeSb,tablesFor,FakeDate,PROFILES,PEOPLE};

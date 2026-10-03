@@ -52,9 +52,9 @@ function fakeSb(opts){
 const dynRows=defs=>defs.map(d=>({key:d.key,value:'«'+d.key+'»'+(d.vars?' '+d.vars.map(v=>'{'+v+'}').join(' '):'')}));
 
 /* ───────────── 1. 기본 글 목록 ───────────── */
-test('차례 3 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 11개(출퇴근 5 · 근무표 2 · 연차 4)',()=>{
+test('차례 3 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 14개(출퇴근·근태차이 8 · 근무표 2 · 연차 4)',()=>{
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
-  assert.equal(defs.length,326,'차례 3 글 키 수(고쳐 쓰는 글 295 + 모달 속 고정 글 19 · P7 이름 보기 추가)');
+  assert.equal(defs.length,439,'차례 3 글 키 수(고쳐 쓰는 글 295 + 모달 속 고정 글 19 · P7 이름 보기 추가)');
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
   for(const d of defs){
     assert.match(d.key,/^[a-z][a-z0-9_.]{1,80}$/,d.key);
@@ -63,8 +63,8 @@ test('차례 3 글 목록: 키 모양·중복 없음·{자리표시자} 일치·
     assert.deepEqual([...new Set(ph)].sort(),clone(d.vars||[]).sort(),d.key+' 자리표시자');
   }
   const screens=[...new Set(defs.map(d=>d.screen))];
-  assert.equal(screens.length,11);
-  assert.equal(screens.filter(s=>s.startsWith('🕘 출퇴근')).length,5);
+  assert.equal(screens.length,20,'B2 소명 화면 6개와 C 근태차이 화면 3개 추가');
+  assert.equal(screens.filter(s=>s.startsWith('🕘 출퇴근')).length,14,'B2·C의 출퇴근 소명·차이 화면 9개 추가');
   assert.equal(screens.filter(s=>s.startsWith('🗓 근무표')).length,2);
   assert.equal(screens.filter(s=>s.startsWith('🌿 연차')).length,4);
 });
@@ -85,6 +85,19 @@ test('화면 코드(hr.html)에 박힌 기본 글이 기본값 목록과 글자�
   for(const sm of hr.matchAll(/<[a-z0-9]+\b[^>]*\bdata-hubph="([a-z0-9_.]+)"[^>]*>/g)){const ph=/placeholder="([^"]*)"/.exec(sm[0]);assert.ok(ph,sm[1]+' 흐린 글 칸');if(CH3.test(sm[1]))stat.set(sm[1],ph[1]);}
   const defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
   for(const d of defs){
+    if(d.key==='att.myissue.th_evidence'){assert.equal(d.def,'증거');assert.ok(!found.has(d.key),'내 소명 목록을 두 줄로 바꾸며 증거 열 머리는 더 이상 표시하지 않음');continue;}
+    if(['att.issueform.mode_new','att.issueform.mode_answer','att.issueform.mode_edit','att.issue.auto_clock_in','att.issue.auto_clock_out'].includes(d.key)){
+      assert.match(hr,/hubT\(form\.mode==='new'\?'att\.issueform\.mode_new':form\.mode==='answer'\?'att\.issueform\.mode_answer':'att\.issueform\.mode_edit'/,'실제 양식 렌더는 세 모드 글 키를 선택함');
+      assert.match(hr,/att\.myissue\.pending/,'실제 내 소명 카드가 자동 감지 글을 선택함');
+      const mode=hr.match(/hubT\(form\.mode==='new'\?'att\.issueform\.mode_new':form\.mode==='answer'\?'att\.issueform\.mode_answer':'att\.issueform\.mode_edit',form\.mode==='new'\?'([^']*)':form\.mode==='answer'\?'([^']*)':'([^']*)'\)/);
+      assert.ok(mode,"form mode fallback literals present");
+      const clocks=[...hr.matchAll(/hubT\(i\.type==='[^']+'\?'att\.issue\.auto_clock_out':'att\.issue\.auto_clock_in',i\.type==='[^']+'\?'([^']*)':'([^']*)'\)/g)];
+      assert.equal(clocks.length,3,'자동 출퇴근 글의 대기 카드·내 표·관리자 표 세 callsite');
+      for(const call of clocks)assert.deepEqual(call.slice(1),clocks[0].slice(1),'세 callsite의 기본 글이 서로 같음');
+      const fallback={'att.issueform.mode_new':mode[1],'att.issueform.mode_answer':mode[2],'att.issueform.mode_edit':mode[3],'att.issue.auto_clock_out':clocks[0][1],'att.issue.auto_clock_in':clocks[0][2]};
+      assert.equal(d.def,fallback[d.key],d.key+" default text equals hr.html fallback");
+      continue;
+    }
     if(stat.has(d.key)){assert.equal(stat.get(d.key),d.def,d.key+' 고정 글이 기본값과 다름');assert.ok(!found.has(d.key),d.key+' 고정 글과 호출이 겹침');continue;}
     assert.ok(found.has(d.key),d.key+' 키가 hr.html에서 안 쓰임');
     assert.equal(found.get(d.key),d.def,d.key+' 기본 글이 화면 코드와 다름');
@@ -109,7 +122,7 @@ test('숫자·목록 기본값: 연차·소명 숫자 5개와 연차 유형·근
   assert.match(hr,/<select id="lvType"><option>연차<\/option><option>반차<\/option><option>조퇴<\/option><option>기타<\/option><\/select>/,'신청 창 기본 선택칸(기존 시험이 이 줄을 찾음)');
   assert.equal(L('list.work_depts').addable,false);assert.equal(L('list.leave_types').addable,false);
   assert.ok(S('leave.same_day_limit').where.includes('DB에는 없어요'));
-  assert.match(hr,/hub-texts\.js\?v=2026100308/,'캐시 번호를 새 값으로 올림(차례 4에서 2026100109 → 2026100110, 차례 5에서 → 2026100111, 차례 6에서 → 2026100112, 차례 7에서 → 2026100113, 10-02 원장요청 5건에서 → 2026100221, 10-02 인박스 판에서 → 2026100223)');
+  assert.match(hr,/hub-texts\.js\?v=2026100309/,'캐시 번호를 새 값으로 올림(차례 4에서 2026100109 → 2026100110, 차례 5에서 → 2026100111, 차례 6에서 → 2026100112, 차례 7에서 → 2026100113, 10-02 원장요청 5건에서 → 2026100221, 10-02 인박스 판에서 → 2026100223)');
 });
 
 /* ───────────── 2. 기본값만 있을 때 옛 화면과 똑같음 ───────────── */
@@ -148,15 +161,30 @@ test('시험이 실제로 잡는지: 화면 글을 한 글자만 바꾸면 대�
 });
 
 /* ───────────── 3. 표에 값이 있으면 그 글 ───────────── */
-test('표에 값이 있으면 그 글: 고쳐 쓰는 글 294개가 모두 화면(제목·표 머리·단추·알림창·확인창·메시지)에 나온다',async()=>{
+test('표에 값이 있으면 그 글: 고쳐 쓰는 글 355개가 모두 화면(제목·표 머리·단추·알림창·확인창·메시지)에 나온다',async()=>{
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
   const stat=new Set([...hr.matchAll(/\bdata-hub(?:k|ph)="([a-z0-9_.]+)"/g)].map(m=>m[1]));
   const dyn=defs.filter(d=>!stat.has(d.key)&&!P7_DATE_TEXT_KEYS.has(d.key)); // 날짜 전환 글 3개는 attendance-date-switch.test.js의 실제 호출로 확인함
-  assert.equal(dyn.length,304);
+  assert.equal(dyn.length,417);
   const out=await renderAll(hr,{engine:true,textRows:dynRows(dyn),settings:{}});
-  const all=Object.values(out).join('\n');
-  const missing=dyn.filter(d=>!all.includes('«'+d.key+'»')).map(d=>d.key);
-  assert.equal(missing.length,0,'값을 넣었는데 화면에 안 나오는 키: '+missing.join(', '));
+  const b2Defs=defs.filter(d=>/^att\.issue\.p_date$|^att\.issueform\.|^att\.myissue\.|^att\.issue\.(?:evidence_|admin_evidence|awaiting_staff|auto_clock_)/.test(d.key));
+  const b2Observed=await require('./fixtures/hub3-harness.cjs').observeAttendanceIssueB2(hr,{textRows:dynRows(b2Defs)});
+  const cDefs=defs.filter(d=>d.key.startsWith('att.diff.'));
+  const P=await renderAll(hr,{probe:true,engine:true,textRows:dynRows(cDefs),settings:{'att.diff.gap_min':'1','att.diff.show_staff':'1'}}),c=await P.makeCtx();
+  c.ctx.ME={id:'u1',name:'김직원',role:'chief'};
+  vm.runInContext('this.api.attDiffCardHtml=attDiffCardHtml;this.api.attDiffRenderRows=attDiffRenderRows;this.api.attDiffExportModel=attDiffExportModel;this.api.attDiffLabel=attDiffLabel;this.api.attDiffSignedMinutes=attDiffSignedMinutes;this.api.attDiffGapText=attDiffGapText;this.api.attDiffStaffMissingKinds=attDiffStaffMissingKinds;this.api.attDiffWeekday=attDiffWeekday;this.api.attendanceStaffDiffHtml=attendanceStaffDiffHtml',c.ctx);
+  const sample={userId:'u1',name:'김직원',workDate:'2026-10-02',kinds:'출근 · 퇴근',manualIn:'09:02',manualOut:'18:02',fpIn:'09:00',fpOut:'18:00',diffInMin:2,diffOutMin:2,manualStatus:'대기',manualReason:'사유',issueStatus:'',issueReason:''};
+  const cObserved=[c.api.attDiffCardHtml(),c.api.attDiffRenderRows({rows:[sample],month:'2026-10',coverageEnd:'2026-10-31'}),c.api.attDiffRenderRows({rows:[],month:'2026-10',coverageEnd:null}),c.api.attDiffRenderRows({rows:[],month:'2026-10',error:{message:'query fail'}})];
+  c.ctx.ME.role='staff';cObserved.push(c.api.attendanceStaffDiffHtml([sample]),c.api.attendanceStaffDiffHtml([]),c.api.attendanceStaffDiffHtml({error:'query fail'}));
+  cObserved.push(JSON.stringify(c.api.attDiffExportModel([sample],{month:'2026-10',thresholdMin:1,coverageEnd:'2026-10-31',createdAt:'2026-10-03T10:00:00Z'})),JSON.stringify(c.api.attDiffExportModel([],{month:'2026-10',thresholdMin:1,coverageEnd:null,createdAt:'2026-10-03T10:00:00Z'})),c.api.attDiffLabel('출근 · 퇴근 · 지문 출근 없음 · 지문 퇴근 없음 · 지문 없음'),c.api.attDiffSignedMinutes(sample.diffInMin),c.api.attDiffSignedMinutes(sample.diffOutMin),c.api.attDiffGapText(2,2),c.api.attDiffStaffMissingKinds('출근 · 퇴근 · 지문 출근 없음 · 지문 퇴근 없음 · 지문 없음'),...['2026-10-04','2026-10-05','2026-10-06','2026-10-07','2026-10-08','2026-10-09','2026-10-10'].map(d=>c.api.attDiffWeekday(d)));
+  const cObservedText=cObserved.join('\n');
+  const cObservedMissing=cDefs.filter(d=>!cObservedText.includes('«'+d.key+'»')).map(d=>d.key);
+  assert.equal(cObservedMissing.length,0,'C 차이 글은 관리자·직원·오류·빈 상태·엑셀의 실제 렌더에 모두 나타남 '+cObservedMissing.join(', '));
+  const all=Object.values(out).join('\n')+'\n'+b2Observed+'\n'+cObservedText;
+  const legacyMissing=dyn.filter(d=>!b2Defs.some(x=>x.key===d.key)&&!all.includes('«'+d.key+'»')).map(d=>d.key);
+  const visibleMissing=b2Defs.filter(d=>d.key!=='att.myissue.th_evidence'&&!all.includes('«'+d.key+'»')).map(d=>d.key);
+  assert.equal(legacyMissing.length,0,'기존 화면 글은 기존 관측 그대로 검사: '+legacyMissing.join(', '));
+  assert.equal(visibleMissing.length,0,'B2 양식·카드·관리자 표·증거 목록은 실제 관측 렌더로 검사: '+visibleMissing.join(', '));
   // 자리표시자는 화면이 채워 넣음
   assert.match(all,/«att\.close\.confirm»/);
   assert.ok(!/«[a-z0-9_.]+»[^"\\]*\{[a-z_]+\}/.test(all.replace(/\\"/g,'"')),'{자리표시자}가 채워지지 않고 남음');
@@ -381,7 +409,7 @@ test('화면: 🔢 숫자·기준 — 연차·소명 기준 5개가 더 있고(�
   await t.render(OWNER);
   await t.click('[hub-subtab]=settings');
   const sec=t.section.innerHTML;
-  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,12+2+4+1+8+1+1,'근태 7 + 연차·소명 5 + 차례 4 결재 건수 2 + 차례 5 문의함·상담일지 4');
+  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,12+2+4+1+8+1+1+6,'근태 7 + 연차·소명 5 + 차례 4 결재 건수 2 + 차례 5 문의함·상담일지 4');
   assert.ok(sec.includes('🌿 연차 기준')&&sec.includes('🕘 근태 기준'));
   assert.match(sec,/id="hubSetIn_8" type="number" inputmode="numeric" min="1" max="30" value="2"/);
   assert.match(sec,/id="hubSetIn_10" type="number" inputmode="decimal" step="0\.1" min="0\.1" max="1" value="0\.5"/);
@@ -406,7 +434,7 @@ test('화면: 📋 목록에 연차 유형 이름·근무부서 이름이 있고
   await t.click('[hub-subtab]=lists');
   let sec=t.section.innerHTML;
   assert.ok(sec.includes('연차 유형 이름')&&sec.includes('근무부서 이름'));
-  assert.equal((sec.match(/<span class="hub-code">/g)||[]).length,4+6+3+4+4+7+6+3+8+7+6+5+32,'차례 4: 결재 종류 6 · 일정 종류 3 추가 + 차례 5: 문의 출처 8 · 문의 상태 7 · 상담 구분 6 · 상담 상태 5');
+  assert.equal((sec.match(/<span class="hub-code">/g)||[]).length,4+6+3+4+4+7+6+3+8+7+6+5+32+3,'차례 4: 결재 종류 6 · 일정 종류 3 추가 + 차례 5: 문의 출처 8 · 문의 상태 7 · 상담 구분 6 · 상담 상태 5 + B2 소명 종류 3');
   assert.equal((sec.match(/data-hub-list-add=/g)||[]).length,2,'새 항목을 늘릴 수 있는 목록은 직원 부서·서류 종류뿐');
   assert.match(sec,/<span class="hub-code">반차<\/span><input id="hubLstLbl_4_1" type="text" maxlength="20" value="반차"/);
   assert.match(sec,/<span class="hub-code">Dr\.<\/span><input id="hubLstLbl_5_0" type="text" maxlength="20" value="Dr\."/);

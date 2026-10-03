@@ -9,20 +9,25 @@ const chief='11111111-1111-1111-1111-111111111111',staff='22222222-2222-2222-222
 try{
   await db.exec(`create role anon; create role authenticated; create schema auth;
   create or replace function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('app.test_uid',true),'')::uuid $$;
-  create table public.profiles(user_id uuid primary key,name text,active boolean default true,approved boolean default true,role text);
+  create table public.profiles(user_id uuid primary key,name text,active boolean default true,approved boolean default true,account_access_status text default '활성',role text);
   create or replace function public.my_role() returns text language sql stable as $$ select coalesce((select role from public.profiles where user_id=auth.uid()),'') $$;
+  create or replace function public.employee_hub_access_allowed() returns boolean language sql stable security definer set search_path='' as $$select exists(select 1 from public.profiles p where p.user_id=auth.uid() and p.active and p.approved and p.account_access_status='활성')$$;
   create table public.attendance(user_id uuid,work_date date,clock_in time,clock_out time,source text,late_min int default 0,early_min int default 0,overtime_min int default 0,memo text,primary key(user_id,work_date));
   create table public.attendance_issues(id bigint generated always as identity primary key,user_id uuid,work_date date,type text check(type in ('시업누락','종업누락','정정')),reason text,rule_label text,status text default '대기' check(status in ('대기','실장승인','원장확정','반려')),chief_by text,chief_at timestamptz,owner_by text,owner_at timestamptz,created_at timestamptz default now());
   grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated; grant select on public.profiles to authenticated;
   grant select,insert,update on public.attendance,public.attendance_issues to authenticated;
+  create schema storage;create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);create table storage.objects(id bigint generated always as identity primary key,bucket_id text,name text,owner text,owner_id text,version text,metadata jsonb default '{}'::jsonb,user_metadata jsonb default '{}'::jsonb);grant usage on schema storage to authenticated;grant select,insert,delete on storage.objects to authenticated;alter table storage.objects enable row level security;
   create policy attendance_issues_select_test on public.attendance_issues for select to authenticated using (user_id=auth.uid() or public.my_role() in ('chief','owner'));
-  insert into public.profiles values('${chief}','합성실장',true,true,'chief'),('${staff}','합성직원',true,true,'staff'),('${owner}','합성원장',true,true,'owner'),('${other}','합성다른직원',true,true,'staff');
+  insert into public.profiles(user_id,name,active,approved,role) values('${chief}','합성실장',true,true,'chief'),('${staff}','합성직원',true,true,'staff'),('${owner}','합성원장',true,true,'owner'),('${other}','합성다른직원',true,true,'staff');
   insert into public.attendance values('${staff}','2026-09-22','09:00','18:00','fp',0,0,0,'원본');
-  insert into public.attendance_issues(user_id,work_date,type,reason,rule_label) values('${staff}','2026-09-22','정정','지문 누락','지문인식오류');`+fs.readFileSync('db/attendance_issue_resolution_release.sql','utf8'));
+  insert into public.attendance_issues(user_id,work_date,type,reason,rule_label) values('${staff}','2026-09-22','시업누락','지문 단일 인식(자동 감지)','자동');`+fs.readFileSync('db/attendance_issue_resolution_release.sql','utf8'));
+  await db.exec(fs.readFileSync('db/attendance_issue_evidence.sql','utf8'));
   const issue=(await db.query("select id from public.attendance_issues where user_id='"+staff+"'")).rows[0].id;
   await q('set role authenticated');
   const rpc=async(name,p)=>{const args=Object.values(p).map(v=>v===null?'null':typeof v==='boolean'?v?'true':'false':`'${String(v).replaceAll("'","''")}'`).join(',');return q(`select * from public.${name}(${args})`)};
   await q(`select set_config('app.test_uid','${staff}',false)`);
+  const recognized=await rpc('respond_attendance_issue',{p_id:issue,p_kind:'지문인식오류',p_reason:'출근 당시 기기가 인식하지 않아 기록을 확인함'});
+  assert.deepEqual({type:recognized[0].type,rule_label:recognized[0].rule_label,staff_kind:recognized[0].staff_kind},{type:'시업누락',rule_label:'지문인식오류',staff_kind:'지문인식오류'});
   let invalid='';try{await rpc('submit_manual_attendance',{p_work_date:null,p_clock_in:null,p_clock_out:null,p_late_min:0,p_early_min:0,p_overtime_raw_text:'',p_overtime_min:0,p_reason:null,p_reason_required:false})}catch(e){invalid=String(e)}assert.match(invalid,/invalid manual attendance submission/);
    const submitted=await rpc('submit_manual_attendance',{p_work_date:'2026-09-22',p_clock_in:'09:12',p_clock_out:'18:00',p_late_min:12,p_early_min:0,p_overtime_raw_text:'19',p_overtime_min:10,p_reason:'지문 누락 보정',p_reason_required:true});assert.equal(submitted[0].status,'대기');assert.equal(submitted[0].id,1);await q(`select set_config('app.test_uid','${owner}',false)`);let premature='';try{await q("select status from public.review_manual_attendance(1,'approve')")}catch(e){premature=String(e)}assert.match(premature,/not allowed/);assert.equal((await q('select status from public.attendance_manual_entries where id=1'))[0].status,'대기');
   await q(`select set_config('app.test_uid','${chief}',false)`);assert.equal((await q(`select status from public.review_attendance_issue(${issue},'approve')`))[0].status,'실장승인');assert.equal((await q('select status from public.review_manual_attendance(1,\'approve\')'))[0].status,'실장승인');
@@ -38,5 +43,16 @@ try{
   let forgedInsert='';try{await q(`insert into public.attendance_issues(user_id,work_date,type,rule_label,status,owner_by) values('${staff}','2026-09-24','정정','지문인식오류','원장확정','위조')`)}catch(e){forgedInsert=String(e)}assert.match(forgedInsert,/row-level security|permission denied/);
   await q(`select set_config('app.test_uid','${owner}',false)`);const autoFinal=await rpc('record_auto_attendance_issue',{p_user_id:staff,p_work_date:'2026-09-22',p_type:'시업누락',p_reason:'재업로드'});assert.equal(autoFinal[0].status,'원장확정');const autoNew=await rpc('record_auto_attendance_issue',{p_user_id:staff,p_work_date:'2026-09-26',p_type:'시업누락',p_reason:'자동 누락'});const autoAgain=await rpc('record_auto_attendance_issue',{p_user_id:staff,p_work_date:'2026-09-26',p_type:'종업누락',p_reason:'다른 재업로드'});assert.equal(autoAgain[0].id,autoNew[0].id);assert.equal(autoAgain[0].type,'시업누락');
   await q(`select set_config('app.test_uid','${other}',false)`);assert.equal((await q('select count(*)::int n from public.attendance_issue_resolutions'))[0].n,0);
-  console.log('PGLITE_ATTENDANCE_RELEASE_PASS: ui-payload-submit/chief-owner-approvals/version-guard/resolution/original-fp-preserved/direct-update-blocked/scoped-RLS');
+  // Existing release SQL consumes rule_label. A changed staff choice must therefore
+  // change that canonical field, and the original owner approval path must reject it.
+  await q('reset role');await q(`insert into public.attendance(user_id,work_date,clock_in,clock_out,source) values('${staff}','2026-09-23','09:00','18:00','fp')`);
+  await q(`select set_config('app.test_uid','${staff}',false)`);await q('set role authenticated');
+  const initiallyRecognized=(await q("select * from public.submit_attendance_issue_v2('2026-09-23','지문인식오류','현장 기록을 확인해 입력을 바로잡음')"))[0];
+  const otherKind=(await q(`select * from public.respond_attendance_issue(${initiallyRecognized.id},'기타','현장 기록을 확인해 입력을 바로잡음')`))[0];
+  assert.deepEqual({type:otherKind.type,rule_label:otherKind.rule_label,staff_kind:otherKind.staff_kind},{type:'정정',rule_label:'기타',staff_kind:'기타'});
+  const otherManual=(await rpc('submit_manual_attendance',{p_work_date:'2026-09-23',p_clock_in:'09:10',p_clock_out:'18:00',p_late_min:10,p_early_min:0,p_overtime_raw_text:'',p_overtime_min:0,p_reason:'근태 기록 정정',p_reason_required:true}))[0];
+  await q(`select set_config('app.test_uid','${chief}',false)`);await q(`select public.review_attendance_issue(${otherKind.id},'approve')`);await q(`select public.review_manual_attendance(${otherManual.id},'approve')`);
+  await q(`select set_config('app.test_uid','${owner}',false)`);await q(`select public.review_attendance_issue(${otherKind.id},'approve')`);
+  let wrongKind='';try{await q(`select public.review_manual_attendance(${otherManual.id},'approve')`)}catch(e){wrongKind=String(e)}assert.match(wrongKind,/fingerprint evidence requires approved recognition-error issue/);
+  console.log('PGLITE_ATTENDANCE_RELEASE_PASS: evidence migration integrates original release SQL; recognized-kind approval succeeds and other-kind approval is denied');
 }finally{await db.close()}

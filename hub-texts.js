@@ -399,6 +399,70 @@ function hubTextDefsChapter3(add){
   add('att.review.empty','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','수기 검토 카드 — 수기 입력이 하나도 없을 때','수기 입력 없음');
   add('att.review.err','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','수기 검토 카드 — 조회 실패 앞 글(뒤에 오류 내용이 붙음)','수기 근태 조회 실패:');
   add('att.review.err_draft','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','수기 검토 조회 실패인데 오류 내용이 없을 때','DB 초안이 아직 적용되지 않았습니다.');
+  add('att.diff.title','🕘 출퇴근 › 지문·수기 차이','실장·원장 차이 카드 제목','📊 지문·수기 차이');
+  add('att.diff.month','🕘 출퇴근 › 지문·수기 차이','차이를 조회할 달 선택','달');
+  add('att.diff.employee','🕘 출퇴근 › 지문·수기 차이','차이를 조회할 직원 선택','직원');
+  add('att.diff.all','🕘 출퇴근 › 지문·수기 차이','직원 선택 전체 항목','전체');
+  add('att.diff.list','🕘 출퇴근 › 지문·수기 차이','차이 목록 조회 단추','목록 보기');
+  add('att.diff.export','🕘 출퇴근 › 지문·수기 차이','차이 엑셀 내려받기 단추','엑셀로 받기');
+  add('att.diff.error','🕘 출퇴근 › 지문·수기 차이','차이 자료 조회 실패({msg}는 오류 내용)','차이를 불러오지 못했습니다: {msg}',['msg']);
+  add('att.diff.coverage','🕘 출퇴근 › 지문·수기 차이','지문 자료 범위·기준·건수 안내({date}·{gap}·{count}는 화면 값)','지문 자료는 {date}까지 · {gap}분 이상 다르면 차이 · {count}건',['date','gap','count']);
+  add('att.diff.no_fp','🕘 출퇴근 › 지문·수기 차이','조회 달에 지문 자료가 없을 때','이 달 지문 자료가 아직 없음');
+  add('att.diff.export_no_fp','🕘 출퇴근 › 지문·수기 차이 엑셀','안내 시트에 지문 자료가 없을 때','자료 없음');
+  add('att.diff.none','🕘 출퇴근 › 지문·수기 차이','차이가 없을 때','차이 없음');
+  add('att.diff.th_person','🕘 출퇴근 › 지문·수기 차이','차이 표 직원 열','직원');
+  add('att.diff.th_date','🕘 출퇴근 › 지문·수기 차이','차이 표 날짜 열','날짜');
+  add('att.diff.th_kind','🕘 출퇴근 › 지문·수기 차이','차이 표 종류 열','종류');
+  add('att.diff.th_manual','🕘 출퇴근 › 지문·수기 차이','차이 표 수기 시간 열','수기');
+  add('att.diff.th_fp','🕘 출퇴근 › 지문·수기 차이','차이 표 지문 시간 열','지문');
+  add('att.diff.th_gap','🕘 출퇴근 › 지문·수기 차이','차이 표 차이 열','차이');
+  add('att.diff.th_status','🕘 출퇴근 › 지문·수기 차이','차이 표 수기 상태 열','수기 상태');
+  add('att.diff.th_issue','🕘 출퇴근 › 지문·수기 차이','차이 표 소명 열','소명');
+  add('att.diff.staff_gap','🕘 출퇴근 › 내 지문·수기 차이','직원 본인 화면의 출근·퇴근 차이 분({in}과 {out}은 분 차이, 없으면 -) 표시','차이: 출근 {in}분 · 퇴근 {out}분',['in','out']);
+  add('att.diff.staff_title','🕘 출퇴근 › 내 지문·수기 차이','직원 본인 차이 목록 제목','지문·수기가 다른 날');
+  add('att.diff.staff_issue','🕘 출퇴근 › 내 지문·수기 차이','직원이 차이 날짜 소명 양식을 여는 단추','소명 쓰기');
+  add('att.diff.signed_minute','🕘 출퇴근 › 지문·수기 차이','부호가 있는 수기−지문 분 차이({value}는 부호와 숫자)','{value}분',['value']);
+  add('att.diff.staff_line','🕘 출퇴근 › 내 지문·수기 차이','직원 본인 차이 한 줄({date} 날짜, {manual_in}~{manual_out} 수기, {fp_in}~{fp_out} 지문, {in_delta}/{out_delta}분 차이, {missing}은 지문 누락 종류)','{date} · 수기 {manual_in}~{manual_out} · 지문 {fp_in}~{fp_out} · 출근 {in_delta} · 퇴근 {out_delta}{missing}',['date','manual_in','manual_out','fp_in','fp_out','in_delta','out_delta','missing']);
+  add('att.diff.staff_none','🕘 출퇴근 › 내 지문·수기 차이','직원 본인 차이가 없을 때','다른 날이 없습니다.');
+  add('att.diff.staff_error','🕘 출퇴근 › 내 지문·수기 차이','직원 본인 차이 자료 조회 실패({msg}는 오류 내용)','차이를 불러오지 못했습니다: {msg}',['msg']);
+  add('att.diff.kind_in','🕘 출퇴근 › 지문·수기 차이','출근 시각 차이 종류','출근');
+  add('att.diff.kind_out','🕘 출퇴근 › 지문·수기 차이','퇴근 시각 차이 종류','퇴근');
+  add('att.diff.kind_in_missing','🕘 출퇴근 › 지문·수기 차이','수기 출근만 있고 지문 출근이 없는 차이 종류','지문 출근 없음');
+  add('att.diff.kind_out_missing','🕘 출퇴근 › 지문·수기 차이','수기 퇴근만 있고 지문 퇴근이 없는 차이 종류','지문 퇴근 없음');
+  add('att.diff.kind_absent','🕘 출퇴근 › 지문·수기 차이','수기 날짜의 지문 자료가 없는 차이 종류','지문 없음');
+  add('att.diff.export.sheet_list','🕘 출퇴근 › 지문·수기 차이 엑셀','차이 엑셀 첫 시트 이름','차이 목록');
+  add('att.diff.export.sheet_guide','🕘 출퇴근 › 지문·수기 차이 엑셀','차이 엑셀 안내 시트 이름','안내');
+  add('att.diff.export.item','🕘 출퇴근 › 지문·수기 차이 엑셀','안내 시트 첫 열','항목');
+  add('att.diff.export.content','🕘 출퇴근 › 지문·수기 차이 엑셀','안내 시트 둘째 열','내용');
+  add('att.diff.export_gap','🕘 출퇴근 › 지문·수기 차이 엑셀','안내 시트 차이 기준 행','차이 기준');
+  add('att.diff.export_gap_value','🕘 출퇴근 › 지문·수기 차이 엑셀','안내 시트 차이 기준 값({n}은 분)','{n}분 이상',['n']);
+  add('att.diff.export_coverage','🕘 출퇴근 › 지문·수기 차이 엑셀','안내 시트 지문 자료 마지막 날 행','지문 자료 마지막 날');
+  add('att.diff.export_created','🕘 출퇴근 › 지문·수기 차이 엑셀','안내 시트 만든 시각 행','만든 시각');
+  add('att.diff.export_kinds','🕘 출퇴근 › 지문·수기 차이 엑셀','안내 시트 차이 종류 행','차이 종류');
+  add('att.diff.export_kind_help','🕘 출퇴근 › 지문·수기 차이 엑셀','안내 시트 차이 종류 설명','수기 시각과 지문 시각 차이 또는 지문 기록 없음');
+  add('att.diff.weekday_sun','🕘 출퇴근 › 지문·수기 차이 엑셀','요일 일요일','일');
+  add('att.diff.weekday_mon','🕘 출퇴근 › 지문·수기 차이 엑셀','요일 월요일','월');
+  add('att.diff.weekday_tue','🕘 출퇴근 › 지문·수기 차이 엑셀','요일 화요일','화');
+  add('att.diff.weekday_wed','🕘 출퇴근 › 지문·수기 차이 엑셀','요일 수요일','수');
+  add('att.diff.weekday_thu','🕘 출퇴근 › 지문·수기 차이 엑셀','요일 목요일','목');
+  add('att.diff.weekday_fri','🕘 출퇴근 › 지문·수기 차이 엑셀','요일 금요일','금');
+  add('att.diff.weekday_sat','🕘 출퇴근 › 지문·수기 차이 엑셀','요일 토요일','토');
+  add('att.diff.export.head_person','🕘 출퇴근 › 지문·수기 차이 엑셀','차이 표 직원 열','직원');
+  add('att.diff.export.head_date','🕘 출퇴근 › 지문·수기 차이 엑셀','차이 표 날짜 열','날짜');
+  add('att.diff.export.head_weekday','🕘 출퇴근 › 지문·수기 차이 엑셀','차이 표 요일 열','요일');
+  add('att.diff.export.head_kind','🕘 출퇴근 › 지문·수기 차이 엑셀','차이 표 차이 종류 열','차이 종류');
+  add('att.diff.export.head_manual_in','🕘 출퇴근 › 지문·수기 차이 엑셀','차이 표 수기 출근 열','수기 출근');
+  add('att.diff.export.head_manual_out','🕘 출퇴근 › 지문·수기 차이 엑셀','차이 표 수기 퇴근 열','수기 퇴근');
+  add('att.diff.export.head_fp_in','🕘 출퇴근 › 지문·수기 차이 엑셀','차이 표 지문 출근 열','지문 출근');
+  add('att.diff.export.head_fp_out','🕘 출퇴근 › 지문·수기 차이 엑셀','차이 표 지문 퇴근 열','지문 퇴근');
+  add('att.diff.export.head_diff_in','🕘 출퇴근 › 지문·수기 차이 엑셀','차이 표 출근 차이 열','출근 차이(분, 수기−지문)');
+  add('att.diff.export.head_diff_out','🕘 출퇴근 › 지문·수기 차이 엑셀','차이 표 퇴근 차이 열','퇴근 차이(분, 수기−지문)');
+  add('att.diff.export.head_manual_status','🕘 출퇴근 › 지문·수기 차이 엑셀','차이 표 수기 상태 열','수기 상태');
+  add('att.diff.export.head_manual_reason','🕘 출퇴근 › 지문·수기 차이 엑셀','차이 표 수기 사유 열','수기 사유');
+  add('att.diff.export.head_issue_status','🕘 출퇴근 › 지문·수기 차이 엑셀','차이 표 소명 상태 열','소명 상태');
+  add('att.diff.export.head_issue_reason','🕘 출퇴근 › 지문·수기 차이 엑셀','차이 표 소명 사유 열','소명 사유');
+  add('att.diff.export.head_staff_reply','🕘 출퇴근 › 지문·수기 차이 엑셀','차이 표 직원 확인 열','직원 확인');
+  add('att.diff.export.head_memo','🕘 출퇴근 › 지문·수기 차이 엑셀','차이 표 메모 열','메모');
   add('att.close.confirm','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 확정 누르면 뜨는 확인창({month}는 해당 달)','{month} 근태를 확정할까요? (이후 수정은 소명/정정으로)',['month']);
   add('att.absset.title','🕘 출퇴근 › 결근 후보·지문누락 소명','결근 후보 기준 카드 제목(원장만 보임)','⚙ 결근/미기록 후보 기준');
   add('att.absset.title_sub','🕘 출퇴근 › 결근 후보·지문누락 소명','결근 후보 기준 제목 옆 작은 글','원장');
@@ -422,12 +486,61 @@ function hubTextDefsChapter3(add){
   add('att.issue.th_reason','🕘 출퇴근 › 결근 후보·지문누락 소명','소명 표 머리 — 사유','사유');
   add('att.issue.empty','🕘 출퇴근 › 결근 후보·지문누락 소명','지문누락 소명 카드 — 소명이 하나도 없을 때','소명 없음');
   add('att.issue.m_act_fail','🕘 출퇴근 › 결근 후보·지문누락 소명','지문누락 소명 승인·반려 실패({msg}는 서버 오류)','소명 처리 실패: {msg}',['msg']);
-  add('att.issue.p_date','🕘 출퇴근 › 결근 후보·지문누락 소명','소명 올리기 — 근무일을 묻는 창','소명할 근무일 (YYYY-MM-DD):');
-  add('att.issue.p_type','🕘 출퇴근 › 결근 후보·지문누락 소명','소명 올리기 — 오류 유형을 묻는 창(고르는 값 3개는 서버 규칙이라 못 바꿈)','오류 유형을 입력하세요: 지문인식오류 / 입력오류 / 기타');
-  add('att.issue.m_type','🕘 출퇴근 › 결근 후보·지문누락 소명','소명 올리기 — 오류 유형을 잘못 적었을 때','오류 유형은 지문인식오류, 입력오류, 기타 중 하나여야 합니다.');
-  add('att.issue.p_reason','🕘 출퇴근 › 결근 후보·지문누락 소명','소명 올리기 — 사유를 묻는 창','사유 (예: 지문 찍었으나 인식 누락):');
-  add('att.issue.m_save_fail','🕘 출퇴근 › 결근 후보·지문누락 소명','소명 올리기 실패({msg}는 서버 오류)','소명 저장 실패: {msg}',['msg']);
-  add('att.issue.m_saved','🕘 출퇴근 › 결근 후보·지문누락 소명','소명을 올렸을 때 뜨는 글','소명을 올렸습니다. 실장 승인 후 반영됩니다.');
+  add('att.issue.p_date','🕘 출퇴근 › 결근 후보·지문누락 소명','소명 올리기 — 근무일을 묻는 창','소명할 근무일');
+  add('att.issueform.title','🕘 출퇴근 › 지문누락 소명 양식','소명 양식 창 제목','🙋 지문누락 소명');
+  add('att.issueform.date','🕘 출퇴근 › 지문누락 소명 양식','소명 양식 근무일 칸','근무일');
+  add('att.issueform.auto','🕘 출퇴근 › 지문누락 소명 양식','자동 감지 건에 표시하는 안내','{kind} 지문 없음(자동 감지)',['kind']);
+  add('att.issueform.kind','🕘 출퇴근 › 지문누락 소명 양식','사유 종류 고르는 칸','사유 종류');
+  add('att.issueform.reason','🕘 출퇴근 › 지문누락 소명 양식','자세한 사유 입력 칸','자세한 사유');
+  add('att.issueform.reason_hint','🕘 출퇴근 › 지문누락 소명 양식','자세한 사유 안내','언제·왜 지문이 빠졌는지, 실제 출근·퇴근 시각을 적어 주세요.');
+  add('att.issueform.evidence','🕘 출퇴근 › 지문누락 소명 양식','증거 파일 선택 칸','증거 파일');
+  add('att.issueform.evidence_hint','🕘 출퇴근 › 지문누락 소명 양식','증거 파일 안내','카톡 캡처·사진 등 사유를 보여 주는 자료를 올려 주세요. JPG·PNG·WEBP·PDF, 파일마다 10MB 이하.');
+  add('att.issueform.evidence_required','🕘 출퇴근 › 지문누락 소명 양식','필수 증거 표시','증거 파일을 꼭 내야 합니다.');
+  add('att.issueform.files','🕘 출퇴근 › 지문누락 소명 양식','이미 연결된 파일 제목','이미 낸 파일');
+  add('att.issueform.no_files','🕘 출퇴근 › 지문누락 소명 양식','이미 낸 파일이 없을 때','아직 낸 파일이 없습니다.');
+  add('att.issueform.btn_submit','🕘 출퇴근 › 지문누락 소명 양식','저장 단추','저장');
+  add('att.issueform.btn_cancel','🕘 출퇴근 › 지문누락 소명 양식','닫기 단추','닫기');
+  add('att.issueform.m_date','🕘 출퇴근 › 지문누락 소명 양식','근무일이 없거나 올바르지 않을 때','근무일을 확인해 주세요.');
+  add('att.issueform.m_kind','🕘 출퇴근 › 지문누락 소명 양식','사유 종류를 고르지 않았을 때','사유 종류를 골라 주세요.');
+  add('att.issueform.m_reason','🕘 출퇴근 › 지문누락 소명 양식','사유가 짧거나 긴 때','자세한 사유는 {min}자 이상 1000자 이하로 적어 주세요.',['min']);
+  add('att.issueform.m_evidence_required','🕘 출퇴근 › 지문누락 소명 양식','필수 증거가 없을 때','증거 파일을 하나 이상 올려 주세요.');
+  add('att.issueform.m_file_type','🕘 출퇴근 › 지문누락 소명 양식','허용되지 않는 파일 형식','JPG·PNG·WEBP·PDF 파일만 올릴 수 있습니다.');
+  add('att.issueform.m_file_size','🕘 출퇴근 › 지문누락 소명 양식','10MB를 넘는 파일','파일마다 10MB 이하만 올릴 수 있습니다.');
+  add('att.issueform.m_file_count','🕘 출퇴근 › 지문누락 소명 양식','파일 개수가 설정 한도를 넘을 때','파일은 한 건에 최대 {max}개까지 올릴 수 있습니다.',['max']);
+  add('att.issueform.m_saving','🕘 출퇴근 › 지문누락 소명 양식','저장 중','소명을 저장하는 중…');
+  add('att.issueform.m_fail','🕘 출퇴근 › 지문누락 소명 양식','소명 저장 실패({detail}은 서버 오류)','소명 저장 실패: {detail}',['detail']);
+  add('att.issueform.m_not_found','🕘 출퇴근 › 지문누락 소명 양식','직원 소명을 찾지 못했을 때({detail}은 서버 오류)','소명을 찾지 못했습니다: {detail}',['detail']);
+  add('att.issueform.m_not_editable','🕘 출퇴근 › 지문누락 소명 양식','대기 상태가 아닌 소명을 고치려 할 때','대기 중인 소명만 고칠 수 있습니다.');
+  add('att.issue.evidence_missing','🕘 출퇴근 › 소명 증거','증거 파일이 없을 때','파일 없음');
+  add('att.issueform.m_partial','🕘 출퇴근 › 지문누락 소명 양식','소명은 저장됐지만 파일이 일부 실패({n}은 연결되지 않은 파일 수)','소명은 저장됐고 파일 {n}개가 안 올라갔습니다. 「내 소명」의 고치기로 다시 올려 주세요.',['n']);
+  add('att.issueform.m_uncertain','🕘 출퇴근 › 지문누락 소명 양식','연결 응답이 끊겨 파일 처리 결과가 불명일 때({n}은 결과 불명 수)','소명은 저장됐지만 파일 {n}개의 처리 결과를 확인하지 못했습니다. 파일이 남아 있을 수 있어 삭제하지 않았습니다. 내 소명에서 상태를 확인해 주세요.',['n']);
+  add('att.issueform.m_refresh_fail','🕘 출퇴근 › 지문누락 소명 양식','저장 성공 뒤 화면 갱신 실패','소명은 저장됐지만 화면 갱신에 실패했습니다. 다시 열어 저장 상태를 확인해 주세요.');
+  add('att.issueform.m_saved','🕘 출퇴근 › 지문누락 소명 양식','저장 성공','소명을 저장했습니다.');
+  add('att.issueform.mode_new','🕘 출퇴근 › 지문누락 소명 양식','새 소명 설명','새 소명을 올립니다.');
+  add('att.issueform.mode_answer','🕘 출퇴근 › 지문누락 소명 양식','자동 감지 건 답변 설명','자동 감지된 소명에 사유를 적습니다.');
+  add('att.issueform.mode_edit','🕘 출퇴근 › 지문누락 소명 양식','내 소명 수정 설명','대기 중인 내 소명을 고칩니다.');
+  add('att.myissue.title','🕘 출퇴근 › 내 지문누락 소명','직원·매니저·실장 소명 카드 제목','🙋 내 지문누락 소명');
+  add('att.myissue.pending','🕘 출퇴근 › 내 지문누락 소명','직원 답이 필요한 소명 제목','답이 필요한 소명');
+  add('att.myissue.pending_empty','🕘 출퇴근 › 내 지문누락 소명','답이 필요한 소명이 없을 때','답이 필요한 소명이 없습니다.');
+  add('att.myissue.btn_answer','🕘 출퇴근 › 내 지문누락 소명','자동 감지 건 답변 단추','사유 쓰기');
+  add('att.myissue.list','🕘 출퇴근 › 내 지문누락 소명','내 소명 목록 제목','내 소명');
+  add('att.myissue.empty','🕘 출퇴근 › 내 지문누락 소명','내 소명이 없을 때','올린 소명이 없습니다.');
+  add('att.myissue.btn_new','🕘 출퇴근 › 내 지문누락 소명','새 소명 단추','소명 올리기');
+  add('att.myissue.btn_edit','🕘 출퇴근 › 내 지문누락 소명','내 대기 소명 수정 단추','고치기');
+  add('att.myissue.th_kind','🕘 출퇴근 › 내 지문누락 소명','내 소명 목록 종류 머리','종류');
+  add('att.myissue.th_reason','🕘 출퇴근 › 내 지문누락 소명','내 소명 목록 사유 머리','사유');
+  add('att.myissue.th_evidence','🕘 출퇴근 › 내 지문누락 소명','내 소명 목록 증거 머리','증거');
+  add('att.issue.admin_evidence','🕘 출퇴근 › 소명 검토 표','관리자 표 증거 머리','증거');
+  add('att.issue.evidence_load_fail','🕘 출퇴근 › 소명 증거','연결된 증거 파일 조회에 실패했을 때','증거 파일 조회 실패');
+  add('att.issue.awaiting_staff','🕘 출퇴근 › 소명 검토 표','직원 답 전 상태','직원 답 기다림');
+  add('att.issue.evidence_none','🕘 출퇴근 › 소명 검토 표','필수 증거가 빠진 소명 상태','증거 없음');
+  add('att.issue.evidence_count','🕘 출퇴근 › 소명 검토 표','증거 파일 개수 단추({n}은 개수)','📎 {n}',['n']);
+  add('att.issue.evidence_view','🕘 출퇴근 › 소명 증거 보기','증거 파일 목록 창 제목','소명 증거 파일');
+  add('att.issue.evidence_open_fail','🕘 출퇴근 › 소명 증거 보기','서명 주소를 만들지 못했을 때','파일 주소를 만들지 못했습니다. 파일이 삭제됐거나 접근할 수 없습니다.');
+  add('att.issue.evidence_open_blocked','🕘 출퇴근 › 소명 증거 보기','새 탭을 열지 못했을 때','새 탭이 막혔습니다. 팝업 허용 후 다시 눌러 주세요.');
+  add('att.issue.evidence_empty','🕘 출퇴근 › 소명 증거 보기','증거 파일이 없을 때','연결된 증거 파일이 없습니다.');
+  add('att.issue.auto_clock_in','🕘 출퇴근 › 소명 유형','출근 지문 누락 유형','출근 지문 없음(자동 감지)');
+  add('att.issue.auto_clock_out','🕘 출퇴근 › 소명 유형','퇴근 지문 누락 유형','퇴근 지문 없음(자동 감지)');
   add('att.absent.loading','🕘 출퇴근 › 결근 후보·지문누락 소명','결근 후보 확인 중 글','확인 중…');
   add('att.absent.err','🕘 출퇴근 › 결근 후보·지문누락 소명','결근 후보 확인 실패 앞 글(뒤에 오류 내용이 붙음)','후보 확인 실패:');
   add('att.absent.set_warn','🕘 출퇴근 › 결근 후보·지문누락 소명','결근 후보 — 설정을 못 불러왔을 때 경고','설정 불러오기 오류: 오늘 후보는 표시하지 않습니다.');
@@ -1663,7 +1776,13 @@ const HUB_SETTING_DEFS=[
   {key:'aiu.external_days',screen:'💰 AI비용 기준',label:'사용량 현황판 「외부 AI」 날짜별 표 일수',where:'AI비용 › 사용량 현황판 › 외부 AI — 날짜별 표에 최근 며칠치까지 보여 줄지(PC가 올린 날짜까지만 나와요 · 위쪽 작은 글의 일수도 같이 바뀌어요)',def:'14',kind:'int',min:3,max:60,unit:'일'},
   {key:'aiu.session_limit',screen:'💰 AI비용 기준',label:'사용량 현황판 「대화 효율 점검」에 보이는 대화 수',where:'AI비용 › 사용량 현황판 › 대화 효율 점검 — 돈이 새는 대화를 최대 몇 개까지 보여 줄지',def:'8',kind:'int',min:3,max:30,unit:'건'},
   {key:'leave.hidden_accounts',screen:'🌿 연차 기준',label:'연차 현황에서 접어 둘 계정 이름',where:'입사일 없는 계정은 항상 접음. 이름 목록은 JSON으로 적고 *는 어떤 글자든 뜻함. []면 이름으로 숨기지 않음',def:'["*_test","테스트","직원검토","abc","공용1","매니저"]',kind:'stringlist'},
-  {key:'marketing.manager_view_enabled',screen:'📣 마케팅비 기준',label:'마케팅비 매니저 보기',where:'켬이면 매니저가 마케팅 분류 내역만 읽을 수 있어요. 미분류·제외 내역과 수정은 원장만 가능해요.',def:'true',kind:'bool'}
+  {key:'marketing.manager_view_enabled',screen:'📣 마케팅비 기준',label:'마케팅비 매니저 보기',where:'켬이면 매니저가 마케팅 분류 내역만 읽을 수 있어요. 미분류·제외 내역과 수정은 원장만 가능해요.',def:'true',kind:'bool'},
+  {key:'att.diff.gap_min',screen:'🕘 근태 기준',label:'지문·수기 차이를 보여 줄 분',where:'출퇴근 차이 비교 — 수기와 지문 시각 차이가 이 분 이상이면 차이로 보여 줌',def:'1',kind:'int',min:1,max:120,unit:'분'},
+  {key:'att.diff.show_staff',screen:'🕘 근태 기준',label:'직원에게 지문·수기 차이 보이기',where:'출퇴근 — 1이면 직원에게 본인 차이를 보여 주고 0이면 숨김',def:'1',kind:'int',min:0,max:1,unit:'1=보임 · 0=숨김'},
+  {key:'att.issue.reason_min',screen:'🕘 근태 기준',label:'소명 사유 최소 글자 수',where:'지문누락 소명 — 직원이 직접 적어야 하는 사유의 최소 길이',def:'10',kind:'int',min:1,max:200,unit:'자'},
+  {key:'att.issue.evidence_required',screen:'🕘 근태 기준',label:'소명 증거 파일 제출',where:'지문누락 소명 — 1이면 파일을 꼭 내고 0이면 생략 가능',def:'1',kind:'int',min:0,max:1,unit:'1=꼭 냄 · 0=안 내도 됨'},
+  {key:'att.issue.evidence_max',screen:'🕘 근태 기준',label:'소명 한 건에 낼 수 있는 파일 수',where:'지문누락 소명 — 기존 파일과 새 파일을 합친 최대 개수',def:'5',kind:'int',min:1,max:10,unit:'개'},
+  {key:'att.myissue_list_limit',screen:'🕘 근태 기준',label:'내 소명 목록에 보이는 건수',where:'출퇴근 — 내 소명 목록에 최근 몇 건까지 보여 줄지',def:'20',kind:'int',min:5,max:100,unit:'건'},
 ];
 function hubSettingDefByKey(key){
   for(let i=0;i<HUB_SETTING_DEFS.length;i++)if(HUB_SETTING_DEFS[i].key===key)return HUB_SETTING_DEFS[i];
@@ -1738,7 +1857,11 @@ const HUB_LIST_DEFS=[
   {key:'list.work_depts',screen:'🗓 근무표',label:'근무부서 이름',addable:false,
    where:'근무표 › 근무명부 관리 표의 「근무부서」 고르는 칸 · 「비로그인 근무자 추가」 부서 고르는 칸',
    note:'근무부서는 서버에 저장 가능한 7가지로 정해져 있어요(Dr. 이름은 화면이 직접 알아보는 코드이기도 해요). 그래서 코드는 못 바꾸고 새 부서도 못 늘려요. 보이는 이름만 고칠 수 있어요.',
-   def:[{code:'Dr.',label:'Dr.'},{code:'진료실',label:'진료실'},{code:'데스크',label:'데스크'},{code:'기공실',label:'기공실'},{code:'미지정',label:'미지정'},{code:'상담',label:'상담'},{code:'행정',label:'행정'}]},
+    def:[{code:'Dr.',label:'Dr.'},{code:'진료실',label:'진료실'},{code:'데스크',label:'데스크'},{code:'기공실',label:'기공실'},{code:'미지정',label:'미지정'},{code:'상담',label:'상담'},{code:'행정',label:'행정'}]},
+  {key:'list.att_issue_kinds',screen:'🕘 출퇴근',label:'지문누락 소명 사유 종류 이름',addable:false,
+   where:'출퇴근 › 지문누락 소명 양식의 「사유 종류」 고르는 칸 · 소명 표의 유형',
+   note:'서버가 허용하는 세 종류라 왼쪽 코드는 바꿀 수 없고 이름만 고칠 수 있으며, 새 항목은 늘릴 수 없어요.',
+   def:[{code:'지문인식오류',label:'지문인식오류(찍었는데 인식 안 됨)'},{code:'입력오류',label:'입력오류(안 찍었거나 잘못 찍음)'},{code:'기타',label:'기타(외근·기기 고장 등)'}]},
   {key:'list.approval_kinds',screen:'🖊 결재함',label:'결재 종류 이름',addable:false,
    where:'결재함 › 「결재 올리기」 창의 「종류」 고르는 칸 · 이름을 고친 종류는 결재 문서 카드의 [종류] 표시에도 바뀌어 보여요',
    note:'결재 종류는 서버에 저장되는 값(연차·사직서·보고·소명·기타)과 재직증명서 발급 흐름이 이 코드로 움직여서 코드는 못 바꾸고 새 종류도 못 늘려요. 보이는 이름만 고칠 수 있어요. 이미 올라간 문서의 제목·내용은 안 바뀌어요.',
