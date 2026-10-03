@@ -410,7 +410,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 <footer>© 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지</footer>
 
 <script src="hub-intro.js?v=2026100301"></script>
-<script src="hub-texts.js?v=2026100309"></script>
+<script src="hub-texts.js?v=2026100310"></script>
 <script>
 /* ═══════ 설정 ═══════
    실제 값은 DB의 app_settings 표에서 읽어옵니다.
@@ -2785,7 +2785,7 @@ async function submitOnbo(itemId){
   if(error){alert(hubT('onbo.check.m_save_fail','체크리스트 저장 실패: {detail}',{detail:error.message}));return;}
   setStatus('saved');render();refreshBadges();
 }
-async function confirmOnbo(itemId){const {error}=await sb.from('onboarding_checks').update({status:'확인',checked_by:ME.name,checked_at:new Date().toISOString()}).eq('item_id',itemId).eq('user_id',ME.id);if(error){alert(hubT('onbo.check.m_save_fail','체크리스트 저장 실패: {detail}',{detail:error.message}));setStatus('error');return;}setStatus('saved');render();}
+async function confirmOnbo(itemId){const {data,error}=await sb.from('onboarding_checks').update({status:'확인',checked_by:ME.name,checked_at:new Date().toISOString()}).eq('item_id',itemId).eq('user_id',ME.id).select('user_id,item_id');if(error){alert(hubT('onbo.check.m_save_fail','체크리스트 저장 실패: {detail}',{detail:error.message}));setStatus('error');return;}if(!data?.length){alert(hubT('onbo.check.m_not_confirmed','확인되지 않았음. 권한과 대상 항목을 확인한 뒤 다시 시도해 주세요.'));setStatus('error');return;}setStatus('saved');render();}
 async function addOnboItem(){const l=$('#oiNew').value.trim();if(!l)return;await sb.from('onboarding_items').insert({label:l});setStatus('saved');render();}
 
 /* ── 진료기록(구 케이스노트) ── */

@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS public.p7_job_group_backup_20261003 (
 ALTER TABLE public.p7_job_group_backup_20261003 ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.p7_job_group_backup_20261003 FROM public,anon,authenticated;
 DO $$
-DECLARE v_name text; v_group text; v_count integer; v_id uuid; v_old text; v_profile_id uuid; v_link_count integer;
+DECLARE v_name text; v_group text; v_count integer; v_id uuid; v_old text; v_profile_id uuid; v_link_count integer; v_mismatch record;
 BEGIN
   FOR v_name,v_group IN SELECT * FROM (VALUES
     ('권은영','clinical_consult'),('김수란','clinical_consult'),('김수연','clinical_consult'),
@@ -34,21 +34,24 @@ BEGIN
     ELSE
       RAISE NOTICE 'profiles 미일치/중복: % (%행)',v_name,v_count;
     END IF;
+    FOR v_mismatch IN SELECT id,profile_user_id FROM public.schedule_people
+      WHERE active=true AND name=v_name AND profile_user_id IS NOT NULL
+        AND profile_user_id IS DISTINCT FROM v_profile_id LOOP
+      RAISE NOTICE 'schedule_people 연결 불일치(보존): % (명부 %, 연결 직원 %)',v_name,v_mismatch.id,v_mismatch.profile_user_id;
+    END LOOP;
     SELECT count(*) INTO v_link_count FROM public.schedule_people WHERE profile_user_id=v_profile_id AND active=true;
     IF v_link_count>0 THEN
       v_count:=v_link_count;
     ELSE
       SELECT count(*) INTO v_count FROM public.schedule_people s
-        WHERE s.active=true AND s.name=v_name AND coalesce(s.department,'미지정') NOT IN ('','미지정')
-          AND NOT EXISTS(SELECT 1 FROM public.profiles p WHERE p.user_id=s.profile_user_id
-            AND (p.active IS NOT TRUE OR coalesce(p.employment_status,'재직')<>'재직'));
+        WHERE s.active=true AND s.profile_user_id IS NULL AND s.name=v_name
+          AND coalesce(s.department,'미지정') NOT IN ('','미지정');
     END IF;
     IF v_count=1 THEN
       SELECT s.id,s.job_group INTO v_id,v_old FROM public.schedule_people s
       WHERE ((v_link_count=1 AND s.profile_user_id=v_profile_id)
-        OR (v_link_count=0 AND s.name=v_name AND coalesce(s.department,'미지정') NOT IN ('','미지정')
-          AND NOT EXISTS(SELECT 1 FROM public.profiles p WHERE p.user_id=s.profile_user_id
-            AND (p.active IS NOT TRUE OR coalesce(p.employment_status,'재직')<>'재직'))))
+        OR (v_link_count=0 AND s.profile_user_id IS NULL AND s.name=v_name
+          AND coalesce(s.department,'미지정') NOT IN ('','미지정')))
         AND s.active=true AND coalesce(s.department,'')<>'Dr.'
         AND NOT EXISTS(SELECT 1 FROM public.profiles p WHERE p.user_id=s.profile_user_id AND p.dept='Dr.')
       FOR UPDATE;
@@ -72,19 +75,19 @@ WITH confirmed(name,job_group) AS (VALUES
 ), unique_profiles AS (
   SELECT name,(array_agg(user_id))[1] user_id FROM active_profiles GROUP BY name HAVING count(*)=1
 ), roster_choices AS (
-  SELECT s.* FROM public.schedule_people s LEFT JOIN unique_profiles p ON p.name=s.name
-  WHERE s.active=true AND ((s.profile_user_id=p.user_id)
+  SELECT c.name AS confirmed_name,s.* FROM confirmed c
+  LEFT JOIN unique_profiles p ON p.name=c.name
+  JOIN public.schedule_people s ON s.active=true AND ((s.profile_user_id=p.user_id)
     OR (NOT EXISTS(SELECT 1 FROM public.schedule_people linked WHERE linked.profile_user_id=p.user_id AND linked.active=true)
-      AND coalesce(s.department,'미지정') NOT IN ('','미지정')
-      AND NOT EXISTS(SELECT 1 FROM public.profiles retired WHERE retired.user_id=s.profile_user_id
-        AND (retired.active IS NOT TRUE OR coalesce(retired.employment_status,'재직')<>'재직'))))
+      AND s.profile_user_id IS NULL AND s.name=c.name
+      AND coalesce(s.department,'미지정') NOT IN ('','미지정')))
 ), reports AS (
   SELECT 'profiles' AS source_table,c.name,c.job_group AS expected_group,
     count(p.user_id)::int AS exact_matches, max(p.job_group) AS actual_group
   FROM confirmed c LEFT JOIN active_profiles p ON p.name=c.name GROUP BY c.name,c.job_group
   UNION ALL
   SELECT 'schedule_people',c.name,c.job_group,count(s.id)::int,max(s.job_group)
-  FROM confirmed c LEFT JOIN roster_choices s ON s.name=c.name GROUP BY c.name,c.job_group
+  FROM confirmed c LEFT JOIN roster_choices s ON s.confirmed_name=c.name GROUP BY c.name,c.job_group
 )
 SELECT * FROM reports WHERE exact_matches<>1 OR actual_group IS DISTINCT FROM expected_group ORDER BY source_table,name;
 SELECT id,name,department,profile_user_id FROM public.schedule_people

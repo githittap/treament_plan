@@ -224,6 +224,7 @@ function hubTextDefsChapter2(add){
   add('onbo.check.f_workspace',S6,'체크칸 이름 — 워크스페이스 로그인','워크스페이스 로그인 확인');
   add('onbo.check.btn_save',S6,'저장 단추 글','체크리스트 정보 저장');
   add('onbo.check.m_save_fail',S6,'저장에 실패했을 때 — {detail}은 이유','체크리스트 저장 실패: {detail}',['detail']);
+  add('onbo.check.m_not_confirmed',S6,'확인 저장에서 바뀐 행이 없을 때','확인되지 않았음. 권한과 대상 항목을 확인한 뒤 다시 시도해 주세요.');
   add('onbo.docs.title',S7,'카드 제목','📎 서류함');
   add('onbo.docs.hint',S7,'제목 아래 설명','어떤 서류든 여기로 올리시면 됩니다. 직원서류와 연차증빙, 결재 요청을 종류별로 한 화면에서 확인합니다.');
   add('onbo.docs.filter_label',S7,'필터 단추 줄의 화면 읽기용 이름(눈에는 안 보임)','서류함 필터');

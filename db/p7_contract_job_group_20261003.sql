@@ -3,11 +3,9 @@
 -- 별칭은 hub_ui_texts의 contract_job.alias_* 글로 원장이 고칠 수 있음(쉼표로 구분).
 BEGIN;
 ALTER TABLE public.contracts ADD COLUMN IF NOT EXISTS sent_job_group text;
-CREATE OR REPLACE FUNCTION public.p7_contract_job_group_sync()
+-- 발송 기록 보호는 자동 전파를 되돌려도 남음. guard가 sync보다 먼저 실행됨.
+CREATE OR REPLACE FUNCTION public.p7_contract_sent_job_group_guard()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
-DECLARE v_title text; v_code text; v_matches text[]:=ARRAY[]::text[]; v_aliases text; v_key text; v_default text;
-  v_lead boolean:=coalesce(public.my_role() IN ('owner','chief'),false)
-    OR (auth.uid() IS NULL AND session_user='postgres');
 BEGIN
   IF tg_op='INSERT' THEN
     IF new.sent_job_group IS NOT NULL THEN RAISE EXCEPTION 'frozen contract job group cannot be supplied'; END IF;
@@ -17,6 +15,18 @@ BEGIN
       RAISE EXCEPTION 'frozen contract job group cannot be changed';
     END IF;
   END IF;
+  RETURN new;
+END $$;
+DROP TRIGGER IF EXISTS p7_contract_job_group_guard ON public.contracts;
+CREATE TRIGGER p7_contract_job_group_guard BEFORE INSERT OR UPDATE ON public.contracts
+FOR EACH ROW EXECUTE FUNCTION public.p7_contract_sent_job_group_guard();
+REVOKE ALL ON FUNCTION public.p7_contract_sent_job_group_guard() FROM public,anon,authenticated;
+CREATE OR REPLACE FUNCTION public.p7_contract_job_group_sync()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+DECLARE v_title text; v_code text; v_matches text[]:=ARRAY[]::text[]; v_aliases text; v_key text; v_default text;
+  v_lead boolean:=coalesce(public.my_role() IN ('owner','chief'),false)
+    OR (auth.uid() IS NULL AND session_user='postgres');
+BEGIN
   -- 일반 fields 수정이나 직원의 상태 조작으로 발송 원본을 만들지 않음.
   IF new.status='대기' AND (tg_op='INSERT' OR old.status IS DISTINCT FROM '대기') THEN
     IF NOT v_lead THEN RAISE EXCEPTION 'contract final send requires owner or chief'; END IF;
