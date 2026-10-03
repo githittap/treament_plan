@@ -410,8 +410,9 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 <footer>© 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지</footer>
 
 <script src="hub-intro.js?v=2026100302"></script>
-<script src="hub-texts.js?v=2026100312"></script>
+<script src="hub-texts.js?v=2026100401"></script>
 <script src="security-pledge.js?v=20261003p9d"></script>
+<script src="wage-hourly.js?v=2026100401"></script>
 <script>
 /* ═══════ 설정 ═══════
    실제 값은 DB의 app_settings 표에서 읽어옵니다.
@@ -1070,7 +1071,7 @@ async function renderHome(m){
   </div>
   ${undone.length&&onboardingGuideVisibleForRole(ME.role)?onboardingGuideCard({collapsed:true}):''}
   ${MY_PAYSLIPS.length?`<div class="card"><h2>${esc(hubT('home.slip_title','💰 내 명세서'))}</h2>${MY_PAYSLIPS.map(s=>`<div class="rowflex" style="justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line)"><span>${esc(s.month)}</span><button class="mini" onclick="openMyPayslip(${s.id})">${esc(hubT('home.slip_btn','보기'))}</button></div>`).join('')}</div>`:''}
-  ${homeInboxCard}
+  ${typeof wageHourlyHome==='function'?await wageHourlyHome():''}${homeInboxCard}
   ${canManageConsultation()?'<div class="card" style="padding:12px 14px"><div class="rowflex" style="justify-content:space-between;align-items:center;gap:10px"><div><h2 style="margin-bottom:3px">'+esc(hubT('home.consult_title','🗂 상담일지'))+'</h2><div class="hint">매니저·실장·원장만 상담 기록을 입력·조회·수정합니다.</div></div><button class="mini" onclick="go(\'consult\')">상담일지 열기</button></div></div>':''}`);
   refreshBadges();
 }
@@ -1344,6 +1345,7 @@ async function renderAtt(m){
         <button class="mini" onclick="openIssue()">${esc(hubT('att.my.fix_btn','소명 올리기'))}</button></div>
     </div>${attendanceIssueMyCardHtml(myIssueRows||[],await fetchStaffAttDiff())}`;
   }
+  if(typeof wageHourlyCorrectionPanel==='function'&&['owner','chief'].includes(ME.role)){const hourlyCorrection=await wageHourlyCorrectionPanel();if(hourlyCorrection)m.insertAdjacentHTML('beforeend',hourlyCorrection);}
   renderManualAttendanceCalendar();
   await loadManualAttendanceDate($('#manualWorkDate')?.value||today());
 }
@@ -4045,10 +4047,11 @@ function payWageTypeLabel(c){const def=[{code:'monthly',label:'월급'},{code:'h
 function payTop(){return `<div class="card"><h2>${esc(hubT('pay.title','💰 급여'))} <span class="sub">${esc(hubT('pay.sub','(원장 전용)'))}</span></h2>
   <button class="mini ${PAY_VIEW==='ledger'?'stamp':''}" onclick="setPayView('ledger')">${esc(hubT('pay.tab_ledger','급여대장'))}</button>
   <button class="mini ${PAY_VIEW==='wage'?'stamp':''}" onclick="setPayView('wage')">${esc(hubT('pay.tab_wage','시급설정'))}</button>
-  <button class="mini ${PAY_VIEW==='payslip'?'stamp':''}" onclick="setPayView('payslip')">${esc(hubT('pay.tab_slip','명세서'))}</button></div>`;}
+  <button class="mini ${PAY_VIEW==='payslip'?'stamp':''}" onclick="setPayView('payslip')">${esc(hubT('pay.tab_slip','명세서'))}</button>${typeof wageHourlyNav==='function'?wageHourlyNav():''}</div>`;}
 function setPayView(v){PAY_VIEW=v;PAY_MESSAGE='';render();}
 async function renderPay(m){
   if(ME.role!=='owner'){m.innerHTML='<div class="card"><div class="empty">'+esc(hubT('pay.owner_only','원장만 사용할 수 있습니다.'))+'</div></div>';return;}
+  if(PAY_VIEW==='hourly'&&typeof renderWageHourly==='function'){await renderWageHourly(m);return;}
   if(PAY_VIEW==='wage')await renderPayWages(m);else if(PAY_VIEW==='payslip')await renderPaySlip(m);else await renderPayLedger(m);
 }
 async function renderPayWages(m){
