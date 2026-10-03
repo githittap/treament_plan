@@ -27,6 +27,7 @@ function dataUrlBytes(value: string) {
 }
 
 async function appendSecurityPledge(pdf: any, pledge: any, kit: any, fontData: string) {
+  const contractPages = pdf.getPages().slice();
   pdf.registerFontkit(kit);
   const font = await pdf.embedFont(Uint8Array.from(atob(fontData), c => c.charCodeAt(0)), { subset: true });
   const size = 10, lineHeight = 16, margin = 42, maxWidth = 511;
@@ -54,6 +55,9 @@ async function appendSecurityPledge(pdf: any, pledge: any, kit: any, fontData: s
   if (y < 130) { page = newPage(); y = 800; }
   const image = await pdf.embedPng(dataUrlBytes(pledge.signature_png));
   page.drawImage(image, { x: margin, y: y - 60, width: 240, height: 60 });
+  const pledgePages = pdf.getPages().slice(contractPages.length);
+  for (let i = pdf.getPageCount() - 1; i >= 0; i--) pdf.removePage(i);
+  for (const item of [...pledgePages, ...contractPages]) pdf.addPage(item);
 }
 
 export function createContractPdfSignHandler(deps: { createClient?: any; PDFDocument?: any; fontkit?: any; pledgeFont?: string; env?: (name: string) => string | undefined } = {}) {
@@ -90,7 +94,7 @@ export function createContractPdfSignHandler(deps: { createClient?: any; PDFDocu
     let securityPledge: any = null;
     if (preflight.pledge_required === true) {
       const { data: pledge, error: pledgeError } = await admin.from("contract_security_pledges").select("*").eq("contract_id", contractId).maybeSingle();
-      if (pledgeError || !pledge || pledge.user_id !== user.id || !pledge.staged_at || (!validatePledge && (!pledge.signed_at || pledge.read_confirmed !== true || pledge.rules_confirmed !== true))) throw new Error("signed security pledge and confirmations required");
+      if (pledgeError || !pledge || pledge.user_id !== user.id || !pledge.staged_at || !pledge.signed_at || pledge.read_confirmed !== true || pledge.rules_confirmed !== true) throw new Error("signed security pledge and confirmations required");
       if (!Array.isArray(pledge.contract_signatures) || pledge.contract_signatures.length !== parts.length) throw new Error('staged contract signatures differ');
       for (const part of parts) {
         const stored = pledge.contract_signatures?.find((s: any) => s.part === part), supplied = body.signatures?.find((s: any) => s.part === part);
@@ -98,7 +102,7 @@ export function createContractPdfSignHandler(deps: { createClient?: any; PDFDocu
         if (!stored || !supplied || stored.signature_png !== supplied.signature_png || (stored.signature_id ?? null) !== (supplied.signature_id ?? null) || stored.confirmed !== supplied.confirmed || !suppliedCoord || (!validatePledge && (!coord || ["page_no", "x", "y", "width", "height"].some(k => coord[k] !== suppliedCoord[k])))) throw new Error("staged contract signatures differ");
       }
       if (validatePledge && pledge.signed_at && body.pledge_signature_png !== pledge.signature_png) throw new Error('signed pledge evidence is immutable');
-      securityPledge = validatePledge ? {...pledge,signature_png:body.pledge_signature_png} : pledge;
+      securityPledge = pledge;
     }
     if (structured && (!Array.isArray(body.signatures) || body.signatures.length !== parts.length || !Array.isArray(body.coordinates) || body.coordinates.length !== parts.length)) throw new Error("one or three independent signatures and coordinates required");
     const entries = structured ? parts.map((part) => {

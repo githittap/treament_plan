@@ -58,10 +58,11 @@ async function edgeSigningAttempt(confirmed = [true, true, true], integrated = t
   };
   let appendedPages=0;
   const page = { getRotation: () => ({ angle: 0 }), getWidth: () => 600, getHeight: () => 800, drawImage: () => {},setSize:()=>{},drawText:()=>{} };
-  const pdf = { getPageCount: () => 1, getPage: () => page, embedPng: async () => {if(options.invalidImage)throw Error('PNG cannot be decoded');return {};},save: async () => sourceBytes,registerFontkit:()=>{},embedFont:async()=>({widthOfTextAtSize:s=>String(s).length*5}),addPage:()=>{appendedPages++;return page;} };
+  const pages=[{...page,kind:'contract'}];
+  const pdf = { getPages:()=>pages,getPageCount: () => pages.length, getPage: () => page, embedPng: async () => {if(options.invalidImage)throw Error('PNG cannot be decoded');return {};},save: async () => sourceBytes,registerFontkit:()=>{},embedFont:async()=>({widthOfTextAtSize:s=>String(s).length*5}),removePage:i=>pages.splice(i,1),addPage:item=>{if(item){pages.push(item);return item;}appendedPages++;const p={...page,kind:'pledge'};pages.push(p);return p;} };
   const handler = context.createHandler({ createClient: (_url, key) => key === 'service' ? admin : userClient, PDFDocument: options.PDFDocument||{ load: async () => pdf }, fontkit:options.fontkit||{},pledgeFont:options.pledgeFont||'AA==',env: name => ({ SUPABASE_URL: 'https://example.invalid', SUPABASE_SERVICE_ROLE_KEY: 'service', SUPABASE_ANON_KEY: 'anon' })[name] });
   const response = await handler(new Request('https://example.invalid/sign', { method: 'POST', headers: { Authorization: 'Bearer test' }, body: JSON.stringify(body) }));
-  return { response: await response.json(), status: response.status, rpcCalls: JSON.parse(JSON.stringify(rpcCalls)), body,uploadedBytes,appendedPages };
+  return { response: await response.json(), status: response.status, rpcCalls: JSON.parse(JSON.stringify(rpcCalls)), body,uploadedBytes,appendedPages,pageOrder:pages.map(p=>p.kind) };
 }
 
 module.exports = { edgeSigningAttempt };

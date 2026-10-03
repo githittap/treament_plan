@@ -287,7 +287,7 @@ test('⚙️ 허브 설정 탭: 원장 전용 묶음에 계정·권한 다음으
   const st=menuHarness({role:'staff'});
   assert.equal(st.ctx.visibleTabKeys().has('owner'),false);
   assert.match(hr,/else if\(TAB==='hubset'\)\{if\(window\.HubUi\)await window\.HubUi\.renderSettings\(m,\{sb,me:ME\}\)/);
-  assert.match(hr,/<script src="hub-texts\.js\?v=\d+"><\/script>\s*<script src="security-pledge\.js\?v=20261003p9"><\/script>\s*<script>\s*\/\* ═+ 설정 ═+/,'hub-texts.js는 main 스크립트보다 먼저 불러옴');
+  assert.match(hr,/<script src="hub-texts\.js\?v=\d+"><\/script>\s*<script src="security-pledge\.js\?v=20261003p9c"><\/script>\s*<script>\s*\/\* ═+ 설정 ═+/,'hub-texts.js는 main 스크립트보다 먼저 불러옴');
   assert.match(hr,/<script src="ai-assistants\.js\?v=2026100309"><\/script>/,'AI 도우미 스크립트 번호(10-02 원장요청 5건에서 2026100106 → 2026100221)');
 });
 
@@ -397,7 +397,7 @@ test('화면: 원장에게는 「📝 글 고치기 · 🔢 숫자·기준 · �
   assert.match(sec,/<input id="hubTxtSearch"/);
   assert.equal((sec.match(/<details class="hub-grp" data-hub-group="/g)||[]).length,3+11+17+12+9+5+14+1+3+1+1,'화면별 접기: 탭 이름·메뉴 묶음 이름·계정·권한 + 차례 2(내 서류함 8 · 업무자료 3) + 차례 3(출퇴근 5 · 근무표 2 · 연차 4) + 차례 4(결재함 4 · 공지 3 · 캘린더 3 · 건의함 2) + 차례 5(문의함 6 · 상담일지 3) + 시간 표시 1(⏰ 시간 표시 · 2026-10-02)');
   const n=(sec.match(/data-hub-text-save="\d+"/g)||[]).length;
-  assert.equal(n,21+4+19+193+439+147+168+188+329+8+2+5+35+27+12+38,'키마다 저장 단추(P7 이름 보기·계약 직무 별칭·충돌 안내·보안서약 키를 포함함)');
+  assert.equal(n,21+4+19+193+439+147+168+188+329+8+2+5+35+27+12+41,'키마다 저장 단추(P7 이름 보기·계약 직무 별칭·충돌 안내·보안서약 키를 포함함)');
   assert.equal((sec.match(/data-hub-text-reset="\d+"/g)||[]).length,n);
   assert.match(sec,/고친 것 1개/);assert.match(sec,/<span class="b ok">고침<\/span>/);
   assert.match(sec,/이름표: tab\.home/);

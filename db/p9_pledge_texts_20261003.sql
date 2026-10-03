@@ -3,21 +3,24 @@ begin;
 insert into public.hub_ui_texts(key,value) values
 ('pledge.body.title','비밀유지·의료정보 보안·개인정보 취급자 서약서'),
 ('pledge.body.rules','본인은 취업규칙 등 원내 규정이 근로기준법 제14조에 따라 원내에 게시되어 언제든지 자유롭게 열람할 수 있음을 안내받았으며, 이를 열람하지 않아 생기는 불이익은 본인이 감수함을 확인합니다.'),
+('pledge.first','먼저 보안서약을 완료해 주세요'),
+('pledge.contract_waiting','근로계약 서명 대기'),
+('pledge.retry_pdf','서명 위치 확인 후 근로계약 완료'),
 ('pledge.pending','대기'),
 ('pledge.waiting','서약 서명 대기'),
-('pledge.progress','계약 {n}곳 {contract} · 서약 {pledge}'),
+('pledge.progress','서약 {pledge} · 계약 {n}곳 {contract}'),
 ('pledge.signature','보안서약 별도 서명'),
 ('pledge.signed_meta','서명 일시 {date} · 버전 {version}'),
 ('pledge.read','조항을 모두 읽었음'),
-('pledge.submit','서약 서명·확인 후 완료'),
+('pledge.submit','보안서약 서명 저장'),
 ('pledge.clear','서약 서명 지우기'),
 ('pledge.print','서약본 인쇄·PDF 저장'),
 ('pledge.open','보안서약 서명'),
 ('pledge.card_title','보안서약 서명'),
 ('pledge.overview','직원별 보안서약 서명 현황'),
-('pledge.finish_pdf','계약·서약 묶음 완료 PDF 만들기'),
-('pledge.stage','계약 {n}서명 저장 후 보안서약으로'),
-('pledge.stage_confirm','계약 {n}곳의 서명을 저장하고 별도 보안서약 서명으로 이어갑니다.'),
+('pledge.finish_pdf','완료본 인쇄·PDF 저장'),
+('pledge.stage','근로계약 {n}곳 서명 후 완료'),
+('pledge.stage_confirm','보안서약을 완료했습니다. 계약 {n}곳의 서명을 저장하고 근로계약을 완료합니다.'),
 ('pledge.failed','서약 처리 실패: {msg}'),
 ('pledge.coordinates','PDF 서명 위치를 확인하세요.'),
 ('phone.title','폰 알림'),
@@ -40,4 +43,9 @@ insert into public.hub_ui_texts(key,value) values
 ('pledge.body.clause.13','계정·출입증 공동사용 금지 — 업무에 할당된 사용자 ID·패스워드·출입증·개인정보 처리시스템을 타인과 공동사용하거나 관련 정보를 누설하지 않음.'),
 ('pledge.body.clause.14','위반 때 책임·변상·복구 — DOCX의 「부정경쟁방지 및 영업비밀보호에 관한 법률」·「정보통신망이용촉진 및 정보보호등에 관한 법률」 등에 규정된 민형사상 책임, 회사 징계조치 및 손해의 지체 없는 변상·복구 서약을 유지함. PDF 머리말의 관련 법령에 따른 민·형사상·행정상 책임, 의원 내규·관련 규정의 징계조치 등 불이익 감수와 손해 변상·복구 문구도 유지함.')
 on conflict(key) do nothing;
+update public.hub_ui_texts set value='서약 {pledge} · 계약 {n}곳 {contract}' where key='pledge.progress' and value='계약 {n}곳 {contract} · 서약 {pledge}';
+update public.hub_ui_texts set value='보안서약 서명 저장' where key='pledge.submit' and value='서약 서명·확인 후 완료';
+update public.hub_ui_texts set value='근로계약 {n}곳 서명 후 완료' where key='pledge.stage' and value='계약 {n}서명 저장 후 보안서약으로';
+update public.hub_ui_texts set value='보안서약을 완료했습니다. 계약 {n}곳의 서명을 저장하고 근로계약을 완료합니다.' where key='pledge.stage_confirm' and value='계약 {n}곳의 서명을 저장하고 별도 보안서약 서명으로 이어갑니다.';
+update public.hub_ui_texts set value='완료본 인쇄·PDF 저장' where key='pledge.finish_pdf' and value='계약·서약 묶음 완료 PDF 만들기';
 commit;

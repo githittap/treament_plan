@@ -76,77 +76,96 @@ const single=[sign('employment')];
 async function stage(id,coordinates=null){await query(`select stage_contract_pledge_signatures(${id},${qjson(single)},${coordinates?qjson(coordinates):'null'})`);return (await query(`select * from contract_security_pledges where contract_id=${id}`))[0];}
 const submit=(id,p)=>`select submit_contract_security_pledge(${id},'data:image/png;base64,${png}',true,true,'${p.version}')`;
 async function validate(id,coordinates=coords){await db.exec('reset role;set role service_role');await query(`select validate_contract_pledge_pdf(${id},'${uid}',${qjson(single)},${qjson(coordinates)},repeat('a',64),'data:image/png;base64,${png}')`);await employee();}
-add('pending-migration-with-deferred-events',async()=>{
-  await setup(true);
-  assert.deepEqual((await query('select pledge_required from contracts where id in (20,21,22) order by id')).map(r=>r.pledge_required),[true,true,true]);
-  assert.equal((await query('select pledge_required from contracts where id=9'))[0].pledge_required,false);
-});
-add('single-html-contract-and-pledge-complete-together',async()=>{
+async function prepare(id){await query(`select prepare_contract_security_pledge(${id})`);return (await query(`select * from contract_security_pledges where contract_id=${id}`))[0];}
+async function pledgeFirst(id){const p=await prepare(id);await query(submit(id,p));return (await query(`select * from contract_security_pledges where contract_id=${id}`))[0];}
+add('01-no-pledge-contract-rpc-and-legacy-rpc-denied',async()=>{
   await setup();await pending(30);await employee();
-  const p=await stage(30);assert.equal((await query('select status from contracts where id=30'))[0].status,'대기');
+  await assert.rejects(()=>stage(30),/signed security pledge/);
   await assert.rejects(()=>query(`select apply_employee_contract_signature(30,'bypass','[]',now(),null)`),/security pledge/);
-  await query(submit(30,p));
-  const c=(await query('select * from contracts where id=30'))[0];assert.equal(c.status,'서명완료');assert.match(c.merged_html,/data-contract-part="security-pledge"/);assert.ok(!c.merged_html.includes('data-sign-slot="employee"'));
+  await db.exec('reset role');await pending(33,false,true);await employee();
+  await assert.rejects(()=>query(`select apply_integrated_contract_signatures(33,'${all}'::jsonb)`),/security pledge/);
 });
-add('legacy-pending-and-final-send-single-contracts',async()=>{
-  await setup(true);
-  await query("update contracts set status='대기' where id=22");await employee();
-  for(const id of [21,22]){const p=await stage(id);await query(submit(id,p));assert.equal((await query(`select status from contracts where id=${id}`))[0].status,'서명완료');}
+add('02-both-confirmations-required',async()=>{
+  await setup();await pending(30);await employee();const p=await prepare(30);
+  for(const [read,rules] of [[true,false],[false,true]])await assert.rejects(()=>query(`select submit_contract_security_pledge(30,'data:image/png;base64,${png}',${read},${rules},'${p.version}')`),/both pledge confirmations/);
+  await db.exec('reset role');await query(`update contract_security_pledges set signed_at=now(),read_confirmed=true,rules_confirmed=false where contract_id=30`);await employee();
+  await assert.rejects(()=>stage(30),/signed security pledge/);
 });
-add('old-completed-contract-card-without-body-access',async()=>{
-  await setup();await db.exec(fs.readFileSync('db/contract_final_send.sql','utf8'));
-  await query("update contracts set signed_at=now()-interval '30 days' where id=9");await employee();
-  assert.equal((await query('select * from contracts where id=9')).length,0);
-  const cards=await query('select * from get_my_contract_security_pledges()');assert.equal(cards.length,1);assert.equal(Number(cards[0].contract_id),9);assert.ok(!Object.keys(cards[0]).includes('merged_html'));
-  const p=(await query('select prepare_contract_security_pledge(9)')).length;assert.equal(p,1);
-  await query("select set_config('app.test_uid','33333333-3333-3333-3333-333333333333',false)");assert.equal((await query('select * from get_my_contract_security_pledges()')).length,0);
+add('03-pledge-only-does-not-complete-four-contract-kinds',async()=>{
+  await setup();
+  for(const [id,pdf,integrated] of [[30,false,false],[31,false,true],[32,true,false],[33,true,true]]){
+    await db.exec('reset role');await pending(id,pdf,integrated);await employee();
+    const p=await pledgeFirst(id),c=(await query(`select * from contracts where id=${id}`))[0];
+    assert.ok(p.signed_at);assert.equal(p.staged_at,null);assert.equal(c.status,'대기');assert.equal(c.signed_pdf_path,null);
+    if(pdf)await query(`select stage_contract_pledge_signatures(${id},${integrated?"'"+all+"'::jsonb":qjson(single)},${qjson(integrated?['employment','medical','privacy'].map(part=>({...coords[0],part})):coords)})`);
+    else{
+      await query(`select stage_contract_pledge_signatures(${id},${integrated?"'"+all+"'::jsonb":qjson(single)},null)`);
+      const done=(await query(`select * from contracts where id=${id}`))[0];assert.equal(done.status,'서명완료');
+      assert.ok(done.merged_html.indexOf('data-contract-part="security-pledge"')<done.merged_html.indexOf(integrated?'data-contract-part="medical"':'사직 희망일'));
+      if(integrated)assert.ok(done.merged_html.indexOf('data-contract-part="privacy"')<done.merged_html.indexOf('사직 희망일'));
+      assert.ok(!done.merged_html.includes('data-sign-slot='));assert.ok(new Date(done.signed_at)>=new Date(p.signed_at));
+    }
+  }
 });
-add('pdf-pledge-requires-server-prevalidation',async()=>{
-  await setup();await pending(31,true);await employee();
-  const p=await stage(31,[{...coords[0],page_no:999,x:999999}]);
-  await assert.rejects(()=>query(submit(31,p)),/PDF prevalidation required/);
-  assert.equal((await query('select signed_at from contract_security_pledges where contract_id=31'))[0].signed_at,null);
-  await stage(31,coords);await validate(31);await query(submit(31,p));
-  assert.equal((await query('select status from contracts where id=31'))[0].status,'대기');
-  await assert.rejects(()=>query(`select validate_contract_pledge_pdf(31,'${uid}',${qjson(single)},${qjson(coords)},repeat('a',64),'data:image/png;base64,${png}')`),/permission denied/);
+add('04-direct-completion-without-pledge-or-contract-signatures-denied',async()=>{
+  await setup();await pending(30);await assert.rejects(()=>query("update contracts set status='서명완료' where id=30"),/security pledge/);
+  await employee();await pledgeFirst(30);await assert.rejects(()=>query("update contracts set status='서명완료' where id=30"),/security pledge/);
+  await assert.rejects(()=>query('update contracts set pledge_required=false where id=30'),/immutable/);
 });
-add('single-html-original-slot-quote-compatibility',async()=>{
-  await setup();await pending(34);
-  await query(`update contracts set merged_html=${qstr(template.replace('data-sign-slot="employee"',"data-sign-slot = 'employee'"))} where id=34`);
-  await employee();const p=await stage(34);await query(submit(34,p));
-  assert.ok(!(await query('select merged_html from contracts where id=34'))[0].merged_html.includes("data-sign-slot = 'employee'"));
+add('05-edge-no-pledge-and-missing-confirmation-denied',async()=>{
+  for(const integrated of [false,true])for(const pledge of [null,{signed_at:null},{read_confirmed:false},{rules_confirmed:false}]){
+    const r=await edgeSigningAttempt(undefined,integrated,{pledgeRequired:true,pledge});assert.equal(r.status,400);assert.equal(r.rpcCalls.length,0);assert.equal(r.uploadedBytes,null);
+    const v=await edgeSigningAttempt(undefined,integrated,{pledgeRequired:true,pledge,validate:true});assert.equal(v.status,400);assert.equal(v.rpcCalls.length,0);
+  }
 });
-add('unvalidated-integrated-pdf-pledge-rejected',async()=>{
-  await setup();await pending(33,true,true);await employee();
-  const bad=['employment','medical','privacy'].map(part=>({part,page_no:999,x:999999,y:72,width:150,height:50}));
-  await query(`select stage_contract_pledge_signatures(33,'${all}'::jsonb,${qjson(bad)})`);
-  const p=(await query('select * from contract_security_pledges where contract_id=33'))[0];
-  await assert.rejects(()=>query(submit(33,p)),/PDF prevalidation required/);
-  assert.equal((await query('select signed_at from contract_security_pledges where contract_id=33'))[0].signed_at,null);
+add('06-bad-coordinates-preserve-pledge-then-correct-and-complete',async()=>{
+  await setup();await pending(32,true);await employee();await pledgeFirst(32);
+  await stage(32,[{...coords[0],page_no:999}]);const before=(await query('select * from contract_security_pledges where contract_id=32'))[0];
+  const bad=await edgeSigningAttempt(undefined,false,{pledgeRequired:true,validate:true,body:{coordinates:[{...coords[0],page_no:999}]}});assert.equal(bad.status,400);assert.equal(bad.rpcCalls.length,0);
+  assert.equal((await query('select status from contracts where id=32'))[0].status,'대기');
+  await validate(32,coords);const after=(await query('select * from contract_security_pledges where contract_id=32'))[0];
+  for(const key of ['signature_png','signed_at','document','version','read_confirmed','rules_confirmed','contract_signatures','staged_at'])assert.deepEqual(after[key],before[key]);
+  assert.equal(after.coordinate_corrections.length,1);assert.equal(after.coordinate_corrections[0].before[0].page_no,999);
+  const good=await edgeSigningAttempt(undefined,false,{pledgeRequired:true,validate:true});assert.equal(good.status,200);
+  const final=await edgeSigningAttempt(undefined,false,{pledgeRequired:true});assert.equal(final.status,200);
+  await db.exec('reset role;set role service_role');await query(`select record_contract_pdf_signature(32,'${uid}',null,repeat('a',64),'contracts/32/signed.pdf',repeat('b',64),repeat('c',64),1,72,72,150,50)`);
+  assert.equal((await query('select status from contracts where id=32'))[0].status,'서명완료');
 });
-add('signed-pledge-coordinate-correction-preserves-evidence',async()=>{
-  await setup();await pending(32,true);await employee();const p=await stage(32,coords);await validate(32);await query(submit(32,p));
-  const before=(await query('select * from contract_security_pledges where contract_id=32'))[0];
-  const changed=[{...coords[0],x:85}];await validate(32,changed);
-  const after=(await query('select * from contract_security_pledges where contract_id=32'))[0];
-  for(const key of ['signature_png','signed_at','document','version','contract_signatures','staged_at'])assert.deepEqual(after[key],before[key]);
-  assert.deepEqual(after.pdf_coordinates,changed);assert.equal(after.coordinate_corrections.length,1);assert.deepEqual(after.coordinate_corrections[0].before,coords);
+add('07-five-legacy-completed-contracts-and-document-cards-preserved',async()=>{
+  await setup();await db.exec(fs.readFileSync('db/p9_security_pledge_20261003_rollback.sql','utf8'));
+  for(const id of [10,11,12,13])await query(`insert into contracts(id,user_id,merged_html,status,due_at) values(${id},'${uid}','legacy completed original','서명완료',now()-interval '1 day')`);
+  const before=await query('select * from contracts order by id');await db.exec(fs.readFileSync('db/p9_security_pledge_20261003.sql','utf8'));
+  assert.deepEqual(await query('select * from contracts order by id'),before);
+  await db.exec(fs.readFileSync('db/contract_final_send.sql','utf8'));await query("update contracts set signed_at=now()-interval '30 days'");await employee();
+  assert.equal((await query('select * from contracts')).length,0);const cards=await query('select * from get_my_contract_security_pledges()');assert.equal(cards.length,5);
+  const p=await pledgeFirst(9);assert.ok(p.signed_at);await db.exec('reset role');assert.equal((await query('select merged_html from contracts where id=9'))[0].merged_html,'legacy completed original');
+  await employee();await query("select set_config('app.test_uid','33333333-3333-3333-3333-333333333333',false)");assert.equal((await query('select * from get_my_contract_security_pledges()')).length,0);
 });
-add('pending-apply-rollback-reapply-preserves-evidence',async()=>{
-  await setup(true);await employee();const p=await stage(21);await query(submit(21,p));await db.exec('reset role');
-  const before=(await query('select * from contract_security_pledges where contract_id=21'))[0];
+add('08-expired-contract-pledge-and-signature-denied',async()=>{
+  await setup();await pending(30);await employee();const p=await prepare(30);await db.exec('reset role');await query("update contracts set due_at=now()-interval '1 day' where id=30");await employee();
+  await assert.rejects(()=>query(submit(30,p)),/expired|not signable/);await assert.rejects(()=>stage(30),/expired|not signable/);await assert.rejects(()=>prepare(30),/expired|not signable/);
+});
+add('09-pending-apply-rollback-reapply-preserves-evidence',async()=>{
+  await setup(true);assert.deepEqual((await query('select pledge_required from contracts where id in (20,21,22) order by id')).map(r=>r.pledge_required),[true,true,true]);
+  await employee();await pledgeFirst(21);await stage(21);await db.exec('reset role');const before=(await query('select * from contract_security_pledges where contract_id=21'))[0];
   await db.exec(fs.readFileSync('db/p9_security_pledge_20261003_rollback.sql','utf8'));await db.exec(fs.readFileSync('db/p9_security_pledge_20261003.sql','utf8'));
   assert.deepEqual((await query('select * from contract_security_pledges where contract_id=21'))[0],before);
-  await query("update contracts set status='대기' where id=22");await employee();const again=await stage(22);assert.ok(again.staged_at);
+  await query("update contracts set status='대기' where id=22");await employee();await pledgeFirst(22);await stage(22);assert.equal((await query('select status from contracts where id=22'))[0].status,'서명완료');
+});
+add('single-html-original-slot-quote-compatibility',async()=>{
+  await setup();await pending(34);await query(`update contracts set merged_html=${qstr(template.replace('data-sign-slot="employee"',"data-sign-slot = 'employee'"))} where id=34`);
+  await employee();await pledgeFirst(34);await stage(34);assert.ok(!(await query('select merged_html from contracts where id=34'))[0].merged_html.includes("data-sign-slot = 'employee'"));
+});
+add('signed-pledge-restaging-preserves-evidence-and-coordinate-history',async()=>{
+  await setup();await pending(32,true);await employee();await pledgeFirst(32);await stage(32,[{...coords[0],page_no:999}]);
+  const before=(await query('select * from contract_security_pledges where contract_id=32'))[0];await stage(32,coords);
+  const after=(await query('select * from contract_security_pledges where contract_id=32'))[0];for(const k of ['signature_png','signed_at','document','version'])assert.deepEqual(after[k],before[k]);assert.equal(after.coordinate_corrections.length,1);
 });
 add('empty-pending-rollback-reapply',async()=>{
-  await setup();
-  await db.exec(fs.readFileSync('db/p9_security_pledge_20261003_rollback.sql','utf8'));
-  await db.exec(fs.readFileSync(process.env.P9_BASELINE_SQL||'db/p9_security_pledge_20261003.sql','utf8'));
-  assert.equal((await query('select count(*)::int n from contract_security_pledges'))[0].n,0);
+  await setup();await db.exec(fs.readFileSync('db/p9_security_pledge_20261003_rollback.sql','utf8'));await db.exec(fs.readFileSync('db/p9_security_pledge_20261003.sql','utf8'));assert.equal((await query('select count(*)::int n from contract_security_pledges'))[0].n,0);
 });
 let failures=0;
 const selected=process.env.P9_CASE?cases.filter(c=>c.name===process.env.P9_CASE):cases;
-for(const {name,fn} of selected){try{await fn();console.log('PASS '+name);}catch(e){failures++;console.log('FAIL '+name+': '+e.message);if(e.internalQuery)console.log(e.internalQuery,e.internalPosition);}finally{if(db)await db.close();}}
+for(const {name,fn} of selected){try{await fn();console.log('PASS '+name);}catch(e){failures++;console.log('FAIL '+name+': '+e.message);if(e.internalQuery)console.log(e.internalQuery,e.internalPosition);}finally{if(db){await db.close();db=null;}}}
 console.log(`PGLITE_P9_REGRESSIONS: ${selected.length-failures}/${selected.length} scenarios passed`);
 if(failures)process.exitCode=1;
