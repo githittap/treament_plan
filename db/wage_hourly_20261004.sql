@@ -178,7 +178,7 @@ begin
   days:='[]';total_min:=0;total_net:=0;complete:=true;
   for a in select * from public.attendance where user_id=p.user_id and work_date>=start_day-1 and work_date<end_day order by work_date loop
    select * into w from public.wage_info where user_id=p.user_id and effective_from<=a.work_date order by effective_from desc limit 1;
-   if not found or not w.hourly_enabled then continue; end if;
+   -- 적용 첫날이 야간 근무 중간에 시작해도 날짜별 구간에서 판단함.
    select x.clock_in,x.clock_out into corr from (
     select clock_in,clock_out,created_at t,id from public.attendance_manual_entries where user_id=p.user_id and work_date=a.work_date and hourly_correction and status='원장확정'
     union all select clock_in,clock_out,approved_at,id from public.attendance_issue_resolutions where user_id=p.user_id and work_date=a.work_date
@@ -186,7 +186,7 @@ begin
    has_correction:=found;
    ci:=case when has_correction then corr.clock_in else a.clock_in end;co:=case when has_correction then corr.clock_out else a.clock_out end;
    if ci is null or co is null then
-    if a.work_date>=start_day then days:=days||jsonb_build_array(jsonb_build_object('date',a.work_date,'work_date',a.work_date,'needs_review',true,'minutes',null,'net',null));complete:=false;end if;
+    if a.work_date>=start_day and coalesce(w.hourly_enabled,false) then days:=days||jsonb_build_array(jsonb_build_object('date',a.work_date,'work_date',a.work_date,'needs_review',true,'minutes',null,'net',null));complete:=false;end if;
     continue;
    end if;
    t1:=date_trunc('minute',a.work_date+ci);t2:=date_trunc('minute',a.work_date+co);

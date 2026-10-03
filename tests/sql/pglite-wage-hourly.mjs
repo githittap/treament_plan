@@ -22,7 +22,7 @@ try{
   create table public.attendance_issues(id bigint generated always as identity primary key,user_id uuid,work_date date,type text,reason text,rule_label text,status text default '대기',chief_by text,chief_at timestamptz,owner_by text,owner_at timestamptz,created_at timestamptz default now());
   create table public.payroll_rows(month text,user_id uuid,items jsonb,net numeric);create table public.payslips(id bigint,month text,user_id uuid,html text,issued boolean);
   grant usage on schema auth to authenticated;grant select on profiles to authenticated;
-  insert into public.profiles values ${Object.entries(ids).map(([role,id])=>`('${id}','${role==='staff'?'이소연':'합성'+role}','${role}',true,true)`).join(',')};
+  insert into public.profiles values ${Object.entries(ids).map(([role,id])=>`('${id}','${role==='staff'?'이소연':'합성'+role}','${role==='other'?'staff':role}',true,true)`).join(',')};
   insert into auth.users select user_id from public.profiles;
   insert into public.payroll_rows values('2026-10','${ids.other}','{"base_pay":3200000,"net_pay":2900000}',2900000);
   insert into public.payslips values(1,'2026-10','${ids.other}','기존 명세서',true);`);
@@ -44,9 +44,12 @@ try{
   eq(r.users[0].gross_estimate,null);eq((await month('2026-11')).users[0].net,3000);
   await deny(`select public.wage_hourly_month('2026-10','${ids.other}')`);
   await deny('select public.wage_hourly_config()');
+  await deny("select public.wage_hourly_correction_targets('2026-10-05')");
   await deny(`select public.wage_hourly_save_employee('${ids.staff}','2026-10-01',true,'{"weekday":1,"weekend":1}',true)`);
   await deny(`select public.wage_hourly_correct('${ids.staff}','2026-10-05','09:00','10:00','직원 무단 정정')`);
   await as('chief');await deny(`select public.wage_hourly_month('2026-10','${ids.staff}')`);
+  const targets=(await q("select public.wage_hourly_correction_targets('2026-10-05') r"))[0].r;
+  eq(Object.keys(targets[0]).sort(),['clock_in','clock_out','name','user_id']);
   const receipt=(await q(`select public.wage_hourly_correct('${ids.staff}','2026-10-05','09:00','10:07','지문 장치 오류 확인') r`))[0].r;
   eq(receipt.net,undefined);
   await as('staff');r=await month();eq(r.users[0].net,25200);eq(r.users[0].minutes,142);
@@ -75,5 +78,26 @@ try{
   await as('owner');await deny(`select public.wage_hourly_month('2026-10','${ids.staff}')`,/disabled/);
   await db.exec('reset role');await db.exec(fs.readFileSync('db/wage_hourly_20261004.sql','utf8'));
   await as('staff');r=await month();eq(r.users[0].net,27666);
+  await db.exec('reset role');await q(`insert into attendance(user_id,work_date,clock_in,source) values('${ids.staff}','2026-10-06','09:00','fp')`);
+  await as('staff');r=await month();eq(r.users[0].net,null);eq(r.users[0].needs_review,true);
+  await as('owner');await q(`select public.wage_hourly_correct('${ids.staff}','2026-10-06','09:00','09:00','누락 확인: 근무 없음')`);
+  r=await month();eq(r.users[0].net,27666);
+  const special={...changed,categories:[...changed.categories,{code:'holiday',label:'공휴일',days:[],dates:['2026-10-05']}]};
+  await q(`select public.wage_hourly_save_config('${JSON.stringify(special)}')`);
+  await q(`select public.wage_hourly_save_employee('${ids.staff}','2026-10-01',true,'{"weekday":10000,"weekend":15000,"holiday":18000}',true)`);
+  r=await month();eq(r.users[0].days.find(d=>d.date==='2026-10-05').net,20400);
+  await q(`select public.wage_hourly_save_config('${JSON.stringify(changed)}')`);
+  await q(`select public.wage_hourly_save_employee('${ids.staff}','2026-10-01',true,'{"weekday":10000,"weekend":15000}',true)`);
+  r=await month();eq(r.users[0].net,27666);
+  if(process.env.HOURLY_ARTIFACT_DIR){
+    const out=path.resolve(process.env.HOURLY_ARTIFACT_DIR);
+    assert.equal(out.toLowerCase(),path.resolve('Z:/09_claude-output/04_AI·Claude운영/초인종_일/7ec82d18/work').toLowerCase());
+    const config=(await q('select public.wage_hourly_config() r'))[0].r;
+    r.users.forEach(u=>u.name='합성 직원');config.employees.forEach((e,i)=>e.name='합성 직원 '+(i+1));
+    fs.writeFileSync(path.join(out,'hourly-fixture.json'),JSON.stringify({result:r,config,selfId:ids.staff},null,2));
+  }
+  await as('owner');await q(`select public.wage_hourly_save_employee('${ids.other}','2026-10-01',true,'{"weekday":6000,"weekend":9000}',false)`);
+  await db.exec('reset role');await q(`insert into attendance(user_id,work_date,clock_in,clock_out,source) values('${ids.other}','2026-09-30','23:55','00:05','fp')`);
+  await as('other');const firstMonth=await month('2026-10',ids.other);eq(firstMonth.users[0].net,500);eq(firstMonth.users[0].minutes,5);
   console.log(`PGLITE_WAGE_HOURLY_PASS checks=${checks}`);
 }finally{await db.close();}

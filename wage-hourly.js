@@ -11,14 +11,14 @@ function wageHourlyPanelHtml(data,ownerView){
   const date=WH_MONTH||data?.month||today().slice(0,7);
   const gross=u=>u.insured&&u.gross_estimate!=null?`<div class="hint">${esc(wageT('gross','참고용 세전 추정치'))}: ${wageMoney(u.gross_estimate)} ${esc(wageT('won','원'))} · ${esc(u.income_tax_included?wageT('tax_included','설정된 소득세 반영'):wageT('tax_missing','소득세 미반영'))}</div>`:'';
   const details=u=>`<details ${owner?'':'open'}><summary>${esc(u.name)} · ${wageMoney(u.minutes)} ${esc(wageT('minutes','분'))} · ${wageMoney(u.net)} ${esc(wageT('won','원'))}</summary>${gross(u)}
-    <div class="tblwrap"><table><thead><tr><th>${esc(wageT('date','날짜'))}</th><th>${esc(wageT('category','구분'))}</th><th>${esc(wageT('time','근무분'))}</th><th>${esc(wageT('rate','세후 시급'))}</th><th>${esc(wageT('net','세후 지급액'))}</th><th>${esc(wageT('basis','기록'))}</th></tr></thead><tbody>
+    <div class="tblwrap wage-hourly-days"><table><thead><tr><th>${esc(wageT('date','날짜'))}</th><th>${esc(wageT('category','구분'))}</th><th>${esc(wageT('time','근무분'))}</th><th>${esc(wageT('rate','세후 시급'))}</th><th>${esc(wageT('net','세후 지급액'))}</th><th>${esc(wageT('basis','기록'))}</th></tr></thead><tbody>
     ${(u.days||[]).map(d=>`<tr><td>${esc(d.date)}</td><td>${esc(d.label||'—')}</td><td>${wageMoney(d.minutes)}</td><td>${wageMoney(d.rate)}</td><td>${wageMoney(d.net)}</td><td>${esc(d.needs_review?wageT('review','확인 필요'):d.corrected?wageT('corrected','정정'):wageT('fingerprint','지문'))}</td></tr>`).join('')}
     </tbody></table></div></details>`;
   return `<div class="card" id="wageHourlyPanel"><h2>${esc(owner?wageT('owner_title','시급제 월 지급액'):wageT('self_title','내 시급제 지급액'))}</h2>
     <div class="rowflex" style="flex-wrap:wrap;gap:8px"><label>${esc(wageT('month','대상 월'))} <input class="mini" type="month" value="${esc(date)}" onchange="WH_MONTH=this.value;render()"></label>
     ${owner?`<button class="mini" onclick="wageHourlyDownload()">${esc(wageT('csv','CSV 내려받기'))}</button>`:''}</div>
     <div class="hint">${esc(wageT('calculation_hint','지문 출퇴근의 분을 그대로 계산합니다. 자정을 넘으면 날짜별 시급을 적용하며, 일별 금액은 원 단위로 반올림합니다.'))}</div>
-    ${owner?`<div class="tblwrap"><table><tr><th>${esc(wageT('employee','직원'))}</th><th>${esc(wageT('time','근무분'))}</th><th>${esc(wageT('net','세후 지급액'))}</th><th>${esc(wageT('gross','참고용 세전 추정치'))}</th></tr>
+    ${owner?`<div class="tblwrap wage-hourly-summary"><table><tr><th>${esc(wageT('employee','직원'))}</th><th>${esc(wageT('time','근무분'))}</th><th>${esc(wageT('net','세후 지급액'))}</th><th>${esc(wageT('gross','참고용 세전 추정치'))}</th></tr>
     ${users.map(u=>`<tr><td>${esc(u.name)}</td><td>${wageMoney(u.minutes)}</td><td>${wageMoney(u.net)}</td><td>${u.insured&&u.gross_estimate!=null?wageMoney(u.gross_estimate):'—'}</td></tr>`).join('')}</table></div>`:''}
     ${users.map(details).join('')||`<div class="empty">${esc(wageT('empty','시급제 대상자가 없습니다. 아래 설정에서 추가하세요.'))}</div>`}
     ${users.some(u=>u.needs_review)?`<div class="hint">${esc(wageT('incomplete','출퇴근 누락 또는 시급 미입력이 있어 지급액 확인이 필요합니다.'))}</div>`:''}</div>`;
