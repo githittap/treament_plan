@@ -20,7 +20,7 @@ create policy payment_receipts_select_approval_line on storage.objects for selec
 drop policy if exists payment_receipts_insert_requester_pending on storage.objects;
 create policy payment_receipts_insert_requester_pending on storage.objects for insert to authenticated with check (bucket_id='payment-receipts' and public.employee_hub_access_allowed() and split_part(name,'/',1)=auth.uid()::text and split_part(name,'/',2)~'^[0-9]+$' and exists(select 1 from public.payment_requests p where p.id=split_part(name,'/',2)::bigint and p.requester_id=auth.uid() and p.status='chief_pending') and metadata->>'mimetype' in ('image/jpeg','image/png','application/pdf'));
 drop policy if exists payment_receipts_deputy_block on storage.objects;
-create policy payment_receipts_deputy_block on storage.objects as restrictive for all to authenticated using (public.my_role()<>'deputy') with check (public.my_role()<>'deputy');`);
+create policy payment_receipts_deputy_block on storage.objects as restrictive for all to authenticated using (bucket_id<>'payment-receipts' or public.my_role()<>'deputy') with check (bucket_id<>'payment-receipts' or public.my_role()<>'deputy');`);
 const apply=async file=>db.exec(sqlText(file));
 try{
   await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;
@@ -37,6 +37,7 @@ try{
     ('${ids.staff}','staff','활성'),('${ids.manager}','manager','활성'),('${ids.chief}','chief','활성'),('${ids.owner}','owner','활성'),('${ids.other}','staff','활성'),('${ids.deputy}','deputy','활성'),('${ids.blocked}','staff','차단');`);
   await db.exec(sqlText('payment_requests_draft.sql'));
   await resetReceiptPolicies();
+  await db.exec(`create policy fixture_other_bucket_probe on storage.objects as permissive for all to authenticated using(bucket_id='fixture-other') with check(bucket_id='fixture-other');`);
   await db.exec(`insert into public.payment_requests(requester_id,payment_item,bank_name,account_holder,account_number,amount_krw,status) values('${ids.staff}','시험','은행','직원','1234',1000,'chief_pending');
     insert into public.payment_request_receipts(request_id,storage_path,original_name,mime_type,size_bytes) values(1,'${ids.staff}/1/linked.pdf','linked.pdf','application/pdf',100);
     insert into storage.objects(bucket_id,name,owner_id,metadata) values
@@ -44,13 +45,16 @@ try{
     ('payment-receipts','${await unlinked(ids.staff)}','${ids.staff}','{"mimetype":"application/pdf"}'),
     ('payment-receipts','${await unlinked(ids.other)}','${ids.other}','{"mimetype":"application/pdf"}'),
     ('payment-receipts','${await unlinked(ids.deputy)}','${ids.deputy}','{"mimetype":"application/pdf"}'),
-    ('payment-receipts','${await unlinked(ids.blocked)}','${ids.blocked}','{"mimetype":"application/pdf"}');`);
+    ('payment-receipts','${await unlinked(ids.blocked)}','${ids.blocked}','{"mimetype":"application/pdf"}'),
+    ('fixture-other','${ids.deputy}/other-bucket/before.pdf','${ids.deputy}','{}');`);
   const before=await policyRows();
   assert.equal(receiptPolicy(before).qual.includes('payment_request_receipts'),true);
   await as(ids.staff);
   assert.equal(await count(`select count(*)::int n from storage.objects where name='${await unlinked(ids.staff)}'`),0,'pre-fix select hides own unlinked object');
   assert.equal((await q(`delete from storage.objects where name='${await unlinked(ids.staff)}' returning id`)).length,0,'pre-fix DELETE RETURNING selects zero rows');
   await db.exec('reset role');
+  const preQual=(await q("select qual from pg_policies where schemaname='storage' and tablename='objects' and policyname='payment_receipts_select_approval_line'"))[0].qual;
+  console.log('PGLITE_PRE_QUAL='+JSON.stringify(preQual));
   await apply('payment_receipts_select_own_folder.sql');
   await apply('payment_receipts_select_own_folder.sql');
   const after=await policyRows();
@@ -79,10 +83,20 @@ try{
     assert.equal(await count(`select count(*)::int n from storage.objects where name='${await unlinked(ids.staff)}'`),0);
     assert.equal((await q(`delete from storage.objects where name='${ids.staff}/1/linked.pdf' returning id`)).length,0);
   }
+  for(const id of [ids.chief,ids.owner,ids.manager]){
+    await db.exec('reset role');
+    await db.exec(`insert into storage.objects(bucket_id,name,owner_id,metadata) values('payment-receipts','${await unlinked(id)}','${id}','{"mimetype":"application/pdf"}')`);
+    await as(id);
+    assert.equal(await count(`select count(*)::int n from storage.objects where name='${await unlinked(id)}'`),1,'manager, chief and owner intentionally see their own unlinked folder file');
+  }
   await as(ids.manager);
-  assert.equal(await count(`select count(*)::int n from storage.objects where bucket_id='payment-receipts'`),0);
+  assert.equal(await count(`select count(*)::int n from storage.objects where name='${await unlinked(ids.staff)}'`),0);
   await as(ids.deputy);
   assert.equal(await count(`select count(*)::int n from storage.objects where name='${await unlinked(ids.deputy)}'`),0);
+  assert.equal(await count(`select count(*)::int n from storage.objects where bucket_id='fixture-other' and name='${ids.deputy}/other-bucket/before.pdf'`),1,'deputy restrictive policy preserves the actual non-receipt bucket exception for USING');
+  await db.exec(`insert into storage.objects(bucket_id,name,owner_id,metadata) values('fixture-other','${ids.deputy}/other-bucket/after.pdf','${ids.deputy}','{}')`);
+  await db.exec('reset role');
+  assert.equal(await count(`select count(*)::int n from storage.objects where bucket_id='fixture-other' and name='${ids.deputy}/other-bucket/after.pdf'`),1,'deputy restrictive policy preserves the actual non-receipt bucket exception for WITH CHECK');
   await as(ids.blocked);
   assert.equal(await count(`select count(*)::int n from storage.objects where name='${await unlinked(ids.blocked)}'`),0);
   await db.exec('reset role');
