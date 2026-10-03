@@ -86,7 +86,7 @@ insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types) v
 grant usage on schema storage to authenticated;
 grant select,insert,delete on storage.objects to authenticated;
 drop policy if exists payment_receipts_select_approval_line on storage.objects;
-create policy payment_receipts_select_approval_line on storage.objects for select to authenticated using (bucket_id='payment-receipts' and public.employee_hub_access_allowed() and exists(select 1 from public.payment_request_receipts r join public.payment_requests p on p.id=r.request_id where r.storage_path=name and (p.requester_id=auth.uid() or public.my_role() in ('chief','owner'))));
+create policy payment_receipts_select_approval_line on storage.objects for select to authenticated using (bucket_id='payment-receipts' and public.employee_hub_access_allowed() and (split_part(name,'/',1)=auth.uid()::text or exists(select 1 from public.payment_request_receipts r join public.payment_requests p on p.id=r.request_id where r.storage_path=name and (p.requester_id=auth.uid() or public.my_role() in ('chief','owner')))));
 drop policy if exists payment_receipts_insert_requester_pending on storage.objects;
 create policy payment_receipts_insert_requester_pending on storage.objects for insert to authenticated with check (bucket_id='payment-receipts' and public.employee_hub_access_allowed() and split_part(name,'/',1)=auth.uid()::text and split_part(name,'/',2)~'^[0-9]+$' and exists(select 1 from public.payment_requests p where p.id=split_part(name,'/',2)::bigint and p.requester_id=auth.uid() and p.status='chief_pending') and coalesce((metadata->>'size')::bigint,10485761)<=10485760);
 drop policy if exists payment_receipts_delete_unlinked_requester on storage.objects;
