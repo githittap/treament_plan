@@ -2,6 +2,7 @@
 -- 입사일 기준 매월 같은 날(월말은 그 달 마지막 날), 첫해 최대 11일만 자동 처리함.
 -- 기존 누적 목표·수기 상계·leave_accrual_runs 중복 방지를 그대로 사용함.
 -- 기본 auto는 입사일마다 적립하고 결근/미기록 후보는 원장이 사후 확인함.
+begin;
 insert into public.app_settings(key,value,label)
 values('monthly_leave_attendance_mode','auto','1년 미만 월차 적립 방식') on conflict(key) do nothing;
 alter table public.leave_accrual_runs
@@ -304,3 +305,5 @@ begin
   end if;
 end;
 $$;
+
+commit;

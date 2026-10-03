@@ -13,6 +13,12 @@ begin
     or to_regprocedure('public.my_role()') is null then
     raise exception 'marketing manager preflight: settings or marketing schema missing';
   end if;
+  if exists(select 1 from pg_class where oid in (
+    'public.marketing_expense_events'::regclass,'public.marketing_merchant_rules'::regclass,
+    'public.marketing_month_budgets'::regclass,'public.marketing_foreign_charge_links'::regclass
+  ) and not relrowsecurity) then
+    raise exception 'marketing manager preflight: marketing RLS must be enabled';
+  end if;
 end $$;
 
 insert into public.app_settings(key,value,label)

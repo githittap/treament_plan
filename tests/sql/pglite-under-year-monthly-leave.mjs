@@ -118,7 +118,7 @@ try{
   const before=(await q('select count(*)::int n from leave_accrual_runs'))[0].n;
   const ledgerBefore=await q('select * from leave_ledger order by id');
   await db.exec(fs.readFileSync('db/under_year_monthly_leave_20261003_rollback.sql','utf8').replace("exists(select 1 from pg_extension where extname='pg_cron')","to_regnamespace('cron') is not null"));
-  await assert.rejects(q("select * from run_under_year_monthly_leave_accrual('2026-10-18')"),/monthly automatic accrual paused/);
+  await assert.rejects(q("select * from run_under_year_monthly_leave_accrual('2026-10-18')"),/does not exist/);
   assert.equal((await q('select schedule from cron.job'))[0].schedule,'paused');
   await assert.rejects(q("select * from preview_monthly_leave_accruals('2026-10-18')"),/owner execution required/);
   assert.equal((await q('select count(*)::int n from leave_accrual_runs'))[0].n,before);

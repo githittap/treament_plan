@@ -1,17 +1,32 @@
 -- P7 계약 직무 → 직원 직무 초안. 운영에 적용하지 않음.
--- 계약의 최종 발송(대기)·서명 완료 때만 빈 profiles.job_group을 같은 트랜잭션에서 채움.
+-- 최종 발송 직무를 고정하고, 서명 완료 때만 빈 profiles.job_group을 채움.
 -- 별칭은 hub_ui_texts의 contract_job.alias_* 글로 원장이 고칠 수 있음(쉼표로 구분).
 BEGIN;
+ALTER TABLE public.contracts ADD COLUMN IF NOT EXISTS sent_job_group text;
 CREATE OR REPLACE FUNCTION public.p7_contract_job_group_sync()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
 DECLARE v_title text; v_code text; v_matches text[]:=ARRAY[]::text[]; v_aliases text; v_key text; v_default text;
+  v_lead boolean:=coalesce(public.my_role() IN ('owner','chief'),false)
+    OR (auth.uid() IS NULL AND session_user='postgres');
 BEGIN
-  IF new.status NOT IN ('대기','서명완료') THEN RETURN new; END IF;
-  IF tg_op='UPDATE' AND old.status IS NOT DISTINCT FROM new.status AND old.fields IS NOT DISTINCT FROM new.fields THEN RETURN new; END IF;
+  IF tg_op='INSERT' THEN
+    IF new.sent_job_group IS NOT NULL THEN RAISE EXCEPTION 'frozen contract job group cannot be supplied'; END IF;
+  ELSE
+    IF new.sent_job_group IS DISTINCT FROM old.sent_job_group
+      OR (old.sent_job_group IS NOT NULL AND new.user_id IS DISTINCT FROM old.user_id) THEN
+      RAISE EXCEPTION 'frozen contract job group cannot be changed';
+    END IF;
+  END IF;
+  -- 일반 fields 수정이나 직원의 상태 조작으로 발송 원본을 만들지 않음.
+  IF new.status='대기' AND (tg_op='INSERT' OR old.status IS DISTINCT FROM '대기') THEN
+    IF NOT v_lead THEN RAISE EXCEPTION 'contract final send requires owner or chief'; END IF;
+    IF new.sent_job_group IS NULL THEN
+      v_title:=coalesce(nullif(btrim(new.fields->>'job_group'),''),nullif(btrim(new.fields->>'직무'),''),
+        nullif(btrim(new.fields->>'직무분류'),''),nullif(btrim(new.fields->>'직종'),''));
+    END IF;
+  END IF;
   IF EXISTS(SELECT 1 FROM public.profiles p WHERE p.user_id=new.user_id AND p.dept='Dr.')
     OR EXISTS(SELECT 1 FROM public.schedule_people s WHERE s.profile_user_id=new.user_id AND s.department='Dr.') THEN RETURN new; END IF;
-  v_title:=coalesce(nullif(btrim(new.fields->>'job_group'),''),nullif(btrim(new.fields->>'직무'),''),
-    nullif(btrim(new.fields->>'직무분류'),''),nullif(btrim(new.fields->>'직종'),''));
   IF v_title IN ('clinical_consult','sterilization_admin','lab','desk') THEN v_matches:=ARRAY[v_title];
   ELSE
     FOR v_code,v_key,v_default IN SELECT * FROM (VALUES
@@ -28,12 +43,17 @@ BEGIN
     END LOOP;
   END IF;
   IF cardinality(v_matches)=1 THEN
-    UPDATE public.profiles SET job_group=v_matches[1]
-    WHERE user_id=new.user_id AND nullif(btrim(job_group),'') IS NULL;
+    new.sent_job_group:=v_matches[1];
+  END IF;
+  IF new.status='서명완료' AND tg_op='UPDATE' AND old.status='대기'
+    AND new.sent_job_group IN ('clinical_consult','sterilization_admin','lab','desk') THEN
+    UPDATE public.profiles SET job_group=new.sent_job_group
+      WHERE user_id=new.user_id AND nullif(btrim(job_group),'') IS NULL;
   END IF;
   RETURN new;
 END $$;
 DROP TRIGGER IF EXISTS p7_contract_job_group_sync ON public.contracts;
-CREATE TRIGGER p7_contract_job_group_sync AFTER INSERT OR UPDATE OF status,fields ON public.contracts
+CREATE TRIGGER p7_contract_job_group_sync BEFORE INSERT OR UPDATE ON public.contracts
 FOR EACH ROW EXECUTE FUNCTION public.p7_contract_job_group_sync();
+REVOKE ALL ON FUNCTION public.p7_contract_job_group_sync() FROM public,anon,authenticated;
 COMMIT;

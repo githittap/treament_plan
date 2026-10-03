@@ -36,6 +36,7 @@ try{
       ('${id(112)}','${id(12)}','임은숙','상담',null),('${id(113)}','${id(13)}','임은숙','미지정',null),
       ('${id(115)}',null,'김나현','기공',null),('${id(116)}',null,'김나현','미지정',null);
   `);
+  await db.exec('create role anon;create role authenticated;alter table schedule_people add column active boolean default true;');
   if(!process.argv.includes('--baseline'))await db.exec(read('p7_job_group_backfill_20261003.sql'));
   equal(await group('profiles',1),'clinical_consult','unique exact name is filled');
   equal(await group('schedule_people',101),'clinical_consult','linked roster also filled');
@@ -76,39 +77,49 @@ try{
   equal(await group('profiles',13),null,'rollback never modifies retired duplicate');
   equal(await group('schedule_people',113),null,'rollback preserves retired roster');
 
-  await db.exec(`insert into profiles(user_id,name,dept,job_group) values
+  await db.exec(`create schema auth;
+    create function auth.uid() returns uuid language sql as $$select nullif(current_setting('app.uid',true),'')::uuid$$;
+    create function my_role() returns text language sql as $$select current_setting('app.role',true)$$;
+    insert into profiles(user_id,name,dept,job_group) values
     ('${id(20)}','계약직원','진료실',null),('${id(21)}','기존직무','데스크','desk'),
     ('${id(22)}','Dr계약','Dr.',null),('${id(23)}','설정직무','진료실',null),
     ('${id(24)}','서명직원','진료실',null),('${id(25)}','미확인직무','진료실',null),
     ('${id(26)}','실패계약','진료실',null),('${id(27)}','중복설정','진료실',null);`);
   if(!process.argv.includes('--baseline-contract'))await db.exec(read('p7_contract_job_group_20261003.sql'));
-  const add=async(n,status,fields)=>db.query('insert into contracts values($1,$2,$3,$4)',[n,id(n),status,JSON.stringify(fields)]);
+  const add=async(n,status,fields)=>db.query('insert into contracts(id,user_id,status,fields) values($1,$2,$3,$4)',[n,id(n),status,JSON.stringify(fields)]);
+  const sign=async n=>db.exec(`update contracts set status='서명완료' where id=${n}`);
   await add(20,'발송요청',{직종:'위생사'});equal(await group('profiles',20),null,'request is not final send');
-  await db.exec("update contracts set status='대기' where id=20");equal(await group('profiles',20),'clinical_consult','send transition fills blank');
-  await add(21,'대기',{직무:'기공'});equal(await group('profiles',21),'desk','conflicting existing value preserved');
-  await add(22,'대기',{직무:'기공'});equal(await group('profiles',22),null,'contract never classifies Dr');
+  await db.exec("update contracts set status='대기' where id=20");
+  equal(await group('profiles',20),null,'send freezes classification without filling profile');
+  await sign(20);equal(await group('profiles',20),'clinical_consult','sign uses frozen send classification');
+  await add(21,'대기',{직무:'기공'});await sign(21);equal(await group('profiles',21),'desk','conflicting existing value preserved');
+  await add(22,'대기',{직무:'기공'});await sign(22);equal(await group('profiles',22),null,'contract never classifies Dr');
   await db.exec("insert into hub_ui_texts values('contract_job.alias_lab','보철제작')");
-  await add(23,'대기',{직종:'보철제작'});equal(await group('profiles',23),'lab','owner editable alias read by backend');
+  await add(23,'대기',{직종:'보철제작'});await sign(23);equal(await group('profiles',23),'lab','owner editable alias frozen by backend');
   await add(24,'발송요청',{직무:'소독·행정'});
-  await db.exec("update contracts set status='서명완료' where id=24");equal(await group('profiles',24),'sterilization_admin','sign completion also fills blank');
-  await add(25,'대기',{직종:'알 수 없는 직종'});equal(await group('profiles',25),null,'unknown title not guessed');
+  await sign(24);equal(await group('profiles',24),null,'sign without trusted send does not classify');
+  await add(25,'대기',{직종:'알 수 없는 직종'});await sign(25);equal(await group('profiles',25),null,'unknown title not guessed');
   await db.exec("insert into hub_ui_texts values('contract_job.alias_desk','위생사')");
-  await add(27,'대기',{직종:'위생사'});equal(await group('profiles',27),null,'ambiguous configured alias not guessed');
+  await add(27,'대기',{직종:'위생사'});await sign(27);equal(await group('profiles',27),null,'ambiguous configured alias not guessed');
   await db.exec(read('p7_contract_job_group_20261003.sql'));
   equal((await db.query("select count(*)::int n from pg_trigger where tgname='p7_contract_job_group_sync'")).rows[0].n,1,'repeat migration keeps a single trigger');
-  await db.exec("update contracts set status='서명완료' where id=21");
-  equal(await group('profiles',21),'desk','sign completion also preserves a conflicting existing value');
   await db.exec(`insert into profiles(user_id,name,dept,job_group) values('${id(28)}','별칭교체','진료실',null),('${id(29)}','직원서명','진료실',null)`);
-  await add(28,'대기',{직종:'기공'});equal(await group('profiles',28),null,'replacing aliases disables old title matching');
-  await add(29,'발송요청',{직무:'소독·행정'});
-  await db.exec('create role p7_test_staff; grant select,update on contracts to p7_test_staff; grant select on profiles to p7_test_staff; set role p7_test_staff;');
+  await add(28,'대기',{직종:'기공'});await sign(28);equal(await group('profiles',28),null,'replacing aliases disables old title matching');
+  await add(29,'대기',{직무:'소독·행정'});
+  await db.exec(`create role p7_test_staff;grant usage on schema auth to p7_test_staff;
+    grant select,update on contracts to p7_test_staff;grant select on profiles to p7_test_staff;
+    select set_config('app.uid','${id(29)}',false);select set_config('app.role','staff',false);set role p7_test_staff;`);
   await assert.rejects(db.exec(`update profiles set job_group='desk' where user_id='${id(29)}'`),/permission denied/i);checks++;
-  await db.exec("update contracts set status='서명완료' where id=29; reset role;");
-  equal(await group('profiles',29),'sterilization_admin','employee signing can trigger the fill without direct profile update privilege');
-  await db.exec("begin; insert into contracts values(26,'"+id(26)+"','대기','{\"job_group\":\"lab\"}'); rollback;");
-  equal(await group('profiles',26),null,'failed/rolled back contract cannot leave profile mutation');
+  await db.exec("update contracts set fields='{\"job_group\":\"lab\"}' where id=29");
+  equal(await group('profiles',29),null,'staff changing pending fields cannot fill profile');
+  await assert.rejects(db.exec("update contracts set sent_job_group='lab' where id=29"),/frozen contract job group/);checks++;
+  await db.exec("update contracts set status='서명완료' where id=29;reset role;select set_config('app.uid','',false);");
+  equal(await group('profiles',29),'sterilization_admin','employee signing uses original frozen value');
+  await db.exec("begin; insert into contracts(id,user_id,status,fields) values(26,'"+id(26)+"','대기','{\"job_group\":\"lab\"}'); rollback;");
+  equal(await group('profiles',26),null,'rolled back contract cannot leave profile mutation');
   await db.exec(read('p7_contract_job_group_20261003_rollback.sql'));
   equal(await group('profiles',20),'clinical_consult','contract rollback does not erase staff classification');
+  equal((await db.query('select sent_job_group from contracts where id=29')).rows[0].sent_job_group,'sterilization_admin','rollback preserves frozen send audit');
   await add(26,'대기',{job_group:'lab'});equal(await group('profiles',26),null,'rollback removes automatic propagation');
-  console.log(`PASS ${checks} PGlite assertions (exact-name backfill, repeat, conditional rollback, send/sign, aliases, Dr, unknown, conflict, atomic rollback)`);
+  console.log(`PASS ${checks} PGlite assertions (active backfill, repeat, conditional rollback, frozen send/sign, staff tamper, aliases, Dr, unknown, conflict)`);
 }finally{await db.close()}

@@ -108,5 +108,13 @@ await db.exec(down);
 await actor(2);await assert.rejects(db.exec(`select set_employment_status('${id(6)}','재직','2026-10-04','복귀')`),/owner required/);
 await db.exec("insert into consultation_inbox(created_via) values('service_ingest')");assert.deepEqual(await recipients('consultation_received','consultation:4:%'),expected(2,3,4,8));
 assert.equal((await db.query('select count(*)::int n from profile_employment_history')).rows[0].n,2,'되돌려도 인사 이력 보존');
+// 되돌린 뒤 새 정상 함수가 배포되면 다음 적용/되돌리기는 그 최신 정의를 사용함.
+const updatedOriginal=(await db.query("select pg_get_functiondef('queue_notice_push_event()'::regprocedure) d")).rows[0].d.replace('begin','begin\n -- NORMAL_CHANGE_AFTER_ROLLBACK');
+await db.exec(updatedOriginal);
+const newerDefinition=(await db.query("select pg_get_functiondef('queue_notice_push_event()'::regprocedure) d")).rows[0].d;
+await db.exec(up);await db.exec(up);
+assert.equal((await db.query("select count(*)::int n from p7_settings_notify_backup_history where signature='public.queue_notice_push_event()'")).rows[0].n,2,'new backup round saved without repeat duplication');
+await db.exec(down);
+assert.equal((await db.query("select pg_get_functiondef('queue_notice_push_event()'::regprocedure) d")).rows[0].d,newerDefinition,'rollback restores latest normal change');
 await db.close();
 console.log('PASS: P7 8개 알림 종류 실제 트리거·설정 변경·기본 대상·비활성/차단 제외·퇴사 역할 제한·반복 적용·되돌리기');

@@ -2785,7 +2785,7 @@ async function submitOnbo(itemId){
   if(error){alert(hubT('onbo.check.m_save_fail','체크리스트 저장 실패: {detail}',{detail:error.message}));return;}
   setStatus('saved');render();refreshBadges();
 }
-async function confirmOnbo(itemId){await sb.from('onboarding_checks').update({status:'확인',checked_by:ME.name,checked_at:new Date().toISOString()}).eq('item_id',itemId).eq('user_id',ME.id);setStatus('saved');render();}
+async function confirmOnbo(itemId){const {error}=await sb.from('onboarding_checks').update({status:'확인',checked_by:ME.name,checked_at:new Date().toISOString()}).eq('item_id',itemId).eq('user_id',ME.id);if(error){alert(hubT('onbo.check.m_save_fail','체크리스트 저장 실패: {detail}',{detail:error.message}));setStatus('error');return;}setStatus('saved');render();}
 async function addOnboItem(){const l=$('#oiNew').value.trim();if(!l)return;await sb.from('onboarding_items').insert({label:l});setStatus('saved');render();}
 
 /* ── 진료기록(구 케이스노트) ── */

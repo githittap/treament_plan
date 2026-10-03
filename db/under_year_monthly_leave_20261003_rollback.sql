@@ -1,4 +1,5 @@
 -- 자동 월차만 중단함. 기존 월차·연차 장부·실행 이력·수동 확인 함수를 보존함.
+begin;
 do $$
 begin
   if exists(select 1 from pg_extension where extname='pg_cron') then
@@ -6,16 +7,7 @@ begin
   end if;
 end;
 $$;
-create or replace function public.run_under_year_monthly_leave_accrual(
-  p_as_of date default (now() at time zone 'Asia/Seoul')::date
-)
-returns table(user_id uuid,granted_days numeric,created_runs integer)
-language plpgsql security definer set search_path=pg_catalog,public as $$
-begin
-  raise exception 'monthly automatic accrual paused';
-end;
-$$;
-revoke all on function public.run_under_year_monthly_leave_accrual(date) from public,anon,authenticated;
+drop function if exists public.run_under_year_monthly_leave_accrual(date);
 
 -- DB 스케줄러 예외도 제거하고 기존 원장 전용 미리보기 가드를 정확히 복원함.
 create or replace function public.preview_monthly_leave_accruals(p_as_of date)
@@ -152,10 +144,5 @@ $$;
 drop function if exists public.get_monthly_leave_accrual_candidates();
 drop function if exists public.revoke_monthly_leave_accrual(bigint,text);
 drop function if exists public.monthly_leave_absence_candidates(uuid,date,date,text);
-alter table public.leave_accrual_runs
-  drop column if exists attendance_mode,
-  drop column if exists revoked_at,
-  drop column if exists revoked_by,
-  drop column if exists revoke_reason,
-  drop column if exists revoke_ledger_id;
-delete from public.app_settings where key='monthly_leave_attendance_mode';
+-- attendance_mode·취소 감사 열·monthly_leave_attendance_mode 설정은 재적용 후에도 보존함.
+commit;

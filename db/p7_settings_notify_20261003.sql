@@ -3,11 +3,30 @@
 -- 기존 서버 함수 원문을 저장하여 실제 적용 직전 동작 그대로 되돌림. 설정값·알림·인사 이력은 건드리지 않음.
 begin;
 create table if not exists public.p7_settings_notify_backup(signature text primary key,definition text not null);
+alter table public.p7_settings_notify_backup add column if not exists applied_definition text;
+create table if not exists public.p7_settings_notify_backup_history(
+  signature text not null,apply_round bigint not null,definition text not null,
+  saved_at timestamptz not null default now(),primary key(signature,apply_round)
+);
 revoke all on public.p7_settings_notify_backup from public,anon,authenticated,service_role;
-do $$ declare signature text; begin
-  foreach signature in array array['public.queue_leave_push_event()','public.queue_payment_push_event()','public.queue_approval_push_event()','public.queue_notice_push_event()','public.queue_document_push_event()','public.queue_consultation_push_event()','public.queue_ai_billing_alert_push()','public.can_dispatch_ai_billing_push(bigint,uuid)','public.set_employment_status(uuid,text,date,text)'] loop
-    if to_regprocedure(signature) is null then raise exception 'P7 prerequisite missing: %',signature; end if;
-    insert into public.p7_settings_notify_backup values(signature,pg_get_functiondef(to_regprocedure(signature))) on conflict do nothing;
+revoke all on public.p7_settings_notify_backup_history from public,anon,authenticated,service_role;
+do $$ declare v_signature text;current_definition text;saved record;next_round bigint; begin
+  lock table public.p7_settings_notify_backup,public.p7_settings_notify_backup_history in share row exclusive mode;
+  foreach v_signature in array array['public.queue_leave_push_event()','public.queue_payment_push_event()','public.queue_approval_push_event()','public.queue_notice_push_event()','public.queue_document_push_event()','public.queue_consultation_push_event()','public.queue_ai_billing_alert_push()','public.can_dispatch_ai_billing_push(bigint,uuid)','public.set_employment_status(uuid,text,date,text)'] loop
+    if to_regprocedure(v_signature) is null then raise exception 'P7 prerequisite missing: %',v_signature; end if;
+    current_definition:=pg_get_functiondef(to_regprocedure(v_signature));
+    select b.* into saved from public.p7_settings_notify_backup b where b.signature=v_signature;
+    if not found then
+      insert into public.p7_settings_notify_backup(signature,definition) values(v_signature,current_definition);
+      insert into public.p7_settings_notify_backup_history(signature,apply_round,definition) values(v_signature,1,current_definition);
+    elsif current_definition is distinct from saved.definition and current_definition is distinct from saved.applied_definition then
+      insert into public.p7_settings_notify_backup_history(signature,apply_round,definition)
+        values(v_signature,1,saved.definition) on conflict do nothing;
+      -- 되돌린 뒤 새 정상 수정이 있으면 그 회차 원문을 추가로 보존하고 이번 되돌리기 기준으로 사용함.
+      select coalesce(max(h.apply_round),0)+1 into next_round from public.p7_settings_notify_backup_history h where h.signature=v_signature;
+      insert into public.p7_settings_notify_backup_history(signature,apply_round,definition) values(v_signature,next_round,current_definition);
+      update public.p7_settings_notify_backup b set definition=current_definition where b.signature=v_signature;
+    end if;
   end loop;
 end $$;
 -- 미설정 칸은 기존 트리거가 정한 대상·처리단계를 그대로 사용함(문의의 실장만 기본 끔).
@@ -83,7 +102,7 @@ begin
   else return new; end if;
   for recipient in select user_id from public.p7_notify_recipients('approval',array(select user_id from public.profiles
     where role=target_role and active=true and approved=true and account_access_status='활성'),(select author from public.approval_docs where id=new.doc_id)) loop
-    perform public.enqueue_push_event(format('approval-doc:%s:step:%s:%s',new.doc_id,new.seq,recipient.user_id),recipient.user_id,'approval_submitted','{}'::jsonb);
+    perform public.enqueue_push_event(format('approval-doc:%s:step:%s:%s:%s',new.doc_id,new.seq,target_role,recipient.user_id),recipient.user_id,'approval_submitted','{}'::jsonb);
   end loop;
   return new;
 end; $$;
@@ -185,4 +204,5 @@ begin
 end $$;
 
 create or replace function public.set_employment_status(p_user_id uuid,p_employment_status text,p_effective_date date,p_reason text) returns void language plpgsql security definer set search_path='' as $$ declare a uuid;b text;s text;begin if p_employment_status not in('재직','자진퇴사','계약만료','권고사직') or p_effective_date is null then raise exception 'invalid employment status or effective date';end if;a:=public.assert_employment_lead(p_user_id);select employment_status,account_access_status into b,s from public.profiles where user_id=p_user_id for update;if p_employment_status='재직' and s='차단' then raise exception 'blocked account cannot return to employed status';end if;update public.profiles set employment_status=p_employment_status,employment_effective_date=p_effective_date,employment_reason=nullif(btrim(p_reason),''),active=(p_employment_status='재직'),approved=case when p_employment_status='재직' then approved else false end where user_id=p_user_id;if p_employment_status<>'재직' then update public.schedule_people set active=false,included_in_schedule=false where profile_user_id=p_user_id;end if;insert into public.profile_employment_history(user_id,from_status,to_status,effective_date,reason,account_action,acted_by) values(p_user_id,b,p_employment_status,p_effective_date,nullif(btrim(p_reason),''),'상태변경',a);end $$;
+update public.p7_settings_notify_backup b set applied_definition=pg_get_functiondef(to_regprocedure(b.signature));
 commit;

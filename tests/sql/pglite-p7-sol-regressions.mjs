@@ -17,8 +17,8 @@ const rosterSetup=`create role anon;create role authenticated;
 test('RED1 inactive linked and fallback roster stays blank and absent from report',()=>fixture(async db=>{
   await db.exec(rosterSetup);await db.exec(read('p7_job_group_backfill_20261003.sql'));
   assert.deepEqual((await db.query('select job_group from schedule_people')).rows,[{job_group:null},{job_group:null}]);
-  const report=await db.query(read('p7_job_group_backfill_20261003.sql').split('-- 아래 두 조회')[1].split('WITH confirmed')[1].split('COMMIT;')[0].replace(/^/,'WITH confirmed'));
-  assert.ok(report.rows.every(r=>!r.id),'inactive rows omitted from final missing-group report');
+  const reports=await db.exec('WITH confirmed'+read('p7_job_group_backfill_20261003.sql').split('-- 아래 두 조회')[1].split('WITH confirmed')[1].split('COMMIT;')[0]);
+  assert.equal(reports.at(-1).rows.length,0,'inactive rows omitted from final missing-group report');
 }));
 test('RED2 backup cannot be read or tampered with despite default API grants',()=>fixture(async db=>{
   await db.exec(rosterSetup);await db.exec(read('p7_job_group_backfill_20261003.sql'));
@@ -26,6 +26,11 @@ test('RED2 backup cannot be read or tampered with despite default API grants',()
   await db.exec('set role authenticated');
   await assert.rejects(db.query('select * from p7_job_group_backup_20261003'),/permission denied/);
   await assert.rejects(db.query("update p7_job_group_backup_20261003 set old_job_group='desk'"),/permission denied/);
+}));
+test('RED1 inactive unlinked unique fallback roster stays blank',()=>fixture(async db=>{
+  await db.exec(rosterSetup.split("  ('22222222")[0].replace(/,\s*$/,';'));
+  await db.exec(read('p7_job_group_backfill_20261003.sql'));
+  assert.equal((await db.query('select job_group from schedule_people')).rows[0].job_group,null);
 }));
 test('RED3 pending fields do not fill profile; employee cannot forge frozen job; signing uses sent job',()=>fixture(async db=>{
   await db.exec(`create role anon;create role authenticated;create schema auth;
@@ -38,16 +43,19 @@ test('RED3 pending fields do not fill profile; employee cannot forge frozen job;
     insert into profiles values('${uid}','서명직원','진료실',null);
     alter table contracts enable row level security;
     create policy contracts_select on contracts for select to authenticated using(user_id=auth.uid() or my_role()='owner');
-    grant usage on schema auth to authenticated;grant select,insert,update on contracts to authenticated;grant select on profiles to authenticated;`);
+    grant usage on schema auth to authenticated;grant select,insert,update on contracts to authenticated;grant select on profiles to authenticated;
+    -- 실제 서명 RPC와 같은 SECURITY DEFINER 경계: 직원은 자신의 대기 계약만 서명함.
+    create function test_sign_contract(p_id bigint) returns void language sql security definer as $$update contracts set status='서명완료' where id=p_id and user_id=auth.uid() and status='대기'$$;`);
   const policy=read('hr_policies.sql');
   await db.exec(policy.slice(policy.indexOf('drop policy if exists contracts_insert_owner'),policy.indexOf('-- approval_docs',policy.indexOf('drop policy if exists contracts_insert_owner'))));
   await db.exec(read('p7_contract_job_group_20261003.sql'));
+  assert.equal((await db.query("select has_function_privilege('authenticated','p7_contract_job_group_sync()','EXECUTE') allowed")).rows[0].allowed,false);
   await db.exec(`set role authenticated;select set_config('test.uid','${uid}',false);select set_config('test.actor','owner',false);
     insert into contracts(id,user_id,status,fields) values(1,'${uid}','대기','{"job_group":"desk"}');
     select set_config('test.actor','staff',false);update contracts set fields='{"job_group":"lab"}' where id=1;`);
   assert.equal((await db.query('select job_group from profiles')).rows[0].job_group,null,'pending employee fields never propagate');
   await assert.rejects(db.query("update contracts set sent_job_group='lab' where id=1"),/frozen contract job group/);
-  await db.exec("update contracts set status='서명완료' where id=1");
+  await db.exec("select test_sign_contract(1)");
   assert.equal((await db.query('select job_group from profiles')).rows[0].job_group,'desk','signed value is original trusted send value');
 }));
 test('RED5 approval migration and rollback rerun; foreign definition preserved',()=>fixture(async db=>{
@@ -67,4 +75,13 @@ test('RED6 onboarding migration and rollback rerun; foreign function and trigger
   await db.exec('create function foreign_gate() returns trigger language plpgsql as $$begin return new;end$$;drop trigger p7_onboarding_evidence_gate on onboarding_checks;create trigger p7_onboarding_evidence_gate before insert on onboarding_checks for each row execute function foreign_gate()');
   await assert.rejects(db.exec(up),/P7 onboarding trigger conflict/);await db.exec('rollback');
   assert.equal((await db.query("select tgfoid='foreign_gate()'::regprocedure same from pg_trigger where tgname='p7_onboarding_evidence_gate'")).rows[0].same,true);
+}));
+test('YELLOW marketing preflight rejects tables without RLS before changing policies or settings',()=>fixture(async db=>{
+  await db.exec(`create table app_settings(key text,value text,label text);
+    create table marketing_expense_events(id uuid);create table marketing_merchant_rules(id uuid);
+    create table marketing_month_budgets(id uuid);create table marketing_foreign_charge_links(id uuid);
+    create function my_role() returns text language sql as $$select 'owner'::text$$;`);
+  await assert.rejects(db.exec(read('marketing_manager_view_20261003.sql')),/marketing RLS must be enabled/);
+  await db.exec('rollback');
+  assert.equal((await db.query('select count(*)::int n from app_settings')).rows[0].n,0);
 }));
