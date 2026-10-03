@@ -76,7 +76,9 @@ async function validatePngCompression(bytes: Uint8Array) {
 async function appendSecurityPledge(pdf: any, pledge: any, kit: any, fontData: string) {
   const contractPages = pdf.getPages().slice();
   pdf.registerFontkit(kit);
-  const font = await pdf.embedFont(Uint8Array.from(atob(fontData), c => c.charCodeAt(0)), { subset: true });
+  let fontBytes = Uint8Array.from(atob(fontData), c => c.charCodeAt(0));
+  if (fontData.startsWith("H4sI")) fontBytes = new Uint8Array(await new Response(new Blob([fontBytes]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer());
+  const font = await pdf.embedFont(fontBytes, { subset: true });
   const size = 10, lineHeight = 16, margin = 42, maxWidth = 511;
   const newPage = () => { const p = pdf.addPage(); p.setSize(595, 842); return p; };
   let page = newPage(), y = 800;
