@@ -396,7 +396,7 @@ test('화면: 원장에게는 「📝 글 고치기 · 🔢 숫자·기준 · �
   assert.match(sec,/<input id="hubTxtSearch"/);
   assert.equal((sec.match(/<details class="hub-grp" data-hub-group="/g)||[]).length,3+11+17+12+9+5+14+1+3+1,'화면별 접기: 탭 이름·메뉴 묶음 이름·계정·권한 + 차례 2(내 서류함 8 · 업무자료 3) + 차례 3(출퇴근 5 · 근무표 2 · 연차 4) + 차례 4(결재함 4 · 공지 3 · 캘린더 3 · 건의함 2) + 차례 5(문의함 6 · 상담일지 3) + 시간 표시 1(⏰ 시간 표시 · 2026-10-02)');
   const n=(sec.match(/data-hub-text-save="\d+"/g)||[]).length;
-  assert.equal(n,21+4+19+192+439+147+168+188+329+8+2+5+35+27,'키마다 저장 단추(P7 이름 보기·계약 직무 별칭·충돌 안내 키를 포함함)');
+  assert.equal(n,21+4+19+192+439+147+168+188+329+8+2+5+35+27+12,'키마다 저장 단추(P7 이름 보기·계약 직무 별칭·충돌 안내 키를 포함함)');
   assert.equal((sec.match(/data-hub-text-reset="\d+"/g)||[]).length,n);
   assert.match(sec,/고친 것 1개/);assert.match(sec,/<span class="b ok">고침<\/span>/);
   assert.match(sec,/이름표: tab\.home/);
@@ -450,7 +450,7 @@ test('화면: 🔢 숫자·기준 — 근태 기준 7개, 잘못된 값은 DB �
   await t.render({id:'o1',role:'owner'});
   await t.click('[hub-subtab]=settings');
   const sec=t.section.innerHTML;
-  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,7+5+2+4+1+8+1+1+6);
+  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,7+5+2+4+1+8+1+1+6+1);
   assert.match(sec,/id="hubSetIn_0" type="time" value="09:50"/,'지금 값(표에서 읽음)');
   assert.match(sec,/처음 값 09:40/);
   assert.match(sec,/<span id="hubSetBadge_0"><span class="b ok">고침<\/span><\/span>/);
@@ -556,4 +556,14 @@ test('원본 글 검사: 로그인 전 화면 글은 옮기지 않았고, hub-te
   for(const fn of ['doLogin','doSignup','sendPasswordReset','showPendingGate'])assert.doesNotMatch(hr.match(new RegExp('(async )?function '+fn+'\\([\\s\\S]*?\\n\\}'))?.[0]||'',/hubText/,fn);
   assert.notEqual(fs.readFileSync(path.join(root,'hub-texts.js'))[0],0xEF);
   assert.match(js,/hub-texts:test-start/);
+});
+
+test('원장 월차 방식 선택 화면: 글 설정 반영·저장·기본 자동 복원·잘못된 방식 거절',async()=>{
+  const t=ui({texts:[{key:'p7.monthly.mode_label',value:'신입 월차 방식'},{key:'p7.monthly.mode_hint',value:'우리 월차 안내'},{key:'p7.monthly.mode_auto',value:'바로 적립'},{key:'p7.monthly.mode_schedule',value:'근무 확인'}]});
+  await t.render({id:'o1',role:'owner'});await t.click('[hub-subtab]=settings');
+  assert.match(t.section.innerHTML,/신입 월차 방식/);assert.match(t.section.innerHTML,/우리 월차 안내/);assert.match(t.section.innerHTML,/<option value="auto" selected>바로 적립<\/option>/);assert.match(t.section.innerHTML,/<option value="published_schedule">근무 확인<\/option>/);
+  const index=35,before=t.state.calls.length;
+  t.el('#hubSetIn_'+index).value='bad';await t.click('[hub-set-save]='+index);assert.equal(t.state.calls.length,before);
+  t.el('#hubSetIn_'+index).value='published_schedule';await t.click('[hub-set-save]='+index);assert.equal(t.state.settings.find(r=>r.key==='monthly_leave_attendance_mode').value,'published_schedule');
+  await t.click('[hub-set-reset]='+index);assert.equal(t.state.settings.find(r=>r.key==='monthly_leave_attendance_mode').value,'auto');
 });

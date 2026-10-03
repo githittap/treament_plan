@@ -27,6 +27,7 @@ try{
   }
   const migration=fs.readFileSync('db/under_year_monthly_leave_20261003.sql','utf8');
   await db.exec(migration);
+  await q("update app_settings set value='published_schedule' where key='monthly_leave_attendance_mode'");
   // pg_cron이 없는 환경에서도 함수는 준비되고, cron 호출은 건너뜀.
   assert.equal((await q("select to_regnamespace('cron') is null absent"))[0].absent,true);
   // 매일 공표 근무표가 있고, 이채연·수기상계 직원은 출근 이력이 있음.
@@ -58,8 +59,50 @@ try{
   assert.equal((await q("select * from run_under_year_monthly_leave_accrual('2027-09-18')")).length,0);
   assert.equal((await q("select count(*)::int n from leave_accrual_runs where accrual_kind='annual'"))[0].n,0);
   await assert.rejects(q("select * from run_under_year_monthly_leave_accrual('2099-01-01')"),/future as-of/);
+  // 새 기본 auto는 근무표가 없어도 적립됨. 같은 후보 함수를 조회·자동 경로에서 재사용함.
+  const automatic='55555555-5555-5555-5555-555555555555',manager='66666666-6666-6666-6666-666666666666';
+  await db.exec(`insert into profiles(user_id,name,hire_date,role) values('${automatic}','자동월차','2026-09-18','staff'),('${manager}','매니저',null,'manager');
+    update app_settings set value='auto' where key='monthly_leave_attendance_mode';`);
+  result=await q("select * from run_under_year_monthly_leave_accrual('2026-10-18')");
+  assert.equal(Number(result.find(r=>r.user_id===automatic).granted_days),1);
+  const candidates=()=>q(`select work_date::text ds from monthly_leave_absence_candidates('${automatic}','2026-09-18','2026-10-18','auto')`);
+  assert.equal((await candidates()).length,21);
+  assert.equal((await candidates()).some(r=>['2026-09-19','2026-09-20'].includes(r.ds)),false);
+  await q("insert into holidays values('2026-09-21')");assert.equal((await candidates()).length,20);
+  await q(`insert into attendance values('${automatic}','2026-09-22','09:40','18:30')`);assert.equal((await candidates()).length,19);
+  await q(`insert into attendance_issue_resolutions values('${automatic}','2026-09-23')`);assert.equal((await candidates()).length,18);
+  await q(`insert into leave_requests values('${automatic}','2026-09-24','2026-09-24','승인','연차')`);assert.equal((await candidates()).length,17);
+  await q(`insert into attendance_manual_entries values('${automatic}','2026-09-25','대기')`);assert.equal((await candidates()).length,16);
+  await q(`insert into schedules values('${automatic}','2026-09-28',1,'off')`);assert.equal((await candidates()).length,15);
+  await db.exec(`insert into schedules values('${automatic}','2026-10-05',1,'off');update schedule_weeks set status='초안' where week_start='2026-10-05';`);
+  assert.equal((await candidates()).some(r=>r.ds==='2026-10-05'),true,'draft off is not an exclusion');
+  await q("insert into app_settings(key,value) values('absence_exclude_pending_manual','false') on conflict(key) do update set value=excluded.value");assert.equal((await candidates()).length,16);
+  await q("update app_settings set value='true' where key='absence_exclude_pending_manual'");
+  const run=(await q(`select id from leave_accrual_runs where user_id='${automatic}'`))[0].id;
+  await q(`select set_config('app.uid','${owner}',false)`);
+  const list=await q('select * from get_monthly_leave_accrual_candidates()');assert.equal(list.find(r=>r.user_id===automatic).candidate_dates.length,15);
+  await assert.rejects(q(`select * from revoke_monthly_leave_accrual(${run},' ')`),/reason required/);
+  result=await q(`select * from revoke_monthly_leave_accrual(${run},'결근 후보 확인')`);assert.equal(Number(result[0].revoked_days),1);
+  assert.equal(Number((await q(`select sum(days) balance from leave_ledger where user_id='${automatic}'`))[0].balance),0);
+  result=await q(`select * from revoke_monthly_leave_accrual(${run},'다시 클릭')`);assert.equal(result[0].already_revoked,true);
+  assert.equal((await q(`select count(*)::int n from leave_ledger where user_id='${automatic}' and kind='조정'`))[0].n,1);
+  const audit=(await q(`select revoked_at,revoked_by,revoke_reason,revoke_ledger_id from leave_accrual_runs where id=${run}`))[0];
+  assert.ok(audit.revoked_at&&audit.revoke_ledger_id);assert.equal(audit.revoked_by,owner);assert.equal(audit.revoke_reason,'결근 후보 확인');
+  await q("select set_config('app.uid','',false)");
+  assert.equal((await q("select * from run_under_year_monthly_leave_accrual('2026-10-19')")).some(r=>r.user_id===automatic),false);
+  result=await q("select * from run_under_year_monthly_leave_accrual('2026-11-18')");assert.equal(Number(result.find(r=>r.user_id===automatic).granted_days),1);
+  assert.equal(Number((await q(`select sum(days) balance from leave_ledger where user_id='${automatic}'`))[0].balance),1);
+  await q("update app_settings set value='published_schedule' where key='monthly_leave_attendance_mode'");
+  assert.equal((await q("select * from run_under_year_monthly_leave_accrual('2026-12-18')")).some(r=>r.user_id===automatic),false,'old mode requires published schedule');
+  // Migration reruns preserve the owner-selected setting and revoke audit.
+  await db.exec(migration);assert.equal((await q("select value from app_settings where key='monthly_leave_attendance_mode'"))[0].value,'published_schedule');
   await db.exec(`grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;grant select on profiles to authenticated;set role authenticated;select set_config('app.uid','${owner}',false);`);
   await assert.rejects(q("select * from run_under_year_monthly_leave_accrual('2026-10-18')"),/permission denied/);
+  for(const actor of [manager,staff]){
+    await q(`select set_config('app.uid','${actor}',false)`);
+    await assert.rejects(q(`select * from revoke_monthly_leave_accrual(${run},'권한 시험')`),/owner execution required/);
+    await assert.rejects(q('select * from get_monthly_leave_accrual_candidates()'),/owner execution required/);
+  }
   await q(`select set_config('app.uid','${staff}',false)`);
   await assert.rejects(q("select * from preview_monthly_leave_accruals('2026-10-18')"),/owner execution required/);
   await q("select set_config('app.uid','',false)");
@@ -73,10 +116,13 @@ try{
   await db.exec(cronBlock);await db.exec(cronBlock);
   let jobs=await q('select * from cron.job');assert.equal(jobs.length,1);assert.equal(jobs[0].schedule,'10 15 * * *');assert.match(jobs[0].command,/run_under_year_monthly_leave_accrual/);
   const before=(await q('select count(*)::int n from leave_accrual_runs'))[0].n;
+  const ledgerBefore=await q('select * from leave_ledger order by id');
   await db.exec(fs.readFileSync('db/under_year_monthly_leave_20261003_rollback.sql','utf8').replace("exists(select 1 from pg_extension where extname='pg_cron')","to_regnamespace('cron') is not null"));
   await assert.rejects(q("select * from run_under_year_monthly_leave_accrual('2026-10-18')"),/monthly automatic accrual paused/);
   assert.equal((await q('select schedule from cron.job'))[0].schedule,'paused');
   await assert.rejects(q("select * from preview_monthly_leave_accruals('2026-10-18')"),/owner execution required/);
   assert.equal((await q('select count(*)::int n from leave_accrual_runs'))[0].n,before);
-  console.log('P7_MONTHLY_AUTO_PASS: 10/17·10/18·11/17·11/18 경계, 중복·수기상계·미기록·재확인·최대11·연차제외·호출권한·되돌리기·cron 합성 예약/해제');
+  assert.deepEqual(await q('select * from leave_ledger order by id'),ledgerBefore);
+  assert.equal((await q("select count(*)::int n from app_settings where key='monthly_leave_attendance_mode'"))[0].n,0);
+  console.log('P7_MONTHLY_AUTO_PASS: auto 근무표 없음·평일/공휴일/출근/소명/승인휴가/수기/공표휴무·원장취소/중복/다음달·직원/매니저거절·published_schedule·기록보존 롤백 +  10/17·10/18·11/17·11/18 경계, 중복·수기상계·미기록·재확인·최대11·연차제외·호출권한·되돌리기·cron 합성 예약/해제');
 }finally{await db.close();}

@@ -1,7 +1,93 @@
 -- P7 2장: 운영 적용 전 검수할 SQL 초안. monthly_leave_accrual_draft.sql 적용 뒤 실행함.
 -- 입사일 기준 매월 같은 날(월말은 그 달 마지막 날), 첫해 최대 11일만 자동 처리함.
 -- 기존 누적 목표·수기 상계·leave_accrual_runs 중복 방지를 그대로 사용함.
--- 공표된 근무표에서 빠진 날짜는 개근을 추측하지 않고 기존 수동 확인 화면에 남김.
+-- 기본 auto는 입사일마다 적립하고 결근/미기록 후보는 원장이 사후 확인함.
+insert into public.app_settings(key,value,label)
+values('monthly_leave_attendance_mode','auto','1년 미만 월차 적립 방식') on conflict(key) do nothing;
+alter table public.leave_accrual_runs
+  add column if not exists attendance_mode text,
+  add column if not exists revoked_at timestamptz,
+  add column if not exists revoked_by uuid references public.profiles(user_id),
+  add column if not exists revoke_reason text,
+  add column if not exists revoke_ledger_id bigint references public.leave_ledger(id);
+
+-- 자동 적립과 원장 후보 조회가 같은 제외 규칙을 사용함. 기간 끝은 포함하지 않음.
+create or replace function public.monthly_leave_absence_candidates(
+  p_user_id uuid,p_start date,p_end date,p_mode text default 'auto'
+) returns table(work_date date)
+language sql stable security invoker set search_path=pg_catalog,public as $$
+  select d::date
+  from generate_series(p_start,p_end-1,interval '1 day') d
+  where not exists(select 1 from public.holidays h where h.date=d::date)
+    and (
+      (p_mode='published_schedule' and not exists(
+        select 1 from public.schedules s join public.schedule_weeks w on w.week_start=s.week_start and w.status='공표'
+        where s.user_id=p_user_id and s.week_start=d::date-(extract(isodow from d)::integer-1) and s.day=extract(dow from d)::integer
+      ))
+      or (
+        (p_mode='auto' and extract(isodow from d) between 1 and 5
+          and not exists(select 1 from public.schedules s join public.schedule_weeks w on w.week_start=s.week_start and w.status='공표'
+            where s.user_id=p_user_id and s.week_start=d::date-(extract(isodow from d)::integer-1) and s.day=extract(dow from d)::integer and s.shift='off'))
+        or (p_mode='published_schedule' and exists(
+          select 1 from public.schedules s join public.schedule_weeks w on w.week_start=s.week_start and w.status='공표'
+          where s.user_id=p_user_id and s.week_start=d::date-(extract(isodow from d)::integer-1) and s.day=extract(dow from d)::integer and s.shift<>'off'
+        ))
+      ) and not exists(select 1 from public.attendance a where a.user_id=p_user_id and a.work_date=d::date)
+        and not exists(select 1 from public.attendance_issue_resolutions a where a.user_id=p_user_id and a.work_date=d::date)
+        and not exists(select 1 from public.leave_requests l where l.user_id=p_user_id and l.status='승인' and d::date between l.date_from and l.date_to)
+        and not exists(select 1 from public.attendance_manual_entries a where a.user_id=p_user_id and a.work_date=d::date and a.status in ('대기','실장승인','원장확정')
+          and coalesce((select value from public.app_settings where key='absence_exclude_pending_manual'),'true')<>'false')
+    )
+  order by d;
+$$;
+revoke all on function public.monthly_leave_absence_candidates(uuid,date,date,text) from public,anon,authenticated;
+
+create or replace function public.get_monthly_leave_accrual_candidates()
+returns table(run_id bigint,user_id uuid,due_date date,days numeric,candidate_dates date[],revoked_at timestamptz)
+language plpgsql security definer set search_path=pg_catalog,public as $$
+begin
+  if auth.uid() is null or coalesce(public.my_role(),'')<>'owner'
+    or not exists(select 1 from public.profiles p where p.user_id=auth.uid() and p.active=true and p.approved=true) then
+    raise exception 'owner execution required';
+  end if;
+  return query select r.id,r.user_id,r.due_date,r.days,
+    array(select c.work_date from public.monthly_leave_absence_candidates(r.user_id,
+      (p.hire_date+make_interval(months=>r.months_completed-1))::date,r.due_date,'auto') c),r.revoked_at
+    from public.leave_accrual_runs r join public.profiles p on p.user_id=r.user_id
+    where r.accrual_kind='monthly' and r.attendance_mode='auto' and r.days>0
+    order by r.user_id,r.due_date;
+end;
+$$;
+revoke all on function public.get_monthly_leave_accrual_candidates() from public,anon;
+grant execute on function public.get_monthly_leave_accrual_candidates() to authenticated;
+
+create or replace function public.revoke_monthly_leave_accrual(p_run_id bigint,p_reason text)
+returns table(run_id bigint,revoked_days numeric,already_revoked boolean)
+language plpgsql security definer set search_path=pg_catalog,public as $$
+declare item public.leave_accrual_runs%rowtype; target_user uuid; adjustment_id bigint;
+begin
+  if auth.uid() is null or coalesce(public.my_role(),'')<>'owner'
+    or not exists(select 1 from public.profiles p where p.user_id=auth.uid() and p.active=true and p.approved=true) then
+    raise exception 'owner execution required';
+  end if;
+  if nullif(btrim(p_reason),'') is null then raise exception 'reason required'; end if;
+  select r.user_id into target_user from public.leave_accrual_runs r where r.id=p_run_id;
+  if not found then raise exception 'monthly accrual not found'; end if;
+  -- 자동 적립과 같은 직원 잠금을 먼저 잡은 뒤 행 잠금을 잡아 중복·교착을 막음.
+  perform pg_advisory_xact_lock(hashtextextended(target_user::text,0));
+  select r.* into item from public.leave_accrual_runs r where r.id=p_run_id for update;
+  if item.accrual_kind<>'monthly' or item.days<=0 then raise exception 'monthly credited accrual required'; end if;
+  if item.revoked_at is not null then
+    return query select item.id,0::numeric,true; return;
+  end if;
+  insert into public.leave_ledger(user_id,kind,days,note)
+    values(item.user_id,'조정',-item.days,format('월차 취소: %s / %s',item.due_date,btrim(p_reason))) returning id into adjustment_id;
+  update public.leave_accrual_runs set revoked_at=now(),revoked_by=auth.uid(),revoke_reason=btrim(p_reason),revoke_ledger_id=adjustment_id where id=item.id;
+  return query select item.id,item.days,false;
+end;
+$$;
+revoke all on function public.revoke_monthly_leave_accrual(bigint,text) from public,anon;
+grant execute on function public.revoke_monthly_leave_accrual(bigint,text) to authenticated;
 
 -- 기존 미리보기 계산을 DB 스케줄러(postgres, 로그인 없음)에서도 부를 수 있게 함.
 -- authenticated·anon과 비활성 원장에 대한 기존 가드는 그대로 유지함.
@@ -150,11 +236,14 @@ declare
   new_run_id bigint;
   created_ids bigint[]:='{}'::bigint[];
   period_start date;
+  attendance_mode text;
 begin
   -- 이 함수는 DB 스케줄러 전용임. 로그인 이용자의 RPC에서는 실행하지 않음.
   if auth.uid() is not null then raise exception 'database scheduler execution required'; end if;
   if p_as_of is null then raise exception 'as-of date required'; end if;
   if p_as_of>(now() at time zone 'Asia/Seoul')::date then raise exception 'future as-of date not allowed'; end if;
+  attendance_mode:=coalesce((select value from public.app_settings where key='monthly_leave_attendance_mode'),'auto');
+  if attendance_mode not in ('auto','published_schedule') then raise exception 'invalid monthly leave attendance mode'; end if;
   for candidate in
     select preview.user_id,preview.hire_date,preview.months_completed,preview.due_date
     from public.preview_monthly_leave_accruals(p_as_of) preview
@@ -173,24 +262,8 @@ begin
         where r.user_id=candidate.user_id and r.due_date=(candidate.hire_date+make_interval(months=>prior.n))::date)
     ) then continue; end if;
     period_start:=(candidate.hire_date+make_interval(months=>candidate.months_completed-1))::date;
-    -- 기존 결근/미기록 후보 규칙: 휴무·공휴일·출근 기록·승인 휴가·수기 확인 건은 제외함.
-    -- 지각 분·반차·조퇴를 새로운 개근 탈락 규칙으로 추가하지 않음.
-    if exists(
-      select 1 from generate_series(period_start,candidate.due_date-1,interval '1 day') d
-      where not exists(select 1 from public.holidays h where h.date=d::date)
-        and (
-          not exists(select 1 from public.schedules s join public.schedule_weeks w on w.week_start=s.week_start and w.status='공표'
-            where s.user_id=candidate.user_id and s.week_start=(d::date-(extract(isodow from d)::integer-1)) and s.day=extract(dow from d)::integer)
-          or (
-            exists(select 1 from public.schedules s join public.schedule_weeks w on w.week_start=s.week_start and w.status='공표'
-              where s.user_id=candidate.user_id and s.week_start=(d::date-(extract(isodow from d)::integer-1)) and s.day=extract(dow from d)::integer and s.shift<>'off')
-            and not exists(select 1 from public.attendance a where a.user_id=candidate.user_id and a.work_date=d::date)
-            and not exists(select 1 from public.attendance_issue_resolutions a where a.user_id=candidate.user_id and a.work_date=d::date)
-            and not exists(select 1 from public.leave_requests l where l.user_id=candidate.user_id and l.status='승인' and d::date between l.date_from and l.date_to)
-            and not exists(select 1 from public.attendance_manual_entries a where a.user_id=candidate.user_id and a.work_date=d::date and a.status in ('대기','실장승인','원장확정')
-              and coalesce((select value from public.app_settings where key='absence_exclude_pending_manual'),'true')<>'false')
-          )
-        )
+    if attendance_mode='published_schedule' and exists(
+      select 1 from public.monthly_leave_absence_candidates(candidate.user_id,period_start,candidate.due_date,'published_schedule')
     ) then continue; end if;
     select greatest(coalesce(sum(case when ll.kind in ('부여','조정') then ll.days else 0 end),0),0)::numeric
       into current_credit from public.leave_ledger ll where ll.user_id=candidate.user_id;
@@ -204,8 +277,8 @@ begin
         returning id into new_ledger_id;
     end if;
     -- 자동 확인은 사람 이름을 사칭하지 않음. 확인자 null + 확인 시각으로 구분함.
-    insert into public.leave_accrual_runs(user_id,due_date,accrual_kind,months_completed,target_days,days,ledger_id,attendance_confirmed_by,attendance_confirmed_at)
-      values(candidate.user_id,candidate.due_date,'monthly',candidate.months_completed,candidate.months_completed,actual_grant,new_ledger_id,null,now())
+    insert into public.leave_accrual_runs(user_id,due_date,accrual_kind,months_completed,target_days,days,ledger_id,attendance_confirmed_by,attendance_confirmed_at,attendance_mode)
+      values(candidate.user_id,candidate.due_date,'monthly',candidate.months_completed,candidate.months_completed,actual_grant,new_ledger_id,null,now(),attendance_mode)
       returning id into new_run_id;
     created_ids:=array_append(created_ids,new_run_id);
   end loop;

@@ -147,3 +147,15 @@ begin
 end;
 $$;
 
+
+-- 새 기능만 제거함. 적립·취소 조정 장부와 실행 행은 모두 보존함.
+drop function if exists public.get_monthly_leave_accrual_candidates();
+drop function if exists public.revoke_monthly_leave_accrual(bigint,text);
+drop function if exists public.monthly_leave_absence_candidates(uuid,date,date,text);
+alter table public.leave_accrual_runs
+  drop column if exists attendance_mode,
+  drop column if exists revoked_at,
+  drop column if exists revoked_by,
+  drop column if exists revoke_reason,
+  drop column if exists revoke_ledger_id;
+delete from public.app_settings where key='monthly_leave_attendance_mode';

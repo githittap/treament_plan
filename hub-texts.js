@@ -1783,6 +1783,7 @@ const HUB_SETTING_DEFS=[
   {key:'att.issue.evidence_required',screen:'🕘 근태 기준',label:'소명 증거 파일 제출',where:'지문누락 소명 — 1이면 파일을 꼭 내고 0이면 생략 가능',def:'1',kind:'int',min:0,max:1,unit:'1=꼭 냄 · 0=안 내도 됨'},
   {key:'att.issue.evidence_max',screen:'🕘 근태 기준',label:'소명 한 건에 낼 수 있는 파일 수',where:'지문누락 소명 — 기존 파일과 새 파일을 합친 최대 개수',def:'5',kind:'int',min:1,max:10,unit:'개'},
   {key:'att.myissue_list_limit',screen:'🕘 근태 기준',label:'내 소명 목록에 보이는 건수',where:'출퇴근 — 내 소명 목록에 최근 몇 건까지 보여 줄지',def:'20',kind:'int',min:5,max:100,unit:'건'},
+  {key:'monthly_leave_attendance_mode',screen:'🌿 연차 기준',label:'1년 미만 월차 적립 방식',labelKey:'p7.monthly.mode_label',where:'자동은 근무표 없이 매달 적립하고 원장이 결근 후보를 확인해 뺄 수 있습니다. 근무표 확인은 공표된 근무표로 개근 확인 뒤 적립합니다.',whereKey:'p7.monthly.mode_hint',def:'auto',kind:'enum',options:[{value:'auto',label:'매달 자동',labelKey:'p7.monthly.mode_auto'},{value:'published_schedule',label:'공표 근무표 확인',labelKey:'p7.monthly.mode_schedule'}]},
 ];
 function hubSettingDefByKey(key){
   for(let i=0;i<HUB_SETTING_DEFS.length;i++)if(HUB_SETTING_DEFS[i].key===key)return HUB_SETTING_DEFS[i];
@@ -1791,6 +1792,7 @@ function hubSettingDefByKey(key){
 // 값 검사: 화면에서 막고, 읽을 때는 모양이 틀리면 기본값을 쓴다. 통과하면 {ok:true,value}, 아니면 {ok:false,reason}.
 function hubSettingValidate(def,raw){
   const v=String(raw==null?'':raw).trim();
+  if(def.kind==='enum')return def.options.some(o=>o.value===v)?{ok:true,value:v}:{ok:false,reason:hubText('p7.monthly.mode_invalid','월차 적립 방식을 선택해 주세요.')};
   if(def.kind==='stringlist'){
     try{const a=JSON.parse(v);if(Array.isArray(a)&&a.length<=100&&a.every(x=>typeof x==='string'&&x.trim()&&x.length<=100))return {ok:true,value:JSON.stringify(a.map(x=>x.trim()))};}catch(e){}
     return {ok:false,reason:'이름 목록은 ["*_test","테스트"] 모양으로 적어 주세요. 모두 표시하려면 []를 적어요.'};
@@ -2124,6 +2126,19 @@ function hubNotifyDefault(row,col){
 function hubNotifyEnabled(row,col){const raw=hubSetting('notify.'+row+'.'+col,'');return raw==='true'?true:raw==='false'?false:hubNotifyDefault(row,col);}
 function hubTextDefsP7(add){
   const S='⚙️ 허브 설정 › 알림·직무별 매뉴얼';
+  add('p7.monthly.mode_label',S,"1년 미만 월차 적립 방식","1년 미만 월차 적립 방식",[]);
+  add('p7.monthly.mode_hint',S,"자동은 근무표 없이 매달 적립하고 원장이 결근 후보를 확인해 뺄 수 있습니다. 근무표 확인은 공표된 근무표로 개근 확인 뒤 적립합니다.","자동은 근무표 없이 매달 적립하고 원장이 결근 후보를 확인해 뺄 수 있습니다. 근무표 확인은 공표된 근무표로 개근 확인 뒤 적립합니다.",[]);
+  add('p7.monthly.mode_auto',S,"매달 자동","매달 자동",[]);
+  add('p7.monthly.mode_schedule',S,"공표 근무표 확인","공표 근무표 확인",[]);
+  add('p7.monthly.mode_invalid',S,"월차 적립 방식을 선택해 주세요.","월차 적립 방식을 선택해 주세요.",[]);
+  add('p7.monthly.candidate',S,"결근 후보 {n}일","결근 후보 {n}일",["n"]);
+  add('p7.monthly.revoke',S,"이 달 월차 빼기","이 달 월차 빼기",[]);
+  add('p7.monthly.confirm',S,"{date}에 적립한 월차 {days}일을 뺄까요?","{date}에 적립한 월차 {days}일을 뺄까요?",["date", "days"]);
+  add('p7.monthly.reason',S,"결근 후보 확인 후 월차 취소","결근 후보 확인 후 월차 취소",[]);
+  add('p7.monthly.revoked',S,"월차를 뺐습니다.","월차를 뺐습니다.",[]);
+  add('p7.monthly.load_fail',S,"월차 결근 후보를 불러오지 못했습니다: {msg}","월차 결근 후보를 불러오지 못했습니다: {msg}",["msg"]);
+  add('p7.monthly.revoke_fail',S,"월차를 빼지 못했습니다: {msg}","월차를 빼지 못했습니다: {msg}",["msg"]);
+
   [['p7.notify.title','🔔 알림 받는 사람'],['p7.notify.hint','칸을 켜거나 끄면 다음 알림부터 반영됩니다. 결재·결제 요청의 기본 알림은 현재 처리 단계의 담당자에게 갑니다.'],['p7.manual.title','📚 직무별 매뉴얼 주소'],['p7.manual.hint','주소를 비우면 기존 공용 매뉴얼을 사용합니다.'],['p7.save','저장'],['p7.saved','저장했습니다.'],['p7.invalid_url','http:// 또는 https:// 주소를 입력해 주세요.'],['p7.employment.title','직원 재직 상태 지정'],['p7.employment.status','재직 상태'],['p7.employment.date','유효일'],['p7.employment.reason','사유'],['p7.employment.no_access','재직 상태를 지정할 권한이 없습니다.'],['manual.card_title','업무 매뉴얼'],['manual.card_hint','내 직무에 맞는 업무 안내를 확인합니다.']].forEach(it=>add(it[0],S,it[1],it[1]));
   ['재직','자진퇴사','계약만료','권고사직'].forEach((label,i)=>add('p7.employment.state.'+i,S,'재직 상태 이름',label));
   HUB_NOTIFY_ROWS.forEach(it=>add('p7.notify.row.'+it[0],S,'알림 종류 이름',it[1]));
@@ -2292,6 +2307,7 @@ async function hubRenderSettingsSection(sec){
 }
 // 정수 목록은 화면에 「14, 30, 60」 모양으로 보여 주고, 기본값 비교도 같은 모양(검사를 거친 값)으로 한다.
 function hubSettingShow(d,raw){
+  if(d.kind==='enum'){const option=d.options.find(o=>o.value===raw)||d.options.find(o=>o.value===d.def);return hubText(option.labelKey,option.label);}
   if(d.kind==='bool')return raw==='true'?'켬':'끔';
   if(d.kind!=='intlist')return raw;
   const chk=hubSettingValidate(d,raw);
@@ -2314,7 +2330,9 @@ function hubDrawSettingsSection(sec){
       return '<details class="hub-grp" open><summary>'+hubEsc(g.name)+' <span class="sub">('+g.items.length+'개)</span></summary>'+
         g.items.map(function(x){
           const d=x.d,i=x.i,cur=hubSetting(d.key,d.def);
-          const input=d.kind==='bool'
+          const input=d.kind==='enum'
+            ?'<select id="hubSetIn_'+i+'">'+d.options.map(o=>'<option value="'+hubEsc(o.value)+'"'+(cur===o.value?' selected':'')+'>'+hubEsc(hubText(o.labelKey,o.label))+'</option>').join('')+'</select>'
+            :d.kind==='bool'
             ?'<select id="hubSetIn_'+i+'"><option value="true"'+(cur==='true'?' selected':'')+'>켬</option><option value="false"'+(cur!=='true'?' selected':'')+'>끔</option></select>'
             :d.kind==='time'
             ?'<input id="hubSetIn_'+i+'" type="time" value="'+hubEsc(cur)+'">'
@@ -2324,8 +2342,8 @@ function hubDrawSettingsSection(sec){
             ?'<input id="hubSetIn_'+i+'" type="text" inputmode="numeric" size="16" placeholder="14, 30, 60" value="'+hubEsc(hubSettingShow(d,cur))+'"> '+hubEsc(d.unit||'')+' (쉼표로 나눠 적어요)'
             :'<input id="hubSetIn_'+i+'" type="number" inputmode="'+(d.kind==='dec'?'decimal':'numeric')+'"'+(d.kind==='dec'?' step="0.1"':'')+' min="'+d.min+'" max="'+d.max+'" value="'+hubEsc(cur)+'"> '+hubEsc(d.unit||'');
           return '<div class="hub-row" data-hub-set-row="'+i+'">'+
-            '<div class="hub-where"><b>'+hubEsc(d.label)+'</b> <span id="hubSetBadge_'+i+'">'+hubBadge(!hubSettingIsDefault(d,cur))+'</span></div>'+
-            '<div class="sub">'+hubEsc(d.where)+' · 이름표: '+hubEsc(d.key)+'</div>'+
+            '<div class="hub-where"><b>'+hubEsc(d.labelKey?hubText(d.labelKey,d.label):d.label)+'</b> <span id="hubSetBadge_'+i+'">'+hubBadge(!hubSettingIsDefault(d,cur))+'</span></div>'+
+            '<div class="sub">'+hubEsc(d.whereKey?hubText(d.whereKey,d.where):d.where)+' · 이름표: '+hubEsc(d.key)+'</div>'+
             '<div class="sub">처음 값 '+hubEsc(hubSettingShow(d,d.def))+(d.kind==='int'||d.kind==='dec'?' · '+d.min+'~'+d.max+' 사이':(d.kind==='intlist'?' · 숫자 1~5개, 각각 '+d.min+'~'+d.max+' 사이':''))+'</div>'+
             '<div class="rowflex">'+input+'<button class="mini stamp" data-hub-set-save="'+i+'">저장</button><button class="mini" data-hub-set-reset="'+i+'">기본으로 되돌리기</button><span class="hint" id="hubSetMsg_'+i+'"></span></div>'+
             '</div>';
