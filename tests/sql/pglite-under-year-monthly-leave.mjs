@@ -123,6 +123,12 @@ try{
   await assert.rejects(q("select * from preview_monthly_leave_accruals('2026-10-18')"),/owner execution required/);
   assert.equal((await q('select count(*)::int n from leave_accrual_runs'))[0].n,before);
   assert.deepEqual(await q('select * from leave_ledger order by id'),ledgerBefore);
-  assert.equal((await q("select count(*)::int n from app_settings where key='monthly_leave_attendance_mode'"))[0].n,0);
+  assert.equal((await q("select value from app_settings where key='monthly_leave_attendance_mode'"))[0]?.value,'published_schedule','RED4 rollback preserves owner attendance mode');
+  assert.deepEqual((await q(`select revoked_at,revoked_by,revoke_reason,revoke_ledger_id from leave_accrual_runs where id=${run}`))[0],audit,'RED4 rollback preserves cancellation audit');
+  await db.exec(migration);
+  await q(`select set_config('app.uid','${owner}',false)`);
+  result=await q(`select * from revoke_monthly_leave_accrual(${run},'재적용 후 클릭')`);
+  assert.equal(result[0].already_revoked,true,'RED4 cancellation remains idempotent after rollback/reapply');
+  assert.deepEqual(await q('select * from leave_ledger order by id'),ledgerBefore,'RED4 no second deduction');
   console.log('P7_MONTHLY_AUTO_PASS: auto 근무표 없음·평일/공휴일/출근/소명/승인휴가/수기/공표휴무·원장취소/중복/다음달·직원/매니저거절·published_schedule·기록보존 롤백 +  10/17·10/18·11/17·11/18 경계, 중복·수기상계·미기록·재확인·최대11·연차제외·호출권한·되돌리기·cron 합성 예약/해제');
 }finally{await db.close();}

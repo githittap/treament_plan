@@ -68,6 +68,13 @@ await setting('notify.payment.chief','false');await setting('notify.payment.mana
 await db.exec(`insert into approval_docs(author) values('${id(5)}');insert into approval_steps(doc_id,seq,status) values(1,1,'대기')`);assert.deepEqual(await recipients('approval_submitted','approval-doc:1:%'),expected(2));
 await db.exec("update approval_steps set status='승인' where id=1");assert.deepEqual(await recipients('approval_submitted','approval-doc:1:%'),expected(1,2),'설정을 안 바꾸면 결재 기본 단계별 대상 유지');
 await setting('notify.approval.chief','false');await setting('notify.approval.desk','true');await db.exec(`insert into approval_docs(author) values('${id(5)}');insert into approval_steps(doc_id,seq,status) values(2,1,'대기')`);assert.deepEqual(await recipients('approval_submitted','approval-doc:2:%'),expected(4));
+await setting('notify.approval.owner','true');
+await db.exec(`insert into approval_docs(author) values('${id(5)}');insert into approval_steps(doc_id,seq,status) values(3,1,'대기')`);
+const ownerAlerts=async()=> (await db.query('select id,event_key from push_events where recipient_id=$1 and event_key like $2 order by id',[id(1),'approval-doc:3:%'])).rows;
+const firstOwnerAlerts=await ownerAlerts();assert.equal(firstOwnerAlerts.length,1);
+await db.exec("update approval_steps set status='승인' where doc_id=3 and seq=1");
+assert.equal((await ownerAlerts()).length,2,'RED8 owner gets a new notification when chief approves after initial submission');
+assert.notEqual((await ownerAlerts())[1].id,firstOwnerAlerts[0].id);
 await db.exec(`insert into notices(author_id) values('${id(5)}')`);assert.deepEqual(await recipients('notice_published','notice:1:%'),expected(1,2,3,4,6));
 await setting('notify.notice.chief','false');await setting('notify.notice.applicant','true');await db.exec(`insert into notices(author_id) values('${id(5)}')`);assert.deepEqual(await recipients('notice_published','notice:2:%'),expected(1,3,4,5,6));
 await db.exec(`insert into employee_documents(user_id) values('${id(5)}');update employee_documents set checked_at=now() where id=1`);assert.deepEqual(await recipients('document_approved','employee-document:1:%'),expected(5));

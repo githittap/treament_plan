@@ -1,0 +1,5 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const html=fs.readFileSync('hr.html','utf8');
+function setup(error){const calls=[];const ctx={ME:{id:'staff',name:'직원'},Date,alert:m=>calls.push(['alert',m]),hubT:(k,d,v)=>d.replace('{detail}',v.detail),setStatus:s=>calls.push(['status',s]),render:()=>calls.push(['render']),sb:{from:()=>({update(){return this;},eq(){return this;},then(resolve){resolve({error});}})}};vm.createContext(ctx);vm.runInContext(html.match(/async function confirmOnbo\(itemId\)\{[^\n]+/)[0],ctx);return {ctx,calls};}
+test('RED7 온보딩 DB 거절은 실패 글을 보이며 저장 성공·새로 그리기를 하지 않는다',async()=>{const s=setup({message:'onboarding evidence is required'});await s.ctx.confirmOnbo(1);assert.ok(s.calls.some(c=>c[0]==='alert'&&c[1].includes('onboarding evidence is required')));assert.ok(s.calls.some(c=>c[0]==='status'&&c[1]==='error'));assert.ok(!s.calls.some(c=>c[1]==='saved'||c[0]==='render'));});
+test('온보딩 확인 성공은 저장 완료 후 화면을 갱신한다',async()=>{const s=setup(null);await s.ctx.confirmOnbo(1);assert.deepEqual(s.calls,[['status','saved'],['render']]);});
