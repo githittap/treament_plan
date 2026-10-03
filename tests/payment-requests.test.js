@@ -2,6 +2,8 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const html=fs.readFileSync('hr.html','utf8');
 const sql=fs.readFileSync('db/payment_requests_draft.sql','utf8');
 const rollback=fs.readFileSync('db/payment_requests_rollback.sql','utf8');
+const receiptSelect=fs.readFileSync('db/payment_receipts_select_own_folder.sql','utf8');
+const receiptSelectRollback=fs.readFileSync('db/payment_receipts_select_own_folder_rollback.sql','utf8');
 
 assert.match(html,/paymentRequestCard\(/,'서류함에 결제 요청 카드가 있어야 합니다.');
 assert.match(html,/결제 요청/,'직원이 서류함에서 결제 요청을 시작할 수 있어야 합니다.');
@@ -22,6 +24,15 @@ assert.match(sql,/v_role='chief'/);
 assert.match(sql,/v_role='owner'/);
 assert.match(sql,/requester_id=auth\.uid\(\).*public\.my_role\(\) in \('chief','owner'\)/is,'본인과 결재선만 민감 요청을 읽어야 합니다.');
 assert.match(sql,/bucket_id='payment-receipts'/);
+assert.equal((receiptSelect.match(/drop policy/gi)||[]).length,1,'new SQL drops exactly one policy');
+assert.equal((receiptSelect.match(/create policy/gi)||[]).length,1,'new SQL creates exactly one policy');
+assert.match(receiptSelect,/drop policy if exists payment_receipts_select_approval_line on storage\.objects/i);
+assert.match(receiptSelect,/create policy payment_receipts_select_approval_line on storage\.objects for select to authenticated using/i);
+assert.match(receiptSelect,/split_part\(name,'\/',1\)=auth\.uid\(\)::text/i,'own-folder access is present');
+assert.match(receiptSelect,/payment_request_receipts r join public\.payment_requests p/i,'existing linked-request access is preserved');
+assert.doesNotMatch(receiptSelectRollback,/split_part\(name,'\/',1\)=auth\.uid\(\)::text/i,'rollback restores linked-only access');
+const policyStatement=text=>text.match(/create policy payment_receipts_select_approval_line[\s\S]*?;/i)?.[0]?.replace(/\s+/g,' ').trim().toLowerCase();
+assert.equal(policyStatement(sql),policyStatement(receiptSelect),'draft SELECT policy matches standalone migration');
 assert.match(sql,/payment_request_receipts.*storage_path/is,'첨부 조회도 결재선 범위여야 합니다.');
 assert.match(sql,/from storage\.objects o where o\.bucket_id='payment-receipts' and o\.name=p_storage_path and o\.owner_id=auth\.uid\(\)::text/is,'실제 Storage owner_id(text)와 인증 UUID를 같은 타입으로 대조해야 합니다.');
 assert.match(sql,/o\.metadata->>'size'\)::bigint,-1\)=p_size_bytes/is,'영수증 연결 전 실제 Storage 객체 크기를 대조해야 합니다.');
