@@ -93,3 +93,14 @@ test('SQL 계약: 직원은 표를 못 쓰고, 뽑기는 하루 횟수·개수 �
   assert.match(sql,/security definer set search_path = ''/);
   ['fortune_status','fortune_draw','fortune_admin_overview','fortune_save_settings','fortune_save_prizes','fortune_mark_paid'].forEach(f=>assert.match(sql,new RegExp('create or replace function public\\.'+f)));
 });
+
+test('상품권 그림·색: 상품 이름의 키워드로 고르고, 없으면 금빛 선물상자 · 위에서부터 먼저 맞는 줄 · 이상한 그림 이름은 선물상자',()=>{
+  const th=T['intro.fortune_themes'];
+  assert.equal(H.pickTheme(th,'스타벅스 커피 쿠폰').img,'coffee');
+  assert.equal(H.pickTheme(th,'치킨 기프티콘').img,'chicken');
+  assert.equal(H.pickTheme(th,'상품권 5만원').img,'gift');
+  assert.equal(H.pickTheme('커피|coffee|#111111\n커피|cake|#222222','커피').color,'#111111');
+  assert.equal(H.pickTheme('커피|../x|#111111','커피').img,'gift');
+  assert.equal(H.pickTheme('커피|coffee|red','커피').color,'#c26a00');
+  ['coffee','chicken','cake','pizza','icecream','snack','movie','gift'].forEach(n=>assert.ok(fs.existsSync(path.join(root,'icons/fortune',n+'.png')),n+'.png 없음'));
+});

@@ -29,6 +29,8 @@ const DEFS=[
     '민트|#2fd9c4\n하늘색|#6fc3ff\n살구색|#ffb38a\n라벤더|#b9a4ff\n레몬 노랑|#ffe066\n코랄 핑크|#ff8fb8\n연두|#a8e063\n크림 흰색|#fff4dc\n남색|#3a4a9f\n금색|#ffc94a'],
   ['intro.fortune_items','행운의 아이템 목록 — 한 줄에 하나','텀블러\n볼펜\n손거울\n초콜릿\n에코백\n비타민\n이어폰\n양말\n작은 노트\n핸드크림\n립밤\n우산\n스티커\n머그컵'],
   ['intro.fortune_win_title','당첨됐을 때 큰 글 — {prize}는 상품 이름','🎉 {prize} 당첨!'],
+  ['intro.fortune_themes','당첨 상품권 그림·색 — 한 줄에 하나, 「상품 이름에 들어갈 말(쉼표로 여러 개)|그림 이름|#색번호」. 위에서부터 먼저 맞는 줄을 씀. 그림 이름: coffee chicken cake pizza icecream snack movie gift',
+    '커피,카페,아메리카노,라떼|coffee|#7a4a24\n치킨|chicken|#d9480f\n케이크,빵,베이커리,디저트,마카롱|cake|#d6336c\n피자|pizza|#c92a2a\n아이스크림,빙수|icecream|#0f9d7a\n편의점,과자,간식,초콜릿,음료|snack|#3b5bdb\n영화,팝콘,CGV,메가박스|movie|#c2255c'],
   ['intro.fortune_voucher_head','당첨 상품권 윗줄 글','🎁 GIFT VOUCHER · 상품권'],
   ['intro.fortune_voucher_foot','당첨 상품권 아랫줄 글','원장님께 이 화면을 보여 주세요'],
   ['intro.fortune_win_note','당첨됐을 때 안내 글','원장님이 직접 챙겨 드려요. 이 화면을 캡처해 두면 좋아요 📸'],
@@ -72,6 +74,20 @@ function buildCard(seed,src){
   const stars=pickStars(rnd());
   const pick=function(a){return a.length?a[Math.floor(rnd()*a.length)]:'';};
   return {stars:stars,grade:grades.length?grades[Math.min(grades.length-1,5-stars)]:'',line:pick(lines),color:pick(colors)||{name:'',hex:''},number:1+Math.floor(rnd()*99),item:pick(items)};
+}
+// 상품 이름 → 상품권 그림·색. 「키워드,키워드|그림|#색」 줄을 위에서부터 보고 이름에 키워드가 들어 있으면 그 줄을 쓴다. 없으면 금빛 선물상자.
+const THEME_IMGS=['coffee','chicken','cake','pizza','icecream','snack','movie','gift'];
+function pickTheme(text,name){
+  const nm=String(name==null?'':name).toLowerCase(),def={img:'gift',color:'#c26a00'};
+  const lines=splitLines(text);
+  for(let i=0;i<lines.length;i++){
+    const p=lines[i].split('|');if(p.length<2)continue;
+    const keys=p[0].split(',').map(function(k){return k.trim().toLowerCase();}).filter(Boolean);
+    if(!keys.some(function(k){return nm.indexOf(k)>=0;}))continue;
+    const img=String(p[1]).trim().toLowerCase(),hex=String(p[2]||'').trim();
+    return {img:/^[a-z0-9_-]{1,30}$/.test(img)?img:'gift',color:/^#[0-9a-fA-F]{3,8}$/.test(hex)?hex:def.color};
+  }
+  return def;
 }
 function fmtWon(n){const v=Math.round(Number(n)||0);return v.toLocaleString('ko-KR')+'원';}
 // 오류 → 사람 글. 서버가 'invalid_prizes: 설명' 꼴로 주는 건 설명만 보인다.
@@ -140,10 +156,13 @@ const CSS=`
 .hf-lucky{display:grid;grid-template-columns:auto 1fr;gap:3px 8px;font-size:12px;text-align:left;margin-top:auto;width:100%}
 .hf-lucky b{opacity:.65;font-weight:600}
 .hf-sw{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px;border:1px solid rgba(0,0,0,.25)}
-.hf-voucher{position:relative;width:100%;border-radius:10px;background:linear-gradient(135deg,#fff,#fff6dc);color:#8a4b00;padding:7px 10px 6px;box-shadow:0 2px 8px rgba(160,90,0,.3);border:1.5px dashed #e0a21a;text-align:center;-webkit-mask:radial-gradient(circle 6px at 0 50%,transparent 98%,#000) left/51% 100% no-repeat,radial-gradient(circle 6px at 100% 50%,transparent 98%,#000) right/51% 100% no-repeat;mask:radial-gradient(circle 6px at 0 50%,transparent 98%,#000) left/51% 100% no-repeat,radial-gradient(circle 6px at 100% 50%,transparent 98%,#000) right/51% 100% no-repeat}
+.hf-voucher{--vc:#c26a00;position:relative;width:100%;border-radius:10px;background:linear-gradient(135deg,#fff,#fff6dc);color:#8a4b00;padding:7px 10px 6px;box-shadow:0 2px 8px rgba(160,90,0,.3);border:1.5px dashed var(--vc);text-align:center;-webkit-mask:radial-gradient(circle 6px at 0 50%,transparent 98%,#000) left/51% 100% no-repeat,radial-gradient(circle 6px at 100% 50%,transparent 98%,#000) right/51% 100% no-repeat;mask:radial-gradient(circle 6px at 0 50%,transparent 98%,#000) left/51% 100% no-repeat,radial-gradient(circle 6px at 100% 50%,transparent 98%,#000) right/51% 100% no-repeat}
 .hf-vhead{font-size:9.5px;letter-spacing:.12em;font-weight:700;opacity:.7}
-.hf-vname{font-size:14px;font-weight:800;margin-top:2px;word-break:keep-all}
-.hf-vamt{font-size:21px;font-weight:900;color:#c26a00;line-height:1.15;margin-top:1px}
+.hf-vbody{display:flex;align-items:center;gap:8px;margin-top:3px;text-align:left}
+.hf-vbody img{width:46px;height:46px;object-fit:contain;flex:none}
+.hf-vtxt{flex:1;min-width:0;text-align:center}
+.hf-vname{font-size:14px;font-weight:800;margin-top:2px;word-break:keep-all;color:var(--vc)}
+.hf-vamt{font-size:21px;font-weight:900;color:var(--vc);line-height:1.15;margin-top:1px}
 .hf-vfoot{font-size:9.5px;opacity:.65;margin-top:3px;border-top:1px dashed rgba(160,90,0,.35);padding-top:3px}
 .hf-msg{text-align:center;font-size:14px;line-height:1.5;min-height:21px;margin:2px 0 6px}
 .hf-win-title{font-size:19px;font-weight:800;color:#ffe27a;text-shadow:0 0 12px rgba(255,201,74,.6)}
@@ -252,10 +271,15 @@ function faceHtml(S,draw){
     +'<div class="hf-starlbl">'+esc(T('intro.fortune_stars'))+'</div>'
     +'<div class="hf-line">'+esc(c.line)+'</div>'
     +(S.ctx.animalSrc?'<div class="hf-animal"><img src="'+esc(S.ctx.animalSrc)+'" alt="" onerror="this.style.display=\'none\'"></div>':'')
-    +(win?'<div class="hf-voucher"><div class="hf-vhead">'+esc(T('intro.fortune_voucher_head'))+'</div><div class="hf-vname">'+esc(draw.prize_name)+'</div>'
-      +(Number(draw.prize_amount_krw)>0?'<div class="hf-vamt">'+esc(fmtWon(draw.prize_amount_krw))+'</div>':'')
-      +'<div class="hf-vfoot">'+esc(T('intro.fortune_voucher_foot'))+'</div></div>':'')
+    +(win?voucherHtml(T,draw):'')
     +'<div class="hf-lucky"><b>'+esc(T('intro.fortune_color'))+'</b><span>'+sw+esc(c.color.name)+'</span><b>'+esc(T('intro.fortune_number'))+'</b><span>'+c.number+'</span><b>'+esc(T('intro.fortune_item'))+'</b><span>'+esc(c.item)+'</span></div>';
+}
+function voucherHtml(T,draw){
+  const th=pickTheme(T('intro.fortune_themes'),draw.prize_name);
+  return '<div class="hf-voucher" style="--vc:'+esc(th.color)+'"><div class="hf-vhead">'+esc(T('intro.fortune_voucher_head'))+'</div>'
+    +'<div class="hf-vbody"><img src="icons/fortune/'+esc(th.img)+'.png" alt="" onerror="this.style.display=\'none\'"><div class="hf-vtxt"><div class="hf-vname">'+esc(draw.prize_name)+'</div>'
+    +(Number(draw.prize_amount_krw)>0?'<div class="hf-vamt">'+esc(fmtWon(draw.prize_amount_krw))+'</div>':'')+'</div></div>'
+    +'<div class="hf-vfoot">'+esc(T('intro.fortune_voucher_foot'))+'</div></div>';
 }
 function winsHtml(S){
   const T=S.ctx.T,w=(S.state&&S.state.wins)||[];
@@ -444,5 +468,5 @@ function drawList(S){
 }
 
 root.HubFortune={open:open,close:close,isOpen:function(){return !!CUR;},defs:DEFS,
-  _t:{mulberry32:mulberry32,splitLines:splitLines,parseColors:parseColors,pickStars:pickStars,buildCard:buildCard,fmtWon:fmtWon,errMsg:errMsg,rowsToPayload:rowsToPayload,prizeStats:prizeStats}};
+  _t:{mulberry32:mulberry32,splitLines:splitLines,parseColors:parseColors,pickStars:pickStars,buildCard:buildCard,fmtWon:fmtWon,errMsg:errMsg,rowsToPayload:rowsToPayload,prizeStats:prizeStats,pickTheme:pickTheme}};
 })(typeof window!=='undefined'?window:globalThis);
