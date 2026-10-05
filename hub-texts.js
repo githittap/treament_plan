@@ -1809,6 +1809,21 @@ function hubTextDefsSpend(add){
   add("spend.tokens_small","📈 기간·주기","50만 토큰 미만","50만 토큰 미만");
   add("spend.load_error","📈 기간·주기","기간 분석 자료를 불러오지 못했습니다.","기간 분석 자료를 불러오지 못했습니다.");
   add("spend.reorder_up","📈 기간·주기","위로","위로");
+  add("spend.anomaly_excess","📈 기간·주기","🔴 최근 7일 {amount} — 평소 7일 평균 {average}보다 {pct}(평소 범위 밖)","🔴 최근 7일 {amount} — 평소 7일 평균 {average}보다 {pct}(평소 범위 밖)");
+  add("spend.anomaly_interval","📈 기간·주기","🔴 결제 간격이 평소 {baseline}일 → 최근 {recent}일로 짧아짐","🔴 결제 간격이 평소 {baseline}일 → 최근 {recent}일로 짧아짐");
+  add("spend.anomaly_normal","📈 기간·주기","🟢 평소 범위 안","🟢 평소 범위 안");
+  add("spend.anomaly_insufficient","📈 기간·주기","⚪ 아직 비교할 평소 자료가 부족함({n}건)","⚪ 아직 비교할 평소 자료가 부족함({n}건)");
+  add("spend.chart_daily","📈 기간·주기","날짜별 지출","날짜별 지출");
+  add("spend.chart_tokens","📈 기간·주기","날짜별 토큰","날짜별 토큰");
+  add("spend.chart_weekly","📈 기간·주기","주별 합계","주별 합계");
+  add("spend.chart_range","📈 기간·주기","평소 범위","평소 범위");
+  add("spend.chart_mean","📈 기간·주기","평소 평균","평소 평균");
+  add("spend.chart_spike","📈 기간·주기","튀는 날","튀는 날");
+  add("spend.chart_interval","📈 기간·주기","결제 간격 흐름","결제 간격 흐름");
+  add("spend.chart_interval_mean","📈 기간·주기","평소 평균 {days}일","평소 평균 {days}일");
+  add("spend.chart_gap","📈 기간·주기","{date} · {days}일","{date} · {days}일");
+  add("spend.chart_value","📈 기간·주기","{date} · {amount}","{date} · {amount}");
+  add("spend.chart_period","📈 기간·주기","{start} ~ {end}","{start} ~ {end}");
   add("spend.reorder_down","📈 기간·주기","아래로","아래로");
 }
 function hubTextDefs(){
@@ -1909,6 +1924,13 @@ const HUB_SETTING_DEFS=[
   {"key":"spend.change_alert_pct","screen":"📈 기간·주기","label":"지난 기간 증감 강조 기준","where":"마케팅비·AI비용의 기간 분석 구역","def":"30","kind":"int","min":0,"max":1000,"unit":"%"},
   {"key":"spend.enabled_marketing","screen":"📈 기간·주기","label":"마케팅비 기간 분석 보이기","where":"마케팅비·AI비용의 기간 분석 구역","def":"true","kind":"bool"},
   {"key":"spend.enabled_ai","screen":"📈 기간·주기","label":"AI비용·토큰 기간 분석 보이기","where":"마케팅비·AI비용의 기간 분석 구역","def":"true","kind":"bool"},
+  {"key":"spend.baseline_weeks","screen":"📈 기간·주기","label":"평소 자료를 비교할 기간","where":"마케팅비·AI비용의 기간 분석 구역","def":"8","kind":"int","min":1,"max":104,"unit":"주"},
+  {"key":"spend.z_threshold","screen":"📈 기간·주기","label":"평소 범위를 벗어나는 정도","where":"마케팅비·AI비용의 기간 분석 구역","def":"2","kind":"dec","min":0,"max":20,"unit":""},
+  {"key":"spend.excess_pct","screen":"📈 기간·주기","label":"최근 7일 금액 과다 기준","where":"마케팅비·AI비용의 기간 분석 구역","def":"50","kind":"int","min":0,"max":1000,"unit":"%"},
+  {"key":"spend.shrink_pct","screen":"📈 기간·주기","label":"결제 간격 단축 기준","where":"마케팅비·AI비용의 기간 분석 구역","def":"40","kind":"int","min":0,"max":100,"unit":"%"},
+  {"key":"spend.recent_payments","screen":"📈 기간·주기","label":"최근 결제 간격을 비교할 건수","where":"마케팅비·AI비용의 기간 분석 구역","def":"5","kind":"int","min":2,"max":100,"unit":"건"},
+  {"key":"spend.min_baseline_events","screen":"📈 기간·주기","label":"평소 자료가 필요할 최소 건수","where":"마케팅비·AI비용의 기간 분석 구역","def":"5","kind":"int","min":1,"max":1000,"unit":"건"},
+  {"key":"spend.chart_enabled","screen":"📈 기간·주기","label":"기간·주기 그래프 보이기","where":"마케팅비·AI비용의 기간 분석 구역","def":"true","kind":"bool"},
 
 ];
 function hubSettingDefByKey(key){

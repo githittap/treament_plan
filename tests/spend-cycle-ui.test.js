@@ -9,7 +9,7 @@ function harness(settings={}){
 }
 const row=(id,amount,extra={})=>({id,parse_status:'recorded',event_kind:'purchase',transaction_at:'2026-10-03T02:00:00Z',currency:'KRW',amount_krw:amount,merchant:'Google Ads',merchant_key:'google',raw_text:'SECRET SMS 1234567890123456',...extra});
 test('실제 화면에 두 구역을 삽입하고 캐시 번호를 올린다',()=>{
- assert.match(html,/spend-cycle\.js\?v=2026100501/);assert.match(html,/spend-cycle-ui\.js\?v=2026100503/);assert.match(html,/SpendUi\.marketing\(all,rules,links\)/);assert.match(html,/SpendUi\.loadAi\(sb,billingFetchAll\)/);assert.match(html,/SpendUi\.ai\(spendData\)/);
+ assert.match(html,/spend-cycle\.js\?v=2026100510/);assert.match(html,/spend-cycle-ui\.js\?v=2026100510/);assert.match(html,/SpendUi\.marketing\(all,rules,links\)/);assert.match(html,/SpendUi\.loadAi\(sb,billingFetchAll\)/);assert.match(html,/SpendUi\.ai\(spendData\)/);
 });
 test('분류·연결·취소 기준을 재사용하며 문자 원문은 화면에 들어가지 않는다',()=>{
  const c=harness(),rows=[row('a',1000),row('b',7000,{category_override:'not_marketing'}),row('c',9000,{parse_status:'failed'}),row('foreign',0,{currency:'USD'}),row('krw',500),row('cancel',-100,{event_kind:'cancellation',reversed_event_id:'a'})],rules=[{merchant_key:'google',category:'google'}],links=[{foreign_event_id:'foreign',krw_event_id:'krw'}];
@@ -24,10 +24,10 @@ test('켜기·끄기, 문구, 숫자 기준, 기간 이름·순서가 허브 설
  const out=c.SpendUi.marketing([row('a',1000),row('b',500,{merchant:'Second'})],[{merchant_key:'google',category:'google'}],[]);assert.match(out,/변경한 제목 &lt;b&gt;/);assert.match(out,/그 외/);assert.match(out,/금일/);
  c.SpendUi.change('marketing','preset','custom');assert.equal(c.rendered,true);assert.match(c.SpendUi.marketing([],[],[]),/type="date"/);
 });
-test('AI 분석 조회는 선택 기간과 이전 기간만 읽고 원문과 메모는 select하지 않는다',async()=>{
+test('AI 분석 조회는 선택 기간·이전 기간·기준선을 읽고 원문과 메모는 select하지 않는다',async()=>{
  const c=harness(),calls=[];const db={from(table){const q={select(s){calls.push({table,select:s,filters:[]});return q;},gte(k,v){calls.at(-1).filters.push(['gte',k,v]);return q;},lte(k,v){calls.at(-1).filters.push(['lte',k,v]);return q;},or(s){calls.at(-1).periods=s;return q;},order(){return q;},then(resolve){resolve({data:[],error:null});}};return q;}};
- const data=await c.SpendUi.loadAi(db,make=>make());assert.equal(calls.length,2);for(const x of calls)assert.doesNotMatch(x.select,/raw_text|note/);assert.deepEqual(calls[1].filters,[['gte','usage_date','2026-08-07'],['lte','usage_date','2026-10-05']]);assert.equal(data.tokensError,false);
- c.SpendUi.change('ai','preset','this_month');calls.length=0;await c.SpendUi.loadAi(db,make=>make());assert.equal(calls[1].periods,'and(usage_date.gte.2026-09-01,usage_date.lte.2026-09-05),and(usage_date.gte.2026-10-01,usage_date.lte.2026-10-05)');
+ const data=await c.SpendUi.loadAi(db,make=>make());assert.equal(calls.length,2);for(const x of calls)assert.doesNotMatch(x.select,/raw_text|note/);assert.deepEqual(calls[1].filters,[['gte','usage_date','2026-07-12'],['lte','usage_date','2026-10-05']]);assert.equal(data.tokensError,false);
+ c.SpendUi.change('ai','preset','this_month');calls.length=0;await c.SpendUi.loadAi(db,make=>make());assert.deepEqual(calls[1].filters,[['gte','usage_date','2026-08-06'],['lte','usage_date','2026-10-05']]);
 });
 test('AI는 광고 제외·직접 입력 제외·토큰 간격 숨김·오류별 표시를 한다',()=>{
  const c=harness(),data={money:[{platform:'Claude',received_at:'2026-10-03T00:00:00Z',amount_krw:1000},{platform:'naver_ads',received_at:'2026-10-03T00:00:00Z',amount_krw:9000}],tokens:[{usage_date:'2026-10-03',model:'Sol',tokens:800000}],moneyError:false,tokensError:false};
@@ -62,4 +62,39 @@ test('손질 10-05: 토큰 억 단위 · 지난 기간 기록 없음 · 잘린 �
  const out=c.SpendUi.marketing(ev,rules,[]);
  assert.match(out,/카카오 · 1건/);assert.doesNotMatch(out,/주식회사카카/);
  assert.match(out,/지난 기간 기록 없음/);assert.doesNotMatch(out,/비교 불가/);assert.doesNotMatch(out,/지난 기간 대비 지난 기간/);
+});
+
+const anomalyDay=(d,n)=>new Date(Date.parse(d+'T00:00:00Z')+n*86400000).toISOString().slice(0,10);
+function chartRows(mode='normal'){
+ const out=[];for(let i=0;i<56;i+=(mode==='short'?4:1))out.push(row('base'+i,100,{transaction_at:anomalyDay('2026-08-04',i)+'T12:00:00+09:00'}));
+ for(let i=0;i<7;i++)out.push(row('recent'+i,mode==='excess'?300:100,{transaction_at:anomalyDay('2026-09-29',i)+'T12:00:00+09:00'}));
+ return mode==='insufficient'?out.filter(x=>x.id.startsWith('recent')||['base0','base1','base2','base3'].includes(x.id)):out;
+}
+test('그래프: 날짜별 SVG·평소 범위 띠·평균선·간격 점선과 날짜 금액 title이 나온다',()=>{
+ const c=harness({'spend.default_days':'7'}),out=c.SpendUi.marketing(chartRows(),[{merchant_key:'google',category:'google'}],[]);
+ assert.match(out,/<svg[^>]+data-spend-chart="daily"/);assert.match(out,/spend-baseline-band/);assert.match(out,/spend-baseline-mean/);assert.match(out,/data-spend-chart="interval"/);assert.match(out,/stroke-dasharray/);assert.match(out,/<title>2026-10-05 · ₩100<\/title>/);assert.match(out,/viewBox=/);assert.match(out,/width:100%/);assert.match(out,/🟢 평소 범위 안/);
+});
+test('그래프: 과다·단축·정상·부족 네 상태와 빨간 막대·점이 나온다',()=>{
+ const c=harness({'spend.default_days':'7'}),rules=[{merchant_key:'google',category:'google'}];
+ const excess=c.SpendUi.marketing(chartRows('excess'),rules,[]);assert.match(excess,/data-spend-anomaly="excess"/);assert.match(excess,/spend-spike/);assert.match(excess,/최근 7일 ₩2,100/);assert.match(excess,/평소 7일 평균 ₩700보다 \+200.0%/);
+ const short=c.SpendUi.marketing(chartRows('short'),rules,[]);assert.match(short,/data-spend-anomaly="interval"/);assert.match(short,/결제 간격이 평소 4일 → 최근 1일/);assert.match(short,/spend-short/);
+ const insufficient=c.SpendUi.marketing(chartRows('insufficient'),rules,[]);assert.match(insufficient,/data-spend-anomaly="insufficient"/);assert.match(insufficient,/아직 비교할 평소 자료가 부족함\(4건\)/);assert.doesNotMatch(insufficient,/spend-spike|data-spend-anomaly="normal"|spend-baseline-band/);
+ assert.doesNotMatch(excess,/SECRET|raw_text|\d{16}/);
+});
+test('그래프: 60일 초과는 주별 막대이고 끔이면 모든 SVG를 숨긴다',()=>{
+ const c=harness({'spend.default_days':'61'}),out=c.SpendUi.marketing(chartRows(),[{merchant_key:'google',category:'google'}],[]);assert.match(out,/data-spend-bucket="week"/);assert.ok((out.match(/class="spend-bar/g)||[]).length<=10);
+ const off=harness({'spend.default_days':'7','spend.chart_enabled':'false'}),disabled=off.SpendUi.marketing(chartRows(),[{merchant_key:'google',category:'google'}],[]);assert.doesNotMatch(disabled,/<svg/);assert.match(disabled,/data-spend-anomaly="normal"/);
+});
+test('그래프: AI 돈·토큰에 각각 막대가 나오고 토큰에는 간격이 없다',()=>{
+ const c=harness({'spend.default_days':'7'}),rows=chartRows('excess'),out=c.SpendUi.ai({money:rows.map(x=>({platform:'Claude',received_at:x.transaction_at,amount_krw:x.amount_krw})),tokens:rows.map(x=>({usage_date:x.transaction_at.slice(0,10),model:'Sol',tokens:x.amount_krw*10000})),moneyError:false,tokensError:false});
+ assert.equal((out.match(/data-spend-chart="daily"/g)||[]).length,2);assert.equal((out.match(/data-spend-chart="interval"/g)||[]).length,1);assert.doesNotMatch(out.split('data-spend-unit="tokens"')[1],/결제 간격|data-spend-chart="interval"/);assert.match(out,/2,100만 토큰/);
+});
+test('그래프: 숫자 설정 6개·켬 설정은 등록되고 소수 기준과 문구를 DB 방식으로 바꾼다',async()=>{
+ const c=harness({'spend.default_days':'7'}),writes=[],db={from(table){return {upsert(row){writes.push({table,...row});return Promise.resolve({error:null});}};}};
+ for(const [key,value] of [['baseline_weeks','2'],['z_threshold','2.5'],['excess_pct','500'],['shrink_pct','80'],['recent_payments','3'],['min_baseline_events','4'],['chart_enabled','false']]){assert.ok(c.spendTestDefs.settings.some(x=>x.key==='spend.'+key),key);assert.equal((await c.spendTestDefs.settingSave(db,'spend.'+key,value)).ok,true,key);}
+ assert.equal(c.SpendUi.options('marketing').z_threshold,2.5);const out=c.SpendUi.marketing(chartRows('excess'),[{merchant_key:'google',category:'google'}],[]);assert.match(out,/data-spend-anomaly="normal"/);assert.doesNotMatch(out,/<svg/);assert.ok(writes.every(x=>x.table==='app_settings'));
+ await c.HubUi.load({from(){return {select(){return Promise.resolve({data:[{key:'spend.anomaly_normal',value:'기준 안 <b>'}],error:null});}}}});assert.match(c.SpendUi.marketing(chartRows(),[{merchant_key:'google',category:'google'}],[]),/기준 안 &lt;b&gt;/);
+});
+test('그래프: 기존 월 합계·예산·기간 숫자를 보존하고 경고에도 원문은 없다',()=>{
+ const c=harness({'spend.default_days':'7'}),rows=chartRows('excess'),rules=[{merchant_key:'google',category:'google'}],before=JSON.stringify(c.marketingMonthSummary(rows,rules,[],'2026-10')),out=c.SpendUi.marketing(rows,rules,[]);assert.equal(JSON.stringify(c.marketingMonthSummary(rows,rules,[],'2026-10')),before);assert.match(out,/하루 평균 ₩300/);assert.match(out,/₩2,100/);assert.doesNotMatch(out,/SECRET|raw_text|\d{16}/);
 });
