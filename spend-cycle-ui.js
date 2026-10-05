@@ -52,19 +52,19 @@
     for(let i=0;i<a.days.length;i+=weekly?7:1){const part=a.days.slice(i,i+(weekly?7:1));buckets.push({date:part[0].date,end:part.at(-1).date,amount:part.reduce((sum,x)=>sum+x.amount,0),count:part.length,spike:part.some(x=>spikeDates.has(x.date))});}
     const W=640,H=235,L=130,R=14,T=18,B=40,PW=W-L-R,PH=H-T-B;
     const band=buckets.map(x=>({avg:a.baseline.dayAvg*x.count,sd:a.baseline.daySd*x.count}));
-    const values=buckets.map(x=>x.amount);if(!a.insufficient)band.forEach(x=>values.push(x.avg-x.sd,x.avg+x.sd));
+    const values=buckets.map(x=>x.amount);if(!a.insufficient)band.forEach(x=>values.push(Math.max(0,x.avg-x.sd),x.avg+x.sd));
     const low=Math.min(0,...values),high=Math.max(1,...values),y=value=>T+(high-value)/(high-low)*PH,x=i=>L+i/buckets.length*PW,step=PW/buckets.length;
-    const shell=(type,label,content,extra='')=>'<svg data-spend-chart="'+type+'" '+extra+' role="img" aria-label="'+esc(label)+'" viewBox="0 0 '+W+' '+H+'" style="display:block;width:100%;max-width:100%;height:auto;overflow:hidden;font-size:20px;fill:var(--ink,#263b42)"><title>'+esc(label)+'</title>'+content+'</svg>';
+    const shell=(type,label,content,extra='')=>'<svg data-spend-chart="'+type+'" '+extra+' role="img" aria-label="'+esc(label)+'" viewBox="0 0 '+W+' '+H+'" style="display:block;width:100%;max-width:640px;height:auto;max-height:240px;overflow:hidden;font-size:20px;fill:var(--ink,#263b42)"><title>'+esc(label)+'</title>'+content+'</svg>';
     let plot='';
     if(!a.insufficient){
-      plot+=band.map((b,i)=>'<rect class="spend-baseline-band" x="'+x(i)+'" y="'+y(b.avg+b.sd)+'" width="'+step+'" height="'+Math.max(1,y(b.avg-b.sd)-y(b.avg+b.sd))+'" fill="var(--mint,#39a894)" opacity="0.15"/>').join('');
+      plot+=band.map((b,i)=>'<rect class="spend-baseline-band" x="'+x(i)+'" y="'+y(b.avg+b.sd)+'" width="'+step+'" height="'+Math.max(1,y(Math.max(0,b.avg-b.sd))-y(b.avg+b.sd))+'" fill="var(--mint,#39a894)" opacity="0.15"/>').join('');
       plot+='<path class="spend-baseline-mean" d="'+band.map((b,i)=>(i?'L':'M')+x(i)+','+y(b.avg)+' L'+x(i+1)+','+y(b.avg)).join(' ')+'" fill="none" stroke="var(--mint,#39a894)" stroke-dasharray="5 4"/>';
     }
     plot+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y(0)+'" y2="'+y(0)+'" stroke="var(--line,#d9e3e7)"/>';
     plot+=buckets.map((b,i)=>'<rect class="spend-bar'+(b.spike?' spend-spike':'')+'" x="'+(x(i)+step*0.12)+'" y="'+Math.min(y(0),y(b.amount))+'" width="'+step*0.76+'" height="'+Math.abs(y(0)-y(b.amount))+'" fill="'+(b.spike?'var(--red,#b83f42)':'var(--mint,#39a894)')+'"><title>'+esc(t('chart_value',{date:weekly?t('chart_period',{start:b.date,end:b.end}):b.date,amount:format(b.amount,token)}))+'</title></rect>').join('');
     const ticks=[...new Set([0,Math.floor((buckets.length-1)/2),buckets.length-1])];
     plot+=ticks.map(i=>'<text x="'+(x(i)+step/2)+'" y="'+(H-16)+'" text-anchor="'+(i===0?'start':i===buckets.length-1?'end':'middle')+'">'+esc(buckets[i].date.slice(5))+'</text>').join('');
-    plot+=[high,(low+high)/2,low].map(value=>'<text x="'+(L-8)+'" y="'+(y(value)+4)+'" text-anchor="end">'+esc(format(value,token))+'</text>').join('');
+    plot+=[high,(low+high)/2,low].map(value=>'<text x="'+(L-8)+'" y="'+(y(value)+4)+'" text-anchor="end">'+esc(value===0?'0':format(value,token))+'</text>').join('');
     const label=t(weekly?'chart_weekly':token?'chart_tokens':'chart_daily');
     let out='<div style="margin:12px 0;min-width:0"><b>'+esc(label)+'</b>'+shell('daily',label,plot,'data-spend-bucket="'+(weekly?'week':'day')+'"')+(a.insufficient?'':'<div class="sub">'+esc(t('chart_range'))+' · '+esc(t('chart_mean'))+' · <span style="color:var(--red,#b83f42)">'+esc(t('chart_spike'))+'</span></div>')+'</div>';
     if(token||!a.points.length)return out;
