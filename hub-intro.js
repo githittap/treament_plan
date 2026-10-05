@@ -101,6 +101,7 @@ const DEFS=[
   ['intro.edit','원장 전용 — 문구 고치기 단추','✏️ 문구 고치기'],
   ['intro.loading','정보 불러오는 중 글','불러오는 중…']
 ];
+if(root.HUB_FORTUNE_TEXT_DEFS)Array.prototype.push.apply(DEFS,root.HUB_FORTUNE_TEXT_DEFS); // hub-fortune.js의 운세 카드 글(없으면 건너뜀)
 const DEF_MAP={};DEFS.forEach(function(d){DEF_MAP[d[0]]=d[2];});
 root.HUB_INTRO_TEXT_DEFS=DEFS; // hub-texts.js 「글 고치기」 목록이 읽음
 
@@ -181,6 +182,9 @@ const CSS=`
 #hubIntro .hi-greet .sub{font-size:13px;color:#a9cfc8;margin-top:4px}
 #hubIntro .hi-hint{font-size:11.5px;color:#7fa9a2;margin-top:4px}
 @keyframes hiShine{0%{background-position:100% 0}100%{background-position:-150% 0}}
+#hubIntro .hi-chip.hi-fortune.hot{border-color:rgba(255,201,74,.75);background:rgba(255,201,74,.16)}
+#hubIntro .hi-chip.hi-fortune.hot::after{content:'';width:7px;height:7px;border-radius:50%;background:#ff6b8b;box-shadow:0 0 8px #ff6b8b;animation:hi-fortune-dot 1.2s ease-in-out infinite}
+@keyframes hi-fortune-dot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.5);opacity:.55}}
 #hubIntro .hi-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:7px;margin-top:8px}
 #hubIntro .hi-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;perspective:900px}
 #hubIntro .hi-card{position:relative;border-radius:16px;padding:13px 15px;min-width:0;overflow:hidden;
@@ -329,6 +333,7 @@ function uiHtml(opts){
     <div class="hi-chips">
       ${DAY_ORDER.map(function(n){return '<button type="button" class="hi-chip pe day" data-day="'+n+'" data-ik="intro.day'+n+'_chip"></button>';}).join('')}
       <button type="button" class="hi-chip pe" data-game data-ik="intro.chip_game"></button>
+      ${(root.HubFortune&&opts.fortune&&opts.fortune.sb)?'<button type="button" class="hi-chip pe hi-fortune" data-fortune data-ik="intro.fortune_chip" style="display:none"></button>':''}
     </div>
   </div>
   <div class="hi-cards pe">
@@ -455,13 +460,15 @@ function bindUi(S){
   const on=function(t,ev,fn,o){t.addEventListener(ev,fn,o);S.disposers.push(function(){t.removeEventListener(ev,fn,o);});};
   on(el.querySelector('.hi-enter'),'click',function(){enter(S);});
   on(document,'keydown',function(e){
-    if(S.destroyed)return;
+    if(S.destroyed||S.fortuneOpen)return; // 운세 카드 창이 열려 있으면 Enter·Esc는 그 창이 처리
     const tag=(e.target&&e.target.tagName)||'';
     if(tag==='TEXTAREA'||tag==='INPUT')return;
     if(e.key==='Enter'||e.key==='Escape'){e.preventDefault();enter(S);}
   });
   el.querySelectorAll('[data-day]').forEach(function(b){on(b,'click',function(){selectDay(S,Number(b.getAttribute('data-day')));});});
   const gb=el.querySelector('[data-game]');if(gb)on(gb,'click',function(){if(S.g)S.g.startGame();});
+  const fb=el.querySelector('[data-fortune]');
+  if(fb){on(fb,'click',function(){openFortune(S);});loadFortuneChip(S);}
   // 카드 3D 기울기(마우스를 따라)
   el.querySelectorAll('.hi-card').forEach(function(c){
     on(c,'pointermove',function(e){
@@ -549,10 +556,34 @@ function enter(S){
   };
   if(S.g&&!S.g.reduced){S.g.warp(finish);}else finish();
 }
+/* ── 운세 카드(hub-fortune.js) — 단추는 서버 상태를 읽은 뒤에만 보임(표가 없거나 꺼져 있으면 원장 말고는 안 보임) ── */
+function fortuneChipSet(S,st){
+  const b=S.el&&S.el.querySelector('[data-fortune]');if(!b)return;
+  const on=st&&(st.enabled||S.opts.isOwner);
+  b.style.display=on?'':'none';
+  const done=st&&st.used_today>0&&st.used_today>=st.draws_per_day;
+  const k=st&&st.used_today>0?'intro.fortune_chip_done':'intro.fortune_chip';
+  b.setAttribute('data-ik',k);b.textContent=T(k);
+  b.classList.toggle('hot',!!(st&&st.enabled&&st.used_today<1));
+  if(done)b.classList.remove('hot');
+}
+function loadFortuneChip(S){
+  const f=S.opts.fortune;if(!f||!f.sb)return;
+  f.sb.rpc('fortune_status').then(function(r){if(S.destroyed||r.error||!r.data)return;S.fortune=r.data;fortuneChipSet(S,r.data);},function(){});
+}
+function openFortune(S){
+  const f=S.opts.fortune;if(!f||!root.HubFortune||S.destroyed)return;
+  root.HubFortune.open({sb:f.sb,host:S.el,T:T,isOwner:!!S.opts.isOwner,animalSrc:dayPng(todayN()),
+    celebrate:function(level){if(S.g&&S.g.celebrate)S.g.celebrate(level);},
+    onOpen:function(){S.fortuneOpen=true;},
+    onClose:function(){S.fortuneOpen=false;loadFortuneChip(S);},
+    onDrawn:function(st){if(st)fortuneChipSet(S,st);}});
+}
 function destroy(S){
   if(S.destroyed)return;S.destroyed=true;
   S.timers.forEach(function(t){clearInterval(t);clearTimeout(t);});
   S.disposers.forEach(function(f){try{f();}catch(e){}});
+  if(root.HubFortune&&root.HubFortune.isOpen())try{root.HubFortune.close();}catch(e){}
   if(S.g)try{S.g.dispose();}catch(e){}
   if(S.el&&S.el.parentNode)S.el.parentNode.removeChild(S.el);
   document.documentElement.style.overflow=S.prevOverflow||'';
@@ -1140,6 +1171,11 @@ function makeScene(S,THREE,GLTFLoader,dayImg,tier,canvas){
     poke:poke,
     setDay:setDay,
     startGame:startGame,
+    celebrate:function(level){ // 운세 카드 결과 연출 — 1 작은 불꽃 · 2 큰 불꽃(당첨)
+      if(!(level>0))return;
+      const n=level>=2?7:3;
+      for(let i=0;i<n;i++)setTimeout(function(){if(!disposed)burst(new THREE.Vector3((Math.random()-.5)*6,hero.position.y+Math.random()*2.5,0),level>=2?80:45,FIRE[(Math.random()*4)|0],5.5,1.2);},i*160);
+    },
     setWords:function(w){words=w&&w.length?w:words;},
     setPaused:function(p){paused=!!p;if(!paused&&!disposed&&!raf){last=performance.now();raf=requestAnimationFrame(frame);}},
     warp:function(done){

@@ -413,7 +413,8 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 <div class="mask" id="attMonthlyMask"><div class="modal wide"><div class="rowflex att-monthly-actions" style="justify-content:space-between"><h3>월 근태 확인용 자료</h3><div><button class="mini" onclick="printAttMonthlyPerson()">인쇄</button> <button class="mini" onclick="hide('attMonthlyMask')">닫기</button></div></div><div id="attMonthlyPersonBody"></div></div></div>
 <footer>© 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지</footer>
 
-<script src="hub-intro.js?v=2026100302"></script>
+<script src="hub-fortune.js?v=2026100501"></script>
+<script src="hub-intro.js?v=2026100503"></script>
 <script src="hub-texts.js?v=2026100502"></script>
 <script src="security-pledge.js?v=20261003p9d"></script>
 <script src="wage-hourly.js?v=2026100401"></script>
@@ -4768,7 +4769,8 @@ function hubIntroOptions(){
       return {leave:bal.error?null:(bal.data?bal.data.balance:0),notice:nt.error||rd.error?null:(nt.data||[]).filter(n=>!read.has(n.id)).length,
         docs:oi.error||oc.error?null:(oi.data||[]).filter(i=>!done.has(i.id)).length,appr:st?(st.error?null:(st.data||[]).length):null,soon};
     },
-    saveText:(k,v)=>HubUi.saveText(sb,k,v),resetText:k=>HubUi.resetText(sb,k)};
+    saveText:(k,v)=>HubUi.saveText(sb,k,v),resetText:k=>HubUi.resetText(sb,k),
+    fortune:{sb:sb}}; // 운세 카드(hub-fortune.js) — 서버 함수 fortune_* 를 같은 로그인으로 부름
 }
 async function doLogin(){
   const msg=$('#lgMsg'),email=$('#lgEmail').value.trim(),pw=$('#lgPw').value;
