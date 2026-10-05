@@ -10,6 +10,8 @@ const clone=x=>JSON.parse(JSON.stringify(x));
 const CH3=/^(att|sched|leave)\./;
 // P7에서 허용된 시간 입력 연결 속성과 숨긴 모바일 입력만 제외해 PC의 기존 글·배치를 계속 대조한다.
 function attendanceLegacyLayout(value){return String(value)
+  .replace(/    <div class="card"><h2>📊 직원별 월 근태 요약<\/h2>[\s\S]*?(?=    <div class="card"><h2>📝 수기 출퇴근 입력)/g,'') // 뒤에 추가된 월 근태 요약은 별도 시험에서 확인함
+  .replace(/\n    \n(?=    <div class="card"><h2>📝 수기 출퇴근 입력)/g,'\n') // 시급제 카드가 없는 역할에서 생기는 빈 줄만 제외함
   .replace(/ class="rowflex manual-clock-desktop"/g,' class="rowflex"')
   .replace(/ onchange="syncManualClock\('(In|Out)',false\)"/g,'')
   .replace(/<input type="time" class="manual-clock-mobile" id="manualClock(In|Out)Time"[^>]*>/g,'')
