@@ -102,6 +102,8 @@ function hubList(key,defItems){
   if(typeof raw!=='string'||raw.trim()==='')return def;
   const stored=hubListParse(raw);
   if(!stored)return def;
+  const orderDef=hubListDefByKey(key);
+  if(orderDef&&orderDef.orderable){const chk=hubListValidate(orderDef,stored);if(chk.ok)return chk.items;}
   const byCode={};stored.forEach(function(i){byCode[i.code]=i;});
   const out=def.map(function(d){return {code:d.code,label:byCode[d.code]?byCode[d.code].label:d.label};});
   const defCodes={};def.forEach(function(d){defCodes[d.code]=true;});
@@ -1766,6 +1768,47 @@ function hubTextDefsTime(add){
   add('time.fmt_today',S,'목록·로그 줄에서 「오늘」 기록의 꼴 — 기본은 시각만 보임({time}). 오늘 기록에도 날짜를 붙이려면 「{date} {time}」으로 바꾸세요(입금 목록·AI 도우미 대화록 목록 등)','{time}',['time','date']);
   add('time.fmt_md_time',S,'원장 보기판 안에 「10-02 20:13」처럼 해가 없이 적힌 시각을 바꿔 보여 줄 때의 꼴 — {m}은 달, {d}는 일, {time}은 위 시각 꼴. 예 「10.2 오후 8시 13분」(보기판 원본 글은 안 바뀜)','{m}.{d} {time}',['m','d','time']);
 }
+function hubTextDefsSpend(add){
+  add("spend.title","📈 기간·주기","📈 기간·주기","📈 기간·주기");
+  add("spend.period","📈 기간·주기","조회 기간","조회 기간");
+  add("spend.days","📈 기간·주기","최근 일수","최근 일수");
+  add("spend.from","📈 기간·주기","시작일","시작일");
+  add("spend.to","📈 기간·주기","마지막 날","마지막 날");
+  add("spend.total","📈 기간·주기","기간 합계","기간 합계");
+  add("spend.count","📈 기간·주기","{n}건","{n}건");
+  add("spend.day","📈 기간·주기","하루","하루");
+  add("spend.week","📈 기간·주기","주","주");
+  add("spend.month","📈 기간·주기","월","월");
+  add("spend.average","📈 기간·주기","평균","평균");
+  add("spend.maximum","📈 기간·주기","최대","최대");
+  add("spend.interval","📈 기간·주기","결제 간격","결제 간격");
+  add("spend.interval_values","📈 기간·주기","평균 {avg}일 · 최소 {min}일 · 최대 {max}일","평균 {avg}일 · 최소 {min}일 · 최대 {max}일");
+  add("spend.last_payment","📈 기간·주기","마지막 결제 {at}","마지막 결제 {at}");
+  add("spend.no_interval","📈 기간·주기","결제 2건부터 간격을 계산합니다.","결제 2건부터 간격을 계산합니다.");
+  add("spend.comparison","📈 기간·주기","지난 기간 대비","지난 기간 대비");
+  add("spend.unavailable","📈 기간·주기","비교 불가","비교 불가");
+  add("spend.comparison_values","📈 기간·주기","{amount} ({pct})","{amount} ({pct})");
+  add("spend.previous","📈 기간·주기","지난 기간 {start} ~ {end} · {amount}","지난 기간 {start} ~ {end} · {amount}");
+  add("spend.summary","📈 기간·주기","{start} ~ {end} 동안 {amount}({count}건) · 하루 평균 {avg}","{start} ~ {end} 동안 {amount}({count}건) · 하루 평균 {avg}");
+  add("spend.summary_interval","📈 기간·주기"," · 평균 {days}일마다 결제"," · 평균 {days}일마다 결제");
+  add("spend.summary_comparison","📈 기간·주기"," · 지난 기간보다 {pct}"," · 지난 기간보다 {pct}");
+  add("spend.channels","📈 기간·주기","채널별","채널별");
+  add("spend.merchants","📈 기간·주기","상호별","상호별");
+  add("spend.platforms","📈 기간·주기","플랫폼별","플랫폼별");
+  add("spend.models","📈 기간·주기","모델별","모델별");
+  add("spend.other","📈 기간·주기","그 외","그 외");
+  add("spend.unknown_merchant","📈 기간·주기","상호 미확인","상호 미확인");
+  add("spend.empty","📈 기간·주기","선택 기간에 기록이 없습니다.","선택 기간에 기록이 없습니다.");
+  add("spend.manual_hint","📈 기간·주기","직접 입력 월 합계는 이 분석에 들어가지 않음","직접 입력 월 합계는 이 분석에 들어가지 않음");
+  add("spend.foreign_count","📈 기간·주기","외화 {n}건은 원화 합계·결제 간격에서 제외함","외화 {n}건은 원화 합계·결제 간격에서 제외함");
+  add("spend.money_title","📈 기간·주기","자동감지 결제금액","자동감지 결제금액");
+  add("spend.tokens_title","📈 기간·주기","모델 사용 토큰","모델 사용 토큰");
+  add("spend.tokens_unit","📈 기간·주기","토큰","토큰");
+  add("spend.tokens_small","📈 기간·주기","50만 토큰 미만","50만 토큰 미만");
+  add("spend.load_error","📈 기간·주기","기간 분석 자료를 불러오지 못했습니다.","기간 분석 자료를 불러오지 못했습니다.");
+  add("spend.reorder_up","📈 기간·주기","위로","위로");
+  add("spend.reorder_down","📈 기간·주기","아래로","아래로");
+}
 function hubTextDefs(){
   if(HUB_TEXT_DEFS_CACHE)return HUB_TEXT_DEFS_CACHE;
   const defs=[];
@@ -1800,6 +1843,7 @@ function hubTextDefs(){
   hubTextDefsChapter7(add);
   hubTextDefsTime(add);
   hubTextDefsHourly(add);
+  hubTextDefsSpend(add);
   ((typeof globalThis!=='undefined'&&globalThis.HUB_INTRO_TEXT_DEFS)||[]).forEach(function(d){add(d[0],'🌌 첫 화면',d[1],d[2]);}); // hub-intro.js의 첫 화면 글
   hubTextDefsP7(add);
   hubTextDefsP9(add);
@@ -1857,6 +1901,13 @@ const HUB_SETTING_DEFS=[
   {key:'att.issue.evidence_max',screen:'🕘 근태 기준',label:'소명 한 건에 낼 수 있는 파일 수',where:'지문누락 소명 — 기존 파일과 새 파일을 합친 최대 개수',def:'5',kind:'int',min:1,max:10,unit:'개'},
   {key:'att.myissue_list_limit',screen:'🕘 근태 기준',label:'내 소명 목록에 보이는 건수',where:'출퇴근 — 내 소명 목록에 최근 몇 건까지 보여 줄지',def:'20',kind:'int',min:5,max:100,unit:'건'},
   {key:'monthly_leave_attendance_mode',screen:'🌿 연차 기준',label:'1년 미만 월차 적립 방식',labelKey:'p7.monthly.mode_label',where:'자동은 근무표 없이 매달 적립하고 원장이 결근 후보를 확인해 뺄 수 있습니다. 근무표 확인은 공표된 근무표로 개근 확인 뒤 적립합니다.',whereKey:'p7.monthly.mode_hint',def:'auto',kind:'enum',options:[{value:'auto',label:'매달 자동',labelKey:'p7.monthly.mode_auto'},{value:'published_schedule',label:'공표 근무표 확인',labelKey:'p7.monthly.mode_schedule'}]},
+  {"key":"spend.default_days","screen":"📈 기간·주기","label":"기본 조회 일수","where":"마케팅비·AI비용의 기간 분석 구역","def":"30","kind":"int","min":1,"max":3660,"unit":"일"},
+  {"key":"spend.week_start","screen":"📈 기간·주기","label":"주 시작 요일 (0=일요일 · 1=월요일)","where":"마케팅비·AI비용의 기간 분석 구역","def":"1","kind":"int","min":0,"max":6,"unit":"요일"},
+  {"key":"spend.top_merchants","screen":"📈 기간·주기","label":"상위 상호 표시 수","where":"마케팅비·AI비용의 기간 분석 구역","def":"5","kind":"int","min":1,"max":30,"unit":"개"},
+  {"key":"spend.change_alert_pct","screen":"📈 기간·주기","label":"지난 기간 증감 강조 기준","where":"마케팅비·AI비용의 기간 분석 구역","def":"30","kind":"int","min":0,"max":1000,"unit":"%"},
+  {"key":"spend.enabled_marketing","screen":"📈 기간·주기","label":"마케팅비 기간 분석 보이기","where":"마케팅비·AI비용의 기간 분석 구역","def":"true","kind":"bool"},
+  {"key":"spend.enabled_ai","screen":"📈 기간·주기","label":"AI비용·토큰 기간 분석 보이기","where":"마케팅비·AI비용의 기간 분석 구역","def":"true","kind":"bool"},
+
 ];
 function hubSettingDefByKey(key){
   for(let i=0;i<HUB_SETTING_DEFS.length;i++)if(HUB_SETTING_DEFS[i].key===key)return HUB_SETTING_DEFS[i];
@@ -1988,7 +2039,9 @@ const HUB_LIST_DEFS=[
   {key:'list.ai_external_names',screen:'💰 AI비용 › 사용량 현황판',label:'외부 AI 이름',addable:false,
    where:'AI비용 › 사용량 현황판 › 외부 AI 카드·날짜별 표의 AI 이름',
    note:'이 값은 PC가 올릴 때 정한 이름표(deepseek·step5 등)라 코드는 못 바꾸고 새 항목도 못 늘려요. 보이는 이름만 고칠 수 있고, 목록에 없는 AI는 올라온 이름이 그대로 보여요.',
-   def:[{code:'deepseek',label:'딥시크'},{code:'step5',label:'스텝5'},{code:'kimi',label:'키미'},{code:'luna',label:'루나'},{code:'?',label:'이름 모름'}]}
+   def:[{code:'deepseek',label:'딥시크'},{code:'step5',label:'스텝5'},{code:'kimi',label:'키미'},{code:'luna',label:'루나'},{code:'?',label:'이름 모름'}]},
+  {"key":"list.spend_periods","screen":"📈 기간·주기","label":"조회 기간 이름·순서","addable":false,"orderable":true,"where":"마케팅비·AI비용 기간 고르는 목록","note":"이름을 고치고 위로·아래로 단추로 순서를 바꿀 수 있습니다.","def":[{"code":"today","label":"오늘"},{"code":"this_week","label":"이번 주"},{"code":"this_month","label":"이번 달"},{"code":"last_n_days","label":"최근 N일"},{"code":"custom","label":"직접 기간"}]},
+
 ];
 // 카드 목록(app_settings의 JSON). 기본 카드는 hr.html의 workDocuments와 같아야 한다(시험이 대조).
 const HUB_CARD_DEFS=[
@@ -2527,6 +2580,7 @@ function hubDrawListsSection(sec){
         items.map(function(it,ri){
           return '<div class="hub-list-row"><span class="hub-code">'+hubEsc(it.code)+'</span>'+
             '<input id="hubLstLbl_'+di+'_'+ri+'" type="text" maxlength="20" value="'+hubEsc(it.label)+'" aria-label="'+hubEsc(it.code)+' 보이는 이름">'+
+            (def.orderable?'<button class="mini" data-hub-list-move="'+di+':'+ri+':-1" '+(ri===0?'disabled':'')+'>'+hubEsc(hubText('spend.reorder_up','위로'))+'</button><button class="mini" data-hub-list-move="'+di+':'+ri+':1" '+(ri===items.length-1?'disabled':'')+'>'+hubEsc(hubText('spend.reorder_down','아래로'))+'</button>':'')+
             (defCodes[it.code]?'':'<button class="mini rej" data-hub-list-del="'+di+':'+ri+'">빼기</button>')+'</div>';
         }).join('')+
         (def.addable?'<div class="hub-list-row"><input id="hubLstNew_'+di+'" type="text" maxlength="20" placeholder="새 항목 이름" aria-label="새 항목 이름"><button class="mini" data-hub-list-add="'+di+'">＋ 추가</button></div>':'')+
@@ -2537,6 +2591,7 @@ function hubDrawListsSection(sec){
   Array.prototype.forEach.call(sec.querySelectorAll('[data-hub-list-reset]'),function(b){b.addEventListener('click',function(){return hubResetList(sec,Number(b.getAttribute('data-hub-list-reset')));});});
   Array.prototype.forEach.call(sec.querySelectorAll('[data-hub-list-add]'),function(b){b.addEventListener('click',function(){return hubAddListItem(sec,Number(b.getAttribute('data-hub-list-add')));});});
   Array.prototype.forEach.call(sec.querySelectorAll('[data-hub-list-del]'),function(b){b.addEventListener('click',function(){const p=String(b.getAttribute('data-hub-list-del')).split(':');return hubDelListItem(sec,Number(p[0]),Number(p[1]));});});
+  Array.prototype.forEach.call(sec.querySelectorAll('[data-hub-list-move]'),function(b){b.addEventListener('click',function(){const p=b.getAttribute('data-hub-list-move').split(':').map(Number);return hubMoveListItem(sec,p[0],p[1],p[2]);});});
   hubBindCards(sec);
 }
 // 화면에 적힌 이름들을 초안(draft)에 모은다.
@@ -2545,6 +2600,9 @@ function hubCollectListDraft(sec,di){
   const next=items.map(function(it,ri){const el=sec.querySelector('#hubLstLbl_'+di+'_'+ri);return {code:it.code,label:el&&typeof el.value==='string'?el.value:it.label};});
   HUB_LIST_DRAFT[def.key]=next;
   return next;
+}
+function hubMoveListItem(sec,di,ri,delta){
+  const def=HUB_LIST_DEFS[di];if(!def||!def.orderable)return;const items=hubCollectListDraft(sec,di),next=ri+delta;if(next<0||next>=items.length)return;[items[ri],items[next]]=[items[next],items[ri]];HUB_LIST_DRAFT[def.key]=items;hubDrawListsSection(sec);
 }
 function hubAddListItem(sec,di){
   const def=HUB_LIST_DEFS[di],box=sec.querySelector('#hubLstNew_'+di),name=String(box&&box.value||'').trim();

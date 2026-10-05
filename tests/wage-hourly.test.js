@@ -36,7 +36,7 @@ test('새 시급 문구는 모두 기존 허브 설정에 등록되며 캐시 �
  const keys=[...js.matchAll(/wageT\('([^']+)'/g)].map(m=>m[1]);
  keys.forEach(k=>assert.ok(texts.includes("'wh."+k+"'"),k));
  assert.match(hr,/wage-hourly.js\?v=20261004/);assert.match(hr,/await wageHourlyHome\(/);assert.match(hr,/await renderWageHourly\(/);
- assert.match(hr,/hub-texts.js\?v=20261004/);
+ assert.match(hr,/hub-texts.js\?v=20261005/);
 });
 test('설정 화면은 평일·주말 시급·가입 여부·공제율을 입력할 수 있다',()=>{
  const config={settings:{categories:[{code:'weekday',label:'평일',days:[1,2,3,4,5],dates:[]},{code:'weekend',label:'주말',days:[0,6],dates:[]}],deductions:{pension:0.0475,health:0.03595,ltc_health:0.1314,employment:0.009,local_income:0.1},income_tax:[]},employees:[{user_id:'self',name:'합성직원',enabled:true,rates:{weekday:10000,weekend:12000},insured:false,effective_from:'2026-10-01'}]};

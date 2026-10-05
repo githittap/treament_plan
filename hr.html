@@ -414,9 +414,11 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 <footer>© 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지</footer>
 
 <script src="hub-intro.js?v=2026100302"></script>
-<script src="hub-texts.js?v=2026100401"></script>
+<script src="hub-texts.js?v=2026100501"></script>
 <script src="security-pledge.js?v=20261003p9d"></script>
 <script src="wage-hourly.js?v=2026100401"></script>
+<script src="spend-cycle.js?v=2026100501"></script>
+<script src="spend-cycle-ui.js?v=2026100501"></script>
 <script>
 /* ═══════ 설정 ═══════
    실제 값은 DB의 app_settings 표에서 읽어옵니다.
@@ -3892,7 +3894,7 @@ async function renderMarketingExpensePanel(){
     const rulesHtml=ruleRows.map((row,index)=>{const current=marketingCategoryFor(row,rules)||'';return `<div class="rowflex" style="justify-content:space-between;gap:8px;margin:6px 0;min-width:0"><span style="overflow-wrap:anywhere">${esc(row.merchant)}</span><div style="display:flex;gap:4px;flex:none"><select class="mini" id="marketingRule-${index}" style="max-width:135px">${marketingCategoryOptions(current)}</select><button class="mini" onclick="saveMarketingMerchantRule('${esc(row.merchant_key)}','${esc(row.merchant)}',${index})">${esc(hubT('mkt.btn_rule','가맹점 기본값'))}</button></div></div>`;}).join('');
     return `<section class="card" id="marketingExpenses"><h2>${esc(hubT('mkt.title','📣 마케팅비'))} <span class="sub">${esc(isOwner?hubT('mkt.sub','(원장 전용)'):hubT('mkt.manager_sub','(마케팅 분류 내역만 · 읽기 전용)'))}</span></h2>
       ${billingMonthPicker(month,'marketing')}
-      <div class="sub" style="margin-top:14px">${esc(hubT('mkt.sum_label','이번 달 원화 합계'))}</div><div style="font-size:28px;font-weight:800;color:var(--mint);text-align:right">₩${aicostMoney(summary.totalKrw)}</div>
+      <div class="sub" style="margin-top:14px">${esc(hubT('mkt.sum_label','이번 달 원화 합계'))}</div><div style="font-size:28px;font-weight:800;color:var(--mint);text-align:right">₩${aicostMoney(summary.totalKrw)}</div>${typeof SpendUi==='undefined'?'':SpendUi.marketing(all,rules,links)}
       ${isOwner?`<div class="rowflex" style="justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:8px"><label>${esc(hubT('mkt.f_budget','월 예산'))} <input id="marketingBudget" class="mini" type="number" min="0" step="1" inputmode="numeric" placeholder="${esc(hubT('mkt.ph_budget','입력 안 함'))}" value="${budget==null?'':Number(budget)}" style="max-width:150px"> ${esc(hubT('mkt.unit_won','원'))}</label><button class="mini stamp" onclick="saveMarketingBudget()">${esc(hubT('mkt.btn_budget','예산 저장'))}</button></div>`:`<div class="hint">${esc(hubT('mkt.f_budget','월 예산'))} · ${budget==null?esc(hubT('mkt.ph_budget','입력 안 함')):'₩'+aicostMoney(budget)}</div>`}
       ${billingBudgetHtml(budget,summary.totalKrw,'marketing')}${isOwner?billingExportButtons('marketing'):''}
       <div style="margin-top:12px">${channelRows||'<div class="empty">'+esc(hubT('mkt.no_sum','이번 달 집계가 없습니다.'))+'</div>'}</div>
@@ -4076,11 +4078,14 @@ async function renderAicost(m){
   BILLING_EXPORT_DATA.ai={month:AICOST_MONTH,rows:aiRows,yearRows:Array.from({length:12},(_,i)=>billingAiRows(history,events,year+'-'+String(i+1).padStart(2,'0'))).flat()};
   const aiChannelSummary=AICOST_PLATFORMS.map(p=>`<div class="rowflex" style="justify-content:space-between;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line);padding:6px 0"><span>${esc(aicostPlatformLabel(p))}</span><b>₩${aicostMoney(aiRows.filter(row=>row.category===p).reduce((sum,row)=>sum+row.amount,0))}</b></div>`).join('');
   const marketingHtml=await renderMarketingExpensePanel();
+  let spendData=null;
+  if(typeof SpendUi!=='undefined'){try{spendData=await SpendUi.loadAi(sb,billingFetchAll);}catch{spendData={money:[],tokens:[],moneyError:true,tokensError:true};}}
+  if(spendData){const excluded=new Set((events||[]).filter(isNaverAdBillingEvent).map(e=>e.id));spendData.money=spendData.money.filter(e=>!excluded.has(e.id));}
   m.innerHTML=`<div class="card" id="aiBillingMonthly"><h2>${esc(hubT('aic.title','💰 AI비용'))} <span class="sub">${esc(hubT('aic.sub','(원장 전용)'))}</span></h2>
     ${billingMonthPicker(AICOST_MONTH)}
     <div style="font-size:13px;color:var(--gray);margin-top:16px">${esc(hubT('aic.total_label','이번 달 실제 청구액 (직접 입력 + 자동감지 문자 합계)'))}</div>
     <div style="font-size:30px;font-weight:800;color:var(--mint);margin:4px 0 18px">₩${aicostMoney(total)}</div>
-    <div class="rowflex" style="gap:8px;flex-wrap:wrap;justify-content:space-between"><label>${esc(hubT('bill.budget','이번 달 예산'))} <input id="aiMonthBudget" class="mini" type="number" min="0" step="1" inputmode="numeric" value="${aiBudget==null?'':aiBudget}" style="max-width:150px"> ${esc(hubT('aic.unit_won','원'))}</label><button class="mini stamp" onclick="saveAiMonthBudget()">${esc(hubT('bill.save_budget','예산 저장'))}</button></div>
+    <div class="rowflex" style="gap:8px;flex-wrap:wrap;justify-content:space-between"><label>${esc(hubT('bill.budget','이번 달 예산'))} <input id="aiMonthBudget" class="mini" type="number" min="0" step="1" inputmode="numeric" value="${aiBudget==null?'':aiBudget}" style="max-width:150px"> ${esc(hubT('aic.unit_won','원'))}</label><button class="mini stamp" onclick="saveAiMonthBudget()">${esc(hubT('bill.save_budget','예산 저장'))}</button></div>${typeof SpendUi==='undefined'?'':SpendUi.ai(spendData)}
     ${billingBudgetHtml(aiBudget,total)}${aiChannelSummary}${billingExportButtons('ai')}
     <div class="tblwrap"><table><tr><th>${esc(hubT('aic.th_platform','플랫폼'))}</th><th>${esc(hubT('aic.th_manual','직접 입력'))}</th><th>${esc(hubT('aic.th_auto','자동감지(문자)'))}</th><th>${esc(hubT('aic.th_note','메모'))}</th><th></th></tr>
     ${AICOST_PLATFORMS.map((p,i)=>{const r=byPlatform[p]||{},auto=Number(autoByPlatform[p]||0);return `<tr><td>${esc(aicostPlatformLabel(p))}</td>
