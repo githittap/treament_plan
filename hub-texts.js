@@ -1787,6 +1787,8 @@ function hubTextDefsSpend(add){
   add("spend.no_interval","📈 기간·주기","결제 2건부터 간격을 계산합니다.","결제 2건부터 간격을 계산합니다.");
   add("spend.comparison","📈 기간·주기","지난 기간 대비","지난 기간 대비");
   add("spend.unavailable","📈 기간·주기","비교 불가","비교 불가");
+  add("spend.no_previous","📈 기간·주기","지난 기간 기록 없음","지난 기간 기록 없음");
+  add("spend.summary_no_previous","📈 기간·주기"," · 지난 기간 기록 없음"," · 지난 기간 기록 없음");
   add("spend.comparison_values","📈 기간·주기","{amount} ({pct})","{amount} ({pct})");
   add("spend.previous","📈 기간·주기","지난 기간 {start} ~ {end} · {amount}","지난 기간 {start} ~ {end} · {amount}");
   add("spend.summary","📈 기간·주기","{start} ~ {end} 동안 {amount}({count}건) · 하루 평균 {avg}","{start} ~ {end} 동안 {amount}({count}건) · 하루 평균 {avg}");

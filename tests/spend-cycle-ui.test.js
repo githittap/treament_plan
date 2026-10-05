@@ -9,7 +9,7 @@ function harness(settings={}){
 }
 const row=(id,amount,extra={})=>({id,parse_status:'recorded',event_kind:'purchase',transaction_at:'2026-10-03T02:00:00Z',currency:'KRW',amount_krw:amount,merchant:'Google Ads',merchant_key:'google',raw_text:'SECRET SMS 1234567890123456',...extra});
 test('실제 화면에 두 구역을 삽입하고 캐시 번호를 올린다',()=>{
- assert.match(html,/spend-cycle\.js\?v=2026100501/);assert.match(html,/spend-cycle-ui\.js\?v=2026100501/);assert.match(html,/SpendUi\.marketing\(all,rules,links\)/);assert.match(html,/SpendUi\.loadAi\(sb,billingFetchAll\)/);assert.match(html,/SpendUi\.ai\(spendData\)/);
+ assert.match(html,/spend-cycle\.js\?v=2026100501/);assert.match(html,/spend-cycle-ui\.js\?v=2026100502/);assert.match(html,/SpendUi\.marketing\(all,rules,links\)/);assert.match(html,/SpendUi\.loadAi\(sb,billingFetchAll\)/);assert.match(html,/SpendUi\.ai\(spendData\)/);
 });
 test('분류·연결·취소 기준을 재사용하며 문자 원문은 화면에 들어가지 않는다',()=>{
  const c=harness(),rows=[row('a',1000),row('b',7000,{category_override:'not_marketing'}),row('c',9000,{parse_status:'failed'}),row('foreign',0,{currency:'USD'}),row('krw',500),row('cancel',-100,{event_kind:'cancellation',reversed_event_id:'a'})],rules=[{merchant_key:'google',category:'google'}],links=[{foreign_event_id:'foreign',krw_event_id:'krw'}];
@@ -48,4 +48,18 @@ test('설정 저장은 기존 DB upsert로 실행되며 기간 순서 변경은 
  const index=h.lists.findIndex(x=>x.key==='list.spend_periods'),def=h.lists[index],sec={innerHTML:'',querySelector(selector){return {value:selector.endsWith('_0')?'금일':def.def[Number(selector.split('_').at(-1))].label};},querySelectorAll(){return [];}};
  h.move(sec,index,0,1);const draft=h.items(def);assert.equal(draft[1].code,'today');assert.equal(draft[1].label,'금일');assert.match(sec.innerHTML,/data-hub-list-move/);
  assert.equal((await h.listSave(db,'list.spend_periods',draft)).ok,true);assert.equal(c.SpendUi.periods()[1].label,'금일');assert.ok(writes.every(x=>x.table==='app_settings'));
+});
+
+test('손질 10-05: 토큰 억 단위 · 지난 기간 기록 없음 · 잘린 상호는 가맹점 규칙 이름',()=>{
+ const c=harness();
+ assert.equal(c.SpendUi.format(11011500000000/1000,true),'110.1억 토큰');
+ assert.equal(c.SpendUi.format(4500000,true),'450만 토큰');
+ assert.equal(c.SpendUi.format(100000,true),'50만 토큰 미만');
+ const rules=[{merchant_key:'카카',merchant_label:'카카오',category:'kakao'},{merchant_key:'카카오',merchant_label:'카카오',category:'kakao'}];
+ assert.equal(c.SpendUi.merchantLabel({merchant:'주식회사카카',merchant_key:'주식회사카카'},rules),'카카오');
+ assert.equal(c.SpendUi.merchantLabel({merchant:'쿠팡',merchant_key:'쿠팡'},rules),'쿠팡');
+ const ev=[{id:'k1',parse_status:'recorded',event_kind:'purchase',transaction_at:'2026-10-03T02:00:00Z',currency:'KRW',amount_krw:39540,merchant:'주식회사카카',merchant_key:'주식회사카카'}];
+ const out=c.SpendUi.marketing(ev,rules,[]);
+ assert.match(out,/카카오 · 1건/);assert.doesNotMatch(out,/주식회사카카/);
+ assert.match(out,/지난 기간 기록 없음/);assert.doesNotMatch(out,/비교 불가/);
 });
