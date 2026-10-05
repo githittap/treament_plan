@@ -29,6 +29,8 @@ const DEFS=[
     '민트|#2fd9c4\n하늘색|#6fc3ff\n살구색|#ffb38a\n라벤더|#b9a4ff\n레몬 노랑|#ffe066\n코랄 핑크|#ff8fb8\n연두|#a8e063\n크림 흰색|#fff4dc\n남색|#3a4a9f\n금색|#ffc94a'],
   ['intro.fortune_items','행운의 아이템 목록 — 한 줄에 하나','텀블러\n볼펜\n손거울\n초콜릿\n에코백\n비타민\n이어폰\n양말\n작은 노트\n핸드크림\n립밤\n우산\n스티커\n머그컵'],
   ['intro.fortune_win_title','당첨됐을 때 큰 글 — {prize}는 상품 이름','🎉 {prize} 당첨!'],
+  ['intro.fortune_voucher_head','당첨 상품권 윗줄 글','🎁 GIFT VOUCHER · 상품권'],
+  ['intro.fortune_voucher_foot','당첨 상품권 아랫줄 글','원장님께 이 화면을 보여 주세요'],
   ['intro.fortune_win_note','당첨됐을 때 안내 글','원장님이 직접 챙겨 드려요. 이 화면을 캡처해 두면 좋아요 📸'],
   ['intro.fortune_lose','당첨 상품이 없을 때 글','이번엔 선물이 없지만 행운은 가득! ✨'],
   ['intro.fortune_off','원장이 운세 카드를 꺼 두었을 때 글','운세 카드는 잠시 쉬는 중이에요.'],
@@ -138,7 +140,11 @@ const CSS=`
 .hf-lucky{display:grid;grid-template-columns:auto 1fr;gap:3px 8px;font-size:12px;text-align:left;margin-top:auto;width:100%}
 .hf-lucky b{opacity:.65;font-weight:600}
 .hf-sw{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px;border:1px solid rgba(0,0,0,.25)}
-.hf-prize{width:100%;border-radius:10px;background:#fff;color:#a05a00;font-weight:800;font-size:13.5px;padding:6px 8px;box-shadow:0 2px 8px rgba(160,90,0,.25)}
+.hf-voucher{position:relative;width:100%;border-radius:10px;background:linear-gradient(135deg,#fff,#fff6dc);color:#8a4b00;padding:7px 10px 6px;box-shadow:0 2px 8px rgba(160,90,0,.3);border:1.5px dashed #e0a21a;text-align:center;-webkit-mask:radial-gradient(circle 6px at 0 50%,transparent 98%,#000) left/51% 100% no-repeat,radial-gradient(circle 6px at 100% 50%,transparent 98%,#000) right/51% 100% no-repeat;mask:radial-gradient(circle 6px at 0 50%,transparent 98%,#000) left/51% 100% no-repeat,radial-gradient(circle 6px at 100% 50%,transparent 98%,#000) right/51% 100% no-repeat}
+.hf-vhead{font-size:9.5px;letter-spacing:.12em;font-weight:700;opacity:.7}
+.hf-vname{font-size:14px;font-weight:800;margin-top:2px;word-break:keep-all}
+.hf-vamt{font-size:21px;font-weight:900;color:#c26a00;line-height:1.15;margin-top:1px}
+.hf-vfoot{font-size:9.5px;opacity:.65;margin-top:3px;border-top:1px dashed rgba(160,90,0,.35);padding-top:3px}
 .hf-msg{text-align:center;font-size:14px;line-height:1.5;min-height:21px;margin:2px 0 6px}
 .hf-win-title{font-size:19px;font-weight:800;color:#ffe27a;text-shadow:0 0 12px rgba(255,201,74,.6)}
 .hf-sub{font-size:12px;opacity:.75}
@@ -246,7 +252,9 @@ function faceHtml(S,draw){
     +'<div class="hf-starlbl">'+esc(T('intro.fortune_stars'))+'</div>'
     +'<div class="hf-line">'+esc(c.line)+'</div>'
     +(S.ctx.animalSrc?'<div class="hf-animal"><img src="'+esc(S.ctx.animalSrc)+'" alt="" onerror="this.style.display=\'none\'"></div>':'')
-    +(win?'<div class="hf-prize">🎁 '+esc(draw.prize_name)+(Number(draw.prize_amount_krw)>0?' · '+esc(fmtWon(draw.prize_amount_krw)):'')+'</div>':'')
+    +(win?'<div class="hf-voucher"><div class="hf-vhead">'+esc(T('intro.fortune_voucher_head'))+'</div><div class="hf-vname">'+esc(draw.prize_name)+'</div>'
+      +(Number(draw.prize_amount_krw)>0?'<div class="hf-vamt">'+esc(fmtWon(draw.prize_amount_krw))+'</div>':'')
+      +'<div class="hf-vfoot">'+esc(T('intro.fortune_voucher_foot'))+'</div></div>':'')
     +'<div class="hf-lucky"><b>'+esc(T('intro.fortune_color'))+'</b><span>'+sw+esc(c.color.name)+'</span><b>'+esc(T('intro.fortune_number'))+'</b><span>'+c.number+'</span><b>'+esc(T('intro.fortune_item'))+'</b><span>'+esc(c.item)+'</span></div>';
 }
 function winsHtml(S){
