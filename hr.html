@@ -3876,7 +3876,7 @@ async function renderMarketingExpensePanel(){
   try{
     const [{data:events,error:e1},{data:budgets,error:e2},{data:rules,error:e3},{data:links,error:e4}]=await Promise.all([
       billingFetchAll(()=>sb.from('marketing_expense_events').select('id,received_at,transaction_at,event_kind,parse_status,failure_code,currency,amount_native,amount_krw,merchant,merchant_key,category_override,reversed_event_id').order('transaction_at',{ascending:false}).order('id',{ascending:false})),
-      sb.from('marketing_month_budgets').select('month,amount_krw').eq('month',AICOST_MONTH+'-01').maybeSingle(),
+      sb.from('marketing_month_budgets').select('month,amount_krw').lte('month',AICOST_MONTH+'-01').order('month',{ascending:false}).limit(1).maybeSingle(),
       billingFetchAll(()=>sb.from('marketing_merchant_rules').select('merchant_key,merchant_label,category').order('merchant_key')),
       billingFetchAll(()=>sb.from('marketing_foreign_charge_links').select('foreign_event_id,krw_event_id').order('foreign_event_id'))
     ]);

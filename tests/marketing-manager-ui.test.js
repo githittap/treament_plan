@@ -5,15 +5,15 @@ const fn=name=>html.match(new RegExp('async function '+name+'\\([^]*?\\r?\\n\\}\
 const event=(id,merchant,key,category_override=null)=>({id,merchant,merchant_key:key,category_override,transaction_at:'2026-10-01T00:00:00Z',parse_status:'recorded',event_kind:'purchase',currency:'KRW',amount_native:1000,amount_krw:1000});
 const events=[event('ad','Marketing ad','googleads'),event('private','Private excluded','googleads','not_marketing'),event('unknown','Private unclassified','unknown'),{...event('failed','Private failure','unknown'),parse_status:'failed',received_at:'2026-10-01T00:00:00Z'}];
 function harness(role='manager',value='true',error=null){
-  const calls=[],writes=[],nav={innerHTML:''},nav2={innerHTML:''};
+  const calls=[],lteCalls=[],writes=[],nav={innerHTML:''},nav2={innerHTML:''};
   const tables={app_settings:{data:value===null?null:{key:'marketing.manager_view_enabled',value},error},marketing_expense_events:{data:events},marketing_month_budgets:{data:{month:'2026-10-01',amount_krw:5000}},marketing_merchant_rules:{data:[{merchant_key:'googleads',category:'google'}]},marketing_foreign_charge_links:{data:[]}};
   const ctx={ME:{id:'test',role},TAB_ROLES:{},TAB_OVERRIDES:{},BADGE:{},TAB:'aicost',today:()=> '2026-10-03',render(){},setStatus(){},hubT:(k,d,v)=>v?d.replace(/\{(\w+)\}/g,(m,k)=>v[k]??m):d,esc:s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'),formatLeaveTimestamp:v=>v,$:s=>s==='#nav'?nav:nav2,aicostMoney:v=>Number(v||0).toLocaleString('ko-KR'),
-    sb:{from(table){calls.push(table);if(!tables[table])throw Error('unexpected private query '+table);const api={select(){return api;},eq(){return api;},maybeSingle(){return Promise.resolve(tables[table]);},order(){return api;},range(){return Promise.resolve(tables[table]);},upsert(){writes.push(table);return api;},update(){writes.push(table);return api;},delete(){writes.push(table);return api;},then(resolve,reject){return Promise.resolve(tables[table]).then(resolve,reject);}};return api;}}};
+    sb:{from(table){calls.push(table);if(!tables[table])throw Error('unexpected private query '+table);const api={select(){return api;},eq(){return api;},lte(c,v){lteCalls.push([table,c,v]);return api;},limit(){return api;},maybeSingle(){return Promise.resolve(tables[table]);},order(){return api;},range(){return Promise.resolve(tables[table]);},upsert(){writes.push(table);return api;},update(){writes.push(table);return api;},delete(){writes.push(table);return api;},then(resolve,reject){return Promise.resolve(tables[table]).then(resolve,reject);}};return api;}}};
   vm.createContext(ctx);
   vm.runInContext(hub,ctx);ctx.hubT=(k,d,v)=>ctx.hubText(k,d,v);ctx.HubUi.setSettings(value===null?{}:{'marketing.manager_view_enabled':value});
   const tabs=html.match(/const TABS=\[[\s\S]*?\r?\n\];/)[0],menu=html.match(/const MENU=\[[\s\S]*?\r?\n\];/)[0];
   vm.runInContext(`let AICOST_MONTH='2026-10',BILLING_EXPORT_DATA={};${tabs}${menu}${region(html,'menu-restructure')}${region(html,'marketing-expenses')}${region(html,'billing-monthly')}${fn('renderMarketingExpensePanel')}${fn('renderAicost')};this.api={renderAicost,renderMarketingExpensePanel,renderNav,visibleTabKeys,exportData:()=>BILLING_EXPORT_DATA};`,ctx);
-  return {ctx,api:ctx.api,calls,writes,nav,nav2,tables};
+  return {ctx,api:ctx.api,calls,lteCalls,writes,nav,nav2,tables};
 }
 test('manager navigation uses marketing label and switches off; owner AI label stays',()=>{
   const on=harness();on.api.renderNav();assert.ok(on.api.visibleTabKeys().has('aicost'));assert.match(on.nav.innerHTML,/📣 마케팅비/);assert.doesNotMatch(on.nav.innerHTML,/💰 AI비용|🔒 원장 전용/);
@@ -65,4 +65,8 @@ test('hub switch is a boolean preference with default on, saved and reset throug
   assert.ok((await h.hubSettingReset(sb,d.key)).ok);assert.equal(h.hubSettingBoolean(d.key,false),true);
   assert.deepEqual(writes.map(w=>w.row.value),['false','true']);
   const sec={innerHTML:'',querySelectorAll:()=>[]};h.hubDrawSettingsSection(sec);assert.match(sec.innerHTML,/마케팅비 매니저 보기/);assert.match(sec.innerHTML,/<option value="true" selected>켬/);assert.match(sec.innerHTML,/<option value="false">끔/);
+});
+test('monthly budget carries over: reads the latest budget at or before the shown month',async()=>{
+  const h=harness(),m={innerHTML:''};await h.api.renderAicost(m);
+  assert.deepEqual(h.lteCalls.filter(c=>c[0]==='marketing_month_budgets'),[['marketing_month_budgets','month','2026-10-01']]);
 });
