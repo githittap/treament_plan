@@ -52,3 +52,17 @@ test('실제 renderSuggestions는 종료된 캠페인에서도 댓글 입력을 
   c.api.toggleSuggestionComments(7);const m={innerHTML:''};await c.renderSuggestions(m);assert.match(m.innerHTML,/suggestionCommentNew-7/);assert.doesNotMatch(m.innerHTML,/id="suggestionNewBody"/);assert.match(m.innerHTML,/피드백 &lt;script&gt;/);
   error={message:'댓글 DB 오류'};await c.renderSuggestions(m);assert.match(m.innerHTML,/댓글 DB 오류/);
 });
+
+test('10-06: Ctrl+Enter(맥 Cmd+Enter)로 저장 · 그냥 Enter는 줄바꿈 · 한글 조합 중엔 무시 · 다시 그려도 보던 자리 유지',()=>{
+  assert.match(html,/id="suggestionCommentNew-\$\{suggestionId\}"[^>]*onkeydown="suggestionCommentKey\(event,\$\{suggestionId\},null\)"/);
+  assert.match(html,/id="suggestionCommentEdit-\$\{c\.id\}"[^>]*onkeydown="suggestionCommentKey\(event,\$\{suggestionId\},\$\{c\.id\}\)"/);
+  const fn=html.match(/function suggestionCommentKey\(e,suggestionId,id\)\{.*\}/)[0];const saved=[];
+  const run=new Function('saveSuggestionComment',fn+';return suggestionCommentKey;')((a,b)=>saved.push([a,b]));
+  const ev=o=>Object.assign({key:'Enter',ctrlKey:false,metaKey:false,isComposing:false,preventDefault(){this.p=true;}},o);
+  const plain=ev({});run(plain,7,null);assert.equal(saved.length,0);assert.ok(!plain.p);
+  run(ev({isComposing:true,ctrlKey:true}),7,null);assert.equal(saved.length,0);
+  const c=ev({ctrlKey:true});run(c,7,null);assert.deepEqual(saved,[[7,null]]);assert.ok(c.p);
+  run(ev({metaKey:true}),7,11);assert.deepEqual(saved[1],[7,11]);
+  assert.match(html,/setStatus\('saved'\);await suggestionRenderKeep\(suggestionId\);/);
+  assert.match(html,/setStatus\('saved'\);suggestionRenderKeep\(suggestionId\);/);
+});

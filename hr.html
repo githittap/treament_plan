@@ -2604,9 +2604,15 @@ function validateSuggestionComment(raw){
   if(Array.from(text).length>1000)return {ok:false,key:'sug.cmt.invalid_long'};
   return {ok:true,body:text.trim()};
 }
-function toggleSuggestionComments(id){if(SUGGESTION_COMMENT_OPEN.has(id))SUGGESTION_COMMENT_OPEN.delete(id);else SUGGESTION_COMMENT_OPEN.add(id);render();}
-function beginSuggestionCommentEdit(suggestionId,id){SUGGESTION_COMMENT_OPEN.add(suggestionId);SUGGESTION_COMMENT_EDIT_ID=id;render();}
-function cancelSuggestionCommentEdit(){SUGGESTION_COMMENT_EDIT_ID=null;render();}
+/* 건의 댓글: Ctrl+Enter 저장 · 다시 그려도 보던 자리 유지(10-06 원장 요청) */
+function suggestionCommentKey(e,suggestionId,id){if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)&&!e.isComposing){e.preventDefault();saveSuggestionComment(suggestionId,id);}}
+async function suggestionRenderKeep(suggestionId){if(typeof document==='undefined'||!document.querySelectorAll)return render();const box=[document.scrollingElement,...document.querySelectorAll('main,#main,.main')].filter(Boolean),pos=box.map(el=>el.scrollTop),anchor=document.getElementById('suggestionComments-'+suggestionId)||document.querySelector('[aria-controls="suggestionComments-'+suggestionId+'"]'),top=anchor?anchor.getBoundingClientRect().top:null;
+  await render();
+  box.forEach((el,i)=>{if(el&&el.isConnected)el.scrollTop=pos[i];});
+  const again=document.getElementById('suggestionComments-'+suggestionId)||document.querySelector('[aria-controls="suggestionComments-'+suggestionId+'"]');if(again&&top!=null){const d=again.getBoundingClientRect().top-top;if(Math.abs(d)>1)window.scrollBy(0,d);}}
+function toggleSuggestionComments(id){if(SUGGESTION_COMMENT_OPEN.has(id))SUGGESTION_COMMENT_OPEN.delete(id);else SUGGESTION_COMMENT_OPEN.add(id);suggestionRenderKeep(id);}
+function beginSuggestionCommentEdit(suggestionId,id){SUGGESTION_COMMENT_OPEN.add(suggestionId);SUGGESTION_COMMENT_EDIT_ID=id;suggestionRenderKeep(suggestionId);}
+function cancelSuggestionCommentEdit(){const sid=[...SUGGESTION_COMMENT_OPEN][0];SUGGESTION_COMMENT_EDIT_ID=null;sid==null?render():suggestionRenderKeep(sid);}
 function renderSuggestionComments(suggestionId,comments){
   const rows=(comments||[]).filter(c=>String(c.suggestion_id)===String(suggestionId)),open=SUGGESTION_COMMENT_OPEN.has(suggestionId);
   const heading=`<button class="mini" aria-expanded="${open}" aria-controls="suggestionComments-${suggestionId}" onclick="toggleSuggestionComments(${suggestionId})">${esc(hubT('sug.cmt.toggle','💬 댓글 {n}',{n:rows.length}))}</button>`;
@@ -2614,9 +2620,9 @@ function renderSuggestionComments(suggestionId,comments){
   const list=rows.length?rows.map(c=>{
     const own=c.user_id===ME.id,editing=SUGGESTION_COMMENT_EDIT_ID===c.id;
     const when=typeof hubFmtDateTime==='function'?hubFmtDateTime(c.created_at):new Date(c.created_at).toLocaleString('ko-KR',{hour12:false});
-    return `<div style="border-top:1px solid var(--line);padding:10px 0;overflow-wrap:anywhere"><div class="rowflex"><b>${esc(nameOf(c.user_id))}</b><time class="sub" datetime="${esc(c.created_at)}">${esc(when)}</time></div><div style="white-space:pre-wrap;margin:6px 0">${esc(c.body)}</div>${own?`<button class="mini" onclick="beginSuggestionCommentEdit(${suggestionId},${c.id})">${esc(hubT('sug.cmt.edit','수정'))}</button>`:''}${own||ME.role==='owner'?` <button class="mini" onclick="deleteSuggestionComment(${suggestionId},${c.id})">${esc(hubT('sug.cmt.delete','삭제'))}</button>`:''}${editing&&own?`<div><textarea id="suggestionCommentEdit-${c.id}" rows="3" style="width:100%;box-sizing:border-box;margin:6px 0">${esc(c.body)}</textarea><button class="mini stamp" onclick="saveSuggestionComment(${suggestionId},${c.id})">${esc(hubT('sug.cmt.save','수정 저장'))}</button> <button class="mini" onclick="cancelSuggestionCommentEdit()">${esc(hubT('sug.cmt.cancel','취소'))}</button></div>`:''}</div>`;
+    return `<div style="border-top:1px solid var(--line);padding:10px 0;overflow-wrap:anywhere"><div class="rowflex"><b>${esc(nameOf(c.user_id))}</b><time class="sub" datetime="${esc(c.created_at)}">${esc(when)}</time></div><div style="white-space:pre-wrap;margin:6px 0">${esc(c.body)}</div>${own?`<button class="mini" onclick="beginSuggestionCommentEdit(${suggestionId},${c.id})">${esc(hubT('sug.cmt.edit','수정'))}</button>`:''}${own||ME.role==='owner'?` <button class="mini" onclick="deleteSuggestionComment(${suggestionId},${c.id})">${esc(hubT('sug.cmt.delete','삭제'))}</button>`:''}${editing&&own?`<div><textarea id="suggestionCommentEdit-${c.id}" rows="3" style="width:100%;box-sizing:border-box;margin:6px 0" onkeydown="suggestionCommentKey(event,${suggestionId},${c.id})">${esc(c.body)}</textarea><button class="mini stamp" onclick="saveSuggestionComment(${suggestionId},${c.id})">${esc(hubT('sug.cmt.save','수정 저장'))}</button> <button class="mini" onclick="cancelSuggestionCommentEdit()">${esc(hubT('sug.cmt.cancel','취소'))}</button></div>`:''}</div>`;
   }).join(''):`<div class="sub" style="padding:8px 0">${esc(hubT('sug.cmt.empty','첫 댓글을 남겨 주세요.'))}</div>`;
-  return `<div style="margin-top:10px;min-width:0">${heading}<div id="suggestionComments-${suggestionId}" style="margin-top:8px">${list}<textarea id="suggestionCommentNew-${suggestionId}" rows="3" style="width:100%;box-sizing:border-box" aria-label="${esc(hubT('sug.cmt.placeholder','댓글을 입력하세요. (최대 1000자)'))}" placeholder="${esc(hubT('sug.cmt.placeholder','댓글을 입력하세요. (최대 1000자)'))}"></textarea><button class="mini stamp" style="margin-top:6px" onclick="saveSuggestionComment(${suggestionId},null)">${esc(hubT('sug.cmt.submit','댓글 달기'))}</button></div></div>`;
+  return `<div style="margin-top:10px;min-width:0">${heading}<div id="suggestionComments-${suggestionId}" style="margin-top:8px">${list}<textarea id="suggestionCommentNew-${suggestionId}" rows="3" style="width:100%;box-sizing:border-box" onkeydown="suggestionCommentKey(event,${suggestionId},null)" aria-label="${esc(hubT('sug.cmt.placeholder','댓글을 입력하세요. (최대 1000자)'))}" placeholder="${esc(hubT('sug.cmt.placeholder','댓글을 입력하세요. (최대 1000자)'))}"></textarea><button class="mini stamp" style="margin-top:6px" onclick="saveSuggestionComment(${suggestionId},null)">${esc(hubT('sug.cmt.submit','댓글 달기'))}</button></div></div>`;
 }
 async function saveSuggestionComment(suggestionId,id){
   const field=$('#'+(id?'suggestionCommentEdit-'+id:'suggestionCommentNew-'+suggestionId)),checked=validateSuggestionComment(field.value);
@@ -2626,14 +2632,14 @@ async function saveSuggestionComment(suggestionId,id){
   try{
     const result=id?await sb.from('suggestion_comments').update({body:checked.body}).eq('id',id):await sb.from('suggestion_comments').insert({suggestion_id:suggestionId,user_id:ME.id,body:checked.body});
     if(result.error){setStatus('error');alert(hubT('sug.cmt.error_save','댓글을 저장하지 못했습니다: {msg}',{msg:result.error.message}));return;}
-    SUGGESTION_COMMENT_OPEN.add(suggestionId);SUGGESTION_COMMENT_EDIT_ID=null;setStatus('saved');await render();
+    SUGGESTION_COMMENT_OPEN.add(suggestionId);SUGGESTION_COMMENT_EDIT_ID=null;setStatus('saved');await suggestionRenderKeep(suggestionId);
   }finally{SUGGESTION_COMMENT_SAVING.delete(suggestionId);}
 }
 async function deleteSuggestionComment(suggestionId,id){
   if(!confirm(hubT('sug.cmt.confirm_delete','이 댓글을 삭제할까요?')))return;
   setStatus('saving');const result=await sb.from('suggestion_comments').delete().eq('id',id);
   if(result.error){setStatus('error');alert(hubT('sug.cmt.error_delete','댓글을 삭제하지 못했습니다: {msg}',{msg:result.error.message}));return;}
-  SUGGESTION_COMMENT_OPEN.add(suggestionId);if(SUGGESTION_COMMENT_EDIT_ID===id)SUGGESTION_COMMENT_EDIT_ID=null;setStatus('saved');render();
+  SUGGESTION_COMMENT_OPEN.add(suggestionId);if(SUGGESTION_COMMENT_EDIT_ID===id)SUGGESTION_COMMENT_EDIT_ID=null;setStatus('saved');suggestionRenderKeep(suggestionId);
 }
 /* suggestion-comments:test-end */
 /* suggestion-board:render-start */
