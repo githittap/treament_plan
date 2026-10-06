@@ -9,11 +9,11 @@ function harness(settings={}){
 }
 const row=(id,amount,extra={})=>({id,parse_status:'recorded',event_kind:'purchase',transaction_at:'2026-10-03T02:00:00Z',currency:'KRW',amount_krw:amount,merchant:'Google Ads',merchant_key:'google',raw_text:'SECRET SMS 1234567890123456',...extra});
 test('실제 화면에 두 구역을 삽입하고 캐시 번호를 올린다',()=>{
- assert.match(html,/spend-cycle\.js\?v=2026100510/);assert.match(html,/spend-cycle-ui\.js\?v=2026100510/);assert.match(html,/SpendUi\.marketing\(all,rules,links\)/);assert.match(html,/SpendUi\.loadAi\(sb,billingFetchAll\)/);assert.match(html,/SpendUi\.ai\(spendData\)/);
+ assert.match(html,/spend-cycle\.js\?v=2026100608/);assert.match(html,/spend-cycle-ui\.js\?v=2026100608/);assert.match(html,/SpendUi\.marketing\(all,rules,links\)/);assert.match(html,/SpendUi\.loadAi\(sb,billingFetchAll\)/);assert.match(html,/SpendUi\.ai\(spendData\)/);
 });
 test('분류·연결·취소 기준을 재사용하며 문자 원문은 화면에 들어가지 않는다',()=>{
  const c=harness(),rows=[row('a',1000),row('b',7000,{category_override:'not_marketing'}),row('c',9000,{parse_status:'failed'}),row('foreign',0,{currency:'USD'}),row('krw',500),row('cancel',-100,{event_kind:'cancellation',reversed_event_id:'a'})],rules=[{merchant_key:'google',category:'google'}],links=[{foreign_event_id:'foreign',krw_event_id:'krw'}];
- const out=c.SpendUi.marketing(rows,rules,links);assert.match(out,/data-spend-scope="marketing"/);assert.match(out,/₩1,400/);assert.match(out,/3건/);assert.doesNotMatch(out,/SECRET|1234567890123456|raw_text/);assert.match(out,/외화 0건/);
+ const out=c.SpendUi.marketing(rows,rules,links);assert.match(out,/data-spend-scope="marketing"/);assert.match(out,/1,400원/);assert.match(out,/3건/);assert.doesNotMatch(out,/SECRET|1234567890123456|raw_text/);assert.match(out,/외화 0건/);
  const old=c.marketingMonthSummary(rows,rules,links,'2026-10');assert.equal(old.totalKrw,1400);
 });
 test('켜기·끄기, 문구, 숫자 기준, 기간 이름·순서가 허브 설정에서 바뀐다',async()=>{
@@ -31,7 +31,7 @@ test('AI 분석 조회는 선택 기간·이전 기간·기준선을 읽고 원�
 });
 test('AI는 광고 제외·직접 입력 제외·토큰 간격 숨김·오류별 표시를 한다',()=>{
  const c=harness(),data={money:[{platform:'Claude',received_at:'2026-10-03T00:00:00Z',amount_krw:1000},{platform:'naver_ads',received_at:'2026-10-03T00:00:00Z',amount_krw:9000}],tokens:[{usage_date:'2026-10-03',model:'Sol',tokens:800000}],moneyError:false,tokensError:false};
- const out=c.SpendUi.ai(data);assert.match(out,/₩1,000/);assert.doesNotMatch(out,/₩9,000/);assert.match(out,/직접 입력 월 합계는/);const tok=out.split('data-spend-unit="tokens"')[1];assert.ok(tok);assert.doesNotMatch(tok,/결제 간격/);assert.match(tok,/100만 토큰/);
+ const out=c.SpendUi.ai(data);assert.match(out,/1,000원/);assert.doesNotMatch(out,/9,000원/);assert.match(out,/직접 입력 월 합계는/);const tok=out.split('data-spend-unit="tokens"')[1];assert.ok(tok);assert.doesNotMatch(tok,/결제 간격/);assert.match(tok,/100만 토큰/);
  assert.match(c.SpendUi.ai({...data,moneyError:true}),/불러오지 못했습니다/);
 });
 test('모든 화면 글과 설정 기준은 허브 설정 목록에 등록된다',()=>{
@@ -76,7 +76,7 @@ test('그래프: 날짜별 SVG·평소 범위 띠·평균선·간격 점선과 �
 });
 test('그래프: 과다·단축·정상·부족 네 상태와 빨간 막대·점이 나온다',()=>{
  const c=harness({'spend.default_days':'7'}),rules=[{merchant_key:'google',category:'google'}];
- const excess=c.SpendUi.marketing(chartRows('excess'),rules,[]);assert.match(excess,/data-spend-anomaly="excess"/);assert.match(excess,/spend-spike/);assert.match(excess,/최근 7일 ₩2,100/);assert.match(excess,/평소 7일 평균 ₩700보다 \+200.0%/);
+ const excess=c.SpendUi.marketing(chartRows('excess'),rules,[]);assert.match(excess,/data-spend-anomaly="excess"/);assert.match(excess,/spend-spike/);assert.match(excess,/최근 7일 2,100원/);assert.match(excess,/평소 7일 평균 700원보다 \+200.0%/);
  const short=c.SpendUi.marketing(chartRows('short'),rules,[]);assert.match(short,/data-spend-anomaly="interval"/);assert.match(short,/결제 간격이 평소 4일 → 최근 1일/);assert.match(short,/spend-short/);
  const insufficient=c.SpendUi.marketing(chartRows('insufficient'),rules,[]);assert.match(insufficient,/data-spend-anomaly="insufficient"/);assert.match(insufficient,/아직 비교할 평소 자료가 부족함\(4건\)/);assert.doesNotMatch(insufficient,/spend-spike|data-spend-anomaly="normal"|spend-baseline-band/);
  assert.doesNotMatch(excess,/SECRET|raw_text|\d{16}/);
@@ -96,5 +96,25 @@ test('그래프: 숫자 설정 6개·켬 설정은 등록되고 소수 기준과
  await c.HubUi.load({from(){return {select(){return Promise.resolve({data:[{key:'spend.anomaly_normal',value:'기준 안 <b>'}],error:null});}}}});assert.match(c.SpendUi.marketing(chartRows(),[{merchant_key:'google',category:'google'}],[]),/기준 안 &lt;b&gt;/);
 });
 test('그래프: 기존 월 합계·예산·기간 숫자를 보존하고 경고에도 원문은 없다',()=>{
- const c=harness({'spend.default_days':'7'}),rows=chartRows('excess'),rules=[{merchant_key:'google',category:'google'}],before=JSON.stringify(c.marketingMonthSummary(rows,rules,[],'2026-10')),out=c.SpendUi.marketing(rows,rules,[]);assert.equal(JSON.stringify(c.marketingMonthSummary(rows,rules,[],'2026-10')),before);assert.match(out,/하루 평균 ₩300/);assert.match(out,/₩2,100/);assert.doesNotMatch(out,/SECRET|raw_text|\d{16}/);
+ const c=harness({'spend.default_days':'7'}),rows=chartRows('excess'),rules=[{merchant_key:'google',category:'google'}],before=JSON.stringify(c.marketingMonthSummary(rows,rules,[],'2026-10')),out=c.SpendUi.marketing(rows,rules,[]);assert.equal(JSON.stringify(c.marketingMonthSummary(rows,rules,[],'2026-10')),before);assert.match(out,/하루 평균 300원/);assert.match(out,/2,100원/);assert.doesNotMatch(out,/SECRET|raw_text|\d{16}/);
+});
+
+test('만원 표시: 금액·요약은 줄이고 상세는 원 금액과 결제 건수를 보존한다',()=>{
+ const c=harness({'spend.default_days':'7'}),rows=[row('a',2853834),row('b',10000)],out=c.SpendUi.marketing(rows,[{merchant_key:'google',category:'google'}],[]);
+ assert.equal(c.SpendUi.format(2853834,false),'285만원');assert.match(out,/286만원/);assert.match(out,/평균 40만원/);assert.match(out,/data-spend-detail-text="2026-10-03 \(토\) · ₩2,863,834 · 결제 2건"/);
+ const won=harness({'spend.amount_unit':'won'});assert.equal(won.SpendUi.format(2853834,false),'2,853,834원');
+});
+test('결제 간격: 설명·일 단위·정확한 금액과 앞 결제 날짜·쉬운 요약을 표시한다',()=>{
+ const c=harness({'spend.default_days':'7'}),out=c.SpendUi.marketing(chartRows(),[{merchant_key:'google',category:'google'}],[]);
+ assert.match(out,/점 하나 = 결제 1건/);assert.match(out,/0 = 같은 날 또 결제/);assert.match(out,/>1일<\/text>/);assert.match(out,/평소 1일/);assert.match(out,/10-05 결제 ₩100 · 앞 결제\(10-04\)와 1일 차이/);assert.match(out,/동안 7건 · 평균 1일마다 1번 결제 · 가장 길게 쉰 간격 1일/);
+});
+test('주 막대: 실제 결제 건수와 묶음 시작·끝을 상세로 표시한다',()=>{
+ const c=harness({'spend.default_days':'61'}),out=c.SpendUi.marketing([row('a',12345678)], [{merchant_key:'google',category:'google'}],[]);
+ assert.match(out,/10-01 ~ 10-05 · ₩12,345,678 · 결제 1건/);assert.match(out,/1,234만원/);
+});
+test('금액 단위: 허브 설정으로 저장하고 새 문구를 덮어쓸 수 있다',async()=>{
+ const c=harness(),writes=[],db={from(table){return {upsert(row){writes.push({table,...row});return Promise.resolve({error:null});}};}};
+ assert.ok(c.spendTestDefs.settings.some(d=>d.key==='spend.amount_unit'&&d.kind==='enum'));
+ assert.equal((await c.spendTestDefs.settingSave(db,'spend.amount_unit','won')).ok,true);assert.equal(c.SpendUi.format(19999,false),'19,999원');assert.equal((await c.spendTestDefs.settingSave(db,'spend.amount_unit','bad')).ok,false);assert.equal(writes.length,1);
+ await c.HubUi.load({from(){return {select(){return Promise.resolve({data:[{key:'spend.chart_interval_help',value:'간격 설명 바꿈 <b>'}],error:null});}}}});assert.match(c.SpendUi.marketing(chartRows(),[{merchant_key:'google',category:'google'}],[]),/간격 설명 바꿈 &lt;b&gt;/);
 });

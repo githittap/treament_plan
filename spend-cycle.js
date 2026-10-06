@@ -4,6 +4,10 @@
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
   'use strict';
   const DAY=86400000,KST=9*3600000;
+  function spendMan(value,unit='man'){
+    const amount=Math.abs(Number(value)),sign=value<0?'−':'';
+    return sign+(unit!=='won'&&amount>=10000?Math.floor(amount/10000).toLocaleString('ko-KR')+'만원':Math.round(amount).toLocaleString('ko-KR')+'원');
+  }
   function date(value){
     if(/^\d{4}-\d{2}-\d{2}$/.test(String(value))){
       const t=Date.parse(value+'T00:00:00Z');if(!Number.isFinite(t)||new Date(t).toISOString().slice(0,10)!==value)throw new Error('Invalid date');return value;
@@ -80,5 +84,5 @@
       interval:{flag:!insufficient&&intervalPct!=null&&intervalPct>=shrinkPct,recentAvg,baselineAvg,pct:intervalPct},
       days,points:points.map((p,i)=>({...p,recent:i>=payments.length-recent.length}))};
   }
-  return {calculate,window,date,anomaly};
+  return {calculate,window,date,anomaly,spendMan};
 });

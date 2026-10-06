@@ -1830,10 +1830,19 @@ function hubTextDefsSpend(add){
   add("spend.chart_mean","📈 기간·주기","평소 평균","평소 평균");
   add("spend.chart_spike","📈 기간·주기","튀는 날","튀는 날");
   add("spend.chart_interval","📈 기간·주기","결제 간격 흐름","결제 간격 흐름");
-  add("spend.chart_interval_mean","📈 기간·주기","평소 평균 {days}일","평소 평균 {days}일");
+  add("spend.chart_interval_mean","📈 기간·주기","평소 {days}일","평소 {days}일");
   add("spend.chart_gap","📈 기간·주기","{date} · {days}일","{date} · {days}일");
   add("spend.chart_value","📈 기간·주기","{date} · {amount}","{date} · {amount}");
   add("spend.chart_period","📈 기간·주기","{start} ~ {end}","{start} ~ {end}");
+  add("spend.amount_man","📈 기간·주기","만원 단위 (버림)","만원 단위 (버림)");
+  add("spend.amount_won","📈 기간·주기","원 단위","원 단위");
+  add("spend.chart_interval_help","📈 기간·주기","점 하나 = 결제 1건 · 높이 = 바로 앞 결제와 며칠 떨어졌나 · 점이 아래로 몰리면 결제가 잦아진 것(0 = 같은 날 또 결제)","점 하나 = 결제 1건 · 높이 = 바로 앞 결제와 며칠 떨어졌나 · 점이 아래로 몰리면 결제가 잦아진 것(0 = 같은 날 또 결제)");
+  add("spend.chart_detail","📈 기간·주기","{date} · {amount} · 결제 {count}건","{date} · {amount} · 결제 {count}건");
+  add("spend.chart_gap_detail","📈 기간·주기","{date} 결제 {amount} · 앞 결제({previous})와 {days}일 차이","{date} 결제 {amount} · 앞 결제({previous})와 {days}일 차이");
+  add("spend.chart_days","📈 기간·주기","{days}일","{days}일");
+  add("spend.chart_interval_summary","📈 기간·주기","{start}~{end} 동안 {count}건 · 평균 {avg}일마다 1번 결제 · 가장 길게 쉰 간격 {max}일","{start}~{end} 동안 {count}건 · 평균 {avg}일마다 1번 결제 · 가장 길게 쉰 간격 {max}일");
+  add("spend.chart_date","📈 기간·주기","{date} ({weekday})","{date} ({weekday})");
+  add("spend.chart_weekdays","📈 기간·주기","일,월,화,수,목,금,토","일,월,화,수,목,금,토");
   add("spend.reorder_down","📈 기간·주기","아래로","아래로");
 }
 function hubTextDefs(){
@@ -1939,6 +1948,7 @@ const HUB_SETTING_DEFS=[
   {key:'att.issue.evidence_max',screen:'🕘 근태 기준',label:'소명 한 건에 낼 수 있는 파일 수',where:'지문누락 소명 — 기존 파일과 새 파일을 합친 최대 개수',def:'5',kind:'int',min:1,max:10,unit:'개'},
   {key:'att.myissue_list_limit',screen:'🕘 근태 기준',label:'내 소명 목록에 보이는 건수',where:'출퇴근 — 내 소명 목록에 최근 몇 건까지 보여 줄지',def:'20',kind:'int',min:5,max:100,unit:'건'},
   {key:'monthly_leave_attendance_mode',screen:'🌿 연차 기준',label:'1년 미만 월차 적립 방식',labelKey:'p7.monthly.mode_label',where:'자동은 근무표 없이 매달 적립하고 원장이 결근 후보를 확인해 뺄 수 있습니다. 근무표 확인은 공표된 근무표로 개근 확인 뒤 적립합니다.',whereKey:'p7.monthly.mode_hint',def:'auto',kind:'enum',options:[{value:'auto',label:'매달 자동',labelKey:'p7.monthly.mode_auto'},{value:'published_schedule',label:'공표 근무표 확인',labelKey:'p7.monthly.mode_schedule'}]},
+  {key:'spend.amount_unit',screen:'📈 기간·주기',label:'금액 표시 단위',where:'그래프·기간 합계·요약 금액 (표·CSV·상세는 원 단위 유지)',def:'man',kind:'enum',options:[{value:'man',label:'만원 단위 (버림)',labelKey:'spend.amount_man'},{value:'won',label:'원 단위',labelKey:'spend.amount_won'}]},
   {"key":"spend.default_days","screen":"📈 기간·주기","label":"기본 조회 일수","where":"마케팅비·AI비용의 기간 분석 구역","def":"30","kind":"int","min":1,"max":3660,"unit":"일"},
   {"key":"spend.week_start","screen":"📈 기간·주기","label":"주 시작 요일 (0=일요일 · 1=월요일)","where":"마케팅비·AI비용의 기간 분석 구역","def":"1","kind":"int","min":0,"max":6,"unit":"요일"},
   {"key":"spend.top_merchants","screen":"📈 기간·주기","label":"상위 상호 표시 수","where":"마케팅비·AI비용의 기간 분석 구역","def":"5","kind":"int","min":1,"max":30,"unit":"개"},
