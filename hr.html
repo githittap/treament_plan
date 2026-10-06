@@ -415,7 +415,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 
 <script src="hub-fortune.js?v=2026100601"></script>
 <script src="hub-intro.js?v=2026100503"></script>
-<script src="hub-texts.js?v=2026100605"></script>
+<script src="hub-texts.js?v=2026100606"></script>
 <script src="security-pledge.js?v=20261003p9d"></script>
 <script src="wage-hourly.js?v=2026100401"></script>
 <script src="spend-cycle.js?v=2026100510"></script>
@@ -1891,6 +1891,29 @@ async function saveLeaveBalance(index){
   finally{button.disabled=false;}
 }
 /* leave-status:test-end */
+/* suggestion-six:start */
+function leaveChangeButtons(r){
+  if(r.user_id!==ME.id||r.status!=='승인'||r.date_from<today())return '';
+  return `<button class="mini rej" onclick="requestLeaveChange(${r.id},'cancel')">${esc(hubT('leave.change.cancel','취소 요청'))}</button>`+(r.type==='연차'?` <button class="mini" onclick="requestLeaveChange(${r.id},'half')">${esc(hubT('leave.change.half','반차로 바꾸기 요청'))}</button>`:'');
+}
+function leaveChangeCards(rows){
+  return `<div class="card"><h2>${esc(hubT('leave.change.title','연차 취소·변경 요청'))}</h2>${(rows||[]).map(r=>`<div class="hint"><b>${esc(r.action==='cancel'?hubT('leave.change.cancel','취소 요청'):hubT('leave.change.half','반차로 바꾸기 요청'))}</b> · #${r.request_id||''} · ${esc(r.status)} · ${esc(r.reason)}${r.type_note?' · '+esc(r.type_note):''}${r.status==='대기'&&['chief','owner'].includes(ME.role)?`${ME.role==='chief'?` <button class="mini stamp" onclick="processLeaveChange(${r.id},'approve')">${esc(hubT('leave.pend.btn_ok','실장 최종 승인'))}</button>`:''} <button class="mini rej" onclick="processLeaveChange(${r.id},'reject')">${esc(hubT('leave.btn.reject','반려'))}</button>`:''}</div>`).join('')||`<div class="empty">${esc(hubT('leave.pend.empty','대기 없음'))}</div>`}</div>`;
+}
+const LEAVE_CHANGE_BUSY=new Set();
+async function requestLeaveChange(id,action){
+  if(LEAVE_CHANGE_BUSY.has(id))return;
+  const reason=prompt(hubT('leave.change.reason','취소·변경 사유를 적어 주세요. (필수)'));if(!reason?.trim())return;
+  const note=action==='half'?prompt(hubT('leave.change.time','반차 시간 범위 (예: 09:00~13:00)')):null;if(action==='half'&&!note)return;
+  LEAVE_CHANGE_BUSY.add(id);
+  try{const result=await sb.rpc('request_leave_change',{p_request_id:id,p_action:action,p_reason:reason.trim(),p_type_note:note});if(result.error)throw result.error;if(!result.data)throw new Error(hubT('leave.m_save_unknown','신청 저장 결과를 확인하지 못했습니다.'));await render();await refreshBadges();}
+  catch(error){alert(hubT('leave.m_fail','실패: {msg}',{msg:error.message}));}finally{LEAVE_CHANGE_BUSY.delete(id);}
+}
+async function processLeaveChange(id,action){
+  if(LEAVE_CHANGE_BUSY.has(id)||!confirm(hubT('leave.change.confirm','연차 변경 요청을 처리할까요?')))return;LEAVE_CHANGE_BUSY.add(id);
+  try{const result=await sb.rpc('process_leave_change',{p_id:id,p_action:action});if(result.error)throw result.error;if(!result.data?.length)throw new Error(hubT('leave.m_act_unknown','처리 결과를 확인하지 못했습니다. 새로고침 후 확인하세요.'));await render();await refreshBadges();}
+  catch(error){alert(hubT('leave.m_act_fail','처리 실패: {msg}',{msg:error.message}));}finally{LEAVE_CHANGE_BUSY.delete(id);}
+}
+/* suggestion-six:end */
 async function renderLeave(m){
   const {data:bal}=await sb.from('v_leave_balance').select('*').eq('user_id',ME.id).maybeSingle();
   const {data:mine}=await sb.from('leave_requests').select('*').eq('user_id',ME.id).order('created_at',{ascending:false}).limit(hubN('leave.my_list_limit',20));
@@ -1912,6 +1935,8 @@ async function renderLeave(m){
       ${(archive||[]).length?`<div class="tblwrap"><table><tr><th>${esc(hubT('leave.th.person','직원'))}</th><th>${esc(hubT('leave.th.period','기간'))}</th><th>${esc(hubT('leave.th.days','일수'))}</th><th>${esc(hubT('leave.th.status','상태'))}</th><th>${esc(hubT('leave.arch.th_approver','승인자·승인일'))}</th><th>${esc(hubT('leave.arch.th_canceler','취소자·취소일'))}</th><th>${esc(hubT('leave.arch.th_action','액션'))}</th></tr>
       ${(archive||[]).map(r=>`<tr><td>${esc(nameOf(r.user_id))}</td><td>${md(r.date_from)}~${md(r.date_to)}</td><td>${r.days}</td><td><span class="b ${r.status==='승인'?'ok':'no'}">${esc(r.status)}</span></td><td>${esc(r.owner_by||r.chief_by||'')}${r.owner_at||r.chief_at?' · '+stampDate(r.owner_at||r.chief_at):''}</td><td>${r.cancelled_by?esc(r.cancelled_by)+(r.cancelled_at?' · '+stampDate(r.cancelled_at):''):''}</td><td>${r.status==='승인'&&ME.role==='owner'?`<button class="mini rej" onclick="cancelApprovedLeave(${r.id})">${esc(hubT('leave.arch.btn_cancel','승인 취소·복구'))}</button>`:r.status==='승인'?'<span class="sub">'+esc(hubT('leave.arch.done','승인완료'))+'</span>':''}</td></tr>`).join('')}</table></div>`:'<div class="empty">'+esc(hubT('leave.arch.empty','선택한 달의 승인·취소 내역 없음'))+'</div>'}</div>`;
   }
+  const changes=await sb.from('leave_change_requests').select('*').order('created_at',{ascending:false});
+  const changeHtml=changes.error?`<div class="card">${esc(hubT('leave.m_fail','실패: {msg}',{msg:changes.error.message}))}</div>`:leaveChangeCards(changes.data);
   const grantHtml=await renderEmployeeLeaveStatus();
   const accrualHtml=ME.role==='owner'?`<div class="card"><h2>${esc(hubT('leave.acc.title','📆 1년 된 직원의 연차 15일을 확인하고 넣기'))} <span class="sub">(${esc(hubT('leave.owner_tag','원장'))})</span></h2><div class="hint">${esc(hubT('leave.acc.hint','1년 미만 월차는 매달 자동으로 생깁니다. 1년이 된 직원의 15일과 아직 확인되지 않은 지난 기간은 여기에서 개근·재직을 확인하고 넣습니다. 이미 넣은 연차는 두 번 넣지 않습니다.'))}</div><div class="rowflex" style="margin-top:8px"><label>${esc(hubT('leave.acc.f_asof','기준일'))} <input id="laAsOf" class="mini" type="date" value="${esc(LEAVE_ACCRUAL_AS_OF||today())}" max="${today()}"></label><button class="mini" onclick="previewLeaveAccrual()">${esc(hubT('leave.acc.btn_preview','미리보기'))}</button><button id="laApply" class="mini stamp" onclick="applyLeaveAccrual()" disabled>${esc(hubT('leave.acc.btn_apply','확인한 항목 적용'))}</button></div><div id="laMsg" class="hint" style="margin-top:8px">${esc(hubT('leave.acc.need_preview','적용 전 미리보기가 필요합니다.'))}</div><div id="laRows"></div></div>`:'';
   m.innerHTML=`
@@ -1921,8 +1946,8 @@ async function renderLeave(m){
     <h3>${esc(hubT('leave.my.list_title','내 신청 내역'))}</h3>
     ${(mine||[]).length?`<div class="tblwrap"><table><tr><th>${esc(hubT('leave.th.type','유형'))}</th><th>${esc(hubT('leave.th.period','기간'))}</th><th>${esc(hubT('leave.th.days','일수'))}</th><th>${esc(hubT('leave.th.status','상태'))}</th><th></th></tr>
     ${(mine||[]).map(r=>`<tr><td>${esc(leaveTypeLabel(r.type))}${r.type_note&&r.type!=='기타'?' · '+esc(r.type_note):''}</td><td>${md(r.date_from)}~${md(r.date_to)}</td><td>${r.days}</td>
-      <td><span class="b ${r.status==='승인'?'ok':(r.status==='반려'?'no':'wait')}">${esc(r.status)}</span></td><td><button class="mini" onclick="openLeaveForm(${r.id})">${esc(hubT('leave.btn.form','📄 신청서'))}</button> ${r.status==='대기'?`<button class="mini" onclick="openLeaveEdit(${r.id})">${esc(hubT('leave.my.btn_edit','수정'))}</button><button class="mini rej" onclick="cancelPendingLeave(${r.id})">${esc(hubT('leave.my.btn_cancel','취소'))}</button>`:''}</td></tr>`).join('')}</table></div>`:'<div class="empty">'+esc(hubT('leave.my.empty','신청 내역 없음'))+'</div>'}
-  </div>${leadHtml}${archiveHtml}${grantHtml}${accrualHtml}`;
+      <td><span class="b ${r.status==='승인'?'ok':(r.status==='반려'?'no':'wait')}">${esc(r.status)}</span></td><td><button class="mini" onclick="openLeaveForm(${r.id})">${esc(hubT('leave.btn.form','📄 신청서'))}</button> ${leaveChangeButtons(r)} ${r.status==='대기'?`<button class="mini" onclick="openLeaveEdit(${r.id})">${esc(hubT('leave.my.btn_edit','수정'))}</button><button class="mini rej" onclick="cancelPendingLeave(${r.id})">${esc(hubT('leave.my.btn_cancel','취소'))}</button>`:''}</td></tr>`).join('')}</table></div>`:'<div class="empty">'+esc(hubT('leave.my.empty','신청 내역 없음'))+'</div>'}
+  </div>${leadHtml}${archiveHtml}${changeHtml}${grantHtml}${accrualHtml}`;
 }
 function leaveApplyModalPrepare(){try{hubStaticFill();const sel=$('#lvType');if(sel)sel.innerHTML=leaveTypeItems().map(i=>'<option value="'+esc(i.code)+'">'+esc(i.label)+'</option>').join('');}catch(e){}}
 function refreshLeaveTypeFields(){const type=$('#lvType').value,isTimed=type==='반차'||type==='조퇴';$('#lvNoteWrap').style.display=type==='기타'?'':'none';$('#lvTimeWrap').style.display=isTimed?'':'none';}

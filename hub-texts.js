@@ -1868,6 +1868,7 @@ function hubTextDefs(){
   hubTextDefsChapter5(add);
   hubTextDefsChapter6(add);
   hubTextDefsChapter7(add);
+  [['cancel','취소 요청'],['half','반차로 바꾸기 요청'],['title','연차 취소·변경 요청'],['reason','취소·변경 사유를 적어 주세요. (필수)'],['time','반차 시간 범위 (예: 09:00~13:00)'],['confirm','연차 변경 요청을 처리할까요?']].forEach(([key,text])=>add('leave.change.'+key,'🌿 연차 변경',text,text));
   hubTextDefsTime(add);
   hubTextDefsHourly(add);
   hubTextDefsSpend(add);
