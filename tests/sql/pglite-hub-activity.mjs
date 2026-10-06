@@ -19,7 +19,9 @@ try{
  create function my_role() returns text language sql stable security definer as $$select role from profiles where user_id=auth.uid()$$;
  create table app_settings(key text primary key,value text,label text);
  create table notice_reads(notice_id bigint,user_id uuid,read_at timestamptz);
- create table consultation_inbox_views(inbox_id uuid,viewer_id uuid,viewed_at timestamptz);
+ create table consultation_inbox_views(id bigint generated always as identity,inbox_id uuid,viewer_id uuid,viewed_at timestamptz);
+ create table consultation_inbox_replies(id bigint generated always as identity,inbox_id uuid,author_id uuid,created_at timestamptz,reply text);
+ create table consultation_inbox(id uuid,handled_by uuid,handled_at timestamptz);
  create schema cron;create table cron.job(jobname text primary key,schedule text,command text);
  create function cron.schedule(text,text,text) returns bigint language plpgsql as $$begin insert into cron.job values($1,$2,$3) on conflict(jobname) do update set schedule=$2,command=$3;return 1;end$$;
  create function cron.unschedule(text) returns boolean language plpgsql as $$begin delete from cron.job where jobname=$1;return true;end$$;`);
@@ -29,6 +31,8 @@ try{
  await db.exec(fixture);await db.exec(fixture);
  eq((await q('select count(*)::int n from cron.job'))[0].n,1,'cron 재등록');
  eq((await q('select schedule from cron.job'))[0].schedule,'10 19 * * *','KST 04:10');
+ await db.exec("select set_config('cron.timezone','Asia/Seoul',false)");await db.exec(fixture);eq((await q('select schedule from cron.job'))[0].schedule,'10 4 * * *','cron 한국시간 설정');
+ await db.exec("select set_config('cron.timezone','UTC',false)");await db.exec(fixture);
  await user(staff);eq(await log([{kind:'enter',target:'hub',user_id:owner,meta:{password:'secret',duration_seconds:3}}]),1,'쓰기');
  eq((await q('select count(*)::int n from hub_activity_log'))[0].n,0,'직원 본인 기록도 못 읽음');
  await reject(`insert into hub_activity_log(kind,target) values('click','x')`,/permission denied|row-level security/);
@@ -36,6 +40,7 @@ try{
  await reject('select * from hub_activity_page()',/owner_only/);await reject('select * from hub_activity_summary()',/owner_only/);
  await root();const first=(await q('select * from hub_activity_log'))[0];eq(first.user_id,staff,'user_id 위조 차단');eq(first.meta,{duration_seconds:3},'메타 본문 배제');
  await user(manager);eq((await q('select count(*)::int n from hub_activity_log'))[0].n,0,'관리자도 못 읽음');
+ await reject('select * from hub_activity_page()',/owner_only/);
  await user(blocked);await assert.rejects(log([{kind:'enter',target:'hub'}]),/not_allowed/);checks++;
  await user(pending);await assert.rejects(log([{kind:'enter',target:'hub'}]),/not_allowed/);checks++;
  await root();await db.exec('set role anon');await reject(`select log_hub_activity('[]')`,/permission denied/);
@@ -43,15 +48,18 @@ try{
  await assert.rejects(log([{kind:'bad',target:'x'}]),/invalid_event/);checks++;
  await assert.rejects(log([{kind:'click',target:'x'.repeat(201)}]),/invalid_event/);checks++;
  await assert.rejects(log([{kind:'click',target:'x',meta:{huge:'x'.repeat(2100)}}]),/invalid_event/);checks++;
+ eq(await log([{kind:'view',target:'notice_reads'}]),0,'공지 기존 기록 중복 제외');
  // Separate the minute budget fixture from invalid-event checks.
  await root();await db.exec('update hub_activity_log set occurred_at=now()-interval \'2 minutes\'');await user(staff);
  for(let i=0;i<6;i++)eq(await log(Array.from({length:50},()=>({kind:'click',target:'x'}))),50,'분당 300건까지');
  eq(await log([{kind:'click',target:'dropped'}]),0,'300건 초과 버림');
  await user(owner);eq(await log([{kind:'enter',target:'hub'}]),0,'원장 기본 제외');
  await root();await db.exec("update app_settings set value='false' where key='activity_log.exclude_owner'");await user(owner);eq(await log([{kind:'enter',target:'hub'}]),1,'원장 제외 설정 변경');
- await root();await db.exec(`insert into notice_reads values(9,'${staff}',now());insert into consultation_inbox_views values('66666666-6666-6666-6666-666666666666','${staff}',now());`);
+ await root();await db.exec(`insert into notice_reads values(9,'${staff}',now());insert into consultation_inbox_views(inbox_id,viewer_id,viewed_at) values('66666666-6666-6666-6666-666666666666','${staff}',now());`);
+ await db.exec(`insert into consultation_inbox_replies(inbox_id,author_id,created_at,reply) values('66666666-6666-6666-6666-666666666666','${staff}',now(),'secret');insert into consultation_inbox values('66666666-6666-6666-6666-666666666666','${staff}',now());`);
  await user(owner);const page=await q('select * from hub_activity_page()');eq(page.length,200,'200건 페이지');check(page.some(r=>r.source==='notice'),'기존 공지 열람');check(page.some(r=>r.source==='inbox'),'기존 문의 열람');
  const filtered=await q(`select * from hub_activity_page(now()-interval '1 day',now()+interval '1 day','${staff}','view')`);eq(filtered.length,2,'직원·종류 필터');
+ const writes=await q(`select * from hub_activity_page(now()-interval '1 day',now()+interval '1 day','${staff}','write')`);eq(writes.length,2,'기존 문의 답변·처리 합쳐 보기');check(!JSON.stringify(writes).includes('secret'),'기존 문의 본문 제외');
  const summary=await q('select * from hub_activity_summary()');check(summary.some(r=>r.user_id===staff&&r.month_days===1),'월 접속일 요약');
  await root();await db.exec(`insert into hub_activity_log(user_id,kind,target,occurred_at) values('${staff}','click','old',now()-interval '1096 days'),('${staff}','click','keep',now()-interval '1094 days');`);
  await user(owner);await reject('select prune_hub_activity_log()',/permission denied/);

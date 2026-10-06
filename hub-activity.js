@@ -63,24 +63,25 @@ function instrument(sb){
  sb.rpc=function(name,args,options){
   const request=rpc(name,args,options);
   // 읽기 RPC·로그 수집은 제외. 저장 RPC는 서버 성공 뒤에만 이름·ID를 남김.
-  if(name==='log_hub_activity'||!/^(save_|submit_|create_|update_|delete_|remove_|cancel_|approve_|reject_|confirm_|record_|mark_|set_|sign_|grant_|revoke_|apply_|review_|issue_|payroll_(move|archive|restore)|consultation_inbox_(convert|record|reply)|fortune_(draw|mark|save))/.test(name))return request;
-  return Promise.resolve(request).then(result=>{if(succeeded(result)){const id=result.data&&safeId(result.data.id)||safeId(args&&Object.entries(args).find(([k])=>/^p_(id|.*_id)$/.test(k))?.[1]);record('write',name,id,{action:'rpc'});}return result;});
+  if(name==='log_hub_activity'||name==='consultation_inbox_record_view'||!/^(save_|submit_|create_|update_|delete_|remove_|cancel_|approve_|reject_|confirm_|record_|mark_|set_|sign_|grant_|revoke_|apply_|review_|issue_|process_|request_|replace_|respond_|register_|prepare_|copy_|disable_|attendance_issue_add_|payment_request_(act|add)|payroll_(move|archive|restore)|consultation_inbox_(convert|record|reply|set)|fortune_(draw|mark|save))/.test(name))return request;
+  return Promise.resolve(request).then(result=>{if(succeeded(result)){const data=Array.isArray(result.data)?result.data[0]:result.data,id=safeId(data&&typeof data==='object'?data.id||data.doc_id||data.request_id:data)||safeId(args&&Object.entries(args).find(([k])=>/^p_(id|.*_id)$/.test(k))?.[1]);record('write',name,id,{action:'rpc'});}return result;});
  };
  if(sb.storage&&sb.storage.from){const storageFrom=sb.storage.from.bind(sb.storage);sb.storage.from=function(bucket){const storage=storageFrom(bucket);return new Proxy(storage,{get(obj,key){const fn=Reflect.get(obj,key,obj);if(typeof fn!=='function')return fn;if(key!=='download')return fn.bind(obj);return (...args)=>Promise.resolve(fn.apply(obj,args)).then(result=>{if(succeeded(result))record('download','storage:'+bucket);return result;});}});};}
  sb.__hubActivityObserved=true;
 }
 function start(options){
- if(state&&state.me.id===options.me.id){state={...state,...options};return;}
+ if(state&&state.me.id===options.me.id){state={...state,...options,me:{...options.me}};return;}
  if(state){leave();queue=[];}
- state=options;session=root.crypto&&root.crypto.randomUUID?root.crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);lastTab='';entered=Date.now();
- instrument(state.sb);record('enter','hub');
+ state={...options,me:{...options.me}};session=root.crypto&&root.crypto.randomUUID?root.crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);lastTab='';entered=Date.now();
+ try{instrument(state.sb);}catch(_){}record('enter','hub');
  if(interval)clearInterval(interval);interval=setInterval(()=>flush(false),5000);
  const doc=options.document===null?null:root.document;if(installed||!doc)return;installed=true;
  doc.addEventListener('click',e=>{try{
   const el=e.target&&e.target.closest&&e.target.closest('button,a,[role="button"],input[type="button"],input[type="submit"]');if(!el||el.closest('[contenteditable]'))return;
   const name=label(el)||el.tagName==='INPUT'&&'button';if(!name)return;
-  const download=el.hasAttribute('download');record(download?'download':'click',name,el.getAttribute('data-log-id'));
-  const call=el.getAttribute('onclick')||'';if(/(?:View|Range|SubTab|Panel)\(/.test(call)){const fn=call.match(/^\s*(\w+)/);if(fn)record('tab','subtab:'+fn[1]);}
+  const call=el.getAttribute('onclick')||'',download=el.hasAttribute('download')||/^\s*(?:print|download|save\w*Pdf)/i.test(call);record(download?'download':'click',name,el.getAttribute('data-log-id'));
+  if(/(?:View|Range|SubTab|Panel)\(/.test(call)){const fn=call.match(/^\s*(\w+)/);if(fn)record('tab','subtab:'+fn[1]);}
+  const inline=call.match(/\b([A-Z_]*(?:VIEW|TAB|PANEL))\s*=\s*['"]([a-z0-9_-]+)['"]/i);if(inline)record('tab',inline[1]+':'+inline[2]);
  }catch(_){}},true);
  doc.addEventListener('visibilitychange',()=>{if(doc.visibilityState==='hidden')leave();else resume();});
  root.addEventListener('pagehide',leave);root.addEventListener('pageshow',resume);root.addEventListener('beforeprint',()=>record('download','print'));

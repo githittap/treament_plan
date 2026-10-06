@@ -67,7 +67,9 @@ begin
  with events as(
   select 'activity:'||a.id::text event_id,a.user_id,a.occurred_at,a.kind,a.target,a.target_id,a.user_agent_short,'activity'::text source from public.hub_activity_log a
   union all select 'notice:'||r.notice_id::text||':'||r.user_id::text,r.user_id,r.read_at,'view','notice',r.notice_id::text,null::text,'notice' from public.notice_reads r
-  union all select 'inbox:'||v.inbox_id::text||':'||v.viewer_id::text,v.viewer_id,v.viewed_at,'view','consultation_inbox',v.inbox_id::text,null::text,'inbox' from public.consultation_inbox_views v
+  union all select 'inbox:'||v.id::text,v.viewer_id,v.viewed_at,'view','consultation_inbox',v.inbox_id::text,null::text,'inbox' from public.consultation_inbox_views v
+  union all select 'reply:'||r.id::text,r.author_id,r.created_at,'write','consultation_inbox_reply',r.inbox_id::text,null::text,'inbox_reply' from public.consultation_inbox_replies r
+  union all select 'handled:'||i.id::text,i.handled_by,i.handled_at,'write','consultation_inbox_handled',i.id::text,null::text,'inbox_handled' from public.consultation_inbox i where i.handled_by is not null and i.handled_at is not null
  )select e.* from events e where e.occurred_at>=p_from and e.occurred_at<p_to
  and(p_user is null or e.user_id=p_user) and(p_kind is null or p_kind='' or e.kind=p_kind)
  order by e.occurred_at desc,e.event_id desc limit 200 offset p_offset;
@@ -80,10 +82,16 @@ returns table(user_id uuid,first_enter timestamptz,last_activity timestamptz,mon
 language plpgsql security definer set search_path=pg_catalog,public as $$
 begin
  if not public.employee_hub_access_allowed() or public.my_role() is distinct from 'owner' then raise exception 'owner_only';end if;
- return query select a.user_id,
+ return query with events as(
+ select a.user_id,a.occurred_at,a.kind from public.hub_activity_log a
+ union all select r.user_id,r.read_at,'view' from public.notice_reads r
+ union all select v.viewer_id,v.viewed_at,'view' from public.consultation_inbox_views v
+ union all select r.author_id,r.created_at,'write' from public.consultation_inbox_replies r
+ union all select i.handled_by,i.handled_at,'write' from public.consultation_inbox i where i.handled_by is not null and i.handled_at is not null
+ )select a.user_id,
  min(a.occurred_at) filter(where a.kind='enter' and (a.occurred_at at time zone 'Asia/Seoul')::date=(now() at time zone 'Asia/Seoul')::date),
- max(a.occurred_at),count(distinct (a.occurred_at at time zone 'Asia/Seoul')::date) filter(where a.kind='enter')
- from public.hub_activity_log a where a.occurred_at>=date_trunc('month',now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul' group by a.user_id;
+ max(a.occurred_at),count(distinct (a.occurred_at at time zone 'Asia/Seoul')::date) filter(where a.kind='enter' and a.occurred_at>=date_trunc('month',now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul')
+ from events a group by a.user_id;
 end;$$;
 revoke all on function public.hub_activity_summary() from public,anon,authenticated;
 grant execute on function public.hub_activity_summary() to authenticated;

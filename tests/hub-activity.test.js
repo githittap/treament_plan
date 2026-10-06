@@ -56,3 +56,12 @@ test('전역 클릭 감시로 운세·상품권·다운로드 기록, 입력 클
  for(const name of ['오늘의 운세','상품권 보기']){const el={tagName:'BUTTON',textContent:name,closest:()=>null,querySelector:()=>null,getAttribute:()=>null,hasAttribute:()=>false};listeners.click({target:{closest:()=>el}});}
  listeners.click({target:{closest:()=>null}});await h.flush();const clicks=calls.flatMap(p=>p.p_events).filter(e=>e.kind==='click');assert.deepEqual(clicks.map(e=>e.target),['오늘의 운세','상품권 보기']);
 });
+test('연차 처리·문의 처리·서류 RPC 성공이 종류·ID만 기록됨',async()=>{
+ const calls=[],sb={from:()=>({}),rpc:async(n,p)=>{calls.push([n,p]);return {data:n==='submit_approval_document'?19:null,error:null};}};
+ const h=load().HubActivity;h.start({sb,me:{id:'s',role:'staff'},document:null});
+ for(const n of ['process_leave_request','payment_request_act','consultation_inbox_set_dentweb_entered','submit_approval_document'])await sb.rpc(n,{p_id:7,p_body:'SECRET'});
+ await sb.rpc('consultation_inbox_record_view',{p_id:7});await h.flush();const writes=calls.at(-1)[1].p_events.filter(e=>e.kind==='write');assert.equal(writes.length,4);assert.equal(writes.at(-1).target_id,'19');assert.ok(!JSON.stringify(writes).includes('SECRET'));
+});
+test('직접 수정할 수 없는 DB 객체라도 수집 때문에 시작이 실패하지 않음',()=>{
+ const sb=Object.freeze({from(){return {};},rpc:async()=>({})}),h=load().HubActivity;assert.doesNotThrow(()=>h.start({sb,me:{id:'s',role:'staff'},document:null}));assert.equal(h._t.pending(),1);
+});
