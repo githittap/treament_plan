@@ -5,10 +5,15 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const root=path.join(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p),'utf8');
 const js=read('hub-texts.js'),hrRaw=read('hr.html'),hr=hrRaw.replace(/\r\n/g,'\n');
-const {renderAll,tablesFor}=require('./fixtures/hub4-harness.cjs');
+const {renderAll:renderAllWithComments,tablesFor}=require('./fixtures/hub4-harness.cjs');
+async function renderAll(...args){
+  const out=await renderAllWithComments(...args);
+  for(const key of Object.keys(out)){if(typeof out[key]==='string'&&key.startsWith('sug.render.'))out[key]=out[key].replace(/<div style="margin-top:10px"><button class="mini" aria-expanded="false" aria-controls="suggestionComments-\d+" onclick="toggleSuggestionComments\(\d+\)">[\s\S]*?<\/button><\/div>/g,'');}
+  return out;
+}
 const golden=JSON.parse(read('tests/fixtures/hub4-golden-3d4b91e.json'));
 const clone=x=>JSON.parse(JSON.stringify(x));
-const CH4=/^(appr|notice|cal|lvs|sug)\./;
+const CH4=/^(?!sug\.cmt\.)(appr|notice|cal|lvs|sug)\./;
 const STATIC_PART=hr.slice(0,hr.indexOf('<script src="hub-texts.js')); // 고정 HTML(모달)은 이 앞쪽에 있음
 
 function helpers(){

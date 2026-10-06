@@ -1,0 +1,74 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
+const {PGlite}=await import(pathToFileURL(path.join(process.env.PGLITE_PACKAGE_ROOT,'dist/index.js')).href);
+const read=p=>fs.readFileSync(p,'utf8'),up=read('db/suggestion_comments_20261006.sql'),down=read('db/suggestion_comments_20261006_rollback.sql');
+const types=['leave_submitted','leave_status_changed','consultation_received','payment_pending','approval_submitted','notice_published','document_approved','ai_billing_stop','ai_billing_low_balance','ai_billing_charge','marketing_expense_recorded','marketing_expense_cancelled','marketing_expense_review','marketing_budget_alert'];
+const id=n=>'00000000-0000-0000-0000-'+String(n).padStart(12,'0');
+let passed=0;const pass=name=>{passed++;console.log('PASS',name);};
+async function fresh(){
+  const db=new PGlite();
+  await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;
+    create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('test.uid',true),'')::uuid$$;
+    grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;
+    create table profiles(user_id uuid primary key,name text,role text,active boolean default true,approved boolean default true,account_access_status text default '활성');
+    create function employee_hub_access_allowed() returns boolean language sql stable security definer set search_path='' as $$select exists(select 1 from public.profiles where user_id=auth.uid() and active and approved and account_access_status='활성')$$;
+    create function my_role() returns text language sql stable security definer set search_path='' as $$select case when public.employee_hub_access_allowed() then (select role from public.profiles where user_id=auth.uid()) else 'pending' end$$;
+    create table app_settings(key text primary key,value text);
+    create table push_events(id bigint generated always as identity,event_key text unique,recipient_id uuid,event_type text,payload jsonb,constraint push_events_event_type_check check(event_type in (${types.map(t=>"'"+t+"'").join(',')})));
+    insert into profiles(user_id,name,role) values('${id(1)}','원장','owner'),('${id(2)}','작성자','staff'),('${id(3)}','앞선 댓글자','staff'),('${id(4)}','새 댓글자','staff'),('${id(5)}','비참여 직원','staff');
+    insert into profiles(user_id,name,role,active,approved,account_access_status) values('${id(6)}','비활성','owner',false,true,'활성'),('${id(7)}','차단','owner',true,true,'차단'),('${id(8)}','미승인','staff',true,false,'활성');`);
+  await db.exec(read('db/suggestion_board.sql'));
+  await db.exec(read('db/hub_ui_texts.sql'));
+  const enqueue=read('db/push_notifications_draft.sql').match(/create function public\.enqueue_push_event[\s\S]*?end; \$\$;/)[0];
+  await db.exec(enqueue);await db.exec('revoke all on function public.enqueue_push_event(text,uuid,text,jsonb) from public,anon,authenticated,service_role;');
+  await db.exec(`insert into suggestions(campaign_id,user_id,title,body) values(1,'${id(2)}','${'가'.repeat(60)}','건의 원문');update suggestion_campaigns set starts_at='2026-01-01',ends_at='2026-01-31';`);
+  await db.exec(up);await db.exec(up);
+  return db;
+}
+const db=await fresh(),q=async(sql,args=[]) => (await db.query(sql,args)).rows;
+const actor=async n=>{await db.exec('reset role;set role authenticated;');await db.query("select set_config('test.uid',$1,false)",[id(n)]);};
+const admin=()=>db.exec('reset role;');
+const insert=async(n,body='댓글 원문')=>{await actor(n);return (await q('insert into suggestion_comments(suggestion_id,body) values(1,$1) returning id',[body]))[0].id;};
+const events=async cid=>{await admin();return q("select recipient_id,payload,event_key from push_events where event_key like $1 order by recipient_id",['suggestion-comment:'+cid+':%']);};
+const setting=async(col,value)=>{await admin();await q('insert into app_settings values($1,$2) on conflict(key) do update set value=excluded.value',['notify.suggestion_comment.'+col,String(value)]);};
+try{
+  await actor(2);assert.equal((await q('select * from suggestion_comments')).length,0);const own=await insert(2);
+  pass('재실행·종료 캠페인 댓글 등록·본인 기본 user_id');
+  await actor(3);assert.equal((await q('select * from suggestion_comments')).length,1);assert.equal((await q('update suggestion_comments set body=$1 where id=$2 returning id',['남이 수정',own])).length,0);
+  assert.equal((await q('delete from suggestion_comments where id=$1 returning id',[own])).length,0);
+  await assert.rejects(q(`insert into suggestion_comments(suggestion_id,user_id,body) values(1,'${id(2)}','사칭')`),/row-level security/);
+  await actor(2);await assert.rejects(q(`update suggestion_comments set user_id='${id(3)}' where id=${own}`),/permission denied/);await assert.rejects(q(`update suggestion_comments set suggestion_id=999 where id=${own}`),/permission denied/);
+  await assert.rejects(q(`insert into suggestion_comments(id,suggestion_id,body) overriding system value values(100,1,'번호 위조')`),/permission denied/);
+  pass('남의 댓글 수정·삭제 불가, user_id·건의 id·댓글 id 위조 불가');
+  for(const body of ['', '   ', '\n\t', 'x'.repeat(1001),' '+ 'x'.repeat(1000)])await assert.rejects(q('insert into suggestion_comments(suggestion_id,body) values(1,$1)',[body]),/check constraint/);
+  await q('insert into suggestion_comments(suggestion_id,body) values(1,$1)',['😀'.repeat(1000)]);
+  pass('빈 댓글·1000자 초과 거절·유니코드 1000자 허용');
+  await admin();await db.exec("select pg_sleep(0.002)");await actor(2);const before=(await q('select updated_at from suggestion_comments where id=$1',[own]))[0].updated_at;await q('update suggestion_comments set body=$1 where id=$2',['수정 글',own]);const after=(await q('select updated_at from suggestion_comments where id=$1',[own]))[0].updated_at;assert.ok(new Date(after)>new Date(before));
+  pass('본인 수정과 DB updated_at 갱신');
+  const prior=await insert(3);const cid=await insert(4,'잠금화면에 보이면 안 되는 비밀 댓글');let rows=await events(cid);
+  assert.deepEqual(rows.map(r=>r.recipient_id),[1,2,3].map(id));assert.ok(rows.every(r=>r.payload.suggestion_id===1&&r.payload.suggestion_title==='가'.repeat(40)&&r.payload.commenter_name==='새 댓글자'&&r.payload.tab==='suggestions'));assert.ok(rows.every(r=>!JSON.stringify(r.payload).includes('비밀 댓글')&&!('body' in r.payload)));
+  pass('작성자+원장+앞선 댓글자, 본인 제외·중복 없음·원문 제외');
+  await admin();const count=(await q('select count(*)::int n from push_events'))[0].n;await q('select enqueue_push_event($1,$2,$3,$4)',[rows[0].event_key,rows[0].recipient_id,'suggestion_commented',rows[0].payload]);assert.equal((await q('select count(*)::int n from push_events'))[0].n,count);
+  pass('댓글 id·수신자 event_key 중복 적재 방지');
+  await setting('author',false);await setting('owner',false);await setting('commenters',false);assert.equal((await events(await insert(5))).length,0);
+  await setting('author',true);assert.deepEqual((await events(await insert(4))).map(r=>r.recipient_id),[id(2)]);
+  await setting('author',false);await setting('owner',true);assert.deepEqual((await events(await insert(4))).map(r=>r.recipient_id),[id(1)]);
+  await setting('owner',false);await setting('commenters',true);assert.deepEqual((await events(await insert(4))).map(r=>r.recipient_id),[2,3,5].map(id));
+  pass('세 알림 대상 토글을 각각 적용함');
+  await setting('author',true);await setting('owner',true);await admin();await q('insert into hub_ui_texts(key,value) values($1,$2),($3,$4)',['sug.cmt.push_title','고친 제목','sug.cmt.push_body','{name} / {title}']);rows=await events(await insert(4));assert.equal(rows[0].payload.push_title,'고친 제목');assert.equal(rows[0].payload.push_body_template,'{name} / {title}');
+  pass('허브 DB 알림 문구를 큐에 반영함');
+  for(const n of [6,7,8]){await actor(n);assert.equal((await q('select * from suggestion_comments')).length,0);await assert.rejects(q('insert into suggestion_comments(suggestion_id,body) values(1,$1)',['접근 거절']),/row-level security/);}
+  await admin();await q("update profiles set account_access_status='차단' where user_id=$1",[id(3)]);assert.ok(!(await events(await insert(4))).some(r=>r.recipient_id===id(3)));
+  await db.exec('set role anon;');await assert.rejects(q('select * from suggestion_comments'),/permission denied/);await admin();
+  pass('미승인·차단·비활성·익명 접근 및 알림 수신 제외');
+  await actor(1);assert.equal((await q('update suggestion_comments set body=$1 where id=$2 returning id',['원장 수정',own])).length,0);assert.equal((await q('delete from suggestion_comments where id=$1 returning id',[prior])).length,1);await actor(2);assert.equal((await q('delete from suggestion_comments where id=$1 returning id',[own])).length,1);
+  pass('원장은 타인 댓글 삭제만 가능, 본인 삭제 가능');
+  await admin();const definition=(await q("select pg_get_constraintdef(oid) d from pg_constraint where conname='push_events_event_type_check'"))[0].d;for(const type of [...types,'suggestion_commented'])assert.ok(definition.includes("'"+type+"'"));assert.equal((definition.match(/'[^']+'::text/g)||[]).length,15);
+  pass('기존 알림 14개+댓글 1개 CHECK 유지');
+  await assert.rejects(db.exec(down),/preserve data and stop rollback/);await db.exec('rollback');assert.equal((await q("select to_regclass('public.suggestion_comments') is not null present"))[0].present,true);
+  pass('데이터 존재 시 롤백 중단·댓글 보존');
+}finally{await db.close();}
+const empty=await fresh();try{await empty.exec(down);assert.equal((await empty.query("select to_regclass('public.suggestion_comments') is null gone")).rows[0].gone,true);await empty.exec(up);pass('빈 DB 롤백·재적용');}finally{await empty.close();}
+console.log(`PGLITE_SUGGESTION_COMMENTS_PASS: ${passed} scenarios`);

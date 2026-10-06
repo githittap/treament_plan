@@ -930,6 +930,16 @@ function hubTextDefsChapter4(add){
   add('sug.m_review_fail',G2,'평가 저장 실패 알림창(원장 · {msg}는 서버 오류)','평가를 저장하지 못했습니다: {msg}',['msg']);
   add('sug.m_campaign_check',G2,'캠페인 설정 저장 — 제목·기간·상금이 잘못됐을 때 알림창(원장)','캠페인 설정을 확인하세요.');
   add('sug.m_campaign_fail',G2,'캠페인 설정 저장 실패 알림창(원장 · {msg}는 서버 오류)','캠페인 설정을 저장하지 못했습니다: {msg}',['msg']);
+  const commentTexts={
+    toggle:['💬 댓글 {n}',['n']],empty:['첫 댓글을 남겨 주세요.'],placeholder:['댓글을 입력하세요. (최대 1000자)'],
+    submit:['댓글 달기'],edit:['수정'],delete:['삭제'],save:['수정 저장'],cancel:['취소'],
+    invalid_empty:['댓글을 입력하세요.'],invalid_long:['댓글은 1000자까지 입력할 수 있습니다.'],
+    error_load:['댓글을 불러오지 못했습니다: {msg}',['msg']],error_save:['댓글을 저장하지 못했습니다: {msg}',['msg']],
+    error_delete:['댓글을 삭제하지 못했습니다: {msg}',['msg']],confirm_delete:['이 댓글을 삭제할까요?'],
+    push_title:['💬 건의에 새 댓글'],push_body:['「{title}」에 {name}님이 댓글을 달았어요',['title','name']],
+    notify_title:['건의 댓글'],notify_author:['건의 작성자'],notify_owner:['원장'],notify_commenters:['앞선 댓글자']
+  };
+  Object.entries(commentTexts).forEach(([key,value])=>add('sug.cmt.'+key,G1,'건의 댓글 — '+value[0],value[0],value[1]||[]));
 }
 // ── 차례 5: 문의함·상담일지 글(기본 글은 hr.html의 글과 같아야 함 — 시험이 대조) ──
 function hubTextDefsChapter5(add){
@@ -2271,9 +2281,13 @@ const HUB_NOTIFY_ROWS=[['inquiry','문의'],['leave_request','연차 신청'],['
 const HUB_NOTIFY_COLS=[['owner','원장'],['chief','실장'],['manager','매니저'],['desk','데스크'],['applicant','신청자 본인']];
 const HUB_MANUAL_GROUPS=[['clinical_consult','진료·상담'],['sterilization_admin','소독·행정'],['lab','기공'],['desk','데스크']];
 function hubNotifyDefault(row,col){
+  if(row==='suggestion_comment')return ['author','owner','commenters'].includes(col);
   return ({inquiry:['manager','desk'],leave_request:['owner','chief'],leave_result:['applicant'],approval:['owner','chief'],notice:['owner','chief','manager','desk'],document:['applicant'],payment:['owner','chief'],advertising:['owner','manager']})[row].includes(col);
 }
 function hubNotifyEnabled(row,col){const raw=hubSetting('notify.'+row+'.'+col,'');return raw==='true'?true:raw==='false'?false:hubNotifyDefault(row,col);}
+function hubSuggestionNotifyHtml(){
+  return '<div class="hub-row"><b>'+hubEsc(hubText('sug.cmt.notify_title','건의 댓글'))+'</b><div class="rowflex">'+[['author','건의 작성자'],['owner','원장'],['commenters','앞선 댓글자']].map(c=>'<label><input type="checkbox" data-hub-suggestion-notify="notify.suggestion_comment.'+c[0]+'"'+(hubNotifyEnabled('suggestion_comment',c[0])?' checked':'')+'> '+hubEsc(hubText('sug.cmt.notify_'+c[0],c[1]))+'</label>').join('')+'</div></div>';
+}
 
 function hubTextDefsP9(add){
   const defs={
@@ -2344,10 +2358,10 @@ function hubTextDefsP7(add){
   HUB_MANUAL_GROUPS.forEach(it=>add('p7.manual.group.'+it[0],S,'매뉴얼 직무 이름',it[1]));
 }
 function hubP7SettingsHtml(){
-  return '<section><h3>'+hubEsc(hubText('p7.notify.title','🔔 알림 받는 사람'))+'</h3><p>'+hubEsc(hubText('p7.notify.hint','칸을 켜거나 끄면 다음 알림부터 반영됩니다. 결재·결제 요청의 기본 알림은 현재 처리 단계의 담당자에게 갑니다.'))+'</p><div class="tblwrap"><table><thead><tr><th></th>'+HUB_NOTIFY_COLS.map(c=>'<th>'+hubEsc(hubText('p7.notify.col.'+c[0],c[1]))+'</th>').join('')+'</tr></thead><tbody>'+HUB_NOTIFY_ROWS.map(r=>'<tr><th>'+hubEsc(hubText('p7.notify.row.'+r[0],r[1]))+'</th>'+HUB_NOTIFY_COLS.map(c=>'<td><input type="checkbox" data-hub-notify="notify.'+r[0]+'.'+c[0]+'" aria-label="'+hubEsc(hubText('p7.notify.row.'+r[0],r[1])+' '+hubText('p7.notify.col.'+c[0],c[1]))+'"'+(hubNotifyEnabled(r[0],c[0])?' checked':'')+'></td>').join('')+'</tr>').join('')+'</tbody></table></div><span id="hubNotifyMsg" role="status"></span></section><section><h3>'+hubEsc(hubText('p7.manual.title','📚 직무별 매뉴얼 주소'))+'</h3><p>'+hubEsc(hubText('p7.manual.hint','주소를 비우면 기존 공용 매뉴얼을 사용합니다.'))+'</p>'+HUB_MANUAL_GROUPS.map(g=>'<div class="hub-row"><label>'+hubEsc(hubText('p7.manual.group.'+g[0],g[1]))+' <input type="url" id="hubManual_'+g[0]+'" value="'+hubEsc(hubSetting('manual.url.'+g[0],''))+'"></label> <button class="mini stamp" data-hub-manual="'+g[0]+'">'+hubEsc(hubText('p7.save','저장'))+'</button><span id="hubManualMsg_'+g[0]+'" role="status"></span></div>').join('')+'</section>';
+  return '<section><h3>'+hubEsc(hubText('p7.notify.title','🔔 알림 받는 사람'))+'</h3><p>'+hubEsc(hubText('p7.notify.hint','칸을 켜거나 끄면 다음 알림부터 반영됩니다. 결재·결제 요청의 기본 알림은 현재 처리 단계의 담당자에게 갑니다.'))+'</p><div class="tblwrap"><table><thead><tr><th></th>'+HUB_NOTIFY_COLS.map(c=>'<th>'+hubEsc(hubText('p7.notify.col.'+c[0],c[1]))+'</th>').join('')+'</tr></thead><tbody>'+HUB_NOTIFY_ROWS.map(r=>'<tr><th>'+hubEsc(hubText('p7.notify.row.'+r[0],r[1]))+'</th>'+HUB_NOTIFY_COLS.map(c=>'<td><input type="checkbox" data-hub-notify="notify.'+r[0]+'.'+c[0]+'" aria-label="'+hubEsc(hubText('p7.notify.row.'+r[0],r[1])+' '+hubText('p7.notify.col.'+c[0],c[1]))+'"'+(hubNotifyEnabled(r[0],c[0])?' checked':'')+'></td>').join('')+'</tr>').join('')+'</tbody></table></div>'+hubSuggestionNotifyHtml()+'<span id="hubNotifyMsg" role="status"></span></section><section><h3>'+hubEsc(hubText('p7.manual.title','📚 직무별 매뉴얼 주소'))+'</h3><p>'+hubEsc(hubText('p7.manual.hint','주소를 비우면 기존 공용 매뉴얼을 사용합니다.'))+'</p>'+HUB_MANUAL_GROUPS.map(g=>'<div class="hub-row"><label>'+hubEsc(hubText('p7.manual.group.'+g[0],g[1]))+' <input type="url" id="hubManual_'+g[0]+'" value="'+hubEsc(hubSetting('manual.url.'+g[0],''))+'"></label> <button class="mini stamp" data-hub-manual="'+g[0]+'">'+hubEsc(hubText('p7.save','저장'))+'</button><span id="hubManualMsg_'+g[0]+'" role="status"></span></div>').join('')+'</section>';
 }
 async function hubNotifyWrite(sb,key,enabled){
-  if(!HUB_NOTIFY_ROWS.some(r=>HUB_NOTIFY_COLS.some(c=>key==='notify.'+r[0]+'.'+c[0]))||typeof enabled!=='boolean')return {ok:false,reason:'invalid'};
+  if(!(HUB_NOTIFY_ROWS.some(r=>HUB_NOTIFY_COLS.some(c=>key==='notify.'+r[0]+'.'+c[0]))||['author','owner','commenters'].some(c=>key==='notify.suggestion_comment.'+c))||typeof enabled!=='boolean')return {ok:false,reason:'invalid'};
   return hubSettingWrite(sb,key,String(enabled));
 }
 async function hubManualWrite(sb,group,raw){
@@ -2551,8 +2565,8 @@ function hubDrawSettingsSection(sec){
   Array.prototype.forEach.call(sec.querySelectorAll('[data-hub-set-reset]'),function(b){b.addEventListener('click',function(){return hubResetSettingRow(sec,Number(b.getAttribute('data-hub-set-reset')));});});
   // 새 입력칸을 먼저 붙이고 기존 기준 입력칸의 이벤트도 한 번만 연결한다.
   const panel=sec;
-  panel.querySelectorAll('[data-hub-notify]').forEach(function(input){input.addEventListener('change',async function(){
-    const enabled=input.checked;input.disabled=true;const r=await hubNotifyWrite(HUB_SB,input.getAttribute('data-hub-notify'),enabled);input.disabled=false;if(!r.ok)input.checked=!enabled;
+  panel.querySelectorAll('[data-hub-notify],[data-hub-suggestion-notify]').forEach(function(input){input.addEventListener('change',async function(){
+    const enabled=input.checked;input.disabled=true;const r=await hubNotifyWrite(HUB_SB,input.getAttribute('data-hub-notify')||input.getAttribute('data-hub-suggestion-notify'),enabled);input.disabled=false;if(!r.ok)input.checked=!enabled;
     panel.querySelector('#hubNotifyMsg').textContent=r.ok?hubText('p7.saved','저장했습니다.'):hubWriteErrorMessage('저장',r.error);
   });});
   panel.querySelectorAll('[data-hub-manual]').forEach(function(button){button.addEventListener('click',async function(){

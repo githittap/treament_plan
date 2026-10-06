@@ -24,6 +24,12 @@ function aiBillingDetails(payload: Record<string, unknown>): string {
 }
 
 export function safeNotification(eventType: string, payload: Record<string, unknown> = {}): { title: string; body: string; url: string; tag: string } | null {
+  if (eventType === "suggestion_commented") {
+    const text = (value: unknown, max: number, fallback: string) => typeof value === "string" && value.trim() ? Array.from(value.replace(/[\u0000-\u001f\u007f]/g, " ").trim()).slice(0, max).join("") : fallback;
+    const title = text(payload.suggestion_title, 40, ""), name = text(payload.commenter_name, 60, "");
+    const template = text(payload.push_body_template, 500, "「{title}」에 {name}님이 댓글을 달았어요");
+    return { title: text(payload.push_title, 120, "💬 건의에 새 댓글"), body: template.replace(/\{(title|name)\}/g, (_match, key) => key === "title" ? title : name), url: "/hr.html?tab=suggestions", tag: "suggestion-commented" };
+  }
   if (eventType === "leave_submitted") return { title: "연차 신청 알림", body: "새 연차 신청을 확인해 주세요.", url: "/hr.html?tab=leave", tag: "leave-submitted" };
   if (eventType === "leave_status_changed") return { title: "연차 신청 상태 변경", body: "연차 신청 상태가 변경되었습니다.", url: "/hr.html?tab=leave", tag: "leave-status" };
   if (eventType === "approval_submitted") return { title: "결재 대기 알림", body: "확인할 결재 문서가 있습니다.", url: "/hr.html?tab=appr", tag: "approval-pending" };

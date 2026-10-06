@@ -415,7 +415,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 
 <script src="hub-fortune.js?v=2026100601"></script>
 <script src="hub-intro.js?v=2026100503"></script>
-<script src="hub-texts.js?v=2026100603"></script>
+<script src="hub-texts.js?v=2026100605"></script>
 <script src="security-pledge.js?v=20261003p9d"></script>
 <script src="wage-hourly.js?v=2026100401"></script>
 <script src="spend-cycle.js?v=2026100510"></script>
@@ -2470,6 +2470,48 @@ function winnerVisibility(campaign,reviews,suggestions,todayValue){
   return (reviews||[]).filter(row=>row.award_rank!=null).map(row=>({campaign_id:row.campaign_id,suggestion_id:row.suggestion_id,award_rank:row.award_rank,title:row.title,user_id:row.user_id,ends_at:row.ends_at,prize_amount:row.prize_amount}));
 }
 /* suggestion-board:test-end */
+/* suggestion-comments:test-start */
+const SUGGESTION_COMMENT_OPEN=new Set();
+let SUGGESTION_COMMENT_EDIT_ID=null;
+const SUGGESTION_COMMENT_SAVING=new Set();
+function validateSuggestionComment(raw){
+  const text=String(raw||'');
+  if(!text.trim())return {ok:false,key:'sug.cmt.invalid_empty'};
+  if(Array.from(text).length>1000)return {ok:false,key:'sug.cmt.invalid_long'};
+  return {ok:true,body:text.trim()};
+}
+function toggleSuggestionComments(id){if(SUGGESTION_COMMENT_OPEN.has(id))SUGGESTION_COMMENT_OPEN.delete(id);else SUGGESTION_COMMENT_OPEN.add(id);render();}
+function beginSuggestionCommentEdit(suggestionId,id){SUGGESTION_COMMENT_OPEN.add(suggestionId);SUGGESTION_COMMENT_EDIT_ID=id;render();}
+function cancelSuggestionCommentEdit(){SUGGESTION_COMMENT_EDIT_ID=null;render();}
+function renderSuggestionComments(suggestionId,comments){
+  const rows=(comments||[]).filter(c=>String(c.suggestion_id)===String(suggestionId)),open=SUGGESTION_COMMENT_OPEN.has(suggestionId);
+  const heading=`<button class="mini" aria-expanded="${open}" aria-controls="suggestionComments-${suggestionId}" onclick="toggleSuggestionComments(${suggestionId})">${esc(hubT('sug.cmt.toggle','💬 댓글 {n}',{n:rows.length}))}</button>`;
+  if(!open)return `<div style="margin-top:10px">${heading}</div>`;
+  const list=rows.length?rows.map(c=>{
+    const own=c.user_id===ME.id,editing=SUGGESTION_COMMENT_EDIT_ID===c.id;
+    const when=typeof hubFmtDateTime==='function'?hubFmtDateTime(c.created_at):new Date(c.created_at).toLocaleString('ko-KR',{hour12:false});
+    return `<div style="border-top:1px solid var(--line);padding:10px 0;overflow-wrap:anywhere"><div class="rowflex"><b>${esc(nameOf(c.user_id))}</b><time class="sub" datetime="${esc(c.created_at)}">${esc(when)}</time></div><div style="white-space:pre-wrap;margin:6px 0">${esc(c.body)}</div>${own?`<button class="mini" onclick="beginSuggestionCommentEdit(${suggestionId},${c.id})">${esc(hubT('sug.cmt.edit','수정'))}</button>`:''}${own||ME.role==='owner'?` <button class="mini" onclick="deleteSuggestionComment(${suggestionId},${c.id})">${esc(hubT('sug.cmt.delete','삭제'))}</button>`:''}${editing&&own?`<div><textarea id="suggestionCommentEdit-${c.id}" rows="3" style="width:100%;box-sizing:border-box;margin:6px 0">${esc(c.body)}</textarea><button class="mini stamp" onclick="saveSuggestionComment(${suggestionId},${c.id})">${esc(hubT('sug.cmt.save','수정 저장'))}</button> <button class="mini" onclick="cancelSuggestionCommentEdit()">${esc(hubT('sug.cmt.cancel','취소'))}</button></div>`:''}</div>`;
+  }).join(''):`<div class="sub" style="padding:8px 0">${esc(hubT('sug.cmt.empty','첫 댓글을 남겨 주세요.'))}</div>`;
+  return `<div style="margin-top:10px;min-width:0">${heading}<div id="suggestionComments-${suggestionId}" style="margin-top:8px">${list}<textarea id="suggestionCommentNew-${suggestionId}" rows="3" style="width:100%;box-sizing:border-box" aria-label="${esc(hubT('sug.cmt.placeholder','댓글을 입력하세요. (최대 1000자)'))}" placeholder="${esc(hubT('sug.cmt.placeholder','댓글을 입력하세요. (최대 1000자)'))}"></textarea><button class="mini stamp" style="margin-top:6px" onclick="saveSuggestionComment(${suggestionId},null)">${esc(hubT('sug.cmt.submit','댓글 달기'))}</button></div></div>`;
+}
+async function saveSuggestionComment(suggestionId,id){
+  const field=$('#'+(id?'suggestionCommentEdit-'+id:'suggestionCommentNew-'+suggestionId)),checked=validateSuggestionComment(field.value);
+  if(!checked.ok){alert(hubT(checked.key,checked.key==='sug.cmt.invalid_empty'?'댓글을 입력하세요.':'댓글은 1000자까지 입력할 수 있습니다.'));return;}
+  if(SUGGESTION_COMMENT_SAVING.has(suggestionId))return;
+  SUGGESTION_COMMENT_SAVING.add(suggestionId);setStatus('saving');
+  try{
+    const result=id?await sb.from('suggestion_comments').update({body:checked.body}).eq('id',id):await sb.from('suggestion_comments').insert({suggestion_id:suggestionId,user_id:ME.id,body:checked.body});
+    if(result.error){setStatus('error');alert(hubT('sug.cmt.error_save','댓글을 저장하지 못했습니다: {msg}',{msg:result.error.message}));return;}
+    SUGGESTION_COMMENT_OPEN.add(suggestionId);SUGGESTION_COMMENT_EDIT_ID=null;setStatus('saved');await render();
+  }finally{SUGGESTION_COMMENT_SAVING.delete(suggestionId);}
+}
+async function deleteSuggestionComment(suggestionId,id){
+  if(!confirm(hubT('sug.cmt.confirm_delete','이 댓글을 삭제할까요?')))return;
+  setStatus('saving');const result=await sb.from('suggestion_comments').delete().eq('id',id);
+  if(result.error){setStatus('error');alert(hubT('sug.cmt.error_delete','댓글을 삭제하지 못했습니다: {msg}',{msg:result.error.message}));return;}
+  SUGGESTION_COMMENT_OPEN.add(suggestionId);if(SUGGESTION_COMMENT_EDIT_ID===id)SUGGESTION_COMMENT_EDIT_ID=null;setStatus('saved');render();
+}
+/* suggestion-comments:test-end */
 /* suggestion-board:render-start */
 let SUGGESTION_CAMPAIGN_ID=null,SUGGESTION_EDIT_ID=null;
 function beginSuggestionEdit(id){SUGGESTION_EDIT_ID=id;render();}
@@ -2514,6 +2556,9 @@ async function renderSuggestions(m){
   if(suggestionResult.error){m.innerHTML=`<div class="card"><h2>${esc(hubT('sug.title','💡 건의함'))}</h2><div class="cal-error">${esc(hubT('sug.err_load','건의함 정보를 불러오지 못했습니다: {msg}',{msg:suggestionResult.error.message||hubT('sug.unknown_error','알 수 없는 오류')}))}</div></div>`;return;}
   const rows=suggestionResult.data||[],ids=rows.map(row=>row.id),likeResult=ids.length?await sb.from('suggestion_likes').select('suggestion_id,user_id').in('suggestion_id',ids):{data:[],error:null};
   if(likeResult.error){m.innerHTML=`<div class="card"><h2>${esc(hubT('sug.title','💡 건의함'))}</h2><div class="cal-error">${esc(hubT('sug.err_like','좋아요 정보를 불러오지 못했습니다: {msg}',{msg:likeResult.error.message||hubT('sug.unknown_error','알 수 없는 오류')}))}</div></div>`;return;}
+  const commentResult=ids.length?await sb.from('suggestion_comments').select('id,suggestion_id,user_id,body,created_at,updated_at').in('suggestion_id',ids).order('created_at').order('id'):{data:[],error:null};
+  if(commentResult.error){m.innerHTML=`<div class="card"><h2>${esc(hubT('sug.title','💡 건의함'))}</h2><div class="cal-error">${esc(hubT('sug.cmt.error_load','댓글을 불러오지 못했습니다: {msg}',{msg:commentResult.error.message||hubT('sug.unknown_error','알 수 없는 오류')}))}</div></div>`;return;}
+  const comments=commentResult.data||[];
   const likes=likeResult.data||[],summary=summarizeSuggestions(rows,likes,campaign.id),liked=new Set(likes.filter(row=>row.user_id===ME.id).map(row=>String(row.suggestion_id)));
   let reviews=[],awardRows=[];
   if(owner){const result=await sb.from('suggestion_reviews').select('suggestion_id,originality_score,review_note,award_rank').eq('campaign_id',campaign.id);if(result.error){m.innerHTML=`<div class="card"><h2>${esc(hubT('sug.title','💡 건의함'))}</h2><div class="cal-error">${esc(hubT('sug.err_review','평가 정보를 불러오지 못했습니다: {msg}',{msg:result.error.message||hubT('sug.unknown_error','알 수 없는 오류')}))}</div></div>`;return;}reviews=result.data||[];}
@@ -2523,7 +2568,7 @@ async function renderSuggestions(m){
   const campaignForm=owner?`<div class="hint"><b>${esc(hubT('sug.campaign.title','owner 캠페인 설정'))}</b><div class="rowflex"><input class="mini" id="suggestionCampaignTitle" value="${esc(campaign.title)}"><input class="mini" type="date" id="suggestionStartsAt" value="${campaign.starts_at}"><input class="mini" type="date" id="suggestionEndsAt" value="${campaign.ends_at}"><input class="mini" type="number" id="suggestionPrize1" value="${campaign.prize_1}"><input class="mini" type="number" id="suggestionPrize2" value="${campaign.prize_2}"><input class="mini" type="number" id="suggestionPrize3" value="${campaign.prize_3}"><button class="mini" onclick="saveSuggestionCampaign()">${esc(hubT('sug.campaign.btn_save','저장'))}</button></div></div>`:'';
   const form=active?`<div class="hint"><b>${esc(hubT('sug.new.title','새 건의 작성'))}</b><input id="suggestionNewTitle" class="mini" style="width:100%;margin-top:6px" maxlength="120" placeholder="${esc(hubT('sug.new.ph_title','제목'))}"><textarea id="suggestionNewBody" rows="4" style="width:100%;margin-top:6px" maxlength="5000" placeholder="${esc(hubT('sug.new.ph_body','건의 내용을 입력하세요.'))}"></textarea><button class="mini stamp" style="margin-top:6px" onclick="saveSuggestion(null)">${esc(hubT('sug.new.btn_submit','건의 등록'))}</button></div>`:'';
   const people=Object.entries(summary.byUser).filter(([,item])=>item.posts>0).map(([userId,item])=>({name:nameOf(userId),item})).sort((a,b)=>b.item.posts-a.item.posts||b.item.likes-a.item.likes||a.name.localeCompare(b.name,'ko')).map(person=>`<span class="sub">${esc(hubT('sug.people_line','{name} · 게시글 {posts}개 · 받은 좋아요 {likes}개',{name:person.name,posts:person.item.posts,likes:person.item.likes}))}</span>`).join('');
-  const cards=rows.length?rows.map(row=>{const own=row.user_id===ME.id,count=likes.filter(like=>like.suggestion_id===row.id).length,isLiked=liked.has(String(row.id)),review=reviewById.get(String(row.id)),editing=SUGGESTION_EDIT_ID===row.id;return `<div class="card"><div class="rowflex"><b>${esc(row.title)}</b><span class="sub">${esc(nameOf(row.user_id))}</span></div><div style="white-space:pre-wrap;margin:8px 0">${esc(row.body)}</div><button class="mini" ${own||!active?'disabled':''} onclick="toggleSuggestionLikeRemote(${row.id},${isLiked})">${isLiked?esc(hubT('sug.btn_unlike','좋아요 취소')):esc(hubT('sug.btn_like','좋아요'))} ${count}</button>${own&&active?` <button class="mini" onclick="beginSuggestionEdit(${row.id})">${esc(hubT('sug.btn_edit','수정'))}</button>`:''}${(own&&active||owner)?` <button class="mini" onclick="deleteSuggestion(${row.id})">${esc(hubT('sug.btn_del','삭제'))}</button>`:''}${editing?`<div class="hint"><input id="suggestionEditTitle-${row.id}" class="mini" value="${esc(row.title)}"><textarea id="suggestionEditBody-${row.id}" rows="3" style="width:100%">${esc(row.body)}</textarea><button class="mini stamp" onclick="saveSuggestion(${row.id})">${esc(hubT('sug.btn_edit_save','수정 저장'))}</button><button class="mini" onclick="cancelSuggestionEdit()">${esc(hubT('sug.btn_cancel','취소'))}</button></div>`:''}${owner?`<div class="hint" style="margin-top:8px"><input class="mini" id="suggestionScore-${row.id}" type="number" min="1" max="5" value="${review?.originality_score??''}" placeholder="${esc(hubT('sug.review.ph_score','점수 1~5'))}"><input class="mini" id="suggestionRank-${row.id}" type="number" min="1" max="3" value="${review?.award_rank??''}" placeholder="${esc(hubT('sug.review.ph_rank','순위 1~3'))}"><input class="mini" id="suggestionNote-${row.id}" value="${esc(review?.review_note||'')}" placeholder="${esc(hubT('sug.review.ph_note','평가 메모'))}"><button class="mini" onclick="saveSuggestionReview(${row.id})">${esc(hubT('sug.review.btn_save','평가 저장'))}</button></div>`:''}</div>`;}).join(''):'<div class="empty">'+esc(hubT('sug.empty','등록된 건의가 없습니다.'))+'</div>';
+  const cards=rows.length?rows.map(row=>{const own=row.user_id===ME.id,count=likes.filter(like=>like.suggestion_id===row.id).length,isLiked=liked.has(String(row.id)),review=reviewById.get(String(row.id)),editing=SUGGESTION_EDIT_ID===row.id;return `<div class="card"><div class="rowflex"><b>${esc(row.title)}</b><span class="sub">${esc(nameOf(row.user_id))}</span></div><div style="white-space:pre-wrap;margin:8px 0">${esc(row.body)}</div><button class="mini" ${own||!active?'disabled':''} onclick="toggleSuggestionLikeRemote(${row.id},${isLiked})">${isLiked?esc(hubT('sug.btn_unlike','좋아요 취소')):esc(hubT('sug.btn_like','좋아요'))} ${count}</button>${own&&active?` <button class="mini" onclick="beginSuggestionEdit(${row.id})">${esc(hubT('sug.btn_edit','수정'))}</button>`:''}${(own&&active||owner)?` <button class="mini" onclick="deleteSuggestion(${row.id})">${esc(hubT('sug.btn_del','삭제'))}</button>`:''}${editing?`<div class="hint"><input id="suggestionEditTitle-${row.id}" class="mini" value="${esc(row.title)}"><textarea id="suggestionEditBody-${row.id}" rows="3" style="width:100%">${esc(row.body)}</textarea><button class="mini stamp" onclick="saveSuggestion(${row.id})">${esc(hubT('sug.btn_edit_save','수정 저장'))}</button><button class="mini" onclick="cancelSuggestionEdit()">${esc(hubT('sug.btn_cancel','취소'))}</button></div>`:''}${owner?`<div class="hint" style="margin-top:8px"><input class="mini" id="suggestionScore-${row.id}" type="number" min="1" max="5" value="${review?.originality_score??''}" placeholder="${esc(hubT('sug.review.ph_score','점수 1~5'))}"><input class="mini" id="suggestionRank-${row.id}" type="number" min="1" max="3" value="${review?.award_rank??''}" placeholder="${esc(hubT('sug.review.ph_rank','순위 1~3'))}"><input class="mini" id="suggestionNote-${row.id}" value="${esc(review?.review_note||'')}" placeholder="${esc(hubT('sug.review.ph_note','평가 메모'))}"><button class="mini" onclick="saveSuggestionReview(${row.id})">${esc(hubT('sug.review.btn_save','평가 저장'))}</button></div>`:''}${renderSuggestionComments(row.id,comments)}</div>`;}).join(''):'<div class="empty">'+esc(hubT('sug.empty','등록된 건의가 없습니다.'))+'</div>';
   const winners=!active?`<div class="hint"><b>${esc(hubT('sug.win.title','수상 결과'))}</b>${winnerRows.length?winnerRows.map(row=>`<div>${esc(hubT('sug.win.row','{rank}위 · {name} · {title} · {amount}원',{rank:row.award_rank,name:nameOf(row.user_id),title:row.title,amount:Number(row.prize_amount).toLocaleString()}))}</div>`).join(''):'<div>'+esc(hubT('sug.win.none','수상 결과가 없습니다.'))+'</div>'}<div class="sub">${esc(hubT('sug.win.note','지급 기능 없음'))}</div></div>`:'';
   m.innerHTML=`<div class="card"><h2>💡 ${esc(campaign.title)}</h2><div class="hint">${campaign.starts_at} ~ ${campaign.ends_at} · ${active?esc(hubT('sug.state_active','진행 중')):esc(hubT('sug.state_ended','종료'))} · ${esc(hubT('sug.prize_line','1위 {a}원 / 2위 {b}원 / 3위 {c}원',{a:Number(campaign.prize_1).toLocaleString(),b:Number(campaign.prize_2).toLocaleString(),c:Number(campaign.prize_3).toLocaleString()}))}</div>${campaignForm}${form}<div class="rowflex" style="margin-top:10px"><span>게시글 ${summary.totalPosts}개</span><span>좋아요 ${summary.totalLikes}개</span></div><div class="rowflex" style="margin-top:8px">${people}</div></div>${winners}${cards}`;
 }
