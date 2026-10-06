@@ -1798,6 +1798,7 @@ function suggestGrantDays(hireDate){
 }
 let LEAVE_ACCRUAL_PREVIEW=[],LEAVE_ACCRUAL_AS_OF='';
 /* leave-status:test-start */
+function leaveLedgerTotals(entries,total={earned:0,used:0}){return (entries||[]).reduce((t,r)=>{if(r.kind==='부여')t.earned+=Number(r.days);if(r.kind==='사용')t.used+=Number(r.days);if(r.kind==='조정'&&String(r.note||'').startsWith('승인취소 복구:'))t.used-=Number(r.days);return t;},total);}
 let LEAVE_STATUS_ROWS=[],LEAVE_MONTHLY_RUNS=[];
 const LEAVE_MONTHLY_BUSY=new Set();
 function monthlyLeaveCandidatesHtml(userId){
@@ -1844,7 +1845,7 @@ async function renderEmployeeLeaveStatus(){
   try{const result=await sb.rpc('get_monthly_leave_accrual_candidates',{});if(result.error)throw result.error;LEAVE_MONTHLY_RUNS=(result.data||[]).filter(r=>r.run_id!=null&&Array.isArray(r.candidate_dates));}
   catch(error){candidateWarning=`<div class="hint">${esc(hubT('p7.monthly.load_fail','월차 결근 후보를 불러오지 못했습니다: {msg}',{msg:error.message}))}</div>`;}
   const balanceMap=new Map((balances.data||[]).map(r=>[r.user_id,Number(r.balance)])),totals=new Map();
-  (entries.data||[]).forEach(r=>{const t=totals.get(r.user_id)||{earned:0,used:0};if(r.kind==='부여')t.earned+=Number(r.days);if(r.kind==='사용')t.used+=Number(r.days);if(r.kind==='조정'&&String(r.note||'').startsWith('승인취소 복구:'))t.used-=Number(r.days);totals.set(r.user_id,t);});
+  (entries.data||[]).forEach(r=>totals.set(r.user_id,leaveLedgerTotals([r],totals.get(r.user_id)||{earned:0,used:0})));
   const patterns=leaveHiddenAccounts(),main=[],other=[];
   PROFILES.filter(p=>p.active!==false).forEach(p=>{
     const row={profile:p,balance:balanceMap.get(p.user_id)??0,...(totals.get(p.user_id)||{earned:0,used:0})};
@@ -1913,10 +1914,13 @@ async function processLeaveChange(id,action){
   try{const result=await sb.rpc('process_leave_change',{p_id:id,p_action:action});if(result.error)throw result.error;if(!result.data?.length)throw new Error(hubT('leave.m_act_unknown','처리 결과를 확인하지 못했습니다. 새로고침 후 확인하세요.'));await render();await refreshBadges();}
   catch(error){alert(hubT('leave.m_act_fail','처리 실패: {msg}',{msg:error.message}));}finally{LEAVE_CHANGE_BUSY.delete(id);}
 }
+function leaveThreeTotals(balance,entries,requests){return {used:leaveLedgerTotals(entries).used,pending:(requests||[]).filter(r=>['대기','1차승인'].includes(r.status)).reduce((n,r)=>n+Number(r.days),0),balance:Number(balance?.balance||0)};}
+function leaveThreeCards(t){return `<div class="rowflex">${[['used','사용'],['pending','신청 중'],['balance','잔여']].map(([k,label])=>`<div class="stat"><div class="sub">${esc(hubT('leave.my.'+k,label))}</div><div class="big">${t[k]}<span style="font-size:14px"> ${esc(hubT('leave.my.unit','일'))}</span></div></div>`).join('')}</div>`;}
 /* suggestion-six:end */
 async function renderLeave(m){
   const {data:bal}=await sb.from('v_leave_balance').select('*').eq('user_id',ME.id).maybeSingle();
-  const {data:mine}=await sb.from('leave_requests').select('*').eq('user_id',ME.id).order('created_at',{ascending:false}).limit(hubN('leave.my_list_limit',20));
+  const {data:mine,error:mineError}=await fetchAttendancePages(()=>sb.from('leave_requests').select('*').eq('user_id',ME.id).order('created_at',{ascending:false}));
+  const year=today().slice(0,4),entries=await fetchAttendancePages(()=>sb.from('leave_ledger').select('kind,days,note').eq('user_id',ME.id).gte('created_at',year+'-01-01T00:00:00+09:00').lt('created_at',(Number(year)+1)+'-01-01T00:00:00+09:00'));
   let leadHtml='';
   let archiveHtml='';
   if(isLead()){
@@ -1941,7 +1945,7 @@ async function renderLeave(m){
   const accrualHtml=ME.role==='owner'?`<div class="card"><h2>${esc(hubT('leave.acc.title','📆 1년 된 직원의 연차 15일을 확인하고 넣기'))} <span class="sub">(${esc(hubT('leave.owner_tag','원장'))})</span></h2><div class="hint">${esc(hubT('leave.acc.hint','1년 미만 월차는 매달 자동으로 생깁니다. 1년이 된 직원의 15일과 아직 확인되지 않은 지난 기간은 여기에서 개근·재직을 확인하고 넣습니다. 이미 넣은 연차는 두 번 넣지 않습니다.'))}</div><div class="rowflex" style="margin-top:8px"><label>${esc(hubT('leave.acc.f_asof','기준일'))} <input id="laAsOf" class="mini" type="date" value="${esc(LEAVE_ACCRUAL_AS_OF||today())}" max="${today()}"></label><button class="mini" onclick="previewLeaveAccrual()">${esc(hubT('leave.acc.btn_preview','미리보기'))}</button><button id="laApply" class="mini stamp" onclick="applyLeaveAccrual()" disabled>${esc(hubT('leave.acc.btn_apply','확인한 항목 적용'))}</button></div><div id="laMsg" class="hint" style="margin-top:8px">${esc(hubT('leave.acc.need_preview','적용 전 미리보기가 필요합니다.'))}</div><div id="laRows"></div></div>`:'';
   m.innerHTML=`
   <div class="card"><h2>${esc(hubT('leave.my.title','📅 내 연차'))}</h2>
-    <div class="rowflex"><div class="stat"><div class="sub">${esc(hubT('leave.my.balance','잔여'))}</div><div class="big">${bal?bal.balance:0}<span style="font-size:14px"> 일</span></div></div></div>
+    ${mineError||entries.error?`<div class="cal-error">${esc(hubT('leave.m_fail','실패: {msg}',{msg:(mineError||entries.error).message}))}</div>`:leaveThreeCards(leaveThreeTotals(bal,entries.data,mine))}
     <button class="hbtn pri" style="margin-top:10px" onclick="openLeave()">${esc(hubT('leave.my.btn_apply','연차 신청'))}</button>
     <h3>${esc(hubT('leave.my.list_title','내 신청 내역'))}</h3>
     ${(mine||[]).length?`<div class="tblwrap"><table><tr><th>${esc(hubT('leave.th.type','유형'))}</th><th>${esc(hubT('leave.th.period','기간'))}</th><th>${esc(hubT('leave.th.days','일수'))}</th><th>${esc(hubT('leave.th.status','상태'))}</th><th></th></tr>
