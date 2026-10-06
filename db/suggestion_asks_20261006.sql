@@ -1,5 +1,17 @@
 -- 직원 건의 1: 승인 연차 변경. 운영에는 검수·원장 승인 뒤 적용함.
 begin;
+create table if not exists public.suggestion_asks_20261006_restore (name text primary key,definition text not null);
+alter table public.suggestion_asks_20261006_restore enable row level security;
+revoke all on public.suggestion_asks_20261006_restore from public,anon,authenticated;
+-- 기존 결재 CHECK 식을 보존하고 물품구매만 더함. 새 종류 외 기존 값은 그대로 유지됨.
+do $$ declare original text; begin
+  select pg_get_constraintdef(oid) into original from pg_constraint where conrelid='public.approval_docs'::regclass and conname='approval_docs_kind_check';
+  if original is null then raise exception 'approval kind constraint required'; end if;
+  insert into public.suggestion_asks_20261006_restore values('approval_kind',original) on conflict do nothing;
+  select definition into original from public.suggestion_asks_20261006_restore where name='approval_kind';
+  alter table public.approval_docs drop constraint approval_docs_kind_check;
+  execute 'alter table public.approval_docs add constraint approval_docs_kind_check CHECK ('||substring(original from 7)||' OR kind = ''물품구매'')';
+end $$;
 create table if not exists public.leave_change_requests (
   id bigint generated always as identity primary key,
   request_id bigint not null references public.leave_requests(id),

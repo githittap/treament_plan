@@ -342,7 +342,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 <div class="mask" id="apMask"><div class="modal">
   <h3><span data-hubk="appr.modal.title">🖊 결재 올리기</span><button class="x" onclick="hide('apMask')">✕</button></h3>
   <div class="grid">
-    <div class="fld"><label data-hubk="appr.modal.f_kind">종류</label><select id="apKind"><option>연차 신청</option><option>사직서</option><option>재직증명서 발급</option><option>보고</option><option>소명</option><option>기타</option></select></div>
+    <div class="fld"><label data-hubk="appr.modal.f_kind">종류</label><select id="apKind"><option>연차 신청</option><option>사직서</option><option>재직증명서 발급</option><option>보고</option><option>물품구매</option><option>소명</option><option>기타</option></select></div>
     <div class="fld w2"><label data-hubk="appr.modal.f_title">제목</label><input id="apTitle"></div>
     <div class="fld w4"><label data-hubk="appr.modal.f_body">내용</label><textarea id="apBody"></textarea></div>
   </div>
@@ -2198,7 +2198,7 @@ async function submitApproval(){
 }
 
 /* approval-request:test-start */
-const APPROVAL_KIND_VALUES={'연차 신청':'연차','사직서':'사직서','재직증명서 발급':'기타','보고':'보고','소명':'소명','기타':'기타'};
+const APPROVAL_KIND_VALUES={'연차 신청':'연차','사직서':'사직서','재직증명서 발급':'기타','보고':'보고','물품구매':'물품구매','소명':'소명','기타':'기타'};
 function approvalKindValue(label){return APPROVAL_KIND_VALUES[label]||'기타';}
 function approvalRequestTitle(label,title){return label==='재직증명서 발급'?'[재직증명서 발급] '+title:title;}
 function approvalRequestBody(label,body){return label==='재직증명서 발급'?'[재직증명서 발급 요청]\n'+(body||''):body||'';}
@@ -2220,7 +2220,7 @@ function downloadEmploymentCertificate(){
 }
 function printEmploymentCertificate(){document.body.classList.add('certificate-printing');const done=()=>{document.body.classList.remove('certificate-printing');window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);window.print();}
 /* approval-request:test-end */
-function approvalKindItems(){const def=[{code:'연차 신청',label:'연차 신청'},{code:'사직서',label:'사직서'},{code:'재직증명서 발급',label:'재직증명서 발급'},{code:'보고',label:'보고'},{code:'소명',label:'소명'},{code:'기타',label:'기타'}];if(typeof hubList!=='function')return def;const codes=new Set(def.map(d=>d.code));return hubList('list.approval_kinds',def).filter(i=>codes.has(i.code));} /* 결재 종류 이름: 허브 설정 › 목록에서 이름만 고침(코드는 저장 규칙·재직증명서 발급 흐름과 묶여 고정, 새 종류 못 늘림) */
+function approvalKindItems(){const def=[{code:'연차 신청',label:'연차 신청'},{code:'사직서',label:'사직서'},{code:'재직증명서 발급',label:'재직증명서 발급'},{code:'보고',label:'보고'},{code:'물품구매',label:'물품구매'},{code:'소명',label:'소명'},{code:'기타',label:'기타'}];if(typeof hubList!=='function')return def;const codes=new Set(def.map(d=>d.code));return hubList('list.approval_kinds',def).filter(i=>codes.has(i.code));} /* 결재 종류 이름: 허브 설정 › 목록에서 이름만 고침(코드는 저장 규칙·재직증명서 발급 흐름과 묶여 고정, 새 종류 못 늘림) */
 function approvalStatusLabel(c){const def=[{code:'진행',label:'진행'},{code:'완결',label:'완결'},{code:'반려',label:'반려'},{code:'취소',label:'취소'}];const items=typeof hubList==='function'?hubList('list.approval_status',def):def;const it=items.find(function(i){return i.code===c;});return it?it.label:c;} /* 결재 문서 상태 이름: 허브 설정 › 목록에서 이름만 고침(코드는 결재 흐름·DB 값이라 고정) */
 function approvalKindDisplay(doc){const kind=String(doc&&doc.kind!=null?doc.kind:'');let code=null;if(kind==='기타')code=isEmploymentCertificateRequest(doc)?'재직증명서 발급':'기타';else for(const c in APPROVAL_KIND_VALUES){if(APPROVAL_KIND_VALUES[c]===kind&&c!=='재직증명서 발급'){code=c;break;}}const it=code?approvalKindItems().find(i=>i.code===code):null;return it&&it.label!==code?it.label:kind;} /* 문서 카드의 [종류]: 원장이 이름을 고친 종류만 새 이름, 안 고쳤으면 저장된 종류 그대로(옛 화면과 같음) */
 function apprKindSelectFill(){try{const sel=$('#apKind');if(!sel)return;sel.onchange=()=>{if(sel.value==='연차 신청'||sel.value==='연차'){hide('apMask');openLeave();}};const items=approvalKindItems(),want=items.map(i=>i.code+'|'+i.label).join('\n'),have=Array.from(sel.options||[]).map(o=>o.value+'|'+o.textContent).join('\n');if(want===have)return;const cur=sel.value;sel.innerHTML=items.map(i=>hubOptionHtml(i.code,i.label)).join('');if(items.some(i=>i.code===cur))sel.value=cur;}catch(e){}} /* 결재 올리기 창의 종류 고르는 칸: 값은 코드, 글은 허브 설정의 이름 */

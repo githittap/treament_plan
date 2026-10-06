@@ -42,3 +42,10 @@ test('주간 저장은 지문 날을 잠그고 오류 줄만 남기며 유효 �
  let out=await c.saveManualWeekRows(rows);assert.equal(calls.length,0);assert.equal(out[1].status,'error');assert.equal(out[2].status,'locked');
  c.confirm=()=>true;out=await c.saveManualWeekRows(rows);assert.equal(calls.length,1);assert.equal(calls[0][0],'submit_manual_attendance_d');assert.equal(out[0].status,'saved');
 });
+
+test('물품구매는 설정 목록·선택 값·문서 표시에서 같은 종류로 처리된다',()=>{
+ const html=fs.readFileSync('hr.html','utf8'),c=setup();
+ const mapping=html.match(/const APPROVAL_KIND_VALUES=[^;]+;/)[0],items=html.match(/^function approvalKindItems[^\r\n]+/m)[0],value=html.match(/^function approvalKindValue[^\r\n]+/m)[0];
+ vm.runInContext(mapping+items+value,c);assert.equal(c.approvalKindValue('물품구매'),'물품구매');assert.ok(c.approvalKindItems().some(r=>r.code==='물품구매'));
+ const texts=fs.readFileSync('hub-texts.js','utf8');assert.match(texts,/code:'물품구매',label:'물품구매'/);
+});

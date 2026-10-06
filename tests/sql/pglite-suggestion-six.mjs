@@ -16,6 +16,7 @@ async function setup(){
  create function employee_hub_access_allowed() returns boolean language sql security definer as $$select coalesce((select active and approved from profiles where user_id=auth.uid()),false)$$;
  create table leave_requests(id bigint primary key,user_id uuid,type text,type_note text,date_from date,date_to date,days numeric,status text,cancelled_by text,cancelled_at timestamptz);
  create table leave_ledger(id bigint generated always as identity,user_id uuid,kind text,days numeric,ref bigint,note text);
+ create table approval_docs(id bigint,kind text check(kind in ('연차','소명','사직서','보고','기타','기존확장')));
  create table push_events(event_key text unique,recipient_id uuid,event_type text,payload jsonb);
  create function p7_notify_recipients(text,uuid[],uuid) returns table(user_id uuid) language sql as $$select unnest($2)$$;
  create function enqueue_push_event(text,uuid,text,jsonb) returns void language sql as $$insert into push_events values($1,$2,$3,$4) on conflict do nothing$$;
@@ -32,6 +33,7 @@ async function fails(db,sql,regex){await assert.rejects(db.query(sql),regex);}
 let checks=0;const db=await setup();
 try{
  await db.exec(migration);await db.exec(migration);checks++;
+ await db.exec("insert into approval_docs values(1,'물품구매'),(2,'기존확장')");assert.equal((await db.query('select count(*)::int n from approval_docs')).rows[0].n,2);checks++;
  await as(db,2);await fails(db,"select request_leave_change(1,'cancel','사유')",/own future/);checks++;
  await as(db,5);await fails(db,"select request_leave_change(1,'cancel','사유')",/approved/);checks++;
  await as(db,1);
