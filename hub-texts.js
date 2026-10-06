@@ -1868,6 +1868,8 @@ function hubTextDefs(){
   hubTextDefsChapter5(add);
   hubTextDefsChapter6(add);
   hubTextDefsChapter7(add);
+  const activityTexts={title:'👁 사용 기록',today:'오늘',week:'7일',month:'30일',custom:'직접',all_staff:'모든 직원',all_kind:'모든 종류',from:'시작일',to:'마지막 날',staff:'직원',kind:'종류',time:'날짜 시각',target:'대상',device:'기기',load:'조회',more:'200줄 더 보기',csv:'CSV 내려받기',summary:'직원별 요약',first:'오늘 들어온 시각',last:'마지막 활동',days:'이번 달 접속 일수',empty:'기록 없음',error:'기록을 불러오지 못했음',loading:'불러오는 중…',csv_error:'CSV를 만들지 못했음',enter:'접속',leave:'나감',tab:'탭 열람',click:'클릭',write:'작성·수정·삭제',view:'열람',download:'내려받기·인쇄',csv_name:'허브_사용기록',count:'{n}건 표시 중임',owner_only:'원장만 볼 수 있음'};
+  Object.entries(activityTexts).forEach(([key,text])=>add('actlog.'+key,'👁 사용 기록',text,text,key==='count'?['n']:[]));
   [["title", "내 출퇴근 · 월 표"], ["bad_month", "조회할 월을 확인하세요."], ["prev", "이전 달"], ["next", "다음 달"], ["print", "인쇄 / PDF 저장"], ["hint", "본인 기록만 표시합니다. 합계에는 표에 표시된 수기 대기 기록도 포함됩니다."], ["days", "근무일 수 {n}일"], ["total", "연장 합계 {n}분 (점심 포함)"], ["th_date", "날짜"], ["th_weekday", "요일"], ["th_in", "출근"], ["th_out", "퇴근"], ["th_overtime", "연장(분)"], ["th_lunch", "점심 연장(분)"], ["th_early", "조퇴(분)"], ["th_half", "반차"], ["th_leave", "연차"], ["th_reason", "사유"], ["th_status", "기준·상태"]].forEach(([key,text])=>add('att.staff_month.'+key,'🕘 본인 월 출퇴근',text,text,['days','total'].includes(key)?['n']:[]));
 
   [['bank','은행·계좌번호'],['notion','Notion 가입·앱 설치·로그인'],['tb','잠복결핵 검사서'],['license','자격증'],['security','보안서약서']].forEach(([key,text])=>add('pending.onbo.'+key,'가입 승인 대기',text,text));
@@ -1901,6 +1903,8 @@ function hubTextMatches(def,query,current){
 
 /* 숫자 기준(app_settings 키) — 근태 기준 7개(차례 1) + 연차·소명 기준 5개(차례 3) + 결재 목록 건수 2개(차례 4) + 문의함·상담일지 건수·간격 5개(차례 5: 화면에만 있던 숫자만 — DB 함수·Storage 규칙에도 박힌 숫자는 안 옮김) */
 const HUB_SETTING_DEFS=[
+  {key:'activity_log.retention_days',screen:'👁 사용 기록',label:'사용 기록 보관 일수',where:'이 일수가 지난 사용 기록만 매일 정리함. 기본 1095일(3년)임.',def:'1095',kind:'int',min:1,max:36500,unit:'일'},
+  {key:'activity_log.exclude_owner',screen:'👁 사용 기록',label:'원장 행동 기록 제외',where:'켜면 원장 본인 행동은 사용 기록에 남기지 않음.',def:'true',kind:'bool'},
   {key:'late_cut',screen:'🕘 근태 기준',label:'지각 판정 시각',where:'출퇴근 — 이 시각을 넘겨 출근하면 지각으로 계산(예 09:40이면 09:41부터 지각)',def:'09:40',kind:'time'},
   {key:'siueop',screen:'🕘 근태 기준',label:'시업(공식 출근) 시각',where:'출퇴근 — 화면에 보여 주는 공식 출근 시각',def:'10:00',kind:'time'},
   {key:'jongeop_weekday_evening',screen:'🕘 근태 기준',label:'평일 야간조 종업 시각',where:'출퇴근 — 월~금 야간조의 종업 시각(연장근무 계산 기준)',def:'20:00',kind:'time'},
