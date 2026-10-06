@@ -72,7 +72,7 @@ export async function processClaimedEvent(
   let recipientNoLongerAllowed = false;
   const result = await dispatchSubscriptions(event, pendingSubscriptions, async (subscription, payload) => {
     try { await db.renewClaim(event, claimToken); } catch (error) { throw new DispatchAbortError(`claim lease lost before send: ${(error as Error).message}`); }
-    if (event.event_type.startsWith("ai_billing_")) {
+    if (event.event_type.startsWith("ai_billing_") || event.event_type.startsWith("marketing_expense_") || event.event_type === "marketing_budget_alert") {
       const authorization = await db.canDispatchAiBillingPush(event);
       if (authorization.error) throw new Error(`recipient authorization lookup failed: ${authorization.error.message}`);
       if (!authorization.data) {

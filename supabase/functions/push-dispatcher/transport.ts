@@ -40,6 +40,12 @@ export function safeNotification(eventType: string, payload: Record<string, unkn
   if (eventType === "ai_billing_stop") return { title: "네이버 광고 노출 중단", body: [aiBillingDetails(payload), "광고 노출 중단 내용을 허브에서 확인해 주세요."].filter(Boolean).join(" · "), url: "/hr.html?tab=inbox", tag: "ai-billing-stop" };
   if (eventType === "ai_billing_low_balance") return { title: "네이버 광고 잔액 안내", body: [aiBillingDetails(payload), "잔액 안내를 허브에서 확인해 주세요."].filter(Boolean).join(" · "), url: "/hr.html?tab=inbox", tag: "ai-billing-low-balance" };
   if (eventType === "ai_billing_charge") return { title: "네이버 광고 충전 완료", body: [aiBillingDetails(payload), "충전 기록을 허브에서 확인해 주세요."].filter(Boolean).join(" · "), url: "/hr.html?tab=inbox", tag: "ai-billing-charge" };
+  // 마케팅 카드 결제 알림: 고정 문구만 쓴다(payload의 title/body·금액·상호·카드·이름은 푸시에 넣지 않음).
+  if (eventType === "marketing_expense_recorded") return { title: "마케팅 결제 기록", body: "결제 기록을 허브에서 확인해 주세요.", url: "/hr.html?tab=inbox", tag: "marketing-expense-recorded" };
+  if (eventType === "marketing_expense_cancelled") return { title: "마케팅 결제 취소 기록", body: "취소 기록을 허브에서 확인해 주세요.", url: "/hr.html?tab=inbox", tag: "marketing-expense-cancelled" };
+  if (eventType === "marketing_expense_review") return { title: "카드 문자 확인 필요", body: "처리하지 못한 카드 문자를 허브에서 확인해 주세요.", url: "/hr.html?tab=inbox", tag: "marketing-expense-review" };
+  // 마케팅비 월 예산 기준 도달 알림: 고정 문구만 쓴다(금액·예산은 푸시에 넣지 않고 허브 화면에서 확인).
+  if (eventType === "marketing_budget_alert") return { title: "마케팅비 예산 알림", body: "이번 달 마케팅비가 예산 기준을 넘었어요. 허브에서 확인해 주세요.", url: "/hr.html?tab=aicost", tag: "marketing-budget-alert" };
   return null;
 }
 

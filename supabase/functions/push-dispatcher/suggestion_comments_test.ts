@@ -17,3 +17,6 @@ Deno.test("dispatcher_core가 댓글 이벤트를 실제 발송 경로로 처리
   const result=await processClaimedEvent(event,"claim",db,async(_s,payload)=>{payloads.push(payload);});
   check(result.status==="sent"&&result.sent===1,"발송 완료");check(payloads.length===1,"한 번 발송");const n=JSON.parse(payloads[0]);check(n.title==="원장 지정 문구"&&n.body==="정리함 / 직원","DB 문구");check(n.url==="/hr.html?tab=suggestions","이동 탭");check(!payloads[0].includes("원문은 버림"),"원문 없음");check(released[0].status==="sent","상태 기록");
 });
+Deno.test("운영 v7 알림 14종 + 건의 댓글이 모두 문구를 가진다(마케팅 4종 누락 회귀 방지)",()=>{
+  for(const t of ["leave_submitted","leave_status_changed","consultation_received","payment_pending","approval_submitted","notice_published","document_approved","ai_billing_stop","ai_billing_low_balance","ai_billing_charge","marketing_expense_recorded","marketing_expense_cancelled","marketing_expense_review","marketing_budget_alert","suggestion_commented"])check(safeNotification(t,{}),t);
+});
