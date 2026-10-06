@@ -1903,8 +1903,6 @@ function hubTextMatches(def,query,current){
 
 /* 숫자 기준(app_settings 키) — 근태 기준 7개(차례 1) + 연차·소명 기준 5개(차례 3) + 결재 목록 건수 2개(차례 4) + 문의함·상담일지 건수·간격 5개(차례 5: 화면에만 있던 숫자만 — DB 함수·Storage 규칙에도 박힌 숫자는 안 옮김) */
 const HUB_SETTING_DEFS=[
-  {key:'activity_log.retention_days',screen:'👁 사용 기록',label:'사용 기록 보관 일수',where:'이 일수가 지난 사용 기록만 매일 정리함. 기본 1095일(3년)임.',def:'1095',kind:'int',min:1,max:36500,unit:'일'},
-  {key:'activity_log.exclude_owner',screen:'👁 사용 기록',label:'원장 행동 기록 제외',where:'켜면 원장 본인 행동은 사용 기록에 남기지 않음.',def:'true',kind:'bool'},
   {key:'late_cut',screen:'🕘 근태 기준',label:'지각 판정 시각',where:'출퇴근 — 이 시각을 넘겨 출근하면 지각으로 계산(예 09:40이면 09:41부터 지각)',def:'09:40',kind:'time'},
   {key:'siueop',screen:'🕘 근태 기준',label:'시업(공식 출근) 시각',where:'출퇴근 — 화면에 보여 주는 공식 출근 시각',def:'10:00',kind:'time'},
   {key:'jongeop_weekday_evening',screen:'🕘 근태 기준',label:'평일 야간조 종업 시각',where:'출퇴근 — 월~금 야간조의 종업 시각(연장근무 계산 기준)',def:'20:00',kind:'time'},
@@ -1954,6 +1952,8 @@ const HUB_SETTING_DEFS=[
   {"key":"spend.recent_payments","screen":"📈 기간·주기","label":"최근 결제 간격을 비교할 건수","where":"마케팅비·AI비용의 기간 분석 구역","def":"5","kind":"int","min":2,"max":100,"unit":"건"},
   {"key":"spend.min_baseline_events","screen":"📈 기간·주기","label":"평소 자료가 필요할 최소 건수","where":"마케팅비·AI비용의 기간 분석 구역","def":"5","kind":"int","min":1,"max":1000,"unit":"건"},
   {"key":"spend.chart_enabled","screen":"📈 기간·주기","label":"기간·주기 그래프 보이기","where":"마케팅비·AI비용의 기간 분석 구역","def":"true","kind":"bool"},
+  {key:'activity_log.retention_days',screen:'👁 사용 기록',label:'사용 기록 보관 일수',where:'이 일수가 지난 사용 기록만 매일 정리함. 기본 1095일(3년)임.',def:'1095',kind:'int',min:1,max:36500,unit:'일'},
+  {key:'activity_log.exclude_owner',screen:'👁 사용 기록',label:'원장 행동 기록 제외',where:'켜면 원장 본인 행동은 사용 기록에 남기지 않음.',def:'true',kind:'bool'},
 
 ];
 function hubSettingDefByKey(key){

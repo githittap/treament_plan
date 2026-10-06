@@ -25,7 +25,7 @@ const BOARD = [
   /* 직원AI도우미 1단계(2026-09-29, 원장 승인): 허브 전체 도구라 홈 옆 최상위 탭으로 둔다. */
   { kind: 'tab', key: 'ai', label: '🤖 AI 도우미', children: [] },
   { kind: 'group', key: 'g-work', label: '🕘 근무', children: [['sched', '근무표'], ['calendar', '📅 캘린더'], ['att', '출퇴근']] },
-  { kind: 'group', key: 'g-owner', label: '🔒 원장 전용', children: [['owner', '🛡️ 계정·권한 관리'], ['aicost', '💰 AI비용'], ['pay', '💰 급여']] },
+  { kind: 'group', key: 'g-owner', label: '🔒 원장 전용', children: [['owner', '🛡️ 계정·권한 관리'], ['aicost', '💰 AI비용'], ['pay', '💰 급여'], ['actlog', '👁 사용 기록']] },
   { kind: 'group', key: 'g-care', label: '🩺 환자관리·진료', children: [['confid', '진료기록'], ['workdocs', '📚 업무자료'], ['inbox', '📥 문의함'], ['consult', '🗂 상담일지']] },
   { kind: 'group', key: 'g-docs', label: '🏖 연차·결재·서류', children: [['contract', '근로계약서'], ['onbo', '내 서류함'], ['appr', '결재함'], ['leave', '연차']] },
   { kind: 'tab', key: 'deposit', label: '입금', children: [] }
@@ -36,7 +36,7 @@ const ALL = ['staff', 'manager', 'chief', 'owner'];
 const TAB_ROLE_RULES = {
   home: ALL, ai: ALL, att: ALL, deposit: ALL, sched: ALL, leave: ALL, appr: ALL, notice: ALL,
   workdocs: ALL, calendar: ALL, suggestions: ALL, onbo: ALL, confid: ALL, contract: ALL,
-  pay: ['owner'], aicost: ['owner'], owner: ['owner'],
+  pay: ['owner'], aicost: ['owner'], actlog: ['owner'], owner: ['owner'],
   /* 원장 승인 2026-09-23(노션 댓글 "승인한다."): 통합 문의함을 메뉴로 꿄내면서
      상담일지도 같은 묶음에 올렸다. 권한은 consultationCanAccess(manager·owner) 그대로다. */
   inbox: ['staff', 'manager', 'chief', 'owner'], consult: ['manager', 'chief', 'owner']
@@ -44,7 +44,7 @@ const TAB_ROLE_RULES = {
 /* 재편 전 renderNav 의 노출 판정식 — 글자 하나도 바꾸지 않는다(공백만 무시해 비교). */
 const VISIBILITY_RULE = `ME.role==='owner'
     ?t.roles.includes('owner')&&(!t.needsConfid||ME.confidAccess)
-    :(()=>{const ov=(TAB_OVERRIDES[ME.id]||{})[t.key],base=(TAB_ROLES[t.key]||t.roles).includes(ME.role),shown=ov===true?true:ov===false?false:base;return t.key!=='owner'&&t.key!=='ownerboards'&&shown&&(!t.needsConfid||ME.confidAccess);})()`;
+    :(()=>{const ov=(TAB_OVERRIDES[ME.id]||{})[t.key],base=(TAB_ROLES[t.key]||t.roles).includes(ME.role),shown=ov===true?true:ov===false?false:base;return t.key!=='owner'&&t.key!=='ownerboards'&&t.key!=='actlog'&&shown&&(!t.needsConfid||ME.confidAccess);})()`;
 
 /* ── 정본: 조직도 보드 orgchart_final/boards/hub.json ── */
 const HUB = [
@@ -85,7 +85,7 @@ test('① 묶음·소속·순서가 조직도 보드(정정 2건 반영)와 같�
     BOARD.map(e => [e.kind, e.key, e.children.map(c => c[0])]));
   // 정정 ①: 근무 묶음은 최상위이며 원장 전용 안에 없다.
   assert.equal(ctx.MENU.findIndex(e => e.key === 'g-work') >= 0, true);
-  assert.deepEqual(plain(ctx.MENU.find(e => e.key === 'g-owner').children), ['owner', 'aicost', 'pay']);
+  assert.deepEqual(plain(ctx.MENU.find(e => e.key === 'g-owner').children), ['owner', 'aicost', 'pay', 'actlog']);
   // 정정 ②: 커뮤니티 묶음은 메뉴에 없고, 비워 둔 자리라는 것만 주석으로 남는다.
   assert.equal(ctx.MENU.some(e => String(e.label || '').includes('커뮤니티')), false);
   assert.match(hr, /커뮤니티.*묶음은 원장 지시로 비워 둔 자리/);

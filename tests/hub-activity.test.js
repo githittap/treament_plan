@@ -24,5 +24,35 @@ test('날짜 범위는 한국시간으로 계산',()=>{
 test('사용 기록 탭·설정·캐시 연결',()=>{
  const hr=fs.readFileSync(path.join(root,'hr.html'),'utf8'),texts=fs.readFileSync(path.join(root,'hub-texts.js'),'utf8');
  assert.match(hr,/hub-activity\.js\?v=2026100601/);assert.match(hr,/hub-texts\.js\?v=2026100607/);assert.match(hr,/t\.key!==\s*'actlog'/);assert.match(hr,/HubActivity\.start/);assert.match(texts,/activity_log\.retention_days/);
- const c=load();vm.runInNewContext(texts,c);assert.ok(c.HubUi.textDefs().some(d=>d.key==='actlog.title'));
+ const c=load();vm.runInNewContext(texts,c);assert.ok(c.HubUi.helpers.hubTextDefByKey('actlog.title'));
+});
+test('실제 저장 성공 뒤에만 작성 로그·글 ID 기록하고 본문 제외',async()=>{
+ const calls=[],responses=[{data:[{id:42,body:'SECRET'}],error:null},{data:null,error:{message:'fail'}},{data:null,error:null}];
+ const sb={rpc:async(n,p)=>{calls.push([n,p]);return {data:null,error:null};},from(){const builder={insert(){return this;},update(){return this;},select(){return this;},eq(){return this;},then(ok,bad){return Promise.resolve(responses.shift()).then(ok,bad);}};return builder;}};
+ const h=load().HubActivity;h.start({sb,me:{id:'s',role:'staff'},document:null});
+ await sb.from('suggestions').insert({body:'SECRET'}).select('id');await sb.from('suggestions').update({body:'SECRET'}).eq('id',42);await sb.from('notice_reads').insert({notice_id:3});await h.flush();
+ const writes=calls.filter(([n])=>n==='log_hub_activity').flatMap(([,p])=>p.p_events).filter(e=>e.kind==='write');assert.equal(writes.length,1);assert.equal(writes[0].target_id,'42');assert.ok(!JSON.stringify(writes).includes('SECRET'));
+});
+test('읽기 RPC는 그대로 두고 실패한 운세 RPC는 작성으로 기록하지 않음',async()=>{
+ const calls=[],sb={from(){return {};},rpc:async(n,p)=>{calls.push([n,p]);return {data:n==='fortune_draw'?{ok:false}:null,error:null};}};
+ const h=load().HubActivity;h.start({sb,me:{id:'s',role:'staff'},document:null});await sb.rpc('fortune_status');await sb.rpc('fortune_draw');await h.flush();assert.equal(calls.at(-1)[1].p_events.filter(e=>e.kind==='write').length,0);
+});
+test('pagehide·visibilitychange는 keepalive 전송·머문 시간 기록',async()=>{
+ const listeners={},win={},sent=[],doc={addEventListener(k,fn){listeners[k]=fn;},visibilityState:'visible'};
+ const c=load({document:doc,addEventListener:(k,fn)=>win[k]=fn,fetch:async(u,o)=>{sent.push(JSON.parse(o.body));return {};}}),h=c.HubActivity;
+ h.start({sb:{rpc:async()=>({})},me:{id:'s',role:'staff'},url:'https://example.invalid',key:'fixture',token:()=> 'fixture'});
+ h.record('click','운세');doc.visibilityState='hidden';listeners.visibilitychange();assert.equal(sent.length,1);assert.ok(sent[0].p_events.some(e=>e.kind==='leave'&&Number.isFinite(e.meta.duration_seconds)));win.pagehide();assert.equal(sent.length,1,'숨김 후 pagehide는 이중 나감 없음');
+ doc.visibilityState='visible';listeners.visibilitychange();await h.flush();
+});
+test('문서 ID 조회는 열람 기록·파일 내려받기는 내용 없이 기록',async()=>{
+ const calls=[],sb={rpc:async(n,p)=>{calls.push(p);return {};},from(){const b={select(){return this;},eq(){return this;},single(){return this;},then(ok,bad){return Promise.resolve({data:{id:7,body:'SECRET'},error:null}).then(ok,bad);}};return b;},storage:{from(){return {download:async()=>({data:'SECRET',error:null})};}}};
+ const h=load().HubActivity;h.start({sb,me:{id:'s',role:'staff'},document:null});await sb.from('contracts').select('*').eq('id',7).single();await sb.storage.from('employee-documents').download('SECRET-path');await h.flush();
+ const events=calls.flatMap(p=>p.p_events);assert.ok(events.some(e=>e.kind==='view'&&e.target_id==='7'));assert.ok(events.some(e=>e.kind==='download'));assert.ok(!JSON.stringify(events).includes('SECRET'));
+});
+test('전역 클릭 감시로 운세·상품권·다운로드 기록, 입력 클릭은 제외',async()=>{
+ const listeners={},calls=[],doc={addEventListener(k,f){listeners[k]=f;}};
+ const c=load({document:doc,addEventListener(){}}),h=c.HubActivity;
+ h.start({sb:{rpc:async(n,p)=>{calls.push(p);return {};}},me:{id:'s',role:'staff'}});
+ for(const name of ['오늘의 운세','상품권 보기']){const el={tagName:'BUTTON',textContent:name,closest:()=>null,querySelector:()=>null,getAttribute:()=>null,hasAttribute:()=>false};listeners.click({target:{closest:()=>el}});}
+ listeners.click({target:{closest:()=>null}});await h.flush();const clicks=calls.flatMap(p=>p.p_events).filter(e=>e.kind==='click');assert.deepEqual(clicks.map(e=>e.target),['오늘의 운세','상품권 보기']);
 });
