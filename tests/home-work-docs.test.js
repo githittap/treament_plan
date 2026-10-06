@@ -21,3 +21,5 @@ test('업무자료 기능은 원래 자리(업무자료 탭)에 그대로 있고
   assert.match(html, /TAB==='workdocs'\)renderWorkDocuments\(m\)/);
   assert.doesNotMatch(workdocs[1], /app\.notion\.com/);
 });
+
+test('필요물품 요청·구매현황 카드가 노션 필요물품 페이지로 간다(10-06 복구)',()=>{assert.match(html,/필요물품 요청·구매현황[^\n]*163ba489f082805c9db2e2949b98a2d2/);});

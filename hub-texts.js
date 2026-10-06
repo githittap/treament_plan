@@ -2050,7 +2050,7 @@ const HUB_CARD_DEFS=[
   {key:'cards.work_materials',screen:'📚 업무자료',label:'업무자료 카드',
    where:'업무자료 화면 › 검색칸 아래 자료 카드들(맨 위 「직원 허브 사용 설명서」 카드는 따로 있어 여기 없어요)',
    note:'카드마다 제목·설명·링크를 고치고, 순서를 바꾸고, 새 카드를 더하거나 뺄 수 있어요. 링크는 http:// 또는 https:// 로 시작하는 주소만 돼요. 「특정 부서에만 보이기」를 켜면 아래 부서 이름(진료실·상담 등)에 속한 직원에게만 보여요. 카드 안의 「열기 ↗」·검색 안내 글은 📝 글 고치기에서 고쳐요.',
-   def:[{icon:'🩺',category:'진료 매뉴얼',title:'진료 매뉴얼',description:'진료실·상담 직무에 필요한 업무 안내를 확인합니다.',depts:['진료실','상담'],manual:true,url:'https://app.notion.com/p/1f7ba489f082806e9761e748524994bc?source=copy_link'}]}
+   def:[{icon:'🩺',category:'진료 매뉴얼',title:'진료 매뉴얼',description:'진료실·상담 직무에 필요한 업무 안내를 확인합니다.',depts:['진료실','상담'],manual:true,url:'https://app.notion.com/p/1f7ba489f082806e9761e748524994bc?source=copy_link'},{icon:'🛒',category:'구매',title:'필요물품 요청·구매현황',description:'필요물품 요청과 구매 진행현황을 확인합니다.',depts:[],manual:false,url:'https://app.notion.com/p/163ba489f082805c9db2e2949b98a2d2?source=copy_link'}]}
 ];
 function hubListDefByKey(key){
   for(let i=0;i<HUB_LIST_DEFS.length;i++)if(HUB_LIST_DEFS[i].key===key)return HUB_LIST_DEFS[i];

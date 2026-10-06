@@ -415,7 +415,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 
 <script src="hub-fortune.js?v=2026100601"></script>
 <script src="hub-intro.js?v=2026100503"></script>
-<script src="hub-texts.js?v=2026100502"></script>
+<script src="hub-texts.js?v=2026100601"></script>
 <script src="security-pledge.js?v=20261003p9d"></script>
 <script src="wage-hourly.js?v=2026100401"></script>
 <script src="spend-cycle.js?v=2026100501"></script>
@@ -2207,7 +2207,7 @@ async function delNotice(id){if(!confirm(hubT('notice.del.confirm','삭제할까
 /* work-documents:test-start */
 function hubT(k,d,v){return typeof hubText==='function'?hubText(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
 const workDocuments=[
-  {icon:'🩺',category:'진료 매뉴얼',title:'진료 매뉴얼',description:'진료실·상담 직무에 필요한 업무 안내를 확인합니다.',depts:['진료실','상담'],manual:true,url:'https://app.notion.com/p/1f7ba489f082806e9761e748524994bc?source=copy_link'}
+  {icon:'🩺',category:'진료 매뉴얼',title:'진료 매뉴얼',description:'진료실·상담 직무에 필요한 업무 안내를 확인합니다.',depts:['진료실','상담'],manual:true,url:'https://app.notion.com/p/1f7ba489f082806e9761e748524994bc?source=copy_link'},{icon:'🛒',category:'구매',title:'필요물품 요청·구매현황',description:'필요물품 요청과 구매 진행현황을 확인합니다.',depts:[],manual:false,url:'https://app.notion.com/p/163ba489f082805c9db2e2949b98a2d2?source=copy_link'}
 ];
 function workDocumentsForProfile(items,profile){
   const dept=String(profile?.dept||profile?.department||'').trim(),group=String(profile?.job_group||'').trim();

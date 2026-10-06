@@ -94,7 +94,7 @@ test('목록·카드 기본값: 서류 종류·상태 이름·업무자료 카�
   assert.ok(h.hubCardsValidate(h.HUB_CARD_DEFS[0].def).ok,'기본 카드는 검사를 통과');
   // 서류 종류 기본 선택칸 줄(기존 시험이 이 줄을 직접 찾음)이 기본 목록의 근원
   assert.match(hr,/<select id="edType"><option>잠복결핵 검사서<\/option><option>자격증<\/option><option>보안서약서<\/option>/);
-  assert.match(hr,/hub-texts\.js\?v=2026100502/,'캐시 번호를 새 값으로 올림(차례 3에서 2026100108 → 2026100109, 차례 4에서 → 2026100110, 차례 5에서 → 2026100111, 차례 6에서 → 2026100112, 차례 7에서 → 2026100113, 10-02 원장요청 5건에서 → 2026100221, 10-02 인박스 판에서 → 2026100223)');
+  assert.match(hr,/hub-texts\.js\?v=2026100601/,'캐시 번호를 새 값으로 올림(차례 3에서 2026100108 → 2026100109, 차례 4에서 → 2026100110, 차례 5에서 → 2026100111, 차례 6에서 → 2026100112, 차례 7에서 → 2026100113, 10-02 원장요청 5건에서 → 2026100221, 10-02 인박스 판에서 → 2026100223)');
 });
 
 /* ───────────── 2. 기본값만 있을 때 옛 화면과 똑같음 ───────────── */
@@ -379,6 +379,10 @@ test('화면: 📋 목록에 서류 종류·상태 이름 목록과 업무자료
   assert.match(sec,/id="hubCrd_0_0_depts"[^>]*value="진료실,상담"/);assert.match(sec,/id="hubCrd_0_0_manual" type="checkbox" checked/);
   assert.match(sec,/data-hub-card-add="0"/);assert.match(sec,/data-hub-card-save="0"/);assert.match(sec,/data-hub-card-reset="0"/);
   assert.equal(t.state.settings.length,0,'열기만 해서는 DB 안 바뀜');
+  // 기본 카드 2장(진료 매뉴얼 + 10-06 복구한 필요물품) 중 필요물품을 빼서 아래 흐름은 1장 기준으로 본다
+  assert.match(sec,/\(2장\)/);assert.match(sec,/id="hubCrd_0_1_title"[^>]*value="필요물품 요청·구매현황"/);
+  setCard(t,0,0,DEF_CARD);await t.click('[hub-card-del]=0:1');
+  assert.match(t.section.innerHTML,/\(1장\)/);
   // 카드 추가 → 제목·링크를 적지 않으면 저장 거절(DB 안 부름)
   setCard(t,0,0,DEF_CARD);
   await t.click('[hub-card-add]=0');
@@ -421,10 +425,10 @@ test('화면: 📋 목록에 서류 종류·상태 이름 목록과 업무자료
   assert.equal(t.state.settings.find(x=>x.key==='cards.work_materials').value,'[]');
   // 되돌리기
   await t.click('[hub-card-reset]=0');
-  assert.deepEqual(JSON.parse(t.state.settings.find(x=>x.key==='cards.work_materials').value),[{icon:'🩺',category:'진료 매뉴얼',title:'진료 매뉴얼',description:'진료실·상담 직무에 필요한 업무 안내를 확인합니다.',depts:['진료실','상담'],manual:true,url:'https://app.notion.com/p/1f7ba489f082806e9761e748524994bc?source=copy_link'}]);
+  assert.deepEqual(JSON.parse(t.state.settings.find(x=>x.key==='cards.work_materials').value),[{icon:'🩺',category:'진료 매뉴얼',title:'진료 매뉴얼',description:'진료실·상담 직무에 필요한 업무 안내를 확인합니다.',depts:['진료실','상담'],manual:true,url:'https://app.notion.com/p/1f7ba489f082806e9761e748524994bc?source=copy_link'},{icon:'🛒',category:'구매',title:'필요물품 요청·구매현황',description:'필요물품 요청과 구매 진행현황을 확인합니다.',depts:[],manual:false,url:'https://app.notion.com/p/163ba489f082805c9db2e2949b98a2d2?source=copy_link'}]);
   assert.equal(t.el('#hubCrdMsg_0').textContent,'처음 카드로 돌렸어요.');
   // 쓰기 실패(직원 계정 등)
-  const f=ui({failWrite:true});await f.render(OWNER);await f.click('[hub-subtab]=lists');setCard(f,0,0,DEF_CARD);
+  const f=ui({failWrite:true});await f.render(OWNER);await f.click('[hub-subtab]=lists');setCard(f,0,0,DEF_CARD);setCard(f,0,1,{icon:'🛒',category:'구매',title:'필요물품 요청·구매현황',description:'필요물품 요청과 구매 진행현황을 확인합니다.',url:'https://app.notion.com/p/163ba489f082805c9db2e2949b98a2d2?source=copy_link',depts:'',manual:false});
   await f.click('[hub-card-save]=0');
   assert.match(f.el('#hubCrdMsg_0').textContent,/원장 계정으로 로그인/);
 });
