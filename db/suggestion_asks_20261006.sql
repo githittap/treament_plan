@@ -37,7 +37,7 @@ begin
   select * into r from public.leave_requests where id=p_request_id for update;
   if not found or r.user_id<>auth.uid() or r.status<>'승인' or r.date_from<(now() at time zone 'Asia/Seoul')::date then raise exception 'only own future approved leave can be changed'; end if;
   if p_action is null or p_action not in ('cancel','half') or p_reason is null or length(trim(p_reason))=0 then raise exception 'action and reason required'; end if;
-  if p_action='half' and (r.type<>'연차' or r.days<=0 or p_type_note is null or p_type_note !~ '^[0-2][0-9]:[0-5][0-9]~[0-2][0-9]:[0-5][0-9]$') then raise exception 'full leave and half-day time range required'; end if;
+  if p_action='half' and (r.type<>'연차' or r.days<=0 or r.date_from<>r.date_to or p_type_note is null or p_type_note !~ '^[0-2][0-9]:[0-5][0-9]~[0-2][0-9]:[0-5][0-9]$') then raise exception 'full leave and half-day time range required'; end if;
   if p_action='half' and (split_part(p_type_note,'~',1)::time>=split_part(p_type_note,'~',2)::time) then raise exception 'invalid half-day time range'; end if;
   insert into public.leave_change_requests(request_id,user_id,action,reason,type_note) values(r.id,r.user_id,p_action,trim(p_reason),p_type_note) returning id into new_id;
   return new_id;

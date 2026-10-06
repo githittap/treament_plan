@@ -1906,7 +1906,7 @@ async function saveLeaveBalance(index){
 /* suggestion-six:start */
 function leaveChangeButtons(r){
   if(r.user_id!==ME.id||r.status!=='승인'||r.date_from<today())return '';
-  return `<button class="mini rej" onclick="requestLeaveChange(${r.id},'cancel')">${esc(hubT('leave.change.cancel','취소 요청'))}</button>`+(r.type==='연차'?` <button class="mini" onclick="requestLeaveChange(${r.id},'half')">${esc(hubT('leave.change.half','반차로 바꾸기 요청'))}</button>`:'');
+  return `<button class="mini rej" onclick="requestLeaveChange(${r.id},'cancel')">${esc(hubT('leave.change.cancel','취소 요청'))}</button>`+(r.type==='연차'&&r.date_from===r.date_to?` <button class="mini" onclick="requestLeaveChange(${r.id},'half')">${esc(hubT('leave.change.half','반차로 바꾸기 요청'))}</button>`:'');
 }
 function leaveChangeCards(rows){
   return `<div class="card"><h2>${esc(hubT('leave.change.title','연차 취소·변경 요청'))}</h2>${(rows||[]).map(r=>`<div class="hint"><b>${esc(r.action==='cancel'?hubT('leave.change.cancel','취소 요청'):hubT('leave.change.half','반차로 바꾸기 요청'))}</b> · #${r.request_id||''} · ${esc(r.status)} · ${typeof nameOf==='function'?esc(nameOf(r.user_id))+' · ':''}${esc(r.reason)}${r.type_note?' · '+esc(r.type_note):''}${r.status==='대기'&&['chief','owner'].includes(ME.role)?`${ME.role==='chief'?` <button class="mini stamp" onclick="processLeaveChange(${r.id},'approve')">${esc(hubT('leave.pend.btn_ok','실장 최종 승인'))}</button>`:''} <button class="mini rej" onclick="processLeaveChange(${r.id},'reject')">${esc(hubT('leave.btn.reject','반려'))}</button>`:''}</div>`).join('')||`<div class="empty">${esc(hubT('leave.pend.empty','대기 없음'))}</div>`}</div>`;

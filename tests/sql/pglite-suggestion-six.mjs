@@ -23,7 +23,7 @@ async function setup(){
  grant usage on schema public,auth to authenticated; grant execute on function auth.uid(),my_role(),employee_hub_access_allowed() to authenticated;
  insert into profiles values('${uid(1)}','직원','staff',true,true),('${uid(2)}','다른 직원','staff',true,true),('${uid(3)}','실장','chief',true,true),('${uid(4)}','원장','owner',true,true),('${uid(5)}','대기','staff',true,false);
  insert into leave_requests(id,user_id,type,date_from,date_to,days,status) values
- (1,'${uid(1)}','연차',current_date+10,current_date+10,1,'승인'),(2,'${uid(1)}','연차',current_date+11,current_date+11,1,'승인'),(3,'${uid(1)}','연차',current_date-10,current_date-10,1,'승인'),(4,'${uid(1)}','연차',current_date+12,current_date+12,1,'승인');
+ (1,'${uid(1)}','연차',current_date+10,current_date+10,1,'승인'),(2,'${uid(1)}','연차',current_date+11,current_date+11,1,'승인'),(3,'${uid(1)}','연차',current_date-10,current_date-10,1,'승인'),(4,'${uid(1)}','연차',current_date+12,current_date+12,1,'승인'),(5,'${uid(1)}','연차',current_date+20,current_date+24,5,'승인');
  insert into leave_ledger(user_id,kind,days,ref) values('${uid(1)}','부여',10,null),('${uid(1)}','사용',1,1),('${uid(1)}','사용',1,2),('${uid(1)}','사용',1,3),('${uid(1)}','사용',1,4);
  `);
  await db.exec(`alter table profiles add column account_access_status text default '활성';
@@ -61,6 +61,7 @@ try{
  await fails(db,"select request_leave_change(3,'cancel','사유')",/own future/);checks++;
  await fails(db,"select request_leave_change(1,'cancel',' ')",/reason required/);checks++;
  await fails(db,"select request_leave_change(1,'half','사유','13:00~09:00')",/invalid half/);checks++;
+ await fails(db,"select request_leave_change(5,'half','여러 날','09:00~13:00')",/full leave and half-day/);checks++;
  const id=(await db.query("select request_leave_change(1,'half','오전 휴가','09:00~13:00') id")).rows[0].id;
  await fails(db,"select request_leave_change(1,'cancel','중복')",/unique/);checks++;
  assert.equal((await db.query('select count(*)::int n from leave_change_requests')).rows[0].n,1);checks++;
