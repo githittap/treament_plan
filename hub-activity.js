@@ -2,7 +2,8 @@
 (function(root){
 'use strict';
 const KINDS=['enter','leave','tab','click','write','view','download'];
-const TEXTS={title:'👁 사용 기록',today:'오늘',week:'7일',month:'30일',custom:'직접',all_staff:'모든 직원',all_kind:'모든 종류',from:'시작일',to:'마지막 날',staff:'직원',kind:'종류',time:'날짜 시각',target:'대상',device:'기기',load:'조회',more:'200줄 더 보기',csv:'CSV 내려받기',summary:'직원별 요약',first:'오늘 들어온 시각',last:'마지막 활동',days:'이번 달 접속 일수',empty:'기록 없음',error:'기록을 불러오지 못했음',loading:'불러오는 중…',csv_error:'CSV를 만들지 못했음',enter:'접속',leave:'나감',tab:'탭 열람',click:'클릭',write:'작성·수정·삭제',view:'열람',download:'내려받기·인쇄',csv_name:'허브_사용기록',count:'{n}건 표시 중임',owner_only:'원장만 볼 수 있음'};
+const TEXTS={title:'👁 사용 기록',today:'오늘',week:'7일',month:'30일',custom:'직접',all_staff:'모든 직원',all_kind:'모든 종류',from:'시작일',to:'마지막 날',staff:'직원',kind:'종류',time:'날짜 시각',target:'대상',device:'기기',load:'조회',more:'200줄 더 보기',csv:'CSV 내려받기',summary:'직원별 요약',first:'오늘 들어온 시각',last:'마지막 활동',days:'이번 달 접속 일수',empty:'기록 없음',error:'기록을 불러오지 못했음',loading:'불러오는 중…',csv_error:'CSV를 만들지 못했음',enter:'접속',leave:'나감',tab:'탭 열람',click:'클릭',write:'작성·수정·삭제',view:'열람',download:'내려받기·인쇄',csv_name:'허브_사용기록',count:'{n}건 표시 중임',owner_only:'원장만 볼 수 있음',t_notice:'공지',t_consultation_inbox:'상담 문의',t_consultation_inbox_reply:'상담 문의 답변',t_consultation_inbox_handled:'상담 문의 처리',t_suggestions:'건의',t_suggestion_comments:'건의 댓글',t_approval_docs:'결재',t_employee_documents:'직원 서류',t_leave_requests:'연차 신청',t_leave_application_documents:'연차신청서',t_employment_certificates:'재직증명서',t_contracts:'근로계약서',t_consultation_journals:'상담일지',t_hub:'허브'};
+function targetLabel(t){const k='t_'+t;return TEXTS[k]?T(k):t;}
 function T(key,vars){const def=TEXTS[key]||key;return typeof root.hubText==='function'?root.hubText('actlog.'+key,def,vars):String(def).replace(/\{(\w+)\}/g,(m,k)=>vars&&k in vars?vars[k]:m);}
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 function label(el){
@@ -95,7 +96,7 @@ function time(value){if(!value)return '—';return new Date(value).toLocaleStrin
 function nameOf(id,profiles){return (profiles||[]).find(p=>p.user_id===id)?.name||id;}
 let ui=null,uiGeneration=0;
 function filteredArgs(model){return {...bounds(model.from,model.to),p_user:model.user||null,p_kind:model.kind||null};}
-function rowsHtml(rows,profiles){return rows.map(r=>'<tr><td>'+esc(time(r.occurred_at))+'</td><td>'+esc(nameOf(r.user_id,profiles))+'</td><td>'+esc(T(r.kind))+'</td><td>'+esc(r.target)+(r.target_id?' <small>#'+esc(r.target_id)+'</small>':'')+'</td><td>'+esc(r.user_agent_short||'—')+'</td></tr>').join('');}
+function rowsHtml(rows,profiles){return rows.map(r=>'<tr><td>'+esc(time(r.occurred_at))+'</td><td>'+esc(nameOf(r.user_id,profiles))+'</td><td>'+esc(T(r.kind))+'</td><td>'+esc(targetLabel(r.target))+(r.target_id?' <small>#'+esc(r.target_id)+'</small>':'')+'</td><td>'+esc(r.user_agent_short||'—')+'</td></tr>').join('');}
 function summaryHtml(rows,profiles){return '<div class="tblwrap"><table><thead><tr>'+['staff','first','last','days'].map(k=>'<th>'+esc(T(k))+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr><td>'+esc(nameOf(r.user_id,profiles))+'</td><td>'+esc(time(r.first_enter))+'</td><td>'+esc(time(r.last_activity))+'</td><td>'+Number(r.month_days||0)+'</td></tr>').join('')+'</tbody></table></div>';}
 async function render(container,options){
  if(!options.me||options.me.role!=='owner'){container.innerHTML='<div class="empty">'+esc(T('owner_only'))+'</div>';return;}
@@ -127,7 +128,7 @@ async function loadPage(more){
  }catch(_){if(generation===uiGeneration)get('error').textContent=T('error');}
  finally{if(generation===uiGeneration)get('more').disabled=false;}
 }
-function csv(rows,profiles){return '\ufeff'+[['time','staff','kind','target','device'].map(k=>T(k)),...rows.map(r=>[time(r.occurred_at),nameOf(r.user_id,profiles),T(r.kind),r.target+(r.target_id?' #'+r.target_id:''),r.user_agent_short||''])].map(row=>row.map(csvCell).join(',')).join('\r\n');}
+function csv(rows,profiles){return '\ufeff'+[['time','staff','kind','target','device'].map(k=>T(k)),...rows.map(r=>[time(r.occurred_at),nameOf(r.user_id,profiles),T(r.kind),targetLabel(r.target)+(r.target_id?' #'+r.target_id:''),r.user_agent_short||''])].map(row=>row.map(csvCell).join(',')).join('\r\n');}
 async function exportCsv(){
  if(!ui)return;const model=ui,button=model.container.querySelector('#actlog-csv');button.disabled=true;
  try{const args=filteredArgs(model),rows=[];for(let offset=0;;offset+=200){const result=await model.sb.rpc('hub_activity_page',{...args,p_offset:offset});if(result.error)throw result.error;rows.push(...result.data||[]);if((result.data||[]).length<200)break;}
