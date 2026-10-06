@@ -49,3 +49,10 @@ test('물품구매는 설정 목록·선택 값·문서 표시에서 같은 종�
  vm.runInContext(mapping+items+value,c);assert.equal(c.approvalKindValue('물품구매'),'물품구매');assert.ok(c.approvalKindItems().some(r=>r.code==='물품구매'));
  const texts=fs.readFileSync('hub-texts.js','utf8');assert.match(texts,/code:'물품구매',label:'물품구매'/);
 });
+
+test('승인 대기 안내는 신입 안내·공통 목록과 본인 서류·지문 동작만 연다',()=>{
+ const c=setup({onboardingGuideCard:()=>'<div>신입 첫날 안내</div>'});
+ const out=c.pendingOnboardingHtml([{label:'공통 서류 제출'}],[{original_name:'내 서류.pdf'}],null);
+ assert.match(out,/신입 첫날 안내/);assert.match(out,/공통 입사 체크리스트/);assert.match(out,/내 서류.pdf/);assert.match(out,/pendingUploadDocument/);assert.match(out,/pendingReportFingerprint/);
+ assert.doesNotMatch(out,/go\(|renderOnbo|edUser|leave|다른 직원/);
+});

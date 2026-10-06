@@ -1868,6 +1868,9 @@ function hubTextDefs(){
   hubTextDefsChapter5(add);
   hubTextDefsChapter6(add);
   hubTextDefsChapter7(add);
+  [['bank','은행·계좌번호'],['notion','Notion 가입·앱 설치·로그인'],['tb','잠복결핵 검사서'],['license','자격증'],['security','보안서약서']].forEach(([key,text])=>add('pending.onbo.'+key,'가입 승인 대기',text,text));
+  [["hint", "승인 전에는 본인 서류 올리기와 지문 등록 보고만 할 수 있습니다. 나머지 제출은 승인 후 완료하세요."], ["fp", "지문 등록"], ["report", "지문 등록 완료 보고"], ["docs", "본인 서류 올리기"], ["upload", "서류 올리기"], ["default_type", "입사 서류"], ["no_data", "입사 안내를 불러오지 못했습니다."], ["error", "입사 안내 조회 실패: {msg}"], ["upload_error", "서류 저장 실패: {msg}"], ["type_required", "서류 종류를 적어 주세요."]].forEach(([key,text])=>add('pending.onbo.'+key,'가입 승인 대기',text,text,key.includes('error')?['msg']:[]));
+
   [["title", "수기 출퇴근 · 한 주 입력"], ["pick", "입력할 주"], ["hint", "저장할 날을 체크하세요. 지문 기록이 있는 날은 표시만 하고 덮어쓰지 않습니다."], ["partial", "빨간 줄은 저장하지 않습니다. 나머지 유효한 날만 저장할까요?"], ["reason", "정정·예외 사유를 적어 주세요."], ["unknown", "저장 결과를 확인하지 못했습니다."], ["save", "선택한 날 저장"], ["locked", "지문 기록 있음 · 입력 안 함"], ["none", "저장할 날을 체크하세요."], ["result", "저장 {saved}일 · 오류 {failed}일"], ["th_select", "저장"], ["th_date", "날짜·요일"], ["th_in", "출근"], ["th_out", "퇴근"], ["th_late", "지각(분)"], ["th_early", "조퇴(분)"], ["th_lunch", "점심 연장"], ["th_clockout", "퇴근 연장"], ["th_evening", "저녁 연장"], ["th_half", "반차"], ["th_required", "정정·예외"], ["th_reason", "사유"], ["th_note", "비고"], ["th_status", "상태"], ["day0", "일"], ["day1", "월"], ["day2", "화"], ["day3", "수"], ["day4", "목"], ["day5", "금"], ["day6", "토"], ["half0", "없음"], ["half1", "오전 반차"], ["half2", "오후 반차"]].forEach(([key,text])=>add('att.week.'+key,'🕘 주간 출퇴근',text,text,key==='result'?['saved','failed']:[]));
 
   [['used','사용'],['pending','신청 중'],['unit','일']].forEach(([key,text])=>add('leave.my.'+key,'🌿 내 연차',text,text));
@@ -2785,6 +2788,7 @@ const HubUi={
   // 허브를 열 때 한 번: 글 표를 읽어 메모리에 둔다(실패하면 기본값만 씀). 숫자·목록은 호스트 SETTINGS를 그대로 쓴다.
   load:function(sb){return hubTextsLoadInto(sb);},
   setSettings:hubSettingSetValues,
+  setPendingTexts:function(rows){hubTextSetOverrides((rows||[]).filter(r=>/^(onbo\.(guide|check|docs)\.|pending\.onbo\.)/.test(r.key)));},
   renderSettings:renderHubSettings,
   saveText:hubTextsSave,resetText:hubTextsReset, // 첫 화면(hub-intro.js) 「문구 고치기」가 씀
   applyTextFilter:hubApplyTextFilter, // 검색칸 동작(시험용으로도 공개)

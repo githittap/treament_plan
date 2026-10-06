@@ -5,6 +5,15 @@ do $$ begin
   if exists(select 1 from public.approval_docs where kind='물품구매') then raise exception 'purchase history exists; preserve data and stop rollback'; end if;
 end $$;
 do $$ declare original text; begin
+  select definition into original from public.suggestion_asks_20261006_restore where name='storage_check';
+  if original is null then raise exception 'original storage check required'; end if;
+  execute 'alter policy employee_hub_storage_access_gate on storage.objects with check ('||original||')';
+end $$;
+drop function if exists public.pending_add_document(text,text,text);
+drop function if exists public.pending_report_fingerprint();
+drop function if exists public.pending_onboarding_info();
+drop function if exists public.onboarding_self_access_allowed();
+do $$ declare original text; begin
   select definition into original from public.suggestion_asks_20261006_restore where name='approval_kind';
   if original is null then raise exception 'original approval constraint required'; end if;
   alter table public.approval_docs drop constraint approval_docs_kind_check;

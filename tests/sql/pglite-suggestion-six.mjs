@@ -26,6 +26,26 @@ async function setup(){
  (1,'${uid(1)}','연차',current_date+10,current_date+10,1,'승인'),(2,'${uid(1)}','연차',current_date+11,current_date+11,1,'승인'),(3,'${uid(1)}','연차',current_date-10,current_date-10,1,'승인'),(4,'${uid(1)}','연차',current_date+12,current_date+12,1,'승인');
  insert into leave_ledger(user_id,kind,days,ref) values('${uid(1)}','부여',10,null),('${uid(1)}','사용',1,1),('${uid(1)}','사용',1,2),('${uid(1)}','사용',1,3),('${uid(1)}','사용',1,4);
  `);
+ await db.exec(`alter table profiles add column account_access_status text default '활성';
+ create schema storage;
+ create table storage.objects(id bigint generated always as identity,name text,bucket_id text,metadata jsonb);
+ alter table storage.objects enable row level security;
+ create policy hr_docs_insert_scoped on storage.objects for insert to authenticated with check(bucket_id='hr-docs' and split_part(name,'/',1)=auth.uid()::text);
+ create policy hr_docs_select_scoped on storage.objects for select to authenticated using(bucket_id='hr-docs' and split_part(name,'/',1)=auth.uid()::text);
+ create policy employee_hub_storage_access_gate on storage.objects as restrictive for all to authenticated using(employee_hub_access_allowed()) with check(employee_hub_access_allowed());
+ grant usage on schema storage to authenticated;grant select,insert on storage.objects to authenticated;grant usage on sequence storage.objects_id_seq to authenticated;
+ create table onboarding_items(label text,order_no int,active boolean default true);
+ create table employee_documents(id bigint generated always as identity,user_id uuid,uploaded_by uuid,document_type text,original_name text,storage_path text unique,mime_type text,size_bytes bigint,created_at timestamptz default now(),checked_at timestamptz);
+ alter table employee_documents enable row level security;
+ create policy docs_self on employee_documents for select to authenticated using(user_id=auth.uid());
+ create policy employee_hub_access_gate on employee_documents as restrictive for all to authenticated using(employee_hub_access_allowed()) with check(employee_hub_access_allowed());
+ grant select on employee_documents to authenticated;
+ create table fingerprint_registration_requests(user_id uuid primary key,status text default '요청',requested_at timestamptz default now(),manager_id uuid,approved_at timestamptz);
+ create table hub_ui_texts(key text,value text);
+ insert into onboarding_items values('지문 등록 보고',1,true),('공통 서류 제출',2,true);
+ insert into hub_ui_texts values('pending.onbo.hint','대기 안내 수정됨'),('owner.secret','원장 전용 글');
+ insert into employee_documents(user_id,uploaded_by,document_type,original_name,storage_path) values('${uid(2)}','${uid(2)}','서류','남의 서류.pdf','${uid(2)}/others.pdf');
+ `);
  return db;
 }
 async function as(db,n){await db.exec(`reset role; select set_config('test.uid','${uid(n)}',false); set role authenticated;`);}
@@ -57,6 +77,19 @@ try{
  await db.exec('reset role');assert.equal((await db.query('select status from leave_requests where id=4')).rows[0].status,'승인');checks++;
  assert.equal((await db.query("select count(*)::int n from push_events where event_type='leave_submitted'")).rows[0].n,6);checks++;
  assert.equal((await db.query("select count(*)::int n from push_events where event_type='leave_status_changed'")).rows[0].n,3);checks++;
+ await as(db,5);
+ assert.equal((await db.query('select employee_hub_access_allowed() allowed')).rows[0].allowed,false);checks++;
+ const info=(await db.query('select pending_onboarding_info() info')).rows[0].info;assert.equal(info.items.length,2);assert.equal(info.docs.length,0);assert.equal(info.texts.length,1);checks++;
+ await db.query('select pending_report_fingerprint()');await db.query('select pending_report_fingerprint()');assert.equal((await db.query('select pending_onboarding_info() info')).rows[0].info.fingerprint.status,'요청');checks++;
+ await db.query(`insert into storage.objects(name,bucket_id,metadata) values('${uid(5)}/proof.pdf','hr-docs','{"size":100,"mimetype":"application/pdf"}')`);checks++;
+ await fails(db,`insert into storage.objects(name,bucket_id,metadata) values('${uid(2)}/evil.pdf','hr-docs','{}')`,/row-level security/);checks++;
+ await fails(db,`insert into storage.objects(name,bucket_id,metadata) values('${uid(5)}/evil.pdf','leave-docs','{}')`,/row-level security/);checks++;
+ await fails(db,`select pending_add_document('${uid(2)}/others.pdf','다른 서류','입사')`,/own document/);checks++;
+ await db.query(`select pending_add_document('${uid(5)}/proof.pdf','내 증빙.pdf','입사')`);
+ const own=(await db.query('select pending_onboarding_info() info')).rows[0].info;assert.equal(own.docs.length,1);assert.equal(own.docs[0].original_name,'내 증빙.pdf');checks++;
+ assert.equal((await db.query('select * from employee_documents')).rows.length,0);assert.equal((await db.query('select * from storage.objects')).rows.length,0);checks++;
+ await db.exec(`reset role;update profiles set account_access_status='차단' where user_id='${uid(5)}';`);await as(db,5);await fails(db,'select pending_report_fingerprint()',/active onboarding/);checks++;
+ await db.exec('reset role');
  await assert.rejects(db.exec(rollback),/history exists/);await db.exec('rollback');checks++;
 }finally{await db.close();}
 const empty=await setup();try{await empty.exec(migration);await empty.exec(rollback);assert.equal((await empty.query("select to_regclass('public.leave_change_requests') t")).rows[0].t,null);checks++;}finally{await empty.close();}

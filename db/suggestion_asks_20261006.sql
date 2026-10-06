@@ -86,4 +86,58 @@ drop trigger if exists queue_leave_change_push on public.leave_change_requests;
 create trigger queue_leave_change_push after insert or update of status on public.leave_change_requests for each row execute function public.queue_leave_change_push();
 revoke all on function public.request_leave_change(bigint,text,text,text),public.process_leave_change(bigint,text),public.queue_leave_change_push() from public,anon,authenticated;
 grant execute on function public.request_leave_change(bigint,text,text,text),public.process_leave_change(bigint,text) to authenticated;
+-- 대기 계정은 본인 서류와 지문 등록만 처리함. 일반 허브 접근 함수는 바꾸지 않음.
+create or replace function public.onboarding_self_access_allowed()
+returns boolean language sql stable security definer set search_path=public as $$
+  select exists(select 1 from public.profiles p where p.user_id=auth.uid() and p.active and p.account_access_status='활성' and (p.approved or p.role='staff'))
+$$;
+revoke all on function public.onboarding_self_access_allowed() from public,anon;
+grant execute on function public.onboarding_self_access_allowed() to authenticated;
+-- Storage 제한식 원문을 저장하고, 기존 식에 본인 hr-docs INSERT 조건만 더함.
+do $$ declare original text; begin
+  select pg_get_expr(polwithcheck,polrelid) into original from pg_policy where polrelid='storage.objects'::regclass and polname='employee_hub_storage_access_gate';
+  if original is null then raise exception 'storage employee access gate required'; end if;
+  insert into public.suggestion_asks_20261006_restore values('storage_check',original) on conflict do nothing;
+  select definition into original from public.suggestion_asks_20261006_restore where name='storage_check';
+  execute 'alter policy employee_hub_storage_access_gate on storage.objects with check (('||original||') or (bucket_id=''hr-docs'' and split_part(name,''/'',1)=auth.uid()::text and public.onboarding_self_access_allowed()))';
+end $$;
+
+create or replace function public.pending_onboarding_info()
+returns jsonb language plpgsql security definer set search_path=public as $$
+begin
+  if not public.onboarding_self_access_allowed() then raise exception 'active onboarding profile required'; end if;
+  return jsonb_build_object(
+    'items',coalesce((select jsonb_agg(jsonb_build_object('label',label) order by order_no) from public.onboarding_items where active),'[]'::jsonb),
+    'docs',coalesce((select jsonb_agg(jsonb_build_object('original_name',original_name,'document_type',document_type,'checked_at',checked_at) order by created_at desc) from public.employee_documents where user_id=auth.uid()),'[]'::jsonb),
+    'fingerprint',(select to_jsonb(f) from public.fingerprint_registration_requests f where f.user_id=auth.uid()),
+    'texts',coalesce((select jsonb_agg(jsonb_build_object('key',key,'value',value)) from public.hub_ui_texts where key like 'onbo.guide.%' or key like 'onbo.check.%' or key like 'onbo.docs.%' or key like 'pending.onbo.%'),'[]'::jsonb)
+  );
+end $$;
+
+create or replace function public.pending_report_fingerprint()
+returns text language plpgsql security definer set search_path=public as $$
+declare result text;
+begin
+  if not public.onboarding_self_access_allowed() then raise exception 'active onboarding profile required'; end if;
+  insert into public.fingerprint_registration_requests(user_id,status) values(auth.uid(),'요청') on conflict(user_id) do nothing;
+  select status into result from public.fingerprint_registration_requests where user_id=auth.uid();
+  return result;
+end $$;
+
+create or replace function public.pending_add_document(p_storage_path text,p_original_name text,p_document_type text)
+returns bigint language plpgsql security definer set search_path=public as $$
+declare object_row storage.objects%rowtype; result bigint;
+begin
+  if not public.onboarding_self_access_allowed() or split_part(p_storage_path,'/',1) is distinct from auth.uid()::text or nullif(trim(p_original_name),'') is null or nullif(trim(p_document_type),'') is null then raise exception 'own document required'; end if;
+  select * into object_row from storage.objects where bucket_id='hr-docs' and name=p_storage_path;
+  if not found then raise exception 'uploaded document not found'; end if;
+  if coalesce(object_row.metadata->>'size','') !~ '^[0-9]+$' or (object_row.metadata->>'size')::bigint not between 1 and 10485760 then raise exception 'invalid document size'; end if;
+  insert into public.employee_documents(user_id,uploaded_by,document_type,original_name,storage_path,mime_type,size_bytes)
+    values(auth.uid(),auth.uid(),p_document_type,p_original_name,p_storage_path,object_row.metadata->>'mimetype',(object_row.metadata->>'size')::bigint)
+    on conflict(storage_path) do nothing returning id into result;
+  if result is null then select id into result from public.employee_documents where storage_path=p_storage_path and user_id=auth.uid(); end if;
+  return result;
+end $$;
+revoke all on function public.pending_onboarding_info(),public.pending_report_fingerprint(),public.pending_add_document(text,text,text) from public,anon,authenticated;
+grant execute on function public.pending_onboarding_info(),public.pending_report_fingerprint(),public.pending_add_document(text,text,text) to authenticated;
 commit;

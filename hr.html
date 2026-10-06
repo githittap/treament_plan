@@ -242,6 +242,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
   #aiBillingMonthly input{max-width:100%;min-width:0!important;box-sizing:border-box}
 }
 .manual-week-table{min-width:1280px}.manual-week-table input:not([type=checkbox]),.manual-week-table select{width:105px;max-width:105px}.manual-week-table tr.week-error{background:rgba(220,70,60,.18);outline:1px solid var(--red)}
+#pendingGate{overflow-y:auto;align-items:flex-start!important}#pendingGate>div{margin:auto}#pendingGate .card{min-width:0}#pendingGate input{max-width:100%}
 </style>
 </head>
 <body>
@@ -285,10 +286,11 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 </div>
 
 <div id="pendingGate" style="display:none;position:fixed;inset:0;background:var(--bg,#0d1715);align-items:center;justify-content:center;z-index:99">
-  <div style="max-width:360px;text-align:center;padding:24px">
+  <div style="width:min(720px,100%);text-align:center;padding:24px">
     <div style="font-size:30px">⏳</div>
     <h1 style="font-size:19px;margin:6px 0 8px">승인 대기 중입니다</h1>
     <p style="font-size:13px;color:var(--gray,#8fa5a0)">가입 확인 후 원장님이 승인하면 자동으로 사용할 수 있습니다. 승인되면 새로고침해 주세요.</p>
+    <div id="pendingOnboarding" style="text-align:left;margin-top:16px"></div>
     <div id="pendingMsg" style="display:none;margin-top:10px;padding:9px 11px;border-radius:8px;border:1px solid rgba(220,120,90,.55);background:rgba(220,120,90,.16);font-size:12.5px;line-height:1.5;text-align:left"></div>
     <button class="hbtn" style="margin-top:14px" onclick="location.reload()">새로고침</button>
     <button class="hbtn" style="margin-top:8px" onclick="sb.auth.signOut().then(()=>location.reload())">로그아웃</button>
@@ -1954,6 +1956,29 @@ async function submitManualWeek(){
  try{const dates=rows.map(r=>r.args.p_work_date).sort(),fp=await sb.from('attendance').select('work_date').eq('user_id',ME.id).eq('source','fp').gte('work_date',dates[0]).lte('work_date',dates.at(-1));if(fp.error)throw fp.error;rows.forEach(r=>{r.fingerprint=r.fingerprint||(fp.data||[]).some(f=>f.work_date===r.args.p_work_date);const error=manualWeekValidate(r.args);r.el.classList.toggle('week-error',!!error&&!r.fingerprint);const cell=r.el.querySelector('[data-week-status]');if(cell)cell.textContent=r.fingerprint?hubT('att.week.locked','지문 기록 있음 · 입력 안 함'):error;});const result=await saveManualWeekRows(rows);result.forEach(r=>{r.el.classList.toggle('week-error',r.status==='error');const cell=r.el.querySelector('[data-week-status]');if(cell)cell.textContent=r.status==='saved'?hubT('att.manual.m_ok','제출했습니다. 승인 대기 중입니다.'):r.error;if(r.status==='saved')r.el.querySelector('[data-week-select]').checked=false;});$('#manualWeekMsg').textContent=hubT('att.week.result','저장 {saved}일 · 오류 {failed}일',{saved:result.filter(r=>r.status==='saved').length,failed:result.filter(r=>r.status==='error').length});}
  catch(error){$('#manualWeekMsg').textContent=hubT('att.manual.m_fail','실패: {msg}',{msg:error.message});}
  finally{MANUAL_WEEK_BUSY=false;button.disabled=false;$('#manualWeekDate').disabled=false;}
+}
+let PENDING_ONBO_BUSY=false;
+function pendingOnboardingHtml(items,docs,fingerprint){
+ const common=[['pending.onbo.bank','은행·계좌번호'],['pending.onbo.notion','Notion 가입·앱 설치·로그인'],['pending.onbo.tb','잠복결핵 검사서'],['pending.onbo.license','자격증'],['pending.onbo.security','보안서약서']];
+ return `${onboardingGuideCard()}<div class="card"><h2>${esc(hubT('onbo.check.title','✅ 공통 입사 체크리스트'))}</h2><ul>${common.map(([key,label])=>`<li>${esc(hubT(key,label))}</li>`).join('')}${(items||[]).map(r=>`<li>${esc(r.label)}</li>`).join('')}</ul><div class="hint">${esc(hubT('pending.onbo.hint','승인 전에는 본인 서류 올리기와 지문 등록 보고만 할 수 있습니다. 나머지 제출은 승인 후 완료하세요.'))}</div><h3>${esc(hubT('pending.onbo.fp','지문 등록'))}</h3>${fingerprint?`<div>${esc(fingerprint.status)}</div>`:`<button id="pendingFpSave" class="hbtn" onclick="pendingReportFingerprint()">${esc(hubT('pending.onbo.report','지문 등록 완료 보고'))}</button>`}<h3>${esc(hubT('pending.onbo.docs','본인 서류 올리기'))}</h3><ul>${(docs||[]).map(d=>`<li>${esc(d.original_name)} · ${esc(d.document_type)}</li>`).join('')}</ul><div class="fld"><label>${esc(hubT('onbo.docs.f_type','서류 종류'))}</label><input id="pendingDocType" value="${esc(hubT('pending.onbo.default_type','입사 서류'))}"></div><div class="fld"><label>${esc(hubT('onbo.docs.f_file','파일'))}</label><input type="file" id="pendingDocFile"></div><button id="pendingDocSave" class="hbtn pri" onclick="pendingUploadDocument()">${esc(hubT('pending.onbo.upload','서류 올리기'))}</button><div id="pendingOnboMsg" class="msg"></div></div>`;
+}
+async function loadPendingOnboarding(){
+ const box=$('#pendingOnboarding');if(!box)return;
+ try{const result=await sb.rpc('pending_onboarding_info');if(result.error)throw result.error;const data=result.data;if(!data)throw new Error(hubT('pending.onbo.no_data','입사 안내를 불러오지 못했습니다.'));if(typeof HubUi!=='undefined'&&typeof HubUi.setPendingTexts==='function')HubUi.setPendingTexts(data.texts||[]);box.innerHTML=pendingOnboardingHtml(data.items||[],data.docs||[],data.fingerprint);}
+ catch(error){box.innerHTML=`<div class="cal-error">${esc(hubT('pending.onbo.error','입사 안내 조회 실패: {msg}',{msg:error.message}))}</div>`;}
+}
+async function pendingReportFingerprint(){
+ if(PENDING_ONBO_BUSY)return;PENDING_ONBO_BUSY=true;const button=$('#pendingFpSave');if(button)button.disabled=true;
+ try{const result=await sb.rpc('pending_report_fingerprint');if(result.error)throw result.error;await loadPendingOnboarding();}
+ catch(error){$('#pendingOnboMsg').textContent=hubT('pending.onbo.error','입사 안내 조회 실패: {msg}',{msg:error.message});}
+ finally{PENDING_ONBO_BUSY=false;if(button)button.disabled=false;}
+}
+async function pendingUploadDocument(){
+ if(PENDING_ONBO_BUSY)return;const file=$('#pendingDocFile')?.files?.[0],type=$('#pendingDocType')?.value.trim(),msg=$('#pendingOnboMsg'),problem=validateEmployeeDocument(file,type);if(problem||!type){msg.textContent=problem||hubT('pending.onbo.type_required','서류 종류를 적어 주세요.');return;}
+ PENDING_ONBO_BUSY=true;const button=$('#pendingDocSave');button.disabled=true;
+ try{const path=`${ME.id}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`,upload=await sb.storage.from('hr-docs').upload(path,file,{contentType:file.type,upsert:false});if(upload.error)throw upload.error;const added=await sb.rpc('pending_add_document',{p_storage_path:path,p_original_name:file.name,p_document_type:type});if(added.error)throw added.error;if(!added.data)throw new Error(hubT('pending.onbo.no_data','입사 안내를 불러오지 못했습니다.'));await loadPendingOnboarding();}
+ catch(error){msg.textContent=hubT('pending.onbo.upload_error','서류 저장 실패: {msg}',{msg:error.message});}
+ finally{PENDING_ONBO_BUSY=false;button.disabled=false;}
 }
 /* suggestion-six:end */
 async function renderLeave(m){
@@ -4853,6 +4878,7 @@ function validatePasswordReset(newPassword,confirmPassword){
 let _inited=false,_initPromise=null,_stepsClickBound=false,recoveryInProgress=false,passwordRecoveryMode=typeof location!=='undefined'&&location.hash.includes('type=recovery');
 function showPendingGate(message){ // 승인 대기 화면. 프로필 저장이 실패했으면 그 사실을 화면에 남긴다(조용히 넘기지 않는다)
   $('#gate').style.display='none';$('#app').style.display='none';$('#pendingGate').style.display='flex';
+  void loadPendingOnboarding();
   const box=$('#pendingMsg');if(!box)return;
   if(message){box.textContent='⚠️ 프로필을 저장하지 못했습니다: '+message+' · 원장님께 알려 주세요.';box.style.display='';}
   else{box.textContent='';box.style.display='none';}
