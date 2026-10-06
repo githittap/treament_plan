@@ -98,7 +98,7 @@ test('숫자: 만료 알림 일수 하나(정수 목록) · 다른 숫자 18개�
   assert.ok(d.where.includes('가장 작은 수=긴급')&&d.where.includes('이미 저장된 계약서는 안 바뀌어요'));
   assert.match(hr,/typeof hubContractExpiryDays==='function'\?hubContractExpiryDays\(\):\[14,30,60\]/,'화면은 허브 설정 일수를 읽고 엔진이 없으면 14·30·60');
   assert.match(hr,/hub-texts\.js\?v=202610\d{4}/,'캐시 번호를 새 값으로 올림(차례 5에서 2026100111 → 2026100112, 차례 7에서 → 2026100113, 10-02 원장요청 5건에서 → 2026100221, 10-02 인박스 판에서 → 2026100223)');
-  assert.ok(!/hub-texts\.js\?v=202610\d{4}/.test(hr));
+  assert.ok(!/hub-texts\.js\?v=2026100111/.test(hr));
   // 화면에만 있던 숫자라 옮김 — DB 함수·크론·Edge에 같은 일수가 있으면 안 옮겼어야 함
   const files=[];
   for(const f of fs.readdirSync(path.join(root,'db')))if(f.endsWith('.sql'))files.push('db/'+f);

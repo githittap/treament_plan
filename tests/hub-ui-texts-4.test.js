@@ -109,7 +109,7 @@ test('숫자·목록 기본값: 결재 건수 2개와 결재 종류·일정 종�
   assert.equal(L('list.approval_kinds').addable,false);assert.equal(L('list.calendar_kinds').addable,false);
   assert.match(hr,/hub-texts\.js\?v=202610\d{4}/,'캐시 번호를 새 값으로 올림(차례 5에서 2026100110 → 2026100111, 차례 6에서 → 2026100112, 차례 7에서 → 2026100113, 10-02 원장요청 5건에서 → 2026100221, 10-02 인박스 판에서 → 2026100223)');
   // 이전 차례들이 쓰는 캐시 기대값이 남지 않음
-  assert.ok(!/hub-texts\.js\?v=202610\d{4}/.test(hr));
+  assert.ok(!/hub-texts\.js\?v=2026100109/.test(hr));
 });
 
 /* ───────────── 2. 기본값만 있을 때 옛 화면과 똑같음 ───────────── */
