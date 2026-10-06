@@ -39,7 +39,7 @@ function leave(){if(!entered)return;record('leave','hub',null,{duration_seconds:
 function resume(){if(!enabled()||entered)return;entered=Date.now();record('enter','hub');}
 function tab(key){if(key&&key!==lastTab){lastTab=key;record('tab',key);}}
 const MUTATIONS=new Set(['insert','update','delete','upsert']);
-const VIEWS=new Set(['suggestions','suggestion_comments','approval_docs','employee_documents','leave_application_documents','contracts','consultation_journals']);
+const VIEWS=new Set(['suggestions','suggestion_comments','approval_docs','employee_documents','leave_requests','leave_application_documents','employment_certificates','contracts','consultation_journals']);
 const SKIP=new Set(['hub_activity_log','notice_reads','consultation_inbox_views']);
 function succeeded(result){return !!result&&!result.error&&!(result.data&&result.data.ok===false);}
 function observeBuilder(builder,target,info){
@@ -66,7 +66,7 @@ function instrument(sb){
   if(name==='log_hub_activity'||name==='consultation_inbox_record_view'||!/^(save_|submit_|create_|update_|delete_|remove_|cancel_|approve_|reject_|confirm_|record_|mark_|set_|sign_|grant_|revoke_|apply_|review_|issue_|process_|request_|replace_|respond_|register_|prepare_|copy_|disable_|attendance_issue_add_|payment_request_(act|add)|payroll_(move|archive|restore)|consultation_inbox_(convert|record|reply|set)|fortune_(draw|mark|save))/.test(name))return request;
   return Promise.resolve(request).then(result=>{if(succeeded(result)){const data=Array.isArray(result.data)?result.data[0]:result.data,id=safeId(data&&typeof data==='object'?data.id||data.doc_id||data.request_id:data)||safeId(args&&Object.entries(args).find(([k])=>/^p_(id|.*_id)$/.test(k))?.[1]);record('write',name,id,{action:'rpc'});}return result;});
  };
- if(sb.storage&&sb.storage.from){const storageFrom=sb.storage.from.bind(sb.storage);sb.storage.from=function(bucket){const storage=storageFrom(bucket);return new Proxy(storage,{get(obj,key){const fn=Reflect.get(obj,key,obj);if(typeof fn!=='function')return fn;if(key!=='download')return fn.bind(obj);return (...args)=>Promise.resolve(fn.apply(obj,args)).then(result=>{if(succeeded(result))record('download','storage:'+bucket);return result;});}});};}
+ if(sb.storage&&sb.storage.from){const storageFrom=sb.storage.from.bind(sb.storage);sb.storage.from=function(bucket){const storage=storageFrom(bucket);return new Proxy(storage,{get(obj,key){const fn=Reflect.get(obj,key,obj);if(typeof fn!=='function')return fn;if(key!=='download'&&key!=='createSignedUrl')return fn.bind(obj);return (...args)=>Promise.resolve(fn.apply(obj,args)).then(result=>{if(succeeded(result))record(key==='download'||args[2]?.download?'download':'view','storage:'+bucket);return result;});}});};}
  sb.__hubActivityObserved=true;
 }
 function start(options){

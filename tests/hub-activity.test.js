@@ -65,3 +65,8 @@ test('연차 처리·문의 처리·서류 RPC 성공이 종류·ID만 기록됨
 test('직접 수정할 수 없는 DB 객체라도 수집 때문에 시작이 실패하지 않음',()=>{
  const sb=Object.freeze({from(){return {};},rpc:async()=>({})}),h=load().HubActivity;assert.doesNotThrow(()=>h.start({sb,me:{id:'s',role:'staff'},document:null}));assert.equal(h._t.pending(),1);
 });
+test('서명 URL 내려받기도 파일 이름·주소 없이 기록',async()=>{
+ const calls=[],sb={from:()=>({}),rpc:async(n,p)=>{calls.push(p);return {};},storage:{from:()=>({createSignedUrl:async()=>({data:{signedUrl:'SECRET-url'},error:null})})}};
+ const h=load().HubActivity;h.start({sb,me:{id:'s',role:'staff'},document:null});await sb.storage.from('notice-attachments').createSignedUrl('SECRET-path',60,{download:'SECRET-name'});await h.flush();
+ const events=calls.flatMap(p=>p.p_events);assert.ok(events.some(e=>e.kind==='download'&&e.target==='storage:notice-attachments'));assert.ok(!JSON.stringify(events).includes('SECRET'));
+});
