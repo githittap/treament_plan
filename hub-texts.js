@@ -1868,6 +1868,8 @@ function hubTextDefs(){
   hubTextDefsChapter5(add);
   hubTextDefsChapter6(add);
   hubTextDefsChapter7(add);
+  [["title", "수기 출퇴근 · 한 주 입력"], ["pick", "입력할 주"], ["hint", "저장할 날을 체크하세요. 지문 기록이 있는 날은 표시만 하고 덮어쓰지 않습니다."], ["partial", "빨간 줄은 저장하지 않습니다. 나머지 유효한 날만 저장할까요?"], ["reason", "정정·예외 사유를 적어 주세요."], ["unknown", "저장 결과를 확인하지 못했습니다."], ["save", "선택한 날 저장"], ["locked", "지문 기록 있음 · 입력 안 함"], ["none", "저장할 날을 체크하세요."], ["result", "저장 {saved}일 · 오류 {failed}일"], ["th_select", "저장"], ["th_date", "날짜·요일"], ["th_in", "출근"], ["th_out", "퇴근"], ["th_late", "지각(분)"], ["th_early", "조퇴(분)"], ["th_lunch", "점심 연장"], ["th_clockout", "퇴근 연장"], ["th_evening", "저녁 연장"], ["th_half", "반차"], ["th_required", "정정·예외"], ["th_reason", "사유"], ["th_note", "비고"], ["th_status", "상태"], ["day0", "일"], ["day1", "월"], ["day2", "화"], ["day3", "수"], ["day4", "목"], ["day5", "금"], ["day6", "토"], ["half0", "없음"], ["half1", "오전 반차"], ["half2", "오후 반차"]].forEach(([key,text])=>add('att.week.'+key,'🕘 주간 출퇴근',text,text,key==='result'?['saved','failed']:[]));
+
   [['used','사용'],['pending','신청 중'],['unit','일']].forEach(([key,text])=>add('leave.my.'+key,'🌿 내 연차',text,text));
   [['cancel','취소 요청'],['half','반차로 바꾸기 요청'],['title','연차 취소·변경 요청'],['reason','취소·변경 사유를 적어 주세요. (필수)'],['time','반차 시간 범위 (예: 09:00~13:00)'],['confirm','연차 변경 요청을 처리할까요?']].forEach(([key,text])=>add('leave.change.'+key,'🌿 연차 변경',text,text));
   hubTextDefsTime(add);
