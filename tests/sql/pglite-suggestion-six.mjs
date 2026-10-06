@@ -42,6 +42,7 @@ async function setup(){
  grant select on employee_documents to authenticated;
  create table fingerprint_registration_requests(user_id uuid primary key,status text default '요청',requested_at timestamptz default now(),manager_id uuid,approved_at timestamptz);
  create table hub_ui_texts(key text,value text);
+ create table app_settings(key text primary key,value text);
  insert into onboarding_items values('지문 등록 보고',1,true),('공통 서류 제출',2,true);
  insert into hub_ui_texts values('pending.onbo.hint','대기 안내 수정됨'),('owner.secret','원장 전용 글');
  insert into employee_documents(user_id,uploaded_by,document_type,original_name,storage_path) values('${uid(2)}','${uid(2)}','서류','남의 서류.pdf','${uid(2)}/others.pdf');
@@ -77,6 +78,11 @@ try{
  await db.exec('reset role');assert.equal((await db.query('select status from leave_requests where id=4')).rows[0].status,'승인');checks++;
  assert.equal((await db.query("select count(*)::int n from push_events where event_type='leave_submitted'")).rows[0].n,6);checks++;
  assert.equal((await db.query("select count(*)::int n from push_events where event_type='leave_status_changed'")).rows[0].n,3);checks++;
+ await db.exec("insert into app_settings values('leave.half_day_value','0.7')");
+ await as(db,1);const configured=(await db.query("select request_leave_change(4,'half','설정 반차','09:00~13:00') id")).rows[0].id;
+ await fails(db,"insert into leave_change_requests(request_id,user_id,action,reason) values(4,auth.uid(),'cancel','직접쓰기')",/permission denied/);checks++;
+ await as(db,3);await db.query(`select * from process_leave_change(${configured},'approve')`);await db.exec('reset role');
+ assert.equal(Number((await db.query('select days from leave_requests where id=4')).rows[0].days),0.7);checks++;
  await as(db,5);
  assert.equal((await db.query('select employee_hub_access_allowed() allowed')).rows[0].allowed,false);checks++;
  const info=(await db.query('select pending_onboarding_info() info')).rows[0].info;assert.equal(info.items.length,2);assert.equal(info.docs.length,0);assert.equal(info.texts.length,1);checks++;
@@ -92,5 +98,8 @@ try{
  await db.exec('reset role');
  await assert.rejects(db.exec(rollback),/history exists/);await db.exec('rollback');checks++;
 }finally{await db.close();}
-const empty=await setup();try{await empty.exec(migration);await empty.exec(rollback);assert.equal((await empty.query("select to_regclass('public.leave_change_requests') t")).rows[0].t,null);checks++;}finally{await empty.close();}
+const empty=await setup();try{await empty.exec(migration);await empty.exec(rollback);assert.equal((await empty.query("select to_regclass('public.leave_change_requests') t")).rows[0].t,null);checks++;
+ await assert.rejects(empty.exec("insert into approval_docs values(1,'물품구매')"),/check constraint/);await as(empty,5);await fails(empty,`insert into storage.objects(name,bucket_id,metadata) values('${uid(5)}/proof.pdf','hr-docs','{}')`,/row-level security/);checks++;
+}finally{await empty.close();}
+const purchase=await setup();try{await purchase.exec(migration);await purchase.exec("insert into approval_docs values(1,'물품구매')");await assert.rejects(purchase.exec(rollback),/purchase history exists/);await purchase.exec('rollback');assert.equal((await purchase.query('select count(*)::int n from approval_docs')).rows[0].n,1);checks++;}finally{await purchase.close();}
 console.log(`PGLITE_SUGGESTION_SIX_PASS ${checks} checks`);

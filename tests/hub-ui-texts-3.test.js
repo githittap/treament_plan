@@ -7,9 +7,14 @@ const js=read('hub-texts.js'),hrRaw=read('hr.html'),hr=hrRaw.replace(/\r\n/g,'\n
 const {renderAll,tablesFor}=require('./fixtures/hub3-harness.cjs');
 const golden={...JSON.parse(read('tests/fixtures/hub3-golden-84053a7.json')),...JSON.parse(read('tests/fixtures/p7-leave-golden.json'))}; // P7가 정한 연차 원장 카드만 새 기준, 그 밖은 옛 기준 유지
 const clone=x=>JSON.parse(JSON.stringify(x));
-const CH3=/^(att|sched|leave)\./;
+const CH3=/^(?!(?:att\.(?:week|staff_month)\.|leave\.(?:change\.|my\.(?:used|pending|unit)$)))(att|sched|leave)\./;
 // P7에서 허용된 시간 입력 연결 속성과 숨긴 모바일 입력만 제외해 PC의 기존 글·배치를 계속 대조한다.
 function attendanceLegacyLayout(value){return String(value)
+  .replace(/<button class="mini(?: rej)?" onclick="requestLeaveChange\(\d+,'(?:cancel|half)'\)">[^<]*<\/button>\s?/g,'')
+  .replace(/\n    <div class="card" id="manualWeekCard">[\s\S]*?<div id="manualWeekMsg" class="msg"><\/div><\/div>/g,'')
+  .replace(/<div id="staffAttMonthContainer"><\/div>/g,'')
+  .replace(/<div class="rowflex"><div class="stat"><div class="sub">사용<\/div>[\s\S]*?(?=<div class="stat"><div class="sub">잔여<\/div>)/g,'<div class="rowflex">')
+  .replace(/<\/div><div class="card"><h2>연차 취소·변경 요청<\/h2>[\s\S]*?<\/div><\/div>(?=<div class="card">|$)/g,'</div>')
   .replace(/    <div class="card"><h2>📊 직원별 월 근태 요약<\/h2>[\s\S]*?(?=    <div class="card"><h2>📝 수기 출퇴근 입력)/g,'') // 뒤에 추가된 월 근태 요약은 별도 시험에서 확인함
   .replace(/\n    \n(?=    <div class="card"><h2>📝 수기 출퇴근 입력)/g,'\n') // 시급제 카드가 없는 역할에서 생기는 빈 줄만 제외함
   .replace(/ class="rowflex manual-clock-desktop"/g,' class="rowflex"')
@@ -436,7 +441,7 @@ test('화면: 📋 목록에 연차 유형 이름·근무부서 이름이 있고
   await t.click('[hub-subtab]=lists');
   let sec=t.section.innerHTML;
   assert.ok(sec.includes('연차 유형 이름')&&sec.includes('근무부서 이름'));
-  assert.equal((sec.match(/<span class="hub-code">/g)||[]).length,5+4+6+3+4+4+7+6+3+8+7+6+5+32+3,'차례 4: 결재 종류 6 · 일정 종류 3 추가 + 차례 5: 문의 출처 8 · 문의 상태 7 · 상담 구분 6 · 상담 상태 5 + B2 소명 종류 3');
+  assert.equal((sec.match(/<span class="hub-code">/g)||[]).length,5+4+6+3+4+4+7+7+3+8+7+6+5+32+3,'차례 4: 결재 종류 6 · 일정 종류 3 추가 + 차례 5: 문의 출처 8 · 문의 상태 7 · 상담 구분 6 · 상담 상태 5 + B2 소명 종류 3');
   assert.equal((sec.match(/data-hub-list-add=/g)||[]).length,2,'새 항목을 늘릴 수 있는 목록은 직원 부서·서류 종류뿐');
   assert.match(sec,/<span class="hub-code">반차<\/span><input id="hubLstLbl_4_1" type="text" maxlength="20" value="반차"/);
   assert.match(sec,/<span class="hub-code">Dr\.<\/span><input id="hubLstLbl_5_0" type="text" maxlength="20" value="Dr\."/);

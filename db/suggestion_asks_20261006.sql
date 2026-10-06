@@ -45,7 +45,7 @@ end $$;
 
 create or replace function public.process_leave_change(p_id bigint,p_action text)
 returns table(change_id bigint,status text) language plpgsql security definer set search_path=public as $$
-declare c public.leave_change_requests%rowtype; r public.leave_requests%rowtype; role_name text; restored numeric;
+declare c public.leave_change_requests%rowtype; r public.leave_requests%rowtype; role_name text; restored numeric; half_days numeric:=0.5; half_setting text;
 begin
   role_name:=coalesce(public.my_role(),'');
   if not public.employee_hub_access_allowed() or role_name not in ('chief','owner') or p_action is null or p_action not in ('approve','reject') or (p_action='approve' and role_name<>'chief') then raise exception 'chief approval or lead rejection required'; end if;
@@ -55,11 +55,16 @@ begin
     select * into r from public.leave_requests where id=c.request_id for update;
     if not found or r.status<>'승인' or r.date_from<(now() at time zone 'Asia/Seoul')::date or (c.action='half' and r.type<>'연차') then raise exception 'original leave changed or date passed'; end if;
     perform pg_advisory_xact_lock(hashtextextended(r.user_id::text,0));
-    restored:=case when c.action='cancel' then r.days else r.days/2 end;
+    select value into half_setting from public.app_settings where key='leave.half_day_value';
+    if coalesce(half_setting,'') ~ '^[0-9]+(\.[0-9]+)?$' and length(half_setting)<20 then
+      if half_setting::numeric between 0.1 and 1 and mod(half_setting::numeric,0.1)=0 then half_days:=half_setting::numeric; end if;
+    end if;
+    if c.action='half' and r.days<half_days then raise exception 'original leave shorter than half-day value'; end if;
+    restored:=case when c.action='cancel' then r.days else r.days-half_days end;
     if c.action='cancel' then
       update public.leave_requests set status='취소',cancelled_by=(select name from public.profiles where user_id=auth.uid()),cancelled_at=now() where id=r.id;
     else
-      update public.leave_requests set type='반차',type_note=c.type_note,days=r.days/2 where id=r.id;
+      update public.leave_requests set type='반차',type_note=c.type_note,days=half_days where id=r.id;
     end if;
     insert into public.leave_ledger(user_id,kind,days,ref,note) values(r.user_id,'조정',restored,r.id,format('승인취소 복구: 변경요청 %s (%s)',c.id,c.action));
   end if;

@@ -241,8 +241,10 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
   #aiBillingMonthly td{border:0;padding:4px 0}
   #aiBillingMonthly input{max-width:100%;min-width:0!important;box-sizing:border-box}
 }
-.manual-week-table{min-width:1280px}.manual-week-table input:not([type=checkbox]),.manual-week-table select{width:105px;max-width:105px}.manual-week-table tr.week-error{background:rgba(220,70,60,.18);outline:1px solid var(--red)}
+.manual-week-table{min-width:1280px}.manual-week-table td:nth-child(2),.manual-week-table th:nth-child(2){min-width:112px;white-space:nowrap}.manual-week-table input:not([type=checkbox]),.manual-week-table select{width:105px;max-width:105px}.manual-week-table tr.week-error{background:rgba(220,70,60,.18);outline:1px solid var(--red)}
 #pendingGate{overflow-y:auto;align-items:flex-start!important}#pendingGate>div{margin:auto}#pendingGate .card{min-width:0}#pendingGate input{max-width:100%}
+.staff-month-table{min-width:900px}.staff-month-table td{white-space:nowrap}.staff-month-table td:nth-child(10){white-space:normal;min-width:100px}
+@media print{body.staff-att-printing,body.staff-att-printing #app,body.staff-att-printing .card{background:white!important;color:#111!important}body.staff-att-printing .staff-month-table th,body.staff-att-printing .staff-month-table td{color:#111!important;border-color:#ccc!important;break-inside:avoid}body.staff-att-printing> *{display:none!important}body.staff-att-printing>#app,body.staff-att-printing #app main{display:block!important}body.staff-att-printing header,body.staff-att-printing footer,body.staff-att-printing #main> *:not(#staffAttMonthContainer),body.staff-att-printing .staff-month-actions{display:none!important}body.staff-att-printing #staffAttMonthCard{border:0;padding:0}body.staff-att-printing .tblwrap{overflow:visible!important;max-height:none!important;height:auto!important}body.staff-att-printing .staff-month-table{min-width:0;width:100%;font-size:10px}body.staff-att-printing .staff-month-table td{white-space:normal;min-width:0!important}body.staff-att-printing main{max-width:none!important;padding:0}}
 </style>
 </head>
 <body>
@@ -995,6 +997,8 @@ async function refreshBadges(propagateAttendanceError=false){
     BADGE.appr=(st||[]).length||0;
     const {data:lv}=await sb.from('leave_requests').select('id,status');
     BADGE.leave=(lv||[]).filter(r=>r.status==='대기'||r.status==='1차승인').length||0;
+    const {data:leaveChanges}=await sb.from('leave_change_requests').select('id').eq('status','대기');
+    BADGE.leave+=(leaveChanges||[]).length;
   }
   // 내 미제출 온보딩
   const {data:oi}=await sb.from('onboarding_items').select('id').eq('active',true);
@@ -1429,9 +1433,10 @@ async function renderAtt(m){
       ${(manualRows||[]).length?`<div class="hint">${esc(hubT('att.my.manual_list','수기 제출 내역:'))} ${manualRows.map(r=>`${md(r.work_date)} ${esc(r.status)}`).join(' · ')}</div>`:''}
       <div class="hint">${esc(hubT('att.my.fix_a','기록이 실제와 다르면 관리자에게'))} <b>${esc(hubT('att.my.fix_b','지문누락 소명'))}</b>${esc(hubT('att.my.fix_c','을 요청하세요.'))}
         <button class="mini" onclick="openIssue()">${esc(hubT('att.my.fix_btn','소명 올리기'))}</button></div>
-    </div>${attendanceIssueMyCardHtml(myIssueRows||[],await fetchStaffAttDiff())}`;
+    </div><div id="staffAttMonthContainer"></div>${attendanceIssueMyCardHtml(myIssueRows||[],await fetchStaffAttDiff())}`;
   }
   if(typeof wageHourlyCorrectionPanel==='function'&&['owner','chief'].includes(ME.role)){const hourlyCorrection=await wageHourlyCorrectionPanel();if(hourlyCorrection)m.insertAdjacentHTML('beforeend',hourlyCorrection);}
+  if(ME.role!=='owner')await loadStaffAttendanceMonth(STAFF_ATT_MONTH||today().slice(0,7));
   await loadManualWeek(today());
   renderManualAttendanceCalendar();
   await loadManualAttendanceDate($('#manualWorkDate')?.value||today());
@@ -1904,7 +1909,7 @@ function leaveChangeButtons(r){
   return `<button class="mini rej" onclick="requestLeaveChange(${r.id},'cancel')">${esc(hubT('leave.change.cancel','취소 요청'))}</button>`+(r.type==='연차'?` <button class="mini" onclick="requestLeaveChange(${r.id},'half')">${esc(hubT('leave.change.half','반차로 바꾸기 요청'))}</button>`:'');
 }
 function leaveChangeCards(rows){
-  return `<div class="card"><h2>${esc(hubT('leave.change.title','연차 취소·변경 요청'))}</h2>${(rows||[]).map(r=>`<div class="hint"><b>${esc(r.action==='cancel'?hubT('leave.change.cancel','취소 요청'):hubT('leave.change.half','반차로 바꾸기 요청'))}</b> · #${r.request_id||''} · ${esc(r.status)} · ${esc(r.reason)}${r.type_note?' · '+esc(r.type_note):''}${r.status==='대기'&&['chief','owner'].includes(ME.role)?`${ME.role==='chief'?` <button class="mini stamp" onclick="processLeaveChange(${r.id},'approve')">${esc(hubT('leave.pend.btn_ok','실장 최종 승인'))}</button>`:''} <button class="mini rej" onclick="processLeaveChange(${r.id},'reject')">${esc(hubT('leave.btn.reject','반려'))}</button>`:''}</div>`).join('')||`<div class="empty">${esc(hubT('leave.pend.empty','대기 없음'))}</div>`}</div>`;
+  return `<div class="card"><h2>${esc(hubT('leave.change.title','연차 취소·변경 요청'))}</h2>${(rows||[]).map(r=>`<div class="hint"><b>${esc(r.action==='cancel'?hubT('leave.change.cancel','취소 요청'):hubT('leave.change.half','반차로 바꾸기 요청'))}</b> · #${r.request_id||''} · ${esc(r.status)} · ${typeof nameOf==='function'?esc(nameOf(r.user_id))+' · ':''}${esc(r.reason)}${r.type_note?' · '+esc(r.type_note):''}${r.status==='대기'&&['chief','owner'].includes(ME.role)?`${ME.role==='chief'?` <button class="mini stamp" onclick="processLeaveChange(${r.id},'approve')">${esc(hubT('leave.pend.btn_ok','실장 최종 승인'))}</button>`:''} <button class="mini rej" onclick="processLeaveChange(${r.id},'reject')">${esc(hubT('leave.btn.reject','반려'))}</button>`:''}</div>`).join('')||`<div class="empty">${esc(hubT('leave.pend.empty','대기 없음'))}</div>`}</div>`;
 }
 const LEAVE_CHANGE_BUSY=new Set();
 async function requestLeaveChange(id,action){
@@ -1921,7 +1926,7 @@ async function processLeaveChange(id,action){
   catch(error){alert(hubT('leave.m_act_fail','처리 실패: {msg}',{msg:error.message}));}finally{LEAVE_CHANGE_BUSY.delete(id);}
 }
 function leaveThreeTotals(balance,entries,requests){return {used:leaveLedgerTotals(entries).used,pending:(requests||[]).filter(r=>['대기','1차승인'].includes(r.status)).reduce((n,r)=>n+Number(r.days),0),balance:Number(balance?.balance||0)};}
-function leaveThreeCards(t){return `<div class="rowflex">${[['used','사용'],['pending','신청 중'],['balance','잔여']].map(([k,label])=>`<div class="stat"><div class="sub">${esc(hubT('leave.my.'+k,label))}</div><div class="big">${t[k]}<span style="font-size:14px"> ${esc(hubT('leave.my.unit','일'))}</span></div></div>`).join('')}</div>`;}
+function leaveThreeCards(t){return `<div class="rowflex">${[['used','사용'],['pending','신청 중'],['balance','잔여']].map(([k,label])=>`<div class="stat"><div class="sub">${esc(k==='balance'?hubT('leave.my.balance','잔여'):k==='used'?hubT('leave.my.used','사용'):hubT('leave.my.pending','신청 중'))}</div><div class="big">${t[k]}<span style="font-size:14px"> ${esc(hubT('leave.my.unit','일'))}</span></div></div>`).join('')}</div>`;}
 let MANUAL_WEEK_BUSY=false,MANUAL_WEEK_TOKEN=0,MANUAL_WEEK_FP=new Set();
 function manualWeekDates(date){const d=new Date(date+'T12:00:00');d.setDate(d.getDate()-(d.getDay()+6)%7);return Array.from({length:7},(_,i)=>{const x=new Date(d);x.setDate(x.getDate()+i);return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;});}
 function manualWeekPayload(r){return {p_work_date:r.date,p_clock_in:r.clockIn||null,p_clock_out:r.clockOut||null,p_late_min:Number(r.late||0),p_early_min:Number(r.early||0),p_lunch_overtime_raw_text:r.lunch||'',p_lunch_overtime_min:overtimeDraftMinutes(r.lunch),p_clockout_overtime_raw_text:r.clockout||'',p_clockout_overtime_min:overtimeDraftMinutes(r.clockout),p_evening_overtime_raw_text:r.evening||'',p_evening_overtime_min:overtimeDraftMinutes(r.evening),p_reason:r.reason?.trim()||null,p_reason_required:!!r.required,p_manual_note:r.note?.trim()||null,p_half_day:r.half||'없음'};}
@@ -1934,7 +1939,7 @@ function manualWeekValidate(a){
 async function saveManualWeekRows(rows){
   const result=rows.map(r=>({...r,status:r.fingerprint?'locked':manualWeekValidate(r.args)?'error':'ready',error:r.fingerprint?'':manualWeekValidate(r.args)}));
   if(result.some(r=>r.status==='error')&&!confirm(hubT('att.week.partial','빨간 줄은 저장하지 않습니다. 나머지 유효한 날만 저장할까요?')))return result;
-  for(const r of result){if(r.status!=='ready')continue;try{const saved=await sb.rpc('submit_manual_attendance_d',r.args);if(saved.error)throw saved.error;if(!saved.data)throw new Error(hubT('att.week.unknown','저장 결과를 확인하지 못했습니다.'));r.status='saved';}catch(error){r.status='error';r.error=error.message;}}
+  for(const r of result){if(r.status!=='ready')continue;try{const saved=await sb.rpc('submit_manual_attendance_d',r.args);if(saved.error)throw saved.error;if(!saved.data)throw new Error(hubT('att.week.unknown','저장 결과를 확인하지 못했습니다.'));r.status='saved';}catch(error){r.status='error';r.error=error.message;if(result.slice(result.indexOf(r)+1).some(next=>next.status==='ready')&&!confirm(hubT('att.week.partial','빨간 줄은 저장하지 않습니다. 나머지 유효한 날만 저장할까요?')))break;}}
   return result;
 }
 function manualWeekCard(){return `<div class="card" id="manualWeekCard"><h2>${esc(hubT('att.week.title','수기 출퇴근 · 한 주 입력'))}</h2><div class="rowflex"><input id="manualWeekDate" type="date" value="${today()}" aria-label="${esc(hubT('att.week.pick','입력할 주'))}" onchange="loadManualWeek(this.value)"></div><div class="hint">${esc(hubT('att.week.hint','저장할 날을 체크하세요. 지문 기록이 있는 날은 표시만 하고 덮어쓰지 않습니다.'))}</div><div id="manualWeekRows"></div><button id="manualWeekSave" class="hbtn pri" onclick="submitManualWeek()" disabled>${esc(hubT('att.week.save','선택한 날 저장'))}</button><div id="manualWeekMsg" class="msg"></div></div>`;}
@@ -1944,7 +1949,7 @@ function manualWeekTable(dates,manuals,fingerprints){
  return `<div class="tblwrap"><table class="manual-week-table"><tr>${headings.map(([k,d])=>`<th>${esc(hubT('att.week.th_'+k,d))}</th>`).join('')}</tr>${dates.map(date=>{const fp=fingerprints.find(r=>r.work_date===date),r=manuals.find(r=>r.work_date===date)||{},half=r.half_day||'없음';return `<tr data-week-date="${date}"><td><input type="checkbox" data-week-select ${fp?'disabled':''} aria-label="${date}"></td><td>${date}<br>${esc(hubT('att.week.day'+new Date(date+'T12:00:00').getDay(),['일','월','화','수','목','금','토'][new Date(date+'T12:00:00').getDay()]))}</td>${fp?`<td>${esc(fp.clock_in||'-')}</td><td>${esc(fp.clock_out||'-')}</td><td colspan="10">${esc(hubT('att.week.locked','지문 기록 있음 · 입력 안 함'))}</td>`:`<td>${input('clockIn',String(r.clock_in||'').slice(0,5),'time')}</td><td>${input('clockOut',String(r.clock_out||'').slice(0,5),'time')}</td><td>${input('late',r.late_min||0,'number')}</td><td>${input('early',r.early_min||0,'number')}</td><td>${input('lunch',r.lunch_overtime_raw_text||'')}</td><td>${input('clockout',r.clockout_overtime_raw_text||'')}</td><td>${input('evening',r.evening_overtime_raw_text||'')}</td><td><select data-week-field="half">${['없음','오전 반차','오후 반차'].map((v,i)=>`<option value="${v}" ${half===v?'selected':''}>${esc(hubT('att.week.half'+i,v))}</option>`).join('')}</select></td><td><input type="checkbox" data-week-field="required" ${r.reason_required?'checked':''}></td><td>${input('reason',r.reason||'')}</td><td>${input('note',r.manual_note||'')}</td><td data-week-status>${esc(r.status||'')}</td>`}</tr>`;}).join('')}</table></div>`;
 }
 async function loadManualWeek(date){
- if(MANUAL_WEEK_BUSY)return;const token=++MANUAL_WEEK_TOKEN,dates=manualWeekDates(date),button=$('#manualWeekSave');if(!button)return;button.disabled=true;
+ if(MANUAL_WEEK_BUSY)return;if(!/^\d{4}-\d{2}-\d{2}$/.test(date||'')){const save=$('#manualWeekSave');if(save)save.disabled=true;const msg=$('#manualWeekMsg');if(msg)msg.textContent=hubT('att.manual.m_format','출퇴근·연장 원자료 형식 또는 정정 사유를 확인하세요.');return;}const token=++MANUAL_WEEK_TOKEN,dates=manualWeekDates(date),button=$('#manualWeekSave');if(!button)return;button.disabled=true;
  try{const [manuals,fp]=await Promise.all([fetchAttendancePages(()=>sb.from('attendance_manual_entries').select('*').eq('user_id',ME.id).gte('work_date',dates[0]).lte('work_date',dates[6]).order('created_at',{ascending:false})),fetchAttendancePages(()=>sb.from('attendance').select('work_date,clock_in,clock_out').eq('user_id',ME.id).eq('source','fp').gte('work_date',dates[0]).lte('work_date',dates[6]))]);if(token!==MANUAL_WEEK_TOKEN)return;if(manuals.error||fp.error)throw manuals.error||fp.error;MANUAL_WEEK_FP=new Set((fp.data||[]).map(r=>r.work_date));$('#manualWeekRows').innerHTML=manualWeekTable(dates,manuals.data||[],fp.data||[]);$('#manualWeekMsg').textContent='';button.disabled=false;}
  catch(error){if(token===MANUAL_WEEK_TOKEN)$('#manualWeekMsg').textContent=hubT('att.manual.m_load_fail','저장값을 불러오지 못했습니다. 날짜를 다시 선택하세요: {msg}',{msg:error.message});}
 }
@@ -1960,7 +1965,7 @@ async function submitManualWeek(){
 let PENDING_ONBO_BUSY=false;
 function pendingOnboardingHtml(items,docs,fingerprint){
  const common=[['pending.onbo.bank','은행·계좌번호'],['pending.onbo.notion','Notion 가입·앱 설치·로그인'],['pending.onbo.tb','잠복결핵 검사서'],['pending.onbo.license','자격증'],['pending.onbo.security','보안서약서']];
- return `${onboardingGuideCard()}<div class="card"><h2>${esc(hubT('onbo.check.title','✅ 공통 입사 체크리스트'))}</h2><ul>${common.map(([key,label])=>`<li>${esc(hubT(key,label))}</li>`).join('')}${(items||[]).map(r=>`<li>${esc(r.label)}</li>`).join('')}</ul><div class="hint">${esc(hubT('pending.onbo.hint','승인 전에는 본인 서류 올리기와 지문 등록 보고만 할 수 있습니다. 나머지 제출은 승인 후 완료하세요.'))}</div><h3>${esc(hubT('pending.onbo.fp','지문 등록'))}</h3>${fingerprint?`<div>${esc(fingerprint.status)}</div>`:`<button id="pendingFpSave" class="hbtn" onclick="pendingReportFingerprint()">${esc(hubT('pending.onbo.report','지문 등록 완료 보고'))}</button>`}<h3>${esc(hubT('pending.onbo.docs','본인 서류 올리기'))}</h3><ul>${(docs||[]).map(d=>`<li>${esc(d.original_name)} · ${esc(d.document_type)}</li>`).join('')}</ul><div class="fld"><label>${esc(hubT('onbo.docs.f_type','서류 종류'))}</label><input id="pendingDocType" value="${esc(hubT('pending.onbo.default_type','입사 서류'))}"></div><div class="fld"><label>${esc(hubT('onbo.docs.f_file','파일'))}</label><input type="file" id="pendingDocFile"></div><button id="pendingDocSave" class="hbtn pri" onclick="pendingUploadDocument()">${esc(hubT('pending.onbo.upload','서류 올리기'))}</button><div id="pendingOnboMsg" class="msg"></div></div>`;
+ return `${onboardingGuideCard({collapsed:true})}<div class="card"><h2>${esc(hubT('onbo.check.title','✅ 공통 입사 체크리스트'))}</h2><ul>${common.map(([key,label])=>`<li>${esc(hubT(key,label))}</li>`).join('')}${(items||[]).map(r=>`<li>${esc(r.label)}</li>`).join('')}</ul><div class="hint">${esc(hubT('pending.onbo.hint','승인 전에는 본인 서류 올리기와 지문 등록 보고만 할 수 있습니다. 나머지 제출은 승인 후 완료하세요.'))}</div><h3>${esc(hubT('pending.onbo.fp','지문 등록'))}</h3>${fingerprint?`<div>${esc(fingerprint.status)}</div>`:`<button id="pendingFpSave" class="hbtn" onclick="pendingReportFingerprint()">${esc(hubT('pending.onbo.report','지문 등록 완료 보고'))}</button>`}<h3>${esc(hubT('pending.onbo.docs','본인 서류 올리기'))}</h3><ul>${(docs||[]).map(d=>`<li>${esc(d.original_name)} · ${esc(d.document_type)}</li>`).join('')}</ul><div class="fld"><label>${esc(hubT('onbo.docs.f_type','서류 종류'))}</label><input id="pendingDocType" value="${esc(hubT('pending.onbo.default_type','입사 서류'))}"></div><div class="fld"><label>${esc(hubT('onbo.docs.f_file','파일'))}</label><input type="file" id="pendingDocFile"></div><button id="pendingDocSave" class="hbtn pri" onclick="pendingUploadDocument()">${esc(hubT('pending.onbo.upload','서류 올리기'))}</button><div id="pendingOnboMsg" class="msg"></div></div>`;
 }
 async function loadPendingOnboarding(){
  const box=$('#pendingOnboarding');if(!box)return;
@@ -1980,10 +1985,36 @@ async function pendingUploadDocument(){
  catch(error){msg.textContent=hubT('pending.onbo.upload_error','서류 저장 실패: {msg}',{msg:error.message});}
  finally{PENDING_ONBO_BUSY=false;button.disabled=false;}
 }
+let STAFF_ATT_MONTH='',STAFF_ATT_MONTH_TOKEN=0;
+function staffAttendanceMonthModel(month,attendance,manual,leaves){
+ if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw new Error(hubT('att.staff_month.bad_month','조회할 월을 확인하세요.'));
+ const [year,m]=month.split('-').map(Number),last=new Date(year,m,0).getDate(),rows=[];let days=0,overtime=0;
+ const own=(list)=>(list||[]).filter(r=>r.user_id===ME.id),att=own(attendance),draft=own(manual).filter(r=>!['대체','반려'].includes(r.status)).sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))||Number(b.id||0)-Number(a.id||0)),approved=own(leaves).filter(r=>r.status==='승인');
+ for(let d=1;d<=last;d++){
+   const date=`${month}-${String(d).padStart(2,'0')}`,fingerprint=att.find(r=>r.work_date===date&&r.source==='fp'),entry=draft.find(r=>r.work_date===date),r=fingerprint||att.find(r=>r.work_date===date)||entry||{},detail=entry||r;
+   const floor=n=>Math.max(0,Math.floor((Number(n)||0)/10)*10),extra=fingerprint?floor(r.overtime_min):entry?floor(entry.clockout_overtime_min??entry.overtime_min)+floor(entry.evening_overtime_min):floor(r.overtime_min),lunch=floor(detail.lunch_overtime_min);
+   const worked=!!(r.clock_in||r.clock_out);days+=worked?1:0;overtime+=worked?extra+lunch:0;
+   rows.push({date,weekday:new Date(year,m-1,d).getDay(),clockIn:r.clock_in||'',clockOut:r.clock_out||'',overtime:worked?extra:0,lunch:worked?lunch:0,early:detail.early_min||r.early_min||0,half:detail.half_day&&detail.half_day!=='없음'?detail.half_day:'',leave:approved.filter(l=>l.date_from<=date&&l.date_to>=date).map(l=>l.type).join(' · '),reason:detail.reason||detail.manual_note||'',status:entry?.status||'',fingerprint:!!fingerprint});
+ }
+ return {month,rows,days,overtime};
+}
+function staffAttendanceMonthHtml(model){
+ const headings=[['date','날짜'],['weekday','요일'],['in','출근'],['out','퇴근'],['overtime','연장(분)'],['lunch','점심 연장(분)'],['early','조퇴(분)'],['half','반차'],['leave','연차'],['reason','사유'],['status','기준·상태']];
+ return `<div class="card" id="staffAttMonthCard"><h2>${esc(hubT('att.staff_month.title','내 출퇴근 · 월 표'))}</h2><div class="rowflex staff-month-actions"><button class="mini" onclick="moveStaffAttendanceMonth(-1)" aria-label="${esc(hubT('att.staff_month.prev','이전 달'))}">‹</button><input type="month" id="staffAttMonth" value="${model.month}" onchange="loadStaffAttendanceMonth(this.value)" aria-label="${esc(hubT('leave.f_month','대상 월'))}"><button class="mini" onclick="moveStaffAttendanceMonth(1)" aria-label="${esc(hubT('att.staff_month.next','다음 달'))}">›</button><button class="mini" onclick="printStaffAttendanceMonth()">${esc(hubT('att.staff_month.print','인쇄 / PDF 저장'))}</button></div><div class="hint">${esc(model.month)} · ${esc(ME.name||'')} · ${esc(hubT('att.staff_month.hint','본인 기록만 표시합니다. 합계에는 표에 표시된 수기 대기 기록도 포함됩니다.'))}</div><div class="tblwrap"><table class="staff-month-table"><thead><tr>${headings.map(([k,d])=>`<th>${esc(hubT('att.staff_month.th_'+k,d))}</th>`).join('')}</tr></thead><tbody>${model.rows.map(r=>`<tr><td>${r.date}</td><td>${esc(hubT('att.week.day'+r.weekday,['일','월','화','수','목','금','토'][r.weekday]))}</td><td>${esc(String(r.clockIn).slice(0,5))}</td><td>${esc(String(r.clockOut).slice(0,5))}</td><td>${r.overtime||''}</td><td>${r.lunch||''}</td><td>${esc(r.early||'')}</td><td>${esc(r.half)}</td><td>${esc(r.leave)}</td><td>${esc(r.reason)}</td><td>${esc(r.fingerprint?hubT('att.my.basis_fp','지문 기록'):r.status)}</td></tr>`).join('')}</tbody><tfoot><tr><th colspan="4">${esc(hubT('att.staff_month.days','근무일 수 {n}일',{n:model.days}))}</th><th colspan="7">${esc(hubT('att.staff_month.total','연장 합계 {n}분 (점심 포함)',{n:model.overtime}))}</th></tr></tfoot></table></div><div id="staffAttMonthMsg" class="msg"></div></div>`;
+}
+async function loadStaffAttendanceMonth(month){
+ if(ME.role==='owner')return;const container=$('#staffAttMonthContainer');if(!container)return;
+ if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month||''))return;STAFF_ATT_MONTH=month;const token=++STAFF_ATT_MONTH_TOKEN,bounds=attendanceMonthBounds(month);
+ try{const query=(table)=>fetchAttendancePages(()=>sb.from(table).select('*').eq('user_id',ME.id).gte('work_date',bounds.start).lt('work_date',bounds.next));const [att,manual,resolutions,leaves]=await Promise.all([query('attendance'),query('attendance_manual_entries'),query('attendance_issue_resolutions'),fetchAttendancePages(()=>sb.from('leave_requests').select('*').eq('user_id',ME.id).eq('status','승인').lte('date_from',bounds.next).gte('date_to',bounds.start))]);if(token!==STAFF_ATT_MONTH_TOKEN)return;const error=att.error||manual.error||resolutions.error||leaves.error;if(error)throw error;container.innerHTML=staffAttendanceMonthHtml(staffAttendanceMonthModel(month,applyAttendanceResolutions(att.data,resolutions.data),manual.data,leaves.data));}
+ catch(error){if(token===STAFF_ATT_MONTH_TOKEN)container.innerHTML=`<div class="card cal-error">${esc(hubT('att.manual.m_load_fail','저장값을 불러오지 못했습니다. 날짜를 다시 선택하세요: {msg}',{msg:error.message}))}<input type="month" value="${month}" onchange="loadStaffAttendanceMonth(this.value)"></div>`;}
+}
+function moveStaffAttendanceMonth(delta){const [y,m]=(STAFF_ATT_MONTH||today().slice(0,7)).split('-').map(Number),date=new Date(y,m-1+delta,1);return loadStaffAttendanceMonth(date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0'));}
+function printStaffAttendanceMonth(){document.body.classList.add('staff-att-printing');const done=()=>{document.body.classList.remove('staff-att-printing');window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);window.print();}
 /* suggestion-six:end */
 async function renderLeave(m){
-  const {data:bal}=await sb.from('v_leave_balance').select('*').eq('user_id',ME.id).maybeSingle();
-  const {data:mine,error:mineError}=await fetchAttendancePages(()=>sb.from('leave_requests').select('*').eq('user_id',ME.id).order('created_at',{ascending:false}));
+  const {data:bal,error:balanceError}=await sb.from('v_leave_balance').select('*').eq('user_id',ME.id).maybeSingle();
+  const {data:mine,error:mineError}=await sb.from('leave_requests').select('*').eq('user_id',ME.id).order('created_at',{ascending:false}).limit(hubN('leave.my_list_limit',20));
+  const pending=await fetchAttendancePages(()=>sb.from('leave_requests').select('status,days').eq('user_id',ME.id).in('status',['대기','1차승인']));
   const year=today().slice(0,4),entries=await fetchAttendancePages(()=>sb.from('leave_ledger').select('kind,days,note').eq('user_id',ME.id).gte('created_at',year+'-01-01T00:00:00+09:00').lt('created_at',(Number(year)+1)+'-01-01T00:00:00+09:00'));
   let leadHtml='';
   let archiveHtml='';
@@ -2009,12 +2040,12 @@ async function renderLeave(m){
   const accrualHtml=ME.role==='owner'?`<div class="card"><h2>${esc(hubT('leave.acc.title','📆 1년 된 직원의 연차 15일을 확인하고 넣기'))} <span class="sub">(${esc(hubT('leave.owner_tag','원장'))})</span></h2><div class="hint">${esc(hubT('leave.acc.hint','1년 미만 월차는 매달 자동으로 생깁니다. 1년이 된 직원의 15일과 아직 확인되지 않은 지난 기간은 여기에서 개근·재직을 확인하고 넣습니다. 이미 넣은 연차는 두 번 넣지 않습니다.'))}</div><div class="rowflex" style="margin-top:8px"><label>${esc(hubT('leave.acc.f_asof','기준일'))} <input id="laAsOf" class="mini" type="date" value="${esc(LEAVE_ACCRUAL_AS_OF||today())}" max="${today()}"></label><button class="mini" onclick="previewLeaveAccrual()">${esc(hubT('leave.acc.btn_preview','미리보기'))}</button><button id="laApply" class="mini stamp" onclick="applyLeaveAccrual()" disabled>${esc(hubT('leave.acc.btn_apply','확인한 항목 적용'))}</button></div><div id="laMsg" class="hint" style="margin-top:8px">${esc(hubT('leave.acc.need_preview','적용 전 미리보기가 필요합니다.'))}</div><div id="laRows"></div></div>`:'';
   m.innerHTML=`
   <div class="card"><h2>${esc(hubT('leave.my.title','📅 내 연차'))}</h2>
-    ${mineError||entries.error?`<div class="cal-error">${esc(hubT('leave.m_fail','실패: {msg}',{msg:(mineError||entries.error).message}))}</div>`:leaveThreeCards(leaveThreeTotals(bal,entries.data,mine))}
+    ${balanceError||mineError||entries.error||pending.error?`<div class="cal-error">${esc(hubT('leave.m_fail','실패: {msg}',{msg:(balanceError||mineError||entries.error||pending.error).message}))}</div>`:leaveThreeCards(leaveThreeTotals(bal,entries.data,pending.data))}
     <button class="hbtn pri" style="margin-top:10px" onclick="openLeave()">${esc(hubT('leave.my.btn_apply','연차 신청'))}</button>
     <h3>${esc(hubT('leave.my.list_title','내 신청 내역'))}</h3>
     ${(mine||[]).length?`<div class="tblwrap"><table><tr><th>${esc(hubT('leave.th.type','유형'))}</th><th>${esc(hubT('leave.th.period','기간'))}</th><th>${esc(hubT('leave.th.days','일수'))}</th><th>${esc(hubT('leave.th.status','상태'))}</th><th></th></tr>
     ${(mine||[]).map(r=>`<tr><td>${esc(leaveTypeLabel(r.type))}${r.type_note&&r.type!=='기타'?' · '+esc(r.type_note):''}</td><td>${md(r.date_from)}~${md(r.date_to)}</td><td>${r.days}</td>
-      <td><span class="b ${r.status==='승인'?'ok':(r.status==='반려'?'no':'wait')}">${esc(r.status)}</span></td><td><button class="mini" onclick="openLeaveForm(${r.id})">${esc(hubT('leave.btn.form','📄 신청서'))}</button> ${leaveChangeButtons(r)} ${r.status==='대기'?`<button class="mini" onclick="openLeaveEdit(${r.id})">${esc(hubT('leave.my.btn_edit','수정'))}</button><button class="mini rej" onclick="cancelPendingLeave(${r.id})">${esc(hubT('leave.my.btn_cancel','취소'))}</button>`:''}</td></tr>`).join('')}</table></div>`:'<div class="empty">'+esc(hubT('leave.my.empty','신청 내역 없음'))+'</div>'}
+      <td><span class="b ${r.status==='승인'?'ok':(r.status==='반려'?'no':'wait')}">${esc(r.status)}</span></td><td><button class="mini" onclick="openLeaveForm(${r.id})">${esc(hubT('leave.btn.form','📄 신청서'))}</button> ${leaveChangeButtons(r)}${r.status==='대기'?`<button class="mini" onclick="openLeaveEdit(${r.id})">${esc(hubT('leave.my.btn_edit','수정'))}</button><button class="mini rej" onclick="cancelPendingLeave(${r.id})">${esc(hubT('leave.my.btn_cancel','취소'))}</button>`:''}</td></tr>`).join('')}</table></div>`:'<div class="empty">'+esc(hubT('leave.my.empty','신청 내역 없음'))+'</div>'}
   </div>${leadHtml}${archiveHtml}${changeHtml}${grantHtml}${accrualHtml}`;
 }
 function leaveApplyModalPrepare(){try{hubStaticFill();const sel=$('#lvType');if(sel)sel.innerHTML=leaveTypeItems().map(i=>'<option value="'+esc(i.code)+'">'+esc(i.label)+'</option>').join('');}catch(e){}}

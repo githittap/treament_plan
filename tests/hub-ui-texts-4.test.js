@@ -12,6 +12,7 @@ async function renderAll(...args){
   return out;
 }
 const golden=JSON.parse(read('tests/fixtures/hub4-golden-3d4b91e.json'));
+golden['static.modal.apMask']=golden['static.modal.apMask'].replace('보고 소명','보고 물품구매 소명');
 const clone=x=>JSON.parse(JSON.stringify(x));
 const CH4=/^(?!sug\.cmt\.)(appr|notice|cal|lvs|sug)\./;
 const STATIC_PART=hr.slice(0,hr.indexOf('<script src="hub-texts.js')); // 고정 HTML(모달)은 이 앞쪽에 있음
@@ -101,9 +102,9 @@ test('숫자·목록 기본값: 결재 건수 2개와 결재 종류·일정 종�
   assert.match(hr,/limit\(hubN\('appr\.my_list_limit',20\)\)/);assert.match(hr,/limit\(hubN\('appr\.done_list_limit',50\)\)/);
   // 결재 종류: 코드는 화면이 지금 쓰는 이름 그대로(저장 값 규칙·재직증명서 발급 흐름이 이 코드로 움직임)
   const kinds=clone(L('list.approval_kinds').def);
-  assert.deepEqual(kinds.map(k=>k.code),['연차 신청','사직서','재직증명서 발급','보고','소명','기타']);
+  assert.deepEqual(kinds.map(k=>k.code),['연차 신청','사직서','재직증명서 발급','보고','물품구매','소명','기타']);
   assert.ok(kinds.every(k=>k.code===k.label));
-  assert.match(hr,/<select id="apKind"><option>연차 신청<\/option><option>사직서<\/option><option>재직증명서 발급<\/option><option>보고<\/option><option>소명<\/option><option>기타<\/option><\/select>/,'결재 올리기 창 기본 선택칸(기존 시험이 이 줄을 찾음)');
+  assert.match(hr,/<select id="apKind"><option>연차 신청<\/option><option>사직서<\/option><option>재직증명서 발급<\/option><option>보고<\/option><option>물품구매<\/option><option>소명<\/option><option>기타<\/option><\/select>/,'결재 올리기 창 기본 선택칸(기존 시험이 이 줄을 찾음)');
   const vals=vm.runInNewContext('('+hr.match(/const APPROVAL_KIND_VALUES=(\{[^\n]*?\});/)[1]+')');
   assert.deepEqual(kinds.map(k=>k.code),Object.keys(vals));
   // 일정 종류: DB가 허락하는 3가지와 같음
@@ -263,7 +264,7 @@ test('목록 건수: 「내가 올린 문서」·「완결된 결재 문서」 �
 });
 
 /* ───────────── 6. 결재 종류 · 일정 종류 목록 ───────────── */
-const RENAMED_KINDS=[{code:'연차 신청',label:'휴가 신청'},{code:'사직서',label:'퇴직원'},{code:'재직증명서 발급',label:'재직증명서 신청'},{code:'보고',label:'업무 보고'},{code:'소명',label:'소명'},{code:'기타',label:'그 밖'}];
+const RENAMED_KINDS=[{code:'연차 신청',label:'휴가 신청'},{code:'사직서',label:'퇴직원'},{code:'재직증명서 발급',label:'재직증명서 신청'},{code:'보고',label:'업무 보고'},{code:'물품구매',label:'물품구매'},{code:'소명',label:'소명'},{code:'기타',label:'그 밖'}];
 test('결재 종류 이름: 보이는 이름만 바뀌고 저장되는 값(코드)은 그대로 — 선택칸 option 값은 코드, 올리기는 코드로 처리, 문서 카드는 이름을 고친 종류만 새 이름',async()=>{
   const settings={'list.approval_kinds':JSON.stringify(RENAMED_KINDS)};
   const P=await renderAll(hr,{engine:true,textRows:[],settings,probe:true});
@@ -272,15 +273,15 @@ test('결재 종류 이름: 보이는 이름만 바뀌고 저장되는 값(코�
   const base=P.makeDom().$;
   const r=await P.asRole('staff',{$:id=>id==='#apKind'?sel:base(id)});
   r.api2.apprKindSelectFill();
-  assert.equal(sel.innerHTML,'<option value="연차 신청">휴가 신청</option><option value="사직서">퇴직원</option><option value="재직증명서 발급">재직증명서 신청</option><option value="보고">업무 보고</option><option>소명</option><option value="기타">그 밖</option>');
+  assert.equal(sel.innerHTML,'<option value="연차 신청">휴가 신청</option><option value="사직서">퇴직원</option><option value="재직증명서 발급">재직증명서 신청</option><option value="보고">업무 보고</option><option>물품구매</option><option>소명</option><option value="기타">그 밖</option>');
   assert.equal(sel.value,'보고','고른 값은 그대로 유지');
   // (2) 같은 목록이 이미 들어 있으면 다시 안 채움(고른 값을 안 건드림)
-  const sel2={value:'소명',options:[{value:'연차 신청',textContent:'휴가 신청'},{value:'사직서',textContent:'퇴직원'},{value:'재직증명서 발급',textContent:'재직증명서 신청'},{value:'보고',textContent:'업무 보고'},{value:'소명',textContent:'소명'},{value:'기타',textContent:'그 밖'}],innerHTML:'원래'};
+  const sel2={value:'소명',options:[{value:'연차 신청',textContent:'휴가 신청'},{value:'사직서',textContent:'퇴직원'},{value:'재직증명서 발급',textContent:'재직증명서 신청'},{value:'보고',textContent:'업무 보고'},{value:'물품구매',textContent:'물품구매'},{value:'소명',textContent:'소명'},{value:'기타',textContent:'그 밖'}],innerHTML:'원래'};
   const r2=await P.asRole('staff',{$:id=>id==='#apKind'?sel2:base(id)});r2.api2.apprKindSelectFill();
   assert.equal(sel2.innerHTML,'원래');
   // (3) 기본 이름이면 옛 선택칸(값=글)과 같아 다시 안 채움
   const P0=await renderAll(hr,{engine:true,textRows:[],settings:{},probe:true});
-  const sel0={value:'보고',options:['연차 신청','사직서','재직증명서 발급','보고','소명','기타'].map(t=>({value:t,textContent:t})),innerHTML:'원래'};
+  const sel0={value:'보고',options:['연차 신청','사직서','재직증명서 발급','보고','물품구매','소명','기타'].map(t=>({value:t,textContent:t})),innerHTML:'원래'};
   const r0=await P0.asRole('staff',{$:id=>id==='#apKind'?sel0:base(id)});r0.api2.apprKindSelectFill();
   assert.equal(sel0.innerHTML,'원래');
   // (4) 새 이름으로 올려도 서버에 저장되는 값(코드)은 그대로
@@ -307,7 +308,7 @@ test('결재 종류 이름: 보이는 이름만 바뀌고 저장되는 값(코�
   // (6) 코드는 서버가 허락한 6개뿐: 낯선 코드가 끼어도 선택칸에 안 나옴
   const evil=await renderAll(hr,{engine:true,textRows:[],settings:{'list.approval_kinds':JSON.stringify([{code:'연차 신청',label:'연차 신청'},{code:'해고',label:'해고'}])},probe:true});
   const re=await evil.asRole('staff');
-  assert.deepEqual(clone(re.api2.approvalKindItems().map(i=>i.code)),['연차 신청','사직서','재직증명서 발급','보고','소명','기타']);
+  assert.deepEqual(clone(re.api2.approvalKindItems().map(i=>i.code)),['연차 신청','사직서','재직증명서 발급','보고','물품구매','소명','기타']);
 });
 test('일정 종류 이름: 보이는 이름만 바뀌고 저장되는 값(코드)은 그대로 — 일정 추가 칸 option 값은 코드, 일정 위 글은 새 이름',async()=>{
   const settings={'list.calendar_kinds':JSON.stringify([{code:'이벤트',label:'행사'},{code:'단축근무',label:'일찍 퇴근'},{code:'면접',label:'면접'}])};
@@ -416,15 +417,15 @@ test('화면: 📋 목록에 결재 종류 이름·일정 종류 이름이 있�
   await t.click('[hub-subtab]=lists');
   const sec=t.section.innerHTML;
   assert.ok(sec.includes('결재 종류 이름')&&sec.includes('일정 종류 이름'));
-  assert.equal((sec.match(/<span class="hub-code">/g)||[]).length,5+4+6+3+4+4+7+6+3+8+7+6+5+32+3,'B2의 소명 종류 코드 3개');
+  assert.equal((sec.match(/<span class="hub-code">/g)||[]).length,5+4+6+3+4+4+7+7+3+8+7+6+5+32+3,'B2의 소명 종류 코드 3개');
   assert.equal((sec.match(/data-hub-list-add=/g)||[]).length,2,'새 항목을 늘릴 수 있는 목록은 직원 부서·서류 종류뿐');
   assert.match(sec,/<span class="hub-code">재직증명서 발급<\/span><input id="hubLstLbl_7_2" type="text" maxlength="20" value="재직증명서 발급"/);
   assert.match(sec,/<span class="hub-code">단축근무<\/span><input id="hubLstLbl_8_1" type="text" maxlength="20" value="단축근무"/);
-  ['연차 신청','사직서','재직증명서 발급','업무 보고','소명','기타'].forEach((v,i)=>{t.el('#hubLstLbl_7_'+i).value=v;});
+  ['연차 신청','사직서','재직증명서 발급','업무 보고','물품구매','소명','기타'].forEach((v,i)=>{t.el('#hubLstLbl_7_'+i).value=v;});
   await t.click('[hub-list-save]=7');
   const up=t.state.calls.filter(c=>c.table==='app_settings'&&c.op==='upsert');
   assert.equal(up.length,1);assert.equal(up[0].payload.key,'list.approval_kinds');
-  assert.deepEqual(clone(JSON.parse(up[0].payload.value)),[{code:'연차 신청',label:'연차 신청'},{code:'사직서',label:'사직서'},{code:'재직증명서 발급',label:'재직증명서 발급'},{code:'보고',label:'업무 보고'},{code:'소명',label:'소명'},{code:'기타',label:'기타'}]);
+  assert.deepEqual(clone(JSON.parse(up[0].payload.value)),[{code:'연차 신청',label:'연차 신청'},{code:'사직서',label:'사직서'},{code:'재직증명서 발급',label:'재직증명서 발급'},{code:'보고',label:'업무 보고'},{code:'물품구매',label:'물품구매'},{code:'소명',label:'소명'},{code:'기타',label:'기타'}]);
 });
 
 /* ───────────── 8. DB에도 있어 안 옮긴 것 · 기존 시험이 찾는 줄 ───────────── */

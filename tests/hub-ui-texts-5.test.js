@@ -489,7 +489,7 @@ test('화면: 📋 목록에 문의 출처·문의 상태·상담 구분·상담
   await t.click('[hub-subtab]=lists');
   const sec=t.section.innerHTML;
   assert.ok(sec.includes('문의 출처 이름')&&sec.includes('문의 상태 이름')&&sec.includes('상담 구분 이름')&&sec.includes('상담 상태 이름'));
-  assert.equal((sec.match(/<span class="hub-code">/g)||[]).length,5+37+8+7+6+5+32+3);
+  assert.equal((sec.match(/<span class="hub-code">/g)||[]).length,5+38+8+7+6+5+32+3);
   assert.equal((sec.match(/data-hub-list-add=/g)||[]).length,2,'새 항목을 늘릴 수 있는 목록은 직원 부서·서류 종류뿐');
   assert.match(sec,/<span class="hub-code">naver_talktalk<\/span><input id="hubLstLbl_9_3" type="text" maxlength="20" value="네이버 톡톡"/);
   assert.match(sec,/<span class="hub-code">recall_1<\/span><input id="hubLstLbl_10_2" type="text" maxlength="20" value="리콜 1차"/);

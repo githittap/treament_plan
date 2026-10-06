@@ -1868,6 +1868,8 @@ function hubTextDefs(){
   hubTextDefsChapter5(add);
   hubTextDefsChapter6(add);
   hubTextDefsChapter7(add);
+  [["title", "내 출퇴근 · 월 표"], ["bad_month", "조회할 월을 확인하세요."], ["prev", "이전 달"], ["next", "다음 달"], ["print", "인쇄 / PDF 저장"], ["hint", "본인 기록만 표시합니다. 합계에는 표에 표시된 수기 대기 기록도 포함됩니다."], ["days", "근무일 수 {n}일"], ["total", "연장 합계 {n}분 (점심 포함)"], ["th_date", "날짜"], ["th_weekday", "요일"], ["th_in", "출근"], ["th_out", "퇴근"], ["th_overtime", "연장(분)"], ["th_lunch", "점심 연장(분)"], ["th_early", "조퇴(분)"], ["th_half", "반차"], ["th_leave", "연차"], ["th_reason", "사유"], ["th_status", "기준·상태"]].forEach(([key,text])=>add('att.staff_month.'+key,'🕘 본인 월 출퇴근',text,text,['days','total'].includes(key)?['n']:[]));
+
   [['bank','은행·계좌번호'],['notion','Notion 가입·앱 설치·로그인'],['tb','잠복결핵 검사서'],['license','자격증'],['security','보안서약서']].forEach(([key,text])=>add('pending.onbo.'+key,'가입 승인 대기',text,text));
   [["hint", "승인 전에는 본인 서류 올리기와 지문 등록 보고만 할 수 있습니다. 나머지 제출은 승인 후 완료하세요."], ["fp", "지문 등록"], ["report", "지문 등록 완료 보고"], ["docs", "본인 서류 올리기"], ["upload", "서류 올리기"], ["default_type", "입사 서류"], ["no_data", "입사 안내를 불러오지 못했습니다."], ["error", "입사 안내 조회 실패: {msg}"], ["upload_error", "서류 저장 실패: {msg}"], ["type_required", "서류 종류를 적어 주세요."]].forEach(([key,text])=>add('pending.onbo.'+key,'가입 승인 대기',text,text,key.includes('error')?['msg']:[]));
 
