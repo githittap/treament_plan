@@ -105,7 +105,7 @@ test('화면 코드(hr.html)에 박힌 기본 글이 기본값 목록과 글자�
 });
 test('숫자 8개·이름 목록 7개: 기본값이 화면 코드와 같고, 화면 표시용 숫자만(계산식 숫자는 없음) · 캐시 번호',()=>{
   const h=helpers();
-  assert.equal(h.HUB_SETTING_DEFS.length,51);
+  assert.equal(h.HUB_SETTING_DEFS.length,52);
   const S=k=>h.HUB_SETTING_DEFS.find(d=>d.key===k);
   const expect={'home.payslip_limit':['12',1,36,'개월'],'dep.list_limit':['300',50,1000,'건'],'aic.history_months':['6',1,24,'개월'],'aic.auto_limit':['20',5,100,'건'],'aiu.model_days':['7',3,30,'일'],'aiu.cost_months':['6',2,24,'개월'],'aiu.external_days':['14',3,60,'일'],'aiu.session_limit':['8',3,30,'건']};
   for(const k of NUM_KEYS){
@@ -494,7 +494,7 @@ test('화면: 🔢 숫자·기준에 새 숫자 8개(27개)가 있고 잘못된 
   await t.render(OWNER);
   await t.click('[hub-subtab]=settings');
   const sec=t.section.innerHTML;
-  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,6+36+7+2);
+  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,6+36+7+3);
   for(const s of ['🏠 홈·입금 기준','💰 AI비용 기준'])assert.ok(sec.includes(s),s);
   for(const k of NUM_KEYS)assert.ok(sec.includes('이름표: '+k),k);
   const idx=k=>t.ctx.window&&helpers().HUB_SETTING_DEFS.findIndex(d=>d.key===k);
