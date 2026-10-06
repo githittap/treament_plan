@@ -23,7 +23,7 @@ test('aicostPlatformKey는 대소문자·앞뒤 공백을 무시해 목록 값�
 test('renderAicost의 자동감지 합산은 aicostPlatformKey로 이름을 맞춘 뒤 플랫폼별로 모으고, 원본 글자를 그대로 키로 쓰지 않는다',()=>{
   const body=html.match(/async function renderAicost\(m\)\{[\s\S]*?\r?\n\}\r?\n/)?.[0];
   assert.ok(body,'renderAicost 함수를 찾지 못했습니다.');
-  assert.ok(body.includes("const k=aicostPlatformKey(e.platform);autoByPlatform[k]=(autoByPlatform[k]||0)+Number(e.amount_krw||0);"),
+  assert.ok(body.includes("const k=aicostPlatformKey(e.platform,e.raw_text,config);autoByPlatform[k]=(autoByPlatform[k]||0)+Number(e.amount_krw||0);"),
     '자동감지 합산이 aicostPlatformKey로 이름을 맞추지 않습니다.');
   assert.ok(!body.includes('autoByPlatform[e.platform]'),'자동감지 합산이 원본 platform 글자를 그대로 키로 쓰면 안 됩니다.');
 });

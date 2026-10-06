@@ -1,0 +1,95 @@
+{
+  "platforms": [
+    {
+      "key": "Claude",
+      "label": "Claude"
+    },
+    {
+      "key": "Codex(OpenAI)",
+      "label": "Codex(OpenAI)"
+    },
+    {
+      "key": "Kimi",
+      "label": "Kimi"
+    },
+    {
+      "key": "DeepSeek",
+      "label": "DeepSeek"
+    },
+    {
+      "key": "StepFun",
+      "label": "StepFun"
+    },
+    {
+      "key": "Higgsfield",
+      "label": "힉스필드"
+    },
+    {
+      "key": "Typecast",
+      "label": "타입캐스트"
+    },
+    {
+      "key": "기타",
+      "label": "기타 AI"
+    }
+  ],
+  "other_key": "기타",
+  "merchants": [
+    {
+      "contains": "ANTHROPIC",
+      "platform": "Claude"
+    },
+    {
+      "contains": "OPENAI",
+      "platform": "Codex(OpenAI)"
+    },
+    {
+      "contains": "MOONSHOT",
+      "platform": "Kimi"
+    },
+    {
+      "contains": "DeepSeek",
+      "platform": "DeepSeek"
+    },
+    {
+      "contains": "STEPFUN",
+      "platform": "StepFun"
+    },
+    {
+      "contains": "HIGGSFIELD",
+      "platform": "Higgsfield"
+    },
+    {
+      "contains": "TYPECAST",
+      "platform": "Typecast"
+    },
+    {
+      "contains": "타입캐스트",
+      "platform": "Typecast"
+    }
+  ],
+  "texts": {
+    "settings_title": "AI 결제 분류 설정",
+    "settings_hint": "문자에 찍힌 가맹점 글자를 플랫폼에 연결하세요. 위에 있는 글자를 먼저 맞춥니다. 변경하면 이전 내역도 같은 기준으로 다시 모입니다.",
+    "platforms_title": "플랫폼 이름",
+    "key_label": "저장 이름",
+    "label_label": "화면 이름",
+    "merchants_title": "가맹점 연결",
+    "merchant_label": "문자 속 가맹점 글자",
+    "platform_label": "모을 플랫폼",
+    "remove": "행 빼기",
+    "add_merchant": "가맹점 추가",
+    "save": "설정 저장",
+    "texts_title": "안내 문구",
+    "saved": "저장했습니다.",
+    "save_failed": "설정을 저장하지 못했습니다.",
+    "invalid": "플랫폼 이름과 가맹점 연결을 확인하세요. 같은 가맹점 글자는 한 번만 넣으세요.",
+    "note_placeholder": "선택 입력",
+    "other_note_placeholder": "가맹점 이름 / 구독 또는 충전 메모",
+    "events_title": "자동감지 내역",
+    "events_hint": "최근 20건 · 결제 문자",
+    "received_label": "수신",
+    "amount_label": "금액",
+    "empty_events": "아직 자동감지된 결제 문자가 없습니다. 매크로를 연결한 뒤 결제 문자가 오면 쌓입니다."
+  }
+}

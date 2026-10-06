@@ -1,0 +1,17 @@
+{
+  "version": 12,
+  "provenance": "Deployment candidate from task 9d0f7463; deployed as v12 by coordinator per task 7524babf handoff. Test-only frozen copy; never deploy this fixture.",
+  "sha256": {
+    "ai-billing-webhook/webhook_core.ts": "b1066d72fa181db703c8be3bce035cd0ed9f759d43f1bd58bd06b777042ab72c",
+    "ai-billing-webhook/naver_ads.mjs": "25be55c66c0efbdc2516d7770a7b7bc63ae639bb8d5cf360ed1b0baceef0b63d",
+    "ai-billing-webhook/marketing_expenses.mjs": "79307746ffd135dfb375e2b154e8bd3d74f19f29affaa2dfd463cc89dd1baaa4",
+    "navertalk-webhook/payload.mjs": "96e6f5b0d208d5634771367d40e7073703eadce643e1f5adf05f62dfeb763e84"
+  },
+  "source_sha256": {
+    "ai-billing-webhook/webhook_core.ts": "b1066d72fa181db703c8be3bce035cd0ed9f759d43f1bd58bd06b777042ab72c",
+    "ai-billing-webhook/naver_ads.mjs": "25be55c66c0efbdc2516d7770a7b7bc63ae639bb8d5cf360ed1b0baceef0b63d",
+    "ai-billing-webhook/marketing_expenses.mjs": "79307746ffd135dfb375e2b154e8bd3d74f19f29affaa2dfd463cc89dd1baaa4",
+    "navertalk-webhook/payload.mjs": "96e6f5b0d208d5634771367d40e7073703eadce643e1f5adf05f62dfeb763e84"
+  },
+  "hash_mode": "UTF-8 with LF newlines (portable across Git checkouts)"
+}
