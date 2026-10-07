@@ -4000,13 +4000,13 @@ function aicostConfig(value=SETTINGS.aicost_config){
   Object.values(c.texts).forEach(t=>{if(typeof t!=='string'||!t.trim())throw new Error(c.texts.invalid);});
   return c;
 }
-function aicostPlatformKey(platform,rawText='',config=typeof SETTINGS!=='undefined'&&SETTINGS.aicost_config?aicostConfig():null){
+function aicostPlatformKey(platform,rawText='',config=typeof SETTINGS!=='undefined'&&SETTINGS.aicost_config?aicostConfig():null,cardMerchant=''){
   if(!config){const n=String(platform??'').trim().toLowerCase();return AICOST_PLATFORMS.find(p=>p.toLowerCase()===n)||'기타';}
   const n=String(platform==null?'':platform).trim().toLowerCase();
   const direct=config.platforms.find(p=>p.key.toLowerCase()===n||p.label.toLowerCase()===n);
   // 삼성 승인 문자의 날짜·시각 뒤 가맹점만 분류에 사용하며 원문은 화면에 넣지 않음.
   const line=String(rawText).match(/\d{2}\/\d{2}\s+\d{2}:\d{2}\s+([^\r\n]+)/);
-  const merchant=(line?line[1]:'').replace(/\s+누적.*$/,'').trim().toLowerCase();
+  const merchant=(cardMerchant||(line?line[1]:'')).replace(/\s+누적.*$/,'').trim().toLowerCase();
   const byMerchant=merchant&&config.merchants.find(r=>merchant.includes(r.contains.trim().toLowerCase()));
   if(byMerchant)return byMerchant.platform;
   if(direct&&direct.key!==config.other_key)return direct.key;
@@ -4061,7 +4061,7 @@ function billingMarketingRows(events,rules,links,month){
 function billingAiRows(manual,events,month){
   const rows=(manual||[]).filter(row=>row.ym===month).map(row=>({date:row.ym+'-01',merchant:row.platform,category:aicostPlatformKey(row.platform),amount:Number(row.amount_krw||0),source:'manual'}));
   for(const row of events||[]){if(isNaverAdBillingEvent(row)||marketingMonthAt(row.received_at)!==month)continue;
-    rows.push({date:new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul'}).format(new Date(row.received_at)),merchant:row.platform||'',category:aicostPlatformKey(row.platform,row.raw_text),amount:Number(row.amount_krw||0),source:'auto'});
+    rows.push({date:new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul'}).format(new Date(row.received_at)),merchant:row.platform||'',category:aicostPlatformKey(row.platform,row.raw_text,undefined,row.card_merchant),amount:Number(row.amount_krw||0),source:'auto'});
   }
   return rows;
 }
@@ -4366,14 +4366,14 @@ async function renderAicost(m){
   const [{data:rows,error},{data:history,error:historyError},{data:events,error:eventsError},{data:usageRows,error:usageError},{data:snapshots,error:snapshotError}]=await Promise.all([
     sb.from('ai_billing').select('*').eq('ym',AICOST_MONTH),
     billingFetchAll(()=>sb.from('ai_billing').select('ym,platform,amount_krw,note').order('ym',{ascending:false}).order('platform')),
-    billingFetchAll(()=>sb.from('ai_billing_events').select('id,platform,amount_krw,source,note,raw_text,received_at').order('received_at',{ascending:false}).order('id',{ascending:false})),
+    billingFetchAll(()=>sb.from('ai_billing_events').select('id,platform,amount_krw,source,note,raw_text,card_merchant,received_at').order('received_at',{ascending:false}).order('id',{ascending:false})),
     sb.from('ai_model_usage_daily').select('usage_date,model,tokens,turns,synced_at').gte('usage_date',usageWin.start).order('usage_date',{ascending:false}).limit(2000),
     sb.from('ai_usage_snapshots').select('kind,payload,synced_at').in('kind',['platform_cost','codex_sessions','external_ai'])
   ]);
   if(error||historyError||eventsError){setStatus('error');m.innerHTML=`<div class="card"><div class="empty">${esc(hubT('aic.load_err','AI 비용을 불러오지 못했습니다: {detail}',{detail:(((error||historyError||eventsError).message)??'')}))}</div></div>`;return;}
   const byPlatform={};(rows||[]).forEach(r=>{const k=aicostPlatformKey(r.platform,'',config),prev=byPlatform[k];byPlatform[k]={...r,amount_krw:Number(r.amount_krw||0)+Number(prev?prev.amount_krw:0),note:[prev?.note,r.note].filter(Boolean).join(' / ')};});
   // 자동감지(문자 웹훅 등) — 선택한 달의 이벤트만 플랫폼별 합산(이름은 대소문자·앞뒤 공백 무시로 목록 값에 맞추고, 목록 밖은 기타로 모음)
-  const billableEvents=(events||[]).filter(e=>!isNaverAdBillingEvent(e));const autoByPlatform={};billableEvents.forEach(e=>{if(formatLeaveMonth(e.received_at)===AICOST_MONTH){const k=aicostPlatformKey(e.platform,e.raw_text,config);autoByPlatform[k]=(autoByPlatform[k]||0)+Number(e.amount_krw||0);}});
+  const billableEvents=(events||[]).filter(e=>!isNaverAdBillingEvent(e));const autoByPlatform={};billableEvents.forEach(e=>{if(formatLeaveMonth(e.received_at)===AICOST_MONTH){const k=aicostPlatformKey(e.platform,e.raw_text,config,e.card_merchant);autoByPlatform[k]=(autoByPlatform[k]||0)+Number(e.amount_krw||0);}});
   const total=AICOST_PLATFORMS.reduce((sum,p)=>sum+Number((byPlatform[p]||{}).amount_krw||0)+Number(autoByPlatform[p]||0),0);
   const totals={};(history||[]).forEach(r=>totals[r.ym]=(totals[r.ym]||0)+Number(r.amount_krw||0));
   billableEvents.forEach(e=>{const ym=formatLeaveMonth(e.received_at);totals[ym]=(totals[ym]||0)+Number(e.amount_krw||0);});
@@ -4407,7 +4407,7 @@ async function renderAicost(m){
     ${marketingHtml}
   <div class="card"><h2>${esc(hubT('aic.hist_title','최근 {n}개월 실제 청구액',{n:hubN('aic.history_months',6)}))}</h2>${recent.length?recent.map(([ym,sum])=>`<div style="margin:10px 0"><div class="rowflex" style="justify-content:space-between"><span>${esc(ym)}</span><b>₩${aicostMoney(sum)}</b></div><div style="height:8px;background:var(--line);border-radius:4px;margin-top:5px"><div style="height:100%;width:${Math.round(sum/max*100)}%;background:var(--mint);border-radius:4px"></div></div></div>`).join(''):'<div class="empty">'+esc(hubT('aic.hist_empty','저장된 청구 내역이 없습니다.'))+'</div>'}</div>
   <div class="card"><h2>${esc(config?'📩 '+config.texts.events_title:hubT('aic.auto_title','📩 자동감지 내역'))} <span class="sub">${esc(config?'('+config.texts.events_hint+')':hubT('aic.auto_sub','(최근 {n}건, 문자 웹훅)',{n:hubN('aic.auto_limit',20)}))}</span></h2>${recentEvents.length?`<div class="tblwrap"><table><tr><th>${esc(config?config.texts.received_label:hubT('aic.auto_th_time','수신'))}</th><th>${esc(config?config.texts.platform_label:hubT('aic.auto_th_platform','플랫폼'))}</th><th>${esc(config?config.texts.amount_label:hubT('aic.auto_th_amount','금액'))}</th></tr>
-    ${recentEvents.map(e=>`<tr><td>${esc(formatLeaveTimestamp(e.received_at)||hubT('aic.unknown_time','미상'))}</td><td>${esc(aicostPlatformLabel(aicostPlatformKey(e.platform,e.raw_text,config)))}</td><td>₩${aicostMoney(e.amount_krw)}</td></tr>`).join('')}</table></div>`:'<div class="empty">'+esc(config?config.texts.empty_events:hubT('aic.auto_empty','아직 자동감지된 결제 문자가 없습니다. MacroDroid 연동 후 결제 문자가 오면 여기 쌓입니다.'))+'</div>'}</div>`;
+    ${recentEvents.map(e=>`<tr><td>${esc(formatLeaveTimestamp(e.received_at)||hubT('aic.unknown_time','미상'))}</td><td>${esc(aicostPlatformLabel(aicostPlatformKey(e.platform,e.raw_text,config,e.card_merchant)))}</td><td>₩${aicostMoney(e.amount_krw)}</td></tr>`).join('')}</table></div>`:'<div class="empty">'+esc(config?config.texts.empty_events:hubT('aic.auto_empty','아직 자동감지된 결제 문자가 없습니다. MacroDroid 연동 후 결제 문자가 오면 여기 쌓입니다.'))+'</div>'}</div>`;
 }
 
 /* ── 급여 ── */

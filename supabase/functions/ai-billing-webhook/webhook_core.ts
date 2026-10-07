@@ -1,3 +1,4 @@
+import { isCardSms, parseCardSms, recordCardLedger } from './card_ledger.mjs';
 import { parseNaverAdSms } from './naver_ads.mjs';
 import { marketingSmsDigest, parseMarketingSms } from './marketing_expenses.mjs';
 import { sameHex, sha256Hex } from '../navertalk-webhook/payload.mjs';
@@ -28,6 +29,9 @@ export function createWebhookHandler(
     if (!rawText) rawText = bodyText;
     if (!token) return json({ error: 'Unauthorized' }, 401);
 
+    const receivedAt = new Date().toISOString();
+    const cardParsed = parseCardSms(rawText, receivedAt);
+    const cardMessage = isCardSms(rawText);
     let amountKrw = null;
     let usdAmount = null;
     let note = suppliedNote;
@@ -40,13 +44,13 @@ export function createWebhookHandler(
     } else {
       if (note?.startsWith('NAVER_AD_')) return json({ error: '광고 알림 표식은 naver_ads 플랫폼에서만 허용됩니다.' }, 400);
       amountKrw = suppliedAmount;
-      if (amountKrw == null && rawText) {
+      if (platform !== 'card_ledger' && amountKrw == null && rawText) {
         const usd = extractUsdAmount(rawText);
         if (usd != null) { usdAmount = usd; amountKrw = await usdToKrw(usd); }
         else amountKrw = extractKrwAmount(rawText);
       }
     }
-    if (!token || !platform || (platform !== 'marketing' && amountKrw == null)) return json({ error: 'token, platform, 금액 또는 인식 가능한 문자 본문이 필요합니다.' }, 400);
+    if (!token || !platform || (platform !== 'marketing' && platform !== 'card_ledger' && amountKrw == null && !cardMessage)) return json({ error: 'token, platform, 금액 또는 인식 가능한 문자 본문이 필요합니다.' }, 400);
 
     const supabaseUrl = env('SUPABASE_URL');
     const serviceRoleKey = env('SUPABASE_SERVICE_ROLE_KEY');
@@ -59,6 +63,14 @@ export function createWebhookHandler(
     if (secretErr || !secretRow?.value || !sameHex(await sha256Hex(String(secretRow.value)), await sha256Hex(token))) {
       return json({ error: 'Unauthorized' }, 401);
     }
+
+    const ledger = cardMessage ? await recordCardLedger(client, rawText, receivedAt) : null;
+    // pg_cron이 없는 환경에서도 다음 문자 수신 때 만료 원문을 정리함.
+    if (cardMessage) { try { await client.rpc('card_sms_failed_raw_purge'); } catch { /* 기존 쓰기 계속 */ } }
+    if (platform === 'card_ledger') return json({ ok: ledger?.status !== 'error', card_ledger: ledger }, ledger?.status === 'error' ? 503 : 200);
+    if (cardMessage && cardParsed.status === 'ignored') return json({ ok: true, ignored: true, card_ledger: ledger }, 200);
+    if (amountKrw == null && platform !== 'marketing') return json({ error: '금액을 읽지 못했습니다.', card_ledger: ledger }, 400);
+    if (cardParsed.status === 'cancellation') amountKrw = -Math.abs(amountKrw ?? 0);
 
     if (platform === 'marketing') {
       const parsed = parseMarketingSms(rawText, new Date().toISOString());
@@ -114,20 +126,26 @@ export function createWebhookHandler(
         };
         const { error: fallbackErr } = await client.from('marketing_expense_events').upsert(duplicateRow, { onConflict: 'event_hash', ignoreDuplicates: true });
         if (fallbackErr) return json({ error: '이벤트 저장 실패' }, 500);
-        return json({ ok: true, recorded: false, review: true }, 200);
+        return json({ ok: true, recorded: false, review: true, card_ledger: ledger }, 200);
       }
       if (marketingErr) return json({ error: '이벤트 저장 실패' }, 500);
-      return json({ ok: true, recorded: parsed.status === 'recorded' || (parsed.status === 'cancellation' && !!cancellationLink), review: !!cancellationFailure || /취소|승인취소/i.test(rawText) }, 200);
+      return json({ ok: true, recorded: parsed.status === 'recorded' || (parsed.status === 'cancellation' && !!cancellationLink), review: !!cancellationFailure || /취소|승인취소/i.test(rawText), card_ledger: ledger }, 200);
     }
 
     const composedNote = naverAd?.note || [note, usdAmount != null ? `USD ${usdAmount} 자동환산` : null].filter(Boolean).join(' / ') || null;
-    const { error: insertErr } = await client.from('ai_billing_events').insert({
+    const billingRow = {
       platform: String(platform), amount_krw: amountKrw, source: 'sms', note: composedNote,
-      raw_text: rawText || null, account_id: naverAd?.account_id ?? null,
+      raw_text: cardMessage ? null : rawText || null, card_merchant: cardParsed.merchant || null, account_id: naverAd?.account_id ?? null,
       account_name: naverAd?.account_name ?? null, threshold_krw: naverAd?.threshold_krw ?? null,
-    });
+    };
+    let { error: insertErr } = await client.from('ai_billing_events').insert(billingRow);
+    // 새 가맹점 열을 설치하기 전에도 기존 이벤트 기록은 이어감.
+    if (insertErr && ['42703', 'PGRST204'].includes(insertErr.code) && /card_merchant/.test(insertErr.message || '')) {
+      const { card_merchant: _merchant, ...legacyRow } = billingRow;
+      ({ error: insertErr } = await client.from('ai_billing_events').insert(legacyRow));
+    }
     if (insertErr) return json({ error: '이벤트 저장 실패' }, 500);
-    return json({ ok: true, platform, amount_krw: amountKrw, usd_amount: usdAmount }, 200);
+    return json({ ok: true, platform, amount_krw: amountKrw, usd_amount: usdAmount, card_ledger: ledger }, 200);
   };
 }
 
@@ -136,15 +154,17 @@ function json(value: unknown, status: number): Response {
 }
 function extractUsdAmount(text: string): number | null {
   if (!text) return null;
-  let match = text.match(/USD\s*([\d]+\.?\d*)/i);
-  if (match) return Number(match[1]);
-  match = text.match(/([\d]+\.?\d*)\s*\(\s*USD\s*\)/i);
-  return match ? Number(match[1]) : null;
+  let match = text.match(/USD\s*([\d][\d,]*(?:\.\d+)?)/i);
+  if (match) return Number(match[1].replace(/,/g, ''));
+  match = text.match(/([\d][\d,]*(?:\.\d+)?)\s*\(\s*USD\s*\)/i);
+  return match ? Number(match[1].replace(/,/g, '')) : null;
 }
 function extractKrwAmount(text: string): number | null {
   if (!text) return null;
-  const matches = [...text.matchAll(/([\d][\d,]*)\s*원/g)].map(match => Number(match[1].replace(/,/g, '')));
-  return matches.length ? Math.max(...matches) : null;
+  // v12: 누적·잔액을 제외하고 KRW 앞표시도 읽음.
+  const paymentText = text.split(/\r?\n|\//).map(part => part.replace(/(?:누적|잔액).*$/, '')).join('\n');
+  const match = paymentText.match(/(?:KRW\s*([\d][\d,]*)|([\d][\d,]*)\s*원)/i);
+  return match ? Number((match[1] || match[2]).replace(/,/g, '')) : null;
 }
 async function usdToKrw(usd: number): Promise<number> {
   try {

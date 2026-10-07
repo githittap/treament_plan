@@ -1,3 +1,4 @@
+import { parseCardSms } from './card_ledger.mjs';
 /**
  * @typedef {{status:'recorded',eventKind:'purchase',transactionAt:string,currency:string,amount:number,amountKrw:number|null,merchant:string,merchantKey:string}} MarketingRecorded
  * @typedef {{status:'cancellation',transactionAt:string,currency:'KRW',amount:number,amountKrw:number,merchant:string,merchantKey:string}} MarketingCancellation
@@ -11,6 +12,9 @@ export function parseMarketingSms(rawText, receivedAt = new Date().toISOString()
   if (!text) return { status: 'failed', failureCode: 'empty' };
   if (/거절|승인거절|사용불가/i.test(text)) return { status: 'ignored', reason: 'rejected' };
   if (/P사용|포인트\s*결제시차감청구/i.test(text)) return { status: 'ignored', reason: 'points' };
+  const card = parseCardSms(rawText, receivedAt);
+  if (card.status === 'recorded') return parsedPurchase({currency:card.currency,amount:card.amount,date:card.transactionAt,merchant:card.merchant,receivedAt});
+  if (card.status === 'cancellation' && card.currency === 'KRW') return {status:'cancellation',transactionAt:card.transactionAt,currency:'KRW',amount:card.amount,amountKrw:Math.round(card.amount),merchant:sanitizeMerchant(card.merchant),merchantKey:merchantKey(card.merchant)};
   const cancellation = parseSamsungCancellation(text, receivedAt);
   if (/취소|승인취소/i.test(text)) return cancellation || { status: 'failed', failureCode: 'unreadable_fields' };
 
@@ -41,7 +45,7 @@ function parseSamsungCancellation(text, receivedAt) {
 /** @returns {MarketingParseResult} */
 function parsedPurchase({ currency, amount, date, merchant, receivedAt }) {
   const safeMerchant = sanitizeMerchant(merchant);
-  const transactionAt = transactionTimestamp(date, receivedAt);
+  const transactionAt = /\d{4}-\d{2}-\d{2}T/.test(String(date)) ? date : transactionTimestamp(date, receivedAt);
   if (!safeMerchant || !transactionAt || !Number.isFinite(amount) || amount <= 0) {
     return { status: 'failed', failureCode: 'unreadable_fields' };
   }

@@ -89,3 +89,10 @@ test('새 설정 SQL 적용 전에도 기존 비용 화면과 사용량·내보�
   assert.match(target.innerHTML,/DeepSeek|StepFun/);assert.match(target.innerHTML,/₩1,000/);assert.match(target.innerHTML,/기존 광고비 화면/);
   assert.doesNotMatch(target.innerHTML,/원문-표시금지|<th>원문<\/th>/);
 });
+
+test('원문을 없앤 새 결제도 구조화 가맹점으로 같은 AI 분류·합계·내보내기에 들어감',async()=>{
+ const {h}=context({ai_billing_events:[{received_at:'2026-10-06T12:00:00',platform:'AI',amount_krw:12000,raw_text:null,card_merchant:'TYPECAST.AI'}]});
+ assert.equal(h.aicostPlatformKey('AI','',undefined,'TYPECAST.AI'),'Typecast');
+ const target={innerHTML:''};await h.renderAicost(target);assert.match(target.innerHTML,/12,000/);
+ assert.equal(h.billingAiRows([], [{received_at:'2026-10-06T12:00:00',platform:'AI',amount_krw:12000,raw_text:null,card_merchant:'TYPECAST.AI'}],'2026-10')[0].category,'Typecast');
+});

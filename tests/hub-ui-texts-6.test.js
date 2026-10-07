@@ -107,6 +107,7 @@ test('숫자: 만료 알림 일수 하나(정수 목록) · 다른 숫자 18개�
   for(const f of files){
     const t=read(f);
     assert.ok(!/expiry_alert_days/.test(t),f);
+    if(!/contract|근로계약/i.test(t))continue; // SMS 원문 보관기간은 계약 만료 설정과 별개임.
     assert.ok(!/(expir|만료)[^\n]{0,80}interval\s*'(14|30|60) days'/i.test(t)&&!/interval\s*'(14|30|60) days'[^\n]{0,80}(expir|만료)/i.test(t),f+' 에 계약 만료 알림 일수가 박혀 있음');
   }
 });
