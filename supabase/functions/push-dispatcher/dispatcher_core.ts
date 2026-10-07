@@ -95,7 +95,7 @@ export async function processClaimedEvent(
     await db.recordDelivery(event, subscription, outcome, claimToken);
   });
   if (recipientNoLongerAllowed) {
-    await release({ status: "failed", last_error: "recipient no longer authorized for advertising push", next_attempt_at: null });
+    await release({ status: "failed", last_error: event.event_type === "recall_daily" ? "recipient no longer authorized for recall push" : "recipient no longer authorized for advertising push", next_attempt_at: null });
     return { id: event.id, status: "skipped", sent: result.sent, expired: result.expired, failed: result.failed };
   }
   const terminal = result.sent + result.expired >= pendingSubscriptions.length;

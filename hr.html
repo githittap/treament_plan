@@ -3393,10 +3393,11 @@ async function recallSave(index,action){
   catch(e){msg.textContent=recallT('save_error','저장 결과를 확인해 주세요: {msg}. 새로 조회한 뒤 다시 처리하세요.',{msg:e.message});setStatus('error');}
   finally{RECALL_BUSY=false;document.querySelectorAll('.recall-card button,.recall-card select,.recall-card input').forEach(el=>el.disabled=false);}
 }
+async function recallShowJournal(id){TAB='consult';renderNav();await render();if(TAB==='consult')await consultationEdit(id);}
 async function recallOpenJournal(index){
   if(RECALL_BUSY||!recallEnabled())return;const g=RECALL_VISIBLE[index],target=g?.rows.find(r=>r.kind==='inbox'),journal=g?.rows.find(r=>r.kind==='journal');if(!g)return;
-  if(!target){if(journal&&canManageConsultation()){await go('consult');await consultationEdit(journal.id);}return;}
-  RECALL_BUSY=true;try{const {data,error}=await sb.rpc('recall_convert_to_journal',{p_inbox_id:target.id});if(error)throw error;setStatus('saved');if(canManageConsultation()){await go('consult');await consultationEdit(data);}else await recallLoad();}catch(e){const msg=$('#recallList')?.querySelector('[data-recall-index="'+index+'"] .msg');if(msg)msg.textContent=recallT('save_error','저장 결과를 확인해 주세요: {msg}. 새로 조회한 뒤 다시 처리하세요.',{msg:e.message});}finally{RECALL_BUSY=false;}
+  if(!target){if(journal&&canManageConsultation())await recallShowJournal(journal.id);return;}
+  RECALL_BUSY=true;try{const {data,error}=await sb.rpc('recall_convert_to_journal',{p_inbox_id:target.id});if(error)throw error;setStatus('saved');if(canManageConsultation())await recallShowJournal(data);else await recallLoad();}catch(e){const msg=$('#recallList')?.querySelector('[data-recall-index="'+index+'"] .msg');if(msg)msg.textContent=recallT('save_error','저장 결과를 확인해 주세요: {msg}. 새로 조회한 뒤 다시 처리하세요.',{msg:e.message});}finally{RECALL_BUSY=false;}
 }
 
 async function renderInbox(m){
