@@ -24,6 +24,12 @@ function aiBillingDetails(payload: Record<string, unknown>): string {
 }
 
 export function safeNotification(eventType: string, payload: Record<string, unknown> = {}): { title: string; body: string; url: string; tag: string } | null {
+  if (eventType === "recall_daily") {
+    const count = Number(payload.count);
+    if (!Number.isSafeInteger(count) || count < 1) return null;
+    const text = (value: unknown, fallback: string) => typeof value === "string" && value.trim() ? value.replace(/[\u0000-\u001f\u007f]/g, " ").slice(0, 200) : fallback;
+    return { title: text(payload.push_title, "📞 오늘 리콜"), body: text(payload.push_body, "오늘 리콜 {n}명").replace(/\{n\}/g, String(count)), url: "/hr.html?tab=inbox&recall=1", tag: "recall-daily" };
+  }
   if (eventType === "suggestion_commented") {
     const text = (value: unknown, max: number, fallback: string) => typeof value === "string" && value.trim() ? Array.from(value.replace(/[\u0000-\u001f\u007f]/g, " ").trim()).slice(0, max).join("") : fallback;
     const title = text(payload.suggestion_title, 40, ""), name = text(payload.commenter_name, 60, "");

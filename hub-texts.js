@@ -1850,6 +1850,44 @@ function hubTextDefsSpend(add){
   add("spend.chart_weekdays","📈 기간·주기","일,월,화,수,목,금,토","일,월,화,수,목,금,토");
   add("spend.reorder_down","📈 기간·주기","아래로","아래로");
 }
+function hubTextDefsRecall(add){
+  add("recall.journal","📞 리콜 명단","상담일지","상담일지",[]);
+  add("recall.empty","📞 리콜 명단","연락할 사람이 없습니다.","연락할 사람이 없습니다.",[]);
+  add("recall.unassigned","📞 리콜 명단","미배정","미배정",[]);
+  add("recall.unknown","📞 리콜 명단","미상","미상",[]);
+  add("recall.unscheduled","📞 리콜 명단","예정일 없음","예정일 없음",[]);
+  add("recall.contacted","📞 리콜 명단","📞 연락함","📞 연락함",[]);
+  add("recall.reschedule","📞 리콜 명단","예정일 바꾸기","예정일 바꾸기",[]);
+  add("recall.finish","📞 리콜 명단","✅ 리콜 끝","✅ 리콜 끝",[]);
+  add("recall.to_journal","📞 리콜 명단","상담일지로","상담일지로",[]);
+  add("recall.tabs","📞 리콜 명단","문의함 하위 화면","문의함 하위 화면",[]);
+  add("recall.inbox","📞 리콜 명단","📥 문의함","📥 문의함",[]);
+  add("recall.title","📞 리콜 명단","📞 리콜 명단","📞 리콜 명단",[]);
+  add("recall.hint","📞 리콜 명단","문의와 상담일지의 다음 조치를 연락처별로 모았습니다. 예정일이 빠른 순서입니다.","문의와 상담일지의 다음 조치를 연락처별로 모았습니다. 예정일이 빠른 순서입니다.",[]);
+  add("recall.stage","📞 리콜 명단","지금 단계","지금 단계",[]);
+  add("recall.all_stage","📞 리콜 명단","전체 단계","전체 단계",[]);
+  add("recall.assignee","📞 리콜 명단","담당","담당",[]);
+  add("recall.all_assignee","📞 리콜 명단","모든 담당","모든 담당",[]);
+  add("recall.mine","📞 리콜 명단","내 담당만","내 담당만",[]);
+  add("recall.overdue_only","📞 리콜 명단","기한 지남만","기한 지남만",[]);
+  add("recall.refresh","📞 리콜 명단","새로 조회","새로 조회",[]);
+  add("recall.loading","📞 리콜 명단","불러오는 중…","불러오는 중…",[]);
+  add("recall.load_error","📞 리콜 명단","리콜 명단을 불러오지 못했습니다: {msg}","리콜 명단을 불러오지 못했습니다: {msg}",["msg"]);
+  add("recall.summary","📞 리콜 명단","오늘 연락할 사람 {today}명 · 기한 지남 {overdue}명","오늘 연락할 사람 {today}명 · 기한 지남 {overdue}명",["today", "overdue"]);
+  add("recall.note","📞 리콜 명단","연락 메모","연락 메모",[]);
+  add("recall.due","📞 리콜 명단","다음 연락 예정일","다음 연락 예정일",[]);
+  add("recall.save","📞 리콜 명단","저장","저장",[]);
+  add("recall.cancel","📞 리콜 명단","취소","취소",[]);
+  add("recall.need_note","📞 리콜 명단","연락 메모를 입력하세요.","연락 메모를 입력하세요.",[]);
+  add("recall.need_date","📞 리콜 명단","예정일을 입력하세요.","예정일을 입력하세요.",[]);
+  add("recall.save_error","📞 리콜 명단","저장 결과를 확인해 주세요: {msg}. 새로 조회한 뒤 다시 처리하세요.","저장 결과를 확인해 주세요: {msg}. 새로 조회한 뒤 다시 처리하세요.",["msg"]);
+  add("recall.recall_1","📞 리콜 명단","리콜 1차","리콜 1차",[]);
+  add("recall.recall_2","📞 리콜 명단","리콜 2차","리콜 2차",[]);
+  add("recall.recall_3","📞 리콜 명단","리콜 3차","리콜 3차",[]);
+  add("recall.push_title","📞 리콜 명단","📞 오늘 리콜","📞 오늘 리콜",[]);
+  add("recall.push_body","📞 리콜 명단","오늘 리콜 {n}명","오늘 리콜 {n}명",["n"]);
+  add("recall.next_action","📞 리콜 명단","다시 연락","다시 연락",[]);
+}
 function hubTextDefs(){
   if(HUB_TEXT_DEFS_CACHE)return HUB_TEXT_DEFS_CACHE;
   const defs=[];
@@ -1880,6 +1918,7 @@ function hubTextDefs(){
   hubTextDefsChapter3(add);
   hubTextDefsChapter4(add);
   hubTextDefsChapter5(add);
+  if(typeof globalThis!=='undefined'&&globalThis.HUB_RECALL_CATALOG===true)hubTextDefsRecall(add);
   hubTextDefsChapter6(add);
   hubTextDefsChapter7(add);
   const activityTexts={title:'👁 사용 기록',today:'오늘',week:'7일',month:'30일',custom:'직접',all_staff:'모든 직원',all_kind:'모든 종류',from:'시작일',to:'마지막 날',staff:'직원',kind:'종류',time:'날짜 시각',target:'대상',device:'기기',load:'조회',more:'200줄 더 보기',csv:'CSV 내려받기',summary:'직원별 요약',first:'오늘 들어온 시각',last:'마지막 활동',days:'이번 달 접속 일수',empty:'기록 없음',error:'기록을 불러오지 못했음',loading:'불러오는 중…',csv_error:'CSV를 만들지 못했음',enter:'접속',leave:'나감',tab:'탭 열람',click:'클릭',write:'작성·수정·삭제',view:'열람',download:'내려받기·인쇄',csv_name:'허브_사용기록',count:'{n}건 표시 중임',owner_only:'원장만 볼 수 있음',t_notice:'공지',t_consultation_inbox:'상담 문의',t_consultation_inbox_reply:'상담 문의 답변',t_consultation_inbox_handled:'상담 문의 처리',t_suggestions:'건의',t_suggestion_comments:'건의 댓글',t_approval_docs:'결재',t_employee_documents:'직원 서류',t_leave_requests:'연차 신청',t_leave_application_documents:'연차신청서',t_employment_certificates:'재직증명서',t_contracts:'근로계약서',t_consultation_journals:'상담일지',t_hub:'허브'};
@@ -1971,6 +2010,15 @@ const HUB_SETTING_DEFS=[
   {key:'activity_log.exclude_owner',screen:'👁 사용 기록',label:'원장 행동 기록 제외',where:'켜면 원장 본인 행동은 사용 기록에 남기지 않음.',def:'true',kind:'bool'},
 
 ];
+// 리콜 명단을 포함하는 허브에서만 편집 목록을 추가한다. 기존 설정의 순서는 유지한다.
+if(typeof globalThis!=='undefined'&&globalThis.HUB_RECALL_CATALOG===true)HUB_SETTING_DEFS.push(
+{"key":"recall.interval_1","screen":"📞 리콜 기준","label":"리콜 1차 기본 간격","where":"리콜 명단 — 리콜 1차 기본 간격","def":"3","kind":"int","min":1,"max":365,"unit":"일"},
+{"key":"recall.interval_2","screen":"📞 리콜 기준","label":"리콜 2차 기본 간격","where":"리콜 명단 — 리콜 2차 기본 간격","def":"7","kind":"int","min":1,"max":365,"unit":"일"},
+{"key":"recall.interval_3","screen":"📞 리콜 기준","label":"리콜 3차 기본 간격","where":"리콜 명단 — 리콜 3차 기본 간격","def":"14","kind":"int","min":1,"max":365,"unit":"일"},
+{"key":"recall.today_alert","screen":"📞 리콜 기준","label":"오늘 연락 인원 표시","where":"리콜 명단 — 오늘 연락 인원 표시","def":"true","kind":"bool"},
+{"key":"recall.push_enabled","screen":"📞 리콜 기준","label":"아침 9시 리콜 폰 알림","where":"리콜 명단 — 아침 9시 리콜 폰 알림","def":"false","kind":"bool"},
+{"key":"recall.enabled","screen":"📞 리콜 기준","label":"리콜 명단 사용","where":"리콜 명단 — 리콜 명단 사용","def":"true","kind":"bool"}
+);
 function hubSettingDefByKey(key){
   for(let i=0;i<HUB_SETTING_DEFS.length;i++)if(HUB_SETTING_DEFS[i].key===key)return HUB_SETTING_DEFS[i];
   return null;

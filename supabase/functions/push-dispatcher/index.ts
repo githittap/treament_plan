@@ -24,6 +24,9 @@ Deno.serve(async (req) => {
   const vapidPublic = Deno.env.get("VAPID_PUBLIC_KEY"), vapidPrivate = Deno.env.get("VAPID_PRIVATE_KEY"), vapidSubject = Deno.env.get("VAPID_SUBJECT");
   if (!vapidPublic || !vapidPrivate || !vapidSubject) return json({ error: "push sender is not configured" }, 503);
   webpush.setVapidDetails(vapidSubject, vapidPublic, vapidPrivate);
+  // 기존 매분 dispatcher가 오전 9시 이후 담당자별 리콜 큐를 채운다. 실제 발송은 아래 기존 흐름.
+  const { error: recallQueueError } = await supabase.rpc("queue_recall_daily_push");
+  if (recallQueueError) console.error("recall queue failed; continuing existing push events");
   const claimToken = crypto.randomUUID();
   const { data: events, error: eventsError } = await supabase.rpc("claim_push_events", { p_claim_token: claimToken, p_limit: BATCH_SIZE });
   if (eventsError) return json({ error: eventsError.message }, 500);
@@ -42,6 +45,10 @@ Deno.serve(async (req) => {
       },
       canDispatchAiBillingPush: async currentEvent => {
         const { data, error } = await supabase.rpc("can_dispatch_ai_billing_push", { p_event_id: currentEvent.id, p_claim_token: claimToken });
+        return { data: data === true, error };
+      },
+      canDispatchRecallPush: async currentEvent => {
+        const { data, error } = await supabase.rpc("can_dispatch_recall_push", { p_event_id: currentEvent.id, p_claim_token: claimToken });
         return { data: data === true, error };
       },
       getSubscriptions: async () => {

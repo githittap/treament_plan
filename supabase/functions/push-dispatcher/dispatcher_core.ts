@@ -8,6 +8,7 @@ export type DispatcherDb = {
   renewClaim(event: PushEvent, claimToken: string): Promise<void>;
   getProfile(recipientId: string): Promise<{ data: DispatcherProfile; error: DispatcherError | null }>;
   canDispatchAiBillingPush(event: PushEvent): Promise<{ data: boolean; error: DispatcherError | null }>;
+  canDispatchRecallPush?(event: PushEvent): Promise<{ data: boolean; error: DispatcherError | null }>;
   getSubscriptions(recipientId: string): Promise<{ data: Subscription[]; error: DispatcherError | null }>;
   disableUnsafeSubscription(subscription: Subscription): Promise<void>;
   seedDeliveries(event: PushEvent, subscriptions: Subscription[]): Promise<DispatcherError | null>;
@@ -72,6 +73,14 @@ export async function processClaimedEvent(
   let recipientNoLongerAllowed = false;
   const result = await dispatchSubscriptions(event, pendingSubscriptions, async (subscription, payload) => {
     try { await db.renewClaim(event, claimToken); } catch (error) { throw new DispatchAbortError(`claim lease lost before send: ${(error as Error).message}`); }
+    if (event.event_type === "recall_daily") {
+      const authorization = await db.canDispatchRecallPush?.(event);
+      if (!authorization || authorization.error) throw new Error("recall recipient authorization lookup failed");
+      if (!authorization.data) {
+        recipientNoLongerAllowed = true;
+        throw new Error("recipient no longer authorized for recall push");
+      }
+    }
     if (event.event_type.startsWith("ai_billing_") || event.event_type.startsWith("marketing_expense_") || event.event_type === "marketing_budget_alert") {
       const authorization = await db.canDispatchAiBillingPush(event);
       if (authorization.error) throw new Error(`recipient authorization lookup failed: ${authorization.error.message}`);
