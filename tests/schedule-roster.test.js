@@ -500,7 +500,7 @@ test('근무표 연차 조회 오류는 대상과 escape된 메시지만 표시�
 function scheduleMonthRenderHarness({ role = 'staff', leaveRows = [] } = {}) {
   const source = html.match(/async function renderScheduleMonth\([\s\S]*?\r?\n\}\r?\nasync function applyScheduleShift/);
   assert.ok(source, 'renderScheduleMonth 함수를 찾을 수 없습니다.');
-  const helpers = [html.match(/const EMPLOYEE_JOB_GROUPS = \[[\s\S]*?\n\];/)?.[0], html.match(/function employeeJobGroupModel\([\s\S]*?\n\}/)?.[0], html.match(/function scheduleRoleGroupModel\([\s\S]*?\n\}/)?.[0], html.match(/function scheduleHasUnassignedRole\([\s\S]*?\n\}/)?.[0], html.match(/function scheduleMonthWeeks[\s\S]*?\n\}/)?.[0], html.match(/function scheduleShiftOptions[\s\S]*?\n\}/)?.[0], html.match(/function syncScheduleCellValues[\s\S]*?\n\}/)?.[0], html.match(/function scheduleRolePeople[\s\S]*?\n\}/)?.[0], html.match(/function scheduleRoleColor[\s\S]*?\n\}/)?.[0], html.match(/function scheduleRoleCell[\s\S]*?\n\}/)?.[0], html.match(/async function toggleScheduleRoleMember[\s\S]*?\n\}/)?.[0], html.match(/function scheduleMobileRoleDays[\s\S]*?\n\}/)?.[0]].filter(Boolean).join('\n');
+  const helpers = [html.match(/\/\* schedule-half:test-start \*\/([\s\S]*?)\/\* schedule-half:test-end \*\//)?.[1], html.match(/const EMPLOYEE_JOB_GROUPS = \[[\s\S]*?\n\];/)?.[0], html.match(/function employeeJobGroupModel\([\s\S]*?\n\}/)?.[0], html.match(/function scheduleRoleGroupModel\([\s\S]*?\n\}/)?.[0], html.match(/function scheduleHasUnassignedRole\([\s\S]*?\n\}/)?.[0], html.match(/function scheduleMonthWeeks[\s\S]*?\n\}/)?.[0], html.match(/function scheduleShiftOptions[\s\S]*?\n\}/)?.[0], html.match(/function syncScheduleCellValues[\s\S]*?\n\}/)?.[0], html.match(/function scheduleRolePeople[\s\S]*?\n\}/)?.[0], html.match(/function scheduleRoleColor[\s\S]*?\n\}/)?.[0], html.match(/function scheduleRoleCell[\s\S]*?\n\}/)?.[0], html.match(/async function toggleScheduleRoleMember[\s\S]*?\n\}/)?.[0], html.match(/function scheduleMobileRoleDays[\s\S]*?\n\}/)?.[0]].filter(Boolean).join('\n');
   const m = { innerHTML: '' };
   const rows = [{ person_id: 'person-1', user_id: 'user-1', week_start: '2028-01-31', day: 2, shift: 'evening' }, { person_id: 'evening-1', user_id: 'user-2', week_start: '2028-01-31', day: 2, shift: 'evening' }, { person_id: 'work-1', user_id: 'user-3', week_start: '2028-01-31', day: 2, shift: 'work' }, { person_id: 'guest-1', user_id: null, week_start: '2028-02-21', day: 4, shift: 'evening' }, { person_id: 'old-1', user_id: null, week_start: '2028-01-31', day: 2, shift: 'evening' }];
   const weekRows = [{ week_start: '2028-01-31', status: '초안' }, { week_start: '2028-02-07', status: '공표' }, { week_start: '2028-02-14', status: '초안' }, { week_start: '2028-02-21', status: '공표' }, { week_start: '2028-02-28', status: '초안' }];
@@ -1018,7 +1018,7 @@ test('캘린더는 오늘 주간 기본, 주·월 전환과 직무행 숫자 요
 
 test('월간 캘린더 상세 팝업은 근무·OFF·연차·반차를 구분하고 접근 가능한 닫기를 제공한다', () => {
   const source = calendarBlock[1];
-  assert.match(source, /from\('leave_requests'\)\.select\('user_id,type,type_note,date_from,date_to'\)/);
+  assert.match(source, /from\('leave_requests'\)\.select\('user_id,type,type_note,status,date_from,date_to'\)/);
   assert.match(source, /calendarLeaveIndex\(lv\|\|\[\],SCHEDULE_PEOPLE,from,to,nameOf,true\)/);
   assert.match(source, /renderCalendarDayDetail\(/);
   assert.match(source, /calendar-day-detail/);
@@ -1042,7 +1042,7 @@ test('상세 캘린더는 반차 시각과 직원명을 escape하고 연차·반
   const context = { EMPLOYEE_JOB_GROUPS: [{ label: '진료실' }], esc: value => String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'), leaveDisplayText: (type,note) => note ? `${type} · ${note}` : type };
   vm.createContext(context);
   context.render = () => {};
-  vm.runInContext(`${calendarBlock[1]};this.renderCalendarDayDetail=renderCalendarDayDetail;this.calendarLeaveTags=calendarLeaveTags;this.selectCalendarDay=selectCalendarDay;this.closeCalendarDayDetail=closeCalendarDayDetail;this.readCalendarState=()=>[CAL_SELECTED_DATE,CAL_DETAIL_DATE];`, context);
+  vm.runInContext(`${html.match(/\/\* schedule-half:test-start \*\/([\s\S]*?)\/\* schedule-half:test-end \*\//)[1]}\n${calendarBlock[1]};this.renderCalendarDayDetail=renderCalendarDayDetail;this.calendarLeaveTags=calendarLeaveTags;this.selectCalendarDay=selectCalendarDay;this.closeCalendarDayDetail=closeCalendarDayDetail;this.readCalendarState=()=>[CAL_SELECTED_DATE,CAL_DETAIL_DATE];`, context);
   const roster = { departments: { 'Dr.': ['원장 <A>'], 진료실: ['직원 B'] }, evening: [], off: ['직원 C'], etc: [] };
   const leaves = [{ label: '직원 D', type: '연차', type_note: null }, { label: '직원 E', type: '반차', type_note: '오전 09:00~13:00' }];
   const tags = JSON.parse(JSON.stringify(context.calendarLeaveTags(leaves)));

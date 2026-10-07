@@ -78,7 +78,7 @@ test('실제 반차 신청 payload가 조회 결과를 거쳐 캘린더에 시�
   assert.equal(inserted.type,'반차');
   assert.equal(inserted.type_note,'09:00~13:00');
   assert.equal(inserted.days,0.5);
-  assert.match(html, /\.select\(['"]user_id,type,type_note,date_from,date_to['"]\)/);
+  assert.match(html, /\.select\(['"]user_id,type,type_note,status,date_from,date_to['"]\)/);
 
   const calendarSource = html.slice(html.indexOf('function calendarLeaveIndex'), html.indexOf('function scheduleRowsWithoutApprovedLeave'))
     + extractFunction('leaveDisplayText','mondayStr')

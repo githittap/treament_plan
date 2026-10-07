@@ -100,7 +100,7 @@ test('schedule cells mark selected names and keep empty and leave summaries', ()
     esc: value => String(value),
     leaveDisplayText: value => value
   };
-  vm.runInNewContext(`${hr.slice(start, end)};this.render=scheduleRoleCell;`, context);
+  vm.runInNewContext(`${hr.match(/\/\* schedule-half:test-start \*\/([\s\S]*?)\/\* schedule-half:test-end \*\//)[1]}\n${hr.slice(start, end)};this.render=scheduleRoleCell;`, context);
   const people = [
     { id: 1, name: '가상 Dr 정원장', department: 'Dr.', active: true, included_in_schedule: true },
     { id: 2, name: '가상 미선택 Dr', department: 'Dr.', active: true, included_in_schedule: true }

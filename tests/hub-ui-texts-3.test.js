@@ -5,9 +5,10 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const root=path.join(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p),'utf8');
 const js=read('hub-texts.js'),hrRaw=read('hr.html'),hr=hrRaw.replace(/\r\n/g,'\n');
 const {renderAll,tablesFor}=require('./fixtures/hub3-harness.cjs');
-const golden={...JSON.parse(read('tests/fixtures/hub3-golden-84053a7.json')),...JSON.parse(read('tests/fixtures/p7-leave-golden.json'))}; // P7가 정한 연차 원장 카드만 새 기준, 그 밖은 옛 기준 유지
+const golden={...JSON.parse(read('tests/fixtures/hub3-golden-84053a7.json')),...JSON.parse(read('tests/fixtures/p7-leave-golden.json')),...JSON.parse(read('tests/fixtures/schedule-halfday-golden.json'))}; // 승인된 반차만 보이는 근무표·P7 연차 원장 카드는 새 기준, 나머지는 옛 기준 유지
 const clone=x=>JSON.parse(JSON.stringify(x));
-const CH3=/^(?!(?:att\.(?:week|staff_month)\.|leave\.(?:change\.|my\.(?:used|pending|unit)$)))(att|sched|leave)\./;
+// 반차 전용 다섯 키는 schedule-halfday.test.js에서 실제 설정 엔진·세 화면으로 확인함.
+const CH3=/^(?!sched\.half\.)(?!(?:att\.(?:week|staff_month)\.|leave\.(?:change\.|my\.(?:used|pending|unit)$)))(att|sched|leave)\./;
 // P7에서 허용된 시간 입력 연결 속성과 숨긴 모바일 입력만 제외해 PC의 기존 글·배치를 계속 대조한다.
 function attendanceLegacyLayout(value){return String(value)
   .replace(/<button class="mini(?: rej)?" onclick="requestLeaveChange\(\d+,'(?:cancel|half)'\)">[^<]*<\/button>\s?/g,'')
@@ -332,7 +333,7 @@ test('연차 유형 이름: 보이는 이름만 바뀌고 저장되는 값(코�
   assert.match(out['leave.render.chief'],/<td>반일 휴가\(09:00~13:00\)<\/td>/,'승인 대기 표');
   assert.match(out['leave.form.html'],/휴가종류<\/th><td[^>]*>일찍 퇴근 \(13:00~15:00\)</,'휴가 신청서');
   assert.equal(JSON.parse(out['leave.displayText'])[0],'정기 휴가');assert.equal(JSON.parse(out['leave.displayText'])[1],'반일 휴가 · 09:00~13:00');assert.equal(JSON.parse(out['leave.displayText'])[4],'정기 휴가','모르는 유형은 연차 취급(기존 규칙)');
-  assert.match(out['sched.month.staff'],/반일 휴가 · 09:00~13:00|정기 휴가/);
+  assert.match(out['sched.month.staff'],/일찍 퇴근 · 13:00~15:00/);
   // 신청 창 선택칸: 값은 코드, 보이는 글은 새 이름
   const P=await renderAll(hr,{engine:true,textRows:[],settings,probe:true});
   const r=await P.asMgr('staff',{document:{querySelectorAll:()=>[]}});
