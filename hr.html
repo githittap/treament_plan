@@ -2462,10 +2462,13 @@ function toolsListHtml(role){
 }
 function openTool(code){const c=TOOL_CARDS.find(x=>x.code===code);if(!c||!toolCanSee(c,ME.role))return false;TOOLS_OPEN=code;render();return true;}
 function closeTool(){TOOLS_OPEN='';render();}
+/* 도구 페이지의 「← 홈」(index.html)은 iframe 안에서 첫 화면을 다시 띄움 → 같은 주소 도구면 그 링크를 「도구 목록으로 돌아가기」로 바꿔 끼운다(도구 파일은 그대로) */
+function toolHomeHref(h){h=String(h||'').trim();return /^(\.\/)?index\.html([?#].*)?$/i.test(h)||h==='/'||h==='./';}
+function toolFrameLoaded(frame){let n=0;try{const d=frame&&frame.contentDocument;if(!d)return 0;d.querySelectorAll('a[href]').forEach(a=>{if(!toolHomeHref(a.getAttribute('href')))return;a.setAttribute('href','#');a.removeAttribute('target');a.addEventListener('click',e=>{e.preventDefault();closeTool();});n++;});}catch(e){return 0;}return n;}
 function renderTools(m){
   const card=TOOLS_OPEN?TOOL_CARDS.find(x=>x.code===TOOLS_OPEN&&toolCanSee(x,ME.role)):null;
   if(TOOLS_OPEN&&!card)TOOLS_OPEN='';
-  if(card){const url=esc(toolUrl(card)),title=esc(toolText(card,'title'));m.innerHTML=`<div class="card"><div class="tools-bar"><button type="button" class="mini" onclick="closeTool()">${esc(hubT('tools.back','← 도구 목록'))}</button><b>${title}</b><a class="mini" href="${url}" target="_blank" rel="noopener">${esc(hubT('tools.newwin','새 창'))}</a></div><iframe class="tools-frame" src="${url}" title="${title}"></iframe></div>`;return;}
+  if(card){const url=esc(toolUrl(card)),title=esc(toolText(card,'title'));m.innerHTML=`<div class="card"><div class="tools-bar"><button type="button" class="mini" onclick="closeTool()">${esc(hubT('tools.back','← 도구 목록'))}</button><b>${title}</b><a class="mini" href="${url}" target="_blank" rel="noopener">${esc(hubT('tools.newwin','새 창'))}</a></div><iframe class="tools-frame" src="${url}" title="${title}" onload="toolFrameLoaded(this)"></iframe></div>`;return;}
   m.innerHTML=`<div class="card"><h2>${esc(hubT('tools.title','🧰 도구'))}</h2>${toolsListHtml(ME.role)}</div>`;
 }
 /* hub-tools:test-end */

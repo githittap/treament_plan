@@ -27,7 +27,7 @@ function make({role='staff',settings={},texts=[]}={}){
   vm.runInContext('function hubT(k,d,v){return hubText(k,d,v);}',ctx);
   vm.runInContext(`const TABS=[${tabsSource}\n];const MENU=[${menuSource}\n];${menuBlock}${toolsBlock}
     this.TABS=TABS;this.MENU=MENU;this.TOOL_CARDS=TOOL_CARDS;this.toolsVisibleCards=toolsVisibleCards;this.toolsAnyVisible=toolsAnyVisible;this.toolsListHtml=toolsListHtml;
-    this.openTool=openTool;this.closeTool=closeTool;this.renderTools=renderTools;this.visibleTabKeys=visibleTabKeys;this.tabLabel=tabLabel;this.renderNav=renderNav;
+    this.openTool=openTool;this.closeTool=closeTool;this.toolFrameLoaded=toolFrameLoaded;this.toolHomeHref=toolHomeHref;this.renderTools=renderTools;this.visibleTabKeys=visibleTabKeys;this.tabLabel=tabLabel;this.renderNav=renderNav;
     this.getOpen=()=>TOOLS_OPEN;this.setOpen=v=>{TOOLS_OPEN=v;};`,ctx);
   ctx.hubSettingSetValues(settings);
   ctx.hubTextSetOverrides(texts);
@@ -122,7 +122,7 @@ test('카드를 열면 같은 사이트 상대경로 iframe(한글 파일명은 
   const m={innerHTML:''};env.ctx.renderTools(m);
   const url=encodeURI('기공차트_리메이크장부_서식.html');
   assert.ok(url.includes('%'),'한글이 인코딩됨');
-  assert.ok(m.innerHTML.includes('<iframe class="tools-frame" src="'+url+'" title="기공차트 · 리메이크 장부"></iframe>'));
+  assert.ok(m.innerHTML.includes('<iframe class="tools-frame" src="'+url+'" title="기공차트 · 리메이크 장부" onload="toolFrameLoaded(this)"></iframe>'));
   assert.ok(m.innerHTML.includes('<a class="mini" href="'+url+'" target="_blank" rel="noopener">새 창</a>'));
   assert.ok(m.innerHTML.includes('onclick="closeTool()">← 도구 목록</button>'));
   assert.ok(!/src="\/|src="https?:|href="https?:/.test(m.innerHTML),'같은 사이트 상대경로');
@@ -211,4 +211,22 @@ test('글·설정 등록: 새 글 32개와 보는 사람 설정 10개(enum all/l
   }
   // 코드 쪽 기본 보는 사람(hr.html)도 같은 값
   for(const c of cards)assert.equal(c.who,sets.find(d=>d.key==='tools.who.'+c.code).def,c.code);
+});
+
+test('도구 안 「← 홈」(index.html)은 iframe 안에서 첫 화면 대신 도구 목록으로 돌아간다 — 다른 링크는 그대로',()=>{
+  const env=make({role:'staff'});
+  assert.match(env.ctx.renderTools.toString(),/onload="toolFrameLoaded\(this\)"/);
+  for(const h of ['index.html','./index.html','index.html#x','/','./'])assert.ok(env.ctx.toolHomeHref(h),h);
+  for(const h of ['hr.html','https://jung-plant.com/','index.htmlx','#','other/index.html'])assert.ok(!env.ctx.toolHomeHref(h),h);
+  const mk=href=>{const a={attrs:{href,target:'_top'},handlers:[],getAttribute(k){return this.attrs[k];},setAttribute(k,v){this.attrs[k]=v;},removeAttribute(k){delete this.attrs[k];},addEventListener(t,f){this.handlers.push(f);}};return a;};
+  const home=mk('index.html'),other=mk('hr.html');
+  const frame={contentDocument:{querySelectorAll:()=>[home,other]}};
+  env.ctx.setOpen('news');
+  assert.equal(env.ctx.toolFrameLoaded(frame),1);
+  assert.equal(home.attrs.href,'#');assert.equal(home.attrs.target,undefined);
+  assert.equal(other.attrs.href,'hr.html');assert.equal(other.handlers.length,0);
+  let prevented=false;home.handlers[0]({preventDefault(){prevented=true;}});
+  assert.ok(prevented);assert.equal(env.ctx.getOpen(),'','목록으로 돌아감');
+  assert.equal(env.ctx.toolFrameLoaded({get contentDocument(){throw new Error('cross-origin');}}),0,'다른 주소 도구는 건드리지 않음');
+  assert.equal(env.ctx.toolFrameLoaded(null),0);
 });
