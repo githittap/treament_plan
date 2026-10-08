@@ -435,7 +435,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 <script src="hub-intro.js?v=2026100503"></script>
 <script>window.HUB_RECALL_CATALOG=true;</script>
 <script src="card-ledger-ui.js?v=2026100803"></script>
-<script src="hub-texts.js?v=2026100803"></script>
+<script src="hub-texts.js?v=2026100804"></script>
 <script src="hub-activity.js?v=2026100601"></script>
 <script src="security-pledge.js?v=20261003p9d"></script>
 <script src="wage-hourly.js?v=2026100401"></script>
@@ -4327,11 +4327,13 @@ const OWNER_BOARDS=[
 function ownerBoardTexts(board){const m={busd_ledger:{title:h7T('ob.busd_title','📒 뻐스디 장부'),description:h7T('ob.busd_desc','AI 일 장부')},pin_board:{title:h7T('ob.pin_title','📌 명심판'),description:h7T('ob.pin_desc','AI가 지킬 약속')},wordbook:{title:h7T('ob.word_title','📖 박제 단어장'),description:h7T('ob.word_desc','원장이 알아 둘 말')},inbox:{title:h7T('ob.inbox_title','📥 인박스 경고'),description:h7T('ob.inbox_desc','AI가 남긴 최근 경고·대기')}};return m[board.slug]||{title:board.title,description:board.description};}
 function ownerBoardsTimestamp(value){return value?hubFmtDateTime(value):'';}
 function ownerBoardsMissing(error){return !!error&&(error.code==='42P01'||error.code==='PGRST205'||Number(error.status)===404);}
+function ownerLookerUrl(){const raw=String(h7T('ob.looker_url','https://datastudio.google.com/reporting/9c7dbbdd-aace-474d-9a7f-3e71bb663f7c')).trim();return /^https:\/\/[^\s\/?#<>"'\\`@:]+(?:[\/?#][^\s<>"'\\`]*)?$/i.test(raw)?raw:'';}
+function ownerLookerButtonHtml(){const url=ownerLookerUrl();return url?'<div class="rowflex" style="margin:4px 0 10px"><a class="hbtn pri" style="text-decoration:none;display:inline-block" id="ownerLookerBtn" href="'+h7X(url)+'" target="_blank" rel="noopener noreferrer">'+h7X(h7T('ob.looker_btn','📊 루커 분석 열기'))+'</a></div>':'';}
 function ownerBoardsPanelHtml(rows,error){
   const bySlug=new Map((rows||[]).map(row=>[row.slug,row]));
   const cards=OWNER_BOARDS.map(board=>{const row=bySlug.get(board.slug),synced=row&&row.synced_at?esc(h7T('ob.synced','마지막으로 올라온 때 {when}',{when:ownerBoardsTimestamp(row.synced_at)})):esc(h7T('ob.not_synced','아직 PC에서 올라오지 않음'));return `<button type="button" class="card owner-board-card" data-owner-board="${board.slug}" onclick="openOwnerBoard('${board.slug}')"><strong>${esc(ownerBoardTexts(board).title)}</strong><span>${esc(ownerBoardTexts(board).description)}</span><small>${synced}</small></button>`;}).join('');
   const notice=error?(ownerBoardsMissing(error)?'<div class="hint">'+esc(h7T('ob.preparing','원장 보기판이 준비 중입니다.'))+'</div>':`<div class="cal-error">${esc(h7T('ob.list_err','원장 보기판 목록을 불러오지 못했습니다: {detail}',{detail:error.message||h7T('ob.list_err_unknown','조회 오류')}))}</div>`):'';
-  return `<section class="card" id="ownerBoardsPanel"><h2>${esc(h7T('ob.title','📒 원장 보기판'))} <span class="sub">${esc(h7T('ob.sub','원장 전용'))}</span></h2>${notice}<div class="owner-board-grid">${cards}</div><div id="ownerBoardViewer" hidden></div></section>`;
+  return `<section class="card" id="ownerBoardsPanel"><h2>${esc(h7T('ob.title','📒 원장 보기판'))} <span class="sub">${esc(h7T('ob.sub','원장 전용'))}</span></h2>${ownerLookerButtonHtml()}${notice}<div class="owner-board-grid">${cards}</div><div id="ownerBoardViewer" hidden></div></section>`;
 }
 async function renderOwnerBoards(m){
   if(ME.role!=='owner'){m.innerHTML='<div class="card"><div class="empty">'+esc(h7T('ob.owner_only','원장 전용입니다.'))+'</div></div>';return;}

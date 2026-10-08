@@ -1460,6 +1460,8 @@ function hubTextDefsChapter7(add){
   add('ob.loading',S5,'원장 보기판 — 판을 불러오는 동안 보이는 글','판을 불러오는 중…');
   add('ob.unknown_time',S5,'원장 보기판 — 판 보기 화면에서 올라온 시각을 모를 때','확인되지 않음');
   add('ob.view_err',S5,'원장 보기판 — 판을 못 불러왔을 때. {detail}은 오류 글','판을 불러오지 못했습니다: {detail}',['detail']);
+  add('ob.looker_btn',S5,'원장 보기판 — 맨 위 루커(데이터 스튜디오) 분석 보고서를 새 창으로 여는 단추 글','📊 루커 분석 열기');
+  add('ob.looker_url',S5,'원장 보기판 — 루커 단추가 여는 보고서 주소(https로 시작해야 함 · 비우면 단추 숨김)','https://datastudio.google.com/reporting/9c7dbbdd-aace-474d-9a7f-3e71bb663f7c');
   add('ob.png_note',S5,'원장 보기판 — 판 보기 화면 맨 위 작은 글','PNG 저장은 PC 판에서만 됨 · 허브에서는 PDF 저장을 쓰세요');
   add('ob.btn_close',S5,'원장 보기판 — 판 보기 화면의 닫기 단추 글','닫기');
   add('mkt.opt_default',S6,'마케팅비 — 분류 고르는 칸의 맨 위 항목(개별 분류·가맹점 기본 분류가 아니라 「기본 분류를 따름」 뜻)','기본 분류 사용');
