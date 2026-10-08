@@ -74,6 +74,11 @@ test('그래프: 날짜별 SVG·평소 범위 띠·평균선·간격 점선과 �
  const c=harness({'spend.default_days':'7'}),out=c.SpendUi.marketing(chartRows(),[{merchant_key:'google',category:'google'}],[]);
  assert.match(out,/<svg[^>]+data-spend-chart="daily"/);assert.match(out,/spend-baseline-band/);assert.match(out,/spend-baseline-mean/);assert.match(out,/data-spend-chart="interval"/);assert.match(out,/stroke-dasharray/);assert.match(out,/<title>2026-10-05 · ₩100<\/title>/);assert.match(out,/viewBox=/);assert.match(out,/width:100%/);assert.match(out,/🟢 평소 범위 안/);
 });
+test('그래프 모양: 본문 글꼴·가로 눈금선·위만 둥근 막대·간격 점 잇는 선과 평소 띠',()=>{
+ const c=harness({'spend.default_days':'7'}),out=c.SpendUi.marketing(chartRows(),[{merchant_key:'google',category:'google'}],[]);
+ assert.match(out,/font-family:inherit/);assert.ok((out.match(/class="spend-grid"/g)||[]).length>=6);assert.match(out,/<path class="spend-bar[^"]*"[^>]* d="M[^"]*Q/);assert.doesNotMatch(out,/<rect class="spend-bar/);
+ assert.match(out,/class="spend-val"/);assert.match(out,/class="spend-gap-line"/);assert.doesNotMatch(out,/spend-interval-band/);const irregular=[...[0,3,8,10,15,19,22,30,36,41,50].map(i=>row('irr'+i,100,{transaction_at:anomalyDay('2026-08-04',i)+'T12:00:00+09:00'})),...[0,1,2,3,4,5,6].map(i=>row('recent'+i,100,{transaction_at:anomalyDay('2026-09-29',i)+'T12:00:00+09:00'}))],sd=c.SpendUi.marketing(irregular,[{merchant_key:'google',category:'google'}],[]);assert.match(sd,/class="spend-interval-band"/);assert.doesNotMatch(out,/font-size:20px/);
+});
 test('그래프: 과다·단축·정상·부족 네 상태와 빨간 막대·점이 나온다',()=>{
  const c=harness({'spend.default_days':'7'}),rules=[{merchant_key:'google',category:'google'}];
  const excess=c.SpendUi.marketing(chartRows('excess'),rules,[]);assert.match(excess,/data-spend-anomaly="excess"/);assert.match(excess,/spend-spike/);assert.match(excess,/최근 7일 2,100원/);assert.match(excess,/평소 7일 평균 700원보다 \+200.0%/);

@@ -75,10 +75,10 @@
     const baseDays=daily(before,start,end),days=daily(selected,w.start,w.end),dayStats=stats(baseDays.map(x=>x.amount)),weekTotals=[];
     for(let i=0;i<baseDays.length;i+=7)weekTotals.push(baseDays.slice(i,i+7).reduce((sum,x)=>sum+x.amount,0));
     const weekStats=stats(weekTotals),purchases=rows=>rows.filter(e=>e.kind==='purchase'&&e.amount>=0).sort((a,b)=>a.time-b.time),gaps=rows=>rows.slice(1).map((e,i)=>({date:e.date,days:(e.time-rows[i].time)/DAY})),gapAvg=points=>points.length?points.reduce((sum,x)=>sum+x.days,0)/points.length:null;
-    const basePurchases=purchases(before),payments=purchases(selected),points=gaps(payments),recent=payments.slice(-recentPayments),baselineAvg=gapAvg(gaps(basePurchases)),recentAvg=gapAvg(gaps(recent));
+    const basePurchases=purchases(before),payments=purchases(selected),points=gaps(payments),recent=payments.slice(-recentPayments),baseGaps=gaps(basePurchases),baselineAvg=gapAvg(baseGaps),baselineSd=baseGaps.length>=2?Math.sqrt(baseGaps.reduce((sum,x)=>sum+(x.days-baselineAvg)**2,0)/baseGaps.length):null,recentAvg=gapAvg(gaps(recent));
     const baselineEvents=before.filter(e=>(e.kind==='purchase'||e.kind==='usage')&&e.amount>=0).length,insufficient=baselineEvents<minimum;
     const recent7=days.slice(-7).reduce((sum,x)=>sum+x.amount,0),z=weekStats.sd===0?null:(recent7-weekStats.avg)/weekStats.sd,pct=weekStats.avg===0?null:(recent7-weekStats.avg)/Math.abs(weekStats.avg)*100,intervalPct=baselineAvg>0&&recentAvg!=null?(baselineAvg-recentAvg)/baselineAvg*100:null;
-    return {insufficient,baseline:{start,end,events:baselineEvents,dayAvg:dayStats.avg,daySd:dayStats.sd,weekAvg:weekStats.avg,weekSd:weekStats.sd,intervalAvg:baselineAvg},
+    return {insufficient,baseline:{start,end,events:baselineEvents,dayAvg:dayStats.avg,daySd:dayStats.sd,weekAvg:weekStats.avg,weekSd:weekStats.sd,intervalAvg:baselineAvg,intervalSd:baselineSd},
       excess:{flag:!insufficient&&((z!=null&&z>=zThreshold)||(pct!=null&&pct>=excessPct)),recent7,z,pct},
       spikes:insufficient?[]:days.filter(x=>x.amount>dayStats.avg+zThreshold*dayStats.sd),
       interval:{flag:!insufficient&&intervalPct!=null&&intervalPct>=shrinkPct,recentAvg,baselineAvg,pct:intervalPct},

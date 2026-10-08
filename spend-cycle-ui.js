@@ -68,41 +68,66 @@
     const payments=selected.filter(e=>e.kind==='purchase'&&e.amount>=0).sort((a,b)=>new Date(a.at)-new Date(b.at));
     const weekly=a.days.length>60,spikeDates=new Set(a.spikes.map(x=>x.date)),buckets=[];
     for(let i=0;i<a.days.length;i+=weekly?7:1){const part=a.days.slice(i,i+(weekly?7:1)),from=part[0].date,to=part.at(-1).date;buckets.push({date:from,end:to,amount:part.reduce((sum,x)=>sum+x.amount,0),count:part.length,payments:payments.filter(e=>{const d=root.SpendCycle.date(e.at);return d>=from&&d<=to;}).length,spike:part.some(x=>spikeDates.has(x.date))});}
-    const W=640,H=235,L=130,R=14,T=18,B=40,PW=W-L-R,PH=H-T-B;
+    /* 글자는 화면 실제 크기(px) 그대로 보이도록 폭을 창 폭에 맞춰 그림(폰 375px에서도 12px 안팎) */
+    const vw=Number(root.innerWidth)||0,W=vw?Math.max(280,Math.min(640,vw-84)):640,H=W<460?210:235,R=12,T=22,B=30,PH=H-T-B,FS=12;
+    const r1=v=>Math.round(v*10)/10;
+    const tw=s=>String(s).split('').reduce((sum,c)=>sum+(c.charCodeAt(0)>0x2e80?FS:/[0-9]/.test(c)?FS*0.56:c===' '?FS*0.3:FS*0.5),0);
+    const niceStep=span=>{const p=10**Math.floor(Math.log10(span/4));for(const m of [1,2,5,10])if(span/(m*p)<=4)return m*p;return 10*p;};
+    const scaleFor=(lo,hi)=>{const step=niceStep(Math.max(1e-9,hi-lo)),min=lo<0?Math.floor(lo/step)*step:0,max=Math.max(step,Math.ceil(hi/step-1e-9)*step),ticks=[];for(let k=0;min+k*step<=max+step*1e-6;k++)ticks.push(Math.round((min+k*step)*1e6)/1e6);return {min,max,ticks};};
     const band=buckets.map(x=>({avg:a.baseline.dayAvg*x.count,sd:a.baseline.daySd*x.count}));
     const values=buckets.map(x=>x.amount);if(!a.insufficient)band.forEach(x=>values.push(Math.max(0,x.avg-x.sd),x.avg+x.sd));
-    const low=Math.min(0,...values),high=Math.max(1,...values),y=value=>T+(high-value)/(high-low)*PH,x=i=>L+i/buckets.length*PW,step=PW/buckets.length;
-    const shell=(type,label,content,extra='')=>'<svg data-spend-chart="'+type+'" '+extra+' role="img" aria-label="'+esc(label)+'" viewBox="0 0 '+W+' '+H+'" style="display:block;width:100%;max-width:640px;height:auto;max-height:240px;overflow:hidden;font-size:20px;fill:var(--ink,#263b42)"><title>'+esc(label)+'</title>'+content+'</svg>';
+    const sc=scaleFor(Math.min(0,...values),Math.max(1,...values)),yLabel=v=>token&&v===0?'0':format(v,token);
+    const labelsOf=(ticks,fn)=>{const out=[];let prev=null;for(const v of ticks){const s=fn(v);out.push(s===prev?'':s);prev=s;}return out;};
+    const yTexts=labelsOf(sc.ticks,yLabel),L=Math.max(40,Math.ceil(Math.max(...yTexts.map(tw)))+12),PW=W-L-R;
+    const y=value=>T+(sc.max-value)/(sc.max-sc.min)*PH,x=i=>L+i/buckets.length*PW,step=PW/buckets.length;
+    const gridLines=(left,ticks,texts,yf)=>ticks.map((v,i)=>'<line class="spend-grid" x1="'+left+'" x2="'+(W-R)+'" y1="'+r1(yf(v))+'" y2="'+r1(yf(v))+'" stroke="'+(v===0?'var(--gray,#7f949c)':'var(--line,#d9e3e7)')+'" stroke-width="1" opacity="'+(v===0?'0.45':'1')+'"/>'+(texts[i]?'<text class="spend-axis" x="'+(left-8)+'" y="'+r1(yf(v)+4)+'" text-anchor="end">'+esc(texts[i])+'</text>':'')).join('');
+    const xTicks=(count,xf,dateOf)=>[...new Set([0,Math.floor((count-1)/2),count-1])].map(i=>'<text class="spend-axis" x="'+r1(xf(i))+'" y="'+(H-9)+'" text-anchor="'+(i===0?'start':i===count-1?'end':'middle')+'">'+esc(dateOf(i))+'</text>').join('');
+    const halo='paint-order:stroke;stroke:var(--card,#fff);stroke-width:3px;stroke-linejoin:round';
+    const shell=(type,label,content,extra='')=>'<svg data-spend-chart="'+type+'" '+extra+' role="img" aria-label="'+esc(label)+'" viewBox="0 0 '+W+' '+H+'" style="display:block;width:100%;max-width:'+W+'px;height:auto;overflow:hidden;font-family:inherit;font-size:'+FS+'px;fill:var(--gray,#7f949c)"><title>'+esc(label)+'</title>'+content+'</svg>';
     const box='<div data-spend-detail hidden role="status" aria-live="polite" style="box-sizing:border-box;max-width:100%;overflow-wrap:anywhere;border:1px solid var(--line,#d9e3e7);border-radius:8px;padding:8px;margin:6px 0;background:var(--bg,#fff)"></div>';
     const action=text=>token?'':' role="button" tabindex="0" aria-pressed="false" aria-label="'+esc(text)+'" data-spend-detail-text="'+esc(text)+'" onclick="SpendUi.detail(this,event)" onkeydown="SpendUi.detail(this,event)" style="cursor:pointer"';
-    let plot='';
+    /* 막대: 칸 폭의 85%(너무 넓은 칸은 48px까지), 위쪽 끝만 둥글게 */
+    const bw=Math.min(step*0.85,48),bx=i=>x(i)+(step-bw)/2;
+    const barPath=(x0,amount)=>{const w=r1(bw),x1=r1(x0),zero=y(0),end=y(amount),rr=Math.min(4,w/2);
+      if(amount>=0){const top=Math.min(end,zero-1.5),h=zero-top,c=Math.min(rr,h);return 'M'+x1+','+r1(zero)+' V'+r1(top+c)+' Q'+x1+','+r1(top)+' '+r1(x1+c)+','+r1(top)+' H'+r1(x1+w-c)+' Q'+r1(x1+w)+','+r1(top)+' '+r1(x1+w)+','+r1(top+c)+' V'+r1(zero)+' Z';}
+      const bottom=Math.max(end,zero+1.5),h=bottom-zero,c=Math.min(rr,h);return 'M'+x1+','+r1(zero)+' H'+r1(x1+w)+' V'+r1(bottom-c)+' Q'+r1(x1+w)+','+r1(bottom)+' '+r1(x1+w-c)+','+r1(bottom)+' H'+r1(x1+c)+' Q'+x1+','+r1(bottom)+' '+x1+','+r1(bottom-c)+' Z';};
+    let plot=gridLines(L,sc.ticks,yTexts,y);
     if(!a.insufficient){
-      plot+=band.map((b,i)=>'<rect class="spend-baseline-band" x="'+x(i)+'" y="'+y(b.avg+b.sd)+'" width="'+step+'" height="'+Math.max(1,y(Math.max(0,b.avg-b.sd))-y(b.avg+b.sd))+'" fill="var(--mint,#39a894)" opacity="0.15"/>').join('');
-      plot+='<path class="spend-baseline-mean" d="'+band.map((b,i)=>(i?'L':'M')+x(i)+','+y(b.avg)+' L'+x(i+1)+','+y(b.avg)).join(' ')+'" fill="none" stroke="var(--mint,#39a894)" stroke-dasharray="5 4"/>';
+      plot+=band.map((b,i)=>'<rect class="spend-baseline-band" x="'+r1(x(i))+'" y="'+r1(y(b.avg+b.sd))+'" width="'+r1(step)+'" height="'+r1(Math.max(1,y(Math.max(0,b.avg-b.sd))-y(b.avg+b.sd)))+'" fill="var(--mint,#39a894)" opacity="0.15"/>').join('');
+      plot+='<path class="spend-baseline-mean" d="'+band.map((b,i)=>(i?'L':'M')+r1(x(i))+','+r1(y(b.avg))+' L'+r1(x(i+1))+','+r1(y(b.avg))).join(' ')+'" fill="none" stroke="var(--mint,#39a894)" stroke-width="1.2" stroke-dasharray="5 4"/>';
     }
-    plot+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y(0)+'" y2="'+y(0)+'" stroke="var(--line,#d9e3e7)"/>';
     plot+=buckets.map((b,i)=>{
       const date=weekly?t('chart_period',{start:b.date.slice(5),end:b.end.slice(5)}):t('chart_date',{date:b.date,weekday:t('chart_weekdays').split(',')[new Date(b.date+'T00:00:00Z').getUTCDay()]}),text=t('chart_detail',{date,amount:exact(b.amount),count:b.payments});
-      return '<rect class="spend-bar'+(b.spike?' spend-spike':'')+'"'+action(text)+' x="'+(x(i)+step*0.12)+'" y="'+Math.min(y(0),y(b.amount))+'" width="'+step*0.76+'" height="'+Math.max(1,Math.abs(y(0)-y(b.amount)))+'" fill="'+(b.spike?'var(--red,#b83f42)':'var(--mint,#39a894)')+'"><title>'+esc(t('chart_value',{date:weekly?t('chart_period',{start:b.date,end:b.end}):b.date,amount:token?format(b.amount,true):exact(b.amount)}))+'</title></rect>';
+      return '<path class="spend-bar'+(b.spike?' spend-spike':'')+'"'+action(text)+' d="'+barPath(bx(i),b.amount)+'" fill="'+(b.spike?'var(--red,#b83f42)':'var(--mint,#39a894)')+'"'+(b.amount===0?' fill-opacity="0.4"':'')+'><title>'+esc(t('chart_value',{date:weekly?t('chart_period',{start:b.date,end:b.end}):b.date,amount:token?format(b.amount,true):exact(b.amount)}))+'</title></path>';
     }).join('');
-    const ticks=[...new Set([0,Math.floor((buckets.length-1)/2),buckets.length-1])];
-    plot+=ticks.map(i=>'<text x="'+(x(i)+step/2)+'" y="'+(H-16)+'" text-anchor="'+(i===0?'start':i===buckets.length-1?'end':'middle')+'">'+esc(buckets[i].date.slice(5))+'</text>').join('');
-    plot+=[high,(low+high)/2,low].map(value=>'<text x="'+(L-8)+'" y="'+(y(value)+4)+'" text-anchor="end">'+esc(token&&value===0?'0':format(value,token))+'</text>').join('');
+    /* 큰 막대(최대의 50% 이상) 위 금액 — 큰 것부터 놓고 글자가 겹치면 생략 */
+    const peak=Math.max(0,...buckets.map(b=>b.amount)),placed=[];
+    buckets.map((b,i)=>({b,i})).filter(o=>peak>0&&o.b.amount>0&&o.b.amount>=peak*0.5).sort((p,q)=>q.b.amount-p.b.amount).forEach(o=>{
+      const s=format(o.b.amount,token),w=tw(s),cx=x(o.i)+step/2,x0=Math.max(L,Math.min(cx-w/2,W-R-w));
+      if(placed.some(p=>x0<p[1]+4&&x0+w>p[0]-4))return;placed.push([x0,x0+w]);
+      plot+='<text class="spend-val" x="'+r1(x0+w/2)+'" y="'+r1(y(o.b.amount)-5)+'" text-anchor="middle" style="'+halo+';fill:'+(o.b.spike?'var(--red,#b83f42)':'var(--ink,#263b42)')+'">'+esc(s)+'</text>';
+    });
+    plot+=xTicks(buckets.length,i=>x(i)+step/2,i=>buckets[i].date.slice(5));
     const label=t(weekly?'chart_weekly':token?'chart_tokens':'chart_daily');
     let out='<div data-spend-chart-wrap style="margin:12px 0;min-width:0"><b>'+esc(label)+'</b>'+box+shell('daily',label,plot,'data-spend-bucket="'+(weekly?'week':'day')+'"')+(a.insufficient?'':'<div class="sub">'+esc(t('chart_range'))+' · '+esc(t('chart_mean'))+' · <span style="color:var(--red,#b83f42)">'+esc(t('chart_spike'))+'</span></div>')+'</div>';
     if(token||!a.points.length)return out;
-    const max=Math.max(1,...a.points.map(p=>p.days),a.insufficient?0:a.interval.baselineAvg||0),gy=v=>T+(1-v/max)*PH,gx=i=>L+(i+0.5)/a.points.length*PW;
-    let gapsPlot='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+(H-B)+'" y2="'+(H-B)+'" stroke="var(--line,#d9e3e7)"/>';
-    if(!a.insufficient&&a.interval.baselineAvg!=null){
-      gapsPlot+='<line class="spend-interval-mean" x1="'+L+'" x2="'+(W-R)+'" y1="'+gy(a.interval.baselineAvg)+'" y2="'+gy(a.interval.baselineAvg)+'" stroke="var(--mint,#39a894)" stroke-dasharray="5 4"/>';
-      gapsPlot+='<text x="'+(W-R)+'" y="'+Math.max(T+16,gy(a.interval.baselineAvg)-8)+'" text-anchor="end">'+esc(t('chart_interval_mean',{days:roundedDays(a.interval.baselineAvg)}))+'</text>';
+    /* 결제 간격: 점을 얇은 선으로 잇고, 평소 간격은 점선 + 옅은 띠(평균±표준편차) */
+    const hasBase=!a.insufficient&&a.interval.baselineAvg!=null,sd=hasBase?Number(a.baseline.intervalSd):NaN,hasSd=hasBase&&Number.isFinite(sd)&&sd>0;
+    const gHigh=Math.max(1,...a.points.map(p=>p.days),hasBase?a.interval.baselineAvg+(hasSd?sd:0):0),gs=scaleFor(0,gHigh),gy=v=>T+(gs.max-v)/gs.max*PH;
+    const gTexts=labelsOf(gs.ticks,v=>t('chart_days',{days:roundedDays(v)})),gL=Math.max(40,Math.ceil(Math.max(...gTexts.map(tw)))+12),gPW=W-gL-R,gx=i=>gL+(i+0.5)/a.points.length*gPW;
+    let gapsPlot=gridLines(gL,gs.ticks,gTexts,gy);
+    if(hasBase){
+      const m=a.interval.baselineAvg;
+      if(hasSd)gapsPlot+='<rect class="spend-interval-band" x="'+gL+'" y="'+r1(gy(m+sd))+'" width="'+r1(gPW)+'" height="'+r1(Math.max(1,gy(Math.max(0,m-sd))-gy(m+sd)))+'" fill="var(--mint,#39a894)" opacity="0.15"/>';
+      gapsPlot+='<line class="spend-interval-mean" x1="'+gL+'" x2="'+(W-R)+'" y1="'+r1(gy(m))+'" y2="'+r1(gy(m))+'" stroke="var(--mint,#39a894)" stroke-width="1.2" stroke-dasharray="5 4"/>';
+      gapsPlot+='<text class="spend-axis" x="'+(W-R)+'" y="'+r1(Math.max(T+8,gy(hasSd?m+sd:m)-5))+'" text-anchor="end" style="'+halo+'">'+esc(t('chart_interval_mean',{days:roundedDays(m)}))+'</text>';
     }
+    if(a.points.length>1)gapsPlot+='<path class="spend-gap-line" d="'+a.points.map((p,i)=>(i?'L':'M')+r1(gx(i))+','+r1(gy(p.days))).join(' ')+'" fill="none" stroke="var(--mint,#39a894)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" opacity="0.75"/>';
     gapsPlot+=a.points.map((p,i)=>{
-      const text=t('chart_gap_detail',{date:p.date.slice(5),amount:exact(payments[i+1].amount),previous:root.SpendCycle.date(payments[i].at).slice(5),days:roundedDays(p.days)});
-      return '<g'+action(text)+'><circle cx="'+gx(i)+'" cy="'+gy(p.days)+'" r="14" fill="transparent"/><circle class="spend-gap'+(a.interval.flag&&p.recent?' spend-short':'')+'" cx="'+gx(i)+'" cy="'+gy(p.days)+'" r="4" fill="'+(a.interval.flag&&p.recent?'var(--red,#b83f42)':'var(--mint,#39a894)')+'"><title>'+esc(t('chart_gap',{date:p.date,days:roundedDays(p.days)}))+'</title></circle></g>';
+      const text=t('chart_gap_detail',{date:p.date.slice(5),amount:exact(payments[i+1].amount),previous:root.SpendCycle.date(payments[i].at).slice(5),days:roundedDays(p.days)}),short=a.interval.flag&&p.recent;
+      return '<g'+action(text)+'><circle cx="'+r1(gx(i))+'" cy="'+r1(gy(p.days))+'" r="14" fill="transparent"/><circle class="spend-gap'+(short?' spend-short':'')+'" cx="'+r1(gx(i))+'" cy="'+r1(gy(p.days))+'" r="'+(short?6:5)+'" fill="'+(short?'var(--red,#b83f42)':'var(--mint,#39a894)')+'" stroke="var(--card,#fff)" stroke-width="1.5"><title>'+esc(t('chart_gap',{date:p.date,days:roundedDays(p.days)}))+'</title></circle></g>';
     }).join('');
-    gapsPlot+=[...new Set([0,Math.floor((a.points.length-1)/2),a.points.length-1])].map(i=>'<text x="'+gx(i)+'" y="'+(H-16)+'" text-anchor="'+(i===0?'start':i===a.points.length-1?'end':'middle')+'">'+esc(a.points[i].date.slice(5))+'</text>').join('');
-    gapsPlot+=[max,max/2,0].map(value=>'<text x="'+(L-8)+'" y="'+(gy(value)+4)+'" text-anchor="end">'+esc(t('chart_days',{days:roundedDays(value)}))+'</text>').join('');
+    gapsPlot+=xTicks(a.points.length,gx,i=>a.points[i].date.slice(5));
     const avg=a.points.reduce((sum,p)=>sum+p.days,0)/a.points.length;
     out+='<div data-spend-chart-wrap style="margin:12px 0;min-width:0"><b>'+esc(t('chart_interval'))+'</b><div class="sub" style="overflow-wrap:anywhere">'+esc(t('chart_interval_help'))+'</div>'+box+shell('interval',t('chart_interval'),gapsPlot)+'<div class="sub">'+esc(t('chart_interval_summary',{start:a.days[0].date.slice(5),end:a.days.at(-1).date.slice(5),count:payments.length,avg:roundedDays(avg),max:roundedDays(Math.max(...a.points.map(p=>p.days)))}))+'</div></div>';
     return out;
