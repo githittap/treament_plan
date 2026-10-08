@@ -12,15 +12,19 @@ const {renderAll}=require('./fixtures/hub7-harness.cjs');
 const golden=Object.assign(JSON.parse(read('tests/fixtures/hub7-golden-f95b951.json')),JSON.parse(read('tests/fixtures/billing-monthly-golden.json')),JSON.parse(read('tests/fixtures/ai-cost-display-golden.json')));
 const clone=x=>JSON.parse(JSON.stringify(x));
 const CH7=/^(home|dep|cf|aic|mkt|aiu|ob|pay|slip|acct|jg|save|payreq|empdoc)\./;
-const COUNT=329+2-1+2; // 기존 글 + 인박스 판 글 2 - 원문 열 이름 1(화면에서 숨겼음) + 루커 단추 글·주소 2(10-08).
+const COUNT=329+2-1+2+4; // 기존 글 + 인박스 판 글 2 - 원문 열 이름 1(화면에서 숨겼음) + 루커 단추 글·주소 2(10-08) + 다섯째·여섯째 판(AI 규칙 관계도·클로드→코덱스 브라우저 흐름) 글 4(10-08).
 /* 2026-10-02 원장 보기판에 넷째 판(📥 인박스 경고)을 더함 — 옛 화면(f95b951)과의 차이는 기본 글 카드 한 장뿐이어야 한다.
    옛 화면 대조는 그 카드(그대로·JSON 한 번·두 번 감싼 꼴)만 빼고 글자 하나까지 같은지 본다. 카드가 실제로 붙는지는 아래 따로 시험. */
 const INBOX_CARD='<button type="button" class="card owner-board-card" data-owner-board="inbox" onclick="openOwnerBoard(\'inbox\')"><strong>📥 인박스 경고</strong><span>AI가 남긴 최근 경고·대기</span><small>아직 PC에서 올라오지 않음</small></button>';
 const esc1=s=>JSON.stringify(s).slice(1,-1);
+/* 2026-10-08 다섯째·여섯째 판(🧭 AI 규칙 관계도 · 🔀 클로드→코덱스 브라우저 흐름)도 같은 꼴 카드 — 옛 화면 대조에서 이 카드 둘도 뺀다. */
+const boardCard=(slug,title,desc)=>'<button type="button" class="card owner-board-card" data-owner-board="'+slug+'" onclick="openOwnerBoard(\''+slug+'\')"><strong>'+title+'</strong><span>'+desc+'</span><small>아직 PC에서 올라오지 않음</small></button>';
+const RULES_CARD=boardCard('rules_map','🧭 AI 규칙 관계도','AI 규칙·지침이 어떤 순서로 이기는지');
+const FLOW_CARD=boardCard('codex_flow','🔀 클로드→코덱스 브라우저 흐름','클로드가 코덱스 브라우저에 일을 넘기는 길');
 /* 2026-10-08 원장 보기판 맨 위에 「📊 루커 분석 열기」 단추(원장 전용)를 더함 — 옛 화면 대조에서는 이 단추도 뺀다. */
 const LOOKER_URL='https://datastudio.google.com/reporting/9c7dbbdd-aace-474d-9a7f-3e71bb663f7c';
 const LOOKER_BTN='<div class="rowflex" style="margin:4px 0 10px"><a class="hbtn pri" style="text-decoration:none;display:inline-block" id="ownerLookerBtn" href="'+LOOKER_URL+'" target="_blank" rel="noopener noreferrer">📊 루커 분석 열기</a></div>';
-const INBOX_FORMS=[INBOX_CARD,esc1(INBOX_CARD),esc1(esc1(INBOX_CARD)),LOOKER_BTN,esc1(LOOKER_BTN),esc1(esc1(LOOKER_BTN))];
+const INBOX_FORMS=[INBOX_CARD,esc1(INBOX_CARD),esc1(esc1(INBOX_CARD)),RULES_CARD,esc1(RULES_CARD),esc1(esc1(RULES_CARD)),FLOW_CARD,esc1(FLOW_CARD),esc1(esc1(FLOW_CARD)),LOOKER_BTN,esc1(LOOKER_BTN),esc1(esc1(LOOKER_BTN))];
 const dropInbox=out=>Object.fromEntries(Object.entries(out).map(([k,v])=>[k,typeof v==='string'&&k.startsWith('ob.')?INBOX_FORMS.reduce((s,f)=>s.split(f).join(''),v):v]));
 const NUM_KEYS=['home.payslip_limit','dep.list_limit','aic.history_months','aic.auto_limit','aiu.model_days','aiu.cost_months','aiu.external_days','aiu.session_limit'];
 const LIST_KEYS=['list.approval_status','list.contract_status','list.pay_wage_types','list.marketing_categories','list.ai_billing_platforms','list.ai_cost_platforms','list.ai_external_names'];
@@ -66,7 +70,7 @@ const run=(textRows,settings,o)=>renderAll(hr,Object.assign({engine:true,textRow
 const runOld=(textRows,settings,o)=>run(textRows,settings,o).then(dropInbox);
 
 /* ───────────── 1. 기본 글 목록 ───────────── */
-test('차례 7 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 14개·331개(차례 7 329 + 인박스 판 2) · 명세서 서식·위험 확인창은 ⚠️ 안내로 시작',()=>{
+test('차례 7 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 14개·336개(차례 7 329 + 인박스 판 2 - 원문 열 1 + 루커 2 + 규칙·흐름 판 4) · 명세서 서식·위험 확인창은 ⚠️ 안내로 시작',()=>{
   const defs=ch7Defs();
   assert.equal(defs.length,COUNT,'차례 7 글 키 수');
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
@@ -147,16 +151,18 @@ test('기본값만 있을 때: 허브 설정 엔진이 아예 없어도 모든 �
   assert.ok(Object.keys(golden).length>=140,'대조 항목 수');
   for(const k of Object.keys(golden))assert.equal(out[k],golden[k],k);
 });
-test('원장 보기판 넷째 판(📥 인박스 경고): 기본 글 카드가 판 목록 끝에 한 장씩 붙고, 옛 화면과 다른 곳은 그 카드뿐이다',async()=>{
+test('원장 보기판 넷째~여섯째 판(📥 인박스 경고 · 🧭 AI 규칙 관계도 · 🔀 클로드→코덱스 브라우저 흐름): 기본 글 카드가 판 목록 끝에 한 장씩 붙고, 옛 화면과 다른 곳은 그 카드뿐이다',async()=>{
   const out=await renderAll(hr,{engine:false});
   const panels=J(out['ob.panel']);
   assert.equal(panels.length,6);
   for(const p of panels){
     assert.equal(p.split(INBOX_CARD).length-1,1,'판 목록마다 인박스 카드 한 장');
-    assert.ok(p.includes(INBOX_CARD+'</div><div id="ownerBoardViewer" hidden></div>'),'세 판 다음(목록 끝)');
+    assert.equal(p.split(RULES_CARD).length-1,1,'판 목록마다 규칙 관계도 카드 한 장');
+    assert.equal(p.split(FLOW_CARD).length-1,1,'판 목록마다 코덱스 흐름 카드 한 장');
+    assert.ok(p.includes(INBOX_CARD+RULES_CARD+FLOW_CARD+'</div><div id="ownerBoardViewer" hidden></div>'),'네 판 다음 다섯째·여섯째(목록 끝)');
   }
-  for(const k of ['ob.render.owner','ob.render.owner_missing','ob.render.owner_err'])assert.equal(out[k].split(esc1(INBOX_CARD)).length-1,1,k+' 원장 화면에 한 장');
-  assert.ok(!out['ob.render.nonowner'].includes('inbox'),'원장이 아니면 카드 없음');
+  for(const k of ['ob.render.owner','ob.render.owner_missing','ob.render.owner_err'])for(const c of [INBOX_CARD,RULES_CARD,FLOW_CARD])assert.equal(out[k].split(esc1(c)).length-1,1,k+' 원장 화면에 한 장');
+  for(const w of ['inbox','rules_map','codex_flow','AI 규칙 관계도','코덱스 브라우저 흐름'])assert.ok(!out['ob.render.nonowner'].includes(w),'원장이 아니면 카드 없음: '+w);
   const changed=Object.keys(golden).filter(k=>out[k]!==golden[k]).sort();
   assert.deepEqual(changed,['ob.panel','ob.render.owner','ob.render.owner_err','ob.render.owner_missing'],'카드가 붙는 곳 말고는 그대로');
 });
@@ -213,7 +219,7 @@ test('시험이 실제로 잡는지: 화면 글을 한 글자만 바꾸면 대�
 });
 
 /* ───────────── 3. 표에 값이 있으면 그 글 ───────────── */
-test('표에 값이 있으면 그 글: 고쳐 쓰는 글 333개(차례 7 329 + 인박스 판 2 + 루커 2)가 모두 화면에서 나오고, {자리표시자}가 채워진다',async()=>{
+test('표에 값이 있으면 그 글: 고쳐 쓰는 글 336개(차례 7 329 + 인박스 판 2 - 원문 열 1 + 루커 2 + 규칙·흐름 판 4)가 모두 화면에서 나오고, {자리표시자}가 채워진다',async()=>{
   const defs=ch7Defs().filter(d=>!/^ob\.looker_/.test(d.key)); // 루커 주소는 https가 아니면 단추를 숨기므로 아래 루커 시험에서 따로 봄
   const out=await run(dynRows(defs),{});
   const all=allOut(out);
@@ -462,7 +468,7 @@ function ui(opts){
     async render(me){await ctx.window.HubUi.renderSettings(rootEl,{sb,me});await settle();}};
 }
 const OWNER={id:'o1',role:'owner'};
-test('화면: 글 고치기에 새 묶음 14개(331개 — 차례 7 329 + 인박스 판 2)가 접혀 나오고, 검색칸은 새 글의 화면 낱말·글·키로도 찾고 맞는 줄이 없는 묶음은 숨긴다',async()=>{
+test('화면: 글 고치기에 새 묶음 14개(336개 — 차례 7 329 + 인박스 판 2 - 원문 열 1 + 루커 2 + 규칙·흐름 판 4)가 접혀 나오고, 검색칸은 새 글의 화면 낱말·글·키로도 찾고 맞는 줄이 없는 묶음은 숨긴다',async()=>{
   const t=ui({});
   await t.render(OWNER);
   const sec=t.section.innerHTML;

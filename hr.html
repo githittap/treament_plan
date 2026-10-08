@@ -436,7 +436,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 <script src="hub-intro.js?v=2026100503"></script>
 <script>window.HUB_RECALL_CATALOG=true;</script>
 <script src="card-ledger-ui.js?v=2026100803"></script>
-<script src="hub-texts.js?v=2026100804"></script>
+<script src="hub-texts.js?v=2026100810"></script>
 <script src="hub-activity.js?v=2026100601"></script>
 <script src="security-pledge.js?v=20261003p9d"></script>
 <script src="wage-hourly.js?v=2026100401"></script>
@@ -4368,9 +4368,11 @@ const OWNER_BOARDS=[
   {slug:'busd_ledger',title:'📒 뻐스디 장부',description:'AI 일 장부'},
   {slug:'pin_board',title:'📌 명심판',description:'AI가 지킬 약속'},
   {slug:'wordbook',title:'📖 박제 단어장',description:'원장이 알아 둘 말'},
-  {slug:'inbox',title:'📥 인박스 경고',description:'AI가 남긴 최근 경고·대기'}
+  {slug:'inbox',title:'📥 인박스 경고',description:'AI가 남긴 최근 경고·대기'},
+  {slug:'rules_map',title:'🧭 AI 규칙 관계도',description:'AI 규칙·지침이 어떤 순서로 이기는지'},
+  {slug:'codex_flow',title:'🔀 클로드→코덱스 브라우저 흐름',description:'클로드가 코덱스 브라우저에 일을 넘기는 길'}
 ];
-function ownerBoardTexts(board){const m={busd_ledger:{title:h7T('ob.busd_title','📒 뻐스디 장부'),description:h7T('ob.busd_desc','AI 일 장부')},pin_board:{title:h7T('ob.pin_title','📌 명심판'),description:h7T('ob.pin_desc','AI가 지킬 약속')},wordbook:{title:h7T('ob.word_title','📖 박제 단어장'),description:h7T('ob.word_desc','원장이 알아 둘 말')},inbox:{title:h7T('ob.inbox_title','📥 인박스 경고'),description:h7T('ob.inbox_desc','AI가 남긴 최근 경고·대기')}};return m[board.slug]||{title:board.title,description:board.description};}
+function ownerBoardTexts(board){const m={busd_ledger:{title:h7T('ob.busd_title','📒 뻐스디 장부'),description:h7T('ob.busd_desc','AI 일 장부')},pin_board:{title:h7T('ob.pin_title','📌 명심판'),description:h7T('ob.pin_desc','AI가 지킬 약속')},wordbook:{title:h7T('ob.word_title','📖 박제 단어장'),description:h7T('ob.word_desc','원장이 알아 둘 말')},inbox:{title:h7T('ob.inbox_title','📥 인박스 경고'),description:h7T('ob.inbox_desc','AI가 남긴 최근 경고·대기')},rules_map:{title:h7T('ob.rules_title','🧭 AI 규칙 관계도'),description:h7T('ob.rules_desc','AI 규칙·지침이 어떤 순서로 이기는지')},codex_flow:{title:h7T('ob.flow_title','🔀 클로드→코덱스 브라우저 흐름'),description:h7T('ob.flow_desc','클로드가 코덱스 브라우저에 일을 넘기는 길')}};return m[board.slug]||{title:board.title,description:board.description};}
 function ownerBoardsTimestamp(value){return value?hubFmtDateTime(value):'';}
 function ownerBoardsMissing(error){return !!error&&(error.code==='42P01'||error.code==='PGRST205'||Number(error.status)===404);}
 function ownerLookerUrl(){const raw=String(h7T('ob.looker_url','https://datastudio.google.com/reporting/9c7dbbdd-aace-474d-9a7f-3e71bb663f7c')).trim();return /^https:\/\/[^\s\/?#<>"'\\`@:]+(?:[\/?#][^\s<>"'\\`]*)?$/i.test(raw)?raw:'';}

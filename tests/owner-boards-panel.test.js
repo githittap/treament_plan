@@ -34,22 +34,34 @@ test('tabVisible은 개인 설정으로 원장 보기판을 켜도 원장 역할
 test('원장이 아니면 원장 전용 문구만 보이고 표를 조회하지 않는다',async()=>{
   const h=panel({role:'staff'}),m={innerHTML:''};await h.api.renderOwnerBoards(m);
   assert.equal(m.innerHTML,'<div class="card"><div class="empty">원장 전용입니다.</div></div>');assert.equal(h.calls.length,0);
+  for(const word of ['rules_map','codex_flow','AI 규칙 관계도','클로드→코덱스 브라우저 흐름'])assert.ok(!m.innerHTML.includes(word),'원장이 아니면 새 판 카드가 없음: '+word);
 });
 
-test('목록은 네 판과 마지막 올라온 때를 표시하고 HTML 본문은 조회하지 않는다',async()=>{
-  const h=panel({listResult:{data:[{slug:'busd_ledger',synced_at:'2026-09-30T01:02:00Z'},{slug:'pin_board',synced_at:null},{slug:'inbox',synced_at:'2026-10-02T12:49:00Z'}],error:null}}),m={innerHTML:''};await h.api.renderOwnerBoards(m);
+test('목록은 여섯 판과 마지막 올라온 때를 표시하고 HTML 본문은 조회하지 않는다',async()=>{
+  const h=panel({listResult:{data:[{slug:'busd_ledger',synced_at:'2026-09-30T01:02:00Z'},{slug:'pin_board',synced_at:null},{slug:'inbox',synced_at:'2026-10-02T12:49:00Z'},{slug:'rules_map',synced_at:'2026-10-08T01:00:00Z'},{slug:'codex_flow',synced_at:null}],error:null}}),m={innerHTML:''};await h.api.renderOwnerBoards(m);
   assert.deepEqual(h.calls,[{table:'owner_boards',select:'slug,sha256,synced_at'}]);
-  for(const title of ['📒 뻐스디 장부','📌 명심판','📖 박제 단어장','📥 인박스 경고'])assert.ok(m.innerHTML.includes(title));
+  for(const title of ['📒 뻐스디 장부','📌 명심판','📖 박제 단어장','📥 인박스 경고','🧭 AI 규칙 관계도','🔀 클로드→코덱스 브라우저 흐름'])assert.ok(m.innerHTML.includes(title));
   assert.ok(m.innerHTML.includes('마지막으로 올라온 때 '));assert.ok(m.innerHTML.includes('아직 PC에서 올라오지 않음'));
-  assert.match(m.innerHTML,/data-owner-board="busd_ledger"/);assert.match(m.innerHTML,/data-owner-board="pin_board"/);assert.match(m.innerHTML,/data-owner-board="wordbook"/);assert.match(m.innerHTML,/data-owner-board="inbox"/);
+  assert.match(m.innerHTML,/data-owner-board="busd_ledger"/);assert.match(m.innerHTML,/data-owner-board="pin_board"/);assert.match(m.innerHTML,/data-owner-board="wordbook"/);assert.match(m.innerHTML,/data-owner-board="inbox"/);assert.match(m.innerHTML,/data-owner-board="rules_map"/);assert.match(m.innerHTML,/data-owner-board="codex_flow"/);
   assert.ok(m.innerHTML.includes('AI가 남긴 최근 경고·대기'));assert.ok(m.innerHTML.includes('마지막으로 올라온 때 2026.10.2 오후 9시 49분'),'인박스 판도 허브 시간 꼴');
-  assert.deepEqual(JSON.parse(JSON.stringify(h.api.OWNER_BOARDS.map(b=>b.slug))),['busd_ledger','pin_board','wordbook','inbox'],'넷째(끝) 자리');
+  assert.deepEqual(JSON.parse(JSON.stringify(h.api.OWNER_BOARDS.map(b=>b.slug))),['busd_ledger','pin_board','wordbook','inbox','rules_map','codex_flow'],'다섯째·여섯째(끝) 자리');
+  assert.ok(m.innerHTML.includes('AI 규칙·지침이 어떤 순서로 이기는지'));assert.ok(m.innerHTML.includes('클로드가 코덱스 브라우저에 일을 넘기는 길'));assert.ok(m.innerHTML.includes('마지막으로 올라온 때 2026.10.8 오전 10시'),'규칙 관계도 판도 허브 시간 꼴');
 });
 test('인박스 경고 판을 열면 같은 격리 iframe으로 보여 주고 제목·창 이름이 인박스 판이다',async()=>{
   const h=panel({oneResult:{data:{html:'<!doctype html><html><body>인박스</body></html>',synced_at:'2026-10-02T12:49:00Z'},error:null}});
   await h.api.openOwnerBoard('inbox');const frame=h.slot.children[0];
   assert.ok(frame);assert.equal(frame.attrs.sandbox,'allow-scripts allow-downloads allow-modals');assert.equal(frame.attrs.title,'📥 인박스 경고 보기');
   assert.deepEqual(h.calls[0].eq,['slug','inbox']);assert.match(h.viewer.innerHTML,/<strong>📥 인박스 경고<\/strong>/);
+});
+
+test('AI 규칙 관계도·클로드→코덱스 브라우저 흐름 판을 열면 같은 격리 iframe으로 보여 주고 제목·창 이름이 그 판이다',async()=>{
+  for(const [slug,title] of [['rules_map','🧭 AI 규칙 관계도'],['codex_flow','🔀 클로드→코덱스 브라우저 흐름']]){
+    const h=panel({oneResult:{data:{html:'<!doctype html><html><body>'+slug+'</body></html>',synced_at:'2026-10-08T01:00:00Z'},error:null}});
+    await h.api.openOwnerBoard(slug);const frame=h.slot.children[0];
+    assert.ok(frame,slug);assert.equal(frame.attrs.sandbox,'allow-scripts allow-downloads allow-modals');assert.equal(frame.attrs.title,title+' 보기');
+    assert.deepEqual(h.calls[0].eq,['slug',slug]);assert.ok(h.viewer.innerHTML.includes('<strong>'+title+'</strong>'),slug);
+  }
+  const n=panel({role:'staff'});await n.api.openOwnerBoard('rules_map');assert.equal(n.calls.length,0,'원장이 아니면 판 본문을 조회하지 않음');
 });
 
 test('owner_boards 표가 없으면 준비 중 안내로 처리한다',()=>{
