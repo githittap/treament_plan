@@ -39,7 +39,7 @@ export function parseCardSms(raw,receivedAt=new Date().toISOString()) {
   // 국민 해외의 날짜→금액→국가→가맹점 순서도 처리함.
   if(price.index>=dt.index)tail=tail.replace(amountRx,'').trim();
   tail=tail.replace(/^(?:미국|미\s*국|영국|일본|중국|호주|캐나다|독일|프랑스|아일랜드|아일|싱가포르|싱가|네덜란드|홍콩|캐나|스위스|인도|한국)\s+/,'')
-    .replace(/^\([A-Z]{2}\)\s*/,'').split(/\n|\s*누적|\s*잔액/)[0].replace(/\s*(?:승인취소|승인|취소)$/,'').trim();
+    .replace(/^\([A-Z]{2}\)\s*/,'').split(/\n|\s*누적|\s*잔액/)[0].replace(/[\s/]+$/,'').replace(/\s*(?:승인취소|승인|취소)$/,'').replace(/[\s/]+$/,'').trim();
   const merchant=tail.slice(0,120),at=transactionTimestamp(dt[0],receivedAt);
   const explicit=header?.[4]||text.match(/(승인취소|승인|취소)\s*$/)?.[1];
   if(!explicit||!merchant||!merchantKey(merchant)||!at||!Number.isFinite(amount)||amount<=0)return {status:'failed',failureCode:'unreadable_fields'};

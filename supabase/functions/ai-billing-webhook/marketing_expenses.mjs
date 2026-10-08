@@ -19,7 +19,7 @@ export function parseMarketingSms(rawText, receivedAt = new Date().toISOString()
   if (/취소|승인취소/i.test(text)) return cancellation || { status: 'failed', failureCode: 'unreadable_fields' };
 
   let match;
-  if ((match = text.match(/삼성\d{4}승인[\s\S]*?([\d,]+)원\s*일시불\s*\/\s*(\d{2}\/\d{2}\s+\d{2}:\d{2})\s+(.+?)\s*\/\s*누적[\d,]+원/i))) {
+  if ((match = text.match(/삼성\d{4}승인[\s\S]*?([\d,]+)원\s*일시불\s*\/?\s*(\d{2}\/\d{2}\s+\d{2}:\d{2})\s+(.+?)\s*\/?\s*누적[\d,]+원/i))) {
     return parsedPurchase({ currency: 'KRW', amount: Number(match[1].replace(/,/g, '')), date: match[2], merchant: match[3], receivedAt });
   }
   if ((match = text.match(/신한체크승인[\s\S]*?\d{2}\/\d{2}\s+\d{2}:\d{2}\s*\(금액\)\s*([\d,]+)원\s+(.+)$/i))) {
@@ -33,7 +33,7 @@ export function parseMarketingSms(rawText, receivedAt = new Date().toISOString()
 }
 
 function parseSamsungCancellation(text, receivedAt) {
-  const match = text.match(/삼성\d{4}승인취소[\s\S]*?([\d,]+)원\s*일시불\s*\/\s*(\d{2}\/\d{2}\s+\d{2}:\d{2})\s+(.+?)(?:\s*\/\s*누적[\d,]+원)?$/i);
+  const match = text.match(/삼성\d{4}승인취소[\s\S]*?([\d,]+)원\s*일시불\s*\/?\s*(\d{2}\/\d{2}\s+\d{2}:\d{2})\s+(.+?)(?:\s*\/?\s*누적[\d,]+원)?$/i);
   if (!match) return null;
   const merchant = sanitizeMerchant(match[3]);
   const transactionAt = transactionTimestamp(match[2], receivedAt);

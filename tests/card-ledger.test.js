@@ -8,6 +8,7 @@ const messages=[
  ['KB국민카드0051승인\n합*성님\n21,116원 일시불\n10/02 21:10\nImagineArt\n누적999,999원','kb','0051','KRW',21116,'ImagineArt'],
  ['KB국민카드0051 해외승인 합*성\n10.76(USD)\n09/15 10:03 미국 TEST STORE','kb','0051','USD',10.76,'TEST STORE'],
  ['KB국민카드 합*성님 09/15 10:03 21,116(KRW) 미국 TEST STORE 승인','kb',null,'KRW',21116,'TEST STORE'],
+ ['삼성4430승인 합*성 39,000원 일시불/09/29 00:42 네오사피엔스/누적999,999원','samsung','4430','KRW',39000,'네오사피엔스'],
 ];
 for(const [sms,issuer,last,currency,amount,merchant] of messages)test('공통 파서: '+issuer+' '+currency+' '+merchant,()=>{
  const p=parseCardSms('[Web발신]\n'+sms,at);assert.equal(p.status,'recorded');assert.equal(p.issuer,issuer);assert.equal(p.cardLast4,last);
