@@ -18,7 +18,7 @@ const TEXTS={
   reconciliation:'월 대조',reconcile_hint:'매월 카드 명세서와 이 원장을 대조할 자리입니다. 명세서 업로드·대조는 다음 단계에서 연결됩니다.',
   more:'앞에서 {n}건을 보여 주고 있습니다. 기간을 좁혀 나머지 내역을 확인해 주세요.',
   range_invalid:'시작일과 종료일을 확인해 주세요.',review_unmatched:'취소 승인 대조 필요',review_ambiguous:'취소 승인 후보 여러 건',review_duplicate:'이미 취소된 승인 확인',
-  missing_last4:'끝자리 없음',no_body:'본문 없음',settings:'문구·목록·숫자 기준은 허브 설정에서 고칠 수 있습니다.'
+  missing_last4:'끝자리 없음',abroad_filter:'해외 여부',abroad_section:'해외 거래',abroad:'해외',overseas:'해외',domestic:'국내',no_body:'본문 없음',settings:'문구·목록·숫자 기준은 허브 설정에서 고칠 수 있습니다.'
 };
 const CATEGORIES=[{code:'병원',label:'병원'},{code:'개인',label:'개인'},{code:'AI',label:'AI'},{code:'광고',label:'광고'},{code:'기타',label:'미분류'}];
 const CARDS=[{code:'samsung:4430',label:'삼성 4430'},{code:'kb:0051',label:'국민 0051'},{code:'hana:4801',label:'하나 4801'}];
@@ -36,7 +36,7 @@ const won=value=>'₩'+Number(value).toLocaleString('ko-KR');
 const amount=row=>row.amount_krw==null?t('unconverted'):won(row.amount_krw)+(row.fx_source==='fixed_estimate'?' · '+t('estimated'):'');
 function cardName(row){const code=row.card_issuer+':'+(row.card_last4||''),cards=list('list.ledger_cards',CARDS),match=cards.find(x=>x.code===code);return match?match.label:label(row.card_issuer,list('list.ledger_issuers',ISSUERS))+' '+(row.card_last4||t('missing_last4'));}
 function enrich(rows,merchants){const map=new Map(merchants.map(m=>[String(m.id),m]));return rows.map(r=>{const m=map.get(String(r.merchant_id));return {...r,category:m?.category||'기타',display_name:m?.display_name||r.merchant};});}
-function filter(rows,f){return rows.filter(r=>{const d=date(r.transaction_at);return d&&(!f.from||d>=f.from)&&(!f.to||d<=f.to)&&(!f.card||r.card_issuer+':'+(r.card_last4||'')===f.card)&&(!f.category||r.category===f.category);});}
+function filter(rows,f){return rows.filter(r=>{const d=date(r.transaction_at);return d&&(!f.from||d>=f.from)&&(!f.to||d<=f.to)&&(!f.card||r.card_issuer+':'+(r.card_last4||'')===f.card)&&(!f.category||r.category===f.category)&&(!f.abroad||r.abroad===f.abroad);});}
 function aggregate(rows,key){const map=new Map();for(const r of rows){const k=key(r);if(!map.has(k))map.set(k,{key:k,count:0,amount:0,unconverted:0});const a=map.get(k);a.count++;if(r.amount_krw==null)a.unconverted++;else a.amount+=Number(r.amount_krw);}return [...map.values()].sort((a,b)=>b.amount-a.amount||a.key.localeCompare(b.key));}
 function validateMerchant(value){return value&&typeof value.display_name==='string'&&value.display_name.trim().length>=1&&value.display_name.trim().length<=120&&CATEGORIES.some(c=>c.code===value.category)&&String(value.ai_platform||'').length<=120&&String(value.memo||'').length<=num('memo_max',1000,1,20000);}
 function subscriptions(raw){try{const rows=typeof raw==='string'?JSON.parse(raw):raw;return Array.isArray(rows)&&rows.every(r=>r&&typeof r.service==='string'&&FIELDS.every(k=>r[k]==null||typeof r[k]==='string'))?rows:null;}catch{return null;}}
@@ -46,7 +46,7 @@ async function fetchAll(makeQuery){let rows=[];const size=500;for(let offset=0;;
 async function load(ctx,f){
   if(!allowed(ctx))return null;
   const run=ctx.fetchAll||fetchAll;
-  const makeTransactions=()=>{let q=ctx.sb.from('card_transactions').select('id,card_issuer,card_last4,event_kind,transaction_at,currency,amount_native,amount_krw,fx_source,merchant,merchant_id,cancellation_review').order('transaction_at',{ascending:false}).order('id',{ascending:false});if(f.from)q=q.gte('transaction_at',f.from+'T00:00:00+09:00');if(f.to)q=q.lte('transaction_at',f.to+'T23:59:59.999+09:00');return q;};
+  const makeTransactions=()=>{let q=ctx.sb.from('card_transactions').select('id,card_issuer,card_last4,event_kind,transaction_at,currency,amount_native,amount_krw,fx_source,merchant,merchant_id,abroad,cancellation_review').order('transaction_at',{ascending:false}).order('id',{ascending:false});if(f.from)q=q.gte('transaction_at',f.from+'T00:00:00+09:00');if(f.to)q=q.lte('transaction_at',f.to+'T23:59:59.999+09:00');return q;};
   const result=await Promise.all([
     run(makeTransactions),
     run(()=>ctx.sb.from('card_merchants').select('id,merchant_key,display_name,category,ai_platform,memo').order('id')),
@@ -63,13 +63,13 @@ function subscriptionEditor(rows,index){const r=rows[index]||{};return '<form da
 function html(s){
   const f=s.filters,rows=filter(enrich(s.rows,s.merchants),f),limit=num('row_limit',100,5,1000),merchantLimit=num('merchant_limit',50,5,500),failedLimit=num('failed_limit',30,5,1000);
   const cards=list('list.ledger_cards',CARDS).slice();for(const r of s.rows){const code=r.card_issuer+':'+(r.card_last4||'');if(!cards.some(c=>c.code===code))cards.push({code,label:cardName(r)});}
-  let out='<div data-ledger-panel><div class="card"><h2>'+esc(t('title'))+'</h2><p class="hint">'+esc(t('settings'))+'</p><form data-ledger-filters class="ledger-edit"><label>'+esc(t('from'))+'<input name="from" type="date" value="'+esc(f.from)+'"></label><label>'+esc(t('to'))+'<input name="to" type="date" value="'+esc(f.to)+'"></label><label>'+esc(t('card'))+'<select name="card">'+options(cards,f.card,true)+'</select></label><label>'+esc(t('category'))+'<select name="category">'+options(categoryItems(),f.category,true)+'</select></label><button class="mini stamp" type="submit">'+esc(t('apply'))+'</button><span data-ledger-message role="status"></span></form></div>';
+  let out='<div data-ledger-panel><div class="card"><h2>'+esc(t('title'))+'</h2><p class="hint">'+esc(t('settings'))+'</p><form data-ledger-filters class="ledger-edit"><label>'+esc(t('from'))+'<input name="from" type="date" value="'+esc(f.from)+'"></label><label>'+esc(t('to'))+'<input name="to" type="date" value="'+esc(f.to)+'"></label><label>'+esc(t('card'))+'<select name="card">'+options(cards,f.card,true)+'</select></label><label>'+esc(t('category'))+'<select name="category">'+options(categoryItems(),f.category,true)+'</select></label><label>'+esc(t('abroad_filter'))+'<select name="abroad">'+options([{code:'overseas',label:t('overseas')},{code:'domestic',label:t('domestic')}],f.abroad,true)+'</select></label><button class="mini stamp" type="submit">'+esc(t('apply'))+'</button><span data-ledger-message role="status"></span></form></div>';
   if(s.errors[0]||s.errors[1])out+='<div class="card" role="alert">'+esc(t('load_error'))+'</div>';
   else{
-    out+='<div class="ledger-summaries">'+summary(rows,'monthly',r=>date(r.transaction_at).slice(0,7))+summary(rows,'by_card',cardName)+summary(rows,'by_merchant',r=>r.display_name)+'</div>';
+    out+='<div class="ledger-summaries">'+summary(rows,'monthly',r=>date(r.transaction_at).slice(0,7))+summary(rows,'by_card',cardName)+summary(rows,'by_merchant',r=>r.display_name)+summary(rows.filter(r=>r.abroad==='overseas'),'abroad_section',r=>r.display_name+' ('+r.currency+')')+'</div>';
     // SpendUi와 같은 계산 부품으로 기간 합계를 구함. 이상 알림은 별도 단계임.
     if(root.SpendCycle&&f.from&&f.to){const a=root.SpendCycle.calculate(rows.map(r=>({at:r.transaction_at,amount:Number(r.amount_krw||0),key:r.category,label:label(r.category,categoryItems()),kind:r.event_kind})),{preset:'custom',from:f.from,to:f.to,now:f.to});out+='<div class="card"><b>'+esc(t('total'))+' '+esc(won(a.total))+'</b></div>';}
-    out+='<div class="card"><h3>'+esc(t('ledger'))+'</h3>'+(rows.length?table(['date','card','merchant','category','event','amount','native'],rows.slice(0,limit).map(r=>[esc(stamp(r.transaction_at)),esc(cardName(r)),esc(r.display_name),esc(label(r.category,categoryItems())),esc(t(r.event_kind))+(r.cancellation_review?'<div class="hint">'+esc(t('review_'+r.cancellation_review))+'</div>':''),esc(amount(r)),esc(r.currency+' '+Number(r.amount_native).toLocaleString('ko-KR'))])):'<div class="empty">'+esc(t('empty'))+'</div>')+(rows.length>limit?'<div class="hint">'+esc(t('more',{n:limit}))+'</div>':'')+'</div>';
+    out+='<div class="card"><h3>'+esc(t('ledger'))+'</h3>'+(rows.length?table(['date','card','merchant','category','abroad','event','amount','native'],rows.slice(0,limit).map(r=>[esc(stamp(r.transaction_at)),esc(cardName(r)),esc(r.display_name),esc(label(r.category,categoryItems())),esc(r.abroad==='overseas'?t('overseas'):''),esc(t(r.event_kind))+(r.cancellation_review?'<div class="hint">'+esc(t('review_'+r.cancellation_review))+'</div>':''),esc(amount(r)),esc(r.currency+' '+Number(r.amount_native).toLocaleString('ko-KR'))])):'<div class="empty">'+esc(t('empty'))+'</div>')+(rows.length>limit?'<div class="hint">'+esc(t('more',{n:limit}))+'</div>':'')+'</div>';
   }
   if(!s.errors[1]){const fresh=s.merchants.filter(m=>m.category==='기타');out+='<div class="card"><h3>'+esc(t('new_merchants'))+'</h3><p class="hint">'+esc(t('new_hint'))+'</p>'+(fresh.length?fresh.slice(0,merchantLimit).map(merchantForm).join(''):'<div class="empty">'+esc(t('empty'))+'</div>')+(fresh.length>merchantLimit?'<p>'+esc(t('more',{n:merchantLimit}))+'</p>':'')+'</div><div class="card"><h3>'+esc(t('dictionary'))+'</h3><input data-ledger-merchant-search aria-label="'+esc(t('merchant'))+'" type="search"><div data-ledger-dictionary>'+s.merchants.slice(0,merchantLimit).map(merchantForm).join('')+'</div></div>';}
   const subs=s.subscriptions;
@@ -93,7 +93,7 @@ function bind(){
   host.addEventListener('submit',async event=>{
     const form=event.target;if(!form.matches('[data-ledger-filters],[data-ledger-merchant],[data-ledger-subscription]'))return;event.preventDefault();if(!allowed(context))return;
     const msg=form.querySelector('[data-ledger-message]');
-    if(form.hasAttribute('data-ledger-filters')){const f=values(form,['from','to','card','category']);if(!/^\d{4}-\d{2}-\d{2}$/.test(f.from)||!/^\d{4}-\d{2}-\d{2}$/.test(f.to)||f.from>f.to){msg.textContent=t('range_invalid');return;}await render(mount,context,f);return;}
+    if(form.hasAttribute('data-ledger-filters')){const f=values(form,['from','to','card','category','abroad']);if(!/^\d{4}-\d{2}-\d{2}$/.test(f.from)||!/^\d{4}-\d{2}-\d{2}$/.test(f.to)||f.from>f.to){msg.textContent=t('range_invalid');return;}await render(mount,context,f);return;}
     const button=form.querySelector('button[type="submit"]');if(button.disabled)return;button.disabled=true;
     const ctx=context,currentHost=host,revision=version;
     let r;
@@ -109,7 +109,7 @@ function bind(){
 async function render(target,ctx,filters){
   const revision=++version;
   if(!allowed(ctx)){target.innerHTML='<div class="card">'+esc(t('owner_only'))+'</div>';return;}
-  const f=filters||{from:date(new Date(new Date().getTime()-(num('default_days',30,1,3660)-1)*86400000)),to:date(new Date()),card:'',category:''};
+  const f=filters||{from:date(new Date(new Date().getTime()-(num('default_days',30,1,3660)-1)*86400000)),to:date(new Date()),card:'',category:'',abroad:''};
   target.innerHTML='<div class="card">'+esc(t('loading'))+'</div>';
   let s;try{s=await load(ctx,f);}catch{if(revision===version)target.innerHTML='<div class="card" role="alert">'+esc(t('load_error'))+'</div>';return;}
   if(revision!==version||!allowed(ctx)||ctx.isActive&& !ctx.isActive())return;
