@@ -247,6 +247,17 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 .staff-month-table{min-width:900px}.staff-month-table td{white-space:nowrap}.staff-month-table td:nth-child(10){white-space:normal;min-width:100px}
 @media print{body.staff-att-printing,body.staff-att-printing #app,body.staff-att-printing .card{background:white!important;color:#111!important}body.staff-att-printing .staff-month-table th,body.staff-att-printing .staff-month-table td{color:#111!important;border-color:#ccc!important;break-inside:avoid}body.staff-att-printing> *{display:none!important}body.staff-att-printing>#app,body.staff-att-printing #app main{display:block!important}body.staff-att-printing header,body.staff-att-printing footer,body.staff-att-printing #main> *:not(#staffAttMonthContainer),body.staff-att-printing .staff-month-actions{display:none!important}body.staff-att-printing #staffAttMonthCard{border:0;padding:0}body.staff-att-printing .tblwrap{overflow:visible!important;max-height:none!important;height:auto!important}body.staff-att-printing .staff-month-table{min-width:0;width:100%;font-size:10px}body.staff-att-printing .staff-month-table td{white-space:normal;min-width:0!important}body.staff-att-printing main{max-width:none!important;padding:0}}
 .recall-tabs{margin:0 0 12px}.recall-tabs [aria-pressed="true"]{background:var(--blue-bg);font-weight:800}.recall-filters{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:12px 0}.recall-filters label{min-width:0}.recall-filters select{display:block;max-width:100%}.recall-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;border:1px solid var(--line);border-radius:9px;padding:12px;margin:10px 0}.recall-cell{min-width:0;overflow-wrap:anywhere}.recall-cell .hint{font-size:12px}.recall-cell:nth-child(8)>div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.recall-due{border-left:5px solid var(--red);background:var(--red-bg)}.recall-actions,.recall-editor,.recall-row>.msg{grid-column:1/-1}.recall-actions{display:flex;gap:6px;flex-wrap:wrap}.recall-editor textarea,.recall-editor input{box-sizing:border-box;max-width:100%;width:100%}.recall-editor[hidden]{display:none}@media(max-width:640px){.recall-row{grid-template-columns:repeat(2,minmax(0,1fr));padding:10px;gap:8px}.recall-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.recall-filters select{width:100%}.recall-card{min-width:0;box-sizing:border-box}.recall-tabs{flex-wrap:wrap}}
+
+/* 지출 점검: 휴대폰은 각 거래를 세로로 표시함. */
+.ledger-edit{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin:12px 0;padding:8px 0;border-bottom:1px solid var(--line)}
+.ledger-edit label{display:flex;flex-direction:column;gap:4px;flex:1 1 150px;min-width:0;overflow-wrap:anywhere}
+.ledger-edit input,.ledger-edit select,.ledger-edit textarea{box-sizing:border-box;width:100%;min-width:0;max-width:100%}
+.ledger-summaries{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:10px}
+[data-ledger-panel]{min-width:0;overflow-wrap:anywhere}
+[data-ledger-panel] label{min-width:0;max-width:100%}
+[data-ledger-panel] input,[data-ledger-panel] select,[data-ledger-panel] textarea{box-sizing:border-box;max-width:100%;min-width:0;width:100%}
+.ledger-table td{white-space:normal;overflow-wrap:anywhere}
+@media(max-width:600px){.ledger-table table,.ledger-table tbody,.ledger-table tr,.ledger-table td{display:block;width:100%;box-sizing:border-box}.ledger-table thead{display:none}.ledger-table tr{border-bottom:1px solid var(--line);padding:8px 0}.ledger-table td{display:grid;grid-template-columns:100px minmax(0,1fr);gap:8px;padding:4px 0;border:0}.ledger-table td:before{content:attr(data-label);font-weight:600}.ledger-table pre,.ledger-table details{min-width:0}.ledger-edit label{flex-basis:100%}}
 </style>
 </head>
 <body>
@@ -423,7 +434,8 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 <script src="hub-fortune.js?v=2026100601"></script>
 <script src="hub-intro.js?v=2026100503"></script>
 <script>window.HUB_RECALL_CATALOG=true;</script>
-<script src="hub-texts.js?v=2026100802"></script>
+<script src="card-ledger-ui.js?v=2026100803"></script>
+<script src="hub-texts.js?v=2026100803"></script>
 <script src="hub-activity.js?v=2026100601"></script>
 <script src="security-pledge.js?v=20261003p9d"></script>
 <script src="wage-hourly.js?v=2026100401"></script>
@@ -927,7 +939,7 @@ function employmentTermAlertRows(terms,contracts){
 function tabVisible(t){if(ME.role==='deputy')return t.key==='contract';if(t.key==='aicost'&&ME.role==='manager')return (typeof hubSettingBoolean!=='function'||hubSettingBoolean('marketing.manager_view_enabled',true))&&(TAB_OVERRIDES[ME.id]||{}).aicost!==false;return ME.role==='owner'
     ?t.roles.includes('owner')&&(!t.needsConfid||ME.confidAccess)
     :(()=>{const ov=(TAB_OVERRIDES[ME.id]||{})[t.key],base=(TAB_ROLES[t.key]||t.roles).includes(ME.role),shown=ov===true?true:ov===false?false:base;return t.key!=='owner'&&t.key!=='ownerboards'&&t.key!=='actlog'&&shown&&(!t.needsConfid||ME.confidAccess);})();}
-function visibleTabKeys(){return new Set(TABS.filter(tabVisible).filter(t=>t.key!=='hubset'||ME.role==='owner').map(t=>t.key));} /* ⚙️ 허브 설정은 원장에게만 — 탭 노출 설정·사람별 예외로 열어 줘도 직원에게 안 보인다 */
+function visibleTabKeys(){return new Set(TABS.filter(tabVisible).filter(t=>!['hubset','ledger'].includes(t.key)||ME.role==='owner').map(t=>t.key));} /* ⚙️ 허브 설정은 원장에게만 — 탭 노출 설정·사람별 예외로 열어 줘도 직원에게 안 보인다 */
 function tabLabel(k){if(k==='actlog')return typeof hubText==='function'?hubText('actlog.title','👁 사용 기록'):'👁 사용 기록';if(k==='aicost'&&ME.role==='manager')return typeof hubText==='function'?hubText('mkt.title','📣 마케팅비'):'📣 마케팅비';const t=TABS.find(x=>x.key===k);return t?(typeof hubText==='function'?hubText('tab.'+k,t.label):t.label):k;}
 function menuGroupLabel(e){if(e.key==='g-owner'&&ME.role==='manager')return typeof hubText==='function'?hubText('mkt.title','📣 마케팅비'):'📣 마케팅비';return typeof hubText==='function'?hubText('menu.'+String(e.key).replace(/-/g,'_'),e.label):e.label;}
 function menuChildKeys(e,vis){return e.children.filter(k=>vis.has(k));}
@@ -1063,6 +1075,7 @@ async function render(){
     else if(TAB==='contract')await renderContract(m);
     else if(TAB==='pay')await renderPay(m);
     else if(TAB==='aicost')await renderAicost(m);
+    else if(TAB==='ledger')await CardLedgerUi.render(m,{sb,me:ME,fetchAll:billingFetchAll,isActive:()=>TAB==='ledger'&&ME.role==='owner'});
     else if(TAB==='ownerboards')await renderOwnerBoards(m);
     else if(TAB==='actlog'){if(window.HubActivity)await window.HubActivity.render(m,{sb,me:ME,profiles:PROFILES});}
     else if(TAB==='hubset'){if(window.HubUi)await window.HubUi.renderSettings(m,{sb,me:ME});else m.innerHTML='<div class="card"><div class="empty">허브 설정을 불러오지 못했습니다. 새로고침해 주세요.</div></div>';}
@@ -4347,6 +4360,13 @@ function installHubSettingsTab(tabs,menu){
   const ownerAt=group.children.indexOf('owner');group.children.splice(ownerAt<0?group.children.length:ownerAt+1,0,'hubset');
 }
 if(typeof TABS!=='undefined'&&typeof MENU!=='undefined')installHubSettingsTab(TABS,MENU);
+/* 지출 점검은 기존 원장 전용 메뉴 안에 둠. */
+function installCardLedgerTab(tabs,menu){
+  if(tabs.some(t=>t.key==='ledger'))return;
+  tabs.push({key:'ledger',label:'지출 점검',roles:['owner']});
+  const group=menu.find(e=>e.key==='g-owner');if(group&&!group.children.includes('ledger'))group.children.push('ledger');
+}
+if(typeof TABS!=='undefined'&&typeof MENU!=='undefined')installCardLedgerTab(TABS,MENU);
 async function saveAicost(i){
   if(ME.role!=='owner'||!AICOST_PLATFORMS[i])return;
   const amount=Number($('#aiAmount-'+i).value)||0,note=$('#aiNote-'+i).value.trim()||null;

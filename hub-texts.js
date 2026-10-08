@@ -1935,6 +1935,7 @@ function hubTextDefs(){
   hubTextDefsTime(add);
   hubTextDefsHourly(add);
   hubTextDefsSpend(add);
+  ((typeof globalThis!=='undefined'&&globalThis.HUB_CARD_LEDGER_TEXT_DEFS)||[]).forEach(d=>add(d[0],'지출 점검',d[1],d[1],Array.from(d[1].matchAll(/\{([a-z_]+)\}/g),m=>m[1])));
   ((typeof globalThis!=='undefined'&&globalThis.HUB_INTRO_TEXT_DEFS)||[]).forEach(function(d){add(d[0],'🌌 첫 화면',d[1],d[2]);}); // hub-intro.js의 첫 화면 글
   hubTextDefsP7(add);
   hubTextDefsP9(add);
@@ -2008,7 +2009,7 @@ const HUB_SETTING_DEFS=[
   {"key":"spend.chart_enabled","screen":"📈 기간·주기","label":"기간·주기 그래프 보이기","where":"마케팅비·AI비용의 기간 분석 구역","def":"true","kind":"bool"},
   {key:'activity_log.retention_days',screen:'👁 사용 기록',label:'사용 기록 보관 일수',where:'이 일수가 지난 사용 기록만 매일 정리함. 기본 1095일(3년)임.',def:'1095',kind:'int',min:1,max:36500,unit:'일'},
   {key:'activity_log.exclude_owner',screen:'👁 사용 기록',label:'원장 행동 기록 제외',where:'켜면 원장 본인 행동은 사용 기록에 남기지 않음.',def:'true',kind:'bool'},
-
+  ...((typeof globalThis!=='undefined'&&globalThis.HUB_CARD_LEDGER_SETTING_DEFS)||[]),
 ];
 // 리콜 명단을 포함하는 허브에서만 편집 목록을 추가한다. 기존 설정의 순서는 유지한다.
 if(typeof globalThis!=='undefined'&&globalThis.HUB_RECALL_CATALOG===true)HUB_SETTING_DEFS.push(
@@ -2151,7 +2152,7 @@ const HUB_LIST_DEFS=[
    note:'이 값은 PC가 올릴 때 정한 이름표(deepseek·step5 등)라 코드는 못 바꾸고 새 항목도 못 늘려요. 보이는 이름만 고칠 수 있고, 목록에 없는 AI는 올라온 이름이 그대로 보여요.',
    def:[{code:'deepseek',label:'딥시크'},{code:'step5',label:'스텝5'},{code:'kimi',label:'키미'},{code:'luna',label:'루나'},{code:'?',label:'이름 모름'}]},
   {"key":"list.spend_periods","screen":"📈 기간·주기","label":"조회 기간 이름·순서","addable":false,"orderable":true,"where":"마케팅비·AI비용 기간 고르는 목록","note":"이름을 고치고 위로·아래로 단추로 순서를 바꿀 수 있습니다.","def":[{"code":"today","label":"오늘"},{"code":"this_week","label":"이번 주"},{"code":"this_month","label":"이번 달"},{"code":"last_n_days","label":"최근 N일"},{"code":"custom","label":"직접 기간"}]},
-
+  ...((typeof globalThis!=='undefined'&&globalThis.HUB_CARD_LEDGER_LIST_DEFS)||[]),
 ];
 // 카드 목록(app_settings의 JSON). 기본 카드는 hr.html의 workDocuments와 같아야 한다(시험이 대조).
 const HUB_CARD_DEFS=[
