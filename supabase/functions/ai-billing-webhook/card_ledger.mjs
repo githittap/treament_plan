@@ -4,11 +4,14 @@ export function normalizeSms(raw) {
   return String(raw || '').normalize('NFKC').replace(/\r\n?/g,'\n')
     .replace(/^\s*\[web발신\]\s*/i,'').replace(/[\t ]+\/\s+/g,'\n').trim();
 }
+// 하나카드 문자는 끝자리를 가려서(4*0*) 보냄 — 쓰는 하나카드가 한 장이라 4801로 기록함(원장 확인 2026-10-08).
+const HANA_MASKED={'4*0*':'4801'};
+function cardLast4(issuer,v){return issuer==='hana'&&v&&Object.hasOwn(HANA_MASKED,v)?HANA_MASKED[v]:(v&&/^\d{4}$/.test(v)?v:null);}
 export function merchantKey(value) {
   return String(value||'').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu,'').slice(0,120);
 }
 export function isCardSms(raw) {
-  return /^(?:삼성(?:\d{4}|카드)|KB국민카드|하나카드)/.test(normalizeSms(raw));
+  return /^(?:삼성(?:\d{4}|카드)|KB국민카드|하나(?:카드|\d\*\d\*))/.test(normalizeSms(raw));
 }
 export function transactionTimestamp(value,receivedAt) {
   const m=String(value).match(/^(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})$/),received=new Date(receivedAt);
@@ -25,10 +28,9 @@ export function parseCardSms(raw,receivedAt=new Date().toISOString()) {
   if(!text)return {status:'failed',failureCode:'empty'};
   if(!isCardSms(text))return {status:'ignored',reason:'not_card'};
   if(/거절|사용불가|P사용|포인트\s*결제시차감청구/.test(text))return {status:'ignored',reason:'not_transaction'};
-  const header=text.match(/^(삼성(?:카드)?|KB국민카드|하나카드)\s*(\d{4})?\s*(해외)?(승인취소|승인|취소)?/);
+  const header=text.match(/^(삼성(?:카드)?|KB국민카드|하나카드|하나(?=\d\*))\s*(\d{4}|\d\*\d\*)?\s*(해외)?(승인취소|승인|취소)?/);
   const issuer=header?.[1].startsWith('삼성')?'samsung':header?.[1]==='KB국민카드'?'kb':'hana';
   if(!/승인|취소/.test(text))return {status:'ignored',reason:'notice'};
-  if(issuer==='hana')return {status:'failed',failureCode:'hana_sample_needed'};
   const dt=text.match(/(\d{2}\/\d{2}\s+\d{2}:\d{2})/);
   if(!dt)return {status:'failed',failureCode:'unreadable_fields'};
   const amountRx=new RegExp(`(?:\\b(${CUR})[ \\t]*(-?[\\d,]+(?:\\.\\d{1,4})?)|(-?[\\d,]+(?:\\.\\d{1,4})?)[ \\t]*\\([ \\t]*(${CUR})[ \\t]*\\)|(-?[\\d,]+)[ \\t]*원)`,'i');
@@ -44,7 +46,7 @@ export function parseCardSms(raw,receivedAt=new Date().toISOString()) {
   const explicit=header?.[4]||text.match(/(승인취소|승인|취소)\s*$/)?.[1];
   if(!explicit||!merchant||!merchantKey(merchant)||!at||!Number.isFinite(amount)||amount<=0)return {status:'failed',failureCode:'unreadable_fields'};
   const kind=explicit==='승인'?'purchase':'cancellation';
-  return {status:kind==='purchase'?'recorded':'cancellation',issuer,cardLast4:header?.[2]||null,eventKind:kind,
+  return {status:kind==='purchase'?'recorded':'cancellation',issuer,cardLast4:cardLast4(issuer,header?.[2]),eventKind:kind,
     transactionAt:at,currency,amount,merchant,merchantKey:merchantKey(merchant),
     abroad:header?.[3]||currency!=='KRW'||price[4]?'overseas':'domestic'};
 }

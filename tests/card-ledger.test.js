@@ -23,8 +23,9 @@ test('월경계·연경계·윤년·날짜 오류를 수신 시각 기준으로 
  assert.equal(transactionTimestamp('02/30 10:10',at),null);assert.equal(transactionTimestamp('10/07 24:10',at),null);
  assert.equal(transactionTimestamp('02/29 10:00','2024-03-01T00:00:00+09:00'),'2024-02-29T01:00:00.000Z');
 });
-test('거절·안내는 제외하고 하나카드 승인 표본은 읽기 실패로 남김',()=>{
- assert.equal(parseCardSms('하나카드4801승인\n100원',at).failureCode,'hana_sample_needed');
+test('거절·안내는 제외하고 하나카드 실제 표본(하나4*0*)을 읽음',()=>{
+ assert.equal(parseCardSms('하나카드4801승인\n100원',at).failureCode,'unreadable_fields');
+ {const h=parseCardSms('[Web발신]\n하나4*0*승인 정*태 17,000원 일시불 10/08 11:16 아람메디컬병원 누적342,330원','2026-10-08T02:20:00.000Z');assert.equal(h.status,'recorded');assert.equal(h.issuer,'hana');assert.equal(h.cardLast4,'4801');assert.equal(h.amount,17000);assert.equal(h.merchant,'아람메디컬병원');assert.equal(h.transactionAt,'2026-10-08T02:16:00.000Z');assert.equal(h.abroad,'domestic');}
  assert.equal(parseCardSms('KB국민카드 사용 안내',at).status,'ignored');
  assert.equal(parseCardSms('삼성4430해외거절 USD 1',at).status,'ignored');
 });
