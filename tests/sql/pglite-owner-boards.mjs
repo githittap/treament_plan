@@ -73,5 +73,35 @@ try{
   assert.deepEqual(await slugCheck(),["CHECK ((slug = ANY (ARRAY['busd_ledger'::text, 'pin_board'::text, 'wordbook'::text])))"]);
   assert.deepEqual((await q('select slug from public.owner_boards order by slug')).map(r=>r.slug),['busd_ledger','pin_board','wordbook'],'되돌리기는 인박스 행만 지움');
   await db.exec(inboxMigration);assert.equal((await slugCheck())[0].includes("'inbox'::text"),true,'되돌린 뒤 다시 적용 가능');
+  // 2026-10-08 다섯째·여섯째 판 rules_map·codex_flow: 넷째 판까지만 허용하는 운영 표에는 owner_boards_rules.sql을 돌려야 받는다.
+  const rulesMigration=fs.readFileSync(path.join(root,'db/owner_boards_rules.sql'),'utf8');
+  const rulesRollback=fs.readFileSync(path.join(root,'db/owner_boards_rules_rollback.sql'),'utf8');
+  assert.doesNotMatch(rulesMigration,/\b(delete|drop table|truncate)\b/i,'제약 바꾸기만 — 자료 지우기 없음');
+  assert.doesNotMatch(rulesRollback,/\b(delete|drop table|truncate)\b/i,'되돌리기도 행을 지우지 않음(새 판 행이 있으면 중단)');
+  assert.deepEqual(await slugCheck(),["CHECK ((slug = ANY (ARRAY['busd_ledger'::text, 'pin_board'::text, 'wordbook'::text, 'inbox'::text])))"],'바꾸기 전: 넷째 판까지');
+  await db.exec('set role service_role;');
+  await assert.rejects(q(`select public.owner_board_put('rules_map','<html>x</html>','${hash}',null)`),/owner_boards_slug_check/,'넷째 판까지만 허용한 표는 rules_map을 거절');await db.exec('rollback');
+  await assert.rejects(q(`select public.owner_board_put('codex_flow','<html>x</html>','${hash}',null)`),/owner_boards_slug_check/,'codex_flow도 거절');await db.exec('rollback');
+  await db.exec('reset role;');
+  await db.exec(rulesMigration);await db.exec(rulesMigration);
+  assert.deepEqual(await slugCheck(),["CHECK ((slug = ANY (ARRAY['busd_ledger'::text, 'pin_board'::text, 'wordbook'::text, 'inbox'::text, 'rules_map'::text, 'codex_flow'::text])))"]);
+  assert.equal((await q('select count(*)::int n from public.owner_boards'))[0].n,3,'기존 판 자료는 그대로');
+  await db.exec('set role service_role;');
+  await q(`select public.owner_board_put('rules_map','<!doctype html><html>규칙 관계도</html>','${hash}',now())`);
+  await q(`select public.owner_board_put('codex_flow','<!doctype html><html>코덱스 흐름</html>','${hash}',now())`);
+  await assert.rejects(q(`select public.owner_board_put('other','<html>x</html>','${hash}',null)`),/owner_boards_slug_check/);await db.exec('rollback');
+  await db.exec('reset role;');
+  await setUser(owner);assert.deepEqual((await q('select slug from public.owner_boards order by slug')).map(r=>r.slug),['busd_ledger','codex_flow','pin_board','rules_map','wordbook'],'원장은 새 두 판도 봄');
+  await setUser(staff);assert.equal((await q("select * from public.owner_boards where slug in('rules_map','codex_flow')")).length,0,'직원은 새 두 판을 못 봄');
+  await db.exec('reset role;');
+  // 되돌리기 안전장치: 새 판 행이 남아 있으면 중단하고 아무것도 바꾸지 않는다(행도 안 지움).
+  await assert.rejects(db.exec(rulesRollback),/남아 있어 되돌리기를 중단/);await db.exec('rollback');
+  assert.deepEqual(await slugCheck(),["CHECK ((slug = ANY (ARRAY['busd_ledger'::text, 'pin_board'::text, 'wordbook'::text, 'inbox'::text, 'rules_map'::text, 'codex_flow'::text])))"],'중단되면 검사는 여섯 판 그대로');
+  assert.equal((await q("select count(*)::int n from public.owner_boards where slug in('rules_map','codex_flow')"))[0].n,2,'새 판 행은 그대로(되돌리기가 지우지 않음)');
+  await db.exec("delete from public.owner_boards where slug in('rules_map','codex_flow');"); // 원장이 따로 지웠다고 가정한 시험 준비
+  await db.exec(rulesRollback);
+  assert.deepEqual(await slugCheck(),["CHECK ((slug = ANY (ARRAY['busd_ledger'::text, 'pin_board'::text, 'wordbook'::text, 'inbox'::text])))"],'새 판 행이 없으면 넷째 판까지로 되돌림');
+  assert.equal((await q('select count(*)::int n from public.owner_boards'))[0].n,3,'기존 판 자료는 그대로');
+  await db.exec(rulesMigration);assert.equal((await slugCheck())[0].includes("'codex_flow'::text"),true,'되돌린 뒤 다시 적용 가능');
   console.log('PGLITE_OWNER_BOARDS_PASS');
 }finally{await db.close();}

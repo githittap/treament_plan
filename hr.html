@@ -73,6 +73,7 @@ main{padding:16px 16px 70px;max-width:1080px;margin:0 auto}
 .workdocs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-top:12px}
 .workdoc-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:7px}
 .workdoc-card .workdoc-icon{font-size:24px}.workdoc-card h3{margin:0}.workdoc-card p{color:var(--gray);font-size:12.5px;flex:1}
+.tools-head{margin:16px 0 0;font-size:14px;color:var(--mint)}.tools-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:10px}.tools-bar b{flex:1;min-width:0;overflow-wrap:anywhere}.tools-frame{display:block;width:100%;max-width:100%;height:calc(100vh - 230px);min-height:520px;border:1px solid var(--line);border-radius:8px;background:#fff}
 .guide-shell{max-width:900px}.guide-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:1px solid var(--line);padding-bottom:12px}.guide-breadcrumb{font-size:11px;color:var(--gray);letter-spacing:.02em;margin-bottom:5px}.guide-lead{color:var(--gray);margin:4px 0 0;font-size:13px}.guide-flow{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:14px 0}.guide-flow span{padding:8px 6px;border:1px solid var(--line);border-radius:8px;background:var(--panel);font-size:11px;text-align:center;color:var(--gray)}.guide-flow b{display:block;color:var(--mint);font-size:13px;margin-bottom:2px}.guide-sections{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.guide-section{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px}.guide-section h3{margin:0 0 6px;color:var(--ink);font-size:13px}.guide-section p{margin:0;color:var(--gray);font-size:12.5px;line-height:1.55}.guide-section ul{margin:6px 0 0;padding-left:18px;color:var(--gray);font-size:12px;line-height:1.6}.guide-mock{margin-top:14px;border:1px solid rgba(47,217,196,.35);border-radius:10px;background:#081214;padding:10px}.guide-mock-nav{display:flex;gap:5px;flex-wrap:wrap}.guide-mock-nav span{font-size:10px;padding:4px 7px;border-radius:5px;color:var(--gray);background:rgba(255,255,255,.05)}.guide-mock-nav .active{color:#062421;background:var(--mint);font-weight:800}.guide-mock-row{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:9px;padding:8px;border:1px solid var(--line);border-radius:7px;font-size:11px}.guide-pill{color:var(--mint);font-size:10px}.guide-caption{margin:7px 0 0;color:var(--gray);font-size:11px}.guide-caption b{color:var(--mint)}.guide-close{white-space:nowrap}.guide-shell button:focus-visible,.guide-shell a:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
 @media(max-width:640px){.guide-flow{grid-template-columns:repeat(2,1fr)}.guide-sections{grid-template-columns:1fr}.guide-head{align-items:stretch;flex-direction:column}.guide-close{align-self:flex-start}}
 .guide-shot{margin:10px 0 0}.guide-shot img{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:8px}.guide-shot figcaption{font-size:11px;color:var(--gray);margin-top:5px}
@@ -435,12 +436,12 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 <script src="hub-intro.js?v=2026100503"></script>
 <script>window.HUB_RECALL_CATALOG=true;</script>
 <script src="card-ledger-ui.js?v=2026100901"></script>
-<script src="hub-texts.js?v=2026100803"></script>
+<script src="hub-texts.js?v=2026100810"></script>
 <script src="hub-activity.js?v=2026100601"></script>
 <script src="security-pledge.js?v=20261003p9d"></script>
 <script src="wage-hourly.js?v=2026100401"></script>
-<script src="spend-cycle.js?v=2026100608"></script>
-<script src="spend-cycle-ui.js?v=2026100608"></script>
+<script src="spend-cycle.js?v=2026100809"></script>
+<script src="spend-cycle-ui.js?v=2026100809"></script>
 <script>
 /* ═══════ 설정 ═══════
    실제 값은 DB의 app_settings 표에서 읽어옵니다.
@@ -896,6 +897,7 @@ const TABS=[
   {key:'appr',  label:'결재함',    roles:['staff','manager','chief','owner']},
   {key:'notice',label:'공지',      roles:['staff','manager','chief','owner']},
   {key:'workdocs',label:'📚 업무자료',roles:['staff','manager','chief','owner']},
+  {key:'tools', label:'🧰 도구',   roles:['staff','manager','chief','owner']},
   {key:'calendar',label:'📅 캘린더',roles:['staff','manager','chief','owner']},
   {key:'suggestions',label:'💡 건의함',roles:['staff','manager','chief','owner']},
   {key:'onbo',  label:'내 서류함',  roles:['staff','manager','chief','owner']},
@@ -920,6 +922,7 @@ const MENU=[
   {kind:'group',key:'g-work',  label:'🕘 근무',            children:['sched','calendar','att']},
   {kind:'group',key:'g-owner', label:'🔒 원장 전용',        children:['owner','aicost','pay','actlog']},
   {kind:'group',key:'g-care',  label:'🩺 환자관리·진료',    children:['confid','workdocs','inbox','consult']},
+  {kind:'tab',  key:'tools',                               children:[]},
   {kind:'group',key:'g-docs',  label:'🏖 연차·결재·서류',   children:['contract','onbo','appr','leave']},
   {kind:'tab',  key:'deposit',                             children:[]},
 ];
@@ -939,8 +942,8 @@ function employmentTermAlertRows(terms,contracts){
 function tabVisible(t){if(ME.role==='deputy')return t.key==='contract';if(t.key==='aicost'&&ME.role==='manager')return (typeof hubSettingBoolean!=='function'||hubSettingBoolean('marketing.manager_view_enabled',true))&&(TAB_OVERRIDES[ME.id]||{}).aicost!==false;return ME.role==='owner'
     ?t.roles.includes('owner')&&(!t.needsConfid||ME.confidAccess)
     :(()=>{const ov=(TAB_OVERRIDES[ME.id]||{})[t.key],base=(TAB_ROLES[t.key]||t.roles).includes(ME.role),shown=ov===true?true:ov===false?false:base;return t.key!=='owner'&&t.key!=='ownerboards'&&t.key!=='actlog'&&shown&&(!t.needsConfid||ME.confidAccess);})();}
-function visibleTabKeys(){return new Set(TABS.filter(tabVisible).filter(t=>!['hubset','ledger'].includes(t.key)||ME.role==='owner').map(t=>t.key));} /* ⚙️ 허브 설정은 원장에게만 — 탭 노출 설정·사람별 예외로 열어 줘도 직원에게 안 보인다 */
-function tabLabel(k){if(k==='actlog')return typeof hubText==='function'?hubText('actlog.title','👁 사용 기록'):'👁 사용 기록';if(k==='aicost'&&ME.role==='manager')return typeof hubText==='function'?hubText('mkt.title','📣 마케팅비'):'📣 마케팅비';const t=TABS.find(x=>x.key===k);return t?(typeof hubText==='function'?hubText('tab.'+k,t.label):t.label):k;}
+function visibleTabKeys(){return new Set(TABS.filter(tabVisible).filter(t=>!['hubset','ledger'].includes(t.key)||ME.role==='owner').filter(t=>t.key!=='tools'||typeof toolsAnyVisible!=='function'||toolsAnyVisible(ME.role)).map(t=>t.key));} /* ⚙️ 허브 설정은 원장에게만 — 탭 노출 설정·사람별 예외로 열어 줘도 직원에게 안 보인다 */
+function tabLabel(k){if(k==='tools')return typeof hubText==='function'?hubText('tools.tab','🧰 도구'):'🧰 도구';if(k==='actlog')return typeof hubText==='function'?hubText('actlog.title','👁 사용 기록'):'👁 사용 기록';if(k==='aicost'&&ME.role==='manager')return typeof hubText==='function'?hubText('mkt.title','📣 마케팅비'):'📣 마케팅비';const t=TABS.find(x=>x.key===k);return t?(typeof hubText==='function'?hubText('tab.'+k,t.label):t.label):k;}
 function menuGroupLabel(e){if(e.key==='g-owner'&&ME.role==='manager')return typeof hubText==='function'?hubText('mkt.title','📣 마케팅비'):'📣 마케팅비';return typeof hubText==='function'?hubText('menu.'+String(e.key).replace(/-/g,'_'),e.label):e.label;}
 function menuChildKeys(e,vis){return e.children.filter(k=>vis.has(k));}
 function menuEntryVisible(e,vis){return e.kind==='group'?menuChildKeys(e,vis).length>0:vis.has(e.key);}
@@ -1065,6 +1068,7 @@ async function render(){
     else if(TAB==='appr')await renderAppr(m);
     else if(TAB==='notice')await renderNotice(m);
     else if(TAB==='workdocs')renderWorkDocuments(m);
+    else if(TAB==='tools')renderTools(m);
     else if(TAB==='calendar')await renderCalendar(m);
     else if(TAB==='leavestatus'){CAL_VIEW='leave';TAB='calendar';await renderCalendar(m);}
     else if(TAB==='suggestions')await renderSuggestions(m);
@@ -2426,6 +2430,48 @@ function renderWorkDocuments(m){
   m.innerHTML=`<div class="card"><h2>${esc(hubT('workdoc.title','📚 업무자료'))}</h2><p class="hint">${esc(hubT('workdoc.hint','직원 업무에 필요한 공개 자료를 한곳에서 확인합니다.'))}</p><div class="workdocs-grid"><article class="workdoc-card"><div class="workdoc-icon">🧭</div><div class="sub">${esc(hubT('workdoc.guide_card.label','직원용 안내'))}</div><h3>${esc(hubT('workdoc.guide_card.title','직원 허브 사용 설명서'))}</h3><p>${esc(hubT('workdoc.guide_card.desc','홈·근무표·연차·결재·서류함을 처음 사용하는 방법을 확인합니다.'))}</p><button type="button" class="mini" onclick="showWorkDocumentsGuide()">${esc(hubT('workdoc.guide_card.button','업무자료 설명서 열기'))}</button></article></div><input id="workDocSearch" style="width:100%;margin-top:10px" type="search" placeholder="${esc(hubT('workdoc.search.placeholder','자료 검색'))}" value="${esc(WORK_DOC_QUERY)}" oninput="WORK_DOC_QUERY=this.value;renderWorkDocumentResults()"><div id="workDocResults" class="workdocs-grid">${workDocumentCards(visibleWorkDocuments)}</div></div>${pushNotificationCard()}`;
 }
 /* work-documents:render-end */
+/* hub-tools:test-start */
+/* 🧰 도구 탭(2026-10-08): jung-plant.com 첫 화면의 도구 카드를 허브 안으로. 카드 목록은 코드에 고정 · 글은 hub-texts.js(tools.*) · 보는 사람은 설정 tools.who.<코드>(all 전 직원 · lead 실장·매니저·원장 · owner 원장만) */
+const TOOL_WHO_VALUES=['all','lead','owner'];
+const TOOL_GROUPS=[{key:'top',title:null},{key:'info',title:'📚 정보(치과 소식·AI 모델 지표·설명덱)'},{key:'clinic',title:'🦷진료'},{key:'fun',title:'🎲 재미'}];
+const TOOL_CARDS=[
+  {code:'treatment_plan',group:'top',icon:'🦷',file:'치료계획.html',title:'치과 치료계획 도구',desc:'파노라마 X-ray 위에 임플란트·발치·치료종류를 시각적으로 표시하고, 이미지로 저장·공유합니다.',who:'all'},
+  {code:'news',group:'info',icon:'📰',file:'뉴스.html',title:'치과 소식',desc:'치과 뉴스(치의신보 등)·치과 건강보험·의료 판결 소식을 최신순으로 한눈에 봅니다.',who:'all'},
+  {code:'ai_metrics',group:'info',icon:'🤖',file:'AI지표.html',title:'AI 모델 지표',desc:'코딩·장문분석·차트판독·비환각률 등 업무 직결 6개 지표로 AI 모델을 지표별 상위 순으로 비교합니다.',who:'all'},
+  {code:'deck_maker',group:'info',icon:'🖥️',file:'설명덱_제작기.html',title:'설명덱 만들기',desc:'클릭하면 한 단계씩 열리는 설명형 발표 슬라이드를, 코딩 없이 만들고 HTML 파일로 저장·공유합니다.',who:'all'},
+  {code:'lab_remake_ledger',group:'clinic',icon:'📋',file:'기공차트_리메이크장부_서식.html',title:'기공차트 · 리메이크 장부',desc:'보철 장착·리메이크 기록을 화면에서 입력하면 자동 저장·누적되고, 지난 날짜는 잠깁니다. 인쇄까지 됩니다.',who:'all'},
+  {code:'ortho',group:'clinic',icon:'🦷',file:'ortho.html',title:'교정 케이스 보드',desc:'슈어스마일 교정 환자의 진행 단계·납부·배송·내원 기록을 직원 전체가 실시간으로 공유합니다. (직원 로그인)',who:'all'},
+  {code:'prosthesis_protocol',group:'clinic',icon:'🩺',file:'보철프로토콜_진단기.html',title:'보철 장착 프로토콜',desc:'기공물이 안 맞을 때 누가·어떻게 대응할지, 휴대폰에서 한 단계씩 눌러 바로 확인합니다.',who:'all'},
+  {code:'saju',group:'fun',icon:'🔮',file:'사주.html',title:'사주 정밀풀이',desc:'생년월일시로 사주팔자·오행·십성·대운을 만세력 기반 정밀 계산으로 풀어드립니다.',who:'all'},
+  {code:'progress_board',group:'fun',icon:'📊',file:'진행판.html',title:'작업 진행판',desc:'진행 중인 작업의 목표·단계·다음 할 일을 한눈에 봅니다. 비밀번호를 넣으면 다른 컴퓨터·휴대폰에서도 최신 상황이 실시간으로 보입니다.',who:'owner'},
+  {code:'employee_pick',group:'fun',icon:'🎯',file:'직원뽑기.html',title:'직원 뽑기 · 사다리',desc:'직원 명단을 넣고 한 명 랜덤 뽑기, 사다리타기로 선물·당번을 공정하게 정합니다.',who:'all'}
+];
+let TOOLS_OPEN='';
+/* 카드마다 보는 사람: 설정값이 all/lead/owner가 아니면 카드의 기본값. 원장은 항상 모두 보고, 대리(deputy) 계정은 아무것도 못 봄 */
+function toolWhoOf(card){const v=typeof hubSetting==='function'?hubSetting('tools.who.'+card.code,card.who):card.who;return TOOL_WHO_VALUES.includes(v)?v:card.who;}
+function toolCanSee(card,role){if(role==='owner')return true;if(role==='deputy')return false;const w=toolWhoOf(card);return w==='all'||(w==='lead'&&(role==='manager'||role==='chief'));}
+function toolsVisibleCards(role){return TOOL_CARDS.filter(c=>toolCanSee(c,role));}
+function toolsAnyVisible(role){return toolsVisibleCards(role).length>0;}
+function toolText(card,part){return hubT('tools.card.'+card.code+'.'+part,card[part]);}
+function toolUrl(card){return encodeURI(card.file);}
+function toolCardHtml(c){return `<article class="workdoc-card"><div class="workdoc-icon">${esc(c.icon)}</div><h3>${esc(toolText(c,'title'))}</h3><p>${esc(toolText(c,'desc'))}</p><button type="button" class="mini" onclick="openTool('${c.code}')">${esc(hubT('tools.open','열기'))}</button></article>`;}
+function toolsListHtml(role){
+  const vis=toolsVisibleCards(role);
+  if(!vis.length)return `<div class="empty">${esc(hubT('tools.empty','볼 수 있는 도구가 없습니다.'))}</div>`;
+  return TOOL_GROUPS.map(g=>{const cards=vis.filter(c=>c.group===g.key);if(!cards.length)return '';return (g.title?`<h3 class="tools-head">${esc(hubT('tools.group.'+g.key,g.title))}</h3>`:'')+`<div class="workdocs-grid">${cards.map(toolCardHtml).join('')}</div>`;}).join('');
+}
+function openTool(code){const c=TOOL_CARDS.find(x=>x.code===code);if(!c||!toolCanSee(c,ME.role))return false;TOOLS_OPEN=code;render();return true;}
+function closeTool(){TOOLS_OPEN='';render();}
+/* 도구 페이지의 「← 홈」(index.html)은 iframe 안에서 첫 화면을 다시 띄움 → 같은 주소 도구면 그 링크를 「도구 목록으로 돌아가기」로 바꿔 끼운다(도구 파일은 그대로) */
+function toolHomeHref(h){h=String(h||'').trim();return /^(\.\/)?index\.html([?#].*)?$/i.test(h)||h==='/'||h==='./';}
+function toolFrameLoaded(frame){let n=0;try{const d=frame&&frame.contentDocument;if(!d)return 0;d.querySelectorAll('a[href]').forEach(a=>{if(!toolHomeHref(a.getAttribute('href')))return;a.setAttribute('href','#');a.removeAttribute('target');a.addEventListener('click',e=>{e.preventDefault();closeTool();});n++;});}catch(e){return 0;}return n;}
+function renderTools(m){
+  const card=TOOLS_OPEN?TOOL_CARDS.find(x=>x.code===TOOLS_OPEN&&toolCanSee(x,ME.role)):null;
+  if(TOOLS_OPEN&&!card)TOOLS_OPEN='';
+  if(card){const url=esc(toolUrl(card)),title=esc(toolText(card,'title'));m.innerHTML=`<div class="card"><div class="tools-bar"><button type="button" class="mini" onclick="closeTool()">${esc(hubT('tools.back','← 도구 목록'))}</button><b>${title}</b><a class="mini" href="${url}" target="_blank" rel="noopener">${esc(hubT('tools.newwin','새 창'))}</a></div><iframe class="tools-frame" src="${url}" title="${title}" onload="toolFrameLoaded(this)"></iframe></div>`;return;}
+  m.innerHTML=`<div class="card"><h2>${esc(hubT('tools.title','🧰 도구'))}</h2>${toolsListHtml(ME.role)}</div>`;
+}
+/* hub-tools:test-end */
 /* ── 캘린더 ── */
 function hubT(k,d,v){return typeof hubText==='function'?hubText(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
 let CAL_MONTH=null,CAL_VIEW='all',CAL_PERIOD='week',CAL_WEEK_START=null,CAL_SELECTED_DATE=null,CAL_DETAIL_DATE=null;
@@ -4322,9 +4368,11 @@ const OWNER_BOARDS=[
   {slug:'busd_ledger',title:'📒 뻐스디 장부',description:'AI 일 장부'},
   {slug:'pin_board',title:'📌 명심판',description:'AI가 지킬 약속'},
   {slug:'wordbook',title:'📖 박제 단어장',description:'원장이 알아 둘 말'},
-  {slug:'inbox',title:'📥 인박스 경고',description:'AI가 남긴 최근 경고·대기'}
+  {slug:'inbox',title:'📥 인박스 경고',description:'AI가 남긴 최근 경고·대기'},
+  {slug:'rules_map',title:'🧭 AI 규칙 관계도',description:'AI 규칙·지침이 어떤 순서로 이기는지'},
+  {slug:'codex_flow',title:'🔀 클로드→코덱스 브라우저 흐름',description:'클로드가 코덱스 브라우저에 일을 넘기는 길'}
 ];
-function ownerBoardTexts(board){const m={busd_ledger:{title:h7T('ob.busd_title','📒 뻐스디 장부'),description:h7T('ob.busd_desc','AI 일 장부')},pin_board:{title:h7T('ob.pin_title','📌 명심판'),description:h7T('ob.pin_desc','AI가 지킬 약속')},wordbook:{title:h7T('ob.word_title','📖 박제 단어장'),description:h7T('ob.word_desc','원장이 알아 둘 말')},inbox:{title:h7T('ob.inbox_title','📥 인박스 경고'),description:h7T('ob.inbox_desc','AI가 남긴 최근 경고·대기')}};return m[board.slug]||{title:board.title,description:board.description};}
+function ownerBoardTexts(board){const m={busd_ledger:{title:h7T('ob.busd_title','📒 뻐스디 장부'),description:h7T('ob.busd_desc','AI 일 장부')},pin_board:{title:h7T('ob.pin_title','📌 명심판'),description:h7T('ob.pin_desc','AI가 지킬 약속')},wordbook:{title:h7T('ob.word_title','📖 박제 단어장'),description:h7T('ob.word_desc','원장이 알아 둘 말')},inbox:{title:h7T('ob.inbox_title','📥 인박스 경고'),description:h7T('ob.inbox_desc','AI가 남긴 최근 경고·대기')},rules_map:{title:h7T('ob.rules_title','🧭 AI 규칙 관계도'),description:h7T('ob.rules_desc','AI 규칙·지침이 어떤 순서로 이기는지')},codex_flow:{title:h7T('ob.flow_title','🔀 클로드→코덱스 브라우저 흐름'),description:h7T('ob.flow_desc','클로드가 코덱스 브라우저에 일을 넘기는 길')}};return m[board.slug]||{title:board.title,description:board.description};}
 function ownerBoardsTimestamp(value){return value?hubFmtDateTime(value):'';}
 function ownerBoardsMissing(error){return !!error&&(error.code==='42P01'||error.code==='PGRST205'||Number(error.status)===404);}
 function ownerLookerUrl(){const raw=String(h7T('ob.looker_url','https://datastudio.google.com/reporting/9c7dbbdd-aace-474d-9a7f-3e71bb663f7c')).trim();return /^https:\/\/[^\s\/?#<>"'\\`@:]+(?:[\/?#][^\s<>"'\\`]*)?$/i.test(raw)?raw:'';}

@@ -27,6 +27,8 @@ const BOARD = [
   { kind: 'group', key: 'g-work', label: '🕘 근무', children: [['sched', '근무표'], ['calendar', '📅 캘린더'], ['att', '출퇴근']] },
   { kind: 'group', key: 'g-owner', label: '🔒 원장 전용', children: [['owner', '🛡️ 계정·권한 관리'], ['aicost', '💰 AI비용'], ['pay', '💰 급여'], ['actlog', '👁 사용 기록']] },
   { kind: 'group', key: 'g-care', label: '🩺 환자관리·진료', children: [['confid', '진료기록'], ['workdocs', '📚 업무자료'], ['inbox', '📥 문의함'], ['consult', '🗂 상담일지']] },
+  /* 2026-10-08(원장 승인): 첫 화면 도구 카드를 허브 안 「🧰 도구」 탭으로 옮김 — 업무자료 옆 단독 탭. */
+  { kind: 'tab', key: 'tools', label: '🧰 도구', children: [] },
   { kind: 'group', key: 'g-docs', label: '🏖 연차·결재·서류', children: [['contract', '근로계약서'], ['onbo', '내 서류함'], ['appr', '결재함'], ['leave', '연차']] },
   { kind: 'tab', key: 'deposit', label: '입금', children: [] }
 ];
@@ -35,7 +37,7 @@ const BOARD = [
 const ALL = ['staff', 'manager', 'chief', 'owner'];
 const TAB_ROLE_RULES = {
   home: ALL, ai: ALL, att: ALL, deposit: ALL, sched: ALL, leave: ALL, appr: ALL, notice: ALL,
-  workdocs: ALL, calendar: ALL, suggestions: ALL, onbo: ALL, confid: ALL, contract: ALL,
+  workdocs: ALL, tools: ALL, calendar: ALL, suggestions: ALL, onbo: ALL, confid: ALL, contract: ALL,
   pay: ['owner'], aicost: ['owner'], actlog: ['owner'], owner: ['owner'],
   /* 원장 승인 2026-09-23(노션 댓글 "승인한다."): 통합 문의함을 메뉴로 꿄내면서
      상담일지도 같은 묶음에 올렸다. 권한은 consultationCanAccess(manager·owner) 그대로다. */
@@ -181,10 +183,10 @@ test('권한 없는 탭은 어느 줄에도 나오지 않는다 (staff·manager�
 test('역할별 위줄 묶음 구성이 보드 순서대로 나온다', () => {
   const staff = harness({ role: 'staff' });
   staff.ctx.renderNav();
-  assert.deepEqual(labelsOf(staff.nav.innerHTML), ['홈', '🤖 AI 도우미', '🕘 근무', '🩺 환자관리·진료', '🏖 연차·결재·서류', '입금']);
+  assert.deepEqual(labelsOf(staff.nav.innerHTML), ['홈', '🤖 AI 도우미', '🕘 근무', '🩺 환자관리·진료', '🧰 도구', '🏖 연차·결재·서류', '입금']);
   const owner = harness({ role: 'owner' });
   owner.ctx.renderNav();
-  assert.deepEqual(labelsOf(owner.nav.innerHTML), ['홈', '🤖 AI 도우미', '🕘 근무', '🔒 원장 전용', '🩺 환자관리·진료', '🏖 연차·결재·서류', '입금']);
+  assert.deepEqual(labelsOf(owner.nav.innerHTML), ['홈', '🤖 AI 도우미', '🕘 근무', '🔒 원장 전용', '🩺 환자관리·진료', '🧰 도구', '🏖 연차·결재·서류', '입금']);
 });
 
 test('아래줄은 고른 묶음의 탭들이고, 자식 있는 탭은 자기 자신이 첫 항목이다', () => {
@@ -214,7 +216,7 @@ test('옛 탭 id·딥링크는 그대로이고, 상담 화면 2개가 메뉴에 
   assert.equal(h.ctx.menuEntryOf('inbox').key, 'g-care');
   assert.deepEqual(keysOf(h.nav2.innerHTML), ['workdocs', 'inbox', 'consult'], '진료기록은 접근 명단이 없으면 빠진다');
   assert.equal(onKeyOf(h.nav2.innerHTML), 'consult');
-  assert.equal(labelsOf(h.nav.innerHTML).length, 7);
+  assert.equal(labelsOf(h.nav.innerHTML).length, 8);
   /* 원장 지시 2026-09-23: 문의함은 모두 보고, 상담일지는 매니저·실장·원장만 본다. */
   const staff = harness({ role: 'staff' });
   assert.equal(staff.ctx.visibleTabKeys().has('inbox'), true);
@@ -231,22 +233,27 @@ test('묶음 버튼 뱃지는 그 안 탭들의 안 읽은 수를 합쳐 보여 
   assert.match(h.nav.innerHTML, /🏖 연차·결재·서류<span class="cnt">4<\/span>/);
 });
 
-test('⑥ index.html 도구 묶음·순서가 hub.json과 같다', () => {
-  const groups = [{ label: null, links: [] }];
-  const re = /<h2 class="tools-head">([^<]+)<\/h2>|<a class="card" href="([^"]+)"/g;
-  let m;
-  while ((m = re.exec(index))) {
-    if (m[1] !== undefined) groups.push({ label: m[1], links: [] });
-    else groups[groups.length - 1].links.push(m[2]);
-  }
-  assert.deepEqual(groups, HUB);
-});
-
-test('⑥ index.html 링크 주소 목록은 재편 전과 같다', () => {
+/* 2026-10-08(원장 승인): 도구 카드는 직원 허브 › 🧰 도구 탭으로 옮김 — index.html에는 hr.html 입구 카드만 남고, hub.json 묶음·순서는 도구 탭이 그대로 이어받는다. */
+test('⑥ index.html 첫 화면에는 직원 허브 입구 카드만 남고 안내 한 줄이 있다', () => {
   const links = [...index.matchAll(/<a class="card" href="([^"]+)"/g)].map(m => m[1]);
-  assert.deepEqual([...links].sort(), [...LINKS_BEFORE].sort());
-  assert.equal(links.length, LINKS_BEFORE.length);
+  assert.deepEqual(links, ['hr.html']);
+  assert.doesNotMatch(index, /<h2 class="tools-head">/);
+  assert.match(index, /도구는 직원 허브 › 🧰 도구에 있습니다\./);
   assert.match(index, /manifest-index\.json/);
   assert.match(index, /<script src="shared\.js"><\/script>/);
   assert.match(index, /serviceWorker.*register\('sw\.js'\)/);
+});
+
+test('⑥ 허브 🧰 도구 탭의 묶음·순서가 hub.json(재편 전 index.html)과 같고 주소는 하나도 늘거나 줄지 않는다', () => {
+  const blk = hr.match(/\/\* hub-tools:test-start \*\/([\s\S]*?)\/\* hub-tools:test-end \*\//);
+  assert.ok(blk, 'hub-tools 경계가 없습니다.');
+  const ctx = {};
+  vm.createContext(ctx);
+  vm.runInContext(blk[1] + ';this.G=TOOL_GROUPS;this.C=TOOL_CARDS;', ctx);
+  const groups = plain(ctx.G).map(g => ({ label: g.title, links: plain(ctx.C).filter(c => c.group === g.key).map(c => c.file) }));
+  const expected = HUB.map((g, i) => (i === 0 ? { label: null, links: g.links.filter(l => l !== 'hr.html') } : g));
+  assert.deepEqual(groups, expected);
+  const links = plain(ctx.C).map(c => c.file);
+  assert.deepEqual([...links, 'hr.html'].sort(), [...LINKS_BEFORE].sort());
+  assert.equal(links.length + 1, LINKS_BEFORE.length);
 });

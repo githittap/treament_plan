@@ -394,7 +394,7 @@ test('화면: 🔢 숫자·기준 — 결재 건수 2개가 더 있고 잘못된
   await t.render(OWNER);
   await t.click('[hub-subtab]=settings');
   const sec=t.section.innerHTML;
-  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,6+14+4+1+8+1+1+6+1+7+3,'차례 5의 문의함·상담일지 숫자 4개가 더 있음');
+  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,6+14+4+1+8+1+1+6+1+7+3+10,'차례 5의 문의함·상담일지 숫자 4개가 더 있음');
   assert.ok(sec.includes('🖊 결재 기준'));
   assert.match(sec,/id="hubSetIn_12" type="number" inputmode="numeric" min="5" max="100" value="20"/);
   assert.match(sec,/id="hubSetIn_13" type="number" inputmode="numeric" min="10" max="200" value="50"/);

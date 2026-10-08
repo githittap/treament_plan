@@ -1,5 +1,5 @@
 export const MAX_BODY_BYTES=4*1024*1024;
-export const OWNER_BOARD_SLUGS=new Set(['busd_ledger','pin_board','wordbook','inbox']);
+export const OWNER_BOARD_SLUGS=new Set(['busd_ledger','pin_board','wordbook','inbox','rules_map','codex_flow']);
 export function validSourceMtime(value){
   if(value==null||value==='')return {ok:true,value:null};
   if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value)||!Number.isFinite(Date.parse(value)))return {ok:false};

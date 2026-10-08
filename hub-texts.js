@@ -118,6 +118,37 @@ const HUB_TAB_DEFAULTS=[
   ['consult','🗂 상담일지'],['contract','근로계약서'],['pay','💰 급여'],['aicost','💰 AI비용'],['owner','🛡️ 계정·권한 관리'],['ownerboards','📒 원장 보기판'],['hubset','⚙️ 허브 설정']
 ];
 const HUB_MENU_DEFAULTS=[['g_work','🕘 근무'],['g_owner','🔒 원장 전용'],['g_care','🩺 환자관리·진료'],['g_docs','🏖 연차·결재·서류']];
+// ── 🧰 도구 탭(2026-10-08): 카드 10장의 기본 글·보는 사람. hr.html의 TOOL_CARDS와 글자까지 같아야 한다(시험이 대조). who: all=전 직원 · lead=실장·매니저·원장 · owner=원장만 ──
+const HUB_TOOL_GROUPS=[['info','📚 정보(치과 소식·AI 모델 지표·설명덱)'],['clinic','🦷진료'],['fun','🎲 재미']];
+const HUB_TOOL_CARDS=[
+  ['treatment_plan','치과 치료계획 도구','파노라마 X-ray 위에 임플란트·발치·치료종류를 시각적으로 표시하고, 이미지로 저장·공유합니다.','all'],
+  ['news','치과 소식','치과 뉴스(치의신보 등)·치과 건강보험·의료 판결 소식을 최신순으로 한눈에 봅니다.','all'],
+  ['ai_metrics','AI 모델 지표','코딩·장문분석·차트판독·비환각률 등 업무 직결 6개 지표로 AI 모델을 지표별 상위 순으로 비교합니다.','all'],
+  ['deck_maker','설명덱 만들기','클릭하면 한 단계씩 열리는 설명형 발표 슬라이드를, 코딩 없이 만들고 HTML 파일로 저장·공유합니다.','all'],
+  ['lab_remake_ledger','기공차트 · 리메이크 장부','보철 장착·리메이크 기록을 화면에서 입력하면 자동 저장·누적되고, 지난 날짜는 잠깁니다. 인쇄까지 됩니다.','all'],
+  ['ortho','교정 케이스 보드','슈어스마일 교정 환자의 진행 단계·납부·배송·내원 기록을 직원 전체가 실시간으로 공유합니다. (직원 로그인)','all'],
+  ['prosthesis_protocol','보철 장착 프로토콜','기공물이 안 맞을 때 누가·어떻게 대응할지, 휴대폰에서 한 단계씩 눌러 바로 확인합니다.','all'],
+  ['saju','사주 정밀풀이','생년월일시로 사주팔자·오행·십성·대운을 만세력 기반 정밀 계산으로 풀어드립니다.','all'],
+  ['progress_board','작업 진행판','진행 중인 작업의 목표·단계·다음 할 일을 한눈에 봅니다. 비밀번호를 넣으면 다른 컴퓨터·휴대폰에서도 최신 상황이 실시간으로 보입니다.','owner'],
+  ['employee_pick','직원 뽑기 · 사다리','직원 명단을 넣고 한 명 랜덤 뽑기, 사다리타기로 선물·당번을 공정하게 정합니다.','all']
+];
+function hubTextDefsTools(add){
+  const S='🧰 도구';
+  add('tools.tab',S,'허브 맨 위 메뉴 — 「🧰 도구」 탭 이름','🧰 도구');
+  add('tools.title',S,'도구 탭 화면 맨 위 큰 제목','🧰 도구');
+  add('tools.empty',S,'도구 탭에 내가 볼 수 있는 카드가 하나도 없을 때 뜨는 글','볼 수 있는 도구가 없습니다.');
+  HUB_TOOL_GROUPS.forEach(function(g){add('tools.group.'+g[0],S,'도구 카드 묶음 소제목 — 「'+g[1]+'」',g[1]);});
+  add('tools.open',S,'도구 카드 아래 「열기」 단추 글','열기');
+  add('tools.newwin',S,'도구를 연 화면 위쪽 「새 창」 링크 글(눌러서 새 창으로 열기)','새 창');
+  add('tools.back',S,'도구를 연 화면 위쪽 「도구 목록으로 돌아가기」 단추 글','← 도구 목록');
+  add('tools.who_all',S,'「보는 사람」 선택칸의 항목 이름 — 모든 직원','전 직원');
+  add('tools.who_lead',S,'「보는 사람」 선택칸의 항목 이름 — 실장·매니저·원장','실장·매니저·원장');
+  add('tools.who_owner',S,'「보는 사람」 선택칸의 항목 이름 — 원장만','원장만');
+  HUB_TOOL_CARDS.forEach(function(c){
+    add('tools.card.'+c[0]+'.title',S,'도구 카드 제목 — 「'+c[1]+'」 카드',c[1]);
+    add('tools.card.'+c[0]+'.desc',S,'도구 카드 설명 — 「'+c[1]+'」 카드',c[2]);
+  });
+}
 const HUB_INVITE_DEFAULT='아산정플란트치과 직원허브 가입 안내입니다.\n\n1) 아래 링크로 접속해 회원가입 해주세요.\nhttps://jung-plant.com/hr.html\n2) 회원가입 후 원장 승인을 기다려 주세요.\n3) 승인되면 같은 링크에서 로그인하시면 됩니다.';
 const HUB_NEXT_BODY_DEFAULT='M2 근무표·계약서 자동생성 · M3 급여 대시보드/명세서 발행·월말 평가·휴일근로 계산기 · M4 채용·입금피드·기공차트 통합\n— 백엔드(표)는 이미 준비됨. 화면만 순차 추가.';
 // ── 차례 2: 내 서류함 + 업무자료 글(기본 글은 hr.html의 글과 같아야 함 — 시험이 대조) ──
@@ -1448,6 +1479,10 @@ function hubTextDefsChapter7(add){
   add('ob.word_desc',S5,'원장 보기판 — 셋째 판 카드 설명','원장이 알아 둘 말');
   add('ob.inbox_title',S5,'원장 보기판 — 넷째 판(총괄 인박스 맨 위 경고·대기 줄) 카드·보기 화면 제목','📥 인박스 경고');
   add('ob.inbox_desc',S5,'원장 보기판 — 넷째 판 카드 설명','AI가 남긴 최근 경고·대기');
+  add('ob.rules_title',S5,'원장 보기판 — 다섯째 판(AI 규칙·지침이 이기는 순서 관계도) 카드·보기 화면 제목','🧭 AI 규칙 관계도');
+  add('ob.rules_desc',S5,'원장 보기판 — 다섯째 판 카드 설명','AI 규칙·지침이 어떤 순서로 이기는지');
+  add('ob.flow_title',S5,'원장 보기판 — 여섯째 판(클로드가 코덱스 브라우저에 일을 넘기는 흐름) 카드·보기 화면 제목','🔀 클로드→코덱스 브라우저 흐름');
+  add('ob.flow_desc',S5,'원장 보기판 — 여섯째 판 카드 설명','클로드가 코덱스 브라우저에 일을 넘기는 길');
   add('ob.frame_title',S5,'원장 보기판 — 판 화면 안쪽 창의 읽어 주는 이름(화면에는 안 보임). {title}은 판 제목','{title} 보기',['title']);
   add('ob.synced',S5,'원장 보기판 — 판 카드·보기 화면의 마지막 올라온 시각 글. {when}은 시각','마지막으로 올라온 때 {when}',['when']);
   add('ob.not_synced',S5,'원장 보기판 — 판이 아직 PC에서 안 올라왔을 때 카드 글(판 보기 오류 글에도 같이 씀)','아직 PC에서 올라오지 않음');
@@ -1937,6 +1972,7 @@ function hubTextDefs(){
   hubTextDefsTime(add);
   hubTextDefsHourly(add);
   hubTextDefsSpend(add);
+  hubTextDefsTools(add);
   ((typeof globalThis!=='undefined'&&globalThis.HUB_CARD_LEDGER_TEXT_DEFS)||[]).forEach(d=>add(d[0],'지출 점검',d[1],d[1],Array.from(d[1].matchAll(/\{([a-z_]+)\}/g),m=>m[1])));
   ((typeof globalThis!=='undefined'&&globalThis.HUB_INTRO_TEXT_DEFS)||[]).forEach(function(d){add(d[0],'🌌 첫 화면',d[1],d[2]);}); // hub-intro.js의 첫 화면 글
   hubTextDefsP7(add);
@@ -2011,6 +2047,7 @@ const HUB_SETTING_DEFS=[
   {"key":"spend.chart_enabled","screen":"📈 기간·주기","label":"기간·주기 그래프 보이기","where":"마케팅비·AI비용의 기간 분석 구역","def":"true","kind":"bool"},
   {key:'activity_log.retention_days',screen:'👁 사용 기록',label:'사용 기록 보관 일수',where:'이 일수가 지난 사용 기록만 매일 정리함. 기본 1095일(3년)임.',def:'1095',kind:'int',min:1,max:36500,unit:'일'},
   {key:'activity_log.exclude_owner',screen:'👁 사용 기록',label:'원장 행동 기록 제외',where:'켜면 원장 본인 행동은 사용 기록에 남기지 않음.',def:'true',kind:'bool'},
+  ...HUB_TOOL_CARDS.map(function(c){return {key:'tools.who.'+c[0],screen:'🧰 도구',label:'「'+c[1]+'」 보는 사람',where:'도구 탭 — 이 카드를 볼 수 있는 사람. 원장은 항상 모두 보임. 바꾸면 그 사람이 허브를 다시 열 때부터 반영돼요.',def:c[3],kind:'enum',options:[{value:'all',label:'전 직원',labelKey:'tools.who_all'},{value:'lead',label:'실장·매니저·원장',labelKey:'tools.who_lead'},{value:'owner',label:'원장만',labelKey:'tools.who_owner'}]};}),
   ...((typeof globalThis!=='undefined'&&globalThis.HUB_CARD_LEDGER_SETTING_DEFS)||[]),
 ];
 // 리콜 명단을 포함하는 허브에서만 편집 목록을 추가한다. 기존 설정의 순서는 유지한다.

@@ -9,7 +9,7 @@ function harness(settings={}){
 }
 const row=(id,amount,extra={})=>({id,parse_status:'recorded',event_kind:'purchase',transaction_at:'2026-10-03T02:00:00Z',currency:'KRW',amount_krw:amount,merchant:'Google Ads',merchant_key:'google',raw_text:'SECRET SMS 1234567890123456',...extra});
 test('실제 화면에 두 구역을 삽입하고 캐시 번호를 올린다',()=>{
- assert.match(html,/spend-cycle\.js\?v=2026100608/);assert.match(html,/spend-cycle-ui\.js\?v=2026100608/);assert.match(html,/SpendUi\.marketing\(all,rules,links\)/);assert.match(html,/SpendUi\.loadAi\(sb,billingFetchAll\)/);assert.match(html,/SpendUi\.ai\(spendData\)/);
+ assert.match(html,/spend-cycle\.js\?v=2026100809/);assert.match(html,/spend-cycle-ui\.js\?v=2026100809/);assert.match(html,/SpendUi\.marketing\(all,rules,links\)/);assert.match(html,/SpendUi\.loadAi\(sb,billingFetchAll\)/);assert.match(html,/SpendUi\.ai\(spendData\)/);
 });
 test('분류·연결·취소 기준을 재사용하며 문자 원문은 화면에 들어가지 않는다',()=>{
  const c=harness(),rows=[row('a',1000),row('b',7000,{category_override:'not_marketing'}),row('c',9000,{parse_status:'failed'}),row('foreign',0,{currency:'USD'}),row('krw',500),row('cancel',-100,{event_kind:'cancellation',reversed_event_id:'a'})],rules=[{merchant_key:'google',category:'google'}],links=[{foreign_event_id:'foreign',krw_event_id:'krw'}];
@@ -73,6 +73,11 @@ function chartRows(mode='normal'){
 test('그래프: 날짜별 SVG·평소 범위 띠·평균선·간격 점선과 날짜 금액 title이 나온다',()=>{
  const c=harness({'spend.default_days':'7'}),out=c.SpendUi.marketing(chartRows(),[{merchant_key:'google',category:'google'}],[]);
  assert.match(out,/<svg[^>]+data-spend-chart="daily"/);assert.match(out,/spend-baseline-band/);assert.match(out,/spend-baseline-mean/);assert.match(out,/data-spend-chart="interval"/);assert.match(out,/stroke-dasharray/);assert.match(out,/<title>2026-10-05 · ₩100<\/title>/);assert.match(out,/viewBox=/);assert.match(out,/width:100%/);assert.match(out,/🟢 평소 범위 안/);
+});
+test('그래프 모양: 본문 글꼴·가로 눈금선·위만 둥근 막대·간격 점 잇는 선과 평소 띠',()=>{
+ const c=harness({'spend.default_days':'7'}),out=c.SpendUi.marketing(chartRows(),[{merchant_key:'google',category:'google'}],[]);
+ assert.match(out,/font-family:inherit/);assert.ok((out.match(/class="spend-grid"/g)||[]).length>=6);assert.match(out,/<path class="spend-bar[^"]*"[^>]* d="M[^"]*Q/);assert.doesNotMatch(out,/<rect class="spend-bar/);
+ assert.match(out,/class="spend-val"/);assert.match(out,/class="spend-gap-line"/);assert.doesNotMatch(out,/spend-interval-band/);const irregular=[...[0,3,8,10,15,19,22,30,36,41,50].map(i=>row('irr'+i,100,{transaction_at:anomalyDay('2026-08-04',i)+'T12:00:00+09:00'})),...[0,1,2,3,4,5,6].map(i=>row('recent'+i,100,{transaction_at:anomalyDay('2026-09-29',i)+'T12:00:00+09:00'}))],sd=c.SpendUi.marketing(irregular,[{merchant_key:'google',category:'google'}],[]);assert.match(sd,/class="spend-interval-band"/);assert.doesNotMatch(out,/font-size:20px/);
 });
 test('그래프: 과다·단축·정상·부족 네 상태와 빨간 막대·점이 나온다',()=>{
  const c=harness({'spend.default_days':'7'}),rules=[{merchant_key:'google',category:'google'}];
