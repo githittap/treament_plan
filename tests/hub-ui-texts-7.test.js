@@ -12,12 +12,15 @@ const {renderAll}=require('./fixtures/hub7-harness.cjs');
 const golden=Object.assign(JSON.parse(read('tests/fixtures/hub7-golden-f95b951.json')),JSON.parse(read('tests/fixtures/billing-monthly-golden.json')),JSON.parse(read('tests/fixtures/ai-cost-display-golden.json')));
 const clone=x=>JSON.parse(JSON.stringify(x));
 const CH7=/^(home|dep|cf|aic|mkt|aiu|ob|pay|slip|acct|jg|save|payreq|empdoc)\./;
-const COUNT=329+2-1; // 기존 글 + 인박스 판 글 2 - 원문 열 이름 1(화면에서 숨겼음).
+const COUNT=329+2-1+2; // 기존 글 + 인박스 판 글 2 - 원문 열 이름 1(화면에서 숨겼음) + 루커 단추 글·주소 2(10-08).
 /* 2026-10-02 원장 보기판에 넷째 판(📥 인박스 경고)을 더함 — 옛 화면(f95b951)과의 차이는 기본 글 카드 한 장뿐이어야 한다.
    옛 화면 대조는 그 카드(그대로·JSON 한 번·두 번 감싼 꼴)만 빼고 글자 하나까지 같은지 본다. 카드가 실제로 붙는지는 아래 따로 시험. */
 const INBOX_CARD='<button type="button" class="card owner-board-card" data-owner-board="inbox" onclick="openOwnerBoard(\'inbox\')"><strong>📥 인박스 경고</strong><span>AI가 남긴 최근 경고·대기</span><small>아직 PC에서 올라오지 않음</small></button>';
 const esc1=s=>JSON.stringify(s).slice(1,-1);
-const INBOX_FORMS=[INBOX_CARD,esc1(INBOX_CARD),esc1(esc1(INBOX_CARD))];
+/* 2026-10-08 원장 보기판 맨 위에 「📊 루커 분석 열기」 단추(원장 전용)를 더함 — 옛 화면 대조에서는 이 단추도 뺀다. */
+const LOOKER_URL='https://datastudio.google.com/reporting/9c7dbbdd-aace-474d-9a7f-3e71bb663f7c';
+const LOOKER_BTN='<div class="rowflex" style="margin:4px 0 10px"><a class="hbtn pri" style="text-decoration:none;display:inline-block" id="ownerLookerBtn" href="'+LOOKER_URL+'" target="_blank" rel="noopener noreferrer">📊 루커 분석 열기</a></div>';
+const INBOX_FORMS=[INBOX_CARD,esc1(INBOX_CARD),esc1(esc1(INBOX_CARD)),LOOKER_BTN,esc1(LOOKER_BTN),esc1(esc1(LOOKER_BTN))];
 const dropInbox=out=>Object.fromEntries(Object.entries(out).map(([k,v])=>[k,typeof v==='string'&&k.startsWith('ob.')?INBOX_FORMS.reduce((s,f)=>s.split(f).join(''),v):v]));
 const NUM_KEYS=['home.payslip_limit','dep.list_limit','aic.history_months','aic.auto_limit','aiu.model_days','aiu.cost_months','aiu.external_days','aiu.session_limit'];
 const LIST_KEYS=['list.approval_status','list.contract_status','list.pay_wage_types','list.marketing_categories','list.ai_billing_platforms','list.ai_cost_platforms','list.ai_external_names'];
@@ -157,6 +160,17 @@ test('원장 보기판 넷째 판(📥 인박스 경고): 기본 글 카드가 �
   const changed=Object.keys(golden).filter(k=>out[k]!==golden[k]).sort();
   assert.deepEqual(changed,['ob.panel','ob.render.owner','ob.render.owner_err','ob.render.owner_missing'],'카드가 붙는 곳 말고는 그대로');
 });
+test('원장 보기판 루커 단추: 원장 화면 맨 위에 새 창 단추 한 개 · 원장 아니면 없음 · 글·주소는 글 고치기 값 · https 아닌 주소면 숨김',async()=>{
+  const base=await renderAll(hr,{engine:false});
+  for(const p of J(base['ob.panel']))assert.equal(p.split(LOOKER_BTN).length-1,1,'판 목록마다 단추 한 개');
+  for(const k of ['ob.render.owner','ob.render.owner_missing','ob.render.owner_err'])assert.equal(base[k].split(esc1(LOOKER_BTN)).length-1,1,k);
+  assert.ok(!base['ob.render.nonowner'].includes('ownerLookerBtn'),'원장이 아니면 단추 없음');
+  const custom=await run([{key:'ob.looker_btn',value:'분석 <보기>'},{key:'ob.looker_url',value:'https://lookerstudio.google.com/reporting/abc?x=1&y=2'}],{});
+  assert.ok(J(custom['ob.panel']).join('').includes('href="https://lookerstudio.google.com/reporting/abc?x=1&amp;y=2"'),'고친 주소');
+  assert.ok(J(custom['ob.panel']).join('').includes('>분석 &lt;보기&gt;</a>'),'고친 글은 이스케이프');
+  for(const bad of ['javascript:alert(1)','http://datastudio.google.com/x','https://a.com/"onclick="x'])
+    assert.ok(!J((await run([{key:'ob.looker_url',value:bad}],{}))['ob.panel']).join('').includes('ownerLookerBtn'),'숨김: '+bad);
+});
 test('기본값만 있을 때: 엔진을 못 불러와 hr.html의 대비책(shim)만 있어도 옛 화면과 같다',async()=>{
   const out=dropInbox(await renderAll(hr,{engine:false,shim:true}));
   for(const k of Object.keys(golden))assert.equal(out[k],golden[k],k);
@@ -199,8 +213,8 @@ test('시험이 실제로 잡는지: 화면 글을 한 글자만 바꾸면 대�
 });
 
 /* ───────────── 3. 표에 값이 있으면 그 글 ───────────── */
-test('표에 값이 있으면 그 글: 고쳐 쓰는 글 331개(차례 7 329 + 인박스 판 2)가 모두 화면에서 나오고, {자리표시자}가 채워진다',async()=>{
-  const defs=ch7Defs();
+test('표에 값이 있으면 그 글: 고쳐 쓰는 글 333개(차례 7 329 + 인박스 판 2 + 루커 2)가 모두 화면에서 나오고, {자리표시자}가 채워진다',async()=>{
+  const defs=ch7Defs().filter(d=>!/^ob\.looker_/.test(d.key)); // 루커 주소는 https가 아니면 단추를 숨기므로 아래 루커 시험에서 따로 봄
   const out=await run(dynRows(defs),{});
   const all=allOut(out);
   const missing=defs.filter(d=>!all.includes('«'+d.key+'»')).map(d=>d.key);
