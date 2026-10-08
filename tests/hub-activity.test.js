@@ -23,7 +23,7 @@ test('날짜 범위는 한국시간으로 계산',()=>{
 });
 test('사용 기록 탭·설정·캐시 연결',()=>{
  const hr=fs.readFileSync(path.join(root,'hr.html'),'utf8'),texts=fs.readFileSync(path.join(root,'hub-texts.js'),'utf8');
- assert.match(hr,/hub-activity\.js\?v=2026100601/);assert.match(hr,/hub-texts\.js\?v=2026100803/);assert.match(hr,/t\.key!==\s*'actlog'/);assert.match(hr,/HubActivity\.start/);assert.match(texts,/activity_log\.retention_days/);
+ assert.match(hr,/hub-activity\.js\?v=2026100601/);assert.match(hr,/hub-texts\.js\?v=2026100804/);assert.match(hr,/t\.key!==\s*'actlog'/);assert.match(hr,/HubActivity\.start/);assert.match(texts,/activity_log\.retention_days/);
  const c=load();vm.runInNewContext(texts,c);assert.ok(c.HubUi.helpers.hubTextDefByKey('actlog.title'));
 });
 test('실제 저장 성공 뒤에만 작성 로그·글 ID 기록하고 본문 제외',async()=>{
