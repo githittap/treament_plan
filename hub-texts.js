@@ -141,6 +141,7 @@ function hubTextDefsTools(add){
   add('tools.open',S,'도구 카드 아래 「열기」 단추 글','열기');
   add('tools.newwin',S,'도구를 연 화면 위쪽 「새 창」 링크 글(눌러서 새 창으로 열기)','새 창');
   add('tools.back',S,'도구를 연 화면 위쪽 「도구 목록으로 돌아가기」 단추 글','← 도구 목록');
+  add('tools.header_treat',S,'허브 맨 위 오른쪽 「교정보드」 옆 치료계획 도구 바로가기 단추 글','🦷 치료계획');
   add('tools.who_all',S,'「보는 사람」 선택칸의 항목 이름 — 모든 직원','전 직원');
   add('tools.who_lead',S,'「보는 사람」 선택칸의 항목 이름 — 실장·매니저·원장','실장·매니저·원장');
   add('tools.who_owner',S,'「보는 사람」 선택칸의 항목 이름 — 원장만','원장만');

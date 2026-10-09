@@ -28,7 +28,7 @@ function make({role='staff',settings={},texts=[]}={}){
   vm.runInContext(`const TABS=[${tabsSource}\n];const MENU=[${menuSource}\n];${menuBlock}${toolsBlock}
     this.TABS=TABS;this.MENU=MENU;this.TOOL_CARDS=TOOL_CARDS;this.toolsVisibleCards=toolsVisibleCards;this.toolsAnyVisible=toolsAnyVisible;this.toolsListHtml=toolsListHtml;
     this.openTool=openTool;this.closeTool=closeTool;this.toolFrameLoaded=toolFrameLoaded;this.toolHomeHref=toolHomeHref;this.renderTools=renderTools;this.visibleTabKeys=visibleTabKeys;this.tabLabel=tabLabel;this.renderNav=renderNav;
-    this.getOpen=()=>TOOLS_OPEN;this.setOpen=v=>{TOOLS_OPEN=v;};`,ctx);
+    this.openToolFromHeader=openToolFromHeader;this.toolHeaderBtnVisible=toolHeaderBtnVisible;this.getOpen=()=>TOOLS_OPEN;this.setOpen=v=>{TOOLS_OPEN=v;};`,ctx);
   ctx.hubSettingSetValues(settings);
   ctx.hubTextSetOverrides(texts);
   ctx.TOOLS_NOW='';
@@ -179,10 +179,10 @@ test('index.html 첫 화면에는 hr.html 카드만 남는다(파일은 그대�
   }
 });
 
-test('글·설정 등록: 새 글 32개와 보는 사람 설정 10개(enum all/lead/owner)가 글 고치기 「🧰 도구」 묶음에 있고, 화면 기본 글과 글자까지 같다',()=>{
+test('글·설정 등록: 새 글 33개와 보는 사람 설정 10개(enum all/lead/owner)가 글 고치기 「🧰 도구」 묶음에 있고, 화면 기본 글과 글자까지 같다',()=>{
   const {ctx}=make();
   const defs=clone(ctx.hubTextDefs()).filter(d=>d.key.startsWith('tools.'));
-  assert.equal(defs.length,32);
+  assert.equal(defs.length,33);
   assert.ok(defs.every(d=>d.screen==='🧰 도구'));
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
   const byKey=Object.fromEntries(defs.map(d=>[d.key,d.def]));
@@ -229,4 +229,24 @@ test('도구 안 「← 홈」(index.html)은 iframe 안에서 첫 화면 대신
   assert.ok(prevented);assert.equal(env.ctx.getOpen(),'','목록으로 돌아감');
   assert.equal(env.ctx.toolFrameLoaded({get contentDocument(){throw new Error('cross-origin');}}),0,'다른 주소 도구는 건드리지 않음');
   assert.equal(env.ctx.toolFrameLoaded(null),0);
+});
+
+test('머리줄 「🦷 치료계획」 단추: 교정보드 단추 옆, 도구 탭을 열어 치료계획 도구를 바로 띄움 · 못 보는 사람에겐 숨김',()=>{
+  assert.match(hr,/<a class="hbtn" href="ortho\.html">🦷 교정보드<\/a>\s*<button type="button" class="hbtn" id="treatBtn" data-hubk="tools\.header_treat" onclick="openToolFromHeader\('treatment_plan'\)" hidden>🦷 치료계획<\/button>/);
+  const staff=make({role:'staff'});staff.ctx.TAB='home';
+  assert.equal(staff.ctx.toolHeaderBtnVisible('treatment_plan'),true);
+  assert.equal(staff.ctx.openToolFromHeader('treatment_plan'),true);
+  assert.equal(staff.ctx.TAB,'tools');assert.equal(staff.ctx.getOpen(),'treatment_plan');
+  const deputy=make({role:'deputy'});deputy.ctx.TAB='contract';
+  assert.equal(deputy.ctx.toolHeaderBtnVisible('treatment_plan'),false);
+  assert.equal(deputy.ctx.openToolFromHeader('treatment_plan'),false);
+  assert.equal(deputy.ctx.TAB,'contract');assert.equal(deputy.ctx.getOpen(),'');
+  // 설정으로 치료계획 도구를 원장만으로 바꾸면 직원 머리줄 단추도 사라짐
+  const locked=make({role:'staff',settings:{'tools.who.treatment_plan':'owner'}});
+  assert.equal(locked.ctx.toolHeaderBtnVisible('treatment_plan'),false);
+});
+
+test('도구를 연 화면은 허브 본문 폭 제한을 풀어 도구 안 좌우 칸 배치가 유지된다(상한은 변수 한 곳)',()=>{
+  assert.match(hr,/main:has\(\.tools-frame\)\{--tools-wide-max:\d+px;max-width:min\(var\(--tools-wide-max\),100%\)\}/);
+  assert.match(hr,/main\{padding:16px 16px 70px;max-width:1080px;margin:0 auto\}/,'다른 탭 본문 폭은 그대로');
 });

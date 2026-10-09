@@ -74,6 +74,8 @@ main{padding:16px 16px 70px;max-width:1080px;margin:0 auto}
 .workdoc-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:7px}
 .workdoc-card .workdoc-icon{font-size:24px}.workdoc-card h3{margin:0}.workdoc-card p{color:var(--gray);font-size:12.5px;flex:1}
 .tools-head{margin:16px 0 0;font-size:14px;color:var(--mint)}.tools-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:10px}.tools-bar b{flex:1;min-width:0;overflow-wrap:anywhere}.tools-frame{display:block;width:100%;max-width:100%;height:calc(100vh - 230px);min-height:520px;border:1px solid var(--line);border-radius:8px;background:#fff}
+/* 도구를 열어 둔 화면은 허브 본문 폭(1080px) 제한을 풀어 PC에서 도구 안의 좌우 칸 배치가 유지되게 한다(치료계획.html은 칸 폭 1080px 이하면 세로 1열로 바뀜). 폭 상한은 --tools-wide-max 한 곳 */
+main:has(.tools-frame){--tools-wide-max:1700px;max-width:min(var(--tools-wide-max),100%)}
 .guide-shell{max-width:900px}.guide-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:1px solid var(--line);padding-bottom:12px}.guide-breadcrumb{font-size:11px;color:var(--gray);letter-spacing:.02em;margin-bottom:5px}.guide-lead{color:var(--gray);margin:4px 0 0;font-size:13px}.guide-flow{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:14px 0}.guide-flow span{padding:8px 6px;border:1px solid var(--line);border-radius:8px;background:var(--panel);font-size:11px;text-align:center;color:var(--gray)}.guide-flow b{display:block;color:var(--mint);font-size:13px;margin-bottom:2px}.guide-sections{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.guide-section{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px}.guide-section h3{margin:0 0 6px;color:var(--ink);font-size:13px}.guide-section p{margin:0;color:var(--gray);font-size:12.5px;line-height:1.55}.guide-section ul{margin:6px 0 0;padding-left:18px;color:var(--gray);font-size:12px;line-height:1.6}.guide-mock{margin-top:14px;border:1px solid rgba(47,217,196,.35);border-radius:10px;background:#081214;padding:10px}.guide-mock-nav{display:flex;gap:5px;flex-wrap:wrap}.guide-mock-nav span{font-size:10px;padding:4px 7px;border-radius:5px;color:var(--gray);background:rgba(255,255,255,.05)}.guide-mock-nav .active{color:#062421;background:var(--mint);font-weight:800}.guide-mock-row{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:9px;padding:8px;border:1px solid var(--line);border-radius:7px;font-size:11px}.guide-pill{color:var(--mint);font-size:10px}.guide-caption{margin:7px 0 0;color:var(--gray);font-size:11px}.guide-caption b{color:var(--mint)}.guide-close{white-space:nowrap}.guide-shell button:focus-visible,.guide-shell a:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
 @media(max-width:640px){.guide-flow{grid-template-columns:repeat(2,1fr)}.guide-sections{grid-template-columns:1fr}.guide-head{align-items:stretch;flex-direction:column}.guide-close{align-self:flex-start}}
 .guide-shot{margin:10px 0 0}.guide-shot img{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:8px}.guide-shot figcaption{font-size:11px;color:var(--gray);margin-top:5px}
@@ -321,6 +323,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
     <span id="saveTag">✓ 자동 저장</span>
     <span id="meName"></span><span class="rolechip" id="meRole"></span>
     <a class="hbtn" href="ortho.html">🦷 교정보드</a>
+    <button type="button" class="hbtn" id="treatBtn" data-hubk="tools.header_treat" onclick="openToolFromHeader('treatment_plan')" hidden>🦷 치료계획</button>
     <button class="hbtn" id="introBtn" title="첫 화면 다시 보기">🌌</button>
     <button class="hbtn" id="logoutBtn">로그아웃</button>
   </span>
@@ -969,6 +972,7 @@ function menuSubRow(vis,cur){
 }
 function renderNav(){
   const vis=visibleTabKeys(),cur=menuEntryOf(TAB);
+  if(typeof toolHeaderBtnSync==='function')toolHeaderBtnSync();
   $('#nav').innerHTML=menuTopRow(vis,cur).map(b=>navButton(b.key,b.label,b.on,b.badge)).join('');
   const sub=$('#nav2');if(!sub)return;
   sub.innerHTML=menuSubRow(vis,cur).map(b=>navButton(b.key,b.label,b.on,b.badge)).join('');
@@ -2462,6 +2466,10 @@ function toolsListHtml(role){
 }
 function openTool(code){const c=TOOL_CARDS.find(x=>x.code===code);if(!c||!toolCanSee(c,ME.role))return false;TOOLS_OPEN=code;render();return true;}
 function closeTool(){TOOLS_OPEN='';render();}
+/* 머리줄 「🦷 치료계획」 단추: 도구 탭을 열어 그 도구를 바로 띄움. 도구 탭·카드를 볼 수 없는 사람에게는 숨김 */
+function toolHeaderBtnVisible(code){const c=TOOL_CARDS.find(x=>x.code===code);return !!(c&&toolCanSee(c,ME.role)&&(typeof visibleTabKeys!=='function'||visibleTabKeys().has('tools')));}
+function toolHeaderBtnSync(){const b=$('#treatBtn');if(b)b.hidden=!toolHeaderBtnVisible('treatment_plan');}
+function openToolFromHeader(code){if(!toolHeaderBtnVisible(code))return false;TOOLS_OPEN=code;TAB='tools';if(typeof renderNav==='function')renderNav();render();return true;}
 /* 도구 페이지의 「← 홈」(index.html)은 iframe 안에서 첫 화면을 다시 띄움 → 같은 주소 도구면 그 링크를 「도구 목록으로 돌아가기」로 바꿔 끼운다(도구 파일은 그대로) */
 function toolHomeHref(h){h=String(h||'').trim();return /^(\.\/)?index\.html([?#].*)?$/i.test(h)||h==='/'||h==='./';}
 function toolFrameLoaded(frame){let n=0;try{const d=frame&&frame.contentDocument;if(!d)return 0;d.querySelectorAll('a[href]').forEach(a=>{if(!toolHomeHref(a.getAttribute('href')))return;a.setAttribute('href','#');a.removeAttribute('target');a.addEventListener('click',e=>{e.preventDefault();closeTool();});n++;});}catch(e){return 0;}return n;}
