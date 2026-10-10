@@ -1337,14 +1337,16 @@ function generateDeckHTML(boot, deckObj){
 function emptyDeckHTML(){
   return '<!DOCTYPE html><meta charset="utf-8"><body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:#0f2942;color:#9fb6cc;font-family:system-ui,sans-serif;font-size:15px;text-align:center;line-height:1.7;padding:20px;">＋ 왼쪽에서 슬라이드를 추가하면<br>여기에서 발표가 실시간으로 그려집니다</body>';
 }
-let pvTimer=0, asTimer=0, pvState={si:0,st:0,maxStep:0,total:0};
+let pvTimer=0, asTimer=0, asPending=false, pvState={si:0,st:0,maxStep:0,total:0};
 function bootPreview(){
   if(!deck.slides.length){ B.frame.srcdoc = emptyDeckHTML(); B.pvLab.textContent='–'; B.pvPrev.disabled=B.pvNext.disabled=true; return; }
   const si = Math.min(sel, deck.slides.length-1);
   B.frame.srcdoc = generateDeckHTML({si, atEnd:false});
 }
 function schedulePreview(){ REDO.length=0; clearTimeout(pvTimer); pvTimer=setTimeout(bootPreview, 280); scheduleAutosave(); }
-function scheduleAutosave(){ if(HUB.on){ markDirty(); return; } clearTimeout(asTimer); asTimer=setTimeout(()=>{ try{ localStorage.setItem(LS_KEY, JSON.stringify(deck)); }catch(_){} }, 900); }
+function scheduleAutosave(){ if(HUB.on){ markDirty(); return; } clearTimeout(asTimer); asPending=true; asTimer=setTimeout(()=>{ asPending=false; try{ localStorage.setItem(LS_KEY, JSON.stringify(deck)); }catch(_){} }, 900); }
+/* 대기 중인 자동저장을 지금 바로 실행(탭을 닫거나 숨길 때) */
+function flushAutosave(){ if(HUB.on || !asPending) return; clearTimeout(asTimer); asPending=false; try{ localStorage.setItem(LS_KEY, JSON.stringify(deck)); }catch(_){} }
 function postFrame(m){ try{ B.frame.contentWindow.postMessage(m,'*'); }catch(_){} }
 function gotoPreview(i){ postFrame({cmd:'goto', si:i, atEnd:false}); }
 window.addEventListener('message', e=>{ const d=e.data||{}; if(d.type==='deckState'){ pvState=d; updatePvLab(); } });
@@ -1584,7 +1586,7 @@ function snap(){ REDO.length = 0; const t = snapNow(); if(UNDO[UNDO.length-1] ==
 function snapOnce(el){ if(el._sn) return; el._sn = true; snap(); el.addEventListener('blur', ()=>{ el._sn = false; }, {once:true}); }
 /* 파일 불러오기·새로·튜토리얼·허브 덱 열기처럼 덱을 통째로 바꿀 땐 되돌리기·다시 기록을 비움 */
 let DECK_GEN = 0;   /* 덱 세대 번호: 덱을 통째로 바꿀 때마다 올라감. 사진 올리기는 시작 때 세대를 기억해, 끝났을 때 세대가 다르면 다른 덱의 일이라 버림(같은 덱 안 되돌리기·다시는 세대 유지) */
-function resetHistory(){ UNDO.length = 0; REDO.length = 0; SNAP_DATA.length = 0; DECK_GEN++; PH_PENDING.clear(); PH_FAILED.clear(); PH_JOBS.clear(); }
+function resetHistory(){ UNDO.length = 0; REDO.length = 0; SNAP_DATA.length = 0; DECK_GEN++; loadSeq++; PH_PENDING.clear(); PH_FAILED.clear(); PH_JOBS.clear(); }
 function restoreSnap(t){
   const o = snapDecode(t, SNAP_DATA); deck = o.d; deck.slides.forEach(sidOf); sel = Math.max(0, Math.min(o.s, deck.slides.length-1));
   B.deckName.value = deck.meta.title || ''; PE.sel = null; PE.pend = null; PE.drag = null;
@@ -1634,7 +1636,7 @@ async function attachPhotoRun(s, file){
     const r = await downscale(file);
     const image = (HUB.on && HUB.canEdit) ? {path: await hubUpload(r.blob), w:r.w, h:r.h} : {src: await blobToDataUrl(r.blob), w:r.w, h:r.h};
     if(gen !== DECK_GEN) return 'gone';   /* 그 사이 덱이 통째로 바뀜(파일 불러오기·새로·허브 덱 열기…) — 다른 덱의 일이라 적용·표시 안 함 */
-    if(commitPhoto(sid, ()=> PH_PENDING.get(sid) === req, image)){ PH_FAILED.delete(sid); if(HUB.on) markDirty(); return 'ok'; }
+    if(commitPhoto(sid, ()=> PH_PENDING.get(sid) === req, image)){ PH_FAILED.delete(sid); scheduleAutosave(); return 'ok'; }
     return slideById(sid) ? 'stale' : 'gone';
   } catch(e){
     /* 지금 덱에 있는 슬라이드(같은 sid)의 최신 요청이 실패했을 때만 표시(새 요청으로 대체됐거나 삭제·되돌리기로 슬라이드가 사라진 것의 실패는 무시) */
@@ -1956,14 +1958,27 @@ function download(name, text){ const b=new Blob([text],{type:'text/html;charset=
 function loadDeck(data){ if(!data || !Array.isArray(data.slides)) throw new Error('bad'); deck=normalize(data); resetHistory(); sel=0; B.deckName.value=deck.meta.title||''; renderAll(); bootPreview(); scheduleAutosave(); }
 
 B.deckName.addEventListener('input', ()=>{ snapOnce(B.deckName); deck.meta.title=B.deckName.value; schedulePreview(); });
-B.saveBtn.onclick=()=>{ if(HUB.on){ hubSave(); return; } try{ localStorage.setItem(LS_KEY, JSON.stringify(deck)); toast('저장했어요 — 이 브라우저에서 이어서 작업할 수 있어요'); }catch(e){ toast('저장 실패 (용량 초과일 수 있어요)','err'); } };
+/* 사진을 줄이거나 올리는 중이면 끝날 때까지 기다림. 처리에 실패한 사진이 있으면 옛 사진으로 처리하지 않고 false */
+async function waitPhotos(verb){
+  if(PH_JOBS.size){ toast('사진 처리 중 — 끝나면 '+verb+'해요'); await hubWaitPhotos(); }
+  const n = phFailedCount();
+  if(n){ toast('사진 '+n+'장 처리 실패 — 다시 골라 주세요', 'err'); return false; }
+  return true;
+}
+async function localSave(){
+  if(!(await waitPhotos('저장'))) return;
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(deck)); clearTimeout(asTimer); asPending = false; toast('저장했어요 — 이 브라우저에서 이어서 작업할 수 있어요'); }catch(e){ toast('저장 실패 (용량 초과일 수 있어요)','err'); }
+}
+B.saveBtn.onclick=()=>{ if(HUB.on){ hubSave(); return; } localSave(); };
 B.newBtn.onclick=()=>{ if(deck.slides.length && !confirm('지금 내용을 지우고 새로 시작할까요?\n(저장·내보내기 안 한 변경은 사라집니다)')) return; deck=starterDeck(); resetHistory(); sel=0; B.deckName.value=deck.meta.title; renderAll(); bootPreview(); scheduleAutosave(); toast('새 덱을 시작했어요'); };
 B.tutorialBtn.onclick=()=>{ if(deck.slides.length && !confirm('지금 내용을 지우고 사용법 튜토리얼을 열까요?\n(저장·내보내기 안 한 변경은 사라집니다)')) return; deck=normalize(tutorialDeck()); resetHistory(); sel=0; B.deckName.value=deck.meta.title; renderAll(); bootPreview(); scheduleAutosave(); toast('튜토리얼을 불러왔어요'); };
 B.loadBtn.onclick=()=> B.fileInput.click();
+let loadSeq = 0;   /* 파일 불러오기 요청 번호 — 늦게 끝난 옛 요청은 버림(덱을 통째로 바꾸는 다른 동작도 번호를 올려 대기 중인 읽기를 무효로 함) */
 B.fileInput.onchange=()=>{
   const f=B.fileInput.files&&B.fileInput.files[0]; if(!f) return;
-  const r=new FileReader();
+  const seq=++loadSeq, r=new FileReader();
   r.onload=()=>{
+    if(seq!==loadSeq) return;
     try{
       const txt=String(r.result||''); let data;
       if(/\.json$/i.test(f.name)){ data=JSON.parse(txt); }
@@ -1980,7 +1995,7 @@ async function exportData(){
   for(const sl of d.slides){ if(sl.type==='photo' && sl.image && sl.image.src && !/^data:/.test(sl.image.src)){ try{ sl.image.src = await blobToDataUrl(await (await fetch(sl.image.src)).blob()); }catch(_){} } }
   return d;
 }
-B.exportBtn.onclick=async()=>{ if(!deck.slides.length){ toast('슬라이드를 먼저 추가하세요','err'); return; } const name=(sanitize(deck.meta.title)||'설명덱')+'.html'; download(name, generateDeckHTML({si:0, atEnd:false}, await exportData())); toast('발표 파일을 내려받았어요 — 더블클릭으로 열려요'); };
+B.exportBtn.onclick=async()=>{ if(!deck.slides.length){ toast('슬라이드를 먼저 추가하세요','err'); return; } if(!(await waitPhotos('내려받아'))) return; const name=(sanitize(deck.meta.title)||'설명덱')+'.html'; download(name, generateDeckHTML({si:0, atEnd:false}, await exportData())); toast('발표 파일을 내려받았어요 — 더블클릭으로 열려요'); };
 
 B.pvPrev.onclick=()=>postFrame({cmd:'prev'});
 B.pvNext.onclick=()=>postFrame({cmd:'next'});
@@ -2132,7 +2147,10 @@ async function hubBoot(){
   B.saveBtn.innerHTML = '<span class="ico">❒</span>서버에 저장';
   renderAll(); bootPreview(); setDirty(!HUB.exists);
 }
-window.addEventListener('beforeunload', e=>{ if(HUB.on && (HUB.dirty || PH_JOBS.size) && !HUB.view){ e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', e=>{ if(HUB.on ? ((HUB.dirty || PH_JOBS.size) && !HUB.view) : (PH_JOBS.size > 0 || asPending)){ e.preventDefault(); e.returnValue = ''; } });
+/* 허브 밖(이 브라우저 저장): 탭을 닫거나 숨기기 직전에 대기 중인 자동저장을 바로 실행 */
+window.addEventListener('pagehide', flushAutosave);
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'hidden') flushAutosave(); });
 
 /* ---- 초기화 ---- */
 (function init(){
