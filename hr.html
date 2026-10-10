@@ -987,7 +987,7 @@ function renderNav(){
   sub.innerHTML=menuSubRow(vis,cur).map(b=>navButton(b.key,b.label,b.on,b.badge)).join('');
 }
 /* menu-restructure:test-end */
-function go(k){if(TAB==='pay'&&PAY_VIEW==='bonus'&&typeof bonusCanLeave==='function'&&!bonusCanLeave())return;if(!toolsLeaveOk())return;if(k==='leavestatus'){k='calendar';CAL_VIEW='leave';}TAB=k;renderNav();render();}
+function go(k){if(TAB==='pay'&&PAY_VIEW==='bonus'&&typeof bonusCanLeave==='function'&&!bonusCanLeave())return;if(k==='leavestatus'){k='calendar';CAL_VIEW='leave';}TAB=k;renderNav();render();}
 /* inbox-first:test-start */
 /* 원장 지시 2026-09-26: 데스크·실장·매니저는 허브 맨 앞에 문의함 — 위줄 첫 칸 📥 문의함 + 처음 화면 문의함.
    데스크 = dept '데스크' + 통역 Bakirova(원장 결정 09-26 「통역은 데스크로」 — dept는 입금 열람 권한과 묶여 있어 바꾸지 않고 여기서만 더함).
@@ -1070,12 +1070,7 @@ async function refreshBadges(propagateAttendanceError=false){
 /* ── 렌더 라우터 ── */
 async function render(){
   if(typeof HubActivity!=='undefined')HubActivity.tab(TAB);
-  const main=$('#main');
-  /* 지금 열려야 할 도구 iframe 이 이미 떠 있으면 다시 그리지 않고 그대로 둠 — 다시 그리면 iframe 이 새로 불러와져 편집 중인 내용이 사라짐(인증 재초기화·늦게 끝난 옛 조회가 부르는 render 포함) */
-  if(typeof toolsFrameKept==='function'&&toolsFrameKept(main))return;
-  /* 화면마다 새 전용 칸(view-root)을 만들어 거기에 그림 — 먼저 시작한 옛 화면의 비동기 조회가 늦게 끝나도 이미 떼어진 칸에만 쓰이므로 지금 화면(도구 iframe 포함)을 못 덮음 */
-  const m=document.createElement('div');m.className='view-root';main.replaceChildren(m);
-  m.innerHTML='<div class="empty">불러오는 중…</div>';hubStaticFill();apprKindSelectFill();
+  const m=$('#main');m.innerHTML='<div class="empty">불러오는 중…</div>';hubStaticFill();apprKindSelectFill();
   try{
     if(TAB==='home')await renderHome(m);
     else if(TAB==='ai'){if(window.AIAssistants)await window.AIAssistants.render(m,{sb,me:ME});else m.innerHTML='<div class="card"><div class="empty">AI 도우미를 불러오지 못했습니다. 새로고침해 주세요.</div></div>';}
@@ -1902,7 +1897,7 @@ async function revokeMonthlyLeaveAccrual(index){
     const result=await sb.rpc('revoke_monthly_leave_accrual',{p_run_id:run.run_id,p_reason:hubT('p7.monthly.reason','결근 후보 확인 후 월차 취소')});
     if(result.error)throw result.error;
     if(!result.data||!result.data.length)throw new Error(hubT('leave.m_grant_unknown','잔액 설정 결과를 확인하지 못했습니다.'));
-    setStatus('saved');if(typeof TAB==='undefined'||TAB==='leave')await renderLeave($('#main'));
+    setStatus('saved');await renderLeave($('#main'));
   }catch(error){alert(hubT('p7.monthly.revoke_fail','월차를 빼지 못했습니다: {msg}',{msg:error.message}));setStatus('error');}
   finally{LEAVE_MONTHLY_BUSY.delete(run.run_id);if(button)button.disabled=false;}
 }
@@ -2248,7 +2243,7 @@ async function applyLeaveAccrual(){
   const {data,error}=await sb.rpc('apply_monthly_leave_accruals',{p_as_of:LEAVE_ACCRUAL_AS_OF,p_attendance_confirmations:confirmations,p_apply_confirmed:true});
   if(error){$('#laMsg').textContent=hubT('leave.acc.m_apply_fail','적용 실패: {msg}',{msg:error.message});$('#laApply').disabled=false;setStatus('error');return;}
   const granted=(data||[]).reduce((sum,r)=>sum+Number(r.granted_days||0),0),created=(data||[]).reduce((sum,r)=>sum+Number(r.created_runs||0),0);
-  setStatus('saved');if(typeof TAB!=='undefined'&&TAB!=='leave')return;await renderLeave($('#main'));const refreshed=await previewLeaveAccrual();
+  setStatus('saved');await renderLeave($('#main'));const refreshed=await previewLeaveAccrual();
   if(refreshed)$('#laMsg').textContent=created?hubT('leave.acc.m_done','적용 완료: {created}건 기록, 실제 {granted}일 지급. 기록 상태를 확인하세요.',{created:created,granted:granted}):hubT('leave.acc.m_none','새로 적용된 기록이 없습니다. 이미 기록된 발생일인지 확인하세요.');
   else $('#laMsg').textContent=hubT('leave.acc.m_recheck_fail','적용 응답은 성공했으나 재조회 실패 — {msg}',{msg:$('#laMsg').textContent});
 }
@@ -2486,36 +2481,18 @@ function toolsVisibleCards(role){return TOOL_CARDS.filter(c=>toolCanSee(c,role))
 function toolsAnyVisible(role){return toolsVisibleCards(role).length>0;}
 function toolText(card,part){return hubT('tools.card.'+card.code+'.'+part,card[part]);}
 function toolUrl(card){return encodeURI(card.file);}
-/* 지금 TAB·열린 도구에 맞는 iframe 의 식별값(data-tkey). 목록 화면·볼 수 없는 도구·편집 권한 없는 편집 화면은 '' */
-function toolsFrameKey(){
-  if(TAB!=='tools'||!TOOLS_OPEN)return '';
-  const card=TOOL_CARDS.find(x=>x.code===TOOLS_OPEN&&toolCanSee(x,ME.role));if(!card)return '';
-  if(card.view==='manual'){if(MDECK.mode==='list'||(MDECK.mode!=='view'&&!mdeckCanEdit(ME.role)))return '';return 'manual_deck:'+MDECK.mode+':'+MDECK.id;}
-  return card.code;
-}
-function toolsFrameKept(main){
-  const k=toolsFrameKey();if(!k||!main||!main.querySelectorAll)return false;
-  return Array.prototype.some.call(main.querySelectorAll('iframe.tools-frame'),f=>f.getAttribute('data-tkey')===k);
-}
 function toolCardHtml(c){return `<article class="workdoc-card"><div class="workdoc-icon">${esc(c.icon)}</div><h3>${esc(toolText(c,'title'))}</h3><p>${esc(toolText(c,'desc'))}</p><button type="button" class="mini" onclick="openTool('${c.code}')">${esc(hubT('tools.open','열기'))}</button></article>`;}
 function toolsListHtml(role){
   const vis=toolsVisibleCards(role);
   if(!vis.length)return `<div class="empty">${esc(hubT('tools.empty','볼 수 있는 도구가 없습니다.'))}</div>`;
   return TOOL_GROUPS.map(g=>{const cards=vis.filter(c=>c.group===g.key);if(!cards.length)return '';return (g.title?`<h3 class="tools-head">${esc(hubT('tools.group.'+g.key,g.title))}</h3>`:'')+`<div class="workdocs-grid">${cards.map(toolCardHtml).join('')}</div>`;}).join('');
 }
-/* 허브 안 도구 iframe(업무매뉴얼 편집)에 저장 안 한 내용·사진 처리 중이 있으면 나가기 전에 확인 — iframe 을 치우거나 바꾸는 모든 경로(go·openTool·closeTool·openToolFromHeader·mdeckOpen·recallShowJournal·로그아웃)가 이 한 곳을 지남. 도구가 window.mdeckUnsaved 를 안 내놓으면(다른 도구) 그냥 통과 */
-function toolsLeaveOk(){
-  let unsaved=false;
-  try{if(typeof document!=='undefined')document.querySelectorAll('iframe.tools-frame').forEach(f=>{try{const w=f.contentWindow;if(w&&typeof w.mdeckUnsaved==='function'&&w.mdeckUnsaved())unsaved=true;}catch(e){}});}catch(e){}
-  if(!unsaved)return true;
-  return typeof confirm==='function'?!!confirm(hubT('mdeck.leave_unsaved','저장 안 한 내용이 있어요. 나갈까요?')):true;
-}
-function openTool(code){const c=TOOL_CARDS.find(x=>x.code===code);if(!c||!toolCanSee(c,ME.role))return false;if(!toolsLeaveOk())return false;TOOLS_OPEN=code;render();return true;}
-function closeTool(){if(!toolsLeaveOk())return;TOOLS_OPEN='';render();}
+function openTool(code){const c=TOOL_CARDS.find(x=>x.code===code);if(!c||!toolCanSee(c,ME.role))return false;TOOLS_OPEN=code;render();return true;}
+function closeTool(){TOOLS_OPEN='';render();}
 /* 머리줄 「🦷 치료계획」 단추: 도구 탭을 열어 그 도구를 바로 띄움. 도구 탭·카드를 볼 수 없는 사람에게는 숨김 */
 function toolHeaderBtnVisible(code){const c=TOOL_CARDS.find(x=>x.code===code);return !!(c&&toolCanSee(c,ME.role)&&(typeof visibleTabKeys!=='function'||visibleTabKeys().has('tools')));}
 function toolHeaderBtnSync(){const b=$('#treatBtn');if(b)b.hidden=!toolHeaderBtnVisible('treatment_plan');}
-function openToolFromHeader(code){if(!toolHeaderBtnVisible(code))return false;if(!toolsLeaveOk())return false;TOOLS_OPEN=code;TAB='tools';if(typeof renderNav==='function')renderNav();render();return true;}
+function openToolFromHeader(code){if(!toolHeaderBtnVisible(code))return false;TOOLS_OPEN=code;TAB='tools';if(typeof renderNav==='function')renderNav();render();return true;}
 /* 도구 페이지의 「← 홈」(index.html)은 iframe 안에서 첫 화면을 다시 띄움 → 같은 주소 도구면 그 링크를 「도구 목록으로 돌아가기」로 바꿔 끼운다(도구 파일은 그대로) */
 function toolHomeHref(h){h=String(h||'').trim();return /^(\.\/)?index\.html([?#].*)?$/i.test(h)||h==='/'||h==='./';}
 function toolFrameLoaded(frame){let n=0;try{const d=frame&&frame.contentDocument;if(!d)return 0;d.querySelectorAll('a[href]').forEach(a=>{if(!toolHomeHref(a.getAttribute('href')))return;a.setAttribute('href','#');a.removeAttribute('target');a.addEventListener('click',e=>{e.preventDefault();closeTool();});n++;});}catch(e){return 0;}return n;}
@@ -2526,7 +2503,7 @@ function renderTools(m){
   if(manualOn&&!MDECK.active){MDECK.mode='list';MDECK.decks=null;}
   MDECK.active=manualOn;
   if(manualOn){renderMdeckTool(m);return;}
-  if(card){const url=esc(toolUrl(card)),title=esc(toolText(card,'title'));m.innerHTML=`<div class="card"><div class="tools-bar"><button type="button" class="mini" onclick="closeTool()">${esc(hubT('tools.back','← 도구 목록'))}</button><b>${title}</b><a class="mini" href="${url}" target="_blank" rel="noopener">${esc(hubT('tools.newwin','새 창'))}</a></div><iframe class="tools-frame" src="${url}" title="${title}" data-tkey="${esc(card.code)}" onload="toolFrameLoaded(this)"></iframe></div>`;return;}
+  if(card){const url=esc(toolUrl(card)),title=esc(toolText(card,'title'));m.innerHTML=`<div class="card"><div class="tools-bar"><button type="button" class="mini" onclick="closeTool()">${esc(hubT('tools.back','← 도구 목록'))}</button><b>${title}</b><a class="mini" href="${url}" target="_blank" rel="noopener">${esc(hubT('tools.newwin','새 창'))}</a></div><iframe class="tools-frame" src="${url}" title="${title}" onload="toolFrameLoaded(this)"></iframe></div>`;return;}
   m.innerHTML=`<div class="card"><h2>${esc(hubT('tools.title','🧰 도구'))}</h2>${toolsListHtml(ME.role)}</div>`;
 }
 /* 📘 업무매뉴얼(2026-10-10): 도구 탭 안의 덱 목록 → 보기(넘기기만). 덱 내용·사진은 표 manual_decks·보관함 manual-media(db/manual_decks.sql).
@@ -2568,18 +2545,24 @@ async function mdeckLoad(){
   if(TAB==='tools'&&TOOLS_OPEN==='manual_deck'&&MDECK.mode==='list')render();
 }
 function mdeckOpen(mode,id){
-  if((mode==='edit'||mode==='new')&&!mdeckCanEdit(ME.role))return false;
-  if(!toolsLeaveOk())return false;
-  MDECK.mode=mode;MDECK.id=id||'';if(mode==='list')MDECK.decks=null;render();return true;
+  if(mode==='edit'||mode==='new'){
+    if(!mdeckCanEdit(ME.role))return false;
+    /* 편집·새로 만들기는 새 창(새 탭)으로 연다 — 편집 창은 허브 화면 다시 그리기와 상관없이 독립이고, 저장 안 한 내용은 편집 창이 스스로 닫기 경고를 함. 허브 안 iframe 은 보기 전용 */
+    if(typeof window!=='undefined'&&typeof window.open==='function'){
+      const w=window.open(mdeckFrameUrl(mode,id),'_blank');
+      if(w){try{w.opener=null;}catch(e){}}
+      else if(typeof alert==='function')alert(hubT('mdeck.popup_blocked','새 창이 열리지 않았어요. 이 사이트의 팝업을 허용한 뒤 다시 눌러 주세요.'));
+    }
+    return true;
+  }
+  MDECK.mode=mode==='view'?'view':'list';MDECK.id=id||'';if(MDECK.mode==='list')MDECK.decks=null;render();return true;
 }
-function mdeckBack(){
-  mdeckOpen('list','');   /* 저장 안 한 내용 확인은 mdeckOpen → toolsLeaveOk 에서 */
-}
+function mdeckBack(){mdeckOpen('list','');}
 function renderMdeckTool(m){
-  if(MDECK.mode!=='list'&&!(MDECK.mode==='view'||mdeckCanEdit(ME.role)))MDECK.mode='list';
-  if(MDECK.mode!=='list'){
+  if(MDECK.mode!=='view')MDECK.mode='list';
+  if(MDECK.mode==='view'){
     const url=esc(mdeckFrameUrl(MDECK.mode,MDECK.id)),title=esc(hubT('mdeck.title','📘 업무매뉴얼'));
-    m.innerHTML=`<div class="card"><div class="tools-bar"><button type="button" class="mini" onclick="mdeckBack()">${esc(hubT('mdeck.back','← 매뉴얼 목록'))}</button><b>${title}</b></div><iframe class="tools-frame" src="${url}" title="${title}" data-tkey="${esc('manual_deck:'+MDECK.mode+':'+MDECK.id)}"></iframe></div>`;
+    m.innerHTML=`<div class="card"><div class="tools-bar"><button type="button" class="mini" onclick="mdeckBack()">${esc(hubT('mdeck.back','← 매뉴얼 목록'))}</button><b>${title}</b></div><iframe class="tools-frame" src="${url}" title="${title}"></iframe></div>`;
     return;
   }
   m.innerHTML=mdeckListHtml(ME.role);
@@ -3279,7 +3262,7 @@ async function submitConfidRecord(){
   const {error}=await sb.from('confidential_records').insert({patient_name,chart_no:$('#cfChart').value.trim()||null,body,author:ME.name,owner_only:(ME.role==='owner'&&$('#cfOwnerOnly')&&$('#cfOwnerOnly').checked)||false});
   if(error){$('#cfMsg').textContent=hubT('cf.m_fail','저장 실패: {detail}',{detail:error.message});return;}
   $('#cfName').value='';$('#cfChart').value='';$('#cfBody').value='';$('#cfMsg').textContent='';
-  if(typeof TAB==='undefined'||TAB==='confid')renderConfid($('#main'));setStatus('saved');
+  renderConfid($('#main'));setStatus('saved');
 }
 
 /* ── 상담일지: 원본 엑셀의 허용 시트 범주만 새 기록에 사용한다. ── */
@@ -3548,7 +3531,7 @@ let INBOX_SUBTAB=(typeof location!=='undefined'&&new URLSearchParams(location.se
 let RECALL_ROWS=[],RECALL_VISIBLE=[],RECALL_FILTER={stage:'',assignee:'',mine:false,overdue:false},RECALL_BUSY=false,RECALL_LOAD_SEQ=0;
 function recallEnabled(){return recallCanAccess(ME)&&typeof SETTINGS!=='undefined'&&SETTINGS['recall.enabled']==='true';}
 function recallTabsHtml(){return recallEnabled()?'<nav class="rowflex recall-tabs" aria-label="'+esc(recallT('tabs','문의함 하위 화면'))+'"><button class="mini" aria-pressed="'+(INBOX_SUBTAB==='inbox')+'" onclick="inboxSetSubtab(\'inbox\')">'+esc(recallT('inbox','📥 문의함'))+'</button><button class="mini" aria-pressed="'+(INBOX_SUBTAB==='recall')+'" onclick="inboxSetSubtab(\'recall\')">'+esc(recallT('title','📞 리콜 명단'))+'</button></nav>':'';}
-async function inboxSetSubtab(tab){if(RECALL_BUSY)return;INBOX_SUBTAB=tab==='recall'&&recallEnabled()?'recall':'inbox';if(typeof TAB==='undefined'||TAB==='inbox')await renderInbox($('#main'));}
+async function inboxSetSubtab(tab){if(RECALL_BUSY)return;INBOX_SUBTAB=tab==='recall'&&recallEnabled()?'recall':'inbox';await renderInbox($('#main'));}
 function recallCardHtml(){return recallTabsHtml()+'<section class="card recall-card"><h2>'+esc(recallT('title','📞 리콜 명단'))+'</h2><p class="hint">'+esc(recallT('hint','문의와 상담일지의 다음 조치를 연락처별로 모았습니다. 예정일이 빠른 순서입니다.'))+'</p><div id="recallSummary" role="status"></div><div class="recall-filters"><label>'+esc(recallT('stage','지금 단계'))+'<select id="recallStage" onchange="recallApplyFilters()"><option value="">'+esc(recallT('all_stage','전체 단계'))+'</option>'+['recall_1','recall_2','recall_3','journal'].map(x=>'<option value="'+x+'" '+(RECALL_FILTER.stage===x?'selected':'')+'>'+esc(recallStageLabel(x))+'</option>').join('')+'</select></label><label>'+esc(recallT('assignee','담당'))+'<select id="recallAssignee" onchange="recallApplyFilters()"><option value="">'+esc(recallT('all_assignee','모든 담당'))+'</option>'+PROFILES.filter(p=>recallCanAccess({role:p.role,dept:p.dept,department:p.department,id:p.user_id})&&p.active!==false&&p.approved!==false&&p.account_access_status!=='차단').map(p=>'<option value="'+esc(p.user_id)+'" '+(RECALL_FILTER.assignee===p.user_id?'selected':'')+'>'+esc(p.name||p.user_id)+'</option>').join('')+'</select></label><label><input id="recallMine" type="checkbox" '+(RECALL_FILTER.mine?'checked':'')+' onchange="recallApplyFilters()"> '+esc(recallT('mine','내 담당만'))+'</label><label><input id="recallOverdue" type="checkbox" '+(RECALL_FILTER.overdue?'checked':'')+' onchange="recallApplyFilters()"> '+esc(recallT('overdue_only','기한 지남만'))+'</label><button class="mini" onclick="recallLoad()">'+esc(recallT('refresh','새로 조회'))+'</button></div><div id="recallList" class="hint">'+esc(recallT('loading','불러오는 중…'))+'</div></section>';}
 async function recallLoad(){
   const seq=++RECALL_LOAD_SEQ,box=$('#recallList');if(!box||!recallEnabled())return;
@@ -3566,7 +3549,7 @@ async function recallSave(index,action){
   catch(e){msg.textContent=recallT('save_error','저장 결과를 확인해 주세요: {msg}. 새로 조회한 뒤 다시 처리하세요.',{msg:e.message});setStatus('error');}
   finally{RECALL_BUSY=false;document.querySelectorAll('.recall-card button,.recall-card select,.recall-card input').forEach(el=>el.disabled=false);}
 }
-async function recallShowJournal(id){if(!toolsLeaveOk())return;TAB='consult';renderNav();await render();if(TAB==='consult')await consultationEdit(id);}
+async function recallShowJournal(id){TAB='consult';renderNav();await render();if(TAB==='consult')await consultationEdit(id);}
 async function recallOpenJournal(index){
   if(RECALL_BUSY||!recallEnabled())return;const g=RECALL_VISIBLE[index],target=g?.rows.find(r=>r.kind==='inbox'),journal=g?.rows.find(r=>r.kind==='journal');if(!g)return;
   if(!target){if(journal&&canManageConsultation())await recallShowJournal(journal.id);return;}
@@ -3598,7 +3581,7 @@ async function renderConsultationJournal(m){
   if(error){m.innerHTML='<div class="card"><div class="cal-error">'+esc(consultationRequestError('list',error))+'</div></div>';setStatus('error');return;}
   CONSULTATION_TOTAL=count||0;consultationRenderList(data||[]);$('#cjPages').innerHTML=`<span class="sub">${esc(cjT('cj.page_info','{total}건 · {page}쪽',{total:CONSULTATION_TOTAL,page:CONSULTATION_PAGE+1}))}</span><button class="mini" ${CONSULTATION_PAGE===0?'disabled':''} onclick="consultationChangePage(-1)">${esc(cjT('cj.btn_prev','이전'))}</button><button class="mini" ${(CONSULTATION_PAGE+1)*CONSULTATION_PAGE_SIZE>=CONSULTATION_TOTAL?'disabled':''} onclick="consultationChangePage(1)">${esc(cjT('cj.btn_next','다음'))}</button>`;
 }
-async function saveConsultationJournal(){const msg=$('#cjMsg'),row=consultationDraftFromForm();if(!row.patient_name||!row.consulted_on||!row.consultation_note){msg.textContent=cjT('cj.m_required','환자명, 상담일, 상담 내용은 필수입니다.');return;}if(row.quoted_amount===undefined){msg.textContent=cjT('cj.m_amount','제시 비용은 0 이상의 숫자로 입력하세요.');return;}if(!CONSULTATION_SHEETS.includes(row.source_sheet)||!CONSULTATION_STATUSES.includes(row.status)){msg.textContent=cjT('cj.m_not_allowed','허용되지 않은 상담 구분 또는 상태입니다.');return;}if(!row.next_action&&(row.action_assignee_id||row.action_due_on||row.action_done)){msg.textContent=cjT('cj.m_need_next','담당자·예정일·완료 표시에는 다음 조치 내용이 필요합니다.');return;}setStatus('saving');msg.textContent=cjT('cj.m_saving','저장 중…');const request=CONSULTATION_EDIT_ID===null?sb.from('consultation_journals').insert(row):sb.from('consultation_journals').update(row).eq('id',CONSULTATION_EDIT_ID);const {error}=await request;if(error){msg.textContent=consultationRequestError(CONSULTATION_EDIT_ID===null?'create':'update',error);setStatus('error');return;}setStatus('saved');if(typeof TAB!=='undefined'&&TAB!=='consult')return;consultationResetForm();await renderConsultationJournal($('#main'));}
+async function saveConsultationJournal(){const msg=$('#cjMsg'),row=consultationDraftFromForm();if(!row.patient_name||!row.consulted_on||!row.consultation_note){msg.textContent=cjT('cj.m_required','환자명, 상담일, 상담 내용은 필수입니다.');return;}if(row.quoted_amount===undefined){msg.textContent=cjT('cj.m_amount','제시 비용은 0 이상의 숫자로 입력하세요.');return;}if(!CONSULTATION_SHEETS.includes(row.source_sheet)||!CONSULTATION_STATUSES.includes(row.status)){msg.textContent=cjT('cj.m_not_allowed','허용되지 않은 상담 구분 또는 상태입니다.');return;}if(!row.next_action&&(row.action_assignee_id||row.action_due_on||row.action_done)){msg.textContent=cjT('cj.m_need_next','담당자·예정일·완료 표시에는 다음 조치 내용이 필요합니다.');return;}setStatus('saving');msg.textContent=cjT('cj.m_saving','저장 중…');const request=CONSULTATION_EDIT_ID===null?sb.from('consultation_journals').insert(row):sb.from('consultation_journals').update(row).eq('id',CONSULTATION_EDIT_ID);const {error}=await request;if(error){msg.textContent=consultationRequestError(CONSULTATION_EDIT_ID===null?'create':'update',error);setStatus('error');return;}setStatus('saved');consultationResetForm();await renderConsultationJournal($('#main'));}
 
 /* ── 근로계약서 ── */
 function ctT(k,d,v){return typeof hubT==='function'?hubT(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));} /* 근로계약서 글: 허브 설정에서 고치는 글(hub-texts.js가 없으면 기본 글 그대로). 계약서 본문 문구는 「새로 만드는 계약서」에만 쓰이고, 이미 발송·서명한 계약서는 저장된 본문(merged_html)을 그대로 보여 줌 */
@@ -5378,7 +5361,7 @@ async function boot(){
   $('#toSignup').addEventListener('click',e=>{e.preventDefault();showAuth('signup');});
   $('#toLogin').addEventListener('click',e=>{e.preventDefault();showAuth('login');});
   $('#introBtn').addEventListener('click',()=>{if(typeof HubIntro!=='undefined'&&ME.approved)HubIntro.open(hubIntroOptions());});
-  $('#logoutBtn').addEventListener('click',async()=>{if(!toolsLeaveOk())return;if(typeof HubActivity!=='undefined')HubActivity.stop();try{await sb.auth.signOut();}catch(e){}location.reload();});
+  $('#logoutBtn').addEventListener('click',async()=>{if(typeof HubActivity!=='undefined')HubActivity.stop();try{await sb.auth.signOut();}catch(e){}location.reload();});
   if(!sb){$('#gate').style.display='';$('#lgMsg').textContent='인터넷 연결 후 새로고침하세요.';return;}
   sb.auth.onAuthStateChange((event,s)=>{hubActivityAccessToken=s?.access_token||'';if(!s&&typeof HubActivity!=='undefined')HubActivity.stop();if(event==='PASSWORD_RECOVERY'){showRecoveryView();return;}if(s&&!recoveryInProgress&&!passwordRecoveryMode)onAuthed(s);});
   const {data:{session}}=await sb.auth.getSession();

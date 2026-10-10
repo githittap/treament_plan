@@ -1344,9 +1344,15 @@ function bootPreview(){
   B.frame.srcdoc = generateDeckHTML({si, atEnd:false});
 }
 function schedulePreview(){ REDO.length=0; clearTimeout(pvTimer); pvTimer=setTimeout(bootPreview, 280); scheduleAutosave(); }
-function scheduleAutosave(){ if(HUB.on){ markDirty(); return; } clearTimeout(asTimer); asPending=true; asTimer=setTimeout(()=>{ asPending=false; try{ localStorage.setItem(LS_KEY, JSON.stringify(deck)); }catch(_){} }, 900); }
+/* 이 브라우저(localStorage)에 쓰기 — 성공하면 true. 용량 부족 등으로 실패하면 false(자동저장 대기 표시·닫기 경고는 그대로 유지하고 백업 안내) */
+let lsWarned = false;
+function lsWrite(force){
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(deck)); lsWarned = false; return true; }
+  catch(_){ if(force || !lsWarned){ lsWarned = true; toast('브라우저 저장 공간이 부족해요 — 발표 파일 만들기로 백업하세요', 'err'); } return false; }
+}
+function scheduleAutosave(){ if(HUB.on){ markDirty(); return; } clearTimeout(asTimer); asPending=true; asTimer=setTimeout(()=>{ if(lsWrite()) asPending=false; }, 900); }
 /* 대기 중인 자동저장을 지금 바로 실행(탭을 닫거나 숨길 때) */
-function flushAutosave(){ if(HUB.on || !asPending) return; clearTimeout(asTimer); asPending=false; try{ localStorage.setItem(LS_KEY, JSON.stringify(deck)); }catch(_){} }
+function flushAutosave(){ if(HUB.on || !asPending) return; clearTimeout(asTimer); if(lsWrite()) asPending=false; }
 function postFrame(m){ try{ B.frame.contentWindow.postMessage(m,'*'); }catch(_){} }
 function gotoPreview(i){ postFrame({cmd:'goto', si:i, atEnd:false}); }
 window.addEventListener('message', e=>{ const d=e.data||{}; if(d.type==='deckState'){ pvState=d; updatePvLab(); } });
@@ -1967,7 +1973,7 @@ async function waitPhotos(verb){
 }
 async function localSave(){
   if(!(await waitPhotos('저장'))) return;
-  try{ localStorage.setItem(LS_KEY, JSON.stringify(deck)); clearTimeout(asTimer); asPending = false; toast('저장했어요 — 이 브라우저에서 이어서 작업할 수 있어요'); }catch(e){ toast('저장 실패 (용량 초과일 수 있어요)','err'); }
+  if(lsWrite(true)){ clearTimeout(asTimer); asPending = false; toast('저장했어요 — 이 브라우저에서 이어서 작업할 수 있어요'); }
 }
 B.saveBtn.onclick=()=>{ if(HUB.on){ hubSave(); return; } localSave(); };
 B.newBtn.onclick=()=>{ if(deck.slides.length && !confirm('지금 내용을 지우고 새로 시작할까요?\n(저장·내보내기 안 한 변경은 사라집니다)')) return; deck=starterDeck(); resetHistory(); sel=0; B.deckName.value=deck.meta.title; renderAll(); bootPreview(); scheduleAutosave(); toast('새 덱을 시작했어요'); };

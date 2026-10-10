@@ -122,7 +122,7 @@ test('카드를 열면 같은 사이트 상대경로 iframe(한글 파일명은 
   const m={innerHTML:''};env.ctx.renderTools(m);
   const url=encodeURI('기공차트_리메이크장부_서식.html');
   assert.ok(url.includes('%'),'한글이 인코딩됨');
-  assert.ok(m.innerHTML.includes('<iframe class="tools-frame" src="'+url+'" title="기공차트 · 리메이크 장부" data-tkey="lab_remake_ledger" onload="toolFrameLoaded(this)"></iframe>'));
+  assert.ok(m.innerHTML.includes('<iframe class="tools-frame" src="'+url+'" title="기공차트 · 리메이크 장부" onload="toolFrameLoaded(this)"></iframe>'));
   assert.ok(m.innerHTML.includes('<a class="mini" href="'+url+'" target="_blank" rel="noopener">새 창</a>'));
   assert.ok(m.innerHTML.includes('onclick="closeTool()">← 도구 목록</button>'));
   assert.ok(!/src="\/|src="https?:|href="https?:/.test(m.innerHTML),'같은 사이트 상대경로');

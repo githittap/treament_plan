@@ -160,7 +160,7 @@ test('허브 연결: 허브에서 ?deck/?new 로 열 때만 켜지고, 편집은
 const toolsBlock = between(hr, '/* hub-tools:test-start */', '/* hub-tools:test-end */');
 function hubCtx(role) {
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  const ctx = { ME: { id: 'u', role }, esc, render() {}, $: () => null, confirm: () => true, hubT: (k, d, v) => (v ? String(d).replace(/\{([a-z_]+)\}/g, (m, n) => v[n]) : String(d)), TAB: 'tools' };
+  const opened = [], alerts = [], renders = [], ctx = { opened, alerts, renders, popupBlocked: false, window: { open: (u, t) => { opened.push([u, t]); return ctx.popupBlocked ? null : { opener: {} }; } }, alert: m => alerts.push(m), ME: { id: 'u', role }, esc, render() { renders.push(1); }, $: () => null, confirm: () => true, hubT: (k, d, v) => (v ? String(d).replace(/\{([a-z_]+)\}/g, (m, n) => v[n]) : String(d)), TAB: 'tools' };
   vm.createContext(ctx);
   vm.runInContext(toolsBlock + ';this.api={MDECK,mdeckListHtml,mdeckOpen,mdeckBack,renderMdeckTool,mdeckFiltered,mdeckFrameUrl,mdeckCardHtml,TOOL_CARDS,toolCanSee,mdeckCanEdit,renderTools};', ctx);
   return ctx;
@@ -173,13 +173,13 @@ test('허브 도구 탭: 업무매뉴얼 카드(전 직원) · 직원 계정엔 
     const html = c.api.mdeckListHtml(role);
     assert.ok(html.includes('>보기<'), role); assert.ok(!html.includes('>편집<'), role + ' 편집 단추 없음'); assert.ok(!html.includes('새 매뉴얼'), role + ' 새 매뉴얼 없음'); assert.ok(!html.includes("mdeckOpen('edit'"), role);
     assert.equal(c.api.mdeckOpen('edit', DECKS[0].id), false, role + ' 편집 열기 거절'); assert.equal(c.api.mdeckOpen('new', ''), false);
-    assert.equal(c.api.MDECK.mode, 'list');
+    assert.equal(c.api.MDECK.mode, 'list'); assert.equal(c.opened.length, 0, role + ': 새 창도 안 열림');
   }
   for (const role of ['owner', 'chief']) {
     const c = hubCtx(role); c.api.MDECK.decks = clone(DECKS);
     const html = c.api.mdeckListHtml(role);
     assert.ok(html.includes('>편집<')); assert.ok(html.includes('＋ 새 매뉴얼')); assert.ok(html.includes('비공개'), '미공개 덱 표시');
-    assert.equal(c.api.mdeckOpen('edit', DECKS[0].id), true); assert.equal(c.api.MDECK.mode, 'edit');
+    assert.equal(c.api.mdeckOpen('edit', DECKS[0].id), true); assert.equal(c.api.MDECK.mode, 'list', '허브 화면은 그대로(편집은 새 창)');
   }
   const card = hubCtx('staff').api.TOOL_CARDS.find(x => x.code === 'manual_deck');
   assert.equal(card.who, 'all'); assert.equal(card.group, 'top'); assert.equal(card.view, 'manual');
@@ -649,7 +649,7 @@ test('[8차-2] 허브 밖(이 브라우저 저장)에서도 사진 처리 중이
     localStorage: { setItem: (k, v) => { store[k] = v; } }, setTimeout: f => timers.push(f), clearTimeout: id => { if (id) timers[id - 1] = null; }, window: { addEventListener: (t, f) => { win[t] = f; } }, document: doc,
     blobToDataUrl: b => new Promise((ok, no) => { gates[b.name] = { ok: () => ok('data:image/png;base64,' + b.name), no: m => no(new Error(m)) }; }) });
   c.HUB.on = false;
-  vm.runInContext(['let asTimer = 0, asPending = false; const LS_KEY = "k";', fnSrc(mainJs, 'function scheduleAutosave'), fnSrc(mainJs, 'function flushAutosave'), fnSrc(mainJs, 'async function waitPhotos'), fnSrc(mainJs, 'async function localSave')].join('\n'), c);
+  vm.runInContext(['let asTimer = 0, asPending = false, lsWarned = false; const LS_KEY = "k";', fnSrc(mainJs, 'function lsWrite'), fnSrc(mainJs, 'function scheduleAutosave'), fnSrc(mainJs, 'function flushAutosave'), fnSrc(mainJs, 'async function waitPhotos'), fnSrc(mainJs, 'async function localSave')].join('\n'), c);
   const reg = mainJs.slice(mainJs.indexOf('function mdeckUnsavedNow'), mainJs.indexOf('\n', mainJs.indexOf("document.addEventListener('visibilitychange'")) + 1);
   vm.runInContext(reg, c);
   const ev = e => vm.runInContext(e, c), tick = () => new Promise(r => setTimeout(r, 20));
@@ -688,129 +688,78 @@ test('[8차-2] 허브 밖(이 브라우저 저장)에서도 사진 처리 중이
   assert.equal(saved(), null);
 });
 
-test('[9차] 허브 안에서 화면을 바꾸거나 iframe 을 치우는 모든 경로가 제작기의 미저장 상태(mdeckUnsaved)를 공통 한 곳(toolsLeaveOk)에서 확인한다 — 취소하면 이동 중단, 다른 도구는 영향 없음', () => {
-  const GUARD_MSG = '저장 안 한 내용이 있어요. 나갈까요?';
-  // 시험용 허브 환경: iframe.tools-frame 목록과 confirm 응답을 바꿔 가며 같은 코드(hub-tools 블록)를 돌림
-  const mk = (frames, answer = false) => {
-    const confirms = [], renders = [], navs = [];
-    const ctx = { ME: { id: 'u', role: 'owner' }, esc: s => String(s == null ? '' : s), $: () => null, TAB: 'tools', PAY_VIEW: 'x', CAL_VIEW: 'all', renders, navs, confirms,
-      render() { renders.push(1); }, renderNav() { navs.push(1); }, confirm: m => { confirms.push(m); return answer; }, document: { querySelectorAll: sel => (sel === 'iframe.tools-frame' ? frames : []) },
-      hubT: (k, d, v) => (v ? String(d).replace(/\{([a-z_]+)\}/g, (m, n) => v[n]) : String(d)) };
-    vm.createContext(ctx);
-    const goSrc = hr.match(/function go\(k\)\{[^\r\n]+/)[0], recallSrc = hr.match(/async function recallShowJournal\(id\)\{[^\r\n]+/)[0];
-    vm.runInContext(toolsBlock + ';' + goSrc + ';' + recallSrc + ';this.api={toolsLeaveOk,openTool,closeTool,openToolFromHeader,mdeckOpen,mdeckBack,go,recallShowJournal,MDECK,get open(){return TOOLS_OPEN;},set open(v){TOOLS_OPEN=v;}};', ctx);
-    ctx.consultationEdit = async () => { };
-    return ctx;
-  };
-  const dirtyFrame = { contentWindow: { mdeckUnsaved: () => true } }, cleanFrame = { contentWindow: { mdeckUnsaved: () => false } }, otherTool = { contentWindow: {} };
-  const crossOrigin = { get contentWindow() { throw new Error('cross-origin'); } };
-  // 공통 확인: 도구가 함수를 안 내놓으면(다른 도구)·깨끗하면·접근 불가면 통과(확인창 없음), 미저장이면 확인창(글은 hubT 기본 글)
-  for (const frames of [[], [otherTool], [cleanFrame], [crossOrigin], [otherTool, cleanFrame]]) { const c = mk(frames); assert.equal(c.api.toolsLeaveOk(), true); assert.equal(c.confirms.length, 0, '확인창 없음'); }
-  { const c = mk([otherTool, dirtyFrame], false); assert.equal(c.api.toolsLeaveOk(), false); assert.deepEqual(c.confirms, [GUARD_MSG]); assert.equal(mk([dirtyFrame], true).api.toolsLeaveOk(), true); }
-  // 미저장일 때 모든 이동 경로: 취소하면 상태가 안 바뀌고 다시 그리지도 않음 / 확인하면 진행
-  const paths = {
-    go: c => c.api.go('home'), openTool: c => c.api.openTool('news'), closeTool: c => c.api.closeTool(), openToolFromHeader: c => c.api.openToolFromHeader('treatment_plan'),
-    mdeckOpen: c => c.api.mdeckOpen('list', ''), mdeckBack: c => c.api.mdeckBack(), recallShowJournal: c => c.api.recallShowJournal('j1')
-  };
-  for (const [name, run] of Object.entries(paths)) {
-    const no = mk([dirtyFrame], false); no.api.open = 'manual_deck'; no.api.MDECK.mode = 'edit'; no.api.MDECK.id = '11111111-1111-4111-8111-111111111111';
-    run(no); assert.equal(no.renders.length, 0, name + ': 취소하면 화면을 안 바꿈'); assert.equal(no.api.open, 'manual_deck', name + ': 열린 도구 그대로'); assert.equal(no.TAB, 'tools', name + ': 탭 그대로'); assert.equal(no.api.MDECK.mode, 'edit', name + ': 편집 화면 그대로'); assert.deepEqual(no.confirms, [GUARD_MSG], name);
-    const yes = mk([dirtyFrame], true); yes.api.open = 'manual_deck'; yes.api.MDECK.mode = 'edit'; run(yes); assert.ok(yes.renders.length >= 1, name + ': 확인하면 이동'); assert.deepEqual(yes.confirms, [GUARD_MSG]);
-    const clean = mk([cleanFrame], false); clean.api.open = 'manual_deck'; run(clean); assert.equal(clean.confirms.length, 0, name + ': 깨끗하면 확인창 없음'); assert.ok(clean.renders.length >= 1, name + ': 바로 이동');
-    const other = mk([otherTool], false); other.api.open = 'news'; run(other); assert.equal(other.confirms.length, 0, name + ': 다른 도구엔 영향 없음'); assert.ok(other.renders.length >= 1);
+test('[11차-A] 업무매뉴얼 편집·새로 만들기는 새 창(새 탭)으로 열리고, 허브 안 iframe 은 보기 전용(view=1)이다 — 허브 화면은 안 바뀜', () => {
+  const ID1 = '11111111-1111-4111-8111-111111111111', base = encodeURI('설명덱_제작기.html');
+  for (const role of ['owner', 'chief']) {
+    const c = hubCtx(role); c.api.MDECK.decks = clone(DECKS); c.api.MDECK.mode = 'list';
+    assert.equal(c.api.mdeckOpen('edit', ID1), true); assert.equal(c.api.mdeckOpen('new', ''), true);
+    assert.deepEqual(clone(c.opened), [[base + '?deck=' + ID1, '_blank'], [base + '?new=1', '_blank']], role + ': 편집·새로 만들기는 새 창');
+    assert.equal(c.api.MDECK.mode, 'list', '허브 화면은 그대로'); assert.equal(c.renders.length, 0, '허브를 다시 그리지 않음');
+    // 팝업이 막히면 안내(글은 글 고치기 키)
+    c.popupBlocked = true; c.api.mdeckOpen('edit', ID1); assert.deepEqual(clone(c.alerts), ['새 창이 열리지 않았어요. 이 사이트의 팝업을 허용한 뒤 다시 눌러 주세요.']);
   }
-  // 위 탭 메뉴(go)는 허브 탭을 실제로 바꾸는 쪽까지 막음, 상담일지 이동도 마찬가지
-  { const c = mk([dirtyFrame], false); c.api.go('home'); assert.equal(c.TAB, 'tools'); assert.equal(c.navs.length, 0); c.api.recallShowJournal('j'); assert.equal(c.TAB, 'tools'); const y = mk([dirtyFrame], true); y.api.go('home'); assert.equal(y.TAB, 'home'); }
-  // 전수 검사: TAB / TOOLS_OPEN 을 바꾸는 함수는 전부 확인 경로를 지나거나(go·openTool·closeTool·openToolFromHeader·recallShowJournal), 처음 화면 정하기·그리기 같은 내부용 허용 목록에 있음
-  const lines = hr.split(/\r?\n/); let fn = '(top)'; const found = {};
-  lines.forEach((l, i) => { const m = l.match(/^\s*(?:async\s+)?function\s+(\w+)/); if (m) fn = m[1]; if (/\bTOOLS_OPEN\s*=(?!=)|(^|[^A-Za-z_.])TAB\s*=(?!=)/.test(l) && !/^\s*(let|const) /.test(l)) (found[fn] = found[fn] || []).push(i + 1); });
-  const guarded = ['go', 'openTool', 'closeTool', 'openToolFromHeader', 'recallShowJournal'], internal = ['applyInboxFirst', 'applyTabFromUrl', 'render', 'renderTools', 'onAuthed'];
-  for (const name of Object.keys(found)) assert.ok(guarded.includes(name) || internal.includes(name), '확인을 안 거치는 이동 경로가 새로 생김: ' + name + ' (줄 ' + found[name].join(',') + ')');
-  for (const name of guarded) { const m = hr.match(new RegExp('(?:async )?function ' + name + '\\([^)]*\\)\\{[^\\r\\n]+')); assert.ok(m && /toolsLeaveOk\(\)/.test(m[0]), name + ' 이(가) toolsLeaveOk 를 부름'); }
-  assert.match(fnSrc(toolsBlock, 'function mdeckOpen'), /toolsLeaveOk\(\)/); assert.match(fnSrc(toolsBlock, 'function mdeckBack'), /mdeckOpen\('list',''\)/);
-  assert.match(hr, /\$\('#logoutBtn'\)\.addEventListener\('click',async\(\)=>\{if\(!toolsLeaveOk\(\)\)return;/, '로그아웃도 확인');
-  // 글은 글 고치기 키(mdeck.leave_unsaved)로, 옛 키는 없앰
-  assert.match(hr, /hubT\('mdeck\.leave_unsaved','저장 안 한 내용이 있어요\. 나갈까요\?'\)/); assert.ok(js.includes("add('mdeck.leave_unsaved'")); assert.ok(!js.includes('mdeck.leave_confirm') && !hr.includes('mdeck.leave_confirm'));
-  // 제작기: 하나의 함수를 window.mdeckUnsaved 로 내놓음 — 허브 모드(미저장·사진 처리 중·보기 전용 제외)와 허브 밖(사진 처리 중·자동저장 대기)
-  const env = { HUB: { on: true, dirty: false, view: false }, PH_JOBS: new Set(), asPending: false, window: { addEventListener() { } } };
-  vm.createContext(env); vm.runInContext(fnSrc(mainJs, 'function mdeckUnsavedNow') + ';window.mdeckUnsaved = mdeckUnsavedNow;', env);
-  const u = () => env.window.mdeckUnsaved(); assert.equal(u(), false);
-  env.HUB.dirty = true; assert.equal(u(), true, '허브: 저장 안 됨'); env.HUB.dirty = false; env.PH_JOBS.add({}); assert.equal(u(), true, '허브: 사진 처리 중'); env.PH_JOBS.clear(); env.HUB.dirty = true; env.HUB.view = true; assert.equal(u(), false, '보기 전용은 해당 없음');
-  env.HUB.on = false; env.HUB.view = false; assert.equal(u(), false); env.asPending = true; assert.equal(u(), true, '허브 밖: 자동저장 대기'); env.asPending = false; env.PH_JOBS.add({}); assert.equal(u(), true, '허브 밖: 사진 처리 중');
-  assert.match(mainJs, /window\.mdeckUnsaved = mdeckUnsavedNow;/); assert.match(mainJs, /beforeunload', e=>\{ if\(mdeckUnsavedNow\(\)\)/);
+  for (const role of ['staff', 'manager']) { const c = hubCtx(role); assert.equal(c.api.mdeckOpen('edit', ID1), false); assert.equal(c.api.mdeckOpen('new', ''), false); assert.equal(c.opened.length, 0, role + ': 새 창 안 열림'); }
+  // 보기: 허브 안 iframe 으로(view=1), 편집·새로 만들기 모드는 허브 안에 만들어지지 않음
+  for (const role of ['owner', 'staff']) {
+    const c = hubCtx(role); assert.equal(c.api.mdeckOpen('view', ID1), true); assert.equal(c.api.MDECK.mode, 'view'); assert.equal(c.renders.length, 1);
+    const m = { innerHTML: '' }; c.api.renderMdeckTool(m);
+    assert.ok(m.innerHTML.includes('<iframe class="tools-frame" src="' + base + '?deck=' + ID1 + '&amp;view=1"'), role); assert.ok(!/\?new=1|deck=[^"]*"(?![^"]*view)/.test(m.innerHTML.replace(/&amp;view=1/g, '')) || m.innerHTML.includes('view=1'));
+    assert.equal((m.innerHTML.match(/<iframe/g) || []).length, 1);
+  }
+  for (const mode of ['edit', 'new']) { const c = hubCtx('owner'); c.api.MDECK.decks = []; c.api.MDECK.mode = mode; c.api.MDECK.id = ID1; const m = { innerHTML: '' }; c.api.renderMdeckTool(m); assert.ok(!m.innerHTML.includes('<iframe'), mode + ': 허브 안 편집 iframe 없음'); assert.equal(c.api.MDECK.mode, 'list'); }
+  // 되돌려진 것(9·10차 허브 라우터 변경)이 없다 — 이전 동작 그대로
+  for (const gone of ['toolsLeaveOk', 'toolsFrameKept', 'toolsFrameKey', 'view-root', 'data-tkey', 'mdeck.leave_unsaved', 'mdeck.leave_confirm', 'replaceChildren(m)']) assert.ok(!hr.includes(gone) && !js.includes(gone), '되돌렸어야 할 것이 남아 있음: ' + gone);
+  assert.match(hr, /const m=\$\('#main'\);m\.innerHTML='<div class="empty">불러오는 중…<\/div>';hubStaticFill\(\);apprKindSelectFill\(\);/, 'render() 원래 모양');
+  assert.ok(hr.includes("setStatus('saved');await renderLeave($('#main'));")); assert.ok(hr.includes("setStatus('saved');await renderLeave($('#main'));const refreshed=")); assert.ok(hr.includes("renderConfid($('#main'));setStatus('saved');")); assert.ok(hr.includes("await renderInbox($('#main'));}")); assert.ok(hr.includes("consultationResetForm();await renderConsultationJournal($('#main'));}"), '직접 쓰기 5곳 원래대로');
+  assert.match(hr, /window\.hubSb = sb;/, 'window.hubSb 노출은 유지(허브 보기 iframe 이 씀)');
+  assert.match(fnSrc(hr, 'function mdeckOpen'), /window\.open\(mdeckFrameUrl\(mode,id\),'_blank'\)/);
 });
 
-test('[10차] 사용자 이동이 아닌 render()(늦게 끝난 옛 화면 조회·인증 재초기화 등)가 도구 iframe 을 없애거나 덮지 못한다 — 화면마다 전용 칸, 같은 도구 화면은 다시 그리지 않고 iframe 노드 보존', async () => {
-  // 아주 작은 가짜 화면(DOM): #main · 화면 전용 칸 · iframe(문자열 속 태그를 찾아 줌)
-  const mkNode = () => ({ className: '', children: [], _html: '', get innerHTML() { return this._html; }, set innerHTML(v) { this._html = v; this.children = []; },
-    replaceChildren(...c) { this.children = c; this._html = ''; }, iframes() { const own = [...this._html.matchAll(/<iframe class="tools-frame"[^>]*>/g)].map(m => ({ tag: m[0], getAttribute: k => (m[0].match(new RegExp(k + '="([^"]*)"')) || [])[1] })); return own.concat(...this.children.map(c => c.iframes())); },
-    querySelectorAll(sel) { return sel === 'iframe.tools-frame' ? this.iframes() : []; } });
-  const env = (role = 'owner') => {
-    const main = mkNode(), gates = [], homeWrites = [];
-    const ctx = { ME: { id: 'u', role }, TAB: 'home', main, esc: s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'), $: sel => (sel === '#main' ? main : null),
-      document: { createElement: () => mkNode() }, hubStaticFill() { }, apprKindSelectFill() { }, SCHEDULE_PEOPLE_ERROR: '', gates, homeWrites,
-      hubT: (k, d, v) => (v ? String(d).replace(/\{([a-z_]+)\}/g, (m, n) => v[n]) : String(d)),
-      renderHome: async m => { await new Promise(r => gates.push(r)); m.innerHTML = '<div class="card">홈 내용</div>'; homeWrites.push(m); } };
-    vm.createContext(ctx);
-    vm.runInContext(toolsBlock + ';' + fnSrc(hr, 'async function render()') + ';this.api={render,MDECK,get open(){return TOOLS_OPEN;},set open(v){TOOLS_OPEN=v;}};', ctx);
-    return ctx;
-  };
-  const ID = '11111111-1111-4111-8111-111111111111', wrapperOf = c => c.main.children[0], iframeCount = c => c.main.querySelectorAll('iframe.tools-frame').length;
-  // (1) 홈 조회 시작 → 업무매뉴얼 편집으로 이동 → (제목 입력·사진 처리 중) → 홈 조회 완료: 홈이 편집 화면을 덮지 않음
-  const c = env(); c.TAB = 'home'; const homePromise = c.api.render(); const homeWrapper = wrapperOf(c);
-  c.TAB = 'tools'; c.api.open = 'manual_deck'; c.api.MDECK.active = true; c.api.MDECK.mode = 'edit'; c.api.MDECK.id = ID; await c.api.render();
-  const editWrapper = wrapperOf(c); assert.notStrictEqual(editWrapper, homeWrapper); assert.equal(iframeCount(c), 1, editWrapper.innerHTML.slice(0, 300)); const tag0 = editWrapper.iframes()[0].tag; assert.match(tag0, /data-tkey="manual_deck:edit:11111111-1111-4111-8111-111111111111"/);
-  c.gates.forEach(r => r()); await homePromise;   // 늦게 끝난 홈 조회
-  assert.strictEqual(c.homeWrites[0], homeWrapper, '홈 결과는 옛 칸에만 씀'); assert.strictEqual(wrapperOf(c), editWrapper, '현재 화면 칸이 그대로'); assert.equal(iframeCount(c), 1, '편집 iframe 이 남아 있음'); assert.ok(!editWrapper.innerHTML.includes('홈 내용'), '홈이 현재 화면을 덮지 않음');
-  // (2) 도구 화면에서 render() 를 여러 번(인증 재초기화·실시간 갱신 흉내) 불러도 칸·iframe 이 그대로(다시 그리지 않음 = 새로 불러오지 않음)
-  for (let i = 0; i < 5; i++) await c.api.render();
-  assert.strictEqual(wrapperOf(c), editWrapper, '같은 칸'); assert.equal(editWrapper.innerHTML.includes(tag0), true); assert.equal(editWrapper.iframes()[0].tag, tag0, 'iframe 태그(=노드)가 같음'); assert.equal(c.homeWrites.length, 1);
-  // 다른 도구 화면도 같음
-  const n = env(); n.TAB = 'tools'; n.api.open = 'news'; await n.api.render(); const nw = wrapperOf(n); await n.api.render(); await n.api.render(); assert.strictEqual(wrapperOf(n), nw, '다른 도구: 같은 칸'); assert.equal(iframeCount(n), 1);
-  // (3) 화면이 정말 바뀔 때(도구 닫기·다른 도구·다른 편집 덱·다른 탭)는 새로 그림
-  c.api.open = ''; await c.api.render(); assert.notStrictEqual(wrapperOf(c), editWrapper); assert.equal(iframeCount(c), 0, '도구 목록'); assert.match(wrapperOf(c).innerHTML, /workdocs-grid/);
-  c.api.open = 'manual_deck'; c.api.MDECK.active = true; c.api.MDECK.mode = 'edit'; c.api.MDECK.id = ID; await c.api.render(); const w2 = wrapperOf(c); c.api.MDECK.id = '22222222-2222-4222-8222-222222222222'; await c.api.render(); assert.notStrictEqual(wrapperOf(c), w2, '다른 덱 편집은 새로 그림'); assert.match(wrapperOf(c).iframes()[0].tag, /manual_deck:edit:22222222/);
-  c.api.open = 'news'; await c.api.render(); assert.match(wrapperOf(c).iframes()[0].tag, /data-tkey="news"/, '다른 도구는 새로 그림');
-  c.TAB = 'home'; const hp = c.api.render(); c.gates.forEach(r => r()); await hp; assert.match(wrapperOf(c).innerHTML, /홈 내용/); assert.equal(iframeCount(c), 0, '다른 탭으로 가면 iframe 이 치워짐(이동 확인은 toolsLeaveOk 가 앞에서)');
-  // (4) 업무매뉴얼 목록 화면(iframe 없음)·편집 권한 없는 사람의 편집 화면은 보존 대상이 아님 → 평소처럼 다시 그림
-  const l = env('owner'); l.TAB = 'tools'; l.api.open = 'manual_deck'; l.api.MDECK.active = true; l.api.MDECK.mode = 'list'; l.api.MDECK.decks = []; await l.api.render(); const lw = wrapperOf(l); await l.api.render(); assert.notStrictEqual(wrapperOf(l), lw, '목록은 다시 그림');
-  const s = env('staff'); s.TAB = 'tools'; s.api.open = 'manual_deck'; s.api.MDECK.active = true; s.api.MDECK.mode = 'edit'; s.api.MDECK.id = ID; s.api.MDECK.decks = []; await s.api.render(); assert.equal(iframeCount(s), 0, '직원은 편집 화면 대신 목록'); assert.equal(s.api.MDECK.mode, 'list');
-  // 직원의 보기 화면은 iframe 보존 대상
-  const v = env('staff'); v.TAB = 'tools'; v.api.open = 'manual_deck'; v.api.MDECK.active = true; v.api.MDECK.mode = 'view'; v.api.MDECK.id = ID; await v.api.render(); const vw = wrapperOf(v); await v.api.render(); assert.strictEqual(wrapperOf(v), vw);
-  // (5) 인증 재초기화(onAuthed)는 이미 초기화됐으면 바로 끝나고, 다시 돌더라도 마지막에 render() 를 부르는 것뿐(위 보존이 지킴)·deputy 가 아니면 TAB 을 바꾸지 않음
-  const onAuthed = fnSrc(hr, 'async function onAuthed'); assert.match(onAuthed, /if\(_inited\)return;/); assert.match(onAuthed, /if\(ME\.role==='deputy'\)TAB='contract';/); assert.match(onAuthed, /renderNav\(\);await render\(\);/);
-  assert.match(hr, /if\(typeof toolsFrameKept==='function'&&toolsFrameKept\(main\)\)return;/); assert.match(hr, /const m=document\.createElement\('div'\);m\.className='view-root';main\.replaceChildren\(m\);/);
+test('[11차-B] 인쇄 회귀 없음: 근로계약서·월 근무표·내 출퇴근 월 표 인쇄는 #main 직계 자식을 전제로 하므로 render() 가 #main 에 직접 그리고, 인쇄 함수·CSS 규칙이 그대로다', () => {
+  // 1) render() 는 화면 그리기 함수에 #main 자체를 넘김(감싸는 칸 없음) → 인쇄 CSS `#main>.contract-print-target` 같은 직계 자식 규칙이 먹음
+  const main = { id: 'main', innerHTML: '' }, got = {};
+  const mk = tab => { const ctx = { TAB: tab, main, $: s => (s === '#main' ? main : null), hubStaticFill() { }, apprKindSelectFill() { }, SCHEDULE_PEOPLE_ERROR: '', esc: s => String(s),
+    renderContract: async m => { got.contract = m; }, renderAtt: async m => { got.att = m; }, renderSched: async m => { got.sched = m; } }; vm.createContext(ctx); vm.runInContext(fnSrc(hr, 'async function render()') + ';this.render=render;', ctx); return ctx; };
+  return (async () => {
+    await mk('contract').render(); await mk('att').render(); await mk('sched').render();
+    assert.strictEqual(got.contract, main, '근로계약서'); assert.strictEqual(got.att, main, '내 출퇴근(월 표 인쇄)'); assert.strictEqual(got.sched, main, '월 근무표');
+    // 2) 인쇄 CSS 규칙(직계 자식 기준)이 그대로 있음
+    assert.ok(hr.includes('body.contract-printing #main>.contract-print-target{display:block!important')); assert.ok(hr.includes('body.contract-printing #main> *{display:none!important}'));
+    assert.ok(hr.includes('body.staff-att-printing #main> *:not(#staffAttMonthContainer){display:none!important}') || hr.includes('body.staff-att-printing #main> *:not(#staffAttMonthContainer)'));
+    // 3) printIntegratedContract / printStaffAttendanceMonth: 인쇄 직전에 표시용 클래스가 붙고 인쇄 뒤 떨어짐
+    const classes = new Set(), tclasses = new Set(), snaps = []; const listeners = {};
+    const env = { CONTRACT_ROWS: [{ id: 5, status: '서명완료', pledge_required: false }], document: { getElementById: id => (id === 'integratedContract-5' ? { classList: { add: c => tclasses.add(c), remove: c => tclasses.delete(c) } } : null), body: { classList: { add: c => classes.add(c), remove: c => classes.delete(c) } } },
+      window: { addEventListener: (t, f) => { listeners[t] = f; }, removeEventListener: t => { delete listeners[t]; }, print: () => snaps.push([...classes].concat([...tclasses])) } };
+    vm.createContext(env); vm.runInContext(fnSrc(hr, 'function printIntegratedContract') + ';' + fnSrc(hr, 'function printStaffAttendanceMonth') + ';', env);
+    env.printIntegratedContract(5); assert.deepEqual(snaps[0].sort(), ['contract-print-target', 'contract-printing'], '인쇄 순간: 본문 숨기고 계약서만'); listeners.afterprint(); assert.equal(classes.size + tclasses.size, 0, '인쇄 뒤 원래대로');
+    env.printStaffAttendanceMonth(); assert.deepEqual(snaps[1], ['staff-att-printing']); listeners.afterprint(); assert.equal(classes.size, 0);
+  })();
 });
 
-test('[10차-보강] 저장·조회가 늦게 끝난 뒤 같은 화면을 다시 그리는 코드(#main 에 직접 쓰는 곳)는 지금 TAB 이 그 화면일 때만 그린다 — 휴가 저장 지연 중 도구 화면으로 이동해도 iframe 유지', async () => {
-  const mkEnv = tab => {
-    const main = { id: 'main', innerHTML: '<iframe class="tools-frame" data-tkey="manual_deck:edit:x"></iframe>', writes: 0 }, rendered = [], gates = [];
-    const ctx = { TAB: tab, main, rendered, gates, ME: { role: 'owner' }, LEAVE_MONTHLY_RUNS: [{ run_id: 'r1', due_date: '2026-10-01', granted_days: 1 }], LEAVE_MONTHLY_BUSY: new Set(), confirm: () => true, alert() { }, setStatus() { },
-      hubT: (k, d, v) => (v ? String(d).replace(/\{([a-z_]+)\}/g, (m, n) => v[n]) : String(d)), $: sel => (sel === '#main' ? main : null),
-      sb: { rpc: () => new Promise(r => gates.push(() => r({ data: [{}], error: null }))) },
-      renderLeave: async m => { m.innerHTML = '<div class="card">휴가 화면</div>'; m.writes++; rendered.push('leave'); },
-      RECALL_BUSY: false, INBOX_SUBTAB: 'inbox', recallEnabled: () => true, renderInbox: async () => { rendered.push('inbox'); }, renderConfid: () => { rendered.push('confid'); } };
-    vm.createContext(ctx);
-    vm.runInContext(fnSrc(hr, 'async function revokeMonthlyLeaveAccrual') + ';' + fnSrc(hr, 'async function inboxSetSubtab') + ';this.api={revokeMonthlyLeaveAccrual,inboxSetSubtab};', ctx);
-    return ctx;
-  };
-  const tick = () => new Promise(r => setTimeout(r, 10));
-  // 휴가 월차 취소 저장(rpc)이 느린 사이 도구 화면(업무매뉴얼 편집)으로 이동 → 저장이 끝나도 도구 iframe 이 그대로
-  const c = mkEnv('leave'); const p = c.api.revokeMonthlyLeaveAccrual(0); await tick();
-  c.TAB = 'tools'; c.gates.forEach(g => g()); await p;
-  assert.deepEqual(c.rendered, [], '휴가 화면을 다시 그리지 않음'); assert.match(c.main.innerHTML, /iframe class="tools-frame" data-tkey="manual_deck:edit:x"/); assert.equal(c.main.writes, 0);
-  // 대조: 그대로 휴가 화면에 있으면 저장 뒤 다시 그림
-  const k = mkEnv('leave'); const q = k.api.revokeMonthlyLeaveAccrual(0); await tick(); k.gates.forEach(g => g()); await q; assert.deepEqual(k.rendered, ['leave']); assert.match(k.main.innerHTML, /휴가 화면/);
-  // 문의함 하위 탭: 다른 화면에서는 안 그림
-  const i = mkEnv('tools'); await i.api.inboxSetSubtab('recall'); assert.deepEqual(i.rendered, []); const j = mkEnv('inbox'); await j.api.inboxSetSubtab('recall'); assert.deepEqual(j.rendered, ['inbox']);
-  // 나머지 직접 쓰기(월차 적용·비공개 기록 저장)도 같은 한 줄 가드(글자 출력은 그대로)
-  assert.match(hr, /setStatus\('saved'\);if\(typeof TAB!=='undefined'&&TAB!=='leave'\)return;await renderLeave\(\$\('#main'\)\);const refreshed=/);
-  assert.match(hr, /setStatus\('saved'\);if\(typeof TAB==='undefined'\|\|TAB==='leave'\)await renderLeave\(\$\('#main'\)\);\r?\n  \}catch\(error\)\{alert\(hubT\('p7\.monthly\.revoke_fail'/);
-  assert.match(hr, /if\(typeof TAB==='undefined'\|\|TAB==='confid'\)renderConfid\(\$\('#main'\)\);setStatus\('saved'\);/);
-  assert.match(hr, /setStatus\('saved'\);if\(typeof TAB!=='undefined'&&TAB!=='consult'\)return;consultationResetForm\(\);await renderConsultationJournal\(\$\('#main'\)\);\}/);
-  assert.match(hr, /if\(typeof TAB==='undefined'\|\|TAB==='inbox'\)await renderInbox\(\$\('#main'\)\);\}/);
-  // $('#main') 에 직접 쓰는 곳 전수: 허용 목록 밖에 새로 생기면 시험이 알려 줌(render 자신 · 초기화 실패 안내 · 읽기 전용)
-  const direct = hr.split(/\r?\n/).map((l, n) => [n + 1, l]).filter(([, l]) => /\$\('#main'\)|getElementById\('main'\)/.test(l) && !/^\s*@media/.test(l));
-  const allowed = [/const main=\$\('#main'\);/, /renderLeave\(\$\('#main'\)\)/, /renderConfid\(\$\('#main'\)\)/, /renderInbox\(\$\('#main'\)\)/, /renderConsultationJournal\(\$\('#main'\)\)/, /const m=\$\('#main'\);if\(m\)m\.innerHTML=`<div class="card"><div class="cal-error">초기화에 실패했습니다/];
-  for (const [n, l] of direct) assert.ok(allowed.some(re => re.test(l)), '허용 목록에 없는 #main 직접 쓰기(줄 ' + n + '): ' + l.slice(0, 100));
+test('[11차-C] 허브 밖(이 브라우저 저장)에서 localStorage 쓰기가 실패(용량 초과 등)하면 자동저장·pagehide·수동저장 모두 「미저장」 상태(자동저장 대기·닫기 경고)를 유지하고 백업 안내를 한다', async () => {
+  const timers = [], store = {}, win = {}, doc = { visibilityState: 'visible', addEventListener(t, f) { doc[t] = f; } };
+  let full = true;
+  const c = saveEnv({ sel: 0, PE: {}, renderAll() { }, bootPreview() { }, renderList() { }, renderEditor() { }, clone: o => JSON.parse(JSON.stringify(o)),
+    localStorage: { setItem: (k, v) => { if (full) throw Object.assign(new Error('quota'), { name: 'QuotaExceededError' }); store[k] = v; } }, setTimeout: f => timers.push(f), clearTimeout: id => { if (id) timers[id - 1] = null; }, window: { addEventListener: (t, f) => { win[t] = f; } }, document: doc });
+  c.HUB.on = false;
+  vm.runInContext(['let asTimer = 0, asPending = false, lsWarned = false; const LS_KEY = "k";', fnSrc(mainJs, 'function lsWrite'), fnSrc(mainJs, 'function scheduleAutosave'), fnSrc(mainJs, 'function flushAutosave'), fnSrc(mainJs, 'async function waitPhotos'), fnSrc(mainJs, 'async function localSave')].join('\n'), c);
+  vm.runInContext(mainJs.slice(mainJs.indexOf('function mdeckUnsavedNow'), mainJs.indexOf('\n', mainJs.indexOf("document.addEventListener('visibilitychange'")) + 1), c);
+  const fire = () => { const k = timers.findLastIndex(f => f); const f = timers[k]; timers[k] = null; f(); };
+  const ev = e => vm.runInContext(e, c), MSG = '브라우저 저장 공간이 부족해요 — 발표 파일 만들기로 백업하세요';
+  const unload = () => { const e = { prevented: false, preventDefault() { this.prevented = true; } }; win.beforeunload(e); return e.prevented; };
+  const errToasts = () => c.toasts.filter(t => t[0] === MSG && t[1] === 'err').length;
+  // (1) 자동저장 실패: 타이머가 돌아도 대기 표시 유지 + 닫기 경고 + 백업 안내(한 번)
+  c.deck.meta.title = '고침'; ev('scheduleAutosave()'); assert.equal(ev('asPending'), true); fire();
+  assert.equal(ev('asPending'), true, '쓰기 실패 → 아직 미저장'); assert.equal(unload(), true, '닫기 경고 유지'); assert.equal(errToasts(), 1, '백업 안내'); assert.deepEqual(Object.keys(store), []);
+  ev('scheduleAutosave()'); fire(); assert.equal(errToasts(), 1, '같은 안내를 계속 반복하지 않음');
+  // (2) pagehide·숨김 때 즉시 저장도 실패하면 미저장 유지
+  win.pagehide(); assert.equal(ev('asPending'), true); doc.visibilityState = 'hidden'; doc.visibilitychange(); assert.equal(ev('asPending'), true); assert.equal(unload(), true);
+  // (3) 수동 저장 실패: 「저장했어요」 아님, 백업 안내(매번), 미저장 유지
+  c.toasts.length = 0; await c.localSave(); assert.ok(!c.toasts.some(t => /저장했어요/.test(t[0])), '성공 안내 없음'); assert.equal(errToasts(), 1); assert.equal(ev('asPending'), true); assert.equal(unload(), true);
+  // (4) 공간이 생기면(다른 탭 정리 등) 다음 시도에서 저장되고 대기·경고가 풀림
+  full = false; win.pagehide(); assert.equal(ev('asPending'), false); assert.equal(JSON.parse(store.k).meta.title, '고침'); assert.equal(unload(), false);
+  full = true; ev('scheduleAutosave()'); assert.equal(ev('asPending'), true); fire(); assert.equal(errToasts(), 2, '성공한 뒤 다시 실패하면 안내가 다시 나옴(경고 상태가 풀렸으므로)');
+  full = false; c.toasts.length = 0; await c.localSave(); assert.ok(c.toasts.some(t => /저장했어요/.test(t[0]))); assert.equal(ev('asPending'), false);
+  // 코드: 세 쓰기 경로 모두 lsWrite 한 곳을 지남
+  assert.equal((mainJs.match(/localStorage\.setItem\(LS_KEY/g) || []).length, 1, 'localStorage 쓰기는 lsWrite 한 곳');
 });
