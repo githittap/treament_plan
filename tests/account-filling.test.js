@@ -171,11 +171,11 @@ function applyBulkRoleHarness({ role = 'staff', selected = new Set(['staff-1']),
     { user_id: 'staff-2', role: 'staff' }
   ];
   const rpcQueue = rpcErrors.slice();
-  const elements = { bulkRoleSelect: { value: role } };
+  const elements = { main:{isConnected:true}, bulkRoleSelect: { value: role } };
   const context = {
     PROFILES: profiles,
     ME: { id: 'owner-1' },
-    BULK_ROLE_SELECTED: selected,
+    BULK_ROLE_EDIT_GENERATION:0,BULK_ROLE_SELECTED: selected,
     $: sel => elements[sel.replace('#', '')] || null,
     setStatus: value => calls.status.push(value),
     showScheduleRosterError: message => calls.errors.push(message),

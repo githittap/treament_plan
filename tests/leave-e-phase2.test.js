@@ -52,7 +52,7 @@ test('실제 조퇴 신청 함수가 조퇴 type과 시간범위 payload를 INSE
   ]);
   let inserted;
   const sb = {from(table){assert.equal(table,'leave_requests');return {insert(payload){inserted=payload;return {select:()=>({maybeSingle:async()=>({data:{id:1},error:null})})};}};}};
-  const context = {sb, ME:{id:'user-1'}, LEAVE_EDIT_ID:null, $:id=>fields.get(String(id).replace(/^#/,'') ), leaveConflict:async()=>0,
+  const context = {sb, ME:{id:'user-1'}, LEAVE_EDIT_ID:null, LEAVE_EDIT_GENERATION:0, $:id=>fields.get(String(id).replace(/^#/,'') ), leaveConflict:async()=>0,
     computeLeaveDays:async()=>0.5, hide:()=>{}, setStatus:()=>{}, render:()=>{}, refreshBadges:()=>{}};
   vm.runInNewContext('(async()=>{'+extractFunction('submitLeave','stampDate')+'; this.submitLeave=submitLeave;})()', context);
   await context.submitLeave();
@@ -70,7 +70,7 @@ test('실제 반차 신청 payload가 조회 결과를 거쳐 캘린더에 시�
   ]);
   let inserted;
   const sb = {from(table){assert.equal(table,'leave_requests');return {insert(payload){inserted=payload;return {select:()=>({maybeSingle:async()=>({data:{id:42},error:null})})};}};}};
-  const context = {sb, ME:{id:'user-half-day'}, LEAVE_EDIT_ID:null, $:id=>fields.get(String(id).replace(/^#/,'') ), leaveConflict:async()=>0,
+  const context = {sb, ME:{id:'user-half-day'}, LEAVE_EDIT_ID:null, LEAVE_EDIT_GENERATION:0, $:id=>fields.get(String(id).replace(/^#/,'') ), leaveConflict:async()=>0,
     computeLeaveDays:async()=>0.5, hide:()=>{}, setStatus:()=>{}, render:()=>{}, refreshBadges:()=>{}};
   vm.runInNewContext('(async()=>{'+extractFunction('submitLeave','stampDate')+'; this.submitLeave=submitLeave;})()', context);
   await context.submitLeave();

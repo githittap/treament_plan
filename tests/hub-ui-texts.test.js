@@ -288,7 +288,7 @@ test('⚙️ 허브 설정 탭: 원장 전용 묶음에 계정·권한 다음으
   assert.equal(st.ctx.visibleTabKeys().has('owner'),false);
   assert.match(hr,/else if\(TAB==='hubset'\)\{if\(window\.HubUi\)await window\.HubUi\.renderSettings\(m,\{sb,me:ME\}\)/);
   assert.match(hr,/<script src="hub-texts\.js\?v=\d+"><\/script>\s*<script src="hub-activity\.js\?v=\d+"><\/script>\s*<script src="security-pledge\.js\?v=[0-9a-z]+"><\/script>\s*<script src="wage-hourly\.js\?v=\d+"><\/script>\s*<script src="spend-cycle\.js\?v=\d+"><\/script>\s*<script src="spend-cycle-ui\.js\?v=\d+"><\/script>\s*<script>\s*\/\* ═+ 설정 ═+/,'hub-texts.js와 시급제는 main 스크립트보다 먼저 불러옴');
-  assert.match(hr,/<script src="ai-assistants\.js\?v=2026100309"><\/script>/,'AI 도우미 스크립트 번호(10-02 원장요청 5건에서 2026100106 → 2026100221)');
+  assert.match(hr,/<script src="ai-assistants\.js\?v=2026101110"><\/script>/,'AI 도우미 스크립트 번호(10-02 원장요청 5건에서 2026100106 → 2026100221)');
 });
 
 test('가입 안내 글: 기본은 지금과 같은 글, 원장이 고치면 그 글(복사되는 글)',()=>{
@@ -316,7 +316,7 @@ function ownerHarness(texts){
   const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const TABS=[{key:'att',label:'출퇴근',roles:['staff','owner']},{key:'deposit',label:'입금',roles:['staff','owner']},{key:'sched',label:'근무표',roles:['staff','owner']},{key:'leave',label:'연차',roles:['staff','owner']},{key:'appr',label:'결재함',roles:['staff','owner']},{key:'notice',label:'공지',roles:['staff','owner']},{key:'onbo',label:'내 서류함',roles:['staff','owner']},{key:'ai',label:'🤖 AI 도우미',roles:['staff','owner']}];
   const ctx={ME:{id:'o1',role:'owner'},PROFILES:[{user_id:'o1',name:'원장',role:'owner',approved:true,dept:'진료실'},{user_id:'s1',name:'김직원',role:'staff',approved:true,dept:'데스크'},{user_id:'s2',name:'신입',role:'staff',approved:false,dept:'교육팀',created_at:'2026-09-30T00:00:00Z',account_access_status:'활성'}],
-    SCHEDULE_PEOPLE:[{id:'p1',name:'미가입 명부',department:'진료실',active:true}],SCHEDULE_DEPARTMENTS:['Dr.','진료실','데스크','기공실','미지정','상담','행정'],BULK_ROLE_SELECTED:new Set(),BULK_ROLE_ALLOWED_ROLES:['staff','manager','chief','deputy'],
+    SCHEDULE_PEOPLE:[{id:'p1',name:'미가입 명부',department:'진료실',active:true}],SCHEDULE_DEPARTMENTS:['Dr.','진료실','데스크','기공실','미지정','상담','행정'],BULK_ROLE_EDIT_GENERATION:0,BULK_ROLE_SELECTED:new Set(),BULK_ROLE_ALLOWED_ROLES:['staff','manager','chief','deputy'],
     TABS,TAB_ROLES:{},TAB_OVERRIDES:{},esc,md:s=>s?String(s).slice(5).replace('-','/'):'',today:()=>'2026-10-01',$:()=>null,renderJobGroupAdmin:()=>'',previewEmployeeJobGroup(){},renderOverrideRows(){},
     sb:{rpc:async()=>({data:[],error:null}),from(){const api={select(){return Promise.resolve({data:[]});}};return api;}}};
   vm.createContext(ctx);
@@ -395,9 +395,14 @@ test('화면: 원장에게는 「📝 글 고치기 · 🔢 숫자·기준 · �
   assert.match(html,/📝 글 고치기/);assert.match(html,/🔢 숫자·기준/);assert.match(html,/📋 목록/);
   const sec=t.section.innerHTML;
   assert.match(sec,/<input id="hubTxtSearch"/);
-  assert.equal((sec.match(/<details class="hub-grp" data-hub-group="/g)||[]).length,1+3+11+17+12+9+5+14+1+3+1+1+1+5+1+1,'화면별 접기: 탭 이름·메뉴 묶음 이름·계정·권한 + 차례 2(내 서류함 8 · 업무자료 3) + 차례 3(출퇴근 5 · 근무표 2 · 연차 4) + 차례 4(결재함 4 · 공지 3 · 캘린더 3 · 건의함 2) + 차례 5(문의함 6 · 상담일지 3) + 시간 표시 1(⏰ 시간 표시 · 2026-10-02) + 도구 탭 1(🧰 도구 · 2026-10-08)');
+  assert.equal((sec.match(/<details class="hub-grp" data-hub-group="/g)||[]).length,1+3+11+17+12+9+5+14+1+3+1+1+1+5+1+1+1,'화면별 접기: 탭 이름·메뉴 묶음 이름·계정·권한 + 차례 2(내 서류함 8 · 업무자료 3) + 차례 3(출퇴근 5 · 근무표 2 · 연차 4) + 차례 4(결재함 4 · 공지 3 · 캘린더 3 · 건의함 2) + 차례 5(문의함 6 · 상담일지 3) + 시간 표시 1(⏰ 시간 표시 · 2026-10-02) + 도구 탭 1(🧰 도구 · 업무매뉴얼도 같은 묶음) + 탭 사용법 1(❓ 탭 사용법 · 54개)');
   const n=(sec.match(/data-hub-text-save="\d+"/g)||[]).length;
-  assert.equal(n,39+21+4+19+193+444+147+20+168+188+329+8+2+5+35+27+12+41+68+2+15+77+35+14+9+2+35+13+4,'키마다 저장 단추(원장 보기판 다섯째·여섯째 판 카드 글 4개(규칙 관계도·코덱스 흐름 제목·설명 · 2026-10-08)를 포함함 · P7 이름 보기·계약 직무 별칭·충돌 안내·보안서약·사용 기록 대상 이름·지출 금액 단위·루커 단추 키·도구 탭 글 33개(탭 이름·제목·빈 화면·소제목 3·단추 3·머리줄 치료계획 단추 1·보는 사람 3·카드 20)를 포함함)');
+  assert.equal(n,39+21+4+19+193+444+147+20+168+190+329+8+2+5+35+27+12+41+68+2+15+77+35+14+9+2+35+13+4+54,'키마다 저장 단추(원장 보기판 다섯째·여섯째 판 카드 글 4개(규칙 관계도·코덱스 흐름 제목·설명 · 2026-10-08)를 포함함 · P7 이름 보기·계약 직무 별칭·충돌 안내·보안서약·사용 기록 대상 이름·지출 금액 단위·루커 단추 키·도구 탭 글 35개(기존 33개 + 업무매뉴얼 카드 제목·설명 2개) + 업무매뉴얼 화면 글 13개(mdeck.*) + 탭 사용법 글 54개(help.*) + 계약 저장 결과 안내 2개(contract.m_update_zero·contract.m_status_unknown)를 포함함)');
+  assert.deepEqual(clone(helpers().hubTextDefs().filter(d=>d.key.startsWith('mdeck.')).map(d=>d.key)),[
+    'title','hint','search','cat_all','view','edit','new','empty','loading','error','private','back','popup_blocked'
+  ].map(k=>'mdeck.'+k),'업무매뉴얼 화면 글 13개가 모두 글 고치기 목록에 있음');
+  for(const key of ['tools.card.manual_deck.title','tools.card.manual_deck.desc','contract.m_update_zero','contract.m_status_unknown'])assert.ok(helpers().hubTextDefByKey(key),key);
+  assert.equal(helpers().hubTextDefs().filter(d=>d.key.startsWith('help.')).length,54,'탭 사용법 글 54개도 함께 유지됨');
   assert.equal((sec.match(/data-hub-text-reset="\d+"/g)||[]).length,n);
   assert.match(sec,/고친 것 1개/);assert.match(sec,/<span class="b ok">고침<\/span>/);
   assert.match(sec,/이름표: tab\.home/);

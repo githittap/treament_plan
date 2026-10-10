@@ -9,7 +9,7 @@ const {renderAll,TEMPLATE,CONTRACT_ROWS}=require('./fixtures/hub6-harness.cjs');
 const golden=JSON.parse(read('tests/fixtures/hub6-golden-699df1c.json'));
 const clone=x=>JSON.parse(JSON.stringify(x));
 const CH6=/^contract\./;
-const COUNT=188;
+const COUNT=190;
 const EXPIRY='contract.expiry_alert_days';
 const STATIC_KEYS=['contract.end_title','contract.f_employee','contract.end_f_date','contract.f_period','contract.f_noend','contract.end_hint','contract.btn_save']; // 계약 종료일 설정 창(정적 HTML)의 data-hubk 표지
 
@@ -49,7 +49,7 @@ const ch6Defs=()=>helpers().hubTextDefs().filter(d=>CH6.test(d.key));
 const allOut=out=>Object.values(out).join('\n');
 
 /* ───────────── 1. 기본 글 목록 ───────────── */
-test('차례 6 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 5개·188개 · 계약서 본문 문구는 ⚠️ 안내로 시작',()=>{
+test('차례 6 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 5개·190개 · 계약서 본문 문구는 ⚠️ 안내로 시작',()=>{
   const defs=ch6Defs();
   assert.equal(defs.length,COUNT,'차례 6 글 키 수');
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
@@ -170,9 +170,9 @@ test('시험이 실제로 잡는지: 화면 글을 한 글자만 바꾸면 대�
 });
 
 /* ───────────── 3. 표에 값이 있으면 그 글 ───────────── */
-test('표에 값이 있으면 그 글: 고쳐 쓰는 글 188개 가운데 화면에서 나오는 181개가 모두 나오고(나머지 7개는 정적 창), {자리표시자}가 채워진다',async()=>{
+test('표에 값이 있으면 그 글: 계약 글 190개 중 정적 창 3개를 제외한 모든 글과 0행 안내가 실제로 나오고 {자리표시자}가 채워진다',async()=>{
   const defs=ch6Defs();
-  const out=await renderAll(hr,{engine:true,textRows:dynRows(defs),settings:{}});
+  const out=await renderAll(hr,{engine:true,textRows:dynRows(defs),settings:{},zeroRows:true});
   const all=allOut(out);
   const missing=defs.filter(d=>!all.includes('«'+d.key+'»')).map(d=>d.key);
   assert.deepEqual(clone(missing).sort(),['contract.end_f_date','contract.end_hint','contract.end_title'],'값을 넣었는데 화면에 안 나오는 키(계약 종료일 설정 창은 정적 HTML이라 허브가 열릴 때 hubStaticFill이 채움)');

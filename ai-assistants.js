@@ -1,6 +1,6 @@
 /* ai-assistants.js — 직원허브 「🤖 AI 도우미」 화면(1단계)
    설계서: Z:\09_claude-output\03_병원운영·전산\직원AI도우미\설계서_1단계.md (4장)
-   hr.html은 이 파일을 <script src="ai-assistants.js?v=2026100106"> 로 불러 window.AIAssistants.render(container,{sb,me}) 만 부른다.
+   hr.html은 이 파일을 <script src="ai-assistants.js?v=2026101102"> 로 불러 window.AIAssistants.render(container,{sb,me}) 만 부른다.
    © 2026 Jung · 아산정플란트치과 */
 (function(){
 'use strict';
@@ -478,6 +478,7 @@ function escAi(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g
 let SB=null,ME={},AI_ROOT=null,AI_SUBTAB='chat',AI_STYLE_INJECTED=false;
 let AI_ASSISTANTS=[],AI_ERROR='';
 let AI_ACTIVE_ASSISTANT=null,AI_MESSAGES=[],AI_SENDING=false,AI_CONV=0,AI_REQ=0,AI_UID=null,AI_CONVERSATION_ID=null,AI_IMAGES=[];
+let AI_ASSISTANT_EDIT_GENERATION=0,AI_MODEL_EDIT_GENERATION=0;
 let AI_ADMIN_ASSISTANTS=[],AI_ADMIN_MODELS=[],AI_PROVIDER_ROWS=[],AI_PROVIDER_KEYS=null,AI_EDIT_ASSISTANT=null,AI_EDIT_ERRORS=[],AI_MODEL_EDIT=null;
 let AI_USAGE_ROWS=[],AI_NOTICE='',AI_HELP_OPEN=false;
 let AI_TRANSCRIPTS=[],AI_TRANSCRIPT_OFFSET=0;
@@ -547,6 +548,7 @@ async function renderAIAssistants(container,ctx){
 
 // 로그인 사용자가 바뀌면 이전 사람의 대화·관리 화면 상태를 모두 비운다.
 function resetAiState(){
+  AI_ASSISTANT_EDIT_GENERATION++;AI_MODEL_EDIT_GENERATION++;
   AI_CONV++;AI_REQ++;
   AI_ACTIVE_ASSISTANT=null;AI_MESSAGES=[];AI_SENDING=false;AI_IMAGES=[];AI_SUBTAB='chat';
   aiTextSetOverrides([]);AI_ASSISTANTS=[];AI_ERROR='';AI_ADMIN_ASSISTANTS=[];AI_ADMIN_MODELS=[];AI_EDIT_ASSISTANT=null;AI_EDIT_ERRORS=[];AI_MODEL_EDIT=null;AI_USAGE_ROWS=[];AI_NOTICE='';
@@ -567,8 +569,10 @@ async function reloadAssistants(){
 }
 
 async function loadAndRenderShell(){
+  const target=AI_ROOT;
   // 탭을 열 때 카드 목록과 원장이 고친 안내 문구(ai_ui_texts)를 함께 읽는다. 문구 읽기가 실패하면 조용히 기본 문구를 쓴다.
   await Promise.all([reloadAssistants(),aiTextsLoadInto(SB)]);
+  if(!target||target.isConnected===false||target!==AI_ROOT)return;
   renderShell();
 }
 
@@ -603,6 +607,7 @@ function bindHelpCopyButtons(){
 }
 // 원장이 안내 문구를 저장한 직후: 이미 그려 둔 「❓ 사용법」 패널만 새 문구로 다시 그린다.
 function refreshHelpPanel(){
+  if(!AI_ROOT||AI_ROOT.isConnected===false)return;
   const panel=AI_ROOT&&AI_ROOT.querySelector('#aiHelpPanel');
   if(!panel)return;
   panel.innerHTML=aiHelpHtml(ME.role);
@@ -610,6 +615,7 @@ function refreshHelpPanel(){
 }
 
 function renderShell(){
+  if(!AI_ROOT||AI_ROOT.isConnected===false)return;
   const isOwner=ME.role==='owner';
   const tabs=[{key:'chat',label:'🤖 도우미'}];
   if(isOwner)tabs.push({key:'transcripts',label:'\uD83D\uDDC2\uFE0F \uB300\uD654\uB85D'},{key:'manage',label:'⚙️ 도우미 관리'},{key:'models',label:'🧠 모델 목록'},{key:'usage',label:'📊 사용 기록'},{key:'texts',label:'📝 안내 문구'});
@@ -633,9 +639,15 @@ function renderShell(){
     });
   });
   renderActiveSection();
+  const subnav=AI_ROOT.querySelector('.ai-subnav');
+  if(window.HubHelp&&subnav){
+    const tab=tabs.find(t=>t.key===AI_SUBTAB)||tabs[0];
+    window.HubHelp.mount(AI_ROOT,'ai.'+tab.key,tab.label,subnav);
+  }
 }
 
 function renderActiveSection(){
+  if(!AI_ROOT||AI_ROOT.isConnected===false)return;
   const sec=AI_ROOT&&AI_ROOT.querySelector('#aiSection');
   if(!sec)return;
   if(AI_SUBTAB==='manage'&&ME.role==='owner')renderManageSection(sec);
@@ -648,6 +660,7 @@ function renderActiveSection(){
 
 /* ── 직원 화면: 카드 목록 + 채팅(설계서 4-2) ── */
 function renderChatSection(root){
+  if(!root||root.isConnected===false)return;
   if(AI_ERROR){
     root.innerHTML='<div class="card"><div class="empty">도우미 목록을 불러오지 못했습니다: '+escAi(AI_ERROR)+'</div></div>';
     return;
@@ -695,6 +708,7 @@ function aiMessageHtml(msg,idx){
  return '<div class="ai-msg ai-msg-'+msg.role+'"><div class="ai-msg-who">'+who+'</div><div class="ai-msg-body">'+escAi(text)+'</div>'+meta+(sources?'<div class="sub">\uCD9C\uCC98: '+sources+'</div>':'')+(csv?'<div class="rowflex">'+csv+'</div>':'')+'</div>';
 }
 function renderChatPanel(root){
+  if(!root||root.isConnected===false)return;
  const a=AI_ACTIVE_ASSISTANT,tooLong=aiConversationTooLong(aiHistoryForRequest(AI_MESSAGES));
  root.innerHTML='<div class="card ai-chat-card"><div class="rowflex" style="justify-content:space-between;align-items:center"><h2>'+escAi(a.icon||'\uD83E\uDD16')+' '+escAi(a.name)+'</h2><div class="rowflex"><button class="mini'+(tooLong?' stamp':'')+'" data-ai-new>\uC0C8 \uB300\uD654</button><button class="mini" data-ai-back>\u2190 \uBAA9\uB85D</button></div></div><div class="sub">'+escAi(a.description||'')+'</div>'+
  (tooLong?'<div class="hint" role="alert">'+escAi(aiUiText('too_long'))+'</div>':'')+
@@ -760,17 +774,21 @@ function blankAssistant(){
 }
 
 async function renderManageSection(root){
+  if(!root||root.isConnected===false)return;
+  const gen=AI_ASSISTANT_EDIT_GENERATION;
   root.innerHTML='<div class="empty">불러오는 중…</div>';
   try{
     const [ares,mres]=await Promise.all([
       SB.from('ai_assistants').select('*').order('sort_order',{ascending:true}),
       SB.from('ai_models').select('*').order('sort_order',{ascending:true}),
     ]);
+    if(root.isConnected===false||AI_ASSISTANT_EDIT_GENERATION!==gen)return;
     if(ares.error)throw ares.error;
     if(mres.error)throw mres.error;
     AI_ADMIN_ASSISTANTS=ares.data||[];
     AI_ADMIN_MODELS=mres.data||[];
   }catch(e){
+    if(root.isConnected===false||AI_ASSISTANT_EDIT_GENERATION!==gen)return;
     root.innerHTML='<div class="card"><div class="empty">불러오지 못했습니다: '+escAi((e&&e.message)||'')+'</div></div>';
     return;
   }
@@ -778,6 +796,7 @@ async function renderManageSection(root){
 }
 
 function drawManageSection(root){
+  if(!root||root.isConnected===false)return;
   const modelsById={};AI_ADMIN_MODELS.forEach(function(m){modelsById[m.id]=m;});
   root.innerHTML='<div class="card">'+aiNoticeHtml()+
     '<div class="rowflex" style="justify-content:space-between;align-items:center"><h2>⚙️ 도우미 관리</h2><button class="mini stamp" data-ai-new-assistant>새 도우미</button></div>'+
@@ -806,6 +825,7 @@ function drawManageSection(root){
 }
 
 function openAssistantForm(id){
+  AI_ASSISTANT_EDIT_GENERATION++;
   if(id){
     const found=AI_ADMIN_ASSISTANTS.find(function(a){return a.id===id;});
     AI_EDIT_ASSISTANT=found?Object.assign({},found):blankAssistant();
@@ -826,6 +846,7 @@ function aiModelOptionsHtml(selected){
 }
 
 function drawAssistantForm(){
+  AI_ASSISTANT_EDIT_GENERATION++;
   const wrap=AI_ROOT.querySelector('#aiAssistantFormWrap');
   if(!wrap)return;
   const a=AI_EDIT_ASSISTANT;
@@ -856,7 +877,7 @@ function drawAssistantForm(){
     '<div class="hint" id="aiFMsg"></div><div id="aiFTestArea"></div></div>';
   wrap.querySelector('#aiFKnow').addEventListener('input',function(e){wrap.querySelector('#aiFKnowLen').textContent=e.target.value.length+'자';});
   wrap.querySelector('#aiFSave').addEventListener('click',saveAssistantForm);
-  wrap.querySelector('#aiFCancel').addEventListener('click',function(){AI_EDIT_ASSISTANT=null;drawManageSection(AI_ROOT.querySelector('#aiSection'));});
+  wrap.querySelector('#aiFCancel').addEventListener('click',function(){AI_ASSISTANT_EDIT_GENERATION++;AI_EDIT_ASSISTANT=null;drawManageSection(AI_ROOT.querySelector('#aiSection'));});
   wrap.querySelector('#aiFTest').addEventListener('click',testAssistantForm);
 }
 
@@ -881,22 +902,23 @@ function readAssistantForm(){
 }
 
 async function saveAssistantForm(){
+  const section=AI_ROOT&&AI_ROOT.querySelector('#aiSection'),gen=AI_ASSISTANT_EDIT_GENERATION,editId=AI_EDIT_ASSISTANT&&AI_EDIT_ASSISTANT.id;
   const form=readAssistantForm();
   const errs=aiAssistantFormErrors(form);
   AI_EDIT_ERRORS=errs;
   if(errs.length){drawAssistantForm();return;}
   const msgEl=AI_ROOT.querySelector('#aiFMsg');
   try{
-    if(AI_EDIT_ASSISTANT&&AI_EDIT_ASSISTANT.id){
-      const res=await SB.from('ai_assistants').update(form).eq('id',AI_EDIT_ASSISTANT.id);
+    if(editId){
+      const res=await SB.from('ai_assistants').update(form).eq('id',editId);
       if(res.error)throw res.error;
     }else{
       const res=await SB.from('ai_assistants').insert(form);
       if(res.error)throw res.error;
     }
-    AI_EDIT_ASSISTANT=null;
+    if(AI_ASSISTANT_EDIT_GENERATION===gen)AI_EDIT_ASSISTANT=null;
     await reloadAssistants(); // 직원 화면 카드(준비 여부·이름)도 최신으로
-    await renderManageSection(AI_ROOT.querySelector('#aiSection'));
+    if(AI_ASSISTANT_EDIT_GENERATION===gen&&section&&section.isConnected!==false)await renderManageSection(section);
   }catch(e){
     if(msgEl)msgEl.textContent=aiWriteErrorMessage('저장',e);
   }
@@ -916,36 +938,43 @@ async function testAssistantForm(){
 }
 
 async function toggleAssistantEnabled(id){
+  const section=AI_ROOT&&AI_ROOT.querySelector('#aiSection');
   const a=AI_ADMIN_ASSISTANTS.find(function(x){return x.id===id;});
   if(!a)return;
   try{const res=await SB.from('ai_assistants').update({enabled:!a.enabled}).eq('id',id);if(res.error)throw res.error;await reloadAssistants();}catch(e){AI_NOTICE=aiWriteErrorMessage('켜기·끄기',e);}
-  await renderManageSection(AI_ROOT.querySelector('#aiSection'));
+  await renderManageSection(section);
 }
 async function duplicateAssistant(id){
+  const section=AI_ROOT&&AI_ROOT.querySelector('#aiSection');
   const a=AI_ADMIN_ASSISTANTS.find(function(x){return x.id===id;});
   if(!a)return;
   const copy=Object.assign({},a);
   delete copy.id;delete copy.created_at;delete copy.updated_at;
   copy.name=(copy.name||'')+' 복제';
   try{const res=await SB.from('ai_assistants').insert(copy);if(res.error)throw res.error;await reloadAssistants();}catch(e){AI_NOTICE=aiWriteErrorMessage('복제',e);}
-  await renderManageSection(AI_ROOT.querySelector('#aiSection'));
+  await renderManageSection(section);
 }
 async function deleteAssistant(id){
+  const section=AI_ROOT&&AI_ROOT.querySelector('#aiSection');
   if(!confirm('이 도우미를 삭제할까요? 되돌릴 수 없습니다.'))return;
   try{const res=await SB.from('ai_assistants').delete().eq('id',id);if(res.error)throw res.error;await reloadAssistants();}catch(e){AI_NOTICE=aiWriteErrorMessage('삭제',e);}
-  await renderManageSection(AI_ROOT.querySelector('#aiSection'));
+  await renderManageSection(section);
 }
 
 /* ── 원장 화면 2: 모델 목록(설계서 4-3-2) ── */
 function blankModel(){return {id:null,provider:'anthropic',model_id:'',label:'',enabled:true,supports_images:false,price_in_usd_per_mtok:null,price_out_usd_per_mtok:null,note:'',sort_order:0};}
 
 async function renderModelsSection(root){
+  if(!root||root.isConnected===false)return;
+  const gen=AI_MODEL_EDIT_GENERATION;
   root.innerHTML='<div class="empty">불러오는 중…</div>';
   try{
     const [res,prs]=await Promise.all([SB.from('ai_models').select('*').order('sort_order',{ascending:true}),SB.from('ai_providers').select('*').order('sort_order',{ascending:true})]);
+    if(root.isConnected===false||AI_MODEL_EDIT_GENERATION!==gen)return;
     if(res.error)throw res.error;
     AI_ADMIN_MODELS=res.data||[];AI_PROVIDER_ROWS=prs.error?[]:(prs.data||[]);AI_PROVIDER_ROWS.forEach(p=>AI_PROVIDER_LABELS[p.id]=p.label);
   }catch(e){
+    if(root.isConnected===false||AI_MODEL_EDIT_GENERATION!==gen)return;
     root.innerHTML='<div class="card"><div class="empty">불러오지 못했습니다: '+escAi((e&&e.message)||'')+'</div></div>';
     return;
   }
@@ -967,6 +996,7 @@ function drawProviderKeyBadges(root){
 }
 
 function drawModelsSection(root){
+  if(!root||root.isConnected===false)return;
   const groups=aiGroupModelsByProvider(AI_ADMIN_MODELS,{onlyEnabled:false});
   root.innerHTML='<div class="card">'+aiNoticeHtml()+
     '<div class="rowflex" style="justify-content:space-between;align-items:center"><h2>🧠 모델 목록</h2>'+
@@ -991,7 +1021,7 @@ function drawModelsSection(root){
     '<div id="aiModelTestResult"></div></div>'+
     '<div id="aiModelFormWrap"></div><div id="aiModelFetchResult"></div>';
   root.insertAdjacentHTML('beforeend','<div class="card"><h3>회사 목록</h3>'+AI_PROVIDER_ROWS.map(p=>'<div class="rowflex"><span>'+escAi(p.label)+' · '+escAi(p.id)+' · '+escAi(p.base_url)+' · '+escAi(p.key_env)+'</span><span data-ai-provider-badge="'+escAi(p.id)+'">'+aiProviderKeyBadge(AI_PROVIDER_KEYS,p.id)+'</span><button class="mini" data-ai-provider-toggle="'+escAi(p.id)+'">'+(p.enabled?'끄기':'켜기')+'</button></div>').join('')+'<h4>OpenAI 호환 회사 추가</h4><div class="grid"><input id="aiProviderId" placeholder="회사 ID"><input id="aiProviderLabel" placeholder="화면 이름"><input id="aiProviderUrl" placeholder="https://API 주소/v1"><input id="aiProviderKey" placeholder="MYAI_API_KEY (이름만)"></div><button class="mini stamp" data-ai-provider-save>회사 추가</button><div class="hint" id="aiProviderMsg"></div></div>');
-  root.querySelectorAll('[data-ai-provider-toggle]').forEach(b=>b.addEventListener('click',async()=>{const p=AI_PROVIDER_ROWS.find(x=>x.id===b.getAttribute('data-ai-provider-toggle'));if(p){const r=await SB.from('ai_providers').update({enabled:!p.enabled}).eq('id',p.id);if(r.error)AI_NOTICE=aiWriteErrorMessage('회사 켜기·끄기',r.error);await renderModelsSection(AI_ROOT.querySelector('#aiSection'));}}));
+  root.querySelectorAll('[data-ai-provider-toggle]').forEach(b=>b.addEventListener('click',async()=>{const p=AI_PROVIDER_ROWS.find(x=>x.id===b.getAttribute('data-ai-provider-toggle'));if(p){const r=await SB.from('ai_providers').update({enabled:!p.enabled}).eq('id',p.id);if(r.error)AI_NOTICE=aiWriteErrorMessage('회사 켜기·끄기',r.error);await renderModelsSection(root);}}));
   const providerSave=root.querySelector('[data-ai-provider-save]');if(providerSave)providerSave.addEventListener('click',saveProvider);
   root.querySelector('[data-ai-new-model]').addEventListener('click',function(){openModelForm(null);});
   root.querySelector('[data-ai-fetch-models]').addEventListener('click',fetchModelLists);
@@ -1004,6 +1034,7 @@ function drawModelsSection(root){
 }
 
 function openModelForm(id){
+  AI_MODEL_EDIT_GENERATION++;
   if(id){
     const found=AI_ADMIN_MODELS.find(function(m){return m.id===id;});
     AI_MODEL_EDIT=found?Object.assign({},found):blankModel();
@@ -1014,6 +1045,7 @@ function openModelForm(id){
 }
 
 function drawModelForm(){
+  AI_MODEL_EDIT_GENERATION++;
   const wrap=AI_ROOT.querySelector('#aiModelFormWrap');
   if(!wrap)return;
   const m=AI_MODEL_EDIT;
@@ -1031,10 +1063,11 @@ function drawModelForm(){
     '</div><div class="rowflex" style="margin-top:10px"><button class="mini stamp" id="aiMSave">저장</button><button class="mini" id="aiMCancel">취소</button></div>'+
     '<div class="hint" id="aiMMsg"></div></div>';
   wrap.querySelector('#aiMSave').addEventListener('click',saveModelForm);
-  wrap.querySelector('#aiMCancel').addEventListener('click',function(){AI_MODEL_EDIT=null;drawModelsSection(AI_ROOT.querySelector('#aiSection'));});
+  wrap.querySelector('#aiMCancel').addEventListener('click',function(){AI_MODEL_EDIT_GENERATION++;AI_MODEL_EDIT=null;drawModelsSection(AI_ROOT.querySelector('#aiSection'));});
 }
 
 async function saveModelForm(){
+  const section=AI_ROOT&&AI_ROOT.querySelector('#aiSection'),gen=AI_MODEL_EDIT_GENERATION,editId=AI_MODEL_EDIT&&AI_MODEL_EDIT.id;
   const wrap=AI_ROOT.querySelector('#aiModelFormWrap');
   const priceIn=wrap.querySelector('#aiMPriceIn').value,priceOut=wrap.querySelector('#aiMPriceOut').value;
   const form={
@@ -1051,37 +1084,40 @@ async function saveModelForm(){
   const msgEl=wrap.querySelector('#aiMMsg');
   if(!form.model_id||!form.label){if(msgEl)msgEl.textContent='모델 이름과 표시 이름을 입력하세요.';return;}
   try{
-    if(AI_MODEL_EDIT&&AI_MODEL_EDIT.id){
-      const res=await SB.from('ai_models').update(form).eq('id',AI_MODEL_EDIT.id);
+    if(editId){
+      const res=await SB.from('ai_models').update(form).eq('id',editId);
       if(res.error)throw res.error;
     }else{
       const res=await SB.from('ai_models').insert(form);
       if(res.error)throw res.error;
     }
-    AI_MODEL_EDIT=null;
+    if(AI_MODEL_EDIT_GENERATION===gen)AI_MODEL_EDIT=null;
     await reloadAssistants(); // 모델을 켜고 끄면 도우미 ready가 바뀜
-    await renderModelsSection(AI_ROOT.querySelector('#aiSection'));
+    if(AI_MODEL_EDIT_GENERATION===gen&&section&&section.isConnected!==false)await renderModelsSection(section);
   }catch(e){
     if(msgEl)msgEl.textContent=aiWriteErrorMessage('저장',e);
   }
 }
 
 async function toggleModelEnabled(id){
+  const section=AI_ROOT&&AI_ROOT.querySelector('#aiSection');
   const m=AI_ADMIN_MODELS.find(function(x){return x.id===id;});
   if(!m)return;
   try{const res=await SB.from('ai_models').update({enabled:!m.enabled}).eq('id',id);if(res.error)throw res.error;await reloadAssistants();}catch(e){AI_NOTICE=aiWriteErrorMessage('켜기·끄기',e);}
-  await renderModelsSection(AI_ROOT.querySelector('#aiSection'));
+  await renderModelsSection(section);
 }
 async function toggleModelImages(id){
+  const section=AI_ROOT&&AI_ROOT.querySelector('#aiSection');
   const m=AI_ADMIN_MODELS.find(function(x){return x.id===id;});
   if(!m)return;
   try{const res=await SB.from('ai_models').update({supports_images:!m.supports_images}).eq('id',id);if(res.error)throw res.error;await reloadAssistants();}catch(e){AI_NOTICE=aiWriteErrorMessage('사진 켜기·끄기',e);}
-  await renderModelsSection(AI_ROOT.querySelector('#aiSection'));
+  await renderModelsSection(section);
 }
 async function deleteModel(id){
+  const section=AI_ROOT&&AI_ROOT.querySelector('#aiSection');
   if(!confirm('이 모델을 삭제할까요?'))return;
   try{const res=await SB.from('ai_models').delete().eq('id',id);if(res.error)throw res.error;await reloadAssistants();}catch(e){AI_NOTICE=aiWriteErrorMessage('삭제',e);}
-  await renderModelsSection(AI_ROOT.querySelector('#aiSection'));
+  await renderModelsSection(section);
 }
 async function testModel(id){
   const area=AI_ROOT.querySelector('#aiModelTestResult');
@@ -1135,10 +1171,13 @@ function addFetchedModel(key){
    문구마다: 어디에 보이는지 · 기본 문구 · 지금 문구(여기서 고침) · 저장 · 기본으로 되돌리기.
    저장은 표 ai_ui_texts에 행을 넣고(upsert), 되돌리기는 행을 지운다. 권한은 DB(원장만 쓰기)가 지킨다. */
 async function renderTextsSection(root){
+  if(!root||root.isConnected===false)return;
   root.innerHTML='<div class="empty">불러오는 중…</div>';
   try{
-    aiTextSetOverrides(await aiTextsFetch(SB)); // 탭을 열 때마다 최신 값으로
+    const texts=await aiTextsFetch(SB);if(root.isConnected===false)return;
+    aiTextSetOverrides(texts); // 탭을 열 때마다 최신 값으로
   }catch(e){
+    if(root.isConnected===false)return;
     root.innerHTML='<div class="card"><div class="empty">불러오지 못했습니다: '+escAi((e&&e.message)||'')+'</div></div>';
     return;
   }
@@ -1147,6 +1186,7 @@ async function renderTextsSection(root){
 function aiTextBadgeHtml(key){return aiTextOverride(key)==null?'':'<span class="b ok">고침</span>';}
 function aiTextRowsFor(def){return Math.min(14,Math.max(2,String(def.def).split('\n').length+1));}
 function drawTextsSection(root){
+  if(!root||root.isConnected===false)return;
   const defs=aiTextDefs();
   const groups=[];
   defs.forEach(function(d,i){
@@ -1175,6 +1215,7 @@ function drawTextsSection(root){
   Array.prototype.forEach.call(root.querySelectorAll('[data-ai-text-reset]'),function(b){b.addEventListener('click',function(){return resetTextRow(root,Number(b.getAttribute('data-ai-text-reset')));});});
 }
 function afterTextWrite(root,i,r,okMsg){
+  if(!root||root.isConnected===false)return;
   const d=aiTextDefs()[i];
   const msg=root.querySelector('#aiTxtMsg_'+i),inp=root.querySelector('#aiTxtIn_'+i),badge=root.querySelector('#aiTxtBadge_'+i);
   if(!r.ok){
@@ -1202,9 +1243,11 @@ async function resetTextRow(root,i){
 
 /* ── 원장 화면 3: 사용 기록(설계서 4-3-3) ── */
 async function renderTranscriptsSection(root){
+  if(!root||root.isConnected===false)return;
  root.innerHTML='<div class="empty">불러오는 중…</div>';
  try{
   const [pr,as]=await Promise.all([SB.from('profiles').select('user_id,name'),SB.from('ai_assistants').select('id,name').order('name')]);
+  if(root.isConnected===false)return;
   const names={};(pr.data||[]).forEach(x=>names[x.user_id]=x.name||x.user_id);
   const filters='<div class="rowflex"><label>직원 <select id="aiTranscriptUser"><option value="">전체</option>'+Object.entries(names).map(([id,n])=>'<option value="'+escAi(id)+'">'+escAi(n)+'</option>').join('')+'</select></label><label>도우미 <select id="aiTranscriptAssistant"><option value="">전체</option>'+((as.data||[]).map(x=>'<option value="'+escAi(x.name)+'">'+escAi(x.name)+'</option>').join(''))+'</select></label><label>시작일 <input id="aiTranscriptFrom" type="date"></label><label>종료일 <input id="aiTranscriptTo" type="date"></label><button class="mini" id="aiTranscriptFilter">거르기</button></div>';
   root.innerHTML='<div class="card"><h2>🗂️ 대화록</h2>'+filters+'<div id="aiTranscriptRows" class="sub">불러오는 중…</div><div class="rowflex"><button class="mini" id="aiTranscriptPrev">이전</button><span id="aiTranscriptPage"></span><button class="mini" id="aiTranscriptNext">다음 50개</button></div><div id="aiTranscriptDetail"></div></div>';
@@ -1212,16 +1255,18 @@ async function renderTranscriptsSection(root){
    const user=root.querySelector('#aiTranscriptUser').value,assistant=root.querySelector('#aiTranscriptAssistant').value,from=root.querySelector('#aiTranscriptFrom').value,to=root.querySelector('#aiTranscriptTo').value;
    let q=SB.from('ai_assistant_conversations').select('id,user_id,assistant_name,started_at,last_at').order('last_at',{ascending:false}).range(AI_TRANSCRIPT_OFFSET,AI_TRANSCRIPT_OFFSET+49);
    if(user)q=q.eq('user_id',user);if(assistant)q=q.eq('assistant_name',assistant);if(from)q=q.gte('last_at',new Date(from+'T00:00:00').toISOString());if(to)q=q.lte('last_at',new Date(to+'T23:59:59.999').toISOString());
-   const c=await q;if(c.error)throw c.error;const rows=c.data||[],ids=rows.map(x=>x.id);let grouped={};
+   const c=await q;if(root.isConnected===false)return;if(c.error)throw c.error;const rows=c.data||[],ids=rows.map(x=>x.id);let grouped={};
    if(ids.length){const mr=await SB.from('ai_assistant_messages').select('conversation_id,role,content').in('conversation_id',ids).order('created_at',{ascending:true});if(mr.error)throw mr.error;(mr.data||[]).forEach(m=>(grouped[m.conversation_id]||(grouped[m.conversation_id]=[])).push(m));}
+   if(root.isConnected===false)return;
    root.querySelector('#aiTranscriptRows').innerHTML=rows.map(x=>{const ms=grouped[x.id]||[],first=ms.find(m=>m.role==='user')?.content||'';return '<div class="rowflex"><span>'+escAi(typeof hubFmtWhen==='function'?hubFmtWhen(x.last_at):new Date(x.last_at).toLocaleString('ko-KR'))+'</span><span>'+escAi(names[x.user_id]||x.user_id)+'</span><span>'+escAi(x.assistant_name)+'</span><span>'+escAi(String(first).slice(0,40))+'</span><span>'+ms.filter(m=>m.role==='user').length+'회 대화</span><button class="mini" data-ai-transcript="'+escAi(x.id)+'">열기</button></div>';}).join('')||'<p class="empty">대화가 없습니다.</p>';
    root.querySelector('#aiTranscriptPage').textContent=''+(Math.floor(AI_TRANSCRIPT_OFFSET/50)+1)+'쪽';root.querySelector('#aiTranscriptPrev').disabled=AI_TRANSCRIPT_OFFSET===0;root.querySelector('#aiTranscriptNext').disabled=rows.length<50;
-   root.querySelectorAll('[data-ai-transcript]').forEach(btn=>btn.addEventListener('click',async()=>{const d=await SB.from('ai_assistant_messages').select('*').eq('conversation_id',btn.getAttribute('data-ai-transcript')).order('created_at',{ascending:true}),box=root.querySelector('#aiTranscriptDetail');if(d.error){box.textContent='대화 내용을 불러오지 못했습니다.';return;}box.innerHTML=(d.data||[]).map(m=>'<div class="ai-msg ai-msg-'+m.role+'"><div class="ai-msg-who">'+(m.role==='user'?'직원':'AI')+'</div><div class="ai-msg-body">'+escAi(m.content)+'</div>'+(m.image_count?'<div class="sub">사진 '+m.image_count+'장</div>':'')+'</div>').join('')||'<p class="empty">내용이 없습니다.</p>'; }));
+   root.querySelectorAll('[data-ai-transcript]').forEach(btn=>btn.addEventListener('click',async()=>{const d=await SB.from('ai_assistant_messages').select('*').eq('conversation_id',btn.getAttribute('data-ai-transcript')).order('created_at',{ascending:true}),box=root.querySelector('#aiTranscriptDetail');if(root.isConnected===false)return;if(d.error){box.textContent='대화 내용을 불러오지 못했습니다.';return;}box.innerHTML=(d.data||[]).map(m=>'<div class="ai-msg ai-msg-'+m.role+'"><div class="ai-msg-who">'+(m.role==='user'?'직원':'AI')+'</div><div class="ai-msg-body">'+escAi(m.content)+'</div>'+(m.image_count?'<div class="sub">사진 '+m.image_count+'장</div>':'')+'</div>').join('')||'<p class="empty">내용이 없습니다.</p>'; }));
   };
   root.querySelector('#aiTranscriptFilter').addEventListener('click',()=>{AI_TRANSCRIPT_OFFSET=0;load().catch(()=>{});});root.querySelector('#aiTranscriptPrev').addEventListener('click',()=>{AI_TRANSCRIPT_OFFSET=Math.max(0,AI_TRANSCRIPT_OFFSET-50);load().catch(()=>{});});root.querySelector('#aiTranscriptNext').addEventListener('click',()=>{AI_TRANSCRIPT_OFFSET+=50;load().catch(()=>{});});await load();
- }catch(_){root.innerHTML='<div class="card"><div class="empty">대화록을 불러오지 못했습니다.</div></div>';}
+ }catch(_){if(root.isConnected===false)return;root.innerHTML='<div class="card"><div class="empty">대화록을 불러오지 못했습니다.</div></div>';}
 }
 async function renderUsageSection(root){
+  if(!root||root.isConnected===false)return;
   root.innerHTML='<div class="empty">불러오는 중…</div>';
   const since=new Date(Date.now()-30*24*3600*1000).toISOString();
   try{
@@ -1229,10 +1274,12 @@ async function renderUsageSection(root){
       SB.from('ai_assistant_usage').select('*').gte('created_at',since).order('created_at',{ascending:false}),
       SB.from('profiles').select('user_id,name'),
     ]);
+    if(root.isConnected===false)return;
     if(ures.error)throw ures.error;
     const nameById={};(pres.data||[]).forEach(function(p){nameById[p.user_id]=p.name;});
     AI_USAGE_ROWS=(ures.data||[]).map(function(r){return Object.assign({},r,{user_name:nameById[r.user_id]||r.user_id});});
   }catch(e){
+    if(root.isConnected===false)return;
     root.innerHTML='<div class="card"><div class="empty">불러오지 못했습니다: '+escAi((e&&e.message)||'')+'</div></div>';
     return;
   }
@@ -1240,6 +1287,7 @@ async function renderUsageSection(root){
 }
 
 function drawUsageSection(root){
+  if(!root||root.isConnected===false)return;
   const s=aiUsageSummarize(AI_USAGE_ROWS);
   const rowsHtml=function(rows,label){
     return rows.length?('<div class="tblwrap"><table><tr><th>'+label+'</th><th>건수</th><th>입력 토큰</th><th>출력 토큰</th><th>추정 금액</th></tr>'+

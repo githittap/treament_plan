@@ -366,7 +366,8 @@ async function renderAll(html,opts){
     const d5=makeDom();const r5=await asRole('manager',{$:d5.$},{tables:{consultation_journals:{error:{message:'큐<오류>'}}}});await r5.api.consultationRenderActionQueue();out['cj.queue.error']=JSON.stringify([d5.$('#cjActionQueue').innerHTML,r5.statuses]);
   }
   { // 수정 불러오기·새로 입력
-    const grab=(d)=>JSON.stringify(Object.keys(d.reg).sort().map(k=>[k,d.reg[k].value,d.reg[k].checked,d.reg[k].textContent,d.reg[k].innerHTML]));
+    // 연결 상태 확인용 main 루트는 입력칸의 화면·값 비교에서 제외합니다.
+    const grab=(d)=>JSON.stringify(Object.keys(d.reg).filter(k=>k!=='#main').sort().map(k=>[k,d.reg[k].value,d.reg[k].checked,d.reg[k].textContent,d.reg[k].innerHTML]));
     const d=makeDom();const r=await asRole('manager',{$:d.$});await r.api.consultationEdit('11111111-1111-4111-8111-111111111111');out['cj.edit.ok']=JSON.stringify([grab(d),r.statuses,r.api.getState('CONSULTATION_EDIT_ID')]);
     const d2=makeDom();const r2=await asRole('manager',{$:d2.$},{tables:{consultation_journals:{error:{message:'불러오<실패>'}}}});await r2.api.consultationEdit('11111111-1111-4111-8111-111111111111');out['cj.edit.error']=JSON.stringify([d2.$('#cjMsg').textContent,r2.statuses]);
     const d3=makeDom();const r3=await asRole('manager',{$:d3.$});await r3.api.consultationEdit('not-a-uuid');out['cj.edit.bad_id']=JSON.stringify([grab(d3),r3.statuses]);
@@ -377,6 +378,8 @@ async function renderAll(html,opts){
     const run=async(name,over,sbOver,editId,checked)=>{
       const d=makeDom();Object.entries(Object.assign({},base,over)).forEach(([k,v])=>{d.$(k).value=v;});d.$('#cjActionDone').checked=!!checked;
       const r=await asRole('manager',{$:d.$},sbOver);if(editId)r.api.setState('CONSULTATION_EDIT_ID',editId);
+      // 저장의 공용 render 경로도 실제 상담일지 화면을 실행합니다.
+      r.ctx.render=()=>r.api.renderConsultationJournal(d.$('#main'));
       await r.api.saveConsultationJournal();await flush();
       out['cj.save.'+name]=JSON.stringify([d.$('#cjMsg').textContent,r.statuses,r.ctx.sb.writes,r.log,d.hist.filter(h=>h[0]==='#cjMsg').map(h=>h[2])]);
     };

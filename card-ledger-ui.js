@@ -91,7 +91,7 @@ async function saveSubscription(ctx,rows,index,value){
 function values(form,keys){return Object.fromEntries(keys.map(k=>[k,String(form.elements.namedItem(k)?.value||'')]));}
 function bind(){
   host.addEventListener('submit',async event=>{
-    const form=event.target;if(!form.matches('[data-ledger-filters],[data-ledger-merchant],[data-ledger-subscription]'))return;event.preventDefault();if(!allowed(context))return;
+    const form=event.target;if(mount.isConnected===false)return;if(!form.matches('[data-ledger-filters],[data-ledger-merchant],[data-ledger-subscription]'))return;event.preventDefault();if(!allowed(context))return;
     const msg=form.querySelector('[data-ledger-message]');
     if(form.hasAttribute('data-ledger-filters')){const f=values(form,['from','to','card','category','abroad']);if(!/^\d{4}-\d{2}-\d{2}$/.test(f.from)||!/^\d{4}-\d{2}-\d{2}$/.test(f.to)||f.from>f.to){msg.textContent=t('range_invalid');return;}await render(mount,context,f);return;}
     const button=form.querySelector('button[type="submit"]');if(button.disabled)return;button.disabled=true;
@@ -100,19 +100,20 @@ function bind(){
     if(form.hasAttribute('data-ledger-merchant')){const id=form.getAttribute('data-ledger-merchant');r=await saveMerchant(ctx,id,values(form,['display_name','category','ai_platform','memo']));}
     else{r=await saveSubscription(ctx,state.subscriptions,Number(form.getAttribute('data-ledger-subscription')),values(form,FIELDS));if(r.ok&&revision===version){ctx.subscriptionRaw=r.raw;state.subscriptions=r.rows;}}
     button.disabled=false;msg.textContent=t(r.ok?'saved':r.invalid?'invalid':'save_error');
-    if(r.ok&&form.hasAttribute('data-ledger-merchant')&&revision===version&&currentHost===host)await render(mount,ctx,state.filters);
+    if(r.ok&&form.hasAttribute('data-ledger-merchant')&&revision===version&&currentHost===host&&mount.isConnected!==false)await render(mount,ctx,state.filters);
   });
   host.addEventListener('change',event=>{if(event.target.matches('[data-ledger-sub-select]'))host.querySelector('[data-ledger-sub-editor]').innerHTML=subscriptionEditor(state.subscriptions,Number(event.target.value));});
   host.addEventListener('click',event=>{if(event.target.closest('[data-ledger-sub-add]'))host.querySelector('[data-ledger-sub-editor]').innerHTML=subscriptionEditor(state.subscriptions,-1);});
   host.addEventListener('input',event=>{if(!event.target.matches('[data-ledger-merchant-search]'))return;const q=event.target.value.trim().toLowerCase();host.querySelector('[data-ledger-dictionary]').innerHTML=state.merchants.filter(m=>(m.display_name+' '+m.merchant_key).toLowerCase().includes(q)).slice(0,num('merchant_limit',50,5,500)).map(merchantForm).join('');});
 }
 async function render(target,ctx,filters){
+  if(target.isConnected===false)return;
   const revision=++version;
   if(!allowed(ctx)){target.innerHTML='<div class="card">'+esc(t('owner_only'))+'</div>';return;}
   const f=filters||{from:date(new Date(new Date().getTime()-(num('default_days',30,1,3660)-1)*86400000)),to:date(new Date()),card:'',category:'',abroad:''};
   target.innerHTML='<div class="card">'+esc(t('loading'))+'</div>';
-  let s;try{s=await load(ctx,f);}catch{if(revision===version)target.innerHTML='<div class="card" role="alert">'+esc(t('load_error'))+'</div>';return;}
-  if(revision!==version||!allowed(ctx)||ctx.isActive&& !ctx.isActive())return;
+  let s;try{s=await load(ctx,f);}catch{if(revision===version&&target.isConnected!==false)target.innerHTML='<div class="card" role="alert">'+esc(t('load_error'))+'</div>';return;}
+  if(target.isConnected===false||revision!==version||!allowed(ctx)||ctx.isActive&& !ctx.isActive())return;
   state=s;context={...ctx,subscriptionRaw:s.subscriptionRaw};
   target.innerHTML=html(s);mount=target;host=target.querySelector('[data-ledger-panel]');bind();
 }

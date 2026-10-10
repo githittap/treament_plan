@@ -710,20 +710,42 @@ test('[11차-A] 업무매뉴얼 편집·새로 만들기는 새 창(새 탭)으�
   for (const mode of ['edit', 'new']) { const c = hubCtx('owner'); c.api.MDECK.decks = []; c.api.MDECK.mode = mode; c.api.MDECK.id = ID1; const m = { innerHTML: '' }; c.api.renderMdeckTool(m); assert.ok(!m.innerHTML.includes('<iframe'), mode + ': 허브 안 편집 iframe 없음'); assert.equal(c.api.MDECK.mode, 'list'); }
   // 되돌려진 것(9·10차 허브 라우터 변경)이 없다 — 이전 동작 그대로
   for (const gone of ['toolsLeaveOk', 'toolsFrameKept', 'toolsFrameKey', 'view-root', 'data-tkey', 'mdeck.leave_unsaved', 'mdeck.leave_confirm', 'replaceChildren(m)']) assert.ok(!hr.includes(gone) && !js.includes(gone), '되돌렸어야 할 것이 남아 있음: ' + gone);
-  assert.match(hr, /const m=\$\('#main'\);m\.innerHTML='<div class="empty">불러오는 중…<\/div>';hubStaticFill\(\);apprKindSelectFill\(\);/, 'render() 원래 모양');
-  assert.ok(hr.includes("setStatus('saved');await renderLeave($('#main'));")); assert.ok(hr.includes("setStatus('saved');await renderLeave($('#main'));const refreshed=")); assert.ok(hr.includes("renderConfid($('#main'));setStatus('saved');")); assert.ok(hr.includes("await renderInbox($('#main'));}")); assert.ok(hr.includes("consultationResetForm();await renderConsultationJournal($('#main'));}"), '직접 쓰기 5곳 원래대로');
+  // 탭 사용법의 늦은 응답 차단은 #main 자체를 빈 복제본으로 교체함. 감싸는 칸을 추가하지 않음.
+  const router = fnSrc(hr, 'async function render()');
+  assert.match(router, /const old=\$\('#main'\),m=old\.cloneNode\(false\);/, '#main 속성을 보존한 빈 복제본');
+  assert.match(router, /old\.replaceWith\(m\);/, '새 #main 자체를 같은 위치에 놓음');
+  assert.match(router, /m\.innerHTML='<div class="empty">불러오는 중…<\/div>';hubStaticFill\(\);apprKindSelectFill\(\);/, '초기 화면·공통 글·결재 선택칸 초기화 유지');
+  // 다섯 후속 동작도 공용 render를 거침: 같은 #main 직계 구조 + 탭 사용법 재연결·옛 응답 차단.
+  for (const name of ['revokeMonthlyLeaveAccrual','applyLeaveAccrual','submitConfidRecord','inboxSetSubtab','saveConsultationJournal']) {
+    const body = fnSrc(hr, 'async function ' + name);
+    if(name==='applyLeaveAccrual')assert.match(body, /const redraw=render\(\),refreshedMain=\$\('#main'\);await redraw;/, '연차 적용: 새 #main을 잡고 공용 라우터 완료를 기다림');
+    else assert.match(body, /await render\(\)/, name + ': 공용 라우터로 현재 #main에 그림');
+    assert.doesNotMatch(body, /render[A-Z]\w*\(\$\('#main'\)\)/, name + ': 안내·전환 안전장치를 우회하지 않음');
+  }
+  assert.match(fnSrc(hr, 'async function saveConsultationJournal'), /consultationResetForm\(\);await render\(\);/, '상담일지 초기화 후 현재 화면을 그림');
   assert.match(hr, /window\.hubSb = sb;/, 'window.hubSb 노출은 유지(허브 보기 iframe 이 씀)');
   assert.match(fnSrc(hr, 'function mdeckOpen'), /window\.open\(mdeckFrameUrl\(mode,id\),'_blank'\)/);
 });
 
 test('[11차-B] 인쇄 회귀 없음: 근로계약서·월 근무표·내 출퇴근 월 표 인쇄는 #main 직계 자식을 전제로 하므로 render() 가 #main 에 직접 그리고, 인쇄 함수·CSS 규칙이 그대로다', () => {
   // 1) render() 는 화면 그리기 함수에 #main 자체를 넘김(감싸는 칸 없음) → 인쇄 CSS `#main>.contract-print-target` 같은 직계 자식 규칙이 먹음
-  const main = { id: 'main', innerHTML: '' }, got = {};
-  const mk = tab => { const ctx = { TAB: tab, main, $: s => (s === '#main' ? main : null), hubStaticFill() { }, apprKindSelectFill() { }, SCHEDULE_PEOPLE_ERROR: '', esc: s => String(s),
+  const app = {}, got = {}; let main;
+  const makeMain = () => ({ id: 'main', className: 'panel', parentNode: app, isConnected: true, innerHTML: '',
+    cloneNode(deep) { assert.equal(deep, false, '이전 화면 자식은 복제하지 않음'); const next = makeMain(); next.id = this.id; next.className = this.className; return next; },
+    replaceWith(next) { assert.strictEqual(this, main); next.parentNode = this.parentNode; this.parentNode = null; this.isConnected = false; main = next; }
+  });
+  main = makeMain();
+  const mk = tab => { const ctx = { TAB: tab, $: s => (s === '#main' ? main : null), hubStaticFill() { }, apprKindSelectFill() { }, SCHEDULE_PEOPLE_ERROR: '', esc: s => String(s),
     renderContract: async m => { got.contract = m; }, renderAtt: async m => { got.att = m; }, renderSched: async m => { got.sched = m; } }; vm.createContext(ctx); vm.runInContext(fnSrc(hr, 'async function render()') + ';this.render=render;', ctx); return ctx; };
   return (async () => {
-    await mk('contract').render(); await mk('att').render(); await mk('sched').render();
-    assert.strictEqual(got.contract, main, '근로계약서'); assert.strictEqual(got.att, main, '내 출퇴근(월 표 인쇄)'); assert.strictEqual(got.sched, main, '월 근무표');
+    for (const [tab, label] of [['contract', '근로계약서'], ['att', '내 출퇴근(월 표 인쇄)'], ['sched', '월 근무표']]) {
+      const old = main; old.innerHTML = '<div>이전 화면</div>'; await mk(tab).render();
+      assert.strictEqual(got[tab], main, label + ': 현재 #main 자체에 그림(감싸는 칸 없음)');
+      assert.notStrictEqual(main, old, label + ': 늦은 응답이 쓸 이전 #main과 분리');
+      assert.equal(main.id, 'main'); assert.equal(main.className, 'panel'); assert.strictEqual(main.parentNode, app, '#main은 원래 부모 직계');
+      assert.equal(old.isConnected, false); assert.equal(main.isConnected, true);
+      assert.equal(main.innerHTML, '<div class="empty">불러오는 중…</div>', '이전 화면 자식을 보존하지 않은 새 화면');
+    }
     // 2) 인쇄 CSS 규칙(직계 자식 기준)이 그대로 있음
     assert.ok(hr.includes('body.contract-printing #main>.contract-print-target{display:block!important')); assert.ok(hr.includes('body.contract-printing #main> *{display:none!important}'));
     assert.ok(hr.includes('body.staff-att-printing #main> *:not(#staffAttMonthContainer){display:none!important}') || hr.includes('body.staff-att-printing #main> *:not(#staffAttMonthContainer)'));

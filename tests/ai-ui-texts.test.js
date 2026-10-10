@@ -346,6 +346,6 @@ test('화면: 사용자가 바뀌면 이전 사람이 읽은 덮어쓰기 문구
 
 test('원본 글 검사: 직원 화면에 대화 기록·원장 열람 안내를 새로 넣지 않았고 hr.html 주소 번호가 올라갔다',()=>{
   assert.doesNotMatch(js,/대화는 저장되지 않아요|업무 확인을 위해 저장되며 원장만 볼 수 있어요|사용 기록으로 남고|원장이 볼 수 있어요/);
-  assert.match(read('hr.html'),/<script src="ai-assistants\.js\?v=2026100309"><\/script>/);
+  assert.match(read('hr.html'),/<script src="ai-assistants\.js\?v=2026101110"><\/script>/);
   assert.ok(!js.includes('§'));
 });

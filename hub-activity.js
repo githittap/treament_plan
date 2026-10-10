@@ -115,18 +115,18 @@ async function render(container,options){
  await loadPage(false);
 }
 async function loadPage(more){
- if(!ui)return;const model=ui,container=model.container,get=id=>container.querySelector('#actlog-'+id),generation=++uiGeneration;
+ if(!ui||ui.container.isConnected===false)return;const model=ui,container=model.container,get=id=>container.querySelector('#actlog-'+id),generation=++uiGeneration;
  get('error').textContent=T('loading');get('more').disabled=true;
  try{
   if(!more){model.from=get('from').value;model.to=get('to').value;model.user=get('user').value;model.kind=get('kind').value;model.rows=[];model.offset=0;}
   const args={...filteredArgs(model),p_offset:model.offset},result=await model.sb.rpc('hub_activity_page',args);
-  if(result.error)throw result.error;if(generation!==uiGeneration||model!==ui)return;
+  if(result.error)throw result.error;if(container.isConnected===false||generation!==uiGeneration||model!==ui)return;
   model.rows.push(...result.data||[]);model.offset+=(result.data||[]).length;model.more=(result.data||[]).length===200;
   get('rows').innerHTML=rowsHtml(model.rows,model.profiles);get('count').textContent=model.rows.length?T('count',{n:model.rows.length}):T('empty');get('more').hidden=!model.more;
-  if(!more){const summary=await model.sb.rpc('hub_activity_summary');if(summary.error)throw summary.error;if(generation!==uiGeneration||model!==ui)return;model.summary=summary.data||[];get('summary').innerHTML=summaryHtml(model.summary.filter(r=>!model.user||r.user_id===model.user),model.profiles);}
+  if(!more){const summary=await model.sb.rpc('hub_activity_summary');if(summary.error)throw summary.error;if(container.isConnected===false||generation!==uiGeneration||model!==ui)return;model.summary=summary.data||[];get('summary').innerHTML=summaryHtml(model.summary.filter(r=>!model.user||r.user_id===model.user),model.profiles);}
   get('error').textContent='';
- }catch(_){if(generation===uiGeneration)get('error').textContent=T('error');}
- finally{if(generation===uiGeneration)get('more').disabled=false;}
+ }catch(_){if(container.isConnected!==false&&generation===uiGeneration)get('error').textContent=T('error');}
+ finally{if(container.isConnected===false||generation===uiGeneration)get('more').disabled=false;}
 }
 function csv(rows,profiles){return '\ufeff'+[['time','staff','kind','target','device'].map(k=>T(k)),...rows.map(r=>[time(r.occurred_at),nameOf(r.user_id,profiles),T(r.kind),targetLabel(r.target)+(r.target_id?' #'+r.target_id:''),r.user_agent_short||''])].map(row=>row.map(csvCell).join(',')).join('\r\n');}
 async function exportCsv(){

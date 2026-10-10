@@ -285,6 +285,11 @@ async function renderAll(html,opts){
     await send('insert_fail',{sb:{tables:{contracts:{error:{message:'넣기<실패>'}}}}});
     await send('edit_ok',{edit:11});
     await send('edit_fail',{edit:11,sb:{tables:{contracts:{error:{message:'고치기<실패>'}}}}});
+    // 새 0행 경로도 허브 글 설정의 변경값·자리표시자를 실제 메시지에서 확인합니다.
+    if(o.zeroRows&&text.includes('function contractStateChangedMessage(')){
+      await send('edit_zero',{edit:11,sb:{tables:{contracts:{list:[],single:{status:'대기'}}}}});
+      await send('edit_zero_unknown',{edit:11,sb:{tables:{contracts:{list:[],single:null}}}});
+    }
     const act=async(name,fnName,arg,role,sbOver,state,extra)=>{
       const r=await asRole(role||'owner',extra,sbOver);
       r.api.set('CONTRACT_ROWS',CONTRACT_ROWS.map(x=>Object.assign({},x)));

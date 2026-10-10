@@ -461,7 +461,7 @@ async function renderAll(html,opts){
         const dd=makeDom();dd.$('#laAsOf').value='2026-10-01';
         dd.$('#laRows').querySelectorAll=()=>pick?[{dataset:{laIndex:'0'}}]:[];
         let n=0;
-        const r=await asMgr('owner',{$:dd.$,__confirm:confirmOk,renderLeave:async()=>{}},{rpc:{preview_monthly_leave_accruals:()=>{n++;return (secondPreviewFails&&n>1)?{data:null,error:{message:'재조회<실패>'}}:{data:accrualRows,error:null};},apply_monthly_leave_accruals:rpcRes}});
+        const r=await asMgr('owner',{$:dd.$,__confirm:confirmOk,render:async()=>{},renderLeave:async()=>{}},{rpc:{preview_monthly_leave_accruals:()=>{n++;return (secondPreviewFails&&n>1)?{data:null,error:{message:'재조회<실패>'}}:{data:accrualRows,error:null};},apply_monthly_leave_accruals:rpcRes}});
         // 먼저 미리보기로 기준일·행을 채운 뒤 적용
         await r.api.previewLeaveAccrual();
         if(asOfMismatch)dd.$('#laAsOf').value='2026-09-30';

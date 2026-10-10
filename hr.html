@@ -442,15 +442,16 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 <script src="hub-fortune.js?v=2026100601"></script>
 <script src="hub-intro.js?v=2026100503"></script>
 <script>window.HUB_RECALL_CATALOG=true;</script>
-<script src="card-ledger-ui.js?v=2026100901"></script>
-<script src="payroll-bonus.js?v=2026101007"></script>
+<script src="card-ledger-ui.js?v=2026101110"></script>
+<script src="payroll-bonus.js?v=2026101110"></script>
 <script src="payroll-ledger-extra.js?v=2026101004"></script>
-<script src="payroll-reply.js?v=2026101007"></script>
-<script src="payroll-compare.js?v=2026101007"></script>
-<script src="hub-texts.js?v=2026101007"></script>
-<script src="hub-activity.js?v=2026100601"></script>
+<script src="payroll-reply.js?v=2026101110"></script>
+<script src="payroll-compare.js?v=2026101110"></script>
+<script src="hub-help.js?v=2026101110"></script>
+<script src="hub-texts.js?v=2026101110"></script>
+<script src="hub-activity.js?v=2026101110"></script>
 <script src="security-pledge.js?v=20261003p9d"></script>
-<script src="wage-hourly.js?v=2026101004"></script>
+<script src="wage-hourly.js?v=2026101110"></script>
 <script src="spend-cycle.js?v=2026100809"></script>
 <script src="spend-cycle-ui.js?v=2026100809"></script>
 <script>
@@ -1070,7 +1071,11 @@ async function refreshBadges(propagateAttendanceError=false){
 /* ── 렌더 라우터 ── */
 async function render(){
   if(typeof HubActivity!=='undefined')HubActivity.tab(TAB);
-  const m=$('#main');m.innerHTML='<div class="empty">불러오는 중…</div>';hubStaticFill();apprKindSelectFill();
+  const old=$('#main'),m=old.cloneNode(false);
+  if(typeof HubHelp!=='undefined')HubHelp.unwatch(old);
+  old.replaceWith(m);
+  if(typeof HubHelp!=='undefined')HubHelp.watch(m,()=>mountHubTabHelp(m));
+  m.innerHTML='<div class="empty">불러오는 중…</div>';hubStaticFill();apprKindSelectFill();
   try{
     if(TAB==='home')await renderHome(m);
     else if(TAB==='ai'){if(window.AIAssistants)await window.AIAssistants.render(m,{sb,me:ME});else m.innerHTML='<div class="card"><div class="empty">AI 도우미를 불러오지 못했습니다. 새로고침해 주세요.</div></div>';}
@@ -1097,8 +1102,32 @@ async function render(){
     else if(TAB==='actlog'){if(window.HubActivity)await window.HubActivity.render(m,{sb,me:ME,profiles:PROFILES});}
     else if(TAB==='hubset'){if(window.HubUi)await window.HubUi.renderSettings(m,{sb,me:ME});else m.innerHTML='<div class="card"><div class="empty">허브 설정을 불러오지 못했습니다. 새로고침해 주세요.</div></div>';}
     else if(TAB==='owner')await renderOwner(m);
+    if(!m.isConnected)return;
+    if(typeof HubHelp!=='undefined')mountHubTabHelp(m);
     if(SCHEDULE_PEOPLE_ERROR&&m.insertAdjacentHTML)m.insertAdjacentHTML('afterbegin',`<div class="cal-error">${esc(SCHEDULE_PEOPLE_ERROR)} · 잠시 후 다시 로그인하거나 새로고침해 주세요.</div>`);
-  }catch(e){console.error(e);m.innerHTML='<div class="card"><div class="empty">오류: '+esc(e.message)+'</div></div>';}
+  }catch(e){if(!m.isConnected)return;console.error(e);m.innerHTML='<div class="card"><div class="empty">오류: '+esc(e.message)+'</div></div>';}
+}
+
+
+// 기존 권한으로 열린 화면에만 안내를 붙입니다. 탭 버튼·업무 처리 함수는 그대로 둡니다.
+function mountHubTabHelp(m){
+  if(!m||!visibleTabKeys().has(TAB))return;
+  const label=tabLabel(TAB),title=m.querySelector('h2');
+  if(TAB!=='ai'&&TAB!=='hubset')HubHelp.mount(m,TAB,label,['home','tools'].includes(TAB)?null:title);
+  function row(key,call){
+    const d=HUB_HELP_TABS.find(t=>t.key===key);if(!d)return;
+    const button=Array.from(m.querySelectorAll('button[onclick]')).find(b=>(b.getAttribute('onclick')||'').includes(call));
+    HubHelp.mountRow(m,key,d.label,button);
+  }
+  if(TAB==='pay')row('pay.'+PAY_VIEW,"setPayView('"+PAY_VIEW+"')");
+  if(TAB==='sched')row('sched.'+SCHED_VIEW,"SCHED_VIEW='"+SCHED_VIEW+"'");
+  if(TAB==='calendar'){
+    row('calendar.'+CAL_VIEW,"setCalendarView('"+CAL_VIEW+"')");
+    if(CAL_VIEW==='leave')row('calendar.leave.'+LVSTATUS_VIEW,"LVSTATUS_VIEW='"+LVSTATUS_VIEW+"'");
+    else row('calendar.period.'+CAL_PERIOD,"setCalendarPeriod('"+CAL_PERIOD+"')");
+  }
+  if(TAB==='inbox')row('inbox.'+INBOX_SUBTAB,"inboxSetSubtab('"+INBOX_SUBTAB+"')");
+  if(TAB==='deposit')row('deposit.'+DEP_RANGE,"setDepRange('"+DEP_RANGE+"')");
 }
 
 /* ── 홈 ── */
@@ -1847,7 +1876,7 @@ async function saveAttendance(){
 }
 
 /* ── 연차 ── */
-let LEAVE_ARCHIVE_MONTH=null,LEAVE_EDIT_ID=null;
+let LEAVE_ARCHIVE_MONTH=null,LEAVE_EDIT_ID=null,LEAVE_EDIT_GENERATION=0;
 async function computeLeaveDays(uid,from,to,type){
   if(type==='반차'||type==='조퇴')return hubN('leave.half_day_value',0.5);
   const dates=[];for(let d=from;d<=to;d=addDays(d,1))dates.push(d);
@@ -1876,7 +1905,7 @@ function suggestGrantDays(hireDate){
   if(m==null)return null;
   return m>=12?15:Math.min(11,m);
 }
-let LEAVE_ACCRUAL_PREVIEW=[],LEAVE_ACCRUAL_AS_OF='';
+let LEAVE_ACCRUAL_GENERATION=0,LEAVE_ACCRUAL_PREVIEW=[],LEAVE_ACCRUAL_AS_OF='';
 /* leave-status:test-start */
 function leaveLedgerTotals(entries,total={earned:0,used:0}){return (entries||[]).reduce((t,r)=>{if(r.kind==='부여')t.earned+=Number(r.days);if(r.kind==='사용')t.used+=Number(r.days);if(r.kind==='조정'&&String(r.note||'').startsWith('승인취소 복구:'))t.used-=Number(r.days);return t;},total);}
 let LEAVE_STATUS_ROWS=[],LEAVE_MONTHLY_RUNS=[];
@@ -1892,12 +1921,12 @@ async function revokeMonthlyLeaveAccrual(index){
   const run=LEAVE_MONTHLY_RUNS[index];
   if(ME.role!=='owner'||!run||run.revoked_at||LEAVE_MONTHLY_BUSY.has(run.run_id))return;
   if(!confirm(hubT('p7.monthly.confirm','{date}에 적립한 월차 {days}일을 뺄까요?',{date:run.due_date,days:run.days})))return;
-  LEAVE_MONTHLY_BUSY.add(run.run_id);const button=$('#monthlyRevoke_'+index);if(button)button.disabled=true;
+  const main=$('#main');LEAVE_MONTHLY_BUSY.add(run.run_id);const button=$('#monthlyRevoke_'+index);if(button)button.disabled=true;
   try{
     const result=await sb.rpc('revoke_monthly_leave_accrual',{p_run_id:run.run_id,p_reason:hubT('p7.monthly.reason','결근 후보 확인 후 월차 취소')});
     if(result.error)throw result.error;
     if(!result.data||!result.data.length)throw new Error(hubT('leave.m_grant_unknown','잔액 설정 결과를 확인하지 못했습니다.'));
-    setStatus('saved');await renderLeave($('#main'));
+    setStatus('saved');if(main.isConnected!==false)await render();
   }catch(error){alert(hubT('p7.monthly.revoke_fail','월차를 빼지 못했습니다: {msg}',{msg:error.message}));setStatus('error');}
   finally{LEAVE_MONTHLY_BUSY.delete(run.run_id);if(button)button.disabled=false;}
 }
@@ -2081,6 +2110,7 @@ function moveStaffAttendanceMonth(delta){const [y,m]=(STAFF_ATT_MONTH||today().s
 function printStaffAttendanceMonth(){document.body.classList.add('staff-att-printing');const done=()=>{document.body.classList.remove('staff-att-printing');window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);window.print();}
 /* suggestion-six:end */
 async function renderLeave(m){
+  LEAVE_ACCRUAL_GENERATION++;
   const {data:bal,error:balanceError}=await sb.from('v_leave_balance').select('*').eq('user_id',ME.id).maybeSingle();
   const {data:mine,error:mineError}=await sb.from('leave_requests').select('*').eq('user_id',ME.id).order('created_at',{ascending:false}).limit(hubN('leave.my_list_limit',20));
   const pending=await fetchAttendancePages(()=>sb.from('leave_requests').select('status,days').eq('user_id',ME.id).in('status',['대기','1차승인']));
@@ -2120,8 +2150,8 @@ async function renderLeave(m){
 function leaveApplyModalPrepare(){try{hubStaticFill();const sel=$('#lvType');if(sel)sel.innerHTML=leaveTypeItems().map(i=>'<option value="'+esc(i.code)+'">'+esc(i.label)+'</option>').join('');}catch(e){}}
 function refreshLeaveTypeFields(){const type=$('#lvType').value,isTimed=type==='반차'||type==='조퇴';$('#lvNoteWrap').style.display=type==='기타'?'':'none';$('#lvTimeWrap').style.display=isTimed?'':'none';}
 $('#lvType') && $('#lvType').addEventListener('change',refreshLeaveTypeFields);
-function openLeave(){leaveApplyModalPrepare();LEAVE_EDIT_ID=null;$('#lvFrom').value=today();$('#lvTo').value=today();$('#lvType').value='연차';$('#lvTimeFrom').value='';$('#lvTimeTo').value='';$('#lvReason').value='';$('#lvNote').value='';$('#lvContact').value='';$('#lvSpecial').value='';$('#lvSpecialWrap').style.display='none';$('#lvMsg').textContent='';$('#lvOverlap').textContent='';refreshLeaveTypeFields();show('lvMask');checkClash();}
-async function openLeaveEdit(id){const {data:r,error}=await sb.from('leave_requests').select('*').eq('id',id).eq('user_id',ME.id).maybeSingle();if(error||!r||r.status!=='대기'){alert(hubT('leave.m_edit_only','대기 중인 본인 신청만 수정할 수 있습니다.'));return;}LEAVE_EDIT_ID=id;leaveApplyModalPrepare();$('#lvType').value=r.type||'연차';const times=/^(\d{2}:\d{2})~(\d{2}:\d{2})$/.exec(r.type_note||'');$('#lvTimeFrom').value=times?times[1]:'';$('#lvTimeTo').value=times?times[2]:'';$('#lvNote').value=r.type==='기타'?r.type_note||'':'';$('#lvFrom').value=r.date_from;$('#lvTo').value=r.date_to;$('#lvReason').value=r.reason||'';$('#lvContact').value=r.contact||'';$('#lvSpecial').value=r.special_reason||'';$('#lvMsg').textContent=hubT('leave.m_edit_hint','수정 후 저장하세요.');refreshLeaveTypeFields();show('lvMask');checkClash();}
+function openLeave(){LEAVE_EDIT_GENERATION++;leaveApplyModalPrepare();LEAVE_EDIT_ID=null;$('#lvFrom').value=today();$('#lvTo').value=today();$('#lvType').value='연차';$('#lvTimeFrom').value='';$('#lvTimeTo').value='';$('#lvReason').value='';$('#lvNote').value='';$('#lvContact').value='';$('#lvSpecial').value='';$('#lvSpecialWrap').style.display='none';$('#lvMsg').textContent='';$('#lvOverlap').textContent='';refreshLeaveTypeFields();show('lvMask');checkClash();}
+async function openLeaveEdit(id){const gen=++LEAVE_EDIT_GENERATION;const {data:r,error}=await sb.from('leave_requests').select('*').eq('id',id).eq('user_id',ME.id).maybeSingle();if(gen!==LEAVE_EDIT_GENERATION)return;if(error||!r||r.status!=='대기'){alert(hubT('leave.m_edit_only','대기 중인 본인 신청만 수정할 수 있습니다.'));return;}LEAVE_EDIT_ID=id;leaveApplyModalPrepare();$('#lvType').value=r.type||'연차';const times=/^(\d{2}:\d{2})~(\d{2}:\d{2})$/.exec(r.type_note||'');$('#lvTimeFrom').value=times?times[1]:'';$('#lvTimeTo').value=times?times[2]:'';$('#lvNote').value=r.type==='기타'?r.type_note||'':'';$('#lvFrom').value=r.date_from;$('#lvTo').value=r.date_to;$('#lvReason').value=r.reason||'';$('#lvContact').value=r.contact||'';$('#lvSpecial').value=r.special_reason||'';$('#lvMsg').textContent=hubT('leave.m_edit_hint','수정 후 저장하세요.');refreshLeaveTypeFields();show('lvMask');checkClash();}
 async function cancelPendingLeave(id){if(!confirm(hubT('leave.m_cancel_confirm','아직 승인 전인 연차 신청을 취소할까요?')))return;const result=await sb.rpc('process_leave_request',{p_id:id,p_action:'cancel'});if(result.error){alert(hubT('leave.m_cancel_fail','취소 실패: {msg}',{msg:result.error.message}));return;}if(!result.data||!result.data.length){alert(hubT('leave.m_cancel_unknown','취소 결과를 확인하지 못했습니다.'));return;}setStatus('saved');render();refreshBadges();}
 function printLeaveForm(){document.body.classList.add('leave-printing');const done=()=>{document.body.classList.remove('leave-printing');window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);window.print();}
 ['lvFrom','lvTo'].forEach(id=>{const el=$('#'+id);if(el)el.addEventListener('change',checkClash);});
@@ -2145,22 +2175,24 @@ async function checkClash(){
   $('#lvMsg').textContent=others>=rules.limit?hubT('leave.m_clash','그 날 이미 {n}명이 휴가입니다. 신청할 수 없습니다',{n:rules.limit}):'';
 }
 async function submitLeave(){
+  const gen=LEAVE_EDIT_GENERATION,editId=LEAVE_EDIT_ID;
   const f=$('#lvFrom').value,t=$('#lvTo').value;if(!f||!t){$('#lvMsg').textContent=hubT('leave.m_need_period','기간을 입력하세요.');return;}
   if(t<f){$('#lvMsg').textContent=hubT('leave.m_bad_period','종료일이 시작일보다 빠릅니다.');return;}
   const type=$('#lvType').value;
   const timeFrom=$('#lvTimeFrom').value,timeTo=$('#lvTimeTo').value;
   if((type==='반차'||type==='조퇴')&&(!timeFrom||!timeTo||timeTo<=timeFrom)){ $('#lvMsg').textContent=hubT('leave.m_bad_time','반차·조퇴의 시간 범위를 확인하세요.');return; }
+  const note=$('#lvNote').value,reason=$('#lvReason').value,contact=$('#lvContact').value,specialReason=$('#lvSpecial').value;
   const others=await leaveConflict(f,t),rules=leaveSameDayRules();
   if(others>=rules.limit){$('#lvMsg').innerHTML='<b style="color:var(--red)">'+esc(hubT('leave.m_full','⚠ 신청되지 않았습니다 — 그 날 이미 {n}명이 휴가입니다.',{n:rules.limit}))+'</b>';return;}
-  const reasonNeeded=others>=rules.reasonFrom,special=reasonNeeded&&$('#lvSpecial').value.trim()!=='';
+  const reasonNeeded=others>=rules.reasonFrom,special=reasonNeeded&&specialReason.trim()!=='';
   if(reasonNeeded&&!special){$('#lvMsg').innerHTML='<b style="color:var(--red)">'+esc(hubT('leave.m_need_reason','⚠ 신청되지 않았습니다 — 그날 이미 휴가자가 있어 특별사정 사유를 적어야 신청됩니다.'))+'</b>';return;}
   const days=await computeLeaveDays(ME.id,f,t,type);
-  const payload={type,type_note:(type==='반차'||type==='조퇴')?`${timeFrom}~${timeTo}`:type==='기타'?$('#lvNote').value:null,date_from:f,date_to:t,days,reason:$('#lvReason').value||null,contact:$('#lvContact').value||null,special,special_reason:special?$('#lvSpecial').value:null};
+  const payload={type,type_note:(type==='반차'||type==='조퇴')?`${timeFrom}~${timeTo}`:type==='기타'?note:null,date_from:f,date_to:t,days,reason:reason||null,contact:contact||null,special,special_reason:special?specialReason:null};
   let error=null;
-  if(LEAVE_EDIT_ID){const result=await sb.rpc('replace_pending_leave_request',{p_id:LEAVE_EDIT_ID,p_type:type,p_type_note:payload.type_note,p_date_from:f,p_date_to:t,p_days:days,p_reason:payload.reason,p_contact:payload.contact,p_special:special,p_special_reason:payload.special_reason});error=result.error;}
+  if(editId){const result=await sb.rpc('replace_pending_leave_request',{p_id:editId,p_type:type,p_type_note:payload.type_note,p_date_from:f,p_date_to:t,p_days:days,p_reason:payload.reason,p_contact:payload.contact,p_special:special,p_special_reason:payload.special_reason});error=result.error;}
   else{const created=await sb.from('leave_requests').insert({...payload,user_id:ME.id}).select('id').maybeSingle();error=created.error||(!created.data?{message:hubT('leave.m_save_unknown','신청 저장 결과를 확인하지 못했습니다.')}:null);}
   if(error){$('#lvMsg').textContent=hubT('leave.m_fail','실패: {msg}',{msg:error.message});return;}
-  LEAVE_EDIT_ID=null;hide('lvMask');setStatus('saved');render();refreshBadges();
+  setStatus('saved');if(gen!==LEAVE_EDIT_GENERATION){refreshBadges();return;}LEAVE_EDIT_ID=null;LEAVE_EDIT_GENERATION++;hide('lvMask');render();refreshBadges();
 }
 function hubT(k,d,v){return typeof hubText==='function'?hubText(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
 function leaveSameDayRules(){const ok=typeof hubSettingChecked==='function',lim=ok?hubSettingChecked('leave.same_day_limit',2):2,from=ok?hubSettingChecked('leave.same_day_reason_from',1):1;return {limit:lim,reasonFrom:Math.min(from,lim)};} /* 같은 날 동시 휴가: 이 인원 이상이면 신청 불가 · 이 인원 이상이면 특별사정 사유 필요(허브 설정 › 숫자·기준) */
@@ -2220,11 +2252,12 @@ async function grantLeave(){
 }
 async function previewLeaveAccrual(){
   if(ME.role!=='owner')return;
-  const asOf=$('#laAsOf').value,msg=$('#laMsg'),rows=$('#laRows');
+  const main=$('#main'),gen=++LEAVE_ACCRUAL_GENERATION,asOf=$('#laAsOf').value,msg=$('#laMsg'),rows=$('#laRows');
   LEAVE_ACCRUAL_PREVIEW=[];LEAVE_ACCRUAL_AS_OF='';$('#laApply').disabled=true;rows.innerHTML='';
   if(!/^\d{4}-\d{2}-\d{2}$/.test(asOf)||asOf>today()){msg.textContent=hubT('leave.acc.m_bad_date','오늘 이전의 올바른 기준일을 선택하세요.');return false;}
   msg.textContent=hubT('leave.acc.m_loading','미리보기 불러오는 중…');
   const {data,error}=await sb.rpc('preview_monthly_leave_accruals',{p_as_of:asOf});
+  if(main.isConnected===false||gen!==LEAVE_ACCRUAL_GENERATION)return false;
   if(error){msg.textContent=hubT('leave.acc.m_prev_fail','연차 미리보기 실패: {msg}',{msg:error.message});setStatus('error');return false;}
   LEAVE_ACCRUAL_AS_OF=asOf;LEAVE_ACCRUAL_PREVIEW=data||[];
   rows.innerHTML=LEAVE_ACCRUAL_PREVIEW.length?`<div class="tblwrap"><table><tr><th>${esc(hubT('leave.acc.th_check','개근·재직 확인'))}</th><th>${esc(hubT('leave.th.person','직원'))}</th><th>${esc(hubT('leave.acc.th_hire','입사일'))}</th><th>${esc(hubT('leave.acc.th_due','발생일'))}</th><th>${esc(hubT('leave.acc.th_kind','구분'))}</th><th>${esc(hubT('leave.acc.th_step','단계'))}</th><th>${esc(hubT('leave.acc.th_exist','기존 수기 포함'))}</th><th>${esc(hubT('leave.acc.th_grant','이번 지급'))}</th></tr>${LEAVE_ACCRUAL_PREVIEW.map((r,i)=>`<tr><td>${r.already_recorded?'<span class="b ok">'+esc(hubT('leave.acc.recorded','기록됨'))+'</span>':`<input type="checkbox" data-la-index="${i}" aria-label="${esc(r.user_name||'직원')} ${esc(r.due_date)} 개근·재직 확인">`}</td><td>${esc(r.user_name||'')}</td><td>${esc(r.hire_date||'')}</td><td>${esc(r.due_date||'')}${r.past?' <span class="sub">· 지난 발생분</span>':''}</td><td>${r.accrual_kind==='annual'?''+esc(hubT('leave.acc.kind_annual','1년 15일'))+'':''+esc(hubT('leave.acc.kind_month','월차'))+''}</td><td>${esc(String(r.target_days))}일</td><td>${esc(String(r.existing_credit_days))}일</td><td>${esc(String(r.grant_days))}일</td></tr>`).join('')}</table></div>`:'<div class="empty">'+esc(hubT('leave.acc.empty','기준일까지 발생한 내역이 없습니다.'))+'</div>';
@@ -2233,17 +2266,24 @@ async function previewLeaveAccrual(){
   return true;
 }
 async function applyLeaveAccrual(){
+  const main=$('#main'),gen=LEAVE_ACCRUAL_GENERATION;
   if(ME.role!=='owner'||!LEAVE_ACCRUAL_AS_OF||$('#laAsOf').value!==LEAVE_ACCRUAL_AS_OF){$('#laMsg').textContent=hubT('leave.acc.m_redo_preview','기준일을 다시 미리보기로 확인하세요.');return;}
   const selected=[...$('#laRows').querySelectorAll('[data-la-index]:checked')].map(el=>LEAVE_ACCRUAL_PREVIEW[Number(el.dataset.laIndex)]).filter(r=>r&&!r.already_recorded);
   if(!selected.length){$('#laMsg').textContent=hubT('leave.acc.m_pick_one','개근·재직을 확인한 항목을 선택하세요.');return;}
   const days=selected.reduce((sum,r)=>sum+Number(r.grant_days||0),0);
   if(!confirm(hubT('leave.acc.m_confirm','{n}개 발생일의 개근·재직을 확인하고, 미리보기 기준 {days}일을 연차 장부에 적용할까요?',{n:selected.length,days:days})))return;
-  $('#laApply').disabled=true;$('#laMsg').textContent=hubT('leave.acc.m_applying','적용 중…');
+  const button=$('#laApply');
+  button.disabled=true;$('#laMsg').textContent=hubT('leave.acc.m_applying','적용 중…');
   const confirmations=selected.map(r=>({user_id:r.user_id,due_date:r.due_date,full_attendance:true}));
   const {data,error}=await sb.rpc('apply_monthly_leave_accruals',{p_as_of:LEAVE_ACCRUAL_AS_OF,p_attendance_confirmations:confirmations,p_apply_confirmed:true});
-  if(error){$('#laMsg').textContent=hubT('leave.acc.m_apply_fail','적용 실패: {msg}',{msg:error.message});$('#laApply').disabled=false;setStatus('error');return;}
+  button.disabled=false;
+  if(error){setStatus('error');if(main.isConnected===false)return;$('#laMsg').textContent=hubT('leave.acc.m_apply_fail','적용 실패: {msg}',{msg:error.message});return;}
   const granted=(data||[]).reduce((sum,r)=>sum+Number(r.granted_days||0),0),created=(data||[]).reduce((sum,r)=>sum+Number(r.created_runs||0),0);
-  setStatus('saved');await renderLeave($('#main'));const refreshed=await previewLeaveAccrual();
+  setStatus('saved');if(gen!==LEAVE_ACCRUAL_GENERATION)return;
+  if(gen===LEAVE_ACCRUAL_GENERATION){LEAVE_ACCRUAL_PREVIEW=[];LEAVE_ACCRUAL_AS_OF='';}
+  if(main.isConnected===false)return;
+  const redraw=render(),refreshedMain=$('#main');await redraw;if(refreshedMain.isConnected===false)return;
+  const refreshed=await previewLeaveAccrual();if(refreshedMain.isConnected===false)return;
   if(refreshed)$('#laMsg').textContent=created?hubT('leave.acc.m_done','적용 완료: {created}건 기록, 실제 {granted}일 지급. 기록 상태를 확인하세요.',{created:created,granted:granted}):hubT('leave.acc.m_none','새로 적용된 기록이 없습니다. 이미 기록된 발생일인지 확인하세요.');
   else $('#laMsg').textContent=hubT('leave.acc.m_recheck_fail','적용 응답은 성공했으나 재조회 실패 — {msg}',{msg:$('#laMsg').textContent});
 }
@@ -2638,7 +2678,7 @@ function selectCalendarDay(date,event){
 function closeCalendarDayDetail(){CAL_DETAIL_DATE=null;render();}
 async function saveCalendarPng(){
   const card=$('#calendarCard');if(!card)return;
-  const clone=card.cloneNode(true);clone.querySelectorAll('.calendar-actions').forEach(node=>node.remove());
+  const clone=card.cloneNode(true);clone.querySelectorAll('.calendar-actions,.hub-help-button,.hub-help-card').forEach(node=>node.remove());
   const width=Math.max(card.scrollWidth,760),height=Math.max(card.scrollHeight,500),style=document.querySelector('style')?.textContent||'';
   const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml"><style>${style}</style>${clone.outerHTML}</div></foreignObject></svg>`;
   const url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml;charset=utf-8'}));
@@ -2779,7 +2819,7 @@ function winnerVisibility(campaign,reviews,suggestions,todayValue){
 /* suggestion-board:test-end */
 /* suggestion-comments:test-start */
 const SUGGESTION_COMMENT_OPEN=new Set();
-let SUGGESTION_COMMENT_EDIT_ID=null;
+let SUGGESTION_COMMENT_EDIT_ID=null,SUGGESTION_COMMENT_EDIT_GENERATION=0;
 const SUGGESTION_COMMENT_SAVING=new Set();
 function validateSuggestionComment(raw){
   const text=String(raw||'');
@@ -2794,9 +2834,10 @@ async function suggestionRenderKeep(suggestionId){if(typeof document==='undefine
   box.forEach((el,i)=>{if(el&&el.isConnected)el.scrollTop=pos[i];});
   const again=document.getElementById('suggestionComments-'+suggestionId)||document.querySelector('[aria-controls="suggestionComments-'+suggestionId+'"]');if(again&&top!=null){const d=again.getBoundingClientRect().top-top;if(Math.abs(d)>1)window.scrollBy(0,d);}}
 function toggleSuggestionComments(id){if(SUGGESTION_COMMENT_OPEN.has(id))SUGGESTION_COMMENT_OPEN.delete(id);else SUGGESTION_COMMENT_OPEN.add(id);suggestionRenderKeep(id);}
-function beginSuggestionCommentEdit(suggestionId,id){SUGGESTION_COMMENT_OPEN.add(suggestionId);SUGGESTION_COMMENT_EDIT_ID=id;suggestionRenderKeep(suggestionId);}
-function cancelSuggestionCommentEdit(){const sid=[...SUGGESTION_COMMENT_OPEN][0];SUGGESTION_COMMENT_EDIT_ID=null;sid==null?render():suggestionRenderKeep(sid);}
+function beginSuggestionCommentEdit(suggestionId,id){SUGGESTION_COMMENT_EDIT_GENERATION++;SUGGESTION_COMMENT_OPEN.add(suggestionId);SUGGESTION_COMMENT_EDIT_ID=id;suggestionRenderKeep(suggestionId);}
+function cancelSuggestionCommentEdit(){SUGGESTION_COMMENT_EDIT_GENERATION++;const sid=[...SUGGESTION_COMMENT_OPEN][0];SUGGESTION_COMMENT_EDIT_ID=null;sid==null?render():suggestionRenderKeep(sid);}
 function renderSuggestionComments(suggestionId,comments){
+  SUGGESTION_COMMENT_EDIT_GENERATION++;
   const rows=(comments||[]).filter(c=>String(c.suggestion_id)===String(suggestionId)),open=SUGGESTION_COMMENT_OPEN.has(suggestionId);
   const heading=`<button class="mini" aria-expanded="${open}" aria-controls="suggestionComments-${suggestionId}" onclick="toggleSuggestionComments(${suggestionId})">${esc(hubT('sug.cmt.toggle','💬 댓글 {n}',{n:rows.length}))}</button>`;
   if(!open)return `<div style="margin-top:10px">${heading}</div>`;
@@ -2808,6 +2849,7 @@ function renderSuggestionComments(suggestionId,comments){
   return `<div style="margin-top:10px;min-width:0">${heading}<div id="suggestionComments-${suggestionId}" style="margin-top:8px">${list}<textarea id="suggestionCommentNew-${suggestionId}" rows="3" style="width:100%;box-sizing:border-box" onkeydown="suggestionCommentKey(event,${suggestionId},null)" aria-label="${esc(hubT('sug.cmt.placeholder','댓글을 입력하세요. (최대 1000자)'))}" placeholder="${esc(hubT('sug.cmt.placeholder','댓글을 입력하세요. (최대 1000자)'))}"></textarea><button class="mini stamp" style="margin-top:6px" onclick="saveSuggestionComment(${suggestionId},null)">${esc(hubT('sug.cmt.submit','댓글 달기'))}</button></div></div>`;
 }
 async function saveSuggestionComment(suggestionId,id){
+  const main=$('#main'),gen=SUGGESTION_COMMENT_EDIT_GENERATION;
   const field=$('#'+(id?'suggestionCommentEdit-'+id:'suggestionCommentNew-'+suggestionId)),checked=validateSuggestionComment(field.value);
   if(!checked.ok){alert(hubT(checked.key,checked.key==='sug.cmt.invalid_empty'?'댓글을 입력하세요.':'댓글은 1000자까지 입력할 수 있습니다.'));return;}
   if(SUGGESTION_COMMENT_SAVING.has(suggestionId))return;
@@ -2815,28 +2857,30 @@ async function saveSuggestionComment(suggestionId,id){
   try{
     const result=id?await sb.from('suggestion_comments').update({body:checked.body}).eq('id',id):await sb.from('suggestion_comments').insert({suggestion_id:suggestionId,user_id:ME.id,body:checked.body});
     if(result.error){setStatus('error');alert(hubT('sug.cmt.error_save','댓글을 저장하지 못했습니다: {msg}',{msg:result.error.message}));return;}
-    SUGGESTION_COMMENT_OPEN.add(suggestionId);SUGGESTION_COMMENT_EDIT_ID=null;setStatus('saved');await suggestionRenderKeep(suggestionId);
+    setStatus('saved');if(gen!==SUGGESTION_COMMENT_EDIT_GENERATION)return;SUGGESTION_COMMENT_OPEN.add(suggestionId);SUGGESTION_COMMENT_EDIT_ID=null;SUGGESTION_COMMENT_EDIT_GENERATION++;if(main.isConnected!==false)await suggestionRenderKeep(suggestionId);
   }finally{SUGGESTION_COMMENT_SAVING.delete(suggestionId);}
 }
 async function deleteSuggestionComment(suggestionId,id){
+  const main=$('#main'),gen=SUGGESTION_COMMENT_EDIT_GENERATION;
   if(!confirm(hubT('sug.cmt.confirm_delete','이 댓글을 삭제할까요?')))return;
   setStatus('saving');const result=await sb.from('suggestion_comments').delete().eq('id',id);
   if(result.error){setStatus('error');alert(hubT('sug.cmt.error_delete','댓글을 삭제하지 못했습니다: {msg}',{msg:result.error.message}));return;}
-  SUGGESTION_COMMENT_OPEN.add(suggestionId);if(SUGGESTION_COMMENT_EDIT_ID===id)SUGGESTION_COMMENT_EDIT_ID=null;setStatus('saved');suggestionRenderKeep(suggestionId);
+  setStatus('saved');if(gen!==SUGGESTION_COMMENT_EDIT_GENERATION)return;SUGGESTION_COMMENT_OPEN.add(suggestionId);if(SUGGESTION_COMMENT_EDIT_ID===id)SUGGESTION_COMMENT_EDIT_ID=null;SUGGESTION_COMMENT_EDIT_GENERATION++;if(main.isConnected!==false)suggestionRenderKeep(suggestionId);
 }
 /* suggestion-comments:test-end */
 /* suggestion-board:render-start */
-let SUGGESTION_CAMPAIGN_ID=null,SUGGESTION_EDIT_ID=null;
-function beginSuggestionEdit(id){SUGGESTION_EDIT_ID=id;render();}
-function cancelSuggestionEdit(){SUGGESTION_EDIT_ID=null;render();}
+let SUGGESTION_CAMPAIGN_ID=null,SUGGESTION_EDIT_ID=null,SUGGESTION_EDIT_GENERATION=0;
+function beginSuggestionEdit(id){SUGGESTION_EDIT_GENERATION++;SUGGESTION_EDIT_ID=id;render();}
+function cancelSuggestionEdit(){SUGGESTION_EDIT_GENERATION++;SUGGESTION_EDIT_ID=null;render();}
 async function saveSuggestion(id){
-  const prefix=id?'suggestionEdit-'+id:'suggestionNew',title=$('#'+prefix+'Title').value.trim(),body=$('#'+prefix+'Body').value.trim();
+  const main=$('#main'),gen=SUGGESTION_EDIT_GENERATION;
+  const titleId=id?'suggestionEditTitle-'+id:'suggestionNewTitle',bodyId=id?'suggestionEditBody-'+id:'suggestionNewBody',title=$('#'+titleId).value.trim(),body=$('#'+bodyId).value.trim();
   if(!title||!body){alert(hubT('sug.m_need_both','제목과 내용을 입력하세요.'));return;}
   setStatus('saving');
   const payload=id?{title,body,updated_at:new Date().toISOString()}:{campaign_id:SUGGESTION_CAMPAIGN_ID,user_id:ME.id,title,body};
   const result=id?await sb.from('suggestions').update(payload).eq('id',id):await sb.from('suggestions').insert(payload);
   if(result.error){setStatus('error');alert(hubT('sug.m_save_fail','건의를 저장하지 못했습니다: {msg}',{msg:result.error.message}));return;}
-  setStatus('saved');SUGGESTION_EDIT_ID=null;render();
+  setStatus('saved');if(gen!==SUGGESTION_EDIT_GENERATION)return;SUGGESTION_EDIT_ID=null;SUGGESTION_EDIT_GENERATION++;if(main.isConnected!==false)render();
 }
 async function deleteSuggestion(id){
   if(!confirm(hubT('sug.del.confirm','이 건의를 삭제할까요?')))return;setStatus('saving');const {error}=await sb.from('suggestions').delete().eq('id',id);
@@ -2860,6 +2904,7 @@ async function saveSuggestionCampaign(){
   if(error){setStatus('error');alert(hubT('sug.m_campaign_fail','캠페인 설정을 저장하지 못했습니다: {msg}',{msg:error.message}));return;}setStatus('saved');render();
 }
 async function renderSuggestions(m){
+  SUGGESTION_EDIT_GENERATION++;
   const campaignResult=await sb.from('suggestion_campaigns').select('*').order('starts_at',{ascending:false}).limit(1).maybeSingle();
   if(campaignResult.error){m.innerHTML=`<div class="card"><h2>${esc(hubT('sug.title','💡 건의함'))}</h2><div class="cal-error">${esc(hubT('sug.err_load','건의함 정보를 불러오지 못했습니다: {msg}',{msg:campaignResult.error.message||hubT('sug.unknown_error','알 수 없는 오류')}))}</div></div>`;return;}
   const campaign=campaignResult.data;
@@ -2939,7 +2984,7 @@ async function renderLeaveStatus(m,embedded){
   const listRows=[...rows].sort((a,b)=>a.date_from.localeCompare(b.date_from)||compareLeaveRowsByCreatedAtThenId(a,b));
   const table=rows.length?`<div class="tblwrap"><table><tr><th>${esc(hubT('lvs.th_name','이름'))}</th>${owner?'<th>'+esc(hubT('lvs.th_type','종류'))+'</th>':''}<th>${esc(hubT('lvs.th_period','기간'))}</th><th>${esc(hubT('lvs.th_days','일수'))}</th>${owner?'<th>'+esc(hubT('lvs.th_applied','신청 시각'))+'</th><th>'+esc(hubT('lvs.th_approved','승인 시각'))+'</th>':''}</tr>${listRows.map(row=>`<tr><td>${esc(row.user_name)}</td>${owner?`<td>${esc(row.type||'')}${row.type_note?' '+esc(row.type_note):''}</td>`:''}<td>${md(row.date_from)}~${md(row.date_to)}</td><td>${row.days}</td>${owner?`<td>${esc(formatLeaveTimestamp(row.created_at)||'미상')}</td><td>${esc(formatLeaveTimestamp(row.owner_at)||formatLeaveTimestamp(row.chief_at)||'미상')}</td>`:''}</tr>`).join('')}</table></div>`:'<div class="empty">'+esc(hubT('lvs.empty','선택한 달의 승인 연차가 없습니다.'))+'</div>';
   const calendar=`<div class="cal-grid">${dow.map((label,index)=>`<div class="cal-dow ${index===0?'sun':index===6?'sat':''}">${label}</div>`).join('')}${cells.join('')}</div>`,calendarView=rows.length?calendar:'<div class="empty">'+esc(hubT('lvs.empty','선택한 달의 승인 연차가 없습니다.'))+'</div>';
-  m.innerHTML=`<div class="card"><h2>${esc(hubT('lvs.title','🏖 연차 캘린더'))}</h2><div class="rowflex"><button class="mini ${CAL_VIEW==='work'?'':'stamp'}" onclick="setCalendarView('work')">${esc(hubT('lvs.btn_work','근무 캘린더'))}</button><button class="mini ${CAL_VIEW==='leave'?'stamp':''}" onclick="setCalendarView('leave')">${esc(hubT('lvs.btn_leave','연차 캘린더'))}</button><label>${esc(hubT('cal.f_month','대상 월'))} <input class="mini" type="month" value="${LVSTATUS_MONTH}" onchange="LVSTATUS_MONTH=this.value;CAL_MONTH=this.value;render()"></label><button class="mini ${LVSTATUS_VIEW==='calendar'?'stamp':''}" onclick="LVSTATUS_VIEW='calendar';render()">${esc(hubT('lvs.btn_cal','달력 보기'))}</button><button class="mini ${LVSTATUS_VIEW==='list'?'stamp':''}" onclick="LVSTATUS_VIEW='list';render()">${esc(hubT('lvs.btn_list','목록 보기'))}</button></div><div class="hint">${esc(hubT('lvs.hint','승인된 연차만 표시합니다.'))}</div>${LVSTATUS_VIEW==='calendar'?calendarView:table}</div>`;
+  m.innerHTML=`<div class="card"><h2>${esc(hubT('lvs.title','🏖 연차 캘린더'))}</h2><div class="rowflex"><button class="mini ${CAL_VIEW==='work'?'':'stamp'}" onclick="setCalendarView('work')">${esc(hubT('lvs.btn_work','근무 캘린더'))}</button><button class="mini ${CAL_VIEW==='leave'?'stamp':''}" onclick="setCalendarView('leave')">${esc(hubT('lvs.btn_leave','연차 캘린더'))}</button><label>${esc(hubT('cal.f_month','대상 월'))} <input class="mini" type="month" value="${LVSTATUS_MONTH}" onchange="LVSTATUS_MONTH=this.value;CAL_MONTH=this.value;render()"></label></div><div class="rowflex"><button class="mini ${LVSTATUS_VIEW==='calendar'?'stamp':''}" onclick="LVSTATUS_VIEW='calendar';render()">${esc(hubT('lvs.btn_cal','달력 보기'))}</button><button class="mini ${LVSTATUS_VIEW==='list'?'stamp':''}" onclick="LVSTATUS_VIEW='list';render()">${esc(hubT('lvs.btn_list','목록 보기'))}</button></div><div class="hint">${esc(hubT('lvs.hint','승인된 연차만 표시합니다.'))}</div>${LVSTATUS_VIEW==='calendar'?calendarView:table}</div>`;
 }
 /* leave-calendar:render-end */
 async function addCalendarEvent(){
@@ -3236,6 +3281,7 @@ async function addOnboItem(){const l=$('#oiNew').value.trim();if(!l)return;await
 function confFill(h){return String(h).replace('<h2>🔒 진료기록</h2>',()=>'<h2>'+esc(hubT('cf.title','🔒 진료기록'))+'</h2>');} /* 진료기록 제목: 기존 시험이 이 줄 모양을 찾으므로 원문은 그대로 두고, 고쳤을 때만 바꿔 넣음 */
 async function renderConfid(m){
   const {data,error}=await sb.from('confidential_records').select('*').order('created_at',{ascending:false});
+  if(!m.isConnected)return;
   if(error){m.innerHTML='<div class="empty">'+esc(hubT('cf.err','불러오기 오류'))+'</div>';return;}
   m.innerHTML=confFill(`<div class="card"><h2>🔒 진료기록</h2>
     <input id="cfQ" placeholder="${esc(hubT('cf.ph_search','환자명·차트번호 검색'))}" style="margin-bottom:8px" oninput="filterConfid()">
@@ -3257,12 +3303,14 @@ function filterConfid(){
     <div style="margin-top:4px;white-space:pre-wrap">${esc(r.body)}</div></div>`).join(''):'<div class="empty">'+esc(hubT('cf.empty','기록 없음'))+'</div>';
 }
 async function submitConfidRecord(){
+  const main=$('#main'),msg=$('#cfMsg');
   const patient_name=$('#cfName').value.trim(),body=$('#cfBody').value.trim();
   if(!patient_name||!body){$('#cfMsg').textContent=hubT('cf.m_missing','환자명과 내용은 필수입니다.');return;}
   const {error}=await sb.from('confidential_records').insert({patient_name,chart_no:$('#cfChart').value.trim()||null,body,author:ME.name,owner_only:(ME.role==='owner'&&$('#cfOwnerOnly')&&$('#cfOwnerOnly').checked)||false});
-  if(error){$('#cfMsg').textContent=hubT('cf.m_fail','저장 실패: {detail}',{detail:error.message});return;}
+  if(error){msg.textContent=hubT('cf.m_fail','저장 실패: {detail}',{detail:error.message});return;}
+  if(main.isConnected===false){setStatus('saved');return;}
   $('#cfName').value='';$('#cfChart').value='';$('#cfBody').value='';$('#cfMsg').textContent='';
-  renderConfid($('#main'));setStatus('saved');
+  setStatus('saved');await render();
 }
 
 /* ── 상담일지: 원본 엑셀의 허용 시트 범주만 새 기록에 사용한다. ── */
@@ -3347,7 +3395,7 @@ function consultationStatusItems(){const def=CONSULTATION_STATUSES.map(c=>({code
 function consultationKindLabel(code){const hit=consultationKindItems().find(i=>i.code===code);return hit?hit.label:code;}
 function consultationStatusLabel(code){const hit=consultationStatusItems().find(i=>i.code===code);return hit?hit.label:code;}
 let CONSULTATION_PAGE_SIZE=20;
-let CONSULTATION_EDIT_ID=null,CONSULTATION_SOURCE_SAVED_FIELDS={},CONSULTATION_PAGE=0,CONSULTATION_TOTAL=0,CONSULTATION_FILTERS={query:'',sheet:'',status:'',page:0};
+let CONSULTATION_EDIT_GENERATION=0,CONSULTATION_EDIT_ID=null,CONSULTATION_SOURCE_SAVED_FIELDS={},CONSULTATION_PAGE=0,CONSULTATION_TOTAL=0,CONSULTATION_FILTERS={query:'',sheet:'',status:'',page:0};
 function canManageConsultation(){return consultationCanAccess(ME.role);}function canViewInbox(){return inboxCanView(ME.role);}function canWriteInbox(){return inboxCanWrite(ME.role);}
 function consultationOptions(values,selected,labeler){return values.map(value=>`<option value="${esc(value)}" ${value===selected?'selected':''}>${esc(labeler?labeler(value):value)}</option>`).join('');}
 function consultationActionAssigneeOptions(selected){const eligible=PROFILES.filter(p=>p.active===true&&p.approved===true&&p.account_access_status!=='차단'&&consultationCanAccess(p.role));const stale=selected&&!eligible.some(p=>p.user_id===selected);const T=typeof hubT==='function'?hubT:(k,d)=>d;return `<option value="">${esc(T('cj.opt_unassigned','미지정'))}</option>${stale?`<option value="${esc(selected)}" selected>${esc(T('cj.opt_stale','기존 담당자(현재 배정 불가)'))}</option>`:''}${eligible.map(p=>`<option value="${esc(p.user_id)}" ${p.user_id===selected?'selected':''}>${esc(p.name||p.user_id)}</option>`).join('')}`;}
@@ -3355,8 +3403,8 @@ function consultationAmount(value){const raw=String(value||'').trim();if(!raw)re
 function consultationRenderSourceFields(values=CONSULTATION_SOURCE_SAVED_FIELDS){const box=$('#cjSourceFields');if(!box)return;box.innerHTML=(CONSULTATION_SOURCE_FIELDS[$('#cjSheet').value]||[]).map(([key,label])=>`<div class="fld"><label>${esc(label)}</label><input data-source-key="${key}" maxlength="1000" value="${esc(values[key]||'')}"></div>`).join('');}
 function consultationSourceFieldValues(){const values={...CONSULTATION_SOURCE_SAVED_FIELDS};$('#cjSourceFields')?.querySelectorAll('[data-source-key]').forEach(input=>{values[input.dataset.sourceKey]=input.value.trim();});return values;}
 function consultationDraftFromForm(){return {patient_name:$('#cjName').value.trim(),contact_phone:$('#cjPhone').value.trim()||null,source_sheet:$('#cjSheet').value,consulted_on:$('#cjDate').value,status:$('#cjStatus').value,consultation_note:$('#cjNote').value.trim(),next_action:$('#cjNext').value.trim()||null,action_assignee_id:$('#cjActionAssignee').value||null,action_due_on:$('#cjActionDue').value||null,action_done:$('#cjActionDone').checked,quoted_amount:consultationAmount($('#cjAmount').value),instruction_note:$('#cjInstruction').value.trim()||null,special_note:$('#cjSpecial').value.trim()||null,source_fields:consultationSourceFieldValues()};}
-function consultationResetForm(){CONSULTATION_EDIT_ID=null;CONSULTATION_SOURCE_SAVED_FIELDS={};$('#cjFormTitle').textContent=cjT('cj.form_new','➕ 새 상담 기록');$('#cjSave').textContent=cjT('cj.btn_save','저장');$('#cjName').value='';$('#cjPhone').value='';$('#cjSheet').value=CONSULTATION_SHEETS[0];consultationRenderSourceFields();$('#cjDate').value=today();$('#cjStatus').value='대기';$('#cjNote').value='';$('#cjNext').value='';$('#cjActionAssignee').innerHTML=consultationActionAssigneeOptions(null);$('#cjActionDue').value='';$('#cjActionDone').checked=false;$('#cjAmount').value='';$('#cjInstruction').value='';$('#cjSpecial').value='';$('#cjMsg').textContent='';}
-async function consultationEdit(id){if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(id||'')))return;const {data:row,error}=await sb.from('consultation_journals').select('id,patient_name,contact_phone,source_sheet,consulted_on,status,consultation_note,next_action,action_assignee_id,action_due_on,action_done,quoted_amount,instruction_note,special_note,source_fields').eq('id',id).single();if(error){const msg=$('#cjMsg');if(msg)msg.textContent=consultationRequestError('list',error);setStatus('error');return;}CONSULTATION_EDIT_ID=row.id;CONSULTATION_SOURCE_SAVED_FIELDS=row.source_fields||{};$('#cjFormTitle').textContent=cjT('cj.form_edit','✏️ 상담 기록 수정');$('#cjSave').textContent=cjT('cj.btn_save_edit','수정 저장');$('#cjName').value=row.patient_name||'';$('#cjPhone').value=row.contact_phone||'';$('#cjSheet').value=row.source_sheet||CONSULTATION_SHEETS[0];consultationRenderSourceFields();$('#cjDate').value=row.consulted_on||today();$('#cjStatus').value=row.status||'대기';$('#cjNote').value=row.consultation_note||'';$('#cjNext').value=row.next_action||'';$('#cjActionAssignee').innerHTML=consultationActionAssigneeOptions(row.action_assignee_id);$('#cjActionDue').value=row.action_due_on||'';$('#cjActionDone').checked=row.action_done===true;$('#cjAmount').value=row.quoted_amount??'';$('#cjInstruction').value=row.instruction_note||'';$('#cjSpecial').value=row.special_note||'';$('#cjMsg').textContent='';window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});}
+function consultationResetForm(){CONSULTATION_EDIT_GENERATION++;CONSULTATION_EDIT_ID=null;CONSULTATION_SOURCE_SAVED_FIELDS={};$('#cjFormTitle').textContent=cjT('cj.form_new','➕ 새 상담 기록');$('#cjSave').textContent=cjT('cj.btn_save','저장');$('#cjName').value='';$('#cjPhone').value='';$('#cjSheet').value=CONSULTATION_SHEETS[0];consultationRenderSourceFields();$('#cjDate').value=today();$('#cjStatus').value='대기';$('#cjNote').value='';$('#cjNext').value='';$('#cjActionAssignee').innerHTML=consultationActionAssigneeOptions(null);$('#cjActionDue').value='';$('#cjActionDone').checked=false;$('#cjAmount').value='';$('#cjInstruction').value='';$('#cjSpecial').value='';$('#cjMsg').textContent='';}
+async function consultationEdit(id){if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(id||'')))return;const main=$('#main'),gen=++CONSULTATION_EDIT_GENERATION;const {data:row,error}=await sb.from('consultation_journals').select('id,patient_name,contact_phone,source_sheet,consulted_on,status,consultation_note,next_action,action_assignee_id,action_due_on,action_done,quoted_amount,instruction_note,special_note,source_fields').eq('id',id).single();if(main.isConnected===false||gen!==CONSULTATION_EDIT_GENERATION)return;if(error){const msg=$('#cjMsg');if(msg)msg.textContent=consultationRequestError('list',error);setStatus('error');return;}CONSULTATION_EDIT_ID=row.id;CONSULTATION_SOURCE_SAVED_FIELDS=row.source_fields||{};$('#cjFormTitle').textContent=cjT('cj.form_edit','✏️ 상담 기록 수정');$('#cjSave').textContent=cjT('cj.btn_save_edit','수정 저장');$('#cjName').value=row.patient_name||'';$('#cjPhone').value=row.contact_phone||'';$('#cjSheet').value=row.source_sheet||CONSULTATION_SHEETS[0];consultationRenderSourceFields();$('#cjDate').value=row.consulted_on||today();$('#cjStatus').value=row.status||'대기';$('#cjNote').value=row.consultation_note||'';$('#cjNext').value=row.next_action||'';$('#cjActionAssignee').innerHTML=consultationActionAssigneeOptions(row.action_assignee_id);$('#cjActionDue').value=row.action_due_on||'';$('#cjActionDone').checked=row.action_done===true;$('#cjAmount').value=row.quoted_amount??'';$('#cjInstruction').value=row.instruction_note||'';$('#cjSpecial').value=row.special_note||'';$('#cjMsg').textContent='';window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});}
 function consultationApplyFilters(){CONSULTATION_FILTERS=consultationApplyFilterState(CONSULTATION_FILTERS,{query:$('#cjQuery').value,sheet:$('#cjFilterSheet').value,status:$('#cjFilterStatus').value});CONSULTATION_PAGE=CONSULTATION_FILTERS.page;render();}
 function consultationChangePage(delta){CONSULTATION_PAGE=Math.max(0,CONSULTATION_PAGE+delta);CONSULTATION_FILTERS={...CONSULTATION_FILTERS,page:CONSULTATION_PAGE};render();}
 function consultationRenderList(rows){const list=$('#cjList');list.innerHTML=rows.length?`<div class="tblwrap"><table><tr><th>${esc(cjT('cj.th_date','상담일'))}</th><th>${esc(cjT('cj.th_patient','환자'))}</th><th>${esc(cjT('cj.th_kind','구분'))}</th><th>${esc(cjT('cj.th_status','상태'))}</th><th>${esc(cjT('cj.th_amount','제시 비용'))}</th><th>${esc(cjT('cj.th_next','다음 조치'))}</th><th></th></tr>${rows.map(row=>`<tr><td>${esc(row.consulted_on||'')}</td><td>${esc(row.patient_name||'')}</td><td>${esc(consultationKindLabel(row.source_sheet||''))}</td><td><span class="b ${row.status==='확정'?'ok':row.status==='종결'?'wait':'no'}">${esc(consultationStatusLabel(row.status||''))}</span></td><td>${row.quoted_amount==null?'-':esc(String(row.quoted_amount))}</td><td>${esc(row.next_action||'-')}</td><td><button class="mini" data-consultation-id="${esc(row.id)}">${esc(cjT('cj.btn_edit','수정'))}</button></td></tr>`).join('')}</table></div>`:`<div class="empty">${esc(cjT('cj.list_empty','조건에 맞는 상담 기록이 없습니다.'))}</div>`;list.querySelectorAll('[data-consultation-id]').forEach(button=>button.addEventListener('click',()=>consultationEdit(button.dataset.consultationId)));}
@@ -3370,6 +3418,7 @@ async function consultationRenderActionQueue(){
   queue.innerHTML=rows.length?`<div class="tblwrap"><table><tr><th>${esc(cjT('cj.q_th_due','기한'))}</th><th>${esc(cjT('cj.th_patient','환자'))}</th><th>${esc(cjT('cj.th_next','다음 조치'))}</th><th>${esc(cjT('cj.q_th_who','담당자'))}</th><th></th></tr>${rows.map(row=>`<tr><td><span class="b ${consultationActionTiming(row,today())==='overdue'?'no':'wait'}">${esc(consultationActionTiming(row,today())==='overdue'?cjT('cj.q_overdue','기한 지남'):cjT('cj.q_today','오늘'))}</span> ${esc(row.action_due_on)}</td><td>${esc(row.patient_name||'')}</td><td>${esc(row.next_action||'')}</td><td>${esc(names.get(row.action_assignee_id)||cjT('cj.opt_unassigned','미지정'))}</td><td><button class="mini" data-consultation-action-id="${esc(row.id)}">${esc(cjT('cj.q_btn_open','열기'))}</button></td></tr>`).join('')}</table></div>${rows.length===limit?`<div class="hint">${esc(cjT('cj.q_limit_hint','최대 {n}건 표시 중임',{n:limit}))}</div>`:''}`:`<div class="empty">${esc(cjT('cj.q_empty','오늘 또는 기한이 지난 다음 조치가 없습니다.'))}</div>`;
   queue.querySelectorAll('[data-consultation-action-id]').forEach(button=>button.addEventListener('click',()=>consultationEdit(button.dataset.consultationActionId)));
 }
+let INBOX_DETAIL_GENERATION=0;
 let INBOX_FILTER={source:'',status:''},INBOX_SELECTED=null;
 let INBOX_ONLY_RESERVATIONS=false,INBOX_UNENTERED_RESERVATION_COUNT=0,INBOX_DENTWEB_FIELDS_AVAILABLE=false;
 const INBOX_STATUSES=[['new','신규'],['in_progress','확인 중'],['recall_1','리콜 1차'],['recall_2','리콜 2차'],['recall_3','리콜 3차'],['closed','처리됨'],['converted','전환됨']];
@@ -3394,7 +3443,7 @@ function inboxRenderList(rows){
   const body=items.map(desktopRow).join('');el.innerHTML=summary+(body?'<div class="inbox-desktop-list tblwrap"><table><tr>'+th('inbox.th_time','수신')+th('inbox.th_source','출처')+th('inbox.th_sender','문의자')+th('inbox.th_subject','제목')+th('inbox.th_status','상태')+th('inbox.th_handled','처리')+th('inbox.th_assignee','담당')+(owner?th('inbox.th_views','열람'):'')+'<th></th></tr>'+body+'</table></div><div class="inbox-mobile-list">'+items.map(mobileRow).join('')+'</div>':'<div class="empty">'+esc(inboxT('inbox.empty','조건에 맞는 문의가 없습니다.'))+'</div>');
   const filter=$('#inboxReservationFilter');if(filter?.classList){filter.textContent=inboxT('inbox.btn_reservation','📅 예약 · 미입력 {n}건',{n:INBOX_UNENTERED_RESERVATION_COUNT});filter.classList.toggle('stamp',onlyReservations);filter.setAttribute('aria-pressed',String(onlyReservations));}
   el.querySelectorAll('[data-inbox-ids]').forEach(button=>button.addEventListener('click',()=>inboxSelect(button.dataset.inboxIds.split(','))));
-  el.onclick=ev=>{const button=ev.target&&ev.target.closest?ev.target.closest('button'):null;if(!button||!button.dataset)return;if(button.dataset.inboxHandle!==undefined){INBOX_HANDLING_OPEN=button.dataset.inboxHandle;inboxRenderList(INBOX_LAST_ROWS);const memo=el.querySelector('[data-inbox-handle-memo]');if(memo&&memo.focus)memo.focus();}else if(button.dataset.inboxHandleCancel!==undefined){INBOX_HANDLING_OPEN=null;inboxRenderList(INBOX_LAST_ROWS);}else if(button.dataset.inboxHandleSave!==undefined)inboxListHandleSave(button);}; /* 처리 칸 단추: 목록을 다시 그려도 한 번만 걸리게 한 곳에서 받음 */
+  el.onclick=ev=>{const button=ev.target&&ev.target.closest?ev.target.closest('button'):null;if(!button||!button.dataset)return;if(button.dataset.inboxHandle!==undefined){INBOX_DETAIL_GENERATION++;INBOX_HANDLING_OPEN=button.dataset.inboxHandle;inboxRenderList(INBOX_LAST_ROWS);const memo=el.querySelector('[data-inbox-handle-memo]');if(memo&&memo.focus)memo.focus();}else if(button.dataset.inboxHandleCancel!==undefined){INBOX_DETAIL_GENERATION++;INBOX_HANDLING_OPEN=null;inboxRenderList(INBOX_LAST_ROWS);}else if(button.dataset.inboxHandleSave!==undefined)inboxListHandleSave(button);}; /* 처리 칸 단추: 목록을 다시 그려도 한 번만 걸리게 한 곳에서 받음 */
 }
 async function inboxLoad(){
   const columns='id,source,external_event_id,received_at,sender_name,contact,subject,message,status,assigned_to,journal_id';
@@ -3409,7 +3458,9 @@ async function inboxLoad(){
   INBOX_LAST_ROWS=result.data||[];inboxRenderList(INBOX_LAST_ROWS);
 }
 async function inboxSelect(ids){
+  const main=$('#main'),gen=++INBOX_DETAIL_GENERATION;
   ids=Array.isArray(ids)?ids:[ids];const {data,error}=await sb.from('consultation_inbox').select('*').in('id',ids).order('received_at',{ascending:true});if(error||!data?.length)return;
+  if(gen!==INBOX_DETAIL_GENERATION||main.isConnected===false)return;
   const messages=data,latest=messages[messages.length-1],el=$('#inboxDetail');if(!el)return;
   if(messages.length===1&&inboxIsKakaoBooking(latest)){
     INBOX_SELECTED={...latest,id:latest.id,ids:[latest.id],messages,processable:inboxProcessableRows(messages)};
@@ -3448,6 +3499,7 @@ async function inboxRecordReplyOnce(inboxId,note){
   return {ok:false,unknown:!inboxReplyErrorKnown(res.error),error:res.error};
 }
 async function inboxMarkHandled(messages,memo,msgEl){
+  const main=$('#main'),gen=INBOX_DETAIL_GENERATION;
   const say=text=>{if(msgEl)msgEl.textContent=text;},processable=inboxProcessableRows(messages),target=inboxReplyTarget(messages);
   if(INBOX_HANDLE_BUSY||!canWriteInbox()||!processable.length||!target)return false;
   INBOX_HANDLE_BUSY=true;
@@ -3458,10 +3510,11 @@ async function inboxMarkHandled(messages,memo,msgEl){
     if(me){try{await sb.from('consultation_inbox').update({assigned_to:me}).in('id',ids).is('assigned_to',null);}catch(e){}}
     let memoFail='';
     if(note){const reply=await inboxRecordReplyOnce(target.id,note);if(!reply.ok){memoFail=reply.unknown?inboxT('inbox.m_memo_unknown','처리됨으로 바꿨지만 메모가 저장됐는지 확인하지 못했습니다: {msg} — 문의함을 새로 열어 메모가 없을 때만 상세에서 다시 남겨 주세요',{msg:reply.error.message}):inboxT('inbox.m_handle_memo_fail','처리됨으로 바꿨지만 메모는 저장하지 못했습니다: {msg} — 상세에서 「답변 기록」으로 다시 남겨 주세요',{msg:reply.error.message});say(memoFail);alert(memoFail);}}
+    setStatus('saved');if(gen!==INBOX_DETAIL_GENERATION)return true;
     INBOX_HANDLING_OPEN=null;
     const sel=INBOX_SELECTED,fromDetail=!!(sel&&Array.isArray(sel.ids)&&sel.ids.some(id=>ids.includes(id)));
-    if(fromDetail){INBOX_SELECTED=null;const detail=$('#inboxDetail');if(detail)detail.innerHTML=esc(memoFail||inboxT('inbox.m_handled','처리됨으로 저장했습니다.'));}
-    await inboxLoad();setStatus('saved');if(fromDetail)inboxBackToList();
+    if(fromDetail){INBOX_SELECTED=null;const detail=main.isConnected!==false&&$('#inboxDetail');if(detail)detail.innerHTML=esc(memoFail||inboxT('inbox.m_handled','처리됨으로 저장했습니다.'));}
+    if(main.isConnected!==false){await inboxLoad();if(gen===INBOX_DETAIL_GENERATION&&fromDetail)inboxBackToList();}
     return true;
   }finally{INBOX_HANDLE_BUSY=false;}
 } /* 「✅ 처리」: ①처리 대상 줄을 모두 처리됨으로(실패하면 아무것도 안 바뀜) ②담당은 DB의 지금 값이 비어 있는 줄만 지금 사람으로(그 사이 배정된 담당은 그대로) ③메모가 있으면 마지막에 답변 기록 — 상태가 바뀐 뒤에만 메모가 한 번 들어가므로 중복되지 않음. 처리한 사람·시각은 DB 트리거가 기록 */
@@ -3487,7 +3540,7 @@ async function inboxSetDentwebEntered(){
   const {error}=await sb.rpc('consultation_inbox_set_dentweb_entered',{p_inbox_id:row.id,p_entered:!undo}),msg=$('#inboxDentwebMsg');if(error){if(msg)msg.textContent=inboxT('inbox.m_dentweb_fail','저장 실패: {msg}',{msg:error.message});return;}await inboxSelect(row.id);await inboxLoad();
 }
 async function inboxRecordReply(){if(!INBOX_SELECTED)return;const reply=$('#inboxReply').value.trim();if(!reply){$('#inboxReplyMsg').textContent=inboxT('inbox.m_reply_empty','실제 답변 내용을 입력하세요.');return;}const saved=await inboxRecordReplyOnce(INBOX_SELECTED.id,reply);if(!saved.ok){$('#inboxReplyMsg').textContent=saved.unknown?inboxT('inbox.m_reply_unknown','답변이 기록됐는지 확인하지 못했습니다: {msg} — 문의를 다시 열어 아래 답변 이력에 없을 때만 다시 눌러 주세요',{msg:saved.error.message}):inboxT('inbox.m_reply_fail','기록 실패: {msg}',{msg:saved.error.message});return;}$('#inboxReply').value='';await inboxLoadHistory(INBOX_SELECTED.ids);if(await inboxFillEmptyAssignee(INBOX_SELECTED.processable))await inboxLoad();}async function inboxSave(){if(!INBOX_SELECTED?.ids.length)return;const assigned=$('#inboxAssigned').value||null;const {error}=await sb.from('consultation_inbox').update({status:$('#inboxStatus').value,assigned_to:assigned}).in('id',INBOX_SELECTED.ids);if(!error){await inboxLoad();setStatus('saved');}}
-async function inboxConvert(){if(!INBOX_SELECTED?.ids.length)return;const rows=INBOX_SELECTED.messages||[],processable=inboxProcessableRows(rows);if(!processable.length)return;const latest=processable[processable.length-1],otherIds=processable.slice(0,-1).map(row=>row.id);const {error}=await sb.rpc('consultation_inbox_convert_to_journal',{p_inbox_id:latest.id});if(error){alert(inboxT('inbox.m_convert_fail','상담일지 전환 실패: {msg}',{msg:error.message}));return;}if(otherIds.length){const {error:closeError}=await sb.from('consultation_inbox').update({status:'closed'}).in('id',otherIds);if(closeError)alert(inboxT('inbox.m_convert_close_fail','상담일지 전환은 됐지만 나머지 문의를 처리됨으로 바꾸지 못했습니다: {msg}',{msg:closeError.message}));}await inboxFillEmptyAssignee(processable.slice(0,-1));INBOX_SELECTED=null;const el=$('#inboxDetail');if(el)el.innerHTML=esc(inboxT('inbox.m_converted','상담일지로 전환했습니다. 나머지 처리 대상 문의는 처리됨 상태로 보존했습니다.'));await inboxLoad();setStatus('saved');}
+async function inboxConvert(){const main=$('#main'),gen=INBOX_DETAIL_GENERATION;if(!INBOX_SELECTED?.ids.length)return;const rows=INBOX_SELECTED.messages||[],processable=inboxProcessableRows(rows);if(!processable.length)return;const latest=processable[processable.length-1],otherIds=processable.slice(0,-1).map(row=>row.id);const {error}=await sb.rpc('consultation_inbox_convert_to_journal',{p_inbox_id:latest.id});if(error){alert(inboxT('inbox.m_convert_fail','상담일지 전환 실패: {msg}',{msg:error.message}));return;}if(otherIds.length){const {error:closeError}=await sb.from('consultation_inbox').update({status:'closed'}).in('id',otherIds);if(closeError)alert(inboxT('inbox.m_convert_close_fail','상담일지 전환은 됐지만 나머지 문의를 처리됨으로 바꾸지 못했습니다: {msg}',{msg:closeError.message}));}await inboxFillEmptyAssignee(processable.slice(0,-1));setStatus('saved');if(gen!==INBOX_DETAIL_GENERATION)return;INBOX_SELECTED=null;if(main.isConnected===false)return;const el=$('#inboxDetail');if(el)el.innerHTML=esc(inboxT('inbox.m_converted','상담일지로 전환했습니다. 나머지 처리 대상 문의는 처리됨 상태로 보존했습니다.'));await inboxLoad();}
 async function inboxManualCreate(){const row=inboxPayload({source:$('#inboxSource').value,sender_name:$('#inboxName').value,contact:$('#inboxContact').value,subject:$('#inboxSubject').value,message:$('#inboxMessage').value});if(!row.sender_name||!row.message){$('#inboxMsg').textContent=inboxT('inbox.m_manual_required','문의자와 문의 내용은 필수입니다.');return;}const {error}=await sb.from('consultation_inbox').insert({...row,created_via:'manual',created_by:ME.id});const msg=$('#inboxMsg');if(msg)msg.textContent=error?inboxT('inbox.m_manual_fail','저장 실패: {msg}',{msg:error.message}):inboxT('inbox.m_manual_ok','문의로 접수했습니다.');if(!error){await inboxLoad();setStatus('saved');}}
 let AI_BILLING_ALERT_ROWS=[],AI_BILLING_ALERT_HTML='',AI_BILLING_RECIPIENT_SETTINGS=[],AI_BILLING_RECIPIENT_ERROR='',AI_BILLING_RECIPIENTS_HTML='';
 function aiBillingAlertCanView(role){return role==='owner'||role==='manager';}
@@ -3531,7 +3584,7 @@ let INBOX_SUBTAB=(typeof location!=='undefined'&&new URLSearchParams(location.se
 let RECALL_ROWS=[],RECALL_VISIBLE=[],RECALL_FILTER={stage:'',assignee:'',mine:false,overdue:false},RECALL_BUSY=false,RECALL_LOAD_SEQ=0;
 function recallEnabled(){return recallCanAccess(ME)&&typeof SETTINGS!=='undefined'&&SETTINGS['recall.enabled']==='true';}
 function recallTabsHtml(){return recallEnabled()?'<nav class="rowflex recall-tabs" aria-label="'+esc(recallT('tabs','문의함 하위 화면'))+'"><button class="mini" aria-pressed="'+(INBOX_SUBTAB==='inbox')+'" onclick="inboxSetSubtab(\'inbox\')">'+esc(recallT('inbox','📥 문의함'))+'</button><button class="mini" aria-pressed="'+(INBOX_SUBTAB==='recall')+'" onclick="inboxSetSubtab(\'recall\')">'+esc(recallT('title','📞 리콜 명단'))+'</button></nav>':'';}
-async function inboxSetSubtab(tab){if(RECALL_BUSY)return;INBOX_SUBTAB=tab==='recall'&&recallEnabled()?'recall':'inbox';await renderInbox($('#main'));}
+async function inboxSetSubtab(tab){if(RECALL_BUSY)return;INBOX_SUBTAB=tab==='recall'&&recallEnabled()?'recall':'inbox';await render();}
 function recallCardHtml(){return recallTabsHtml()+'<section class="card recall-card"><h2>'+esc(recallT('title','📞 리콜 명단'))+'</h2><p class="hint">'+esc(recallT('hint','문의와 상담일지의 다음 조치를 연락처별로 모았습니다. 예정일이 빠른 순서입니다.'))+'</p><div id="recallSummary" role="status"></div><div class="recall-filters"><label>'+esc(recallT('stage','지금 단계'))+'<select id="recallStage" onchange="recallApplyFilters()"><option value="">'+esc(recallT('all_stage','전체 단계'))+'</option>'+['recall_1','recall_2','recall_3','journal'].map(x=>'<option value="'+x+'" '+(RECALL_FILTER.stage===x?'selected':'')+'>'+esc(recallStageLabel(x))+'</option>').join('')+'</select></label><label>'+esc(recallT('assignee','담당'))+'<select id="recallAssignee" onchange="recallApplyFilters()"><option value="">'+esc(recallT('all_assignee','모든 담당'))+'</option>'+PROFILES.filter(p=>recallCanAccess({role:p.role,dept:p.dept,department:p.department,id:p.user_id})&&p.active!==false&&p.approved!==false&&p.account_access_status!=='차단').map(p=>'<option value="'+esc(p.user_id)+'" '+(RECALL_FILTER.assignee===p.user_id?'selected':'')+'>'+esc(p.name||p.user_id)+'</option>').join('')+'</select></label><label><input id="recallMine" type="checkbox" '+(RECALL_FILTER.mine?'checked':'')+' onchange="recallApplyFilters()"> '+esc(recallT('mine','내 담당만'))+'</label><label><input id="recallOverdue" type="checkbox" '+(RECALL_FILTER.overdue?'checked':'')+' onchange="recallApplyFilters()"> '+esc(recallT('overdue_only','기한 지남만'))+'</label><button class="mini" onclick="recallLoad()">'+esc(recallT('refresh','새로 조회'))+'</button></div><div id="recallList" class="hint">'+esc(recallT('loading','불러오는 중…'))+'</div></section>';}
 async function recallLoad(){
   const seq=++RECALL_LOAD_SEQ,box=$('#recallList');if(!box||!recallEnabled())return;
@@ -3557,10 +3610,12 @@ async function recallOpenJournal(index){
 }
 
 async function renderInbox(m){
+  INBOX_DETAIL_GENERATION++;
   if(INBOX_SUBTAB==='recall'&&recallEnabled()){m.innerHTML=recallCardHtml();await recallLoad();return;}
   INBOX_SUBTAB='inbox';
   if(!canViewInbox()){m.innerHTML='<div class="card"><div class="empty">'+esc(inboxT('inbox.no_access','통합 문의함 접근 권한이 없습니다.'))+'</div></div>';return;}
   let alertRows=[],alertCount=0,recipientRows=[],recipientError='';if(aiBillingAlertCanView(ME.role)){const [list,summary,...settings]=await Promise.all([sb.from('ai_billing_events').select('id,note,raw_text,received_at,charged_at,account_id,account_name,amount_krw,threshold_krw').in('note',['NAVER_AD_STOP','NAVER_AD_LOW_BALANCE']).is('charged_at',null).order('received_at',{ascending:false}).limit(hubN('inbox.alert_limit',20)),sb.from('ai_billing_events').select('id',{count:'exact',head:true}).in('note',['NAVER_AD_STOP','NAVER_AD_LOW_BALANCE']).is('charged_at',null),...(ME.role==='owner'?[sb.from('ai_billing_alert_recipients').select('user_id,enabled')]:[])]);alertRows=list.data||[];alertCount=summary.count||0;recipientRows=settings[0]?.data||[];recipientError=settings[0]?.error?.message||'';}
+  if(m.isConnected===false)return;
   AI_BILLING_RECIPIENT_SETTINGS=recipientRows;AI_BILLING_RECIPIENT_ERROR=recipientError;AI_BILLING_ALERT_HTML=aiBillingAlertCard(alertRows,alertCount);AI_BILLING_RECIPIENTS_HTML=ME.role==='owner'?aiBillingRecipientPanel(recipientRows):'';m.innerHTML=inboxCardHtml();  await inboxLoad();
 }
 function cjFillLiteral(h){return String(h).replace('<label>지시/혹은 기타사항</label>',()=>'<label>'+esc(cjT('cj.f_instruction','지시/혹은 기타사항'))+'</label>').replace('<label>특이사항</label>',()=>'<label>'+esc(cjT('cj.f_special','특이사항'))+'</label>');} /* 기존 시험이 찾는 이 두 라벨 줄은 그대로 두고, 고쳤을 때만 바꿔 넣음 */
@@ -3568,6 +3623,8 @@ async function renderConsultationJournal(m){
   if(!canManageConsultation()){m.innerHTML='<div class="card"><div class="empty">'+esc(cjT('cj.no_access','상담일지 접근 권한이 없습니다.'))+'</div></div>';return;}
   CONSULTATION_PAGE_SIZE=hubN('consult.page_size',20);
   const currentQuery=CONSULTATION_FILTERS.query,currentSheet=CONSULTATION_FILTERS.sheet,currentStatus=CONSULTATION_FILTERS.status;
+  // 새 입력 화면과 저장 대상은 함께 초기화합니다. 분리된 화면의 늦은 조회는 위에서 종료합니다.
+  CONSULTATION_EDIT_GENERATION++;CONSULTATION_EDIT_ID=null;CONSULTATION_SOURCE_SAVED_FIELDS={};
   m.innerHTML=cjFillLiteral(hubFillHtml(`<div class="card"><div class="rowflex" style="justify-content:space-between;align-items:center"><div><h2>${esc(cjT('cj.title','🗂 상담일지'))}</h2><div data-hubk="cj.hint" class="hint">매니저·실장·원장만 볼 수 있습니다. 원본 엑셀 행은 가져오지 않으며, 새 기록만 저장합니다.</div></div><button class="mini" onclick="go('home')">${esc(cjT('cj.btn_home','홈으로'))}</button></div><div class="rowflex" style="margin-top:10px"><input id="cjQuery" value="${esc(currentQuery)}" placeholder="${esc(cjT('cj.ph_search','환자명·다음 조치 검색'))}"><select id="cjFilterSheet"><option value="">${esc(cjT('cj.f_all_kind','전체 상담 구분'))}</option>${consultationOptions(CONSULTATION_SHEETS,currentSheet,consultationKindLabel)}</select><select id="cjFilterStatus"><option value="">${esc(cjT('cj.f_all_status','전체 상태'))}</option>${consultationOptions(CONSULTATION_STATUSES,currentStatus,consultationStatusLabel)}</select><button class="mini" onclick="consultationApplyFilters()">${esc(cjT('cj.btn_search','검색'))}</button></div><div id="cjList" style="margin-top:10px"></div><div id="cjPages" class="rowflex" style="margin-top:10px"></div></div><div class="card"><h3 id="cjFormTitle">${esc(cjT('cj.form_new','➕ 새 상담 기록'))}</h3><div class="grid"><div class="fld"><label>${esc(cjT('cj.f_name','환자명 *'))}</label><input id="cjName" maxlength="80"></div><div class="fld"><label>${esc(cjT('cj.f_phone','연락처'))}</label><input id="cjPhone" inputmode="tel" maxlength="30"></div><div class="fld"><label>${esc(cjT('cj.f_kind','상담 구분 *'))}</label><select id="cjSheet">${consultationOptions(CONSULTATION_SHEETS,CONSULTATION_SHEETS[0],consultationKindLabel)}</select></div><div class="fld"><label>${esc(cjT('cj.f_date','상담일 *'))}</label><input id="cjDate" type="date" value="${today()}"></div><div class="fld"><label>${esc(cjT('cj.f_status','상태 *'))}</label><select id="cjStatus">${consultationOptions(CONSULTATION_STATUSES,'대기',consultationStatusLabel)}</select></div><div class="fld"><label>${esc(cjT('cj.f_amount','제시 비용'))}</label><input id="cjAmount" type="number" min="0" step="0.01"></div></div><div class="fld" style="margin-top:8px"><label>${esc(cjT('cj.f_note','상담 내용 *'))}</label><textarea id="cjNote" maxlength="4000"></textarea></div><div class="fld" style="margin-top:8px"><label>지시/혹은 기타사항</label><textarea id="cjInstruction" maxlength="1000"></textarea></div><div class="fld" style="margin-top:8px"><label>특이사항</label><textarea id="cjSpecial" maxlength="1000"></textarea></div><div class="fld" style="margin-top:8px"><label>${esc(cjT('cj.f_next','다음 조치'))}</label><textarea id="cjNext" maxlength="1000"></textarea></div><div class="rowflex" style="margin-top:10px"><button class="hbtn pri" id="cjSave" onclick="saveConsultationJournal()">${esc(cjT('cj.btn_save','저장'))}</button><button class="hbtn" onclick="consultationResetForm()">${esc(cjT('cj.btn_reset','새로 입력'))}</button></div><div class="msg" id="cjMsg"></div></div>`));
   $('#cjQuery').parentElement.insertAdjacentHTML('beforebegin','<div style="margin-top:12px"><h3 style="margin:0 0 8px">'+esc(cjT('cj.q_title','오늘·기한 지남'))+'</h3><div id="cjActionQueue" class="hint">'+esc(cjT('cj.q_loading','불러오는 중…'))+'</div></div>');
   $('#cjSpecial').parentElement.insertAdjacentHTML('afterend','<div style="margin-top:10px"><h4>'+esc(cjT('cj.src_title','원본 시트 추가 칸'))+'</h4><div id="cjSourceFields" class="grid"></div></div>');
@@ -3575,16 +3632,19 @@ async function renderConsultationJournal(m){
   consultationRenderSourceFields();
   $('#cjNext').parentElement.insertAdjacentHTML('afterend',`<div class="grid" style="margin-top:8px"><div class="fld"><label>${esc(cjT('cj.f_assignee','다음 조치 담당자'))}</label><select id="cjActionAssignee">${consultationActionAssigneeOptions(null)}</select></div><div class="fld"><label>${esc(cjT('cj.f_due','예정일'))}</label><input id="cjActionDue" type="date"></div><div class="fld"><label>${esc(cjT('cj.f_done','완료'))}</label><label><input id="cjActionDone" type="checkbox"> ${esc(cjT('cj.f_done_check','조치 완료'))}</label></div></div>`);
   await consultationRenderActionQueue();
+  if(m.isConnected===false)return;
   const queryPlan=consultationServerQueryPlan(CONSULTATION_FILTERS,CONSULTATION_PAGE_SIZE);let request=sb.from('consultation_journals').select('id,patient_name,source_sheet,consulted_on,status,next_action,action_due_on,action_done,quoted_amount',{count:'exact'}).order('consulted_on',{ascending:false}).order('id',{ascending:false});
   if(queryPlan.sheet)request=request.eq('source_sheet',queryPlan.sheet);if(queryPlan.status)request=request.eq('status',queryPlan.status);if(queryPlan.query)request=request.or('patient_name.ilike.%'+queryPlan.query+'%,next_action.ilike.%'+queryPlan.query+'%');
   const {data,error,count}=await request.range(queryPlan.from,queryPlan.to);
+  if(m.isConnected===false)return;
   if(error){m.innerHTML='<div class="card"><div class="cal-error">'+esc(consultationRequestError('list',error))+'</div></div>';setStatus('error');return;}
   CONSULTATION_TOTAL=count||0;consultationRenderList(data||[]);$('#cjPages').innerHTML=`<span class="sub">${esc(cjT('cj.page_info','{total}건 · {page}쪽',{total:CONSULTATION_TOTAL,page:CONSULTATION_PAGE+1}))}</span><button class="mini" ${CONSULTATION_PAGE===0?'disabled':''} onclick="consultationChangePage(-1)">${esc(cjT('cj.btn_prev','이전'))}</button><button class="mini" ${(CONSULTATION_PAGE+1)*CONSULTATION_PAGE_SIZE>=CONSULTATION_TOTAL?'disabled':''} onclick="consultationChangePage(1)">${esc(cjT('cj.btn_next','다음'))}</button>`;
 }
-async function saveConsultationJournal(){const msg=$('#cjMsg'),row=consultationDraftFromForm();if(!row.patient_name||!row.consulted_on||!row.consultation_note){msg.textContent=cjT('cj.m_required','환자명, 상담일, 상담 내용은 필수입니다.');return;}if(row.quoted_amount===undefined){msg.textContent=cjT('cj.m_amount','제시 비용은 0 이상의 숫자로 입력하세요.');return;}if(!CONSULTATION_SHEETS.includes(row.source_sheet)||!CONSULTATION_STATUSES.includes(row.status)){msg.textContent=cjT('cj.m_not_allowed','허용되지 않은 상담 구분 또는 상태입니다.');return;}if(!row.next_action&&(row.action_assignee_id||row.action_due_on||row.action_done)){msg.textContent=cjT('cj.m_need_next','담당자·예정일·완료 표시에는 다음 조치 내용이 필요합니다.');return;}setStatus('saving');msg.textContent=cjT('cj.m_saving','저장 중…');const request=CONSULTATION_EDIT_ID===null?sb.from('consultation_journals').insert(row):sb.from('consultation_journals').update(row).eq('id',CONSULTATION_EDIT_ID);const {error}=await request;if(error){msg.textContent=consultationRequestError(CONSULTATION_EDIT_ID===null?'create':'update',error);setStatus('error');return;}setStatus('saved');consultationResetForm();await renderConsultationJournal($('#main'));}
+async function saveConsultationJournal(){const main=$('#main'),gen=CONSULTATION_EDIT_GENERATION,editId=CONSULTATION_EDIT_ID,msg=$('#cjMsg'),row=consultationDraftFromForm();if(!row.patient_name||!row.consulted_on||!row.consultation_note){msg.textContent=cjT('cj.m_required','환자명, 상담일, 상담 내용은 필수입니다.');return;}if(row.quoted_amount===undefined){msg.textContent=cjT('cj.m_amount','제시 비용은 0 이상의 숫자로 입력하세요.');return;}if(!CONSULTATION_SHEETS.includes(row.source_sheet)||!CONSULTATION_STATUSES.includes(row.status)){msg.textContent=cjT('cj.m_not_allowed','허용되지 않은 상담 구분 또는 상태입니다.');return;}if(!row.next_action&&(row.action_assignee_id||row.action_due_on||row.action_done)){msg.textContent=cjT('cj.m_need_next','담당자·예정일·완료 표시에는 다음 조치 내용이 필요합니다.');return;}setStatus('saving');msg.textContent=cjT('cj.m_saving','저장 중…');const request=editId===null?sb.from('consultation_journals').insert(row):sb.from('consultation_journals').update(row).eq('id',editId);const {error}=await request;if(error){msg.textContent=consultationRequestError(editId===null?'create':'update',error);setStatus('error');return;}setStatus('saved');if(CONSULTATION_EDIT_GENERATION!==gen)return;CONSULTATION_EDIT_ID=null;CONSULTATION_SOURCE_SAVED_FIELDS={};if(main.isConnected===false)return;consultationResetForm();await render();}
 
 /* ── 근로계약서 ── */
 function ctT(k,d,v){return typeof hubT==='function'?hubT(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));} /* 근로계약서 글: 허브 설정에서 고치는 글(hub-texts.js가 없으면 기본 글 그대로). 계약서 본문 문구는 「새로 만드는 계약서」에만 쓰이고, 이미 발송·서명한 계약서는 저장된 본문(merged_html)을 그대로 보여 줌 */
+let CONTRACT_EDIT_GENERATION=0;
 let CONTRACT_TEMPLATES=[],CONTRACT_ROWS=[],CONTRACT_TEMPLATE_ID=1,CONTRACT_EMPLOYEE_ID='',CONTRACT_EDIT_ID=null,CONTRACT_EDIT_FIELDS=null,CONTRACT_DRAFT_FIELDS=null,CONTRACT_DRAFT_TIMER=null,CONTRACT_DRAFT_PRESETS=[],CONTRACT_FLASH=null,CONTRACT_LOADED_PRESET=null;
 let CONTRACT_SHOW_CANCELLED=false;
 /* contract-expiry:test-start */
@@ -3748,8 +3808,8 @@ function contractStorageKey(kind){return `hub.contract${kind}.${ME&&ME.id}`;}
 function contractStorageRead(kind){try{return JSON.parse(localStorage.getItem(contractStorageKey(kind))||'null');}catch(_){return null;}}
 function contractStorageWrite(kind,value){try{localStorage.setItem(contractStorageKey(kind),JSON.stringify(value));return true;}catch(_){return false;}}
 function saveContractDraft(){if(CONTRACT_EDIT_ID)return;const d=currentContractDraft();CONTRACT_DRAFT_FIELDS={templateId:d.template&&d.template.id,employeeId:d.employeeId,preset:$('#contractPreset')?$('#contractPreset').value:'',due:d.due,noEnd:!!($('#contractNoEnd')&&$('#contractNoEnd').checked),fields:contractSafeFields(d.fields)};contractStorageWrite('Draft',CONTRACT_DRAFT_FIELDS);}
-function queueContractDraft(){clearTimeout(CONTRACT_DRAFT_TIMER);CONTRACT_DRAFT_TIMER=setTimeout(saveContractDraft,300);}
-function clearContractDraft(){try{localStorage.removeItem(contractStorageKey('Draft'));}catch(_){}CONTRACT_DRAFT_FIELDS=null;CONTRACT_TEMPLATE_ID=1;CONTRACT_EMPLOYEE_ID='';CONTRACT_LOADED_PRESET=null;render();}
+function queueContractDraft(){CONTRACT_EDIT_GENERATION++;clearTimeout(CONTRACT_DRAFT_TIMER);CONTRACT_DRAFT_TIMER=setTimeout(saveContractDraft,300);}
+function clearContractDraft(){CONTRACT_EDIT_GENERATION++;CONTRACT_EDIT_ID=null;CONTRACT_EDIT_FIELDS=null;try{localStorage.removeItem(contractStorageKey('Draft'));}catch(_){}CONTRACT_DRAFT_FIELDS=null;CONTRACT_TEMPLATE_ID=1;CONTRACT_EMPLOYEE_ID='';CONTRACT_LOADED_PRESET=null;render();}
 function saveContractPreset(){const name=prompt('설정 이름을 입력하세요.');if(!name)return;const d=currentContractDraft(),items=contractStorageRead('Presets')||[],item={name,templateId:d.template.id,preset:$('#contractPreset')?$('#contractPreset').value:'',due:d.due,noEnd:!!($('#contractNoEnd')&&$('#contractNoEnd').checked),fields:contractSafeFields(d.fields)};const i=items.findIndex(x=>x.name===name);if(i<0)items.push(item);else items[i]=item;contractStorageWrite('Presets',items);render();}
 function loadContractPreset(name){const p=(contractStorageRead('Presets')||[]).find(x=>x.name===name);if(!p)return;CONTRACT_TEMPLATE_ID=Number(p.templateId);CONTRACT_DRAFT_FIELDS={...p,employeeId:$('#contractEmployee')?$('#contractEmployee').value:CONTRACT_EMPLOYEE_ID};CONTRACT_LOADED_PRESET=name;render();}
 function deleteContractPreset(){const name=$('#contractSavedPreset')&&$('#contractSavedPreset').value;if(!name)return;if(!confirm(`'${name}' 설정을 지울까요?`))return;contractStorageWrite('Presets',contractPresetList(contractStorageRead('Presets')||[],name,true));CONTRACT_LOADED_PRESET=null;render();}
@@ -3774,8 +3834,8 @@ function toggleContractNoEnd(){
   if(end){end.disabled=checked;if(checked)end.value='';}
 }
 function syncContractEnd(){const end=document.querySelector('[data-contract-key="계약종료"]'),noEnd=$('#contractNoEnd');if(!end||!noEnd)return;if(end.value){noEnd.checked=false;noEnd.disabled=true;}else noEnd.disabled=false;}
-function selectContractTemplate(id){CONTRACT_TEMPLATE_ID=Number(id);render();}
-function selectContractEmployee(uid){
+function selectContractTemplate(id){CONTRACT_EDIT_GENERATION++;CONTRACT_TEMPLATE_ID=Number(id);render();}
+function selectContractEmployee(uid){CONTRACT_EDIT_GENERATION++;
   CONTRACT_EMPLOYEE_ID=uid;const p=PROFILES.find(x=>x.user_id===uid);
   document.querySelectorAll('[data-contract-key]').forEach(el=>{if(el.dataset.contractKey==='성명')el.value=p?p.name:'';});
 }
@@ -3825,8 +3885,12 @@ function previewContract(){
   box.innerHTML=`<h3>${esc(ctT('contract.preview_h','미리보기'))}</h3>${contractEmployeeJobGroupInfo(d.employeeId)}${contractJobGroupWarning(d.employeeId,d.fields)}<div class="contract-doc">${mergeContractHtml(d.template,d.fields)}</div>`;
   box.scrollIntoView({behavior:'smooth',block:'start'});
 }
+async function contractStateChangedMessage(id){
+  const {data,error}=await sb.from('contracts').select('status').eq('id',id).maybeSingle();
+  return ctT('contract.m_update_zero','이 계약은 이미 상태가 바뀌어 이번 수정은 저장되지 않았습니다(지금 상태: {status}). 입력 내용은 지금 화면에만 남아 있으니, 새로고침하기 전에 복사해 두세요.',{status:!error&&data?.status?data.status:ctT('contract.m_status_unknown','확인하지 못함')});
+}
 async function sendContract(){
-  const d=currentContractDraft(),msg=$('#contractMsg');
+  const main=$('#main'),gen=CONTRACT_EDIT_GENERATION,editId=CONTRACT_EDIT_ID,d=currentContractDraft(),msg=$('#contractMsg');
   if(!d.template||!d.employeeId||!d.due){if(msg)msg.textContent=ctT('contract.m_need_basic','서식, 직원, 서명 만료일을 모두 선택하세요.');return;}
   const missing=contractArray(d.template.fields).filter(f=>f.required&&!String(d.fields[String(f.key||'')]||'').trim());
   if(missing.length){if(msg)msg.textContent=ctT('contract.m_need_fields','필수 계약 조건을 입력하세요: {list}',{list:missing.map(f=>f.label||f.key).join(', ')});return;}
@@ -3836,21 +3900,29 @@ async function sendContract(){
   if(d.fields['근무시간표']&&!validContractSchedule(d.fields['근무시간표'])){if(msg)msg.textContent=ctT('contract.m_need_schedule','근무시간표에서 요일·시업·종업시간을 모두 입력하세요.');return;}
   const dueDate=new Date(d.due+'T23:59:59+09:00');
   if(Number.isNaN(dueDate.getTime())){if(msg)msg.textContent=ctT('contract.m_bad_due','서명 만료일을 확인하세요.');return;}
-  const finalSend=ME.role==='owner',merged=mergeContractHtml(d.template,d.fields);setStatus('saving');if(msg)msg.textContent=CONTRACT_EDIT_ID?ctT('contract.m_sending_edit','수정 후 최종 발송 중…'):(finalSend?ctT('contract.m_sending_owner','발송 중…'):ctT('contract.m_sending_req','원장 발송 요청 중…'));
-  if(CONTRACT_EDIT_ID){const {error}=await sb.from('contracts').update({template_id:d.template.id,merged_html:merged,fields:d.fields,status:'대기',sent_at:new Date().toISOString(),due_at:dueDate.toISOString(),reviewed_by:ME.name,reviewed_at:new Date().toISOString()}).eq('id',CONTRACT_EDIT_ID).eq('status','발송요청');if(error){if(msg)msg.textContent=ctT('contract.m_fail_edit','수정 발송 실패: {msg}',{msg:error.message});setStatus('error');return;}CONTRACT_EDIT_ID=null;CONTRACT_EDIT_FIELDS=null;CONTRACT_FLASH='수정 후 발송했습니다.';setStatus('saved');render();return;}
+  const finalSend=ME.role==='owner',merged=mergeContractHtml(d.template,d.fields);setStatus('saving');if(msg)msg.textContent=editId?ctT('contract.m_sending_edit','수정 후 최종 발송 중…'):(finalSend?ctT('contract.m_sending_owner','발송 중…'):ctT('contract.m_sending_req','원장 발송 요청 중…'));
+  if(editId){
+    const {data,error}=await sb.from('contracts').update({template_id:d.template.id,merged_html:merged,fields:d.fields,status:'대기',sent_at:new Date().toISOString(),due_at:dueDate.toISOString(),reviewed_by:ME.name,reviewed_at:new Date().toISOString()}).eq('id',editId).eq('status','발송요청').select('id');
+    if(error){if(msg)msg.textContent=ctT('contract.m_fail_edit','수정 발송 실패: {msg}',{msg:error.message});setStatus('error');return;}
+    if(!data?.length){setStatus('error');const notice=await contractStateChangedMessage(editId);if(gen===CONTRACT_EDIT_GENERATION&&main.isConnected!==false&&msg)msg.textContent=notice;return;}
+    setStatus('saved');if(gen!==CONTRACT_EDIT_GENERATION)return;CONTRACT_EDIT_GENERATION++;CONTRACT_EDIT_ID=null;CONTRACT_EDIT_FIELDS=null;CONTRACT_FLASH='수정 후 발송했습니다.';if(main.isConnected!==false)render();return;
+  }
   const {error}=await sb.from('contracts').insert({user_id:d.employeeId,template_id:d.template.id,
     merged_html:merged,fields:d.fields,request_merged_html:finalSend?null:merged,request_fields:finalSend?null:d.fields,sign_slots:contractArray(d.template.sign_slots),status:finalSend?'대기':'발송요청',
     created_by:ME.name,sent_at:finalSend?new Date().toISOString():null,due_at:dueDate.toISOString()});
   if(error){if(msg)msg.textContent=ctT('contract.m_fail_send','발송 실패: {msg}',{msg:error.message});setStatus('error');return;}
-  CONTRACT_FLASH=finalSend?'발송했습니다.':'원장에게 최종 발송을 요청했습니다.';CONTRACT_DRAFT_FIELDS={...CONTRACT_DRAFT_FIELDS,fields:contractSafeFields(d.fields,true)};contractStorageWrite('Draft',CONTRACT_DRAFT_FIELDS);setStatus('saved');render();
+  setStatus('saved');if(gen!==CONTRACT_EDIT_GENERATION)return;
+  CONTRACT_FLASH=finalSend?'발송했습니다.':'원장에게 최종 발송을 요청했습니다.';CONTRACT_DRAFT_FIELDS={...CONTRACT_DRAFT_FIELDS,fields:contractSafeFields(d.fields,true)};contractStorageWrite('Draft',CONTRACT_DRAFT_FIELDS);if(main.isConnected!==false)render();
 }
 async function approveContractSend(id){
   const row=CONTRACT_ROWS.find(r=>Number(r.id)===Number(id));if(!row||ME.role!=='owner'||row.status!=='발송요청')return;
   setStatus('saving');const archivePath=`${row.user_id}/contracts/contract-${row.id}.html`,file=new Blob([row.merged_html||''],{type:'text/html;charset=utf-8'});
   const {error:uploadError}=await sb.storage.from('hr-docs').upload(archivePath,file,{contentType:'text/html;charset=utf-8',upsert:false});
   if(uploadError){alert(ctT('contract.m_archive_fail','최종본 보관 실패: {msg}',{msg:uploadError.message}));setStatus('error');return;}
-  const {error}=await sb.from('contracts').update({status:'대기',sent_at:new Date().toISOString(),archive_path:archivePath}).eq('id',row.id).eq('status','발송요청');
-  if(error){alert(ctT('contract.m_fail_send','발송 실패: {msg}',{msg:error.message}));setStatus('error');return;}CONTRACT_FLASH='최종 발송을 완료했습니다.';setStatus('saved');render();
+  const {data,error}=await sb.from('contracts').update({status:'대기',sent_at:new Date().toISOString(),archive_path:archivePath}).eq('id',row.id).eq('status','발송요청').select('id');
+  if(error){alert(ctT('contract.m_fail_send','발송 실패: {msg}',{msg:error.message}));setStatus('error');return;}
+  if(!data?.length){setStatus('error');alert(await contractStateChangedMessage(row.id));return;}
+  CONTRACT_FLASH='최종 발송을 완료했습니다.';setStatus('saved');render();
 }
 async function rejectContractSend(id){
   const row=CONTRACT_ROWS.find(r=>Number(r.id)===Number(id));if(!row||ME.role!=='owner'||row.status!=='발송요청')return;
@@ -3891,6 +3963,7 @@ async function downloadContractPdf(id){
   const a=document.createElement('a');a.href=URL.createObjectURL(data);a.download=`contract-${id}-signed.pdf`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),60000);
 }
 function editContractRequest(id){
+  CONTRACT_EDIT_GENERATION++;
   const row=CONTRACT_ROWS.find(r=>Number(r.id)===Number(id));
   if(!row||ME.role!=='owner'||row.status!=='발송요청')return;
   const fields=contractObject(row.request_fields||row.fields);
@@ -3937,6 +4010,7 @@ async function cancelContract(id){
   setStatus('saved');render();
 }
 async function renderContractOwner(m){
+  CONTRACT_EDIT_GENERATION++;
   const [{data:templates,error:templateError},{data:rows,error:contractError},{data:terms,error:termError}]=await Promise.all([
     sb.from('doc_templates').select('*').eq('active',true).order('id'),
     sb.from('contracts').select('*').order('created_at',{ascending:false}),
@@ -5036,8 +5110,9 @@ async function accountDeleteFailureText(error,data){
   return '로그인 계정 삭제 실패 — 아무것도 지워지지 않았습니다: '+detail;
 }
 /* account-delete-ui:test-end */
-let BULK_ROLE_SELECTED=new Set();
+let BULK_ROLE_EDIT_GENERATION=0,BULK_ROLE_SELECTED=new Set();
 async function renderOwner(m){
+  BULK_ROLE_EDIT_GENERATION++;
   const {unlinkedRoster,pendingApproval}=accountFillingLists(SCHEDULE_PEOPLE,PROFILES);
   const deptItems=hubList('list.profile_depts',[{code:'진료실',label:'진료실'},{code:'데스크',label:'데스크'},{code:'기공팀',label:'기공팀'},{code:'기타',label:'기타'}]); // 원장이 허브 설정 › 목록에서 이름을 고침(코드 고정)
   const {data:phoneRows,error:phoneError}=ME.role==='owner'?await sb.rpc('get_employee_phone_notification_status'):{data:[],error:null};
@@ -5095,8 +5170,9 @@ async function renderOwner(m){
 }
 async function setRole(uid,role){const {error}=await sb.rpc('update_employee_profile_field',{p_user_id:uid,p_field:'role',p_value:role});if(error){setStatus('error');showScheduleRosterError('권한 변경 실패: '+error.message);return;}await loadProfiles();setStatus('saved');
   if(uid===ME.id){ME.role=role;renderNav();}render();}
-function toggleBulkRoleSelect(uid,checked){if(checked)BULK_ROLE_SELECTED.add(uid);else BULK_ROLE_SELECTED.delete(uid);}
+function toggleBulkRoleSelect(uid,checked){BULK_ROLE_EDIT_GENERATION++;if(checked)BULK_ROLE_SELECTED.add(uid);else BULK_ROLE_SELECTED.delete(uid);}
 async function applyBulkRole(){
+  const main=$('#main'),gen=BULK_ROLE_EDIT_GENERATION;
   const sel=$('#bulkRoleSelect'),role=sel?sel.value:'';
   const uids=bulkRoleApplyTargets(PROFILES,BULK_ROLE_SELECTED,ME.id,role);
   if(!uids.length){setStatus('error');showScheduleRosterError('적용할 대상을 선택하세요.');return;}
@@ -5105,8 +5181,8 @@ async function applyBulkRole(){
     const {error}=await sb.rpc('update_employee_profile_field',{p_user_id:uid,p_field:'role',p_value:role});
     if(error){setStatus('error');showScheduleRosterError('일괄 권한 변경 실패: '+error.message);return;}
   }
-  BULK_ROLE_SELECTED=new Set();
-  await loadProfiles();setStatus('saved');render();
+  await loadProfiles();setStatus('saved');if(gen!==BULK_ROLE_EDIT_GENERATION)return;
+  BULK_ROLE_SELECTED=new Set();if(main.isConnected!==false)render();
 }
 async function copyInviteMessage(){
   try{await navigator.clipboard.writeText(inviteMessageText());showScheduleRosterError(hubText('owner.invite.copied','안내 문구를 복사했습니다.'));}
@@ -5389,7 +5465,7 @@ enhanceFileDrops();
 boot();
 setInterval(loadSteps,1500);
 </script>
-<script src="ai-assistants.js?v=2026100309"></script>
+<script src="ai-assistants.js?v=2026101110"></script>
 <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}</script>
 </body>
 </html>

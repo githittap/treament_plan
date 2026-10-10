@@ -10,7 +10,7 @@ function setup(options={}){
   const ledger=[{user_id:'a',kind:'부여',days:10},{user_id:'a',kind:'사용',days:2},{user_id:'a',kind:'조정',days:1}];
   const c={ME:{role:options.role||'owner'},PROFILES:profiles,today:()=> '2026-10-03',suggestGrantDays:()=>15,esc:s=>String(s??'').replaceAll('<','&lt;').replaceAll('"','&quot;'),
     hubT:(key,def,vars)=>Object.entries(vars||{}).reduce((s,[k,v])=>s.replaceAll('{'+k+'}',v),(options.texts||{})[key]||def),
-    hubSetting:(key,def)=>settings[key]??def,$,alert:s=>alerts.push(s),confirm:()=>options.confirm!==false,renderLeave:async()=>calls.push("render"),setStatus:()=>{},sb:{
+    hubSetting:(key,def)=>settings[key]??def,$,alert:s=>alerts.push(s),confirm:()=>options.confirm!==false,render:async()=>calls.push("render"),setStatus:()=>{},sb:{
       from(table){calls.push(table);const chain={select:()=>chain,gte:()=>chain,lt:()=>chain,then(resolve){return Promise.resolve({data:table==='v_leave_balance'?balances:ledger,error:options.loadError?{message:'조회실패'}:null}).then(resolve);}};return chain;},
       async rpc(name,args){calls.push([name,args]);if(name==='get_monthly_leave_accrual_candidates')return options.candidateError?{error:{message:'후보조회실패'}}:{data:options.candidates||[],error:null};return options.rpcError?{error:{message:'저장실패'}}:{data:[{target_balance:args.p_target}],error:null};}
     }};

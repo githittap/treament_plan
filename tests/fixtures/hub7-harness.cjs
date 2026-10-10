@@ -45,7 +45,7 @@ function makeDom(){
   const reg={},hist=[];
   function el(sel){
     if(!reg[sel]){
-      const e={value:'',checked:false,files:[],disabled:false,hidden:false,style:{},dataset:{},classList:{add(){},remove(){},toggle(){}},
+      const e={value:'',checked:false,files:[],disabled:false,hidden:false,isConnected:true,style:{},dataset:{},classList:{add(){},remove(){},toggle(){}},
         addEventListener(){},removeAttribute(){},setAttribute(){},focus(){},scrollIntoView(){},querySelector(){return null;},querySelectorAll(){return [];}};
       let t='',h='';
       Object.defineProperty(e,'textContent',{get(){return t;},set(v){t=v;hist.push([sel,'t',String(v)]);},enumerable:true});
@@ -250,7 +250,7 @@ async function renderAll(html,opts){
   for(const [name,role,sbOver,q] of [['owner','owner',null,''],['staff','staff',null,''],['search','owner',null,'환자<a'],['search_none','owner',null,'zzz'],['empty','owner',{tables:{confidential_records:{list:[]}}},''],['error','owner',{tables:{confidential_records:{error:{message:'x'}}}},'']]){
     const d=makeDom();
     const r=await asRole(role,{$:d.$},sbOver);
-    const m={innerHTML:''};d.$('#main').innerHTML='';
+    const m={innerHTML:'',isConnected:true};d.$('#main').innerHTML='';
     await r.api.renderConfid(m);await flush();
     if(q){d.$('#cfQ').value=q;r.api.filterConfid();}
     out['conf.'+name]=jj([m.innerHTML,d.hist.map(h=>h.join('|')),r.log]);
@@ -259,6 +259,8 @@ async function renderAll(html,opts){
     const d=makeDom();
     const r=await asRole('owner',{$:d.$},sbOver);
     d.$('#cfName').value=vals.n;d.$('#cfBody').value=vals.b;d.$('#cfChart').value=vals.c||'';
+    // 저장의 공용 render 경로도 실제 진료기록을 조회하게 연결합니다.
+    r.ctx.render=()=>r.api.renderConfid(d.$('#main'));
     await r.api.submitConfidRecord();await flush();
     out['conf.submit_'+name]=jj([d.hist.map(h=>h.join('|')),r.log,r.statuses,r.rec]);
   }

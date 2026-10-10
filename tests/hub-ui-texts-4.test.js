@@ -13,6 +13,9 @@ async function renderAll(...args){
 }
 const golden=JSON.parse(read('tests/fixtures/hub4-golden-3d4b91e.json'));
 golden['static.modal.apMask']=golden['static.modal.apMask'].replace('보고 소명','보고 물품구매 소명');
+// 탭사용법 A4: 연차의 달력·목록 버튼 줄 분리만 새 기준에 반영하며 글·권한 대조는 유지합니다.
+for(const key of Object.keys(golden))if(typeof golden[key]==='string'&&golden[key].includes("LVSTATUS_VIEW='calendar'"))
+ golden[key]=golden[key].replace('render()"></label><button class="mini ','render()"></label></div><div class="rowflex"><button class="mini ');
 const clone=x=>JSON.parse(JSON.stringify(x));
 const CH4=/^(?!sug\.cmt\.)(appr|notice|cal|lvs|sug)\./;
 const STATIC_PART=hr.slice(0,hr.indexOf('<script src="hub-texts.js')); // 고정 HTML(모달)은 이 앞쪽에 있음

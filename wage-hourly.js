@@ -99,6 +99,7 @@ async function renderWageHourly(m){
  if(ME.role!=='owner')return;
  if(!WH_MONTH)WH_MONTH=today().slice(0,7);
  const [result,config]=await Promise.all([sb.rpc('wage_hourly_month',{p_month:WH_MONTH,p_user_id:null}),sb.rpc('wage_hourly_config')]);
+ if(m.isConnected===false)return;
  if(result.error||config.error){m.innerHTML=payTop()+`<div class="card">${esc(wageT('load_error','시급제 지급액을 불러오지 못했습니다. 잠시 후 다시 확인하세요.'))}</div>`;return;}
  WH_DATA=result.data;WH_CONFIG=config.data;
  m.innerHTML=payTop()+(WH_MESSAGE?`<div class="hint">${esc(WH_MESSAGE)}</div>`:'')+wageHourlyPanelHtml(result.data,true)+wageHourlyConfigHtml(config.data);

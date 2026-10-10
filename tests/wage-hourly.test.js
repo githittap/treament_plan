@@ -35,7 +35,7 @@ test('새 시급 문구는 모두 기존 허브 설정에 등록되며 캐시 �
  const js=read('wage-hourly.js'),texts=read('hub-texts.js'),hr=read('hr.html');
  const keys=[...js.matchAll(/wageT\('([^']+)'/g)].map(m=>m[1]);
  keys.forEach(k=>assert.ok(texts.includes("'wh."+k+"'"),k));
- assert.match(hr,/wage-hourly.js\?v=2026101004/);assert.match(hr,/await wageHourlyHome\(/);assert.match(hr,/await renderWageHourly\(/);
+ assert.match(hr,/wage-hourly.js\?v=2026101110/);assert.match(hr,/await wageHourlyHome\(/);assert.match(hr,/await renderWageHourly\(/);
  assert.match(hr,/hub-texts.js\?v=202610\d{4}/);
 });
 test('설정 화면은 평일·주말 시급·가입 여부·공제율을 입력할 수 있다',()=>{

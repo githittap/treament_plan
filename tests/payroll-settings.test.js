@@ -5,7 +5,7 @@ test('실제 상여 스크립트 선행 로드로 글·숫자·목록이 허브 
 test('확정·기본값·CSV·미확정 회신 글은 중복 없는 편집 목록이고 변경 JS 캐시는 7차임',()=>{
  const h=settings(),defs=h.hubTextDefs(),hr=fs.readFileSync('hr.html','utf8');
  for(const key of ['pay.bonus.unconfirmed','pay.bonus.confirmed','pay.bonus.confirm','pay.bonus.confirm_all','pay.bonus.confirmation_summary','pay.bonus.defaults','pay.bonus.default_amount','pay.bonus.import','pay.bonus.import_apply','pay.bonus.import_result','pay.reply.bonus_unconfirmed','pay.reply.bonus_review','pay.reply.hourly_correction_basis','pay.compare.bonus_unconfirmed'])assert.equal(defs.filter(d=>d.key===key).length,1,key);
- for(const name of ['payroll-bonus','payroll-reply','payroll-compare','hub-texts'])assert.ok(hr.includes(name+'.js?v=2026101007'),name);
+ for(const name of ['payroll-bonus','payroll-reply','payroll-compare','hub-texts'])assert.ok(hr.includes(name+'.js?v='+'2026101110'),name);
  h.hubTextSetOverrides([{key:'pay.bonus.confirm',value:'확정하기'},{key:'pay.bonus.defaults',value:'제안 기준'},{key:'pay.bonus.import_result',value:'입력 {inserted} · 제외 {skipped}'}]);
  assert.equal(h.hubText('pay.bonus.confirm','저장(확정)'),'확정하기');assert.equal(h.hubText('pay.bonus.import_result','',{inserted:2,skipped:1}),'입력 2 · 제외 1');
 });

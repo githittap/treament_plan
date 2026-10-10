@@ -27,17 +27,19 @@ const HUB_TEXT_MAX=20000;
 function hubEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 /* ── 글(표 hub_ui_texts) ── */
+const HUB_HELP_EMPTY='무엇:\n누가:\n쓰는 법:\n알아둘 점:';
 let HUB_TEXT_OVERRIDES={};
 function hubTextSetOverrides(rows){
   const next={};
   (Array.isArray(rows)?rows:[]).forEach(function(r){
-    if(r&&typeof r.key==='string'&&typeof r.value==='string'&&r.value.trim()!=='')next[r.key]=r.value;
+    if(r&&typeof r.key==='string'&&typeof r.value==='string'&&(r.value.trim()!==''||r.key.startsWith('help.')))next[r.key]=r.value;
   });
   HUB_TEXT_OVERRIDES=next;
 }
 function hubTextOverride(key){
   const has=Object.prototype.hasOwnProperty.call(HUB_TEXT_OVERRIDES,key);
   const v=has?HUB_TEXT_OVERRIDES[key]:null;
+  if(key.startsWith('help.')&&typeof v==='string'&&(v.trim()===''||v.trim()===HUB_HELP_EMPTY))return '';
   return (typeof v==='string'&&v.trim()!=='')?v:null;
 }
 function hubTextPutOverride(key,value){const next=Object.assign({},HUB_TEXT_OVERRIDES);next[key]=value;HUB_TEXT_OVERRIDES=next;}
@@ -168,6 +170,441 @@ function hubTextDefsMdeck(add){
   add('mdeck.back',S,'매뉴얼을 연 화면 위쪽 「매뉴얼 목록으로 돌아가기」 단추 글','← 매뉴얼 목록');
   add('mdeck.popup_blocked',S,'「편집」·「새 매뉴얼」을 눌렀는데 브라우저가 새 창을 막았을 때 뜨는 안내 글(원장·실장에게만 보임)','새 창이 열리지 않았어요. 이 사이트의 팝업을 허용한 뒤 다시 눌러 주세요.');
 }
+// 모든 메뉴와 화면 안 탭의 안내 목록. 탭 추가 시 tests/tab-help.test.js도 목록을 대조합니다.
+const HUB_HELP_TABS=[
+  {
+    "key": "home",
+    "label": "홈",
+    "roles": "직원·매니저·실장·원장",
+    "source": "hr.html renderHome",
+    "level": 1,
+    "def": "무엇: 내 연차·공지·미제출 서류와 필요한 업무의 요약을 보는 첫 화면입니다.\n누가: 직원·매니저·실장·원장이 사용합니다.\n쓰는 법:\n1. 내 연차 잔여·안 읽은 공지·미제출 서류를 확인합니다.\n2. 처리할 항목의 메뉴로 이동합니다.\n3. 내 명세서가 있으면 「보기」를 누릅니다.\n알아둘 점: 「문의함 열기」·「상담일지 열기」는 해당 업무를 볼 수 있는 사람에게 표시됩니다."
+  },
+  {
+    "key": "ai",
+    "label": "AI 도우미",
+    "roles": "직원·매니저·실장·원장",
+    "source": "ai-assistants.js renderShell",
+    "level": 1,
+    "def": "무엇: 업무별 도우미를 골라 질문하고 답을 받는 화면입니다.\n누가: 직원·매니저·실장·원장이 사용합니다.\n쓰는 법:\n1. 사용할 도우미 카드를 누릅니다.\n2. 메시지를 입력하고 「보내기」를 누릅니다.\n3. 다른 주제로 시작할 때는 「새 대화」를 누릅니다.\n알아둘 점: 원장은 화면 안 탭에서 도우미·모델·안내 문구를 관리할 수 있습니다."
+  },
+  {
+    "key": "sched",
+    "label": "근무표",
+    "roles": "직원·매니저·실장·원장",
+    "source": "hr.html renderSched / renderScheduleMonth",
+    "level": 2,
+    "def": "무엇: 주간·월간 근무표를 조회하고 근무 인원을 편집합니다.\n누가: 직원·매니저·실장·원장이 사용합니다. 승인된 직원·매니저는 초안인 주만 편집할 수 있습니다. 공표된 주는 실장·원장만 수정할 수 있습니다. 편집 가능한 칸을 체크하면 바로 저장됩니다.\n쓰는 법:\n1. 「주간 편집」에서 「◀ 지난주」·「다음주 ▶」로 주를 고릅니다.\n2. 날짜별 직원 칸을 체크합니다. 체크는 바로 저장됩니다.\n3. 실장·원장은 내용을 확인하고 「공표(확정)」을 누릅니다.\n알아둘 점: 체크는 바로 저장되며 별도 저장 단추가 없습니다. 공표된 주를 실장·원장이 고치면 다시 초안이 되므로 재공표해야 합니다. 승인 연차 날짜는 잠기지만 반차·조퇴는 제외됩니다."
+  },
+  {
+    "key": "calendar",
+    "label": "캘린더",
+    "roles": "직원·매니저·실장·원장",
+    "source": "hr.html renderCalendar",
+    "level": 2,
+    "def": "무엇: 근무표·승인된 연차·일정을 한 화면에서 확인합니다.\n누가: 직원·매니저·실장·원장이 사용합니다.\n쓰는 법:\n1. 「전체」·「근무」·「연차」에서 볼 내용을 고릅니다.\n2. 근무 캘린더에서는 주간·월간 보기와 대상 날짜를 고릅니다.\n3. 근무 캘린더에서는 날짜를 눌러 그날의 상세 내용을 확인합니다.\n알아둘 점: 근무 캘린더에서는 칸에 직무별 인원 수가 보이고, 「👤 이름 보기」를 켜면 이름이 보입니다. 날짜를 누르면 직무별 이름이 뜹니다. 「PNG로 저장」으로 그림을 받고 「PDF로 저장」으로 인쇄 창을 엽니다."
+  },
+  {
+    "key": "att",
+    "label": "출퇴근",
+    "roles": "직원·매니저·실장·원장",
+    "source": "hr.html renderAtt",
+    "level": 2,
+    "def": "무엇: 지문 출퇴근 기록과 수기 입력·소명 상태를 확인합니다.\n누가: 직원·매니저·실장은 내 출퇴근을 확인하고 수기 입력·소명을 제출합니다. 원장에게는 「내 출퇴근」과 「소명 올리기」가 없습니다.\n쓰는 법:\n1. 내 출퇴근 기록과 「근태」 상태를 확인합니다.\n2. 지문 기록이 없거나 다르면 수기 입력칸에 날짜·출근·퇴근 시각을 적고 「수기 입력 제출」을 누릅니다. 제출하면 승인 대기 상태가 됩니다.\n3. 기록과 실제 근무가 다르면 「소명 올리기」로 사유와 근거를 제출합니다.\n알아둘 점: 실장·원장은 수기·소명을 승인합니다. 「월 마감」은 원장만 할 수 있습니다."
+  },
+  {
+    "key": "owner",
+    "label": "계정·권한 관리",
+    "roles": "원장",
+    "source": "hr.html renderOwner",
+    "level": 2,
+    "def": "무엇: 가입 승인·직원 계정 상태·역할·탭 노출을 관리하는 화면입니다.\n누가: 원장이 사용합니다.\n쓰는 법:\n1. 미가입자·승인 대기 목록을 확인합니다.\n2. 가입 대기자는 「승인」으로 처리합니다.\n3. 직원 권한·탭 노출 설정·사람별 예외에서 필요한 항목을 변경합니다.\n알아둘 점: 탭 노출과 사람별 예외는 변경 즉시 반영됩니다. 계정 관리와 인사 기록의 상태는 서로 구분됩니다."
+  },
+  {
+    "key": "hubset",
+    "label": "허브 설정",
+    "roles": "원장",
+    "source": "hub-texts.js renderHubSettings",
+    "level": 2,
+    "def": "무엇: 직원 허브의 글·숫자 기준·목록을 직접 고치는 화면입니다.\n누가: 원장이 사용합니다.\n쓰는 법:\n1. 「글 고치기」·「숫자·기준」·「목록」에서 대상을 고릅니다.\n2. 현재 값을 고치고 해당 줄의 「저장」을 누릅니다.\n3. 원래 값이 필요하면 「기본으로 되돌리기」를 누릅니다.\n알아둘 점: 다른 직원은 허브를 다음에 열 때부터 변경된 값을 봅니다. AI 도우미 자체 안내 문구는 AI 화면에서 고칩니다."
+  },
+  {
+    "key": "aicost",
+    "label": "AI비용 / 마케팅비",
+    "roles": "원장·매니저",
+    "source": "hr.html renderAicost",
+    "level": 2,
+    "def": "무엇: 원장은 AI 청구·예산을, 허용된 매니저는 마케팅비를 확인합니다.\n누가: 원장이 사용합니다. 원장이 허용하면 매니저가 「📣 마케팅비」를 읽기 전용으로 봅니다.\n쓰는 법:\n1. ◀·▶ 버튼 또는 월 입력칸에서 달을 고릅니다.\n2. 원장은 플랫폼별 청구·사용량을, 매니저는 마케팅 지출 내역을 확인합니다.\n3. 원장은 청구 입력칸을 고친 뒤 「저장」을 누릅니다.\n4. 원장은 월 예산을 입력하고 「예산 저장」을 누릅니다.\n알아둘 점: 사용 기록의 추정 금액과 실제 청구액을 구분합니다. 매니저 화면은 조회용입니다."
+  },
+  {
+    "key": "ownerboards",
+    "label": "원장 보기판",
+    "roles": "원장",
+    "source": "hr.html renderOwnerBoards",
+    "level": 2,
+    "def": "무엇: PC에서 올라온 원장용 보기판을 확인합니다.\n누가: 원장이 사용합니다.\n쓰는 법:\n1. 보고 싶은 판의 카드를 고릅니다.\n2. 열린 판과 마지막으로 올라온 시각을 확인합니다.\n3. 「닫기」로 판을 닫고 다른 판을 고릅니다.\n알아둘 점: 아직 PC에서 올라오지 않은 판은 준비 중으로 표시됩니다."
+  },
+  {
+    "key": "pay",
+    "label": "급여",
+    "roles": "원장",
+    "source": "hr.html renderPay",
+    "level": 2,
+    "def": "무엇: 급여대장·임금 이력·명세서·상여·노무사 회신을 관리합니다.\n누가: 원장이 사용합니다.\n쓰는 법:\n1. 화면 안 탭에서 작업 종류를 고릅니다.\n2. 선택한 화면의 「대상 월」 또는 「적용일」을 확인합니다.\n3. 입력·저장·발행·확정은 각 화면의 해당 버튼으로 처리합니다.\n알아둘 점: 탭마다 저장 방식이 다릅니다. 아래 사용법에서 선택한 탭의 저장·확정 방식을 확인합니다."
+  },
+  {
+    "key": "actlog",
+    "label": "사용 기록",
+    "roles": "원장",
+    "source": "hub-activity.js render",
+    "level": 2,
+    "def": "무엇: 직원의 허브 접속·열람·작성·내려받기 기록을 확인합니다.\n누가: 원장이 사용합니다.\n쓰는 법:\n1. 기간과 직원·기록 종류를 고릅니다.\n2. 「조회」를 눌러 기록을 읽습니다.\n3. 더 보려면 「200줄 더 보기」, 파일로 받으려면 「CSV 내려받기」를 누릅니다.\n알아둘 점: 기록 조회 화면입니다. 이곳에서 직원의 업무 자료를 수정하지 않습니다."
+  },
+  {
+    "key": "ledger",
+    "label": "지출 점검",
+    "roles": "원장",
+    "source": "card-ledger-ui.js render",
+    "level": 2,
+    "def": "무엇: 카드 사용 내역과 가맹점·정기결제 정보를 점검합니다.\n누가: 원장이 사용합니다.\n쓰는 법:\n1. 조회 기간·카드·용도를 고릅니다.\n2. 사용 내역과 읽기 실패 내역을 확인합니다.\n3. 필요한 가맹점 메모·용도·정기결제 항목을 고친 뒤 「저장」을 누릅니다.\n알아둘 점: 카드 사용 내역과 용도 분류를 구분해서 확인합니다."
+  },
+  {
+    "key": "confid",
+    "label": "진료기록",
+    "roles": "진료기록 접근을 허용받은 직원·매니저·실장·원장",
+    "source": "hr.html renderConfid",
+    "level": 2,
+    "def": "무엇: 허용된 진료기록을 검색하고 기록을 추가합니다.\n누가: 진료기록 접근을 허용받은 직원·매니저·실장·원장이 사용합니다.\n쓰는 법:\n1. 「환자명·차트번호 검색」에 찾을 내용을 적습니다.\n2. 목록에서 기록 내용을 확인합니다.\n3. 기록 추가 칸에 환자명과 내용을 입력하고 저장합니다.\n알아둘 점: 원장은 새 기록을 원장 전용으로 지정할 수 있습니다. 기존 진료기록 접근 권한이 적용됩니다."
+  },
+  {
+    "key": "workdocs",
+    "label": "업무자료",
+    "roles": "직원·매니저·실장·원장",
+    "source": "hr.html renderWorkDocuments",
+    "level": 2,
+    "def": "무엇: 공개 업무자료와 직원용 허브 설명서를 확인합니다.\n누가: 직원·매니저·실장·원장이 사용합니다.\n쓰는 법:\n1. 「자료 검색」에 필요한 낱말을 적습니다.\n2. 원하는 자료 카드를 선택합니다.\n3. 처음 사용한다면 「업무자료 설명서 열기」를 누릅니다.\n알아둘 점: 자료 카드의 종류와 링크를 확인한 뒤 엽니다."
+  },
+  {
+    "key": "inbox",
+    "label": "문의함",
+    "roles": "문의함 접근을 허용받은 직원·매니저·실장·원장",
+    "source": "hr.html renderInbox",
+    "level": 2,
+    "def": "무엇: 여러 경로에서 들어온 문의와 처리 상태를 한곳에서 확인합니다.\n누가: 문의함 접근이 허용된 직원은 목록·상세를 조회합니다. 담당·상태·실제 답변 저장과 처리 완료는 매니저·실장·원장만 가능합니다.\n쓰는 법:\n1. 목록에서 문의 시각·경로·상태를 확인하고 「상세」를 엽니다.\n2. 매니저·실장·원장은 담당·상태를 「상태·담당 저장」으로 남기고 「상담일지로 전환」하거나 「실제 답변 기록」을 남깁니다.\n3. 매니저·실장·원장은 끝난 문의를 「✅ 처리」로 닫습니다. 직원은 조회만 할 수 있습니다.\n알아둘 점: 같은 연락처의 최근 문의는 묶어서 표시됩니다. 리콜 기능이 켜지면 「📞 리콜 명단」도 함께 표시됩니다."
+  },
+  {
+    "key": "consult",
+    "label": "상담일지",
+    "roles": "매니저·실장·원장",
+    "source": "hr.html renderConsultationJournal",
+    "level": 2,
+    "def": "무엇: 상담 내용과 다음 조치·담당자·예정일을 관리합니다.\n누가: 매니저·실장·원장이 사용합니다.\n쓰는 법:\n1. 환자명·상담일·구분·상태·상담 내용을 적습니다.\n2. 다음 조치와 담당자·예정일을 정하고 「저장」을 누릅니다.\n3. 목록에서 「수정」을 누르거나 「오늘·기한 지남」의 「열기」로 후속 업무를 확인합니다.\n알아둘 점: 새 상담은 「새로 입력」으로 작성합니다. 기존 상담의 완료 상태는 해당 입력칸에서 확인합니다."
+  },
+  {
+    "key": "tools",
+    "label": "도구",
+    "roles": "직원·매니저·실장·원장",
+    "source": "hr.html renderTools",
+    "level": 1,
+    "def": "무엇: 허브에서 사용할 수 있는 도구 모음입니다.\n누가: 직원·매니저·실장·원장이 사용합니다.\n쓰는 법:\n1. 필요한 도구 카드를 찾습니다.\n2. 카드의 「열기」를 누릅니다.\n3. 도구 화면의 「← 도구 목록」 또는 「새 창」을 이용합니다.\n알아둘 점: 기존 역할에 따라 볼 수 있는 도구만 표시됩니다. 별도 도구의 내부 사용법은 그 도구에서 확인합니다."
+  },
+  {
+    "key": "contract",
+    "label": "근로계약서",
+    "roles": "직원·매니저·실장·부원장·원장",
+    "source": "hr.html renderContract",
+    "level": 2,
+    "def": "무엇: 근로계약서를 작성·발송하거나 본인의 계약을 확인하고 서명합니다.\n누가: 직원·매니저·실장·부원장·원장이 사용합니다.\n쓰는 법:\n1. 직원·부원장은 받은 계약 내용을 확인합니다.\n2. 서명 대상 계약은 원문을 확인하고 서명 저장 버튼으로 제출합니다.\n3. 관리자는 서식·직원을 골라 「미리보기」 후 발송 요청 또는 최종 발송을 처리합니다.\n알아둘 점: 원장과 다른 관리자의 발송 권한이 다릅니다. 이미 발송한 계약과 새로 작성하는 계약을 구분합니다."
+  },
+  {
+    "key": "onbo",
+    "label": "내 서류함",
+    "roles": "직원·매니저·실장·원장",
+    "source": "hr.html renderOnbo",
+    "level": 2,
+    "def": "무엇: 입사 제출물·본인 서류·결제 요청 등 필요한 제출을 관리합니다.\n누가: 직원·매니저·실장·원장이 사용합니다. 「항목 추가」와 「확인」은 실장·원장만 가능하며 매니저는 관리자 목록을 조회만 합니다.\n쓰는 법:\n1. 내 입사 제출물의 필수 항목과 상태를 확인합니다.\n2. 자료에 맞게 「제출함」·「서류 올리기」·「연차 증빙 올리기」를 누릅니다. 체크리스트는 칸을 체크하고 「체크리스트 정보 저장」을 누릅니다.\n3. 제출 후 상태와 관리자 확인 여부를 확인합니다.\n알아둘 점: 업로드한 연차 증빙 파일은 서류함의 「연차증빙」 필터에서 확인합니다. 허브에서 신청한 연차의 신청서는 「연차」 탭의 「내 신청 내역」에서 「📄 신청서」를 눌러 확인합니다. 「지문 등록 완료 보고」는 매니저 승인으로 완료됩니다."
+  },
+  {
+    "key": "appr",
+    "label": "결재함",
+    "roles": "직원·매니저·실장·원장",
+    "source": "hr.html renderAppr",
+    "level": 2,
+    "def": "무엇: 문서를 올리고 실장 검토·원장 최종 결재의 진행 상태를 확인합니다.\n누가: 직원·매니저·실장·원장이 사용합니다.\n쓰는 법:\n1. 「결재 올리기」를 누르고 종류·내용·첨부를 작성합니다.\n2. 올린 문서는 「내가 올린 문서」에서 상태를 확인합니다.\n3. 실장·원장은 「내 결재 대기」에서 문서를 검토하고 「도장(승인)」 또는 반려로 처리합니다.\n알아둘 점: 직원은 문서를 올리고 상태를 봅니다. 실장 검토와 원장 최종 결재는 별도 단계입니다. 실장·원장은 「완결된 결재 문서」에서 완료 문서를 확인합니다. 직원·매니저는 「내가 올린 문서」에서 본인 문서의 완료 상태를 확인합니다."
+  },
+  {
+    "key": "leave",
+    "label": "연차",
+    "roles": "직원·매니저·실장·원장",
+    "source": "hr.html renderLeave",
+    "level": 2,
+    "def": "무엇: 연차를 신청하고 잔여·신청 상태·승인 내역을 확인합니다.\n누가: 직원·매니저·실장·원장이 사용합니다.\n쓰는 법:\n1. 내 연차 잔여와 신청 내역을 확인합니다.\n2. 「연차 신청」으로 기간·유형·사유를 작성합니다.\n3. 「신청서」 또는 신청 내역의 상태를 확인합니다.\n알아둘 점: 실장은 최종 승인하며 원장은 사전 반려가 가능합니다. 신청 중 수정·취소와 승인 뒤 취소·변경 요청은 구분됩니다. 같은 날 동시 휴가 제한이 있어 신청이 제한될 수 있습니다."
+  },
+  {
+    "key": "deposit",
+    "label": "입금",
+    "roles": "데스크 직원·실장·원장",
+    "source": "hr.html renderDeposit",
+    "level": 1,
+    "def": "무엇: 연결된 입금 내역을 기간별로 조회합니다.\n누가: 데스크 직원·실장·원장이 사용합니다.\n쓰는 법:\n1. 「오늘」·「7일」·「이번달」에서 기간을 고릅니다.\n2. 표의 입금 시각과 내용을 확인합니다.\n3. 필요한 기간으로 바꾸어 내역을 비교합니다.\n알아둘 점: 입금은 데스크·실장·원장의 조회 화면입니다."
+  },
+  {
+    "key": "notice",
+    "label": "공지",
+    "roles": "직원·매니저·실장·원장",
+    "source": "hr.html renderNotice",
+    "level": 2,
+    "def": "무엇: 공지와 첨부 자료를 읽고 공지를 작성합니다.\n누가: 직원·매니저·실장·원장이 사용합니다.\n쓰는 법:\n1. 목록에서 공지 본문·첨부를 읽고, 별도 전문은 「전문 ↗」으로 엽니다.\n2. 「공지 작성」으로 제목·내용·첨부를 올립니다.\n3. 「삭제」는 실장·원장만 누를 수 있습니다.\n알아둘 점: 승인된 활성 직원 누구나 공지를 작성할 수 있습니다. 공지 탭을 열면 읽음으로 처리됩니다."
+  },
+  {
+    "key": "suggestions",
+    "label": "건의함",
+    "roles": "직원·매니저·실장·원장",
+    "source": "hr.html renderSuggestions",
+    "level": 2,
+    "def": "무엇: 건의를 작성하고 의견·좋아요·댓글을 나누는 화면입니다.\n누가: 직원·매니저·실장·원장이 사용합니다.\n쓰는 법:\n1. 건의 입력칸에 제목과 내용을 작성하고 「건의 등록」을 누릅니다.\n2. 다른 건의를 읽고 좋아요·댓글로 의견을 남깁니다.\n3. 본인 건의는 화면의 「수정」·「수정 저장」으로 고칩니다.\n알아둘 점: 직접 올린 건의에는 좋아요를 누를 수 없습니다. 작성·수정 가능 여부는 열린 기간과 역할에 따라 달라집니다."
+  },
+  {
+    "key": "pay.ledger",
+    "label": "급여대장",
+    "roles": "원장",
+    "source": "hr.html renderPayLedger",
+    "level": 3,
+    "def": "무엇: 노무사 급여대장 또는 수기 행을 월별로 보관합니다.\n누가: 원장이 사용합니다.\n쓰는 법:\n1. 「대상 월」을 고릅니다.\n2. 「엑셀 업로드」 또는 「수기 행 추가」로 행을 준비하고 직원 연결을 확인합니다.\n3. 「급여대장 저장」을 누르고 저장 결과를 확인합니다.\n알아둘 점: 입력만으로 저장되지 않습니다. 계정에 연결되지 않은 행도 원본 성명으로 보관합니다."
+  },
+  {
+    "key": "pay.wage",
+    "label": "시급설정",
+    "roles": "원장",
+    "source": "hr.html renderPayWages",
+    "level": 3,
+    "def": "무엇: 직원별 기본급·시급과 적용일별 임금 이력을 관리합니다.\n누가: 원장이 사용합니다.\n쓰는 법:\n1. 직원의 급여형태·기본급/시급·통상시간을 확인합니다.\n2. 필요한 임금 항목과 「적용일」을 적습니다.\n3. 해당 직원 줄의 「저장」을 누릅니다.\n알아둘 점: 적용일을 새 날짜로 바꾸어 저장하면 새 임금 이력이 만들어집니다."
+  },
+  {
+    "key": "pay.payslip",
+    "label": "명세서",
+    "roles": "원장",
+    "source": "hr.html renderPaySlip",
+    "level": 3,
+    "def": "무엇: 저장된 급여대장을 바탕으로 직원 명세서를 발행합니다.\n누가: 원장이 사용합니다.\n쓰는 법:\n1. 「대상 월」과 「직원」을 고릅니다.\n2. 「인쇄 미리보기」로 내용을 확인합니다.\n3. 「발행」 또는 「재발행(덮어쓰기)」를 누릅니다.\n알아둘 점: 해당 월 급여대장을 먼저 저장해야 합니다. 재발행은 기존 명세서를 덮어씁니다."
+  },
+  {
+    "key": "pay.hourly",
+    "label": "시급제 월 지급액",
+    "roles": "원장",
+    "source": "wage-hourly.js renderWageHourly",
+    "level": 3,
+    "def": "무엇: 지문 출퇴근과 직원별 시급 설정으로 월 지급액을 계산합니다.\n누가: 원장이 사용합니다.\n쓰는 법:\n1. 「대상 월」을 고릅니다.\n2. 직원별 근무분·일별 근거와 「확인 필요」 표시를 확인합니다.\n3. 필요하면 「CSV 내려받기」로 자료를 받습니다.\n4. 설정은 해당 직원의 「저장」 또는 「공제율·소득세·구분 저장」으로 반영합니다.\n알아둘 점: 지문 누락·시급 미입력은 확인이 필요합니다. 참고용 세전 추정치는 세후 지급액과 구분됩니다. 설정은 맨 아래 접힌 칸에 있습니다. 입력 시급은 세후 시급이며 시급설정 탭과 별개입니다."
+  },
+  {
+    "key": "pay.bonus",
+    "label": "상여",
+    "roles": "원장",
+    "source": "payroll-bonus.js renderBonus",
+    "level": 3,
+    "def": "무엇: 월별 세후 상여와 기준 항목을 기록하고 급여대장 상여와 비교합니다.\n누가: 원장이 사용합니다.\n쓰는 법:\n1. 「대상 월」을 고릅니다.\n2. 직원의 기준 항목·세후 상여·사유 메모를 입력하고 저장 상태를 확인합니다.\n3. 필요하면 「기준 합계 넣기」로 참고 합계를 금액에 넣습니다.\n4. 확인한 직원은 「저장(확정)」, 전체는 「이 달 전부 확정」을 누릅니다.\n알아둘 점: 입력은 1초 뒤 자동 저장되지만 확정은 별도입니다. 확정 후 값을 고치면 다시 미확정이 됩니다. 지난달·CSV 제안은 기존 값·확정된 줄을 건너뜁니다. 「지난달 그대로 가져오기」로 지난달 값을 가져올 수 있습니다."
+  },
+  {
+    "key": "pay.reply",
+    "label": "노무사 회신",
+    "roles": "원장",
+    "source": "payroll-reply.js renderPayrollReply",
+    "level": 3,
+    "def": "무엇: 선택한 달의 월근태·시급 자료를 노무사 회신용 표로 묶습니다.\n누가: 원장이 사용합니다.\n쓰는 법:\n1. 「대상 월」을 고릅니다.\n2. 회신 표와 확인 필요 표시를 검토합니다.\n3. 조회가 끝나면 「엑셀 받기」를 누릅니다.\n알아둘 점: 미기록을 결근으로 판정하지 않습니다. 필요한 임금 설정이 없는 칸은 확인 후 회신합니다. 포괄 연장 미입력·상여 미확정 때는 「확인 필요」가 표시됩니다."
+  },
+  {
+    "key": "pay.compare",
+    "label": "대조",
+    "roles": "원장",
+    "source": "payroll-compare.js renderPayrollCompare",
+    "level": 3,
+    "def": "무엇: 노무사 회신 자료와 저장된 급여대장의 시간·금액 차이를 확인합니다.\n누가: 원장이 사용합니다.\n쓰는 법:\n1. 「대상 월」을 고릅니다.\n2. 항목별 대조 결과와 차이 표시를 확인합니다.\n3. 차이가 있는 항목은 근태·급여대장·시급 설정에서 근거를 다시 확인합니다.\n알아둘 점: 대조 화면은 조회용입니다. 차이를 표시해도 원본 자료를 자동 수정하지 않습니다."
+  },
+  {
+    "key": "ai.chat",
+    "label": "도우미",
+    "roles": "직원·매니저·실장·원장",
+    "source": "ai-assistants.js renderActiveSection",
+    "level": 3,
+    "def": "무엇: 선택한 도우미와 메시지·사진으로 대화합니다.\n누가: 직원·매니저·실장·원장이 사용합니다.\n쓰는 법:\n1. 도우미 카드를 누릅니다.\n2. 메시지를 입력하고 「보내기」를 누릅니다. 「📎 사진」은 최대 4장까지 첨부합니다.\n3. 「← 목록」으로 돌아가 다른 도우미를 고르거나, 새 주제는 「새 대화」로 시작합니다.\n알아둘 점: 사진을 못 읽는 모델이면, 예비 모델이 사진을 읽을 수 있을 때만 예비 모델이 대신 읽습니다. Ctrl+Enter로도 메시지를 보낼 수 있습니다."
+  },
+  {
+    "key": "ai.transcripts",
+    "label": "대화록",
+    "roles": "원장",
+    "source": "ai-assistants.js renderActiveSection",
+    "level": 3,
+    "def": "무엇: 저장된 직원별 도우미 대화록을 조회합니다.\n누가: 원장이 사용합니다.\n쓰는 법:\n1. 직원·도우미·시작일·종료일을 고릅니다.\n2. 「거르기」를 눌러 목록을 읽습니다.\n3. 대화를 선택하고 「이전」·「다음 50개」로 다른 기록을 확인합니다.\n알아둘 점: 원장만 조회할 수 있습니다. 대화 조회로 새 AI 답변을 생성하지 않습니다."
+  },
+  {
+    "key": "ai.manage",
+    "label": "도우미 관리",
+    "roles": "원장",
+    "source": "ai-assistants.js renderActiveSection",
+    "level": 3,
+    "def": "무엇: 도우미 이름·설명·모델·사용 가능 여부를 관리합니다.\n누가: 원장이 사용합니다.\n쓰는 법:\n1. 「새 도우미」 또는 기존 도우미의 「고치기」를 누릅니다.\n2. 도우미 설정을 입력하고 저장합니다.\n3. 목록에서 켜기·끄기 상태와 연결 모델을 확인합니다.\n알아둘 점: 변경된 도우미는 도우미 목록을 다시 열 때 반영됩니다. 「삭제」는 되돌릴 수 없습니다."
+  },
+  {
+    "key": "ai.models",
+    "label": "모델 목록",
+    "roles": "원장",
+    "source": "ai-assistants.js renderActiveSection",
+    "level": 3,
+    "def": "무엇: 도우미가 사용할 모델과 회사 목록을 관리합니다.\n누가: 원장이 사용합니다.\n쓰는 법:\n1. 「모델 직접 추가」 또는 「회사별 목록 불러오기」로 모델을 준비합니다.\n2. 「고치기」에서 모델 설정을 저장합니다.\n3. 켜기·끄기와 사진 지원 상태를 확인합니다.\n알아둘 점: 「시험」은 모델 호출을 실행하는 별도 버튼입니다. 등록된 회사 열쇠의 상태는 화면에서 확인합니다."
+  },
+  {
+    "key": "ai.usage",
+    "label": "사용 기록",
+    "roles": "원장",
+    "source": "ai-assistants.js renderActiveSection",
+    "level": 3,
+    "def": "무엇: 최근 30일의 AI 사용 건수·토큰·추정 금액을 요약해서 봅니다.\n누가: 원장이 사용합니다.\n쓰는 법:\n1. 「📊 사용 기록」을 엽니다.\n2. 맨 위의 전체 건수·입력/출력 토큰·추정 금액을 확인합니다.\n3. 날짜별·도우미별·직원별·모델별 요약 표를 봅니다.\n4. 가격이 없는 사용 기록은 「미상 N건」으로 확인합니다.\n알아둘 점: 최근 30일만 집계합니다. 금액은 추정치이며 실제 청구액은 AI비용 화면에서 확인합니다."
+  },
+  {
+    "key": "ai.texts",
+    "label": "안내 문구",
+    "roles": "원장",
+    "source": "ai-assistants.js renderActiveSection",
+    "level": 3,
+    "def": "무엇: AI 도우미 화면에 보이는 안내 문구를 고칩니다.\n누가: 원장이 사용합니다.\n쓰는 법:\n1. 고칠 문구가 속한 묶음을 엽니다.\n2. 현재 글을 고치고 「저장」을 누릅니다.\n3. 원래 글로 돌리려면 「기본으로 되돌리기」를 누릅니다.\n알아둘 점: AI 자체 문구 설정입니다. 허브 다른 탭의 글은 「허브 설정」에서 고칩니다."
+  },
+  {
+    "key": "hubset.texts",
+    "label": "글 고치기",
+    "roles": "원장",
+    "source": "hub-texts.js hubShellHtml / renderHubSettings",
+    "level": 3,
+    "def": "무엇: 허브의 화면 글과 각 탭 사용법을 고칩니다.\n누가: 원장이 사용합니다.\n쓰는 법:\n1. 검색칸에 탭 이름이나 「help.」를 적습니다.\n2. 화면 묶음을 열고 「지금 글」을 수정합니다.\n3. 해당 줄의 「저장」을 누릅니다.\n알아둘 점: 「❓ 탭 사용법」은 한 탭의 네 칸을 함께 고칩니다. 사용법 글을 비워 저장하면 버튼이 숨고, 「기본으로 되돌리기」로 다시 보입니다."
+  },
+  {
+    "key": "hubset.settings",
+    "label": "숫자·기준",
+    "roles": "원장",
+    "source": "hub-texts.js hubShellHtml / renderHubSettings",
+    "level": 3,
+    "def": "무엇: 알림 수신 대상과 조회 건수·일수 등 화면의 기본 기준을 정합니다.\n누가: 원장이 사용합니다.\n쓰는 법:\n1. 설정 화면을 엽니다.\n2. 맨 위 「🔔 알림 받는 사람」 표의 칸을 켜거나 끕니다. 변경은 즉시 저장됩니다.\n3. 나머지 숫자·기준은 값을 바꾼 뒤 해당 줄의 「저장」을 누릅니다.\n알아둘 점: 알림 표에는 별도 저장 버튼이 없습니다. 허용 범위를 벗어난 값은 저장되지 않습니다. 「기본으로 되돌리기」는 해당 설정을 복원합니다."
+  },
+  {
+    "key": "hubset.lists",
+    "label": "목록",
+    "roles": "원장",
+    "source": "hub-texts.js hubShellHtml / renderHubSettings",
+    "level": 3,
+    "def": "무엇: 부서·문서 상태 등 목록의 표시 이름을 고칩니다.\n누가: 원장이 사용합니다.\n쓰는 법:\n1. 변경할 목록 묶음을 엽니다.\n2. 표시 이름을 수정합니다.\n3. 해당 목록의 「저장」을 누릅니다.\n알아둘 점: 회색 코드는 내부 기준이라 바꿀 수 없습니다. 추가·순서 변경이 허용된 목록만 해당 버튼이 표시됩니다."
+  },
+  {
+    "key": "sched.week",
+    "label": "주간 편집",
+    "roles": "직원·매니저·실장·원장",
+    "source": "hr.html renderSched / renderScheduleMonth",
+    "level": 3,
+    "def": "무엇: 한 주의 직원별 근무·추가·휴무 배치를 편집합니다.\n누가: 직원·매니저·실장·원장이 사용합니다. 승인된 직원·매니저는 초안인 주만 편집할 수 있습니다. 공표된 주는 실장·원장만 수정할 수 있습니다. 편집 가능한 칸을 체크하면 바로 저장됩니다.\n쓰는 법:\n1. 「주간 편집」에서 「◀ 지난주」·「다음주 ▶」로 주를 고릅니다.\n2. 날짜별 직원 칸을 체크합니다. 체크는 바로 저장됩니다.\n3. 실장·원장은 확인 후 「공표(확정)」을 누릅니다.\n알아둘 점: 체크는 바로 저장되며 별도 저장 단추가 없습니다. 공표된 주를 실장·원장이 고치면 다시 초안이 되므로 재공표해야 합니다. 승인 연차 날짜는 잠기지만 반차·조퇴는 제외됩니다."
+  },
+  {
+    "key": "sched.month",
+    "label": "월간 직무표",
+    "roles": "직원·매니저·실장·원장",
+    "source": "hr.html renderSched / renderScheduleMonth",
+    "level": 3,
+    "def": "무엇: 한 달의 직무별 인원 배치를 확인하고 편집합니다.\n누가: 직원·매니저·실장·원장이 사용합니다. 승인된 직원·매니저는 초안인 주만 편집할 수 있습니다. 공표된 주는 실장·원장만 수정할 수 있습니다. 편집 가능한 칸을 체크하면 바로 저장됩니다.\n쓰는 법:\n1. 주간 화면에서 「월간 편집」을 누릅니다. 월간 화면의 버튼 이름은 「월간 직무표」입니다.\n2. 대상 월을 고르고 직무별·날짜별 근무 인원을 확인하거나 체크합니다.\n3. 「PDF 저장」·「인쇄」는 모두 인쇄 창을 엽니다. PDF 파일은 인쇄 창에서 PDF 저장을 선택합니다.\n알아둘 점: 체크는 바로 저장됩니다. 공표는 주간 화면에서만 합니다. 공표된 주를 실장·원장이 고치면 다시 초안이 되어 재공표해야 합니다."
+  },
+  {
+    "key": "calendar.all",
+    "label": "전체",
+    "roles": "직원·매니저·실장·원장",
+    "source": "hr.html setCalendarView / renderCalendar",
+    "level": 3,
+    "def": "무엇: 근무·연차·일정을 함께 확인하는 캘린더 보기입니다.\n누가: 직원·매니저·실장·원장이 사용합니다.\n쓰는 법:\n1. 「전체」를 누릅니다.\n2. 대상 기간을 고릅니다.\n3. 날짜별 표시와 상세 내용을 확인합니다.\n알아둘 점: 칸에는 직무별 인원 수가 보이고, 「👤 이름 보기」를 켜면 이름이 보입니다. 날짜를 누르면 직무별 이름이 뜹니다. 「PNG로 저장」으로 그림을 받고 「PDF로 저장」으로 인쇄 창을 엽니다."
+  },
+  {
+    "key": "calendar.work",
+    "label": "근무",
+    "roles": "직원·매니저·실장·원장",
+    "source": "hr.html setCalendarView / renderCalendar",
+    "level": 3,
+    "def": "무엇: 근무 중심으로 확인하는 캘린더 보기입니다.\n누가: 직원·매니저·실장·원장이 사용합니다.\n쓰는 법:\n1. 「근무」를 누릅니다.\n2. 대상 기간을 고릅니다.\n3. 날짜별 표시와 상세 내용을 확인합니다.\n알아둘 점: 보기 전환으로 원본 일정이나 근무표가 변경되지 않습니다."
+  },
+  {
+    "key": "calendar.leave",
+    "label": "연차",
+    "roles": "직원·매니저·실장·원장",
+    "source": "hr.html setCalendarView / renderCalendar",
+    "level": 3,
+    "def": "무엇: 승인된 연차를 달력 또는 목록으로 확인합니다.\n누가: 직원·매니저·실장·원장이 사용합니다.\n쓰는 법:\n1. 「연차 캘린더」 화면에서 「달력 보기」 또는 「목록 보기」를 누릅니다.\n2. 「대상 월」을 고릅니다.\n3. 날짜별 연차 표시 또는 목록의 이름·기간·일수를 확인합니다.\n알아둘 점: 승인된 연차만 표시합니다. 목록의 이름·기간·일수는 모두 보이며 종류·신청·승인 시각은 원장에게만 보입니다."
+  },
+  {
+    "key": "calendar.period.week",
+    "label": "주간",
+    "roles": "직원·매니저·실장·원장",
+    "source": "hr.html setCalendarPeriod",
+    "level": 3,
+    "def": "무엇: 한 주의 근무·연차·일정을 표로 확인합니다.\n누가: 직원·매니저·실장·원장이 사용합니다.\n쓰는 법:\n1. 「주간」을 누릅니다.\n2. 날짜 또는 지난주·다음주 버튼으로 주를 고릅니다.\n3. 날짜별 셀을 눌러 상세 내용을 확인합니다.\n알아둘 점: 칸에는 직무별 인원 수가 보이고, 「👤 이름 보기」를 켜면 이름이 보입니다. 날짜를 누르면 직무별 이름이 뜹니다. 「PNG로 저장」으로 그림을 받고 「PDF로 저장」으로 인쇄 창을 엽니다."
+  },
+  {
+    "key": "calendar.period.month",
+    "label": "월간",
+    "roles": "직원·매니저·실장·원장",
+    "source": "hr.html setCalendarPeriod",
+    "level": 3,
+    "def": "무엇: 한 달의 날짜별 일정과 근무를 확인합니다.\n누가: 직원·매니저·실장·원장이 사용합니다.\n쓰는 법:\n1. 「월간」을 누릅니다.\n2. 「대상 월」을 고릅니다.\n3. 날짜를 눌러 선택한 날의 상세 내용을 확인합니다.\n알아둘 점: 칸에는 직무별 인원 수가 보이고, 「👤 이름 보기」를 켜면 이름이 보입니다. 날짜를 누르면 직무별 이름이 뜹니다. 「PNG로 저장」으로 그림을 받고 「PDF로 저장」으로 인쇄 창을 엽니다."
+  },
+  {
+    "key": "calendar.leave.calendar",
+    "label": "달력 보기",
+    "roles": "직원·매니저·실장·원장",
+    "source": "hr.html renderLeaveStatus",
+    "level": 3,
+    "def": "무엇: 승인된 연차를 월간 달력으로 확인합니다.\n누가: 직원·매니저·실장·원장이 사용합니다.\n쓰는 법:\n1. 「연차 캘린더」 화면에서 「달력 보기」를 누릅니다.\n2. 「대상 월」을 고릅니다.\n3. 해당 날짜의 승인 연차 표시를 확인합니다.\n알아둘 점: 신청 중인 연차는 표시하지 않습니다. 「근무 캘린더」로 근무 화면으로 돌아갑니다."
+  },
+  {
+    "key": "calendar.leave.list",
+    "label": "목록 보기",
+    "roles": "직원·매니저·실장·원장",
+    "source": "hr.html renderLeaveStatus",
+    "level": 3,
+    "def": "무엇: 승인된 연차를 목록으로 확인합니다.\n누가: 직원·매니저·실장·원장이 사용합니다.\n쓰는 법:\n1. 「연차 캘린더」 화면에서 「목록 보기」를 누릅니다.\n2. 「대상 월」을 고릅니다.\n3. 목록의 이름·기간·일수를 확인합니다.\n알아둘 점: 승인된 연차만 표시합니다. 목록의 이름·기간·일수는 모두 보이며 종류·신청·승인 시각은 원장에게만 보입니다."
+  },
+  {
+    "key": "inbox.inbox",
+    "label": "문의함",
+    "roles": "문의함·리콜 접근을 허용받은 직원·매니저·실장·원장",
+    "source": "hr.html recallTabsHtml / inboxSetSubtab",
+    "level": 3,
+    "def": "무엇: 통합 문의 목록과 처리 내역을 확인합니다.\n누가: 문의함 접근이 허용된 직원은 목록·상세를 조회합니다. 담당·상태·실제 답변 저장과 처리 완료는 매니저·실장·원장만 가능합니다.\n쓰는 법:\n1. 목록에서 문의 시각·경로·상태를 확인하고 「상세」를 엽니다.\n2. 매니저·실장·원장은 담당·상태를 「상태·담당 저장」으로 남기고 「상담일지로 전환」하거나 「실제 답변 기록」을 남깁니다.\n3. 매니저·실장·원장은 끝난 문의를 「✅ 처리」로 닫습니다. 직원은 조회만 할 수 있습니다.\n알아둘 점: 리콜 기능이 꺼져 있으면 이 하위 탭 단추는 나오지 않습니다."
+  },
+  {
+    "key": "inbox.recall",
+    "label": "리콜 명단",
+    "roles": "문의함·리콜 접근을 허용받은 직원·매니저·실장·원장",
+    "source": "hr.html recallTabsHtml / inboxSetSubtab",
+    "level": 3,
+    "def": "무엇: 문의와 상담일지의 후속 조치를 연락처별로 묶어 확인합니다.\n누가: 리콜 접근이 허용된 데스크 직원·매니저·실장·원장이 조회하고 연락·예정일·완료를 기록합니다.\n쓰는 법:\n1. 「📞 리콜 명단」을 누릅니다.\n2. 단계·담당·마지막 메모·다음 연락 예정일로 대상을 고릅니다.\n3. 줄의 「📞 연락함」 또는 「예정일 바꾸기」를 눌러 메모·예정일 칸을 열고 「저장」을 누릅니다.\n4. 끝난 리콜은 「✅ 리콜 끝」을 누릅니다. 자료를 다시 확인하려면 「새로 조회」를 누릅니다.\n알아둘 점: 「✅ 리콜 끝」은 확인 창 없이 바로 저장됩니다. 리콜 기능이 켜져 있어야 보입니다. 저장 결과가 불분명하면 새로 조회합니다."
+  },
+  {
+    "key": "deposit.today",
+    "label": "오늘",
+    "roles": "데스크 직원·실장·원장",
+    "source": "hr.html setDepRange",
+    "level": 3,
+    "def": "무엇: 오늘의 입금 내역을 확인합니다.\n누가: 데스크 직원·실장·원장이 사용합니다.\n쓰는 법:\n1. 「오늘」을 누릅니다.\n2. 표의 시각·금액·입금자·계좌를 확인합니다.\n3. 다른 기간 버튼으로 바꾸어 내역을 비교합니다.\n알아둘 점: 미검증 자동 알림이며 회계 원장이 아닌 수기 대조용입니다."
+  },
+  {
+    "key": "deposit.week",
+    "label": "7일",
+    "roles": "데스크 직원·실장·원장",
+    "source": "hr.html setDepRange",
+    "level": 3,
+    "def": "무엇: 7일 전 0시부터 오늘까지의 입금 내역을 확인합니다.\n누가: 데스크 직원·실장·원장이 사용합니다.\n쓰는 법:\n1. 「7일」을 누릅니다.\n2. 표의 시각·금액·입금자·계좌를 확인합니다.\n3. 다른 기간 버튼으로 바꾸어 내역을 비교합니다.\n알아둘 점: 미검증 자동 알림이며 회계 원장이 아닌 수기 대조용입니다. 「7일」은 7일 전 0시부터 오늘까지입니다."
+  },
+  {
+    "key": "deposit.month",
+    "label": "이번달",
+    "roles": "데스크 직원·실장·원장",
+    "source": "hr.html setDepRange",
+    "level": 3,
+    "def": "무엇: 이번 달의 입금 내역을 확인합니다.\n누가: 데스크 직원·실장·원장이 사용합니다.\n쓰는 법:\n1. 「이번달」을 누릅니다.\n2. 표의 시각·금액·입금자·계좌를 확인합니다.\n3. 다른 기간 버튼으로 바꾸어 내역을 비교합니다.\n알아둘 점: 미검증 자동 알림이며 회계 원장이 아닌 수기 대조용입니다."
+  }
+];
 const HUB_INVITE_DEFAULT='아산정플란트치과 직원허브 가입 안내입니다.\n\n1) 아래 링크로 접속해 회원가입 해주세요.\nhttps://jung-plant.com/hr.html\n2) 회원가입 후 원장 승인을 기다려 주세요.\n3) 승인되면 같은 링크에서 로그인하시면 됩니다.';
 const HUB_NEXT_BODY_DEFAULT='M2 근무표·계약서 자동생성 · M3 급여 대시보드/명세서 발행·월말 평가·휴일근로 계산기 · M4 채용·입금피드·기공차트 통합\n— 백엔드(표)는 이미 준비됨. 화면만 순차 추가.';
 // ── 차례 2: 내 서류함 + 업무자료 글(기본 글은 hr.html의 글과 같아야 함 — 시험이 대조) ──
@@ -1249,6 +1686,8 @@ function hubTextDefsChapter6(add){
   add('contract.m_sending_owner',C2,'발송 — 원장이 발송하는 동안 뜨는 글','발송 중…');
   add('contract.m_sending_req',C2,'발송 — 실장·매니저가 원장에게 요청하는 동안 뜨는 글','원장 발송 요청 중…');
   add('contract.m_fail_edit',C2,'발송 — 고쳐서 발송하다 실패했을 때 뜨는 글({msg}는 서버 오류)','수정 발송 실패: {msg}',['msg']);
+  add('contract.m_update_zero',C2,'발송 — 상태가 바뀌어 저장 안 됨 — 새로고침 전 복사 안내({status}=지금 상태)','이 계약은 이미 상태가 바뀌어 이번 수정은 저장되지 않았습니다(지금 상태: {status}). 입력 내용은 지금 화면에만 남아 있으니, 새로고침하기 전에 복사해 두세요.',['status']);
+  add('contract.m_status_unknown',C2,'발송 — 바뀐 계약 상태를 조회하지 못했을 때 표시','확인하지 못함');
   add('contract.m_fail_send',C2,'발송 실패 글({msg}는 서버 오류 · 최종 발송 확인 때도 같음)','발송 실패: {msg}',['msg']);
   add('contract.m_sent',C2,'발송을 마쳤을 때 새 계약서 칸 아래에 뜨는 글(원장)','발송했습니다.');
   add('contract.m_requested',C2,'원장에게 발송을 요청했을 때 새 계약서 칸 아래에 뜨는 글(실장·매니저)','원장에게 최종 발송을 요청했습니다.');
@@ -2075,6 +2514,7 @@ function hubTextDefs(){
   hubTextDefsSpend(add);
   hubTextDefsTools(add);
   hubTextDefsMdeck(add);
+  HUB_HELP_TABS.forEach(t=>add("help."+t.key,"❓ 탭 사용법",t.label+" — "+t.roles+(t.key==='ai'?' · AI 탭은 자체 사용법을 써서 이 글은 화면에 나오지 않습니다':''),t.def));
   ((typeof globalThis!=='undefined'&&globalThis.HUB_CARD_LEDGER_TEXT_DEFS)||[]).forEach(d=>add(d[0],'지출 점검',d[1],d[1],Array.from(d[1].matchAll(/\{([a-z_]+)\}/g),m=>m[1])));
   ((typeof globalThis!=='undefined'&&globalThis.HUB_INTRO_TEXT_DEFS)||[]).forEach(function(d){add(d[0],'🌌 첫 화면',d[1],d[2]);}); // hub-intro.js의 첫 화면 글
   hubTextDefsP7(add);
@@ -2415,9 +2855,10 @@ function hubTextNorm(v){return String(v==null?'':v).replace(/\r\n/g,'\n').trim()
 async function hubTextsSave(sb,key,value){
   const def=hubTextDefByKey(key);
   if(!def)return {ok:false,reason:'unknown_key',error:null};
-  const v=String(value==null?'':value).replace(/\r\n/g,'\n');
+  let v=String(value==null?'':value).replace(/\r\n/g,'\n');
+  if(key.startsWith('help.')&&v.trim()==='')v=HUB_HELP_EMPTY;
   if(v.length>HUB_TEXT_MAX)return {ok:false,reason:'too_long',error:null};
-  const same=v.trim()===''||hubTextNorm(v)===hubTextNorm(def.def);
+  const same=(!key.startsWith('help.')&&v.trim()==='')||hubTextNorm(v)===hubTextNorm(def.def);
   try{
     if(same){
       const r=await sb.from('hub_ui_texts').delete().eq('key',key);
@@ -2594,6 +3035,7 @@ async function hubManualWrite(sb,group,raw){
 /* hub-texts:test-end */
 
 /* ── 화면: 「⚙️ 허브 설정」 탭(원장 전용) — 📝 글 고치기 · 🔢 숫자·기준 · 📋 목록 ── */
+let HUB_LIST_EDIT_GENERATION=0;
 let HUB_SB=null,HUB_ME={},HUB_ROOT=null,HUB_SUBTAB='texts',HUB_STYLE_INJECTED=false,HUB_LIST_DRAFT={};
 
 function hubEnsureStyle(){
@@ -2639,7 +3081,7 @@ async function renderHubSettings(m,ctx){
   HUB_SB=(ctx&&ctx.sb)||null;
   HUB_ME=(ctx&&ctx.me)||{};
   HUB_ROOT=m;
-  if(!m)return;
+  if(!m||m.isConnected===false)return;
   // 원장이 아니면 아무것도 그리지 않는다(탭도 숨기지만 한 번 더 막는다). DB도 쓰기는 원장만 허용한다.
   if(HUB_ME.role!=='owner'){m.innerHTML='<div class="card"><div class="empty">원장만 볼 수 있는 화면입니다.</div></div>';return;}
   hubEnsureStyle();
@@ -2652,16 +3094,24 @@ async function renderHubSettings(m,ctx){
   if(HUB_SUBTAB==='settings')await hubRenderSettingsSection(sec);
   else if(HUB_SUBTAB==='lists')await hubRenderListsSection(sec);
   else await hubRenderTextsSection(sec);
+  if(m.isConnected===false||sec.isConnected===false)return;
+  if(root.HubHelp){
+    root.HubHelp.mount(m,'hubset',hubText('tab.hubset','⚙️ 허브 설정'),m.querySelector('h2'));
+    const d=HUB_HELP_TABS.find(t=>t.key==='hubset.'+HUB_SUBTAB);
+    root.HubHelp.mount(m,d.key,d.label,m.querySelector('.hub-subnav'));
+  }
 }
 
 /* ── 📝 글 고치기 ── */
 async function hubRenderTextsSection(sec){
+  if(!sec||sec.isConnected===false)return;
   sec.innerHTML='<div class="empty">불러오는 중…</div>';
-  try{hubTextSetOverrides(await hubTextsFetch(HUB_SB));} // 탭을 열 때마다 최신 값으로
-  catch(e){sec.innerHTML='<div class="empty">불러오지 못했습니다: '+hubEsc((e&&e.message)||'')+' · 표(hub_ui_texts)가 아직 없으면 원장이 SQL을 먼저 적용해야 해요.</div>';return;}
+  try{const texts=await hubTextsFetch(HUB_SB);if(sec.isConnected===false)return;hubTextSetOverrides(texts);} // 탭을 열 때마다 최신 값으로
+  catch(e){if(sec.isConnected===false)return;sec.innerHTML='<div class="empty">불러오지 못했습니다: '+hubEsc((e&&e.message)||'')+' · 표(hub_ui_texts)가 아직 없으면 원장이 SQL을 먼저 적용해야 해요.</div>';return;}
   hubDrawTextsSection(sec);
 }
 function hubDrawTextsSection(sec){
+  if(!sec||sec.isConnected===false)return;
   const defs=hubTextDefs(),groups=[];
   defs.forEach(function(d,i){
     let g=groups.find(function(x){return x.name===d.screen;});
@@ -2679,6 +3129,7 @@ function hubDrawTextsSection(sec){
             '<div class="hub-where"><b>'+hubEsc(d.where)+'</b> <span id="hubTxtBadge_'+i+'">'+hubBadge(hubTextOverride(d.key)!=null)+'</span></div>'+
             '<div class="sub">이름표: '+hubEsc(d.key)+(d.vars?' · 글 안의 '+d.vars.map(function(v){return '{'+v+'}';}).join(' ')+'은 화면이 채워 넣는 자리라 지우지 마세요':'')+'</div>'+
             '<div class="sub">기본 글</div><pre class="hub-def">'+hubEsc(d.def)+'</pre>'+
+            (d.key==='help.ai'?'<div class="sub">AI 탭은 자체 사용법을 써서 이 글은 화면에 나오지 않습니다</div>':d.key.startsWith('help.')?'<div class="sub">빈 글로 저장하면 이 탭의 사용법 버튼을 숨깁니다.</div>':'')+
             '<label class="sub" for="hubTxtIn_'+i+'">지금 글 (여기서 고쳐요)</label>'+
             '<textarea id="hubTxtIn_'+i+'" rows="'+hubRowsFor(d)+'">'+hubEsc(cur)+'</textarea>'+
             '<div class="rowflex"><button class="mini stamp" data-hub-text-save="'+i+'">저장</button><button class="mini" data-hub-text-reset="'+i+'">기본으로 되돌리기</button><span class="hint" id="hubTxtMsg_'+i+'"></span></div>'+
@@ -2705,6 +3156,7 @@ function hubApplyTextFilter(sec,query){
   });
 }
 function hubAfterTextWrite(sec,i,r,okMsg){
+  if(!sec||sec.isConnected===false)return;
   const d=hubTextDefs()[i];
   const msg=sec.querySelector('#hubTxtMsg_'+i),inp=sec.querySelector('#hubTxtIn_'+i),badge=sec.querySelector('#hubTxtBadge_'+i);
   if(!r.ok){
@@ -2734,9 +3186,10 @@ async function hubResetTextRow(sec,i){
 
 /* ── 🔢 숫자·기준 ── */
 async function hubRenderSettingsSection(sec){
+  if(!sec||sec.isConnected===false)return;
   sec.innerHTML='<div class="empty">불러오는 중…</div>';
   try{await hubSettingsRefresh(HUB_SB);}
-  catch(e){sec.innerHTML='<div class="empty">불러오지 못했습니다: '+hubEsc((e&&e.message)||'')+'</div>';return;}
+  catch(e){if(sec.isConnected===false)return;sec.innerHTML='<div class="empty">불러오지 못했습니다: '+hubEsc((e&&e.message)||'')+'</div>';return;}
   hubDrawSettingsSection(sec);
 }
 // 정수 목록은 화면에 「14, 30, 60」 모양으로 보여 주고, 기본값 비교도 같은 모양(검사를 거친 값)으로 한다.
@@ -2753,6 +3206,7 @@ function hubSettingIsDefault(d,raw){
   return a.ok&&b.ok?a.value===b.value:true; // 잘못된 값이 들어 있으면 읽을 때 기본값을 쓰므로 기본으로 본다
 }
 function hubDrawSettingsSection(sec){
+  if(!sec||sec.isConnected===false)return;
   const groups=[];
   HUB_SETTING_DEFS.forEach(function(d,i){
     let g=groups.find(function(x){return x.name===d.screen;});
@@ -2797,6 +3251,7 @@ function hubDrawSettingsSection(sec){
   });});
 }
 function hubAfterSettingWrite(sec,i,r){
+  if(!sec||sec.isConnected===false)return;
   const d=HUB_SETTING_DEFS[i];
   const msg=sec.querySelector('#hubSetMsg_'+i),inp=sec.querySelector('#hubSetIn_'+i),badge=sec.querySelector('#hubSetBadge_'+i);
   if(!r.ok){
@@ -2821,14 +3276,19 @@ async function hubResetSettingRow(sec,i){
 
 /* ── 📋 목록 ── */
 async function hubRenderListsSection(sec){
+  if(!sec||sec.isConnected===false)return;
+  const gen=++HUB_LIST_EDIT_GENERATION;
   sec.innerHTML='<div class="empty">불러오는 중…</div>';
   try{await hubSettingsRefresh(HUB_SB);}
-  catch(e){sec.innerHTML='<div class="empty">불러오지 못했습니다: '+hubEsc((e&&e.message)||'')+'</div>';return;}
+  catch(e){if(sec.isConnected===false||gen!==HUB_LIST_EDIT_GENERATION)return;sec.innerHTML='<div class="empty">불러오지 못했습니다: '+hubEsc((e&&e.message)||'')+'</div>';return;}
+  if(sec.isConnected===false||gen!==HUB_LIST_EDIT_GENERATION)return;
   HUB_LIST_DRAFT={};HUB_CARD_DRAFT={};
   hubDrawListsSection(sec);
 }
 function hubListItemsFor(def){return HUB_LIST_DRAFT[def.key]||hubList(def.key,def.def);}
 function hubDrawListsSection(sec){
+  if(!sec||sec.isConnected===false)return;
+  HUB_LIST_EDIT_GENERATION++;
   sec.innerHTML='<div class="sub">선택지에 나오는 이름이에요. 왼쪽 회색 글은 화면 뒤에서 쓰는 이름표(코드)라 못 바꾸고, 오른쪽 이름만 고칠 수 있어요. 새 항목을 늘려도 되는 목록에만 「＋ 추가」가 있어요.</div>'+
     HUB_LIST_DEFS.map(function(def,di){
       const items=hubListItemsFor(def),defCodes={};def.def.forEach(function(d){defCodes[d.code]=true;});
@@ -2852,6 +3312,8 @@ function hubDrawListsSection(sec){
   Array.prototype.forEach.call(sec.querySelectorAll('[data-hub-list-add]'),function(b){b.addEventListener('click',function(){return hubAddListItem(sec,Number(b.getAttribute('data-hub-list-add')));});});
   Array.prototype.forEach.call(sec.querySelectorAll('[data-hub-list-del]'),function(b){b.addEventListener('click',function(){const p=String(b.getAttribute('data-hub-list-del')).split(':');return hubDelListItem(sec,Number(p[0]),Number(p[1]));});});
   Array.prototype.forEach.call(sec.querySelectorAll('[data-hub-list-move]'),function(b){b.addEventListener('click',function(){const p=b.getAttribute('data-hub-list-move').split(':').map(Number);return hubMoveListItem(sec,p[0],p[1],p[2]);});});
+  sec.querySelectorAll('[id^="hubLstLbl_"]').forEach(function(input){input.addEventListener('input',function(){HUB_LIST_EDIT_GENERATION++;hubCollectListDraft(sec,Number(input.id.split('_')[1]));});});
+  sec.querySelectorAll('[id^="hubCrd_"]').forEach(function(input){input.addEventListener('input',function(){HUB_LIST_EDIT_GENERATION++;hubCollectCardDraft(sec,Number(input.id.split('_')[1]));});});
   hubBindCards(sec);
 }
 // 화면에 적힌 이름들을 초안(draft)에 모은다.
@@ -2886,19 +3348,25 @@ function hubDelListItem(sec,di,ri){
 async function hubSaveList(sec,di){
   const def=HUB_LIST_DEFS[di];
   const draft=hubCollectListDraft(sec,di);
+  const gen=HUB_LIST_EDIT_GENERATION;
   const r=await hubListSave(HUB_SB,def.key,draft);
   const msg=sec.querySelector('#hubLstMsg_'+di);
+  if(gen!==HUB_LIST_EDIT_GENERATION)return;
   if(!r.ok){if(msg)msg.textContent=r.reason==='invalid'?('저장하지 못했어요 — '+r.message):hubWriteErrorMessage('저장',r.error);return;}
   delete HUB_LIST_DRAFT[def.key];
+  if(sec.isConnected===false)return;
   hubDrawListsSection(sec);
   const m2=sec.querySelector('#hubLstMsg_'+di);if(m2)m2.textContent='저장했어요.';
 }
 async function hubResetList(sec,di){
   const def=HUB_LIST_DEFS[di];
+  const gen=++HUB_LIST_EDIT_GENERATION;
   const r=await hubListReset(HUB_SB,def.key);
   const msg=sec.querySelector('#hubLstMsg_'+di);
+  if(gen!==HUB_LIST_EDIT_GENERATION)return;
   if(!r.ok){if(msg)msg.textContent=hubWriteErrorMessage('되돌리',r.error);return;}
   delete HUB_LIST_DRAFT[def.key];
+  if(sec.isConnected===false)return;
   hubDrawListsSection(sec);
   const m2=sec.querySelector('#hubLstMsg_'+di);if(m2)m2.textContent='처음 목록으로 돌렸어요.';
 }
@@ -2973,17 +3441,23 @@ function hubDelCard(sec,di,ri){
 }
 async function hubSaveCards(sec,di){
   const def=HUB_CARD_DEFS[di],draft=hubCollectCardDraft(sec,di);
+  const gen=HUB_LIST_EDIT_GENERATION;
   const r=await hubCardsSave(HUB_SB,def.key,draft);
+  if(gen!==HUB_LIST_EDIT_GENERATION)return;
   if(!r.ok){hubCardMsg(sec,di,r.reason==='invalid'?('저장하지 못했어요 — '+r.message):hubWriteErrorMessage('저장',r.error));return;}
   delete HUB_CARD_DRAFT[def.key];
+  if(sec.isConnected===false)return;
   hubDrawListsSection(sec);
   hubCardMsg(sec,di,'저장했어요.');
 }
 async function hubResetCards(sec,di){
   const def=HUB_CARD_DEFS[di];
+  const gen=++HUB_LIST_EDIT_GENERATION;
   const r=await hubCardsReset(HUB_SB,def.key);
+  if(gen!==HUB_LIST_EDIT_GENERATION)return;
   if(!r.ok){hubCardMsg(sec,di,hubWriteErrorMessage('되돌리',r.error));return;}
   delete HUB_CARD_DRAFT[def.key];
+  if(sec.isConnected===false)return;
   hubDrawListsSection(sec);
   hubCardMsg(sec,di,'처음 카드로 돌렸어요.');
 }
@@ -3009,6 +3483,7 @@ const HubUi={
   applyTextFilter:hubApplyTextFilter, // 검색칸 동작(시험용으로도 공개)
   helpers:{hubText:hubText,hubTextDefByKey:hubTextDefByKey,hubSetting:hubSetting,hubSettingChecked:hubSettingChecked,hubSettingIntList:hubSettingIntList,hubContractExpiryDays:hubContractExpiryDays,hubList:hubList,hubCards:hubCards}
 };
+root.HUB_HELP_TABS=HUB_HELP_TABS;
 root.hubText=hubText;
 root.hubTextHtml=hubTextHtml;
 root.hubSetting=hubSetting;

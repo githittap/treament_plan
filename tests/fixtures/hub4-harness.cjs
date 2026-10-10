@@ -327,7 +327,7 @@ async function renderAll(html,opts){
     await runSave('new_empty',null,{'#suggestionNewTitle':'','#suggestionNewBody':'x'});
     await runSave('new_fail',null,{'#suggestionNewTitle':'제목','#suggestionNewBody':'내용'},{tables:{suggestions:{error:{message:'저장<실패>'}}}});
     await runSave('new_ok',null,{'#suggestionNewTitle':'제목','#suggestionNewBody':'내용'});
-    await runSave('edit_ok',11,{'#suggestionEdit-11Title':'제목','#suggestionEdit-11Body':'내용'});
+    await runSave('edit_ok',11,{'#suggestionEditTitle-11':'제목','#suggestionEditBody-11':'내용'});
     for(const [name,confirmOk,sbOver] of [['declined',false,null],['fail',true,{tables:{suggestions:{error:{message:'삭제<실패>'}}}}],['ok',true,null]]){
       const q=await asRole('staff',{__confirm:confirmOk},sbOver);await q.api.deleteSuggestion(11);out['sug.delete.'+name]=JSON.stringify([q.log,q.statuses]);
     }

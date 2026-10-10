@@ -3,7 +3,7 @@ const html=fs.readFileSync('hr.html','utf8'),texts=fs.readFileSync('hub-texts.js
 function block(source,name){const m=source.match(new RegExp('/\\* '+name+':test-start \\*/([\\s\\S]*?)/\\* '+name+':test-end \\*/'));assert.ok(m,name);return m[1];}
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function context(role='staff'){
-  const calls=[],fields={},alerts=[],c={ME:{id:'me',role},esc,nameOf:id=>id==='me'?'내 이름':'다른 직원',today:()=> '2026-10-06',$:s=>fields[s],alert:s=>alerts.push(s),confirm:()=>true,setStatus:s=>calls.push(s),render:()=>calls.push('render')};
+  const calls=[],fields={'#main':{isConnected:true}},alerts=[],c={ME:{id:'me',role},esc,nameOf:id=>id==='me'?'내 이름':'다른 직원',today:()=> '2026-10-06',$:s=>fields[s],alert:s=>alerts.push(s),confirm:()=>true,setStatus:s=>calls.push(s),render:()=>calls.push('render')};
   vm.createContext(c);
   vm.runInContext(block(texts,'hub-texts')+';this.h={hubTextDefs,hubText,hubTextSetOverrides,hubNotifyEnabled,hubNotifyWrite,hubP7SettingsHtml};',c);
   c.hubT=c.h.hubText;
@@ -63,6 +63,6 @@ test('10-06: Ctrl+Enter(맥 Cmd+Enter)로 저장 · 그냥 Enter는 줄바꿈 ·
   run(ev({isComposing:true,ctrlKey:true}),7,null);assert.equal(saved.length,0);
   const c=ev({ctrlKey:true});run(c,7,null);assert.deepEqual(saved,[[7,null]]);assert.ok(c.p);
   run(ev({metaKey:true}),7,11);assert.deepEqual(saved[1],[7,11]);
-  assert.match(html,/setStatus\('saved'\);await suggestionRenderKeep\(suggestionId\);/);
-  assert.match(html,/setStatus\('saved'\);suggestionRenderKeep\(suggestionId\);/);
+  assert.match(html,/if\(main\.isConnected!==false\)await suggestionRenderKeep\(suggestionId\);/);
+  assert.match(html,/if\(main\.isConnected!==false\)suggestionRenderKeep\(suggestionId\);/);
 });

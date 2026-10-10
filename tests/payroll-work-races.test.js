@@ -56,7 +56,7 @@ test('파일 읽기 오류·잘못된 파일에도 읽기 잠금 해제',{timeou
 });
 
 test('수정한 화면 JS의 캐시와 급여 작업 버튼·읽기 중 월/파일 변경 연결',()=>{
- for(const name of ['payroll-bonus','payroll-reply','hub-texts'])assert.ok(hr.includes(name+'.js?v=2026101007'));
+ for(const name of ['payroll-bonus','payroll-reply','hub-texts'])assert.ok(hr.includes(name+'.js?v='+'2026101110'));
  for(const operation of ['movePayrollMonth','archivePayrollMonth','restorePayrollMonth'])assert.match(hr,new RegExp('data-pay-save-lock onclick="'+operation+'\\(\\)"'));
  assert.ok(hr.includes('data-pay-save-lock data-pay-read-keep'));assert.ok(hr.includes('pay.extra.xls_reading'));
 });
