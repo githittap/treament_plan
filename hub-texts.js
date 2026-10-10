@@ -27,12 +27,13 @@ const HUB_TEXT_MAX=20000;
 function hubEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 /* ── 글(표 hub_ui_texts) ── */
+const HUB_HELP_IMAGE_EMPTY='[숨김]';
 const HUB_HELP_EMPTY='무엇:\n누가:\n쓰는 법:\n알아둘 점:';
 let HUB_TEXT_OVERRIDES={};
 function hubTextSetOverrides(rows){
   const next={};
   (Array.isArray(rows)?rows:[]).forEach(function(r){
-    if(r&&typeof r.key==='string'&&typeof r.value==='string'&&(r.value.trim()!==''||r.key.startsWith('help.')))next[r.key]=r.value;
+    if(r&&typeof r.key==='string'&&typeof r.value==='string'&&(r.value.trim()!==''||r.key.startsWith('help.')||r.key.startsWith('help_img.')))next[r.key]=r.value;
   });
   HUB_TEXT_OVERRIDES=next;
 }
@@ -40,6 +41,7 @@ function hubTextOverride(key){
   const has=Object.prototype.hasOwnProperty.call(HUB_TEXT_OVERRIDES,key);
   const v=has?HUB_TEXT_OVERRIDES[key]:null;
   if(key.startsWith('help.')&&typeof v==='string'&&(v.trim()===''||v.trim()===HUB_HELP_EMPTY))return '';
+  if(key.startsWith('help_img.')&&typeof v==='string'&&(v.trim()===''||v.trim()===HUB_HELP_IMAGE_EMPTY))return '';
   return (typeof v==='string'&&v.trim()!=='')?v:null;
 }
 function hubTextPutOverride(key,value){const next=Object.assign({},HUB_TEXT_OVERRIDES);next[key]=value;HUB_TEXT_OVERRIDES=next;}
@@ -2515,6 +2517,18 @@ function hubTextDefs(){
   hubTextDefsTools(add);
   hubTextDefsMdeck(add);
   HUB_HELP_TABS.forEach(t=>add("help."+t.key,"❓ 탭 사용법",t.label+" — "+t.roles+(t.key==='ai'?' · AI 탭은 자체 사용법을 써서 이 글은 화면에 나오지 않습니다':''),t.def));
+
+  add("help_ui.guide","❓ 탭 사용법","👉 짚어 보기","👉 짚어 보기");
+  add("help_ui.next","❓ 탭 사용법","다음","다음");
+  add("help_ui.close","❓ 탭 사용법","닫기","닫기");
+  add("help_ui.finish","❓ 탭 사용법","마침","마침");
+  add("help_ui.step","❓ 탭 사용법","{n} / {total} 단계","{n} / {total} 단계",["n", "total"]);
+  add("help_ui.missing","❓ 탭 사용법","먼저 {tab} 탭 또는 이 단계에 적힌 단추를 여세요. 지금 화면에 대상이 없으므로 글로 안내합니다.","먼저 {tab} 탭 또는 이 단계에 적힌 단추를 여세요. 지금 화면에 대상이 없으므로 글로 안내합니다.",["tab"]);
+  add("help_ui.image","❓ 탭 사용법","🖼 그림으로 보기","🖼 그림으로 보기");
+  add("help_ui.image_alt","❓ 탭 사용법","예시 자료로 표시한 사용 순서입니다. 빨간 번호를 확인하세요.","예시 자료로 표시한 사용 순서입니다. 빨간 번호를 확인하세요.");
+  add("help_img.appr","❓ 탭 사용법","appr 그림 — PC 경로와 폰 경로를 공백으로 구분; 비우면 숨김","help-img/appr-pc.png help-img/appr-m.png");
+  add("help_img.leave","❓ 탭 사용법","leave 그림 — PC 경로와 폰 경로를 공백으로 구분; 비우면 숨김","help-img/leave-pc.png help-img/leave-m.png");
+  add("help_img.sched","❓ 탭 사용법","sched 그림 — PC 경로와 폰 경로를 공백으로 구분; 비우면 숨김","help-img/sched-pc.png help-img/sched-m.png");
   ((typeof globalThis!=='undefined'&&globalThis.HUB_CARD_LEDGER_TEXT_DEFS)||[]).forEach(d=>add(d[0],'지출 점검',d[1],d[1],Array.from(d[1].matchAll(/\{([a-z_]+)\}/g),m=>m[1])));
   ((typeof globalThis!=='undefined'&&globalThis.HUB_INTRO_TEXT_DEFS)||[]).forEach(function(d){add(d[0],'🌌 첫 화면',d[1],d[2]);}); // hub-intro.js의 첫 화면 글
   hubTextDefsP7(add);
@@ -2857,8 +2871,9 @@ async function hubTextsSave(sb,key,value){
   if(!def)return {ok:false,reason:'unknown_key',error:null};
   let v=String(value==null?'':value).replace(/\r\n/g,'\n');
   if(key.startsWith('help.')&&v.trim()==='')v=HUB_HELP_EMPTY;
+  if(key.startsWith('help_img.')&&v.trim()==='')v=HUB_HELP_IMAGE_EMPTY;
   if(v.length>HUB_TEXT_MAX)return {ok:false,reason:'too_long',error:null};
-  const same=(!key.startsWith('help.')&&v.trim()==='')||hubTextNorm(v)===hubTextNorm(def.def);
+  const same=(!key.startsWith('help.')&&!key.startsWith('help_img.')&&v.trim()==='')||hubTextNorm(v)===hubTextNorm(def.def);
   try{
     if(same){
       const r=await sb.from('hub_ui_texts').delete().eq('key',key);
