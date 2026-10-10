@@ -1305,6 +1305,7 @@ function tutorialDeck(){
 function normalize(d){
   d.meta = d.meta || {title:''};
   d.slides = Array.isArray(d.slides) ? d.slides : [];
+  { const seen = new Set(); d.slides.forEach(s=>{ if(!s.sid || seen.has(s.sid)) s.sid = id(); seen.add(s.sid); }); }   /* 슬라이드마다 바뀌지 않는 id(sid) — 되돌리기로 객체가 새로 만들어져도 사진 올리기 상태를 이어 붙임 */
   d.slides.forEach(s=>{
     if(s.type==='diagram'){ s.nodes=s.nodes||[]; s.nodes.forEach(n=>{ if(!n.id) n.id=id(); }); s.layout=s.layout||'radial'; s.note=s.note||{text:'',step:0,tone:''}; }
     else if(s.type==='table'){ s.head=(s.head&&s.head.length)?s.head:['항목']; s.rows=s.rows||[]; s.rows.forEach(r=>{ r.cells=r.cells||[]; while(r.cells.length<s.head.length) r.cells.push(''); }); }
@@ -1363,7 +1364,7 @@ function renderList(){
     const item = ce('div','slide-item'+(i===sel?' active':''));
     item.appendChild(ce('span','idx', String(i+1)));
     const meta = ce('span','meta');
-    const t = ce('span','t'); t.textContent = (PH_FAILED.has(s) ? '⚠ ' : '')+slideLabel(s);
+    const t = ce('span','t'); t.textContent = (PH_FAILED.has(s.sid) ? '⚠ ' : '')+slideLabel(s);
     const ty = ce('span','ty'); ty.textContent = TYPES[s.type].name;
     meta.appendChild(t); meta.appendChild(ty); item.appendChild(meta);
     item.appendChild(ce('span','drag','⋮⋮'));
@@ -1386,7 +1387,7 @@ function moveSlide(from, to){
 }
 function addSlide(type){
   snap();
-  const s=blank(type);
+  const s=blank(type); s.sid = id();
   const at = deck.slides.length ? sel+1 : 0;
   deck.slides.splice(at,0,s); sel=at;
   renderList(); renderEditor(); bootPreview(); scheduleAutosave();
@@ -1395,7 +1396,7 @@ function addSlide(type){
 function dupSlide(){
   if(!deck.slides.length) return;
   snap();
-  const c=clone(deck.slides[sel]);
+  const c=clone(deck.slides[sel]); c.sid = id();   /* 복제본은 새 sid — 사진 올리기 실패 표시는 따라가지 않음 */
   if(c.marks) c.marks.forEach(m=>{ m.id=id(); });
   if(c.nodes){ const map={}; c.nodes.forEach(n=>{ const nid=id(); map[n.id]=nid; n.id=nid; }); if(c.links) c.links.forEach(l=>{ l.from=map[l.from]||l.from; l.to=map[l.to]||l.to; }); }
   deck.slides.splice(sel+1,0,c); sel++;
@@ -1575,14 +1576,16 @@ function noteField(s){
 
 /* ---- 되돌리기(Ctrl+Z) · 다시(Ctrl+Y): 슬라이드 단위 작업과 사진 표시 작업을 기록 ---- */
 const UNDO = [], REDO = [], SNAP_DATA = [];
-function snapNow(){ return snapEncode({d:deck, s:sel}, SNAP_DATA); }
+function sidOf(s){ return s.sid || (s.sid = id()); }
+function slideById(sid){ return deck.slides.find(x=> x.sid === sid); }
+function snapNow(){ deck.slides.forEach(sidOf); return snapEncode({d:deck, s:sel}, SNAP_DATA); }
 function snap(){ REDO.length = 0; const t = snapNow(); if(UNDO[UNDO.length-1] === t) return; UNDO.push(t); if(UNDO.length > 40) UNDO.shift(); }
 /* 입력 칸은 칸마다 처음 고칠 때 한 번만 기록(칸을 벗어나면 다시 새로 셈) — 칸에 커서만 둔 것으로는 기록·다시를 건드리지 않음 */
 function snapOnce(el){ if(el._sn) return; el._sn = true; snap(); el.addEventListener('blur', ()=>{ el._sn = false; }, {once:true}); }
 /* 파일 불러오기·새로·튜토리얼·허브 덱 열기처럼 덱을 통째로 바꿀 땐 되돌리기·다시 기록을 비움 */
 function resetHistory(){ UNDO.length = 0; REDO.length = 0; SNAP_DATA.length = 0; }
 function restoreSnap(t){
-  const o = snapDecode(t, SNAP_DATA); deck = o.d; sel = Math.max(0, Math.min(o.s, deck.slides.length-1));
+  const o = snapDecode(t, SNAP_DATA); deck = o.d; deck.slides.forEach(sidOf); sel = Math.max(0, Math.min(o.s, deck.slides.length-1));
   B.deckName.value = deck.meta.title || ''; PE.sel = null; PE.pend = null; PE.drag = null;
   renderAll(); bootPreview(); scheduleAutosave();
 }
@@ -1607,13 +1610,14 @@ async function downscale(file){
 const IMG_URL = {};   /* 보관함 경로 → 보여줄 수 있는 주소(서명 주소·방금 올린 임시 주소) */
 function imgUrl(image){ return image ? (image.src || IMG_URL[image.path] || '') : ''; }
 /* 사진 적용 원칙(hubUploadInline 과 같음): 그 슬라이드가 지금 덱에 실제로 있고, 올리기를 시작한 때의 요청이 아직 최신일 때만 적용 */
-function commitPhoto(s, wanted, image){
-  if(!deck.slides.includes(s) || !wanted()) return false;
-  snap(); s.image = image; return true;
+function commitPhoto(sid, wanted, image){
+  const cur = slideById(sid);   /* 덱에 있는지·적용 대상은 sid 로 찾음(되돌리기로 슬라이드 객체가 새로 바뀌어도 같은 슬라이드) */
+  if(!cur || !wanted()) return false;
+  snap(); cur.image = image; return true;
 }
-const PH_FAILED = new WeakMap();   /* 슬라이드 → 「최신 사진 올리기가 실패했다」는 표시(그 슬라이드에서 사진을 다시 고를 때만 풀림) */
-function phFailedCount(){ return deck.slides.filter(s=> PH_FAILED.has(s)).length; }
-const PH_PENDING = new WeakMap();   /* 슬라이드 → 그 슬라이드의 최신 사진 올리기 요청 번호(올리는 중 표시에도 씀) */
+const PH_FAILED = new Map();   /* sid → 「최신 사진 올리기가 실패했다」는 표시(그 슬라이드에서 사진을 다시 고를 때만 풀림) */
+function phFailedCount(){ return deck.slides.filter(s=> PH_FAILED.has(s.sid)).length; }
+const PH_PENDING = new Map();   /* sid → 그 슬라이드의 최신 사진 올리기 요청 번호(올리는 중 표시에도 씀) */
 let phSeq = 0;
 /* 돌려주는 값: 'ok'(적용) · 'stale'(더 새 요청이 있어 버림) · 'gone'(undo·삭제로 덱에서 빠진 슬라이드라 버림) */
 const PH_JOBS = new Set();   /* 올리는 중인 사진 작업들 — 서버 저장은 이게 다 끝나길 기다리고, 닫기 경고에도 씀 */
@@ -1624,17 +1628,17 @@ function attachPhoto(s, file){
   return job;
 }
 async function attachPhotoRun(s, file){
-  const req = ++phSeq; PH_PENDING.set(s, req); PH_FAILED.delete(s);   /* 다시 고르면 실패 표시가 풀림 */
+  const sid = sidOf(s), req = ++phSeq; PH_PENDING.set(sid, req); PH_FAILED.delete(sid);   /* 다시 고르면 실패 표시가 풀림 */
   try{
     const r = await downscale(file);
     const image = (HUB.on && HUB.canEdit) ? {path: await hubUpload(r.blob), w:r.w, h:r.h} : {src: await blobToDataUrl(r.blob), w:r.w, h:r.h};
-    if(commitPhoto(s, ()=> PH_PENDING.get(s) === req, image)){ PH_FAILED.delete(s); if(HUB.on) markDirty(); return 'ok'; }
-    return deck.slides.includes(s) ? 'stale' : 'gone';
+    if(commitPhoto(sid, ()=> PH_PENDING.get(sid) === req, image)){ PH_FAILED.delete(sid); if(HUB.on) markDirty(); return 'ok'; }
+    return slideById(sid) ? 'stale' : 'gone';
   } catch(e){
-    /* 지금 덱에 있는 슬라이드의 최신 요청이 실패했을 때만 표시(새 요청으로 대체됐거나 삭제·undo 로 덱에서 빠진 것의 실패는 무시) */
-    if(PH_PENDING.get(s) === req && deck.slides.includes(s)) PH_FAILED.set(s, (e && e.message) || '실패');
+    /* 지금 덱에 있는 슬라이드(같은 sid)의 최신 요청이 실패했을 때만 표시(새 요청으로 대체됐거나 삭제·되돌리기로 슬라이드가 사라진 것의 실패는 무시) */
+    if(PH_PENDING.get(sid) === req && slideById(sid)) PH_FAILED.set(sid, (e && e.message) || '실패');
     throw e;
-  } finally { if(PH_PENDING.get(s) === req) PH_PENDING.delete(s); }
+  } finally { if(PH_PENDING.get(sid) === req) PH_PENDING.delete(sid); }
 }
 async function hubWaitPhotos(){ while(PH_JOBS.size) await Promise.allSettled([...PH_JOBS]); }
 
@@ -1857,7 +1861,7 @@ FORMS.photo = s=>{
   addField('제목','', mkInput(s.title, v=>s.title=v, '예: 3번 서랍장 정리'));
   const f = ce('div','field');
   const fi = ce('input'); fi.type = 'file'; fi.accept = 'image/*'; fi.style.display = 'none';
-  const ub = ce('button','rep-add'); ub.type = 'button'; ub.style.width = '100%'; ub.textContent = PH_PENDING.has(s) ? '⏳ 사진 올리는 중… (다시 고르면 새 사진으로 바뀜)' : s.image ? '🖼 사진 바꾸기' : '🖼 사진 올리기';
+  const ub = ce('button','rep-add'); ub.type = 'button'; ub.style.width = '100%'; ub.textContent = PH_PENDING.has(sidOf(s)) ? '⏳ 사진 올리는 중… (다시 고르면 새 사진으로 바뀜)' : s.image ? '🖼 사진 바꾸기' : '🖼 사진 올리기';
   ub.onclick = ()=> fi.click();
   fi.onchange = async ()=>{
     const file = fi.files && fi.files[0]; fi.value = ''; if(!file) return;
@@ -1866,12 +1870,12 @@ FORMS.photo = s=>{
     let res = '';
     try{ res = await attachPhoto(s, file); if(res === 'ok') toast('사진을 넣었어요'); }
     catch(e){ toast('사진을 못 넣었어요: '+(e.message || e), 'err'); }
-    if(deck.slides[sel] === s) renderEditor();   /* 지금 보고 있는 장이면 버튼·사진 상태를 새로 그림 */
+    if(deck.slides[sel] && deck.slides[sel].sid === s.sid) renderEditor();   /* 지금 보고 있는 장이면 버튼·사진 상태를 새로 그림 */
     renderList();   /* 올리기 실패 표시(⚠)를 목록에도 반영 */
     if(res === 'ok'){ bootPreview(); scheduleAutosave(); }
   };
   f.appendChild(ub); f.appendChild(fi); B.editor.appendChild(f);
-  if(PH_FAILED.has(s)) B.editor.appendChild(ce('div','hintline','⚠ 사진 올리기 실패 — 위 「사진 바꾸기」로 다시 골라 주세요. 다시 고르기 전에는 서버 저장이 막혀요. ('+PH_FAILED.get(s)+')'));
+  if(PH_FAILED.has(s.sid)) B.editor.appendChild(ce('div','hintline','⚠ 사진 올리기 실패 — 위 「사진 바꾸기」로 다시 골라 주세요. 다시 고르기 전에는 서버 저장이 막혀요. ('+PH_FAILED.get(s.sid)+')'));
   if(s.image){ B.editor.appendChild(photoEditor(s)); B.editor.appendChild(marksField(s)); peRenderRows(); requestAnimationFrame(peRedraw); }
   else B.editor.appendChild(ce('div','hintline','사진을 올리면 그 위에 화살표와 설명 글을 넣을 수 있어요. (사진은 가로·세로 긴 쪽이 1600px로 자동 줄어요)'));
   addField('설명 메모','발표 화면 아래 「설명 보기」로 펼쳐져요', mkArea(s.notes, v=>s.notes=v, ''));
@@ -2026,14 +2030,14 @@ async function hubUpload(blob){
 /* 파일로 불러온 덱처럼 사진이 데이터주소로 들어 있으면 저장할 때 보관함으로 옮김 */
 function photoNeedsUpload(s){ return s.type === 'photo' && s.image && !s.image.path && /^data:image\//.test(s.image.src || ''); }
 async function hubUploadInline(){
-  /* 올리는 동안 사진이 바뀌었거나(s.image 가 다른 객체) 슬라이드가 덱에서 빠졌으면 옛 사진 경로를 적용하지 않고, 지금 덱에 남은 것만 이어서 올림 */
+  /* 올리는 동안 사진이 바뀌었거나(같은 sid 슬라이드의 사진이 다른 것) 슬라이드가 덱에서 빠졌으면 옛 사진 경로를 적용하지 않고, 지금 덱에 남은 것만 이어서 올림 */
   for(let pass = 0; pass < 6; pass++){
     const todo = deck.slides.filter(photoNeedsUpload);
     if(!todo.length) return;
     for(const s of todo){
-      const orig = s.image;
+      const sid = sidOf(s), orig = s.image;
       const path = await hubUpload(await (await fetch(orig.src)).blob());
-      commitPhoto(s, ()=> s.image === orig, {path:path, w:orig.w, h:orig.h});
+      commitPhoto(sid, ()=>{ const c = slideById(sid); return !!(c && c.image && !c.image.path && c.image.src === orig.src); }, {path:path, w:orig.w, h:orig.h});
     }
   }
   if(deck.slides.some(photoNeedsUpload)) throw new Error('사진이 계속 바뀌어 올리지 못했어요. 잠시 뒤 다시 저장해 주세요');
