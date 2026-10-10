@@ -273,7 +273,7 @@ test('[2] 서버 저장 중에 고친 내용은 「저장됨」으로 바뀌지 
     const ctx = { deck: { meta: { title: 't' }, slides: [{ type: 'cover' }] }, HUB: { rev: 0, dirty: false, saving: false, exists: false, id: 'i', category: '', published: false, sb: null },
       B: { saveBtn: { disabled: false }, hubState: { textContent: '', classList: { toggle() { }, add() { } } }, backupBtn: { hidden: true } }, toasts, toast: (m, t) => toasts.push([m, t]), deckForStore: d => d, hubUploadInline: async () => { }, gate: null };
     vm.createContext(ctx);
-    vm.runInContext(['let _sn = 0; const id = () => "s" + (++_sn); let DECK_GEN = 0; let loadSeq = 0;', fnSrc(mainJs, 'function sidOf'), fnSrc(mainJs, 'function slideById'), 'const PH_JOBS = new Set(), PH_FAILED = new Map();', fnSrc(mainJs, 'function phFailedCount'), fnSrc(mainJs, 'function markDirty'), fnSrc(mainJs, 'function setDirty'), fnSrc(mainJs, 'async function hubWaitPhotos'), fnSrc(mainJs, 'function hubConflict'), fnSrc(mainJs, 'async function hubSave')].join('\n') + ';this.hubSave=hubSave;this.markDirty=markDirty;', ctx);
+    vm.runInContext(['let _sn = 0; const id = () => "s" + (++_sn); let DECK_GEN = 0; let loadSeq = 0;', fnSrc(mainJs, 'function sidOf'), fnSrc(mainJs, 'function slideById'), 'const PH_JOBS = new Set(), PH_FAILED = new Map();', fnSrc(mainJs, 'function phFailedCount'), fnSrc(mainJs, 'function markDirty'), 'function hubAutoQueue(){} const clearTimeout = () => {};', fnSrc(mainJs, 'function setDirty'), fnSrc(mainJs, 'async function hubWaitPhotos'), fnSrc(mainJs, 'function hubConflict'), fnSrc(mainJs, 'async function hubSave')].join('\n') + ';this.hubSave=hubSave;this.markDirty=markDirty;', ctx);
     const done = () => ctx.gate.then(() => ({ data: [{ id: 'i' }], error: null }));
     ctx.HUB.sb = { from: () => ({ insert: () => ({ select: done }), update: () => ({ eq: () => ({ eq: () => ({ select: done }) }) }) }) };
     return ctx;
@@ -285,7 +285,7 @@ test('[2] 서버 저장 중에 고친 내용은 「저장됨」으로 바뀌지 
   c.markDirty();               // 저장 요청이 나간 뒤 사용자가 글을 고침
   release(); await p;
   assert.equal(c.HUB.dirty, true, '저장 중에 고친 내용은 아직 저장 안 됨'); assert.equal(c.HUB.exists, true);
-  assert.ok(c.toasts.some(t => /다시 저장/.test(t[0]) && t[1] === 'err'));
+  assert.ok(c.toasts.some(t => /그 사이 고친 내용은 곧 자동 저장돼요/.test(t[0]) && t[1] === undefined));
   // 대조: 고친 게 없으면 저장됨
   c = mk(); c.gate = Promise.resolve(); c.markDirty(); await c.hubSave();
   assert.equal(c.HUB.dirty, false); assert.ok(c.toasts.some(t => /저장했어요/.test(t[0])));
@@ -353,7 +353,7 @@ test('[2차-1] 사진 올리는 동안 같은 슬라이드의 사진을 바꿔�
     toast: (m, t) => toasts.push([m, t]), snap() { }, deckForStore: d => JSON.parse(JSON.stringify(d)), fetch,
     hubUpload: async blob => { const t = await blob.text(); uploaded.push(t); await new Promise(r => { gates[t] = r; if (t !== 'BLACK') r(); }); return 'p/' + t; } };
   vm.createContext(ctx);
-  vm.runInContext(['let _sn = 0; const id = () => "s" + (++_sn); let DECK_GEN = 0; let loadSeq = 0;', fnSrc(mainJs, 'function sidOf'), fnSrc(mainJs, 'function slideById'), 'const PH_JOBS = new Set(), PH_FAILED = new Map();', fnSrc(mainJs, 'function phFailedCount'), fnSrc(mainJs, 'function markDirty'), fnSrc(mainJs, 'function setDirty'), fnSrc(mainJs, 'function photoNeedsUpload'), fnSrc(mainJs, 'function commitPhoto'), fnSrc(mainJs, 'async function hubUploadInline'), fnSrc(mainJs, 'async function hubWaitPhotos'), fnSrc(mainJs, 'function hubConflict'), fnSrc(mainJs, 'async function hubSave')].join('\n') + ';this.hubSave=hubSave;this.markDirty=markDirty;', ctx);
+  vm.runInContext(['let _sn = 0; const id = () => "s" + (++_sn); let DECK_GEN = 0; let loadSeq = 0;', fnSrc(mainJs, 'function sidOf'), fnSrc(mainJs, 'function slideById'), 'const PH_JOBS = new Set(), PH_FAILED = new Map();', fnSrc(mainJs, 'function phFailedCount'), fnSrc(mainJs, 'function markDirty'), 'function hubAutoQueue(){} const clearTimeout = () => {};', fnSrc(mainJs, 'function setDirty'), fnSrc(mainJs, 'function photoNeedsUpload'), fnSrc(mainJs, 'function commitPhoto'), fnSrc(mainJs, 'async function hubUploadInline'), fnSrc(mainJs, 'async function hubWaitPhotos'), fnSrc(mainJs, 'function hubConflict'), fnSrc(mainJs, 'async function hubSave')].join('\n') + ';this.hubSave=hubSave;this.markDirty=markDirty;', ctx);
   const done = { data: [{ id: 'i' }], error: null };
   ctx.HUB.sb = { from: () => ({ insert: row => ({ select: async () => { rows.push(JSON.parse(JSON.stringify(row))); return done; } }), update: () => ({ eq: () => ({ select: async () => done }) }) }) };
   ctx.markDirty();
@@ -365,7 +365,7 @@ test('[2차-1] 사진 올리는 동안 같은 슬라이드의 사진을 바꿔�
   assert.equal(rows.length, 1); assert.equal(rows[0].deck.slides[0].image.path, 'p/BLUE', '저장된 건 파란 사진 — 옛(검은) 사진 경로가 아님');
   assert.equal(rows[0].deck.slides[0].image.w, 2); assert.ok(!JSON.stringify(rows[0]).includes('data:image'), '데이터주소가 서버에 가지 않음');
   assert.equal(ctx.deck.slides[0].image.path, 'p/BLUE');
-  assert.equal(ctx.HUB.dirty, true, '저장 도중 바꾼 사진이라 「저장 안 됨」 유지'); assert.ok(toasts.some(t => /다시 저장/.test(t[0])));
+  assert.equal(ctx.HUB.dirty, true, '저장 도중 바꾼 사진이라 「저장 안 됨」 유지'); assert.ok(toasts.some(t => /곧 자동 저장돼요/.test(t[0])));
   // 대조: 안 바꾸면 그대로 저장되고 저장됨
   uploaded.length = 0; ctx.deck.slides[0].image = { src: dataUrl('GREEN'), w: 3, h: 3 }; ctx.markDirty(); ctx.HUB.exists = false;
   await ctx.hubSave(); assert.deepEqual(uploaded, ['GREEN']); assert.equal(rows[1].deck.slides[0].image.path, 'p/GREEN'); assert.equal(ctx.HUB.dirty, false);
@@ -421,7 +421,7 @@ function saveEnv(extra = {}) {   // 저장·사진 붙이기 부품을 한 환�
     B: { saveBtn: { disabled: false }, hubState: { textContent: '', classList: { toggle() { }, add() { } } }, backupBtn: { hidden: true } }, toast: (m, t) => toasts.push([m, t]), snap() { }, deckForStore: d => JSON.parse(JSON.stringify(d)), fetch,
     downscale: async f => ({ blob: { name: f.name }, w: 1, h: 1 }), blobToDataUrl: async b => 'data:image/png;base64,' + b.name, hubUpload: async blob => 'p/' + blob.name, toasts, srv }, extra);
   vm.createContext(ctx);
-  vm.runInContext(['let _sn = 0; const id = () => "s" + (++_sn); let DECK_GEN = 0; let loadSeq = 0;', fnSrc(mainJs, 'function sidOf'), fnSrc(mainJs, 'function slideById'), 'const PH_PENDING = new Map(), PH_JOBS = new Set(), PH_FAILED = new Map(); let phSeq = 0;', fnSrc(mainJs, 'function phFailedCount'), fnSrc(mainJs, 'function markDirty'), fnSrc(mainJs, 'function setDirty'), fnSrc(mainJs, 'function photoNeedsUpload'), fnSrc(mainJs, 'function commitPhoto'),
+  vm.runInContext(['let _sn = 0; const id = () => "s" + (++_sn); let DECK_GEN = 0; let loadSeq = 0;', fnSrc(mainJs, 'function sidOf'), fnSrc(mainJs, 'function slideById'), 'const PH_PENDING = new Map(), PH_JOBS = new Set(), PH_FAILED = new Map(); let phSeq = 0;', fnSrc(mainJs, 'function phFailedCount'), fnSrc(mainJs, 'function markDirty'), 'function hubAutoQueue(){} const clearTimeout = () => {};', fnSrc(mainJs, 'function setDirty'), fnSrc(mainJs, 'function photoNeedsUpload'), fnSrc(mainJs, 'function commitPhoto'),
     fnSrc(mainJs, 'function attachPhoto('), fnSrc(mainJs, 'async function attachPhotoRun'), 'function scheduleAutosave(){ if(HUB.on) markDirty(); }', fnSrc(mainJs, 'async function hubUploadInline'), fnSrc(mainJs, 'async function hubWaitPhotos'), fnSrc(mainJs, 'function hubConflict'), fnSrc(mainJs, 'async function hubSave'),
     'this.hubSave=hubSave;this.attachPhoto=attachPhoto;this.PH_JOBS=PH_JOBS;this.markDirty=markDirty;'].join('\n'), ctx);
   ctx.HUB.sb = { from: () => ({
@@ -467,7 +467,7 @@ test('[4차-2] 사진 올리는 중 저장하면 끝난 뒤 최신 사진으로 
   assert.equal(c.HUB.dirty, true);
   release(); assert.equal(await job, 'ok'); await save;
   assert.equal(c.srv.writes, 1); assert.equal(c.srv.row.deck.slides[0].image.path, 'p/blue', '끝난 뒤의 최신 사진이 저장됨'); assert.equal(c.PH_JOBS.size, 0);
-  assert.equal(c.HUB.dirty, true, '변경 번호는 기다리기 전에 잡으므로, 기다리는 동안 붙은 사진은 한 번 더 저장해야 「저장됨」(보수적)'); assert.ok(c.toasts.some(t => /다시 저장/.test(t[0])));
+  assert.equal(c.HUB.dirty, true, '변경 번호는 기다리기 전에 잡으므로, 기다리는 동안 붙은 사진은 한 번 더 저장해야 「저장됨」(보수적)'); assert.ok(c.toasts.some(t => /곧 자동 저장돼요/.test(t[0])));
   c.HUB.exists = true; await c.hubSave(); assert.equal(c.HUB.dirty, false, '대기 없이 다시 저장하면 저장됨');
   // 닫기 경고: 첨부 중에도 뜸
   assert.match(mainJs, /function mdeckUnsavedNow\(\)\{ return HUB\.on \? \(\(HUB\.dirty \|\| PH_JOBS\.size > 0\) && !HUB\.view\) : \(PH_JOBS\.size > 0 \|\| asPending\); \}/);   // 허브 모드 조건은 그대로(허브 밖 조건은 [8차] 에서 시험)
@@ -960,4 +960,119 @@ test('[B2] 소스 확인: 접기 단추·pe-view·peXY 보정·Space·붙여넣�
   const paste = between(maker, "document.addEventListener('paste'", "document.addEventListener('keydown'");
   assert.match(paste, /e\.preventDefault\(\);\s*if\(PE\.pop\) peClosePop\(\);/);
   const deco = fnSrc(maker, 'function peDeco'); assert.ok(!/\bsel\b/.test(deco.replace(/\/\*[\s\S]*?\*\//g, '').replace(/'[^']*'/g, '')), 'peDeco 안에 전역 sel 을 가리는 이름이 없음');
+});
+
+/* ---- 배치 C: 허브 자동 저장(노션처럼) · 설명서 · 튜토리얼 사진 장 ---- */
+function autoEnv(over = {}) {   // 진짜 hubAutoQueue·hubAutoRun·hubSave 를 가짜 서버·짧은 지연(30ms)으로 돌림
+  const toasts = [], srv = { version: 'v1', writes: 0, tries: 0, rows: [], gate: null, error: null };
+  const ctx = Object.assign({ deck: { meta: { title: 'v0' }, slides: [{ type: 'cover', sid: 'x1' }] },
+    HUB: { on: true, view: false, canEdit: true, rev: 0, dirty: false, saving: false, exists: true, id: 'i', category: '', published: false, version: 'v1', conflict: false, autoTimer: 0, autoMs: 30, autoAgain: false, sb: null },
+    B: { saveBtn: { disabled: false }, hubState: { textContent: '', classList: { toggle() { }, add() { } } }, backupBtn: { hidden: true } }, toast: (m, t) => toasts.push([m, t]), deckForStore: d => JSON.parse(JSON.stringify(d)), hubUploadInline: async () => { },
+    setTimeout, clearTimeout, toasts, srv }, over);
+  vm.createContext(ctx);
+  vm.runInContext(['const PH_JOBS = new Set(), PH_FAILED = new Map();', fnSrc(mainJs, 'function sidOf'), fnSrc(mainJs, 'function phFailedCount'), fnSrc(mainJs, 'function markDirty'), fnSrc(mainJs, 'function setDirty'), fnSrc(mainJs, 'async function hubWaitPhotos'), fnSrc(mainJs, 'function hubConflict'),
+    fnSrc(mainJs, 'function hubStatus'), fnSrc(mainJs, 'function hubAutoQueue'), fnSrc(mainJs, 'function hubAutoRun'), fnSrc(mainJs, 'async function hubSave'), 'this.hubSave=hubSave;this.markDirty=markDirty;this.PH_JOBS=PH_JOBS;this.PH_FAILED=PH_FAILED;'].join('\n'), ctx);
+  ctx.HUB.sb = { from: () => ({ update: row => { const f = {}; const ch = { eq: (k, v) => { f[k] = v; return ch; }, select: async () => {
+    srv.tries++; srv.rows.push(JSON.parse(JSON.stringify(row)));
+    if (srv.gate) await srv.gate;
+    if (srv.error) return { data: null, error: { message: srv.error } };
+    if (f.updated_at !== srv.version) return { data: [], error: null };
+    srv.writes++; srv.version = 'v' + (srv.writes + 1); return { data: [{ id: 'i', updated_at: srv.version }], error: null }; } }; return ch; },
+    select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { updated_at: srv.version } }) }) }) }) };
+  return ctx;
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const state = c => c.B.hubState.textContent;
+
+test('[C6-1] 자동 저장: 마지막으로 고친 뒤 일정 시간이 지나야 한 번 저장 · 그 사이 또 고치면 시간이 다시 시작 · 성공해도 알림(toast) 없이 상태 줄만 「저장됨 · 자동」', async () => {
+  const c = autoEnv();
+  c.markDirty(); await sleep(15); assert.equal(c.srv.tries, 0, '고친 직후엔 저장 안 함');
+  c.markDirty(); await sleep(25); assert.equal(c.srv.tries, 0, '또 고쳤으니 시간이 다시 시작됨(첫 예약대로면 이미 저장됐을 시각)');
+  await sleep(60); assert.equal(c.srv.writes, 1, '지나면 한 번'); assert.equal(c.HUB.dirty, false); assert.equal(state(c), '저장됨 · 자동'); assert.equal(c.toasts.length, 0, '자동 저장 성공은 알림 없음');
+  await sleep(80); assert.equal(c.srv.tries, 1, '저장된 뒤 또 저장하지 않음');
+  assert.match(mainJs, /autoMs:2500/, '기본 지연은 2.5초'); assert.match(fnSrc(mainJs, 'function markDirty'), /hubAutoQueue\(\)/);
+});
+
+test('[C6-2] 저장 중에 또 고치면 「저장 안 됨」 유지 → 끝난 뒤 한 번 더 저장되고 마지막 내용이 서버에 있다 · 손으로 누른 저장이면 「곧 자동 저장돼요」 안내', async () => {
+  const c = autoEnv(); let release; c.srv.gate = new Promise(r => { release = r; });
+  c.markDirty(); await sleep(60); assert.equal(c.srv.tries, 1, '첫 저장이 서버 응답을 기다리는 중'); assert.equal(c.HUB.saving, true);
+  c.deck.meta.title = '마지막'; c.markDirty();   // 저장 중에 또 고침 → 예약 시각이 저장 중에 지남
+  await sleep(60); assert.equal(c.HUB.autoAgain, true, '저장 중이라 「끝나면 한 번 더」 표시'); assert.equal(c.srv.tries, 1, '겹쳐 저장하지 않음');
+  c.srv.gate = null; release(); await sleep(150);
+  assert.equal(c.srv.writes, 2); assert.equal(c.srv.rows[1].deck.meta.title, '마지막', '마지막 내용이 서버에 감'); assert.equal(c.HUB.dirty, false); assert.equal(c.HUB.autoAgain, false); assert.equal(state(c), '저장됨 · 자동'); assert.equal(c.toasts.length, 0);
+  // 손으로 누른 저장 중에 고침: 알림은 「그 사이 고친 내용은 곧 자동 저장돼요」, 상태는 저장 안 됨, 이어서 자동 저장이 한 번 더
+  const m = autoEnv(); let rel2; m.srv.gate = new Promise(r => { rel2 = r; });
+  m.markDirty(); const p = m.hubSave(); await sleep(10); m.deck.meta.title = '손저장중'; m.markDirty(); m.srv.gate = null; rel2(); await p;
+  assert.equal(m.HUB.dirty, true); assert.ok(m.toasts.some(t => /저장했어요 — 그 사이 고친 내용은 곧 자동 저장돼요/.test(t[0])));
+  await sleep(100); assert.equal(m.srv.writes, 2); assert.equal(m.srv.rows[1].deck.meta.title, '손저장중'); assert.equal(m.HUB.dirty, false);
+});
+
+test('[C6-3] 충돌이면 자동 저장이 멈추고 다시 안 간다(상태 줄 「충돌」 유지, 알림은 hubConflict 의 한 번)', async () => {
+  const c = autoEnv(); c.srv.version = 'vX';   // 열어 둔 사이 서버가 바뀜
+  c.markDirty(); await sleep(70); assert.equal(c.srv.tries, 1); assert.equal(c.HUB.conflict, true); assert.match(state(c), /충돌/); assert.equal(c.toasts.filter(t => /다른 곳에서 바뀌었어요/.test(t[0])).length, 1);
+  c.markDirty(); await sleep(80); assert.equal(c.srv.tries, 1, '충돌 뒤엔 고쳐도 서버에 안 감'); assert.match(state(c), /충돌/, '상태 줄은 계속 「충돌」'); assert.equal(c.srv.writes, 0);
+});
+
+test('[C6-4] 올리기 실패한 사진이 있으면 자동 저장 안 함(상태 줄 「사진 실패 — 자동 저장 멈춤」, 알림 없음) · 사진 올리는 중이면 끝난 뒤 저장', async () => {
+  const c = autoEnv(); c.PH_FAILED.set('x1', '실패');
+  c.markDirty(); await sleep(70); assert.equal(c.srv.tries, 0); assert.equal(state(c), '사진 실패 — 자동 저장 멈춤'); assert.equal(c.toasts.length, 0); assert.equal(c.HUB.dirty, true);
+  // 올리는 중에 시각이 지나면 끝나길 기다렸다가, 끝났는데 실패면 저장하지 않고 상태 줄만
+  const d = autoEnv(); let res; d.PH_JOBS.add(new Promise(r => { res = r; }));
+  d.markDirty(); await sleep(70); assert.equal(d.srv.tries, 0, '올리는 중에는 서버에 쓰지 않음'); assert.match(state(d), /사진 올리는 중/); assert.equal(d.toasts.length, 0);
+  d.PH_FAILED.set('x1', '실패'); d.PH_JOBS.clear(); res(); await sleep(40);
+  assert.equal(d.srv.tries, 0, '끝났는데 실패면 저장하지 않음'); assert.equal(state(d), '사진 실패 — 자동 저장 멈춤'); assert.equal(d.toasts.length, 0); assert.equal(d.HUB.dirty, true);
+  const e = autoEnv(); let res2; e.PH_JOBS.add(new Promise(r => { res2 = r; })); e.markDirty(); await sleep(70); e.PH_JOBS.clear(); res2(); await sleep(40);
+  assert.equal(e.srv.writes, 1, '올리기가 끝나면 저장됨'); assert.equal(e.HUB.dirty, false);
+});
+
+test('[C6-5] 일반 오류는 알림 없이 상태 줄 「자동 저장 실패 — 저장 단추를 눌러 주세요」 · 그 자리에서 다시 시도하지 않고, 다음에 고칠 때만 다시 예약', async () => {
+  const c = autoEnv(); c.srv.error = '네트워크';
+  c.markDirty(); await sleep(70); assert.equal(c.srv.tries, 1); assert.equal(state(c), '자동 저장 실패 — 저장 단추를 눌러 주세요'); assert.equal(c.toasts.length, 0); assert.equal(c.HUB.dirty, true);
+  await sleep(120); assert.equal(c.srv.tries, 1, '끝없이 다시 시도하지 않음');
+  c.markDirty(); await sleep(70); assert.equal(c.srv.tries, 2, '다시 고치면 그때 다시 시도');
+  c.srv.error = null; c.markDirty(); await sleep(70); assert.equal(c.srv.writes, 1); assert.equal(c.HUB.dirty, false);
+  // 손으로 누른 저장 실패는 지금처럼 알림
+  const m = autoEnv(); m.srv.error = '끊김'; m.markDirty(); await m.hubSave(); assert.ok(m.toasts.some(t => /저장 실패: 끊김/.test(t[0]) && t[1] === 'err'));
+});
+
+test('[C6-6] 보기 모드·편집 권한 없음·허브 아님이면 예약하지 않는다 · 손 저장 단추를 누르면 대기 중인 자동 저장 타이머는 지운다(두 번 보내지 않음)', async () => {
+  for (const patch of [{ view: true }, { canEdit: false }, { on: false }]) {
+    const c = autoEnv(); Object.assign(c.HUB, patch); c.markDirty(); assert.ok(!c.HUB.autoTimer, JSON.stringify(patch) + ' — 타이머 없음'); await sleep(70); assert.equal(c.srv.tries, 0, JSON.stringify(patch));
+  }
+  const c = autoEnv(); c.markDirty(); assert.ok(c.HUB.autoTimer, '예약됨'); await c.hubSave();
+  assert.equal(c.HUB.autoTimer, 0, '대기 타이머 지움'); assert.ok(c.toasts.some(t => /저장했어요/.test(t[0])), '손 저장은 알림'); await sleep(90); assert.equal(c.srv.tries, 1, '같은 내용을 두 번 보내지 않음');
+  // 저장 중에 누른 손 저장(무시됨)이 대기 중인 자동 저장을 지워 버리지 않음
+  const d = autoEnv(); let rel; d.srv.gate = new Promise(r => { rel = r; }); d.markDirty(); const p = d.hubSave(); await sleep(10); d.markDirty(); const t0 = d.HUB.autoTimer; await d.hubSave();
+  assert.equal(d.HUB.autoTimer, t0, '저장 중 겹친 손 저장은 아무것도 안 함'); d.srv.gate = null; rel(); await p; await sleep(100); assert.equal(d.HUB.dirty, false); assert.equal(d.srv.writes, 2);
+});
+
+test('[C6-7] 공개 칸 안내·공개 알림·허브 「불러오기」 확인 창 문구(소스)', () => {
+  assert.match(maker, /<label title="고치면 자동 저장돼요\. 공개 중이면 저장된 내용을 다음에 여는 직원부터 볼 수 있어요\. 이미 열린 화면은 새로고침이 필요해요\."><input type="checkbox" id="pubChk">/);
+  assert.match(mainJs, /'공개로 바꿨어요 — 곧 자동 저장돼요 \(다음에 여는 직원부터 보여요\)' : '비공개로 바꿨어요 — 곧 자동 저장돼요'/);
+  assert.match(mainJs, /B\.loadBtn\.onclick=\(\)=>\{ if\(HUB\.on && !confirm\('불러온 파일로 지금 매뉴얼 내용이 통째로 바뀌고 곧 자동 저장돼요\. 계속할까요\?'\)\) return; B\.fileInput\.click\(\); \};/);
+  assert.match(mainJs, /B\.catSel\.onchange = \(\)=>\{ HUB\.category = B\.catSel\.value; markDirty\(\); \}/, '분류 바꾸기도 markDirty → 자동 저장');
+  assert.match(mainJs, /window\.mdeckUnsaved = mdeckUnsavedNow/);
+});
+
+test('[C8-1] 튜토리얼 덱: 7가지 · 사진 슬라이드가 normalize 뒤에도 남음(데이터주소 그림, 표시 4개, 순서 0 하나, 바깥 주소 없음)', () => {
+  const ctx = { PHG: geo, encodeURIComponent }; vm.createContext(ctx);
+  vm.runInContext(['let _sn = 0; const id = () => "s" + (++_sn);', pureSrc, fnSrc(mainJs, 'function tutorialPhotoSlide'), fnSrc(mainJs, 'function tutorialDeck'), fnSrc(mainJs, 'function normalize'), 'this.d = normalize(tutorialDeck());'].join('\n'), ctx);
+  const d = clone(ctx.d), photos = d.slides.filter(s => s.type === 'photo'); assert.equal(photos.length, 1);
+  const p = photos[0]; assert.match(p.image.src, /^data:image\/svg\+xml;charset=utf-8,/); assert.equal(p.image.w, 1200); assert.equal(p.image.h, 800);
+  assert.equal(p.marks.length, 6); assert.equal(p.marks.filter(m => m.step === 0).length, 1); assert.ok(p.marks.find(m => m.step === 0).bg, '순서 0 안내 글엔 배경색');
+  assert.deepEqual([...new Set(p.marks.map(m => m.step))].sort(), [0, 1, 2, 3]);
+  const bend = p.marks.find(m => m.kind === 'arrow' && m.pts.length >= 3 && m.pts.length <= 4); assert.ok(bend && bend.step === 2 && bend.fx === 'fade', '꺾인 화살표(순서 2, 나타나기)');
+  assert.ok(p.marks.some(m => m.kind === 'arrow' && m.pts.length === 2 && m.step === 1), '곧은 화살표(순서 1)'); assert.ok(p.marks.some(m => m.kind === 'label' && m.fx === 'zoom' && m.step === 3), '확대 효과 글(순서 3)');
+  assert.ok(!/https?:\/\//.test(JSON.stringify(d)), '바깥 주소 없음'); assert.ok(!/https?:\/\//.test(decodeURIComponent(p.image.src).replace('xmlns="http://www.w3.org/2000/svg"', '')), '그림 안에도 바깥 주소 없음(SVG 이름표 xmlns 만 있음)');
+  const kinds = d.slides.find(s => s.title === '7가지 중에서 고르면 돼요'); assert.ok(kinds.nodes.some(n => n.label === '사진' && n.sub === '화살표·설명 글')); assert.equal(kinds.nodes.length, 8);
+  assert.ok(d.slides.some(s => s.type === 'table' && s.rows.some(r => r.cells[0] === '사진')), '「어떤 종류를 언제 쓸까」 표에 사진 행');
+  assert.ok(d.slides.findIndex(s => s.type === 'photo') === d.slides.findIndex(s => s.title === '7가지 중에서 고르면 돼요') + 1, '「슬라이드 종류」 도표 바로 뒤');
+  assert.ok(!/6가지/.test(maker.slice(maker.indexOf('function tutorialDeck'), maker.indexOf('function normalize'))));
+});
+
+test('[C8-2] 도움말·단축키 줄: 사진 슬라이드 절·자동 저장·Shift+R·Ctrl+V·확대·이동 문구', () => {
+  const help = between(maker, '<div class="overlay" id="helpOverlay">', 'id="closeHelp2"'), hint = between(maker, 'id="keyHint">', '</div>');
+  for (const w of ['사진 슬라이드', '자동 저장', 'Shift+R', 'Ctrl+V', 'Ctrl+휠', 'Space+끌기', 'Shift+Enter', '접기 ▸', '장 이동', '기본으로', '순서 칸', '발표 파일 만들기', '.html·.json', '7가지', '꺾기 — 고른 화살표에 꺾임점 더하기']) assert.ok(help.includes(w), '도움말에 ' + w);
+  for (const w of ['Shift+R', 'Ctrl+V', 'Ctrl+휠', 'Space+끌기']) assert.ok(hint.includes(w), '단축키 줄에 ' + w);
+  assert.ok(!/6가지|여섯 가지/.test(help));
 });
