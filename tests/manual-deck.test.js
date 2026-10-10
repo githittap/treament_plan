@@ -739,3 +739,78 @@ test('[9차] 허브 안에서 화면을 바꾸거나 iframe 을 치우는 모든
   env.HUB.on = false; env.HUB.view = false; assert.equal(u(), false); env.asPending = true; assert.equal(u(), true, '허브 밖: 자동저장 대기'); env.asPending = false; env.PH_JOBS.add({}); assert.equal(u(), true, '허브 밖: 사진 처리 중');
   assert.match(mainJs, /window\.mdeckUnsaved = mdeckUnsavedNow;/); assert.match(mainJs, /beforeunload', e=>\{ if\(mdeckUnsavedNow\(\)\)/);
 });
+
+test('[10차] 사용자 이동이 아닌 render()(늦게 끝난 옛 화면 조회·인증 재초기화 등)가 도구 iframe 을 없애거나 덮지 못한다 — 화면마다 전용 칸, 같은 도구 화면은 다시 그리지 않고 iframe 노드 보존', async () => {
+  // 아주 작은 가짜 화면(DOM): #main · 화면 전용 칸 · iframe(문자열 속 태그를 찾아 줌)
+  const mkNode = () => ({ className: '', children: [], _html: '', get innerHTML() { return this._html; }, set innerHTML(v) { this._html = v; this.children = []; },
+    replaceChildren(...c) { this.children = c; this._html = ''; }, iframes() { const own = [...this._html.matchAll(/<iframe class="tools-frame"[^>]*>/g)].map(m => ({ tag: m[0], getAttribute: k => (m[0].match(new RegExp(k + '="([^"]*)"')) || [])[1] })); return own.concat(...this.children.map(c => c.iframes())); },
+    querySelectorAll(sel) { return sel === 'iframe.tools-frame' ? this.iframes() : []; } });
+  const env = (role = 'owner') => {
+    const main = mkNode(), gates = [], homeWrites = [];
+    const ctx = { ME: { id: 'u', role }, TAB: 'home', main, esc: s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'), $: sel => (sel === '#main' ? main : null),
+      document: { createElement: () => mkNode() }, hubStaticFill() { }, apprKindSelectFill() { }, SCHEDULE_PEOPLE_ERROR: '', gates, homeWrites,
+      hubT: (k, d, v) => (v ? String(d).replace(/\{([a-z_]+)\}/g, (m, n) => v[n]) : String(d)),
+      renderHome: async m => { await new Promise(r => gates.push(r)); m.innerHTML = '<div class="card">홈 내용</div>'; homeWrites.push(m); } };
+    vm.createContext(ctx);
+    vm.runInContext(toolsBlock + ';' + fnSrc(hr, 'async function render()') + ';this.api={render,MDECK,get open(){return TOOLS_OPEN;},set open(v){TOOLS_OPEN=v;}};', ctx);
+    return ctx;
+  };
+  const ID = '11111111-1111-4111-8111-111111111111', wrapperOf = c => c.main.children[0], iframeCount = c => c.main.querySelectorAll('iframe.tools-frame').length;
+  // (1) 홈 조회 시작 → 업무매뉴얼 편집으로 이동 → (제목 입력·사진 처리 중) → 홈 조회 완료: 홈이 편집 화면을 덮지 않음
+  const c = env(); c.TAB = 'home'; const homePromise = c.api.render(); const homeWrapper = wrapperOf(c);
+  c.TAB = 'tools'; c.api.open = 'manual_deck'; c.api.MDECK.active = true; c.api.MDECK.mode = 'edit'; c.api.MDECK.id = ID; await c.api.render();
+  const editWrapper = wrapperOf(c); assert.notStrictEqual(editWrapper, homeWrapper); assert.equal(iframeCount(c), 1, editWrapper.innerHTML.slice(0, 300)); const tag0 = editWrapper.iframes()[0].tag; assert.match(tag0, /data-tkey="manual_deck:edit:11111111-1111-4111-8111-111111111111"/);
+  c.gates.forEach(r => r()); await homePromise;   // 늦게 끝난 홈 조회
+  assert.strictEqual(c.homeWrites[0], homeWrapper, '홈 결과는 옛 칸에만 씀'); assert.strictEqual(wrapperOf(c), editWrapper, '현재 화면 칸이 그대로'); assert.equal(iframeCount(c), 1, '편집 iframe 이 남아 있음'); assert.ok(!editWrapper.innerHTML.includes('홈 내용'), '홈이 현재 화면을 덮지 않음');
+  // (2) 도구 화면에서 render() 를 여러 번(인증 재초기화·실시간 갱신 흉내) 불러도 칸·iframe 이 그대로(다시 그리지 않음 = 새로 불러오지 않음)
+  for (let i = 0; i < 5; i++) await c.api.render();
+  assert.strictEqual(wrapperOf(c), editWrapper, '같은 칸'); assert.equal(editWrapper.innerHTML.includes(tag0), true); assert.equal(editWrapper.iframes()[0].tag, tag0, 'iframe 태그(=노드)가 같음'); assert.equal(c.homeWrites.length, 1);
+  // 다른 도구 화면도 같음
+  const n = env(); n.TAB = 'tools'; n.api.open = 'news'; await n.api.render(); const nw = wrapperOf(n); await n.api.render(); await n.api.render(); assert.strictEqual(wrapperOf(n), nw, '다른 도구: 같은 칸'); assert.equal(iframeCount(n), 1);
+  // (3) 화면이 정말 바뀔 때(도구 닫기·다른 도구·다른 편집 덱·다른 탭)는 새로 그림
+  c.api.open = ''; await c.api.render(); assert.notStrictEqual(wrapperOf(c), editWrapper); assert.equal(iframeCount(c), 0, '도구 목록'); assert.match(wrapperOf(c).innerHTML, /workdocs-grid/);
+  c.api.open = 'manual_deck'; c.api.MDECK.active = true; c.api.MDECK.mode = 'edit'; c.api.MDECK.id = ID; await c.api.render(); const w2 = wrapperOf(c); c.api.MDECK.id = '22222222-2222-4222-8222-222222222222'; await c.api.render(); assert.notStrictEqual(wrapperOf(c), w2, '다른 덱 편집은 새로 그림'); assert.match(wrapperOf(c).iframes()[0].tag, /manual_deck:edit:22222222/);
+  c.api.open = 'news'; await c.api.render(); assert.match(wrapperOf(c).iframes()[0].tag, /data-tkey="news"/, '다른 도구는 새로 그림');
+  c.TAB = 'home'; const hp = c.api.render(); c.gates.forEach(r => r()); await hp; assert.match(wrapperOf(c).innerHTML, /홈 내용/); assert.equal(iframeCount(c), 0, '다른 탭으로 가면 iframe 이 치워짐(이동 확인은 toolsLeaveOk 가 앞에서)');
+  // (4) 업무매뉴얼 목록 화면(iframe 없음)·편집 권한 없는 사람의 편집 화면은 보존 대상이 아님 → 평소처럼 다시 그림
+  const l = env('owner'); l.TAB = 'tools'; l.api.open = 'manual_deck'; l.api.MDECK.active = true; l.api.MDECK.mode = 'list'; l.api.MDECK.decks = []; await l.api.render(); const lw = wrapperOf(l); await l.api.render(); assert.notStrictEqual(wrapperOf(l), lw, '목록은 다시 그림');
+  const s = env('staff'); s.TAB = 'tools'; s.api.open = 'manual_deck'; s.api.MDECK.active = true; s.api.MDECK.mode = 'edit'; s.api.MDECK.id = ID; s.api.MDECK.decks = []; await s.api.render(); assert.equal(iframeCount(s), 0, '직원은 편집 화면 대신 목록'); assert.equal(s.api.MDECK.mode, 'list');
+  // 직원의 보기 화면은 iframe 보존 대상
+  const v = env('staff'); v.TAB = 'tools'; v.api.open = 'manual_deck'; v.api.MDECK.active = true; v.api.MDECK.mode = 'view'; v.api.MDECK.id = ID; await v.api.render(); const vw = wrapperOf(v); await v.api.render(); assert.strictEqual(wrapperOf(v), vw);
+  // (5) 인증 재초기화(onAuthed)는 이미 초기화됐으면 바로 끝나고, 다시 돌더라도 마지막에 render() 를 부르는 것뿐(위 보존이 지킴)·deputy 가 아니면 TAB 을 바꾸지 않음
+  const onAuthed = fnSrc(hr, 'async function onAuthed'); assert.match(onAuthed, /if\(_inited\)return;/); assert.match(onAuthed, /if\(ME\.role==='deputy'\)TAB='contract';/); assert.match(onAuthed, /renderNav\(\);await render\(\);/);
+  assert.match(hr, /if\(typeof toolsFrameKept==='function'&&toolsFrameKept\(main\)\)return;/); assert.match(hr, /const m=document\.createElement\('div'\);m\.className='view-root';main\.replaceChildren\(m\);/);
+});
+
+test('[10차-보강] 저장·조회가 늦게 끝난 뒤 같은 화면을 다시 그리는 코드(#main 에 직접 쓰는 곳)는 지금 TAB 이 그 화면일 때만 그린다 — 휴가 저장 지연 중 도구 화면으로 이동해도 iframe 유지', async () => {
+  const mkEnv = tab => {
+    const main = { id: 'main', innerHTML: '<iframe class="tools-frame" data-tkey="manual_deck:edit:x"></iframe>', writes: 0 }, rendered = [], gates = [];
+    const ctx = { TAB: tab, main, rendered, gates, ME: { role: 'owner' }, LEAVE_MONTHLY_RUNS: [{ run_id: 'r1', due_date: '2026-10-01', granted_days: 1 }], LEAVE_MONTHLY_BUSY: new Set(), confirm: () => true, alert() { }, setStatus() { },
+      hubT: (k, d, v) => (v ? String(d).replace(/\{([a-z_]+)\}/g, (m, n) => v[n]) : String(d)), $: sel => (sel === '#main' ? main : null),
+      sb: { rpc: () => new Promise(r => gates.push(() => r({ data: [{}], error: null }))) },
+      renderLeave: async m => { m.innerHTML = '<div class="card">휴가 화면</div>'; m.writes++; rendered.push('leave'); },
+      RECALL_BUSY: false, INBOX_SUBTAB: 'inbox', recallEnabled: () => true, renderInbox: async () => { rendered.push('inbox'); }, renderConfid: () => { rendered.push('confid'); } };
+    vm.createContext(ctx);
+    vm.runInContext(fnSrc(hr, 'async function revokeMonthlyLeaveAccrual') + ';' + fnSrc(hr, 'async function inboxSetSubtab') + ';this.api={revokeMonthlyLeaveAccrual,inboxSetSubtab};', ctx);
+    return ctx;
+  };
+  const tick = () => new Promise(r => setTimeout(r, 10));
+  // 휴가 월차 취소 저장(rpc)이 느린 사이 도구 화면(업무매뉴얼 편집)으로 이동 → 저장이 끝나도 도구 iframe 이 그대로
+  const c = mkEnv('leave'); const p = c.api.revokeMonthlyLeaveAccrual(0); await tick();
+  c.TAB = 'tools'; c.gates.forEach(g => g()); await p;
+  assert.deepEqual(c.rendered, [], '휴가 화면을 다시 그리지 않음'); assert.match(c.main.innerHTML, /iframe class="tools-frame" data-tkey="manual_deck:edit:x"/); assert.equal(c.main.writes, 0);
+  // 대조: 그대로 휴가 화면에 있으면 저장 뒤 다시 그림
+  const k = mkEnv('leave'); const q = k.api.revokeMonthlyLeaveAccrual(0); await tick(); k.gates.forEach(g => g()); await q; assert.deepEqual(k.rendered, ['leave']); assert.match(k.main.innerHTML, /휴가 화면/);
+  // 문의함 하위 탭: 다른 화면에서는 안 그림
+  const i = mkEnv('tools'); await i.api.inboxSetSubtab('recall'); assert.deepEqual(i.rendered, []); const j = mkEnv('inbox'); await j.api.inboxSetSubtab('recall'); assert.deepEqual(j.rendered, ['inbox']);
+  // 나머지 직접 쓰기(월차 적용·비공개 기록 저장)도 같은 한 줄 가드(글자 출력은 그대로)
+  assert.match(hr, /setStatus\('saved'\);if\(typeof TAB!=='undefined'&&TAB!=='leave'\)return;await renderLeave\(\$\('#main'\)\);const refreshed=/);
+  assert.match(hr, /setStatus\('saved'\);if\(typeof TAB==='undefined'\|\|TAB==='leave'\)await renderLeave\(\$\('#main'\)\);\r?\n  \}catch\(error\)\{alert\(hubT\('p7\.monthly\.revoke_fail'/);
+  assert.match(hr, /if\(typeof TAB==='undefined'\|\|TAB==='confid'\)renderConfid\(\$\('#main'\)\);setStatus\('saved'\);/);
+  assert.match(hr, /setStatus\('saved'\);if\(typeof TAB!=='undefined'&&TAB!=='consult'\)return;consultationResetForm\(\);await renderConsultationJournal\(\$\('#main'\)\);\}/);
+  assert.match(hr, /if\(typeof TAB==='undefined'\|\|TAB==='inbox'\)await renderInbox\(\$\('#main'\)\);\}/);
+  // $('#main') 에 직접 쓰는 곳 전수: 허용 목록 밖에 새로 생기면 시험이 알려 줌(render 자신 · 초기화 실패 안내 · 읽기 전용)
+  const direct = hr.split(/\r?\n/).map((l, n) => [n + 1, l]).filter(([, l]) => /\$\('#main'\)|getElementById\('main'\)/.test(l) && !/^\s*@media/.test(l));
+  const allowed = [/const main=\$\('#main'\);/, /renderLeave\(\$\('#main'\)\)/, /renderConfid\(\$\('#main'\)\)/, /renderInbox\(\$\('#main'\)\)/, /renderConsultationJournal\(\$\('#main'\)\)/, /const m=\$\('#main'\);if\(m\)m\.innerHTML=`<div class="card"><div class="cal-error">초기화에 실패했습니다/];
+  for (const [n, l] of direct) assert.ok(allowed.some(re => re.test(l)), '허용 목록에 없는 #main 직접 쓰기(줄 ' + n + '): ' + l.slice(0, 100));
+});
