@@ -1087,6 +1087,7 @@ test('[2차 Codex 1차 지적] 누르기만 한 글은 겹침 계산 유지·놓
   const pop = fnSrc(mainJs, 'function peOpenPop');
   assert.ok(/PE\.view\.appendChild\(inp\)/.test(pop) && !/PE\.stage\.appendChild\(inp\)/.test(pop), '입력 창은 확대되는 판이 아니라 틀에');
   assert.ok(/preventScroll:true/.test(pop));
+  assert.ok(/B\.editor\.getBoundingClientRect\(\)/.test(fnSrc(mainJs, 'function pePopPlace')), '입력 창은 편집 칸에서 실제로 보이는 부분 안으로 자름(Codex 2차)');
   assert.ok(/pePopPlace\(\)/.test(fnSrc(mainJs, 'function peApplyView')) && /scrollLeft = 0/.test(fnSrc(mainJs, 'function peApplyView')));
   assert.ok(/PE\.zsid = null/.test(fnSrc(mainJs, 'function renderEditor')), '사진 판 없는 장이면 확대 기억 버림');
   const sizes = JSON.parse(mainJs.match(/const PE_SIZES = (\[[^;]*\]);/)[1].replace(/'/g, '"'));
