@@ -1,8 +1,8 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const {fnSrc}=require('./fixtures/hub7-harness.cjs');
 const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/\r\n/g,'\n');
-test('수정한 화면 모듈은 같은 최신 캐시 번호로 참조한다',()=>{
- const hr=read('hr.html');for(const name of ['card-ledger-ui','payroll-bonus','payroll-reply','payroll-compare','hub-help','hub-texts','hub-activity','wage-hourly','ai-assistants'])assert.ok(hr.includes(name+'.js?v=2026101110'),name);
+test('수정한 안내 모듈은 새 캐시로 참조하고 기존 모듈은 이전 참조를 유지한다',()=>{
+ const hr=read('hr.html');for(const name of ['card-ledger-ui','payroll-bonus','payroll-reply','payroll-compare','hub-help','hub-texts','hub-activity','wage-hourly','ai-assistants'])assert.ok(hr.includes(name+'.js?v='+(name==='hub-help'?'2026101202':name==='hub-texts'?'2026101201':'2026101110')),name);
 });
 test('실제 지출 점검은 같은 탭 재진입 뒤 분리된 옛 루트에 조회 결과를 그리지 않는다',async()=>{
  const c={Intl,Date};vm.createContext(c);vm.runInContext(read('card-ledger-ui.js'),c);
