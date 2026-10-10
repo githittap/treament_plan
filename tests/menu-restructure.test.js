@@ -250,10 +250,10 @@ test('⑥ 허브 🧰 도구 탭의 묶음·순서가 hub.json(재편 전 index.
   const ctx = {};
   vm.createContext(ctx);
   vm.runInContext(blk[1] + ';this.G=TOOL_GROUPS;this.C=TOOL_CARDS;', ctx);
-  const groups = plain(ctx.G).map(g => ({ label: g.title, links: plain(ctx.C).filter(c => c.group === g.key).map(c => c.file) }));
+  const groups = plain(ctx.G).map(g => ({ label: g.title, links: plain(ctx.C).filter(c => c.group === g.key && !c.view).map(c => c.file) }));
   const expected = HUB.map((g, i) => (i === 0 ? { label: null, links: g.links.filter(l => l !== 'hr.html') } : g));
   assert.deepEqual(groups, expected);
-  const links = plain(ctx.C).map(c => c.file);
+  const links = plain(ctx.C).filter(c => !c.view).map(c => c.file); // 허브 안 화면(view 카드: 업무매뉴얼)은 주소 목록에 안 셈
   assert.deepEqual([...links, 'hr.html'].sort(), [...LINKS_BEFORE].sort());
   assert.equal(links.length + 1, LINKS_BEFORE.length);
 });

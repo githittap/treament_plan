@@ -122,6 +122,7 @@ const HUB_MENU_DEFAULTS=[['g_work','🕘 근무'],['g_owner','🔒 원장 전용
 const HUB_TOOL_GROUPS=[['info','📚 정보(치과 소식·AI 모델 지표·설명덱)'],['clinic','🦷진료'],['fun','🎲 재미']];
 const HUB_TOOL_CARDS=[
   ['treatment_plan','치과 치료계획 도구','파노라마 X-ray 위에 임플란트·발치·치료종류를 시각적으로 표시하고, 이미지로 저장·공유합니다.','all'],
+  ['manual_deck','업무매뉴얼','우리 병원 업무 방법을 사진과 화살표로, 클릭할 때마다 한 단계씩 확인합니다.','all'],
   ['news','치과 소식','치과 뉴스(치의신보 등)·치과 건강보험·의료 판결 소식을 최신순으로 한눈에 봅니다.','all'],
   ['ai_metrics','AI 모델 지표','코딩·장문분석·차트판독·비환각률 등 업무 직결 6개 지표로 AI 모델을 지표별 상위 순으로 비교합니다.','all'],
   ['deck_maker','설명덱 만들기','클릭하면 한 단계씩 열리는 설명형 발표 슬라이드를, 코딩 없이 만들고 HTML 파일로 저장·공유합니다.','all'],
@@ -149,6 +150,23 @@ function hubTextDefsTools(add){
     add('tools.card.'+c[0]+'.title',S,'도구 카드 제목 — 「'+c[1]+'」 카드',c[1]);
     add('tools.card.'+c[0]+'.desc',S,'도구 카드 설명 — 「'+c[1]+'」 카드',c[2]);
   });
+}
+// ── 📘 업무매뉴얼(2026-10-10): 도구 탭 안 목록·보기 화면 글. hr.html의 hubT 기본 글과 글자까지 같아야 한다(시험이 대조) ──
+function hubTextDefsMdeck(add){
+  const S='🧰 도구';
+  add('mdeck.title',S,'업무매뉴얼 화면 맨 위 제목','📘 업무매뉴얼');
+  add('mdeck.hint',S,'제목 아래 설명','우리 병원 업무 방법을 사진과 화살표로 한 단계씩 확인합니다.');
+  add('mdeck.search',S,'검색칸 안에 흐리게 보이는 안내 글','매뉴얼 검색');
+  add('mdeck.cat_all',S,'분류 고르는 칸의 첫 항목(모두 보기)','전체');
+  add('mdeck.view',S,'매뉴얼 카드의 「보기」 단추 글','보기');
+  add('mdeck.edit',S,'매뉴얼 카드의 「편집」 단추 글(원장·실장에게만 보임)','편집');
+  add('mdeck.new',S,'「새 매뉴얼」 단추 글(원장·실장에게만 보임)','＋ 새 매뉴얼');
+  add('mdeck.empty',S,'볼 수 있는 매뉴얼이 하나도 없을 때 뜨는 글','볼 수 있는 매뉴얼이 없습니다.');
+  add('mdeck.loading',S,'목록을 불러오는 동안 뜨는 글','불러오는 중…');
+  add('mdeck.error',S,'목록을 못 불러왔을 때 뜨는 글 — {detail}은 오류 내용','불러오지 못했어요: {detail}',['detail']);
+  add('mdeck.private',S,'아직 직원에게 공개 안 한 매뉴얼 카드에 붙는 표시(원장·실장에게만 보임)','비공개');
+  add('mdeck.back',S,'매뉴얼을 연 화면 위쪽 「매뉴얼 목록으로 돌아가기」 단추 글','← 매뉴얼 목록');
+  add('mdeck.leave_confirm',S,'편집 중 목록으로 돌아갈 때 뜨는 확인 글','저장하지 않은 변경은 사라집니다. 목록으로 돌아갈까요?');
 }
 const HUB_INVITE_DEFAULT='아산정플란트치과 직원허브 가입 안내입니다.\n\n1) 아래 링크로 접속해 회원가입 해주세요.\nhttps://jung-plant.com/hr.html\n2) 회원가입 후 원장 승인을 기다려 주세요.\n3) 승인되면 같은 링크에서 로그인하시면 됩니다.';
 const HUB_NEXT_BODY_DEFAULT='M2 근무표·계약서 자동생성 · M3 급여 대시보드/명세서 발행·월말 평가·휴일근로 계산기 · M4 채용·입금피드·기공차트 통합\n— 백엔드(표)는 이미 준비됨. 화면만 순차 추가.';
@@ -2056,6 +2074,7 @@ function hubTextDefs(){
   if(typeof globalThis!=='undefined'&&globalThis.HUB_BONUS_CATALOG===true)hubTextDefsBonus(add);
   hubTextDefsSpend(add);
   hubTextDefsTools(add);
+  hubTextDefsMdeck(add);
   ((typeof globalThis!=='undefined'&&globalThis.HUB_CARD_LEDGER_TEXT_DEFS)||[]).forEach(d=>add(d[0],'지출 점검',d[1],d[1],Array.from(d[1].matchAll(/\{([a-z_]+)\}/g),m=>m[1])));
   ((typeof globalThis!=='undefined'&&globalThis.HUB_INTRO_TEXT_DEFS)||[]).forEach(function(d){add(d[0],'🌌 첫 화면',d[1],d[2]);}); // hub-intro.js의 첫 화면 글
   hubTextDefsP7(add);

@@ -13,7 +13,7 @@ const menuBlock=hr.match(/\/\* menu-restructure:test-start \*\/([\s\S]*?)\/\* me
 const tabsSource=hr.match(/const TABS=\[([\s\S]*?)\n\];/)?.[1];
 const menuSource=hr.match(/const MENU=\[([\s\S]*?)\n\];/)?.[1];
 
-const ALL_CODES=['treatment_plan','news','ai_metrics','deck_maker','lab_remake_ledger','ortho','prosthesis_protocol','saju','progress_board','employee_pick'];
+const ALL_CODES=['treatment_plan','manual_deck','news','ai_metrics','deck_maker','lab_remake_ledger','ortho','prosthesis_protocol','saju','progress_board','employee_pick'];
 
 /* 허브 글·설정 엔진 + 도구 탭 코드 + 메뉴 코드를 한 vm에 올린다. settings = app_settings 값(키:값), texts = hub_ui_texts 행 */
 function make({role='staff',settings={},texts=[]}={}){
@@ -36,11 +36,11 @@ function make({role='staff',settings={},texts=[]}={}){
 }
 const codes=env=>clone(env.ctx.toolsVisibleCards(env.ctx.ME.role).map(c=>c.code));
 
-test('카드 10장이 index.html과 같은 순서·묶음(정보/진료/재미)으로 코드에 고정돼 있다',()=>{
+test('카드 11장(업무매뉴얼 추가)이 index.html과 같은 순서·묶음(정보/진료/재미)으로 코드에 고정돼 있다',()=>{
   const {ctx}=make();
   assert.deepEqual(clone(ctx.TOOL_CARDS.map(c=>c.code)),ALL_CODES);
-  assert.deepEqual(clone(ctx.TOOL_CARDS.map(c=>c.file)),['치료계획.html','뉴스.html','AI지표.html','설명덱_제작기.html','기공차트_리메이크장부_서식.html','ortho.html','보철프로토콜_진단기.html','사주.html','진행판.html','직원뽑기.html']);
-  assert.deepEqual(clone(ctx.TOOL_CARDS.map(c=>c.group)),['top','info','info','info','clinic','clinic','clinic','fun','fun','fun']);
+  assert.deepEqual(clone(ctx.TOOL_CARDS.map(c=>c.file)),['치료계획.html',null,'뉴스.html','AI지표.html','설명덱_제작기.html','기공차트_리메이크장부_서식.html','ortho.html','보철프로토콜_진단기.html','사주.html','진행판.html','직원뽑기.html']);
+  assert.deepEqual(clone(ctx.TOOL_CARDS.map(c=>c.group)),['top','top','info','info','info','clinic','clinic','clinic','fun','fun','fun']);
 });
 
 test('역할별 보이는 카드: 직원·매니저·실장은 진행판만 빠진 9장, 원장은 10장',()=>{
@@ -75,17 +75,17 @@ test('설정(tools.who.<코드>)을 바꾸면 보이는 사람이 바뀐다 — 
 
 test('글 고치기 값이 화면에 나오고 HTML은 이스케이프된다 · 안 고친 글은 기본 글',()=>{
   const base=make({role:'owner'}).ctx.toolsListHtml('owner');
-  for(const t of ['치과 치료계획 도구','치과 소식','AI 모델 지표','설명덱 만들기','기공차트 · 리메이크 장부','교정 케이스 보드','보철 장착 프로토콜','사주 정밀풀이','작업 진행판','직원 뽑기 · 사다리'])assert.ok(base.includes('<h3>'+t+'</h3>'),t);
+  for(const t of ['치과 치료계획 도구','업무매뉴얼','치과 소식','AI 모델 지표','설명덱 만들기','기공차트 · 리메이크 장부','교정 케이스 보드','보철 장착 프로토콜','사주 정밀풀이','작업 진행판','직원 뽑기 · 사다리'])assert.ok(base.includes('<h3>'+t+'</h3>'),t);
   for(const g of ['📚 정보(치과 소식·AI 모델 지표·설명덱)','🦷진료','🎲 재미'])assert.ok(base.includes('<h3 class="tools-head">'+g+'</h3>'),g);
   assert.equal((base.match(/<h3 class="tools-head">/g)||[]).length,3,'치료계획 카드는 소제목 없는 맨 위 묶음');
   assert.ok(base.indexOf('치과 치료계획 도구')<base.indexOf('📚 정보'),'소제목 없는 묶음이 맨 위');
-  assert.equal((base.match(/>열기<\/button>/g)||[]).length,10);
+  assert.equal((base.match(/>열기<\/button>/g)||[]).length,11);
   const texts=[{key:'tools.card.news.title',value:'<b>소식</b> & "새"'},{key:'tools.card.news.desc',value:'설명 <i>고침</i>'},{key:'tools.group.info',value:'정보 <묶음>'},{key:'tools.open',value:'들어가기'}];
   const out=make({role:'owner',texts}).ctx.toolsListHtml('owner');
   assert.ok(out.includes('<h3>&lt;b&gt;소식&lt;/b&gt; &amp; &quot;새&quot;</h3>'));
   assert.ok(out.includes('<p>설명 &lt;i&gt;고침&lt;/i&gt;</p>'));
   assert.ok(out.includes('<h3 class="tools-head">정보 &lt;묶음&gt;</h3>'));
-  assert.equal((out.match(/>들어가기<\/button>/g)||[]).length,10);
+  assert.equal((out.match(/>들어가기<\/button>/g)||[]).length,11);
   assert.ok(!out.includes('<b>소식</b>'));
   // 탭 이름·화면 제목·빈 화면 글도 글 고치기 값을 따른다
   const env=make({role:'staff',texts:[{key:'tools.tab',value:'🧰 연장통'},{key:'tools.title',value:'연장통 <제목>'}]});
@@ -179,10 +179,10 @@ test('index.html 첫 화면에는 hr.html 카드만 남는다(파일은 그대�
   }
 });
 
-test('글·설정 등록: 새 글 33개와 보는 사람 설정 10개(enum all/lead/owner)가 글 고치기 「🧰 도구」 묶음에 있고, 화면 기본 글과 글자까지 같다',()=>{
+test('글·설정 등록: 새 글 35개와 보는 사람 설정 11개(enum all/lead/owner)가 글 고치기 「🧰 도구」 묶음에 있고, 화면 기본 글과 글자까지 같다',()=>{
   const {ctx}=make();
   const defs=clone(ctx.hubTextDefs()).filter(d=>d.key.startsWith('tools.'));
-  assert.equal(defs.length,33);
+  assert.equal(defs.length,35);
   assert.ok(defs.every(d=>d.screen==='🧰 도구'));
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
   const byKey=Object.fromEntries(defs.map(d=>[d.key,d.def]));

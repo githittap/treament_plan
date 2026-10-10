@@ -79,6 +79,7 @@ main{padding:16px 16px 70px;max-width:1080px;margin:0 auto}
 .tools-head{margin:16px 0 0;font-size:14px;color:var(--mint)}.tools-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:10px}.tools-bar b{flex:1;min-width:0;overflow-wrap:anywhere}.tools-frame{display:block;width:100%;max-width:100%;height:calc(100vh - 230px);min-height:520px;border:1px solid var(--line);border-radius:8px;background:#fff}
 /* 도구를 열어 둔 화면은 허브 본문 폭(1080px) 제한을 풀어 PC에서 도구 안의 좌우 칸 배치가 유지되게 한다(치료계획.html은 칸 폭 1080px 이하면 세로 1열로 바뀜). 폭 상한은 --tools-wide-max 한 곳 */
 main:has(.tools-frame){--tools-wide-max:1700px;max-width:min(var(--tools-wide-max),100%)}
+.mdeck-filter{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.mdeck-filter input{flex:1;min-width:160px}.mdeck-badge{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px;background:var(--bg);border:1px solid var(--line);color:var(--gray)}.mdeck-badge.off{color:#e0a85b;border-color:#e0a85b}.mdeck-actions{display:flex;gap:6px}
 .guide-shell{max-width:900px}.guide-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:1px solid var(--line);padding-bottom:12px}.guide-breadcrumb{font-size:11px;color:var(--gray);letter-spacing:.02em;margin-bottom:5px}.guide-lead{color:var(--gray);margin:4px 0 0;font-size:13px}.guide-flow{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:14px 0}.guide-flow span{padding:8px 6px;border:1px solid var(--line);border-radius:8px;background:var(--panel);font-size:11px;text-align:center;color:var(--gray)}.guide-flow b{display:block;color:var(--mint);font-size:13px;margin-bottom:2px}.guide-sections{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.guide-section{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px}.guide-section h3{margin:0 0 6px;color:var(--ink);font-size:13px}.guide-section p{margin:0;color:var(--gray);font-size:12.5px;line-height:1.55}.guide-section ul{margin:6px 0 0;padding-left:18px;color:var(--gray);font-size:12px;line-height:1.6}.guide-mock{margin-top:14px;border:1px solid rgba(47,217,196,.35);border-radius:10px;background:#081214;padding:10px}.guide-mock-nav{display:flex;gap:5px;flex-wrap:wrap}.guide-mock-nav span{font-size:10px;padding:4px 7px;border-radius:5px;color:var(--gray);background:rgba(255,255,255,.05)}.guide-mock-nav .active{color:#062421;background:var(--mint);font-weight:800}.guide-mock-row{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:9px;padding:8px;border:1px solid var(--line);border-radius:7px;font-size:11px}.guide-pill{color:var(--mint);font-size:10px}.guide-caption{margin:7px 0 0;color:var(--gray);font-size:11px}.guide-caption b{color:var(--mint)}.guide-close{white-space:nowrap}.guide-shell button:focus-visible,.guide-shell a:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
 @media(max-width:640px){.guide-flow{grid-template-columns:repeat(2,1fr)}.guide-sections{grid-template-columns:1fr}.guide-head{align-items:stretch;flex-direction:column}.guide-close{align-self:flex-start}}
 .guide-shot{margin:10px 0 0}.guide-shot img{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:8px}.guide-shot figcaption{font-size:11px;color:var(--gray);margin-top:5px}
@@ -2460,6 +2461,7 @@ const TOOL_WHO_VALUES=['all','lead','owner'];
 const TOOL_GROUPS=[{key:'top',title:null},{key:'info',title:'📚 정보(치과 소식·AI 모델 지표·설명덱)'},{key:'clinic',title:'🦷진료'},{key:'fun',title:'🎲 재미'}];
 const TOOL_CARDS=[
   {code:'treatment_plan',group:'top',icon:'🦷',file:'치료계획.html',title:'치과 치료계획 도구',desc:'파노라마 X-ray 위에 임플란트·발치·치료종류를 시각적으로 표시하고, 이미지로 저장·공유합니다.',who:'all'},
+  {code:'manual_deck',group:'top',icon:'📘',view:'manual',title:'업무매뉴얼',desc:'우리 병원 업무 방법을 사진과 화살표로, 클릭할 때마다 한 단계씩 확인합니다.',who:'all'},
   {code:'news',group:'info',icon:'📰',file:'뉴스.html',title:'치과 소식',desc:'치과 뉴스(치의신보 등)·치과 건강보험·의료 판결 소식을 최신순으로 한눈에 봅니다.',who:'all'},
   {code:'ai_metrics',group:'info',icon:'🤖',file:'AI지표.html',title:'AI 모델 지표',desc:'코딩·장문분석·차트판독·비환각률 등 업무 직결 6개 지표로 AI 모델을 지표별 상위 순으로 비교합니다.',who:'all'},
   {code:'deck_maker',group:'info',icon:'🖥️',file:'설명덱_제작기.html',title:'설명덱 만들기',desc:'클릭하면 한 단계씩 열리는 설명형 발표 슬라이드를, 코딩 없이 만들고 HTML 파일로 저장·공유합니다.',who:'all'},
@@ -2496,8 +2498,68 @@ function toolFrameLoaded(frame){let n=0;try{const d=frame&&frame.contentDocument
 function renderTools(m){
   const card=TOOLS_OPEN?TOOL_CARDS.find(x=>x.code===TOOLS_OPEN&&toolCanSee(x,ME.role)):null;
   if(TOOLS_OPEN&&!card)TOOLS_OPEN='';
+  const manualOn=!!(card&&card.view==='manual');
+  if(manualOn&&!MDECK.active){MDECK.mode='list';MDECK.decks=null;}
+  MDECK.active=manualOn;
+  if(manualOn){renderMdeckTool(m);return;}
   if(card){const url=esc(toolUrl(card)),title=esc(toolText(card,'title'));m.innerHTML=`<div class="card"><div class="tools-bar"><button type="button" class="mini" onclick="closeTool()">${esc(hubT('tools.back','← 도구 목록'))}</button><b>${title}</b><a class="mini" href="${url}" target="_blank" rel="noopener">${esc(hubT('tools.newwin','새 창'))}</a></div><iframe class="tools-frame" src="${url}" title="${title}" onload="toolFrameLoaded(this)"></iframe></div>`;return;}
   m.innerHTML=`<div class="card"><h2>${esc(hubT('tools.title','🧰 도구'))}</h2>${toolsListHtml(ME.role)}</div>`;
+}
+/* 📘 업무매뉴얼(2026-10-10): 도구 탭 안의 덱 목록 → 보기(넘기기만). 덱 내용·사진은 표 manual_decks·보관함 manual-media(db/manual_decks.sql).
+   보기·편집 화면은 설명덱_제작기.html 을 ?deck=<id>(&view=1) / ?new=1 로 열어 씀. 편집·새 매뉴얼 단추는 원장·실장에게만(DB도 같은 규칙) */
+const MDECK_CATS=['진료실','데스크','상담','행정','통역','기공실'];
+const MDECK={mode:'list',id:'',decks:null,loading:false,error:'',q:'',cat:'',active:false};
+function mdeckCanEdit(role){return role==='owner'||role==='chief';}
+function mdeckFiltered(decks,q,cat){const t=String(q||'').trim().toLowerCase();return (decks||[]).filter(d=>(!cat||d.category===cat)&&(!t||String(d.title||'').toLowerCase().includes(t)));}
+function mdeckFrameUrl(mode,id){const base=encodeURI('설명덱_제작기.html');if(mode==='new')return base+'?new=1';return base+'?deck='+encodeURIComponent(id)+(mode==='view'?'&view=1':'');}
+function mdeckCardHtml(d,canEdit){
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(String(d.id)))return '';
+  const id=esc(d.id),badges=(d.category?`<span class="mdeck-badge">${esc(d.category)}</span> `:'')+(d.published?'':`<span class="mdeck-badge off">${esc(hubT('mdeck.private','비공개'))}</span>`);
+  return `<article class="workdoc-card"><div class="workdoc-icon">📘</div><h3>${esc(d.title||'')}</h3><p>${badges}</p><div class="mdeck-actions"><button type="button" class="mini" onclick="mdeckOpen('view','${id}')">${esc(hubT('mdeck.view','보기'))}</button>${canEdit?`<button type="button" class="mini" onclick="mdeckOpen('edit','${id}')">${esc(hubT('mdeck.edit','편집'))}</button>`:''}</div></article>`;
+}
+function mdeckResultsHtml(role){
+  if(MDECK.error)return `<div class="empty">${esc(hubT('mdeck.error','불러오지 못했어요: {detail}',{detail:MDECK.error}))}</div>`;
+  if(MDECK.decks===null)return `<div class="empty">${esc(hubT('mdeck.loading','불러오는 중…'))}</div>`;
+  const list=mdeckFiltered(MDECK.decks,MDECK.q,MDECK.cat);
+  if(!list.length)return `<div class="empty">${esc(hubT('mdeck.empty','볼 수 있는 매뉴얼이 없습니다.'))}</div>`;
+  return `<div class="workdocs-grid">${list.map(d=>mdeckCardHtml(d,mdeckCanEdit(role))).join('')}</div>`;
+}
+function mdeckListHtml(role){
+  const can=mdeckCanEdit(role);
+  return `<div class="card"><div class="tools-bar"><button type="button" class="mini" onclick="closeTool()">${esc(hubT('tools.back','← 도구 목록'))}</button><b>${esc(hubT('mdeck.title','📘 업무매뉴얼'))}</b>${can?`<button type="button" class="mini" onclick="mdeckOpen('new','')">${esc(hubT('mdeck.new','＋ 새 매뉴얼'))}</button>`:''}</div>`
+   +`<p class="hint">${esc(hubT('mdeck.hint','우리 병원 업무 방법을 사진과 화살표로 한 단계씩 확인합니다.'))}</p>`
+   +`<div class="mdeck-filter"><input id="manualSearch" type="search" placeholder="${esc(hubT('mdeck.search','매뉴얼 검색'))}" value="${esc(MDECK.q)}" oninput="MDECK.q=this.value;mdeckRefreshList()"><select id="manualCat" onchange="MDECK.cat=this.value;mdeckRefreshList()"><option value="">${esc(hubT('mdeck.cat_all','전체'))}</option>${MDECK_CATS.map(c=>`<option value="${esc(c)}"${MDECK.cat===c?' selected':''}>${esc(c)}</option>`).join('')}</select></div>`
+   +`<div id="manualResults">${mdeckResultsHtml(role)}</div></div>`;
+}
+function mdeckRefreshList(){const r=$('#manualResults');if(r)r.innerHTML=mdeckResultsHtml(ME.role);}
+async function mdeckLoad(){
+  if(MDECK.loading)return;MDECK.loading=true;MDECK.error='';
+  try{
+    if(!sb)throw new Error('connection');
+    const r=await sb.from('manual_decks').select('id,title,category,published,sort,updated_at').order('sort',{ascending:true}).order('updated_at',{ascending:false});
+    if(r.error)throw r.error;
+    MDECK.decks=r.data||[];
+  }catch(e){MDECK.error=(e&&e.message)||String(e);MDECK.decks=[];}
+  MDECK.loading=false;
+  if(TAB==='tools'&&TOOLS_OPEN==='manual_deck'&&MDECK.mode==='list')render();
+}
+function mdeckOpen(mode,id){
+  if((mode==='edit'||mode==='new')&&!mdeckCanEdit(ME.role))return false;
+  MDECK.mode=mode;MDECK.id=id||'';if(mode==='list')MDECK.decks=null;render();return true;
+}
+function mdeckBack(){
+  if((MDECK.mode==='edit'||MDECK.mode==='new')&&typeof confirm==='function'&&!confirm(hubT('mdeck.leave_confirm','저장하지 않은 변경은 사라집니다. 목록으로 돌아갈까요?')))return;
+  mdeckOpen('list','');
+}
+function renderMdeckTool(m){
+  if(MDECK.mode!=='list'&&!(MDECK.mode==='view'||mdeckCanEdit(ME.role)))MDECK.mode='list';
+  if(MDECK.mode!=='list'){
+    const url=esc(mdeckFrameUrl(MDECK.mode,MDECK.id)),title=esc(hubT('mdeck.title','📘 업무매뉴얼'));
+    m.innerHTML=`<div class="card"><div class="tools-bar"><button type="button" class="mini" onclick="mdeckBack()">${esc(hubT('mdeck.back','← 매뉴얼 목록'))}</button><b>${title}</b></div><iframe class="tools-frame" src="${url}" title="${title}"></iframe></div>`;
+    return;
+  }
+  m.innerHTML=mdeckListHtml(ME.role);
+  if(MDECK.decks===null&&!MDECK.loading)mdeckLoad();
 }
 /* hub-tools:test-end */
 /* ── 캘린더 ── */
