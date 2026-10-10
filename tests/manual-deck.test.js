@@ -1076,3 +1076,19 @@ test('[C8-2] 도움말·단축키 줄: 사진 슬라이드 절·자동 저장·S
   for (const w of ['Shift+R', 'Ctrl+V', 'Ctrl+휠', 'Space+끌기']) assert.ok(hint.includes(w), '단축키 줄에 ' + w);
   assert.ok(!/6가지|여섯 가지/.test(help));
 });
+
+test('[2차 Codex 1차 지적] 누르기만 한 글은 겹침 계산 유지·놓으면 다시 계산 · 확대 중 입력 창은 바깥 틀에 · 사진 없는 장을 거치면 확대 초기화 · 「조금 크게」는 기본보다 큼', () => {
+  const red = fnSrc(mainJs, 'function peRedraw');
+  assert.ok(/dm = PE\.drag && PE\.drag\.moved \? PE\.drag\.m : null/.test(red), '실제로 끄는 중일 때만 계산에서 뺌');
+  assert.ok(/PE\.disp\[o\.m\.id\]/.test(red), '비켜 앉은 자리를 기억');
+  const ed = fnSrc(mainJs, 'function photoEditor');
+  assert.ok(/PE\.drag = null; peRedraw\(\);/.test(ed), '놓으면 다시 그림(겹침 다시 계산)');
+  assert.ok(/PE\.disp && PE\.disp\[d\.m\.id\]/.test(ed), '끌기는 보이던 자리에서 시작');
+  const pop = fnSrc(mainJs, 'function peOpenPop');
+  assert.ok(/PE\.view\.appendChild\(inp\)/.test(pop) && !/PE\.stage\.appendChild\(inp\)/.test(pop), '입력 창은 확대되는 판이 아니라 틀에');
+  assert.ok(/preventScroll:true/.test(pop));
+  assert.ok(/pePopPlace\(\)/.test(fnSrc(mainJs, 'function peApplyView')) && /scrollLeft = 0/.test(fnSrc(mainJs, 'function peApplyView')));
+  assert.ok(/PE\.zsid = null/.test(fnSrc(mainJs, 'function renderEditor')), '사진 판 없는 장이면 확대 기억 버림');
+  const sizes = JSON.parse(mainJs.match(/const PE_SIZES = (\[[^;]*\]);/)[1].replace(/'/g, '"'));
+  for (const bw of [600, 1000]) assert.ok(geo.phLabelFont(sizes[0][0], bw) > 15, bw + 'px 사진에서 「조금 크게」가 기본 15px보다 큼');
+});
