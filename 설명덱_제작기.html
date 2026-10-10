@@ -234,7 +234,7 @@
   .pe-lbl.ar{cursor:pointer; opacity:.95;}
   .pe-lbl.sel{border-color:#ff9f1c; box-shadow:0 0 0 3px rgba(255,159,28,.45);}
   .pe-badge{position:absolute; transform:translate(-50%,-50%); min-width:19px; height:19px; padding:0 4px; border-radius:10px; background:var(--navy); color:#fff; font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; pointer-events:none; border:1.5px solid #fff;}
-  .pe-pop{position:absolute; z-index:5; width:min(260px,70%); border:2px solid var(--gold); border-radius:8px; padding:6px 9px; font:inherit; font-size:14px; line-height:1.4; resize:none; background:#fff; color:var(--ink);}
+  .pe-pop{position:fixed; z-index:65; width:min(260px,70vw); box-shadow:0 10px 28px -10px rgba(0,0,0,.55); border:2px solid var(--gold); border-radius:8px; padding:6px 9px; font:inherit; font-size:14px; line-height:1.4; resize:none; background:#fff; color:var(--ink);}
   .slide-go{width:64px; border:1px solid var(--line); border-radius:7px; padding:3px 6px; font-size:12px; font-family:inherit;}
   .pe-mrow textarea.input{resize:vertical; font-family:inherit; line-height:1.4;}
   .pe-deco{display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; margin-top:6px; padding-left:26px; font-size:11px; font-weight:700; color:var(--gray);}
@@ -1278,6 +1278,13 @@ function zoomAt(z, tx, ty, cx, cy, nz, VW, VH){
   const Z = Math.max(1, Math.min(6, +nz || 1)), k = Z/z;
   return {z:Z, tx:Math.max(VW - VW*Z, Math.min(0, cx - (cx - tx)*k)), ty:Math.max(VH - VH*Z, Math.min(0, cy - (cy - ty)*k))};
 }
+/* 글 입력 창 자리(화면 좌표): 기준점(ax,ay) 바로 아래, 아래 자리가 없으면 위로 뒤집음.
+   reg(편집 칸에서 보이는 사각형 [왼,오른,위,아래])에 창이 들어가면 그 안으로, 너무 작으면 win(브라우저 창) 안으로 자름 → 창은 언제나 다 보임 */
+function popPlace(ax, ay, w, h, reg, win){
+  const fits = reg && reg[1]-reg[0] >= w && reg[3]-reg[2] >= h, b = fits ? reg : win, g = 10;
+  let y = ay + g; if(y + h > b[3] && ay - g - h >= b[2]) y = ay - g - h;
+  return {x:Math.max(b[0], Math.min(b[1] - w, ax)), y:Math.max(b[2], Math.min(b[3] - h, y))};
+}
 /* manual-deck:test-end */
 
 /* ---- 기본 슬라이드 틀 ---- */
@@ -1903,15 +1910,16 @@ function peOpenPop(m){
   PE.view.appendChild(inp); PE.pop = {el:inp, m:m}; pePopPlace();   /* 확대되는 판이 아니라 바깥 틀에 둠 — 확대해도 입력 창 크기 그대로, 보이는 틀 안에 */
   setTimeout(()=>{ try{ inp.focus({preventScroll:true}); }catch(_){ inp.focus(); } }, 0);
 }
-/* 입력 창 자리: 그 표시 끝점(글은 그 자리)이 지금 확대·이동 상태로 보이는 곳 바로 아래.
-   틀 안이면서 편집 칸에서 지금 실제로 보이는 부분(스크롤로 가려진 곳 제외) 안으로 자름 */
+/* 입력 창 자리(position:fixed, 화면 좌표): 그 표시 끝점(글은 그 자리)이 지금 확대·이동·스크롤 상태로 보이는 곳 — 계산은 popPlace.
+   편집 칸 스크롤·창 크기 변화·확대/이동 때마다 다시 부름 */
 function pePopPlace(){
-  const p = PE.pop, v = PE.view; if(!p || !v) return;
-  const m = p.m, pt = m.kind === 'arrow' ? m.pts[m.pts.length-1] : [m.x, m.y], VW = v.clientWidth, VH = v.clientHeight;
-  const vr = v.getBoundingClientRect(), er = B.editor.getBoundingClientRect();
-  const x0 = Math.max(0, er.left - vr.left), x1 = Math.min(VW, er.right - vr.left), y0 = Math.max(0, er.top - vr.top), y1 = Math.min(VH, er.bottom - vr.top);
-  const x = PE.tx + pt[0]*VW/100*PE.z, y = PE.ty + pt[1]*VH/100*PE.z + 10;
-  p.el.style.left = Math.max(x0, Math.min(x1 - p.el.offsetWidth, x))+'px'; p.el.style.top = Math.max(y0, Math.min(y1 - p.el.offsetHeight, y))+'px';
+  const p = PE.pop, v = PE.view; if(!p || !v || !p.el.isConnected) return;
+  const m = p.m, pt = m.kind === 'arrow' ? m.pts[m.pts.length-1] : [m.x, m.y];
+  const vr = v.getBoundingClientRect(), er = B.editor.getBoundingClientRect(), dw = document.documentElement.clientWidth, dh = document.documentElement.clientHeight;
+  const ax = vr.left + PE.tx + pt[0]*v.clientWidth/100*PE.z, ay = vr.top + PE.ty + pt[1]*v.clientHeight/100*PE.z;
+  const reg = [Math.max(0, er.left), Math.min(dw, er.right), Math.max(0, er.top), Math.min(dh, er.bottom)];
+  const c = popPlace(ax, ay, p.el.offsetWidth, p.el.offsetHeight, reg, [0, dw, 0, dh]);
+  p.el.style.left = c.x+'px'; p.el.style.top = c.y+'px';
 }
 function peClosePop(){
   const p = PE.pop; if(!p) return;
@@ -2119,6 +2127,9 @@ function pickSlide(i){
   sel = i; renderList(); renderEditor(); gotoPreview(i);
   const it = B.slideList.children[i]; if(it && it.scrollIntoView) it.scrollIntoView({block:'nearest'});
 }
+B.editor.addEventListener('scroll', ()=> pePopPlace(), {passive:true});   /* 글 입력 창이 열린 채 편집 칸을 스크롤하거나 창 크기가 바뀌어도 다 보이게 */
+window.addEventListener('resize', ()=> pePopPlace());
+if(typeof ResizeObserver !== 'undefined') new ResizeObserver(()=> pePopPlace()).observe(B.editor);   /* 사진 틀은 그대로인데 편집 칸만 줄어드는 경우(창 높이 줄이기)도 */
 B.slideGo.addEventListener('keydown', e=>{
   if(e.key !== 'Enter' || e.isComposing) return;
   e.preventDefault(); const n = parseInt(B.slideGo.value, 10), N = deck.slides.length;

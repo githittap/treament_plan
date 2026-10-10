@@ -11,7 +11,7 @@ const engineSrc = between(maker, '<script type="text/plain" id="engineSrc">', '<
 const photoEngine = engineSrc.slice(engineSrc.indexOf('/* ---- 사진 슬라이드: 사진 + 화살표'), engineSrc.indexOf('const BUILDERS'));
 
 const geo = (() => { const ctx = {}; vm.createContext(ctx); vm.runInContext(geoSrc + ';this.api={phFit,phArrow,phLabelPos,phSafeColor,phLabelFont,phAvoid,phFxOk};', ctx); return ctx.api; })();
-const pure = (() => { const ctx = { PHG: geo }; vm.createContext(ctx); vm.runInContext(pureSrc + ';this.api={rnd2,clampPct,roleCanEdit,isTypingTarget,phNormalize,phBendAdd,phBendRemove,phSwapMarks,deckForStore,snapEncode,snapDecode,shortcutAction,zoomAt};', ctx); return ctx.api; })();
+const pure = (() => { const ctx = { PHG: geo }; vm.createContext(ctx); vm.runInContext(pureSrc + ';this.api={rnd2,clampPct,roleCanEdit,isTypingTarget,phNormalize,phBendAdd,phBendRemove,phSwapMarks,deckForStore,snapEncode,snapDecode,shortcutAction,zoomAt,popPlace};', ctx); return ctx.api; })();
 
 /* ---- 아주 작은 가짜 화면(DOM): 엔진의 buildPhoto/phBind를 노드에서 돌리기 위함 ---- */
 function fakeNode(tag, cls) {
@@ -1087,9 +1087,24 @@ test('[2차 Codex 1차 지적] 누르기만 한 글은 겹침 계산 유지·놓
   const pop = fnSrc(mainJs, 'function peOpenPop');
   assert.ok(/PE\.view\.appendChild\(inp\)/.test(pop) && !/PE\.stage\.appendChild\(inp\)/.test(pop), '입력 창은 확대되는 판이 아니라 틀에');
   assert.ok(/preventScroll:true/.test(pop));
-  assert.ok(/B\.editor\.getBoundingClientRect\(\)/.test(fnSrc(mainJs, 'function pePopPlace')), '입력 창은 편집 칸에서 실제로 보이는 부분 안으로 자름(Codex 2차)');
+  const pp = fnSrc(mainJs, 'function pePopPlace');
+  assert.ok(/popPlace\(/.test(pp) && /B\.editor\.getBoundingClientRect\(\)/.test(pp), '입력 창 자리는 편집 칸의 보이는 사각형 기준(Codex 2·3차)');
+  assert.ok(/position:fixed/.test(between(maker, '.pe-pop{', '}')), '입력 창은 화면 기준(확대·틀 넘침에 안 잘림)');
+  assert.ok(/B\.editor\.addEventListener\('scroll', \(\)=> pePopPlace\(\)/.test(mainJs) && /window\.addEventListener\('resize', \(\)=> pePopPlace\(\)\)/.test(mainJs), '스크롤·창 크기 바뀌면 다시 맞춤');
+  assert.ok(/new ResizeObserver\(\(\)=> pePopPlace\(\)\)\.observe\(B\.editor\)/.test(mainJs), '편집 칸 크기 변화도 감시');
   assert.ok(/pePopPlace\(\)/.test(fnSrc(mainJs, 'function peApplyView')) && /scrollLeft = 0/.test(fnSrc(mainJs, 'function peApplyView')));
   assert.ok(/PE\.zsid = null/.test(fnSrc(mainJs, 'function renderEditor')), '사진 판 없는 장이면 확대 기억 버림');
   const sizes = JSON.parse(mainJs.match(/const PE_SIZES = (\[[^;]*\]);/)[1].replace(/'/g, '"'));
   for (const bw of [600, 1000]) assert.ok(geo.phLabelFont(sizes[0][0], bw) > 15, bw + 'px 사진에서 「조금 크게」가 기본 15px보다 큼');
+});
+
+test('[2차 Codex 3차 지적] 글 입력 창 자리 popPlace: 아래 → 자리 없으면 위로 → 칸이 작으면 창 안 — 언제나 다 보임', () => {
+  const P = pure.popPlace, win = [0, 1600, 0, 700], reg = [300, 900, 100, 614];
+  const inside = (c, w, h, b) => c.x >= b[0] && c.x + w <= b[1] && c.y >= b[2] && c.y + h <= b[3];
+  let c = P(500, 300, 260, 54, reg, win); assert.deepEqual([c.x, c.y], [500, 310]);                 // 아래
+  c = P(500, 584, 260, 54, reg, win); assert.equal(c.y, 584 - 10 - 54); assert.ok(inside(c, 260, 54, reg));   // 아래 자리 없음 → 위로(Codex 재현: 기준점 584, 칸 아래 614)
+  c = P(880, 300, 260, 54, reg, win); assert.equal(c.x, 900 - 260);                                // 오른쪽 끝 자름
+  c = P(500, 120, 260, 54, [300, 900, 100, 146], win); assert.ok(inside(c, 260, 54, win));          // 칸 높이 46 < 창 54 → 브라우저 창 안
+  c = P(500, 690, 260, 54, [300, 900, 650, 700], win); assert.ok(inside(c, 260, 54, win));
+  for (let ay = -50; ay <= 760; ay += 37) for (const r of [reg, [300, 900, 100, 140], null]) { const k = P(450, ay, 260, 54, r, win); assert.ok(inside(k, 260, 54, win), 'ay=' + ay); }
 });
