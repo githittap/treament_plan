@@ -1678,7 +1678,7 @@ function peBend(){
   if(!m || m.kind !== 'arrow'){ toast('꺾을 화살표를 먼저 고르세요 (A 로 선택)', 'err'); return; }
   if(m.pts.length > 3){ toast('이미 여러 번 꺾인 화살표예요 — 꺾임점 손잡이를 끌어 모양을 고쳐요'); return; }
   snap();
-  if(m.pts.length === 2){ const a = m.pts[0], b = m.pts[1]; m.pts = [a, [rnd2((a[0]+b[0])/2), rnd2((a[1]+b[1])/2)], b]; toast('가운데 손잡이를 끌어 꺾으세요 (다시 K = 펴기)'); }
+  if(m.pts.length === 2){ const a = m.pts[0], b = m.pts[1]; m.pts = [a, [rnd2((a[0]+b[0])/2), rnd2((a[1]+b[1])/2)], b]; toast('가운데 손잡이를 끌어 꺾으세요 (다시 R = 펴기)'); }
   else { m.pts = [m.pts[0], m.pts[m.pts.length-1]]; toast('곧게 폈어요'); }
   peChanged();
 }

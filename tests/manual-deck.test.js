@@ -131,6 +131,7 @@ test('편집 단축키: 글 입력 칸(입력·글상자·선택칸·편집영�
   assert.equal(pure.shortcutAction(k('Delete'), { photo: true, hasSel: false }), null, '선택한 게 없으면 Delete 무반응(슬라이드를 실수로 안 지움)');
   assert.equal(pure.shortcutAction(k('KeyQ', { altKey: true }), ctx), null);
   assert.equal(pure.shortcutAction(k('KeyQ'), { photo: true, blocked: true }), null, '도움말 창이 열려 있으면 무반응');
+  assert.ok(maker.includes('다시 R = 펴기') && !/다시 [JKD] = /.test(maker), '꺾기 안내도 새 글쇠(R)');
   // 화면 연결: 안내 칸 + 도움말 표 + 보기용 keydown과 따로(제작기 문서 vs 미리보기 문서)
   assert.match(maker, /id="keyHint"/); assert.match(maker, /편집 단축키 \(글 입력 칸에서는 안 먹어요\)/);
   for (const key of ['Ctrl+Z', 'Ctrl+Y', 'Ctrl+E', 'Delete', 'Esc', '↓ / ↑', 'Q', 'R']) assert.ok(maker.includes('<kbd>' + key + '</kbd>'), key);
