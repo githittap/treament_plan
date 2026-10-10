@@ -1363,7 +1363,7 @@ function renderList(){
     const item = ce('div','slide-item'+(i===sel?' active':''));
     item.appendChild(ce('span','idx', String(i+1)));
     const meta = ce('span','meta');
-    const t = ce('span','t'); t.textContent = slideLabel(s);
+    const t = ce('span','t'); t.textContent = (PH_FAILED.has(s) ? '⚠ ' : '')+slideLabel(s);
     const ty = ce('span','ty'); ty.textContent = TYPES[s.type].name;
     meta.appendChild(t); meta.appendChild(ty); item.appendChild(meta);
     item.appendChild(ce('span','drag','⋮⋮'));
@@ -1611,6 +1611,8 @@ function commitPhoto(s, wanted, image){
   if(!deck.slides.includes(s) || !wanted()) return false;
   snap(); s.image = image; return true;
 }
+const PH_FAILED = new WeakMap();   /* 슬라이드 → 「최신 사진 올리기가 실패했다」는 표시(그 슬라이드에서 사진을 다시 고를 때만 풀림) */
+function phFailedCount(){ return deck.slides.filter(s=> PH_FAILED.has(s)).length; }
 const PH_PENDING = new WeakMap();   /* 슬라이드 → 그 슬라이드의 최신 사진 올리기 요청 번호(올리는 중 표시에도 씀) */
 let phSeq = 0;
 /* 돌려주는 값: 'ok'(적용) · 'stale'(더 새 요청이 있어 버림) · 'gone'(undo·삭제로 덱에서 빠진 슬라이드라 버림) */
@@ -1622,12 +1624,16 @@ function attachPhoto(s, file){
   return job;
 }
 async function attachPhotoRun(s, file){
-  const req = ++phSeq; PH_PENDING.set(s, req);
+  const req = ++phSeq; PH_PENDING.set(s, req); PH_FAILED.delete(s);   /* 다시 고르면 실패 표시가 풀림 */
   try{
     const r = await downscale(file);
     const image = (HUB.on && HUB.canEdit) ? {path: await hubUpload(r.blob), w:r.w, h:r.h} : {src: await blobToDataUrl(r.blob), w:r.w, h:r.h};
-    if(commitPhoto(s, ()=> PH_PENDING.get(s) === req, image)){ if(HUB.on) markDirty(); return 'ok'; }
+    if(commitPhoto(s, ()=> PH_PENDING.get(s) === req, image)){ PH_FAILED.delete(s); if(HUB.on) markDirty(); return 'ok'; }
     return deck.slides.includes(s) ? 'stale' : 'gone';
+  } catch(e){
+    /* 지금 덱에 있는 슬라이드의 최신 요청이 실패했을 때만 표시(새 요청으로 대체됐거나 삭제·undo 로 덱에서 빠진 것의 실패는 무시) */
+    if(PH_PENDING.get(s) === req && deck.slides.includes(s)) PH_FAILED.set(s, (e && e.message) || '실패');
+    throw e;
   } finally { if(PH_PENDING.get(s) === req) PH_PENDING.delete(s); }
 }
 async function hubWaitPhotos(){ while(PH_JOBS.size) await Promise.allSettled([...PH_JOBS]); }
@@ -1861,9 +1867,11 @@ FORMS.photo = s=>{
     try{ res = await attachPhoto(s, file); if(res === 'ok') toast('사진을 넣었어요'); }
     catch(e){ toast('사진을 못 넣었어요: '+(e.message || e), 'err'); }
     if(deck.slides[sel] === s) renderEditor();   /* 지금 보고 있는 장이면 버튼·사진 상태를 새로 그림 */
+    renderList();   /* 올리기 실패 표시(⚠)를 목록에도 반영 */
     if(res === 'ok'){ bootPreview(); scheduleAutosave(); }
   };
   f.appendChild(ub); f.appendChild(fi); B.editor.appendChild(f);
+  if(PH_FAILED.has(s)) B.editor.appendChild(ce('div','hintline','⚠ 사진 올리기 실패 — 위 「사진 바꾸기」로 다시 골라 주세요. 다시 고르기 전에는 서버 저장이 막혀요. ('+PH_FAILED.get(s)+')'));
   if(s.image){ B.editor.appendChild(photoEditor(s)); B.editor.appendChild(marksField(s)); peRenderRows(); requestAnimationFrame(peRedraw); }
   else B.editor.appendChild(ce('div','hintline','사진을 올리면 그 위에 화살표와 설명 글을 넣을 수 있어요. (사진은 가로·세로 긴 쪽이 1600px로 자동 줄어요)'));
   addField('설명 메모','발표 화면 아래 「설명 보기」로 펼쳐져요', mkArea(s.notes, v=>s.notes=v, ''));
@@ -2042,8 +2050,10 @@ async function hubSave(){
   if(HUB.saving) return;
   HUB.saving = true; B.saveBtn.disabled = true;
   try{
+    const rev0 = HUB.rev;   /* 저장을 시작한 때의 변경 번호(사진 기다리기 전에 잡음) — 올리는 동안 고친 것도 「저장 안 됨」으로 남김 */
     if(PH_JOBS.size){ toast('사진 올리는 중 — 끝나면 저장해요'); await hubWaitPhotos(); }   /* 올리는 중인 사진은 끝난 뒤의 최신 사진으로 저장 */
-    const rev0 = HUB.rev;   /* 저장을 시작한 때의 변경 번호 — 사진 올리는 동안 고친 것도 「저장 안 됨」으로 남김 */
+    const nFail = phFailedCount();
+    if(nFail){ const pe2 = new Error('photo-failed'); pe2.phFailed = nFail; throw pe2; }   /* 올리기 실패한 사진이 있으면 옛 사진으로 저장하지 않음 */
     await hubUploadInline();
     const row = {title:deck.meta.title || '(제목 없음)', category:HUB.category || null, deck:deckForStore(deck), published:!!HUB.published};
     /* 이미 있는 덱은 열 때(또는 마지막 저장 때) 받은 updated_at 이 그대로일 때만 덮음 — 그 사이 다른 곳(업로더·다른 사람)이 바꿨으면 0행 → 충돌 */
@@ -2062,7 +2072,11 @@ async function hubSave(){
     HUB.exists = true; HUB.version = r.data[0].updated_at; HUB.conflict = false; if(B.backupBtn) B.backupBtn.hidden = true;
     if(HUB.rev === rev0){ setDirty(false); toast(HUB.published ? '저장했어요 — 직원에게 공개 중이에요' : '저장했어요 — 아직 비공개예요'); }
     else toast('저장했어요 — 저장하는 동안 고친 내용은 아직 저장 안 됐어요. 다시 저장해 주세요', 'err');
-  }catch(e){ if(e && e.conflict) hubConflict(); else toast('저장 실패: '+(e.message || e), 'err'); }
+  }catch(e){
+    if(e && e.conflict) hubConflict();
+    else if(e && e.phFailed){ setDirty(true); toast('사진 '+e.phFailed+'장 올리기 실패 — 다시 골라 주세요', 'err'); }
+    else toast('저장 실패: '+(e.message || e), 'err');
+  }
   HUB.saving = false; B.saveBtn.disabled = false;
 }
 function hubStarterDeck(){
