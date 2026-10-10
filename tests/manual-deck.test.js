@@ -339,3 +339,31 @@ test('허브 로그인 세션: 허브가 window.hubSb 로 내놓은 같은 클�
   const ctx = {}; vm.createContext(ctx); vm.runInContext('const sb = {};', ctx); assert.equal(ctx.sb, undefined, 'const 는 전역 객체 속성이 아님');
   vm.runInContext('this.hubSb = {};', ctx); assert.ok(ctx.hubSb);
 });
+
+test('[2차-1] 사진 올리는 동안 같은 슬라이드의 사진을 바꿔도 옛 사진 경로가 저장되지 않는다 — 새 사진을 이어서 올리고, 저장 중 고친 것이라 「저장 안 됨」으로 남는다', async () => {
+  const dataUrl = t => 'data:image/png;base64,' + Buffer.from(t).toString('base64');
+  const toasts = [], uploaded = [], gates = {}, rows = [];
+  const ctx = { deck: { meta: { title: 't' }, slides: [{ type: 'photo', image: { src: dataUrl('BLACK'), w: 1, h: 1 }, marks: [] }] },
+    HUB: { rev: 0, dirty: false, saving: false, exists: false, id: 'i', category: '', published: false, sb: null }, B: { saveBtn: { disabled: false }, hubState: { textContent: '', classList: { toggle() { } } } },
+    toast: (m, t) => toasts.push([m, t]), deckForStore: d => JSON.parse(JSON.stringify(d)), fetch,
+    hubUpload: async blob => { const t = await blob.text(); uploaded.push(t); await new Promise(r => { gates[t] = r; if (t !== 'BLACK') r(); }); return 'p/' + t; } };
+  vm.createContext(ctx);
+  vm.runInContext([fnSrc(mainJs, 'function markDirty'), fnSrc(mainJs, 'function setDirty'), fnSrc(mainJs, 'async function hubUploadInline'), fnSrc(mainJs, 'async function hubSave')].join('\n') + ';this.hubSave=hubSave;this.markDirty=markDirty;', ctx);
+  const done = { data: [{ id: 'i' }], error: null };
+  ctx.HUB.sb = { from: () => ({ insert: row => ({ select: async () => { rows.push(JSON.parse(JSON.stringify(row))); return done; } }), update: () => ({ eq: () => ({ select: async () => done }) }) }) };
+  ctx.markDirty();
+  const p = ctx.hubSave();
+  await new Promise(r => setTimeout(r, 20)); assert.deepEqual(uploaded, ['BLACK'], '검은 사진 업로드가 진행 중');
+  ctx.deck.slides[0].image = { src: dataUrl('BLUE'), w: 2, h: 2 }; ctx.markDirty();   // 업로드 중에 원장이 이 슬라이드 사진을 파란 사진으로 교체
+  gates.BLACK(); await p;
+  assert.deepEqual(uploaded, ['BLACK', 'BLUE'], '교체된 새 사진을 이어서 올림');
+  assert.equal(rows.length, 1); assert.equal(rows[0].deck.slides[0].image.path, 'p/BLUE', '저장된 건 파란 사진 — 옛(검은) 사진 경로가 아님');
+  assert.equal(rows[0].deck.slides[0].image.w, 2); assert.ok(!JSON.stringify(rows[0]).includes('data:image'), '데이터주소가 서버에 가지 않음');
+  assert.equal(ctx.deck.slides[0].image.path, 'p/BLUE');
+  assert.equal(ctx.HUB.dirty, true, '저장 도중 바꾼 사진이라 「저장 안 됨」 유지'); assert.ok(toasts.some(t => /다시 저장/.test(t[0])));
+  // 대조: 안 바꾸면 그대로 저장되고 저장됨
+  uploaded.length = 0; ctx.deck.slides[0].image = { src: dataUrl('GREEN'), w: 3, h: 3 }; ctx.markDirty(); ctx.HUB.exists = false;
+  await ctx.hubSave(); assert.deepEqual(uploaded, ['GREEN']); assert.equal(rows[1].deck.slides[0].image.path, 'p/GREEN'); assert.equal(ctx.HUB.dirty, false);
+  // 변경 번호는 업로드 시작 전에 기억(업로드 뒤에 기억하면 업로드 중 고친 것을 저장됨으로 착각)
+  const src = fnSrc(mainJs, 'async function hubSave'); assert.ok(src.indexOf('const rev0 = HUB.rev') < src.indexOf('await hubUploadInline()'));
+});

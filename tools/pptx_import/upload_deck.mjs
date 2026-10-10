@@ -67,7 +67,8 @@ export function readEnvFile(file, names, fsImpl = fs) {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /* 올릴 계획 만들기(파일 읽기만, 네트워크 없음) */
-export function buildPlan({ deck, imagesDir, mode, existing, fsImpl = fs }) {
+/* only: 충돌 재시도용 고정 목록({append:Set, update:Set} — 첫 조회 때 정한 대상). 있으면 그 목록 밖의 장은 건드리지 않음(그 사이 허브에서 지운 장을 되살리지 않음) */
+export function buildPlan({ deck, imagesDir, mode, existing, only = null, fsImpl = fs }) {
   const bySrc = new Map();
   (existing ? existing.slides : []).forEach((s, i) => { if (s.srcSlide != null) bySrc.set(s.srcSlide, i); });
   const items = [], problems = [], skipped = [];
@@ -79,6 +80,8 @@ export function buildPlan({ deck, imagesDir, mode, existing, fsImpl = fs }) {
     if (!existing) action = 'new';
     else if (idx !== undefined) action = mode.updateImages ? 'update' : 'skip';
     else action = mode.append ? 'append' : 'skip';
+    const key = s.srcSlide != null ? s.srcSlide : 'idx' + i;
+    if (only && ((action === 'append' && !only.append.has(key)) || (action === 'update' && !only.update.has(key)))) action = 'skip';
     if (action === 'skip') { skipped.push(s.srcSlide != null ? s.srcSlide : i + 1); return; }
     if (!file || /[\\/]/.test(file) || !/\.webp$/i.test(file)) { problems.push(`장 ${s.srcSlide != null ? s.srcSlide : i + 1}: image.file 이 없거나 잘못됨`); return; }
     const p = path.join(imagesDir, file);
@@ -88,7 +91,7 @@ export function buildPlan({ deck, imagesDir, mode, existing, fsImpl = fs }) {
     let size; try { size = webpSize(buf); } catch (e) { problems.push(`장 ${s.srcSlide}: ${file} ${e.message}`); return; }
     const sha = crypto.createHash('sha256').update(buf).digest('hex');
     const uploadName = action === 'update' ? file.replace(/\.webp$/i, '') + '.' + sha.slice(0, 8) + '.webp' : file;
-    items.push({ action, srcSlide: s.srcSlide, file, uploadName, sha, bytes: buf.length, w: size.w, h: size.h, slide: s, idx, buf });
+    items.push({ action, key, srcSlide: s.srcSlide, file, uploadName, sha, bytes: buf.length, w: size.w, h: size.h, slide: s, idx, buf });
   });
   return { items, problems, skipped, result };
 }
@@ -189,6 +192,8 @@ export async function run(argv, deps = {}) {
     }
     await Promise.all(Array.from({ length: conc }, worker));
   }
+  /* 첫 조회 때 정한 대상을 고정: 재시도에서는 이 목록 안의 것만 다룸 */
+  const pinned = { append: new Set(plan.items.filter(it => it.action === 'append').map(it => it.key)), update: new Set(plan.items.filter(it => it.action === 'update').map(it => it.key)) };
   const patchHeaders = { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=representation' };
   let attempt = 0;
   for (;;) {
@@ -208,10 +213,10 @@ export async function run(argv, deps = {}) {
     const rows = await r.json();
     if (rows.length) break;
     if (attempt >= 4) throw new Error(`허브에서 계속 고쳐져 ${attempt}번 시도했으나 저장하지 못함 — 허브의 내용은 하나도 덮지 않았음. 잠시 뒤 다시 실행`);
-    log(`충돌: 읽은 뒤 허브에서 덱이 고쳐짐 — 다시 읽어 그림만 다시 적용(${attempt}/3)`);
+    log(`충돌: 읽은 뒤 허브에서 덱이 고쳐짐 — 다시 읽어 처음 정한 대상만 다시 적용 — 그 사이 지워진 장은 되살리지 않음(${attempt}/3)`);
     existingRow = await readRow();
     if (!existingRow) throw new Error('덱이 그 사이 지워졌음: ' + deckId);
-    plan = buildPlan({ deck, imagesDir: a.opt.images, mode, existing: existingRow.deck, fsImpl });
+    plan = buildPlan({ deck, imagesDir: a.opt.images, mode, existing: existingRow.deck, only: pinned, fsImpl });
     if (plan.problems.length) throw new Error('다시 읽은 뒤 문제: ' + plan.problems.join(' / '));
   }
   log(`완료: 그림 올림 ${stat.uploaded}장 · 이미 있어 건너뜀 ${stat.same}장 (${mb(total)}) · 덱 ${existingMode ? '갱신' : '추가(비공개)'} ${deckId}`);

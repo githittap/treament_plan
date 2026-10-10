@@ -1992,20 +1992,29 @@ async function hubUpload(blob){
 }
 /* 파일로 불러온 덱처럼 사진이 데이터주소로 들어 있으면 저장할 때 보관함으로 옮김 */
 async function hubUploadInline(){
-  for(const s of deck.slides){
-    if(s.type === 'photo' && s.image && !s.image.path && /^data:image\//.test(s.image.src || '')){
-      const blob = await (await fetch(s.image.src)).blob();
-      s.image = {path: await hubUpload(blob), w:s.image.w, h:s.image.h};
+  /* 올리는 동안 같은 슬라이드의 사진이 바뀌면(s.image 가 다른 객체) 옛 사진 경로를 적용하지 않고, 새 사진을 이어서 올림 */
+  for(let pass = 0; pass < 6; pass++){
+    let again = false;
+    for(const s of deck.slides.slice()){
+      const orig = s.image;
+      if(s.type === 'photo' && orig && !orig.path && /^data:image\//.test(orig.src || '')){
+        const blob = await (await fetch(orig.src)).blob();
+        const path = await hubUpload(blob);
+        if(s.image === orig) s.image = {path:path, w:orig.w, h:orig.h};
+        else again = true;
+      }
     }
+    if(!again) break;
   }
+  if(deck.slides.some(s=> s.type === 'photo' && s.image && !s.image.path && /^data:image\//.test(s.image.src || ''))) throw new Error('사진이 계속 바뀌어 올리지 못했어요. 잠시 뒤 다시 저장해 주세요');
 }
 async function hubSave(){
   if(!deck.slides.length){ toast('슬라이드를 먼저 추가하세요', 'err'); return; }
   if(HUB.saving) return;
   HUB.saving = true; B.saveBtn.disabled = true;
   try{
+    const rev0 = HUB.rev;   /* 저장을 시작한 때의 변경 번호 — 사진 올리는 동안 고친 것도 「저장 안 됨」으로 남김 */
     await hubUploadInline();
-    const rev0 = HUB.rev;   /* 이 번호까지의 내용이 아래 row 에 담김 */
     const row = {title:deck.meta.title || '(제목 없음)', category:HUB.category || null, deck:deckForStore(deck), published:!!HUB.published};
     const r = HUB.exists
       ? await HUB.sb.from('manual_decks').update(row).eq('id', HUB.id).select('id')

@@ -159,3 +159,30 @@ test('실제 가져오기 결과 deck.json(317장) dry-run: 그림이 모두 있
   const r = await run(['--deck', path.join(D, 'deck.json'), '--images', path.join(D, 'images')], { log: s => out.push(s) });
   assert.equal(r.plan.items.length, 317); assert.equal(r.plan.problems.length, 0); assert.ok(r.plan.items.reduce((n, i) => n + i.bytes, 0) < 50 * 1048576);
 });
+
+test('[2차-2] 충돌 재시도에서 그 사이 허브에서 지운 장을 되살리지 않는다 — --append·--update-images 모두 첫 조회 때 정한 대상 목록만 다시 적용', async () => {
+  const { run } = await load(); const dir = workdir();
+  const ex = n => ({ type: 'photo', title: '허브 ' + n, srcSlide: n, image: imgOf(n), marks: [{ id: 'k' + n, kind: 'label', x: 1, y: 1, text: '내 글 ' + n, step: 1 }] });
+  const srcs = d => d.slides.map(s => s.srcSlide);
+  // (a) --append: 입력 [1,2,3], 기존 [1,2] → 첫 조회 때 붙일 대상은 [3]. 원장이 1을 지운 뒤 재시도 → 1이 새 장으로 되살아나면 안 됨 → [2,3]
+  let n = 0;
+  const a = fakeSb({ rows: { [ID]: hubRow({ meta: { title: 't' }, slides: [ex(1), ex(2)] }) }, hooks: { beforePatch: st => { if (n++ === 0) { st.rows[ID].deck.slides = st.rows[ID].deck.slides.filter(s => s.srcSlide !== 1); st.rows[ID].updated_at = '2026-10-10T00:00:09+00:00'; } } } });
+  const ra = await run(args(dir, '--execute', '--append', '--deck-id', ID), { fetch: a.fetch, log() { }, env });
+  assert.equal(ra.attempts, 2); assert.deepEqual(srcs(a.rows[ID].deck), [2, 3], '지워진 1은 되살아나지 않고, 첫 조회 때 정한 3만 붙음');
+  assert.equal(a.rows[ID].deck.slides[0].marks[0].text, '내 글 2');
+  assert.ok(!a.objects[`${ID}/slide001.webp`], '되살리지 않았으니 1번 그림도 올리지 않음');
+  // (b) --update-images + --append: 입력 [1,2,3], 기존 [1,2] → 1·2 그림 교체, 3 추가. 원장이 1을 지움 → 재시도: 1은 되살리지 않고(교체도 없음) 2·3만 반영 → [2,3]
+  n = 0;
+  const b = fakeSb({ rows: { [ID]: hubRow({ meta: { title: 't' }, slides: [ex(1), ex(2)] }) }, hooks: { beforePatch: st => { if (n++ === 0) { st.rows[ID].deck.slides = st.rows[ID].deck.slides.filter(s => s.srcSlide !== 1); st.rows[ID].updated_at = '2026-10-10T00:00:09+00:00'; } } } });
+  await run(args(dir, '--execute', '--update-images', '--append', '--deck-id', ID), { fetch: b.fetch, log() { }, env });
+  const bd = b.rows[ID].deck; assert.deepEqual(srcs(bd), [2, 3]);
+  assert.match(bd.slides[0].image.path, /slide002\.[0-9a-f]{8}\.webp$/, '2는 그림만 교체'); assert.equal(bd.slides[0].marks[0].text, '내 글 2'); assert.equal(bd.slides[1].image.path, `${ID}/slide003.webp`);
+  // (c) 대조: 재시도에서 지워진 게 없으면 처음 정한 대로 [1,2,3]
+  n = 0;
+  const c = fakeSb({ rows: { [ID]: hubRow({ meta: { title: 't' }, slides: [ex(1), ex(2)] }) }, hooks: { beforePatch: st => { if (n++ === 0) st.rows[ID].updated_at = '2026-10-10T00:00:09+00:00'; } } });
+  await run(args(dir, '--execute', '--append', '--deck-id', ID), { fetch: c.fetch, log() { }, env }); assert.deepEqual(srcs(c.rows[ID].deck), [1, 2, 3]);
+  // (d) 그 사이 원장이 같은 srcSlide 장을 직접 넣었으면 중복해서 또 붙이지 않음
+  n = 0;
+  const d = fakeSb({ rows: { [ID]: hubRow({ meta: { title: 't' }, slides: [ex(1), ex(2)] }) }, hooks: { beforePatch: st => { if (n++ === 0) { st.rows[ID].deck.slides.push(ex(3)); st.rows[ID].updated_at = '2026-10-10T00:00:09+00:00'; } } } });
+  await run(args(dir, '--execute', '--append', '--deck-id', ID), { fetch: d.fetch, log() { }, env }); assert.deepEqual(srcs(d.rows[ID].deck), [1, 2, 3]);
+});
