@@ -10,8 +10,8 @@ const geoSrc = between(maker, '<script type="text/plain" id="phGeoSrc">', '</scr
 const engineSrc = between(maker, '<script type="text/plain" id="engineSrc">', '</script>');
 const photoEngine = engineSrc.slice(engineSrc.indexOf('/* ---- 사진 슬라이드: 사진 + 화살표'), engineSrc.indexOf('const BUILDERS'));
 
-const pure = (() => { const ctx = {}; vm.createContext(ctx); vm.runInContext(pureSrc + ';this.api={rnd2,clampPct,roleCanEdit,isTypingTarget,phNormalize,phNextStep,phSwapMarks,deckForStore,snapEncode,snapDecode,shortcutAction};', ctx); return ctx.api; })();
-const geo = (() => { const ctx = {}; vm.createContext(ctx); vm.runInContext(geoSrc + ';this.api={phFit,phArrow,phLabelPos,phSafeColor,phLabelFont};', ctx); return ctx.api; })();
+const geo = (() => { const ctx = {}; vm.createContext(ctx); vm.runInContext(geoSrc + ';this.api={phFit,phArrow,phLabelPos,phSafeColor,phLabelFont,phAvoid,phFxOk};', ctx); return ctx.api; })();
+const pure = (() => { const ctx = { PHG: geo }; vm.createContext(ctx); vm.runInContext(pureSrc + ';this.api={rnd2,clampPct,roleCanEdit,isTypingTarget,phNormalize,phNextStep,phSwapMarks,deckForStore,snapEncode,snapDecode,shortcutAction};', ctx); return ctx.api; })();
 
 /* ---- 아주 작은 가짜 화면(DOM): 엔진의 buildPhoto/phBind를 노드에서 돌리기 위함 ---- */
 function fakeNode(tag, cls) {
@@ -785,4 +785,105 @@ test('[11차-C] 허브 밖(이 브라우저 저장)에서 localStorage 쓰기가
   full = false; c.toasts.length = 0; await c.localSave(); assert.ok(c.toasts.some(t => /저장했어요/.test(t[0]))); assert.equal(ev('asPending'), false);
   // 코드: 세 쓰기 경로 모두 lsWrite 한 곳을 지남
   assert.equal((mainJs.match(/localStorage\.setItem\(LS_KEY/g) || []).length, 1, 'localStorage 쓰기는 lsWrite 한 곳');
+});
+
+/* ---- 배치 A (2026-10-11): 큰 덱 빈 화면 · 글 겹침 피하기 · 등장 효과 · 줄바꿈·배경색 ---- */
+test('A0 큰 덱 미리보기: 발표 화면 .app 열이 minmax(0,1fr)로 고정되고, 장이 31장 이상이면 점(dot)을 만들지 않고 30장 이하면 장 수만큼', () => {
+  const css = between(maker, '<template id="slideCSS">', '</template>');
+  assert.match(css, /\.app\{[^}]*grid-template-columns:minmax\(0,1fr\)/, '열 크기가 없으면 점 317개가 열 폭을 5천 px로 키움');
+  assert.match(css, /\.controls\{[^}]*min-width:0/);
+  const src = engineSrc.slice(engineSrc.indexOf('function buildControls(){'), engineSrc.indexOf('function updateMeta'));
+  const dots = (n) => {
+    const dotsEl = fakeNode('div'), ctx = { dotsEl, slides: Array.from({ length: n }, () => ({})), si: 0, updateMeta() {}, goSlide() {}, el: (t, c) => fakeNode(t, c) };
+    vm.createContext(ctx); vm.runInContext(src + ';this.buildControls=buildControls;', ctx); ctx.buildControls(); return dotsEl.children.length;
+  };
+  assert.equal(dots(317), 0); assert.equal(dots(31), 0); assert.equal(dots(30), 30); assert.equal(dots(5), 5);
+});
+
+test('A3 phAvoid: 겹친 글은 뒤 글이 비켜나고 · 안 겹치면 그대로 · 고정 글은 안 움직이고 · 경계 밖은 안 고르고 · 같은 입력은 같은 출력 · 빈 배열', () => {
+  const av = (...a) => clone(geo.phAvoid(...a));
+  const ov = (a, b, g = 0) => a.x < b.x + b.w + g && b.x < a.x + a.w + g && a.y < b.y + b.h + g && b.y < a.y + a.h + g;
+  const box = (x, y, w = 100, h = 30) => ({ x, y, w, h }), B = [0, 400, 0, 300];
+  // 겹침 → 뒤 글이 비킴(앞 글=고정 글은 그대로), 비킨 뒤 gap 4px 이상 떨어짐
+  const f = [box(100, 100)], m = [box(110, 110)];
+  const r = av(f, m, B, 4), moved = { ...m[0], ...r[0] };
+  assert.equal(r.length, 1); assert.ok(!ov(f[0], moved, 3.98), '겹침 없음(gap 4)');
+  assert.ok(Math.hypot(r[0].x - 110, r[0].y - 110) <= 40, '가장 가까운 자리: ' + JSON.stringify(r[0]));
+  assert.deepEqual(f, [box(100, 100)], '고정 글 입력은 안 건드림');
+  // 안 겹치면 그대로(gap 딱 4px 떨어지면 그대로, 그 안으로 닿으면 비킴)
+  assert.deepEqual(av([box(0, 0)], [box(200, 200)], B, 4), [{ x: 200, y: 200 }]);
+  assert.deepEqual(av([box(0, 0)], [box(104, 0)], B, 4), [{ x: 104, y: 0 }]);
+  assert.notDeepEqual(av([box(0, 0)], [box(102, 0)], B, 4), [{ x: 102, y: 0 }]);
+  // 움직이는 글끼리도 순서대로 자리 잡음(앞 글 먼저 놓이고 뒤 글이 비킴)
+  const mm = av([], [box(50, 50), box(55, 55), box(60, 60)], B, 4);
+  assert.deepEqual(mm[0], { x: 50, y: 50 });
+  for (let i = 0; i < 3; i++) for (let j = i + 1; j < 3; j++) assert.ok(!ov({ ...box(0, 0), ...mm[i] }, { ...box(0, 0), ...mm[j] }, 3.98), '움직이는 글끼리 ' + i + '-' + j);
+  // 경계 밖 후보는 안 고름: 위쪽 경계에 붙은 고정 글과 겹치면 위(경계 밖)가 아니라 안쪽 후보
+  const up = av([box(100, 0)], [box(100, 10)], B, 4);
+  assert.ok(up[0].y >= 0 && up[0].x >= 0 && up[0].x + 100 <= 400 && up[0].y + 30 <= 300, '경계 안: ' + JSON.stringify(up[0]));
+  assert.deepEqual(av([box(0, 0, 400, 300)], [box(10, 10)], B, 4), [{ x: 10, y: 10 }], '빈 자리 없으면 원래 자리');
+  // 결정적 + 빈 입력
+  const a1 = av(f, [box(110, 110), box(120, 100)], B, 4), a2 = av(f, [box(110, 110), box(120, 100)], B, 4);
+  assert.deepEqual(a1, a2);
+  assert.deepEqual(av([], [], B, 4), []); assert.deepEqual(av([box(0, 0)], [], B, 4), []);
+});
+
+test('A3 발표 엔진 phLayout: 가져온 글(w 있음)은 그대로, 그 위에 겹친 화살표 글·내가 넣은 글만 비킴', () => {
+  const ctx = engineCtx();
+  const s = { type: 'photo', title: 't', image: { src: 'x', w: 1600, h: 900 }, marks: [
+    { kind: 'label', x: 10, y: 10, w: 8, h: 4, text: '고정', step: 1 },
+    { kind: 'label', x: 14, y: 12, text: '내 글(겹침)', step: 2 },
+    { kind: 'arrow', pts: [[10, 12], [30, 40]], text: '화살표 글', step: 3 }] };
+  const ph = ctx.buildPhoto(s)._ph;
+  ph.pv.clientWidth = 1000; ph.pv.clientHeight = 562.5; ph.im.naturalWidth = 1600; ph.im.naturalHeight = 900;
+  ctx.phLayout(ph);
+  assert.equal(ph.labels[0].l.inn.style.transform, 'translate(0px,0px)', '고정 글은 안 움직임');
+  const rect = l => { const t = l.inn.style.transform.match(/-?[\d.]+/g).map(Number); return { x: parseFloat(l.root.style.left) + t[0], y: parseFloat(l.root.style.top) + t[1], w: 80, h: 24 }; };
+  const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  const fix = rect(ph.labels[0].l), free = rect(ph.labels[1].l), ar = rect(ph.arrows[0].lbl);
+  assert.ok(!hit(fix, free), '내 글이 고정 글에서 비켜남 ' + JSON.stringify([fix, free]));
+  assert.ok(!hit(fix, ar) && !hit(free, ar), '화살표 글도 겹치지 않음 ' + JSON.stringify([fix, free, ar]));
+});
+
+test('A4·A9a phNormalize: 잘못된 fx·color·bg는 지우고 허용 값은 유지(화살표 fx는 fade만)', () => {
+  const n = pure.phNormalize({ type: 'photo', image: { path: 'p' }, marks: [
+    { kind: 'label', x: 1, y: 1, text: 'a', fx: 'pop', color: '#112233', bg: '#fff' },
+    { kind: 'label', x: 1, y: 1, text: 'b', fx: 'spin', color: 'red;background:url(x)', bg: 'url(javascript:1)' },
+    { kind: 'label', x: 1, y: 1, text: 'c', fx: 'zoom' }, { kind: 'label', x: 1, y: 1, text: 'd', fx: 'fade', bg: 5 },
+    { kind: 'arrow', pts: [[1, 1], [9, 9]], fx: 'fade', color: '#ff0000' }, { kind: 'arrow', pts: [[1, 1], [9, 9]], fx: 'zoom', color: '' }] }, () => 'i');
+  const m = n.marks;
+  assert.deepEqual(clone([m[0].fx, m[0].color, m[0].bg]), ['pop', '#112233', '#fff'], '허용 값 유지');
+  assert.deepEqual([m[1].fx, m[1].color, m[1].bg], [undefined, undefined, undefined], '잘못된 값 지움');
+  assert.equal(m[2].fx, 'zoom'); assert.equal(m[3].fx, 'fade'); assert.equal(m[3].bg, undefined, '문자열 아닌 색도 지움');
+  assert.deepEqual([m[4].fx, m[4].color], ['fade', '#ff0000']);
+  assert.deepEqual([m[5].fx, m[5].color], [undefined, undefined], '화살표는 zoom 불가 · 빈 색 지움');
+  assert.deepEqual([geo.phFxOk('arrow', 'fade'), geo.phFxOk('arrow', 'pop'), geo.phFxOk('label', 'pop'), geo.phFxOk('label', ''), geo.phFxOk('label', undefined)], [true, false, true, false, false]);
+});
+
+test('A4 엔진 buildPhoto: fx 클래스가 붙고 · 모르는 fx는 무시 · 배경색 적용 · 글은 여전히 textContent로만 · 줄바꿈 글 CSS', () => {
+  const ctx = engineCtx(), body = ctx.buildPhoto(clone({ type: 'photo', title: 't', image: { src: 'x', w: 100, h: 100 }, marks: [
+    { id: 'a', kind: 'arrow', pts: [[10, 10], [30, 30]], text: '<b>x</b>', step: 1, fx: 'fade' },
+    { id: 'b', kind: 'arrow', pts: [[10, 50], [30, 70]], text: '', step: 2, fx: 'zoom' },
+    { id: 'c', kind: 'label', x: 50, y: 50, text: '<img src=x onerror=alert(1)>', step: 3, fx: 'pop', bg: '#ffeeaa' },
+    { id: 'd', kind: 'label', x: 60, y: 60, text: 'd', step: 4, fx: '" onload="alert(1)' },
+    { id: 'e', kind: 'label', x: 20, y: 80, text: 'e', step: 5, fx: 'zoom', bg: 'url(x)' }] }));
+  const cls = []; walk(body, n => { if (/ph-(arrow|head|lbl-box)/.test(n.className)) cls.push(n.className); });
+  assert.equal(cls.filter(c => /^ph-arrow fx-fade$/.test(c)).length, 1); assert.equal(cls.filter(c => /^ph-head fx-fade$/.test(c)).length, 1);
+  assert.equal(cls.filter(c => /^ph-arrow$/.test(c)).length, 1, '화살표 zoom은 무시(기본 그려지듯)');
+  assert.ok(cls.includes('ph-lbl-box fx-fade'), '화살표 글도 fade'); assert.ok(cls.includes('ph-lbl-box fx-pop')); assert.ok(cls.includes('ph-lbl-box fx-zoom'));
+  assert.ok(cls.includes('ph-lbl-box'), '엉뚱한 fx는 클래스로 안 들어감'); assert.ok(!cls.some(c => /onload|alert/.test(c)));
+  const boxes = []; walk(body, n => { if (/ph-lbl-box/.test(n.className)) boxes.push(n); });
+  assert.equal(boxes.find(b => b.textContent.startsWith('<img')).style.background, '#ffeeaa', '배경색 적용');
+  assert.equal(boxes.find(b => b.textContent === 'e').style.background, undefined, '이상한 배경색 무시');
+  let html = false; walk(body, n => { if (/<(img|b)/.test(n.innerHTML)) html = true; });
+  assert.equal(html, false, '글은 textContent로만');
+  assert.ok(boxes.some(b => b.textContent === '<img src=x onerror=alert(1)>'));
+  const css = between(maker, '<template id="slideCSS">', '</template>');
+  assert.match(css, /\.ph-lbl-box\{[^}]*white-space:pre-line/); assert.match(css, /\.ph-arrow\.fx-fade\{/); assert.match(css, /\.ph-lbl-box\.fx-zoom\{/); assert.match(css, /\.ph-lbl-box\.fx-pop\{/);
+  assert.match(css, /prefers-reduced-motion[\s\S]*\.ph-lbl-box\.fx-zoom,\.ph-lbl-box\.fx-pop\{transform:none/, '동작 줄이기: 효과는 투명도만');
+  assert.match(maker, /\.pe-lbl\{[^}]*white-space:pre-line/);
+});
+
+test('A7 발표 파일 만들기: 사진 담는 중 n/전체 알림 + 못 담은 사진 수 알림', () => {
+  assert.ok(maker.includes("'사진 담는 중 '+(++n)+'/'+todo.length")); assert.ok(maker.includes("'장을 못 담았어요'")); assert.ok(maker.includes('if(!r.ok) throw 0'));
 });

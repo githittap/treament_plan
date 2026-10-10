@@ -225,7 +225,7 @@
   .pe-head.sel{fill:#ff9f1c;}
   .pe-handle{fill:#fff; stroke:#ff9f1c; stroke-width:2.5;}
   .pe-handle.mid{fill:#ff9f1c; stroke:#fff;}
-  .pe-lbl{position:absolute; transform:translate(-50%,-50%); background:#fff; color:#16222f; border:2px solid var(--gold); border-radius:9px; padding:3px 8px; font-size:14px; font-weight:700; line-height:1.3; max-width:60%; cursor:move; box-shadow:0 4px 12px -4px rgba(0,0,0,.6);}
+  .pe-lbl{position:absolute; transform:translate(-50%,-50%); white-space:pre-line; background:#fff; color:#16222f; border:2px solid var(--gold); border-radius:9px; padding:3px 8px; font-size:14px; font-weight:700; line-height:1.3; max-width:60%; cursor:move; box-shadow:0 4px 12px -4px rgba(0,0,0,.6);}
   .pe-lbl.ar{cursor:pointer; opacity:.95;}
   .pe-lbl.sel{border-color:#ff9f1c; box-shadow:0 0 0 3px rgba(255,159,28,.45);}
   .pe-badge{position:absolute; transform:translate(-50%,-50%); min-width:19px; height:19px; padding:0 4px; border-radius:10px; background:var(--navy); color:#fff; font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; pointer-events:none; border:1.5px solid #fff;}
@@ -392,7 +392,7 @@
     background-attachment:fixed;
     -webkit-font-smoothing:antialiased;
   }
-  .app{height:100vh; display:grid; grid-template-rows:auto 1fr auto; gap:14px; padding:18px clamp(14px,3vw,40px) 20px; overflow:hidden;}
+  .app{height:100vh; display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:auto 1fr auto; gap:14px; padding:18px clamp(14px,3vw,40px) 20px; overflow:hidden;}
   .topbar{display:flex; align-items:center; justify-content:space-between; color:#eaf1f8; gap:16px;}
   .brand{display:flex; align-items:baseline; gap:12px; min-width:0;}
   .brand .mark{font-size:12px; letter-spacing:2.5px; font-weight:800; text-transform:uppercase; color:var(--gold); flex:none;}
@@ -479,8 +479,15 @@
   .ph-head.on{opacity:1; transition-delay:.55s;}
   .ph-lbl{position:absolute; width:0; height:0; z-index:4; pointer-events:none; transform:scale(var(--iz,1)); transform-origin:0 0;}
   .ph-lbl-in{position:absolute; left:0; top:0; width:max-content;}
-  .ph-lbl-box{background:#fff; color:#16222f; border:2px solid var(--gold); border-radius:10px; padding:5px 10px; font-size:15px; font-weight:700; line-height:1.35; word-break:keep-all; box-shadow:0 6px 16px -6px rgba(0,0,0,.55); opacity:0; transform:translate(var(--sx,-18px),var(--sy,0px)); transition:opacity .45s var(--ease), transform .55s var(--ease);}
+  .ph-lbl-box{background:#fff; color:#16222f; border:2px solid var(--gold); border-radius:10px; padding:5px 10px; font-size:15px; font-weight:700; line-height:1.35; word-break:keep-all; white-space:pre-line; box-shadow:0 6px 16px -6px rgba(0,0,0,.55); opacity:0; transform:translate(var(--sx,-18px),var(--sy,0px)); transition:opacity .45s var(--ease), transform .55s var(--ease);}
   .ph-lbl.on .ph-lbl-box{opacity:1; transform:none;}
+  /* 등장 효과(fx): 화살표 fade = 그려지지 않고 나타남 · 글 fade/zoom/pop */
+  .ph-arrow.fx-fade{stroke-dasharray:none; stroke-dashoffset:0; transition:opacity .5s var(--ease);}
+  .ph-head.fx-fade{transition:opacity .5s var(--ease);}
+  .ph-head.fx-fade.on{transition-delay:0s;}
+  .ph-lbl-box.fx-fade{transform:none;}
+  .ph-lbl-box.fx-zoom{transform:scale(.4);}
+  .ph-lbl-box.fx-pop{transform:scale(.55); transition:opacity .25s var(--ease), transform .55s cubic-bezier(.34,1.56,.64,1);}
   .ph-notes{flex:none; background:var(--blue-soft); border:1px solid #cfe0f2; border-radius:10px; padding:8px 12px; font-size:14px; color:#234;}
   .ph-notes summary{cursor:pointer; font-weight:700; color:var(--blue);}
   .ph-notes-body{margin-top:6px; line-height:1.55; white-space:pre-line; word-break:keep-all;}
@@ -508,13 +515,13 @@
   .check .num{flex:none; width:40px; height:40px; border-radius:50%; background:var(--navy); color:#fff; font-weight:800; font-size:18px; display:flex; align-items:center; justify-content:center;}
   .check .txt{font-size:clamp(16px,1.9vw,20px); font-weight:600; color:var(--ink); line-height:1.4; word-break:keep-all;}
   .check .txt b{color:var(--blue);}
-  .controls{display:flex; align-items:center; justify-content:center; gap:18px; color:#dbe8f4;}
+  .controls{display:flex; align-items:center; justify-content:center; gap:18px; color:#dbe8f4; min-width:0;}
   .nav-btn{appearance:none; border:1px solid rgba(255,255,255,.2); background:rgba(255,255,255,.08); color:#fff; width:46px; height:46px; border-radius:50%; cursor:pointer; font-size:20px; display:flex; align-items:center; justify-content:center; transition:background .15s var(--ease), transform .15s var(--ease), opacity .15s;}
   .nav-btn:hover{background:rgba(255,255,255,.18);}
   .nav-btn:active{transform:scale(.94);}
   .nav-btn:focus-visible{outline:2px solid var(--gold); outline-offset:2px;}
   .nav-btn[disabled]{opacity:.28; cursor:default;}
-  .center{display:flex; flex-direction:column; align-items:center; gap:8px; min-width:220px;}
+  .center{display:flex; flex-direction:column; align-items:center; gap:8px; min-width:220px; max-width:100%;}
   .dots{display:flex; gap:8px; align-items:center;}
   .dot{width:9px; height:9px; border-radius:50%; background:rgba(255,255,255,.25); cursor:pointer; border:none; padding:0; transition:background .2s, transform .2s;}
   .dot:hover{background:rgba(255,255,255,.5);}
@@ -547,7 +554,7 @@
     .link:not(.on){stroke-dashoffset:0; opacity:0;}
     .ph-arrow,.ph-head,.ph-lbl-box{transition:opacity .2s linear !important;}
     .ph-arrow{stroke-dashoffset:0;}
-    .ph-lbl-box{transform:none;}
+    .ph-lbl-box,.ph-lbl-box.fx-zoom,.ph-lbl-box.fx-pop{transform:none;}
     .node.rv:not(.on){transform:translate(-50%,-50%);}
   }
 </template>
@@ -580,6 +587,35 @@ function phLabelPos(w,h,bx,by,gap){
   if(!bx && !by) return [-w/2,-h/2];
   var t=Math.min(bx?(w/2)/Math.abs(bx):Infinity, by?(h/2)/Math.abs(by):Infinity)+(gap==null?8:gap);
   return [bx*t-w/2, by*t-h/2];
+}
+/* 등장 효과: 화살표는 fade(나타남)만, 글은 fade·zoom(확대)·pop(튀어오름). 기본(빈 값)은 지우고 저장 안 함 */
+function phFxOk(kind,fx){ return (kind==='arrow' ? ['fade'] : ['fade','zoom','pop']).indexOf(fx)>=0; }
+/* 글 상자끼리 안 겹치게. fixed=안 움직이는 상자들, movable=차례로 자리 잡는 상자들({x,y,w,h} px, 왼쪽 위 기준), bnd=[왼,오른,위,아래].
+   앞서 놓인 상자와 gap(기본 4px) 안으로 닿으면 겹친 상자의 아래·위·오른쪽·왼쪽 중 원래 자리에서 가장 가까운 빈 자리(bnd 안)로 비킴 — 없으면 그대로. 같은 입력 → 같은 출력 */
+function phAvoid(fixed,movable,bnd,gap){
+  gap = gap==null ? 4 : gap;
+  var hit=function(a,b){ return a.x<b.x+b.w+gap-0.01 && b.x<a.x+a.w+gap-0.01 && a.y<b.y+b.h+gap-0.01 && b.y<a.y+a.h+gap-0.01; };
+  var inb=function(r){ return !bnd || (r.x>=bnd[0]-0.01 && r.x+r.w<=bnd[1]+0.01 && r.y>=bnd[2]-0.01 && r.y+r.h<=bnd[3]+0.01); };
+  var placed=fixed.slice(), out=[];
+  movable.forEach(function(m){
+    var r={x:m.x,y:m.y,w:m.w,h:m.h};
+    if(placed.some(function(p){ return hit(r,p); })){
+      var pick=function(list){
+        var best=null, bd=Infinity;
+        list.forEach(function(p){
+          [{x:m.x,y:p.y+p.h+gap},{x:m.x,y:p.y-m.h-gap},{x:p.x+p.w+gap,y:m.y},{x:p.x-m.w-gap,y:m.y}].forEach(function(c){
+            c.w=m.w; c.h=m.h; var d=Math.hypot(c.x-m.x,c.y-m.y);
+            if(d<bd && inb(c) && !placed.some(function(q){ return hit(c,q); })){ bd=d; best=c; }
+          });
+        });
+        return best;
+      };
+      var b=pick(placed.filter(function(p){ return hit(r,p); })) || pick(placed);
+      if(b) r={x:b.x,y:b.y,w:m.w,h:m.h};
+    }
+    placed.push(r); out.push({x:r.x,y:r.y});
+  });
+  return out;
 }
 </script>
 
@@ -779,9 +815,9 @@ const SVGNS = 'http://www.w3.org/2000/svg';
 function svgEl(tag, cls){ const n = document.createElementNS(SVGNS, tag); if(cls) n.setAttribute('class', cls); return n; }
 let phObs = null;
 function stopPhoto(){ if(phObs){ phObs.disconnect(); phObs = null; } }
-function phMkLabel(text, step){
+function phMkLabel(text, step, fx){
   const root = el('div','ph-lbl'); root.dataset.step = step;
-  const inn = el('div','ph-lbl-in'); const bx = el('div','ph-lbl-box'); bx.textContent = text;
+  const inn = el('div','ph-lbl-in'); const bx = el('div','ph-lbl-box'+(fx ? ' fx-'+fx : '')); bx.textContent = text;
   inn.appendChild(bx); root.appendChild(inn);
   return {root:root, inn:inn, bx:bx};
 }
@@ -796,16 +832,18 @@ function buildPhoto(s){
   (s.marks || []).forEach(m=>{
     const step = (m.step|0);
     if(m.kind === 'arrow' && m.pts && m.pts.length >= 2){
-      const line = svgEl('path','ph-arrow'), head = svgEl('polygon','ph-head');
+      const fx = phFxOk('arrow', m.fx) ? ' fx-'+m.fx : '';
+      const line = svgEl('path','ph-arrow'+fx), head = svgEl('polygon','ph-head'+fx);
       line.dataset.step = step; head.dataset.step = step;
       svg.appendChild(line); svg.appendChild(head);
       const rec = {m:m, line:line, head:head, lbl:null}, col = phSafeColor(m.color);
       if(col){ line.style.stroke = col; head.style.fill = col; }
-      if(m.text){ rec.lbl = phMkLabel(m.text, step); box.appendChild(rec.lbl.root); }
+      if(m.text){ rec.lbl = phMkLabel(m.text, step, fx ? m.fx : ''); box.appendChild(rec.lbl.root); }
       ph.arrows.push(rec);
     } else if(m.kind === 'label' && m.text){
-      const l = phMkLabel(m.text, step); box.appendChild(l.root); ph.labels.push({m:m, l:l});
+      const l = phMkLabel(m.text, step, phFxOk('label', m.fx) ? m.fx : ''); box.appendChild(l.root); ph.labels.push({m:m, l:l});
       const tc = phSafeColor(m.color); if(tc) l.bx.style.color = tc;
+      const bg = phSafeColor(m.bg); if(bg) l.bx.style.background = bg;
     }
   });
   if(s.notes && String(s.notes).trim()){
@@ -830,17 +868,21 @@ function phLayout(ph){
   const sw = Math.max(3, Math.min(6, f.bw/150));
   const maxW = Math.max(120, Math.min(f.bw*0.6, 300))+'px';
   const bnd = [-f.left, W-f.left, -f.top, H-f.top];   /* 글이 보이는 창 밖으로 잘리지 않게 */
+  const items = [];   /* 글 상자 자리 모음 — 가져온 글(w 있음)은 고정, 나머지는 겹치면 비킴 */
   ph.arrows.forEach(r=>{
     const g = phArrow(r.m.pts, f.bw, f.bh, sw);
     r.line.setAttribute('d', g.d); r.line.setAttribute('stroke-width', sw); r.line.style.setProperty('--len', g.len);
     r.head.setAttribute('points', g.head);
-    if(r.lbl) phPlaceLabel(r.lbl, g.tail.x, g.tail.y, g.tail.bx, g.tail.by, maxW, bnd);
+    if(r.lbl) items.push({i:ph.s.marks.indexOf(r.m), l:r.lbl, fix:false, p:phPlaceLabel(r.lbl, g.tail.x, g.tail.y, g.tail.bx, g.tail.by, maxW, bnd)});
   });
   ph.labels.forEach(r=>{
     const m = r.m, tl = phLabelTL(m), fs = phLabelFont(m.size, f.bw);
     r.l.bx.style.fontSize = fs ? fs+'px' : '';
-    phPlaceLabel(r.l, m.x*f.bw/100, m.y*f.bh/100, 0, 0, maxW, bnd, tl ? {w:m.w*f.bw/100, h:(m.h||0)*f.bh/100} : null);
+    items.push({i:ph.s.marks.indexOf(m), l:r.l, fix:!!tl, p:phPlaceLabel(r.l, m.x*f.bw/100, m.y*f.bh/100, 0, 0, maxW, bnd, tl ? {w:m.w*f.bw/100, h:(m.h||0)*f.bh/100} : null)});
   });
+  items.sort((a,b)=> a.i-b.i);
+  const mv = items.filter(o=> !o.fix), nw = phAvoid(items.filter(o=> o.fix).map(o=> o.p), mv.map(o=> o.p), bnd, 4);
+  mv.forEach((o,k)=>{ o.l.inn.style.transform = 'translate('+(nw[k].x-o.p.ax)+'px,'+(nw[k].y-o.p.ay)+'px)'; });
   phApply(ph);
 }
 function phPlaceLabel(l, x, y, bx, by, maxW, bnd, tl){
@@ -851,6 +893,7 @@ function phPlaceLabel(l, x, y, bx, by, maxW, bnd, tl){
   if(bnd){ t[0] = Math.max(bnd[0]-x, Math.min(bnd[1]-x-w, t[0])); t[1] = Math.max(bnd[2]-y, Math.min(bnd[3]-y-h, t[1])); }
   l.inn.style.transform = 'translate('+t[0]+'px,'+t[1]+'px)';
   l.bx.style.setProperty('--sx', (bx ? bx*18 : -18)+'px'); l.bx.style.setProperty('--sy', (by ? by*18 : 0)+'px');
+  return {x:x+t[0], y:y+t[1], w:w, h:h, ax:x, ay:y};
 }
 function phClamp(ph){
   ph.z = Math.max(1, Math.min(6, ph.z));
@@ -1009,7 +1052,7 @@ const prevBtn = $('#prevBtn'), nextBtn = $('#nextBtn');
 function buildControls(){
   if(!dotsEl) return;
   dotsEl.innerHTML = '';
-  slides.forEach((_,i)=>{
+  if(slides.length <= 30) slides.forEach((_,i)=>{   /* 장이 많으면 점을 안 만듦(수백 개가 아래 줄을 밀어 화면이 깨짐) — 「n / 전체」 숫자만 */
     const d = el('button','dot'+(i===si?' active':''));
     d.setAttribute('aria-label',(i+1)+'번째 장');
     d.onclick = ()=> goSlide(i);
@@ -1085,7 +1128,7 @@ const B = {
 const SLIDE_CSS = B.slideCSS.content ? B.slideCSS.content.textContent : B.slideCSS.innerHTML;
 const PHGEO_SRC = q('#phGeoSrc').textContent;
 const ENGINE = PHGEO_SRC + '\n' + B.engineSrc.textContent;
-const PHG = new Function(PHGEO_SRC + ';return {phFit:phFit, phArrow:phArrow, phLabelPos:phLabelPos, phSafeColor:phSafeColor, phLabelFont:phLabelFont, phLabelTL:phLabelTL};')();
+const PHG = new Function(PHGEO_SRC + ';return {phFit:phFit, phArrow:phArrow, phLabelPos:phLabelPos, phSafeColor:phSafeColor, phLabelFont:phLabelFont, phLabelTL:phLabelTL, phAvoid:phAvoid, phFxOk:phFxOk};')();
 const LS_KEY = 'seolmyeongdeok:autosave:v1';
 
 const TYPES = {
@@ -1128,6 +1171,9 @@ function phNormalize(s, mkId){
       m.kind = 'label'; m.x = rnd2(clampPct(m.x)); m.y = rnd2(clampPct(m.y));
       if(m.w != null) m.w = rnd2(clampPct(m.w)); if(m.h != null) m.h = rnd2(clampPct(m.h));
     }
+    if(m.color != null && !PHG.phSafeColor(m.color)) delete m.color;   /* 안전한 색(#rgb·#rrggbb…)이 아니면 지움 */
+    if(m.bg != null && !PHG.phSafeColor(m.bg)) delete m.bg;
+    if(m.fx != null && !PHG.phFxOk(m.kind, m.fx)) delete m.fx;   /* 허용한 등장 효과만 */
   });
   return s;
 }
@@ -1709,6 +1755,7 @@ function peRedraw(){
   const sw = Math.max(3, Math.min(6, W/150));
   const mk = (tag, cls, attrs)=>{ const n = document.createElementNS('http://www.w3.org/2000/svg', tag); if(cls) n.setAttribute('class', cls); Object.keys(attrs||{}).forEach(k=> n.setAttribute(k, attrs[k])); return n; };
   const badge = (x, y, step)=>{ const b = ce('div','pe-badge'); b.textContent = step; b.style.left = x+'px'; b.style.top = y+'px'; lay.appendChild(b); };
+  const items = [], dm = PE.drag ? PE.drag.m : null;   /* 글 상자 자리 모음 — 발표 화면과 같은 phAvoid 로 겹치면 비킴(끄는 중인 글은 계산에서 빼고 손가락 자리 그대로) */
   s.marks.forEach(m=>{
     const on = (m.id === PE.sel);
     if(m.kind === 'arrow'){
@@ -1720,21 +1767,28 @@ function peRedraw(){
       if(m.text){
         const l = ce('div','pe-lbl ar'+(on?' sel':'')); l.textContent = m.text; l.dataset.mid = m.id; lay.appendChild(l);
         const t = PHG.phLabelPos(l.offsetWidth, l.offsetHeight, g.tail.bx, g.tail.by, 8);
-        l.style.transform = 'none'; l.style.left = Math.max(0, Math.min(W-l.offsetWidth, g.tail.x + t[0]))+'px'; l.style.top = Math.max(0, Math.min(H-l.offsetHeight, g.tail.y + t[1]))+'px';
+        const x = Math.max(0, Math.min(W-l.offsetWidth, g.tail.x + t[0])), y = Math.max(0, Math.min(H-l.offsetHeight, g.tail.y + t[1]));
+        l.style.transform = 'none'; l.style.left = x+'px'; l.style.top = y+'px';
+        items.push({m:m, l:l, c:0, fix:false, r:{x:x, y:y, w:l.offsetWidth, h:l.offsetHeight}});
       }
       badge(g.tail.x, g.tail.y, m.step);
       if(on) m.pts.forEach((p, i)=> svg.appendChild(mk('circle', 'pe-handle'+(m.pts.length === 3 && i === 1 ? ' mid' : ''), {cx:p[0]*W/100, cy:p[1]*H/100, r:7})));
     } else {
       const l = ce('div','pe-lbl'+(on?' sel':'')); l.textContent = m.text; l.dataset.mid = m.id;
       l.style.left = (m.x*W/100)+'px'; l.style.top = (m.y*H/100)+'px';
-      const fs = PHG.phLabelFont(m.size, W), tc = PHG.phSafeColor(m.color);
-      if(fs) l.style.fontSize = fs+'px'; if(tc) l.style.color = tc;
+      const fs = PHG.phLabelFont(m.size, W), tc = PHG.phSafeColor(m.color), bg = PHG.phSafeColor(m.bg);
+      if(fs) l.style.fontSize = fs+'px'; if(tc) l.style.color = tc; if(bg) l.style.background = bg;
       const tl = PHG.phLabelTL(m);
       if(tl){ l.style.transform = 'none'; l.style.minWidth = (m.w*W/100)+'px'; l.style.minHeight = ((m.h||0)*H/100)+'px'; l.style.maxWidth = 'none'; }
       lay.appendChild(l);
-      badge(tl ? m.x*W/100 : m.x*W/100 - l.offsetWidth/2, tl ? m.y*H/100 : m.y*H/100 - l.offsetHeight/2, m.step);
+      const w = l.offsetWidth, h = l.offsetHeight;
+      items.push({m:m, l:l, c:tl ? 0 : 1, fix:tl, badge:true, r:{x:tl ? m.x*W/100 : m.x*W/100 - w/2, y:tl ? m.y*H/100 : m.y*H/100 - h/2, w:w, h:h}});
     }
   });
+  const live = items.filter(o=> o.m !== dm), mv = live.filter(o=> !o.fix);
+  const nw = PHG.phAvoid(live.filter(o=> o.fix).map(o=> o.r), mv.map(o=> o.r), [0, W, 0, H], 4);
+  mv.forEach((o, k)=>{ o.r.x = nw[k].x; o.r.y = nw[k].y; o.l.style.left = (o.c ? o.r.x + o.r.w/2 : o.r.x)+'px'; o.l.style.top = (o.c ? o.r.y + o.r.h/2 : o.r.y)+'px'; });
+  items.forEach(o=>{ if(o.badge) badge(o.r.x, o.r.y, o.m.step); });
   if(PE.pend && PE.hover){
     const a = PE.pend, b = PE.hover;
     svg.appendChild(mk('path', 'pe-line tmp', {d:'M'+(a[0]*W/100)+' '+(a[1]*H/100)+' L'+(b[0]*W/100)+' '+(b[1]*H/100), 'stroke-width':sw}));
@@ -1996,12 +2050,17 @@ B.fileInput.onchange=()=>{
   r.readAsText(f,'utf-8');
 };
 /* 보관함 사진은 주소가 시간이 지나면 막히므로 파일에는 사진 자체를 넣음 */
-async function exportData(){
-  const d = deckData();
-  for(const sl of d.slides){ if(sl.type==='photo' && sl.image && sl.image.src && !/^data:/.test(sl.image.src)){ try{ sl.image.src = await blobToDataUrl(await (await fetch(sl.image.src)).blob()); }catch(_){} } }
+async function exportData(info){
+  const d = deckData(), ph = d.slides.filter(sl=> sl.type==='photo' && sl.image), todo = ph.filter(sl=> sl.image.src && !/^data:/.test(sl.image.src));
+  info.miss += ph.filter(sl=> !sl.image.src).length;   /* 주소 자체가 없는 사진은 못 담음 */
+  let n = 0;
+  for(const sl of todo){
+    toast('사진 담는 중 '+(++n)+'/'+todo.length);
+    try{ const r = await fetch(sl.image.src); if(!r.ok) throw 0; sl.image.src = await blobToDataUrl(await r.blob()); }catch(_){ info.miss++; }
+  }
   return d;
 }
-B.exportBtn.onclick=async()=>{ if(!deck.slides.length){ toast('슬라이드를 먼저 추가하세요','err'); return; } if(!(await waitPhotos('내려받아'))) return; const name=(sanitize(deck.meta.title)||'설명덱')+'.html'; download(name, generateDeckHTML({si:0, atEnd:false}, await exportData())); toast('발표 파일을 내려받았어요 — 더블클릭으로 열려요'); };
+B.exportBtn.onclick=async()=>{ if(!deck.slides.length){ toast('슬라이드를 먼저 추가하세요','err'); return; } if(!(await waitPhotos('내려받아'))) return; const name=(sanitize(deck.meta.title)||'설명덱')+'.html'; const info={miss:0}; download(name, generateDeckHTML({si:0, atEnd:false}, await exportData(info))); if(info.miss) toast('발표 파일을 내려받았어요 — 사진 '+info.miss+'장을 못 담았어요','err'); else toast('발표 파일을 내려받았어요 — 더블클릭으로 열려요'); };
 
 B.pvPrev.onclick=()=>postFrame({cmd:'prev'});
 B.pvNext.onclick=()=>postFrame({cmd:'next'});
