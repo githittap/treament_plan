@@ -1642,7 +1642,7 @@ function hubTextDefsChapter7(add){
   add('pay.opt_unmapped',S8,'급여대장 — 직원 매핑 고르는 칸의 맨 위 항목(매핑 안 된 줄)','미매핑');
   add('pay.manual_name',S8,'급여대장 — 수기로 넣은 줄의 원본 성명 칸','수기');
   add('pay.empty',S8,'급여대장 — 입력된 급여 행이 하나도 없을 때','입력된 급여 행이 없습니다.');
-  add('pay.ledger_hint',S8,'급여대장 표 아래 작은 글','직원 이름이 정확히 한 명과 일치할 때만 자동 매핑합니다. 미매핑 행은 저장하지 않습니다.');
+  add('pay.ledger_hint',S8,'급여대장 표 아래 작은 글','활성 직원 이름이 한 명과 일치할 때 자동 연결합니다. 연결 못 한 줄도 계정 없는 인원으로 보관합니다.');
   add('pay.m_pick_month',S8,'급여대장 저장 — 대상 월을 안 골랐을 때','대상 월을 선택하세요.');
   add('pay.m_save_none',S8,'급여대장 저장 — 저장할 행이 하나도 없을 때. {skipped}는 건너뛴 행 수','저장할 매핑 행이 없습니다. 건너뜀 {skipped}건.',['skipped']);
   add('pay.m_ledger_fail',S8,'급여대장 저장 — 저장이 안 됐을 때. {detail}은 서버 오류 글','급여대장 저장 실패: {detail}',['detail']);
@@ -1926,6 +1926,87 @@ function hubTextDefsRecall(add){
   add("recall.push_body","📞 리콜 명단","오늘 리콜 {n}명","오늘 리콜 {n}명",["n"]);
   add("recall.next_action","📞 리콜 명단","다시 연락","다시 연락",[]);
 }
+function hubTextDefsBonus(add){
+  add('wh.reply_column','💰 시급제','시급 구분 · 회신 시간 칸','회신 시간 칸');
+  add('wh.reply_auto','💰 시급제','시급 구분 · 기본 규칙','기본 규칙');
+  add('wh.reply_weekday','💰 시급제','시급 구분 · 평일','평일');
+  add('wh.reply_weekend','💰 시급제','시급 구분 · 주말','주말');
+
+ [
+  ["unsaved", "상여에 저장 안 된 변경이 있습니다. 화면을 바꿀까요? 변경은 다시 상여 화면에서 확인할 수 있습니다."],
+  ["tab", "상여"],
+  ["amount", "세후 상여"],
+  ["memo", "사유 메모"],
+  ["apply_total", "기준 합계 넣기"],
+  ["month", "대상 월"],
+  ["copy", "지난달 그대로 가져오기"],
+  ["history", "고친 기록 보기"],
+  ["criteria", "기준 항목"],
+  ["total", "기준 합계(참고)"],
+  ["person", "직원"],
+  ["ledger", "노무사 대장 상여금(세후)"],
+  ["diff", "차이"],
+  ["state", "저장 상태"],
+  ["point_rate", "1점당 금액"],
+  ["save", "저장"],
+  ["add", "항목 추가"],
+  ["sum", "합계"],
+  ["loading", "불러오는 중…"],
+  ["pending", "변경 저장 대기"],
+  ["load_fail", "불러오기 실패: {detail}"],
+  ["retry", "다시 저장"],
+  ["invalid", "0 이상의 금액을 입력하세요."],
+  ["saving", "저장 중…"],
+  ["saved", "저장됨 {time}"],
+  ["save_fail", "저장 실패: {detail}"],
+  ["copying", "지난달 빈 칸을 가져오는 중…"],
+  ["copy_confirm", "이번 달 빈 칸만 지난달 값으로 채울까요?"],
+  ["new_name", "새 기준 항목 이름"],
+  ["name", "항목 이름"],
+  ["kind", "종류"],
+  ["value", "값"],
+  ["order", "순서"],
+  ["active", "사용"],
+  ["when", "언제"],
+  ["who", "누가"],
+  ["before", "전"],
+  ["after", "후"],
+  ["unconfirmed", "미확정"],
+  ["confirmed", "확정 {time}"],
+  ["confirm", "저장(확정)"],
+  ["confirm_all", "이 달 전부 확정"],
+  ["confirm_all_prompt", "저장 안 된 입력을 먼저 저장하고 이 달 상여를 전부 확정할까요?"],
+  ["confirm_pending", "저장하지 못한 입력이 있습니다. 다시 저장한 뒤 확정해 주세요."],
+  ["confirmation_summary", "확정 합계 {amount} · 미확정 {n}건"],
+  ["defaults", "기본 제안값"],
+  ["defaults_hint", "빈 달에만 미확정 제안으로 채웁니다. 0은 상여 없음이며 사용을 끄면 새 달에 채우지 않습니다."],
+  ["default_amount", "기본 제안 금액"],
+  ["csv_invalid", "CSV 형식이 올바르지 않습니다. 머리줄과 따옴표를 확인하세요."],
+  ["csv_headers", "CSV 머리줄에 직원·근무월·상여(입금-세후)·메모가 필요합니다."],
+  ["csv_row_invalid", "CSV {n}번째 데이터 줄의 직원·근무월·금액을 확인하세요."],
+  ["csv_link", "사람 연결"],
+  ["csv_account", "활성 계정"],
+  ["csv_name", "이름으로 보관"],
+  ["import", "제안 불러오기"],
+  ["import_hint", "CSV는 이 화면에서만 읽으며 원본 파일은 서버에 올리지 않습니다. 이미 값이 있거나 확정한 줄은 건너뜁니다."],
+  ["import_apply", "제안으로 넣기"],
+  ["import_confirm", "미리보기의 빈 줄에만 미확정 제안을 넣을까요?"],
+  ["import_result", "제안 {inserted}건 넣음 · 기존 값·확정·중복 {skipped}건 건너뜀"],
+ ].forEach(d=>add('pay.bonus.'+d[0],'💰 급여 › 상여',d[1],d[1],Array.from(d[1].matchAll(/\{([a-z_]+)\}/g),m=>m[1])));
+
+ [["pay.extra.same_name", "같은 이름 계정 {n}개"], ["pay.extra.no_account", "허브 계정 없음"], ["pay.extra.too_many", "급여대장 행이 너무 많습니다. 제목과 데이터 범위를 확인하세요."], ["pay.extra.title", "계정 없는 인원 · 일용·사업소득"], ["pay.extra.empty", "저장할 급여 행이 없습니다."], ["pay.extra.saved", "계정 없는 인원·별도 시트 {n}건 보관: {names}"], ["pay.extra.map_fail", "연결 기억 저장 실패: {detail}"], ["pay.extra.sheet", "원본 시트"], ["pay.extra.name", "원본 성명"], ["pay.extra.net", "차인지급액"], ["pay.extra.side", "보조 칸"]].forEach(d=>add(d[0],'💰 급여 › 대장 보조',d[1],d[1],Array.from(d[1].matchAll(/\{([a-z_]+)\}/g),m=>m[1])));
+
+ add('pay.extra.xls_reading','💰 급여 › 급여대장','파일 읽기 진행 안내','엑셀을 읽는 중…');
+ add('pay.extra.busy','💰 급여 › 급여대장','작업 진행 안내','급여대장 작업 중… 잠시 기다려 주세요.');
+ add('pay.extra.xls_cancel','💰 급여 › 급여대장','파일 읽기 중단 안내','파일 읽기가 중단되었습니다.');
+ add('pay.bonus.copy_month_changed','💰 급여 › 상여','월 변경 후 가져오기 취소 안내','대상 월이 바뀌어 가져오기를 취소했습니다. 선택한 월에서 다시 가져오세요.');
+ [["pay.reply.tab", "노무사 회신"], ["pay.reply.owner", "원장만 사용할 수 있습니다."], ["pay.reply.inclusive_missing", "포괄 시간 미입력"], ["pay.reply.absence_hint", "허브는 미기록을 결근으로 판정하지 않음"], ["pay.reply.deadline", "{month}월분 회신 기한: {next}월 {reply_day}일 · 급여일 {next}월 {pay_day}일"], ["pay.reply.month", "대상 월"], ["pay.reply.export", "엑셀 받기"], ["pay.reply.loading", "불러오는 중…"], ["pay.reply.failed", "불러오기 실패: {detail}"], ["pay.reply.inclusive", "포괄 포함 연장시간(월)"], ["pay.reply.bonus_basis_value", "세후"], ["pay.reply.monthly_sheet", "월급제"], ["pay.reply.hourly_sheet", "시급제"], ["pay.reply.basis_sheet", "근거"], ["pay.reply.name", "이름"], ["pay.reply.dept", "담당/직위"], ["pay.reply.absence", "결근일수"], ["pay.reply.early", "근태공제시간"], ["pay.reply.late", "지각시간"], ["pay.reply.overtime", "연장/휴일근로시간"], ["pay.reply.holiday_overtime", "공휴일 휴일연장시간"], ["pay.reply.night", "야간시간"], ["pay.reply.bonus", "인센티브"], ["pay.reply.other_bonus", "기타 인센티브"], ["pay.reply.bonus_basis", "인센티브 기준"], ["pay.reply.weekday_work", "평일근무"], ["pay.reply.weekday_over", "평일오버"], ["pay.reply.weekend_work", "주말근무"], ["pay.reply.weekend_over", "주말오버"], ["pay.reply.date", "날짜"], ["pay.reply.clock_in", "출근"], ["pay.reply.clock_out", "퇴근"], ["pay.reply.late_min", "지각(분)"], ["pay.reply.early_min", "조퇴(분)"], ["pay.reply.overtime_min", "연장(분)"], ["pay.reply.holiday_min", "휴일(분)"], ["pay.reply.source", "원 자료"], ["pay.reply.check", "확인필요"]].forEach(d=>add(d[0],'💰 급여 › 노무사 회신',d[1],d[1],Array.from(d[1].matchAll(/\{([a-z_]+)\}/g),m=>m[1])));
+
+
+ [["pay.reply.bonus_unconfirmed", "미확정"], ["pay.reply.bonus_review", "상여 미확정"], ["pay.compare.bonus_unconfirmed", "미확정"]].forEach(d=>add(d[0],'💰 급여 › 상여 확정',d[1],d[1]));
+ [["pay.reply.hourly_correction_basis", "시급 승인 정정"], ["pay.reply.hourly_fallback", "시급제 RPC 대상에 없는 과거 인원: 월근태 출퇴근 시각으로 시간 계산"], ["pay.reply.night_missing", "야간시간: 출퇴근 시각 근거 부족"], ["pay.reply.rule_overtime", "max(0, 허브 연장 분 − 포괄 포함 시간×60) + 휴일근로 분"], ["pay.reply.rule_holiday", "출퇴근 시각 구간; 휴게시간 미차감"], ["pay.reply.rule_inclusive", "직원별 wage_info 적용일 기준; 비어 있으면 전체 연장"], ["pay.reply.clock_review", "출퇴근 시각 확인 필요"], ["pay.reply.rule_calc_label", "계산"], ["pay.reply.rule_time_label", "시간"], ["pay.reply.rule_overtime_label", "연장"], ["pay.reply.rule_holiday_label", "휴일"], ["pay.reply.rule_public_label", "공휴일 연장"], ["pay.reply.rule_night_label", "야간"], ["pay.reply.rule_inclusive_label", "포괄"], ["pay.reply.rule_time", "분 ÷ 60; 소수 {digits}자리"], ["pay.reply.rule_public", "공휴일 하루 {hours}시간 초과분"], ["pay.reply.rule_night", "{start}분부터 다음 {end}분까지"]].forEach(d=>add(d[0],'💰 급여 › 노무사 회신',d[1],d[1],Array.from(d[1].matchAll(/\{([a-z_]+)\}/g),m=>m[1])));
+ [["pay.compare.tab", "대조"], ["pay.compare.no_ledger", "급여대장을 먼저 올려 주세요"], ["pay.compare.overtime", "연장(포괄 초과분)"], ["pay.compare.attendance", "지각+조퇴 시간"], ["pay.compare.holiday", "휴일근로 시간"], ["pay.compare.holiday_overtime", "공휴일 휴일연장 시간"], ["pay.compare.bonus", "상여금(세후)"], ["pay.compare.weekday_work", "평일근무"], ["pay.compare.weekday_over", "평일오버"], ["pay.compare.weekend_work", "주말근무"], ["pay.compare.weekend_over", "주말오버"], ["pay.compare.missing", "근거 없음"], ["pay.compare.month", "대상 월"], ["pay.compare.loading", "불러오는 중…"], ["pay.compare.failed", "불러오기 실패: {detail}"], ["pay.compare.person", "직원"], ["pay.compare.item", "항목"], ["pay.compare.ledger", "노무사 대장"], ["pay.compare.hub", "허브"], ["pay.compare.diff", "차이"]].forEach(d=>add(d[0],'💰 급여 › 대조',d[1],d[1],Array.from(d[1].matchAll(/\{([a-z_]+)\}/g),m=>m[1])));
+}
 function hubTextDefs(){
   if(HUB_TEXT_DEFS_CACHE)return HUB_TEXT_DEFS_CACHE;
   const defs=[];
@@ -1972,6 +2053,7 @@ function hubTextDefs(){
   [['cancel','취소 요청'],['half','반차로 바꾸기 요청'],['title','연차 취소·변경 요청'],['reason','취소·변경 사유를 적어 주세요. (필수)'],['time','반차 시간 범위 (예: 09:00~13:00)'],['confirm','연차 변경 요청을 처리할까요?']].forEach(([key,text])=>add('leave.change.'+key,'🌿 연차 변경',text,text));
   hubTextDefsTime(add);
   hubTextDefsHourly(add);
+  if(typeof globalThis!=='undefined'&&globalThis.HUB_BONUS_CATALOG===true)hubTextDefsBonus(add);
   hubTextDefsSpend(add);
   hubTextDefsTools(add);
   ((typeof globalThis!=='undefined'&&globalThis.HUB_CARD_LEDGER_TEXT_DEFS)||[]).forEach(d=>add(d[0],'지출 점검',d[1],d[1],Array.from(d[1].matchAll(/\{([a-z_]+)\}/g),m=>m[1])));
@@ -1996,6 +2078,9 @@ function hubTextMatches(def,query,current){
 
 /* 숫자 기준(app_settings 키) — 근태 기준 7개(차례 1) + 연차·소명 기준 5개(차례 3) + 결재 목록 건수 2개(차례 4) + 문의함·상담일지 건수·간격 5개(차례 5: 화면에만 있던 숫자만 — DB 함수·Storage 규칙에도 박힌 숫자는 안 옮김) */
 const HUB_SETTING_DEFS=[
+  ...((typeof globalThis!=='undefined'&&globalThis.HUB_BONUS_CATALOG===true)?[{"key": "pay.compare.time_tolerance", "screen": "💰 급여 대조 기준", "label": "시간 차이 허용치", "where": "노무사 대장과 허브 시간 비교 허용치", "def": "0.1", "kind": "dec", "min": 0, "max": 24, "unit": "시간"}, {"key": "pay.compare.money_tolerance", "screen": "💰 급여 대조 기준", "label": "금액 차이 허용치", "where": "노무사 대장과 상여 금액 비교 허용치", "def": "0", "kind": "int", "min": 0, "max": 9999, "unit": "원"}]:[]),
+  ...((typeof globalThis!=='undefined'&&globalThis.HUB_BONUS_CATALOG===true)?[{"key": "pay.reply.digits", "screen": "💰 급여 회신 기준", "label": "시간 소수 자리", "where": "시간 소수 자리", "def": "2", "kind": "int", "min": 0, "max": 4, "unit": ""}, {"key": "pay.reply.night_start", "screen": "💰 급여 회신 기준", "label": "야간 시작(0시부터 분)", "where": "야간 시작(0시부터 분)", "def": "1320", "kind": "int", "min": 0, "max": 1439, "unit": ""}, {"key": "pay.reply.night_end", "screen": "💰 급여 회신 기준", "label": "야간 끝(0시부터 분)", "where": "야간 끝(0시부터 분)", "def": "360", "kind": "int", "min": 0, "max": 1439, "unit": ""}, {"key": "pay.reply.holiday_hours", "screen": "💰 급여 회신 기준", "label": "공휴일 하루 기준시간", "where": "공휴일 하루 기준시간", "def": "8", "kind": "dec", "min": 0, "max": 24, "unit": ""}, {"key": "pay.reply.hourly_day_hours", "screen": "💰 급여 회신 기준", "label": "시급제 하루 기준시간", "where": "시급제 하루 기준시간", "def": "8", "kind": "dec", "min": 0, "max": 24, "unit": ""}, {"key": "pay.reply.deadline", "screen": "💰 급여 회신 기준", "label": "회신 기한일", "where": "회신 기한일", "def": "3", "kind": "int", "min": 1, "max": 28, "unit": ""}, {"key": "pay.reply.payday", "screen": "💰 급여 회신 기준", "label": "급여일", "where": "급여일", "def": "10", "kind": "int", "min": 1, "max": 28, "unit": ""}]:[]),
+  ...((typeof globalThis!=='undefined'&&globalThis.HUB_BONUS_CATALOG===true)?[{key:'pay.bonus.months',screen:'💰 급여 기준',label:'상여 직전 달 보기',where:'상여 오른쪽에 표시할 지난 개월 수',def:'3',kind:'int',min:1,max:12,unit:'개월'}]:[]),
   {key:'late_cut',screen:'🕘 근태 기준',label:'지각 판정 시각',where:'출퇴근 — 이 시각을 넘겨 출근하면 지각으로 계산(예 09:40이면 09:41부터 지각)',def:'09:40',kind:'time'},
   {key:'siueop',screen:'🕘 근태 기준',label:'시업(공식 출근) 시각',where:'출퇴근 — 화면에 보여 주는 공식 출근 시각',def:'10:00',kind:'time'},
   {key:'jongeop_weekday_evening',screen:'🕘 근태 기준',label:'평일 야간조 종업 시각',where:'출퇴근 — 월~금 야간조의 종업 시각(연장근무 계산 기준)',def:'20:00',kind:'time'},
@@ -2171,6 +2256,7 @@ const HUB_LIST_DEFS=[
    where:'근로계약서 › 계약 목록·계약 보기 제목·직원 계약 카드의 상태 표시',
    note:'계약 상태는 서버가 허락하는 값(발송요청·대기·서명완료·취소)이 계약 흐름과 묶여 있어서 코드는 못 바꾸고 새 상태도 못 늘려요. 「반려됨」은 원장이 발송 요청을 반려해 취소된 계약을 화면이 따로 부르는 이름이에요. 보이는 이름만 고칠 수 있어요.',
    def:[{code:'발송요청',label:'발송요청'},{code:'대기',label:'대기'},{code:'서명완료',label:'서명완료'},{code:'취소',label:'취소'},{code:'반려됨',label:'반려됨'}]},
+  ...((typeof globalThis!=='undefined'&&globalThis.HUB_BONUS_CATALOG===true)?[{key:'list.pay_bonus_kinds',screen:'💰 급여',label:'상여 기준 종류 이름',where:'상여 기준 항목 종류',note:'종류 이름만 바꿉니다.',addable:false,def:[{code:'amount',label:'금액'},{code:'points',label:'배점'}]}]:[]),
   {key:'list.pay_wage_types',screen:'💰 급여',label:'급여형태 이름',addable:false,
    where:'급여 › 시급설정 표의 「급여형태」 고르는 칸',
    note:'급여형태는 서버에 저장되는 값(monthly·hourly)이 급여 계산과 묶여 있어서 코드는 못 바꾸고 새 형태도 못 늘려요. 보이는 이름만 고칠 수 있어요.',

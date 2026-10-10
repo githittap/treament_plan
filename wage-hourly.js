@@ -71,11 +71,12 @@ function wageHourlyCategoryRows(rows){
  const labels=[wageT('sun','일'),wageT('mon','월'),wageT('tue','화'),wageT('wed','수'),wageT('thu','목'),wageT('fri','금'),wageT('sat','토')];
  return rows.map((r,i)=>`<div class="wh-category-row" data-code="${esc(r.code)}" style="border-top:1px solid var(--line);padding:10px 0">
  <label>${esc(wageT('category_name','구분 이름'))} <input class="mini wh-category-label" value="${esc(r.label)}" style="width:140px"></label>
+ <label>${esc(wageT('reply_column','회신 시간 칸'))} <select class="mini wh-category-reply">${[['',wageT('reply_auto','기본 규칙')],['weekday',wageT('reply_weekday','평일')],['weekend',wageT('reply_weekend','주말')]].map(([code,label])=>`<option value="${code}" ${(r.reply_column||'')===code?'selected':''}>${esc(label)}</option>`).join('')}</select></label>
  <div class="rowflex" style="flex-wrap:wrap;margin:8px 0">${labels.map((s,d)=>`<label><input type="checkbox" data-day="${d}" ${r.days.includes(d)?'checked':''}> ${esc(s)}</label>`).join('')}</div>
  <label>${esc(wageT('category_dates','별도 날짜 (쉼표로 나눔)'))} <input class="wh-category-dates" value="${esc(r.dates.join(','))}" placeholder="2026-12-25" style="width:100%;box-sizing:border-box"></label></div>`).join('');
 }
 function wageHourlyReadTax(){return [...document.querySelectorAll('.wh-tax-row')].map(el=>({min:Number(el.querySelector('.wh-tax-min').value),max:el.querySelector('.wh-tax-max').value===''?null:Number(el.querySelector('.wh-tax-max').value),amount:Number(el.querySelector('.wh-tax-amount').value)}));}
-function wageHourlyReadCategories(){return [...document.querySelectorAll('.wh-category-row')].map(el=>({code:el.dataset.code,label:el.querySelector('.wh-category-label').value.trim(),days:[...el.querySelectorAll('[data-day]:checked')].map(c=>Number(c.dataset.day)),dates:el.querySelector('.wh-category-dates').value.split(',').map(s=>s.trim()).filter(Boolean)}));}
+function wageHourlyReadCategories(){return [...document.querySelectorAll('.wh-category-row')].map(el=>({code:el.dataset.code,label:el.querySelector('.wh-category-label').value.trim(),...(el.querySelector('.wh-category-reply').value?{reply_column:el.querySelector('.wh-category-reply').value}:{}),days:[...el.querySelectorAll('[data-day]:checked')].map(c=>Number(c.dataset.day)),dates:el.querySelector('.wh-category-dates').value.split(',').map(s=>s.trim()).filter(Boolean)}));}
 function wageHourlyAddTax(){const rows=wageHourlyReadTax();rows.push({min:rows.length?(rows.at(-1).max??0):0,max:null,amount:0});document.querySelector('#whTaxRows').innerHTML=wageHourlyTaxRows(rows);}
 function wageHourlyAddCategory(){
  const label=prompt(wageT('category_prompt','추가할 시급 구분 이름을 입력하세요. 예: 공휴일'));if(!label?.trim())return;

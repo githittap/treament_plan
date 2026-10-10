@@ -12,7 +12,7 @@ const {renderAll}=require('./fixtures/hub7-harness.cjs');
 const golden=Object.assign(JSON.parse(read('tests/fixtures/hub7-golden-f95b951.json')),JSON.parse(read('tests/fixtures/billing-monthly-golden.json')),JSON.parse(read('tests/fixtures/ai-cost-display-golden.json')));
 const clone=x=>JSON.parse(JSON.stringify(x));
 const CH7=/^(home|dep|cf|aic|mkt|aiu|ob|pay|slip|acct|jg|save|payreq|empdoc)\./;
-const COUNT=329+2-1+2+4; // 기존 글 + 인박스 판 글 2 - 원문 열 이름 1(화면에서 숨겼음) + 루커 단추 글·주소 2(10-08) + 다섯째·여섯째 판(AI 규칙 관계도·클로드→코덱스 브라우저 흐름) 글 4(10-08).
+const COUNT=329+2-1+2+4-1; // 기존 글 + 인박스 판 글 2 - 원문 열 이름 1(화면에서 숨겼음) + 루커 단추 글·주소 2(10-08) + 다섯째·여섯째 판(AI 규칙 관계도·클로드→코덱스 브라우저 흐름) 글 4(10-08).
 /* 2026-10-02 원장 보기판에 넷째 판(📥 인박스 경고)을 더함 — 옛 화면(f95b951)과의 차이는 기본 글 카드 한 장뿐이어야 한다.
    옛 화면 대조는 그 카드(그대로·JSON 한 번·두 번 감싼 꼴)만 빼고 글자 하나까지 같은지 본다. 카드가 실제로 붙는지는 아래 따로 시험. */
 const INBOX_CARD='<button type="button" class="card owner-board-card" data-owner-board="inbox" onclick="openOwnerBoard(\'inbox\')"><strong>📥 인박스 경고</strong><span>AI가 남긴 최근 경고·대기</span><small>아직 PC에서 올라오지 않음</small></button>';
@@ -63,7 +63,7 @@ function fakeSb(opts){
 }
 const dynRows=defs=>defs.map(d=>({key:d.key,value:'«'+d.key+'»'+(d.vars?' '+d.vars.map(v=>'{'+v+'}').join(' '):'')}));
 // 기존 차례 7 화면 대조 범위. 새 매니저 전용 글은 marketing-manager-ui.test.js에서 실제 화면으로 확인함.
-const ch7Defs=()=>helpers().hubTextDefs().filter(d=>CH7.test(d.key)&&!['mkt.manager_sub','mkt.view_unavailable','aic.auto_th_text'].includes(d.key));
+const ch7Defs=()=>helpers().hubTextDefs().filter(d=>CH7.test(d.key)&&!['mkt.manager_sub','mkt.view_unavailable','aic.auto_th_text','pay.m_skipped'].includes(d.key));
 const allOut=out=>Object.values(out).join('\n');
 const J=x=>JSON.parse(x);
 const run=(textRows,settings,o)=>renderAll(hr,Object.assign({engine:true,textRows:textRows||[],settings:settings||{}},o||{}));
@@ -91,18 +91,19 @@ test('차례 7 글 목록: 키 모양·중복 없음·{자리표시자} 일치·
   // 앞 차례 키와 겹치지 않음
   const h=helpers();
   const earlier=h.hubTextDefs().filter(d=>!CH7.test(d.key));
-  assert.equal(earlier.length+COUNT+2+1,h.hubTextDefs().length,'화면 글과 매니저 글 2개 및 남겨 둔 원문 열 이름 1개');
+  assert.equal(earlier.length+COUNT+2+2,h.hubTextDefs().length,'화면 글과 매니저 글 2개 및 남겨 둔 원문 열 이름 1개');
 });
 test('화면 코드(hr.html)에 박힌 기본 글이 기본값 목록과 글자까지 같고, 목록의 모든 키가 화면에서 쓰인다',()=>{
   const h=helpers(),found=new Map();
   const re=/\b(?:hubT|h7T|hubTE|acctT|jgT)\(\s*'((?:home|dep|cf|aic|mkt|aiu|ob|pay|slip|acct|jg|save|payreq|empdoc)\.[a-z0-9_.]+)'\s*,\s*('(?:[^'\\\n]|\\.)*')/g;
   let m;
-  while((m=re.exec(hr))){
+  while((m=re.exec(hr+'\n'+read('payroll-ledger-extra.js')))){
+    if(/^pay\.(extra|reply)\./.test(m[1]))continue;
     const v=vm.runInNewContext(m[2]);
     if(found.has(m[1]))assert.equal(found.get(m[1]),v,m[1]+' 같은 키를 두 곳에서 다른 기본 글로 씀');
     found.set(m[1],v);
   }
-  const defs=h.hubTextDefs().filter(d=>CH7.test(d.key)&&d.key!=='aic.auto_th_text');
+  const defs=h.hubTextDefs().filter(d=>CH7.test(d.key)&&!['aic.auto_th_text','pay.m_skipped'].includes(d.key));
   for(const d of defs){
     assert.ok(found.has(d.key),d.key+' 키가 hr.html에서 안 쓰임');
     assert.equal(found.get(d.key),d.def,d.key+' 기본 글이 화면 코드와 다름');

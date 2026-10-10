@@ -6,7 +6,7 @@ const apply=html.slice(html.indexOf('function applyAttendanceResolutions('),html
 const bounds=html.slice(html.indexOf('function attendanceMonthBounds('),html.indexOf('\n',html.indexOf('function attendanceMonthBounds(')));
 const pages=html.slice(html.indexOf('async function fetchAttendancePages('),html.indexOf('\n',html.indexOf('async function fetchAttendancePages(')));
 const plain=x=>JSON.parse(JSON.stringify(x));
-function ctx(extra={}){const c={ME:{id:'owner',role:'owner'},PROFILES:[],Intl,Date,Map,Set,esc:s=>String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x])),...extra};vm.createContext(c);vm.runInContext(apply+bounds+pages+payroll+summary,c);return c;}
+function ctx(extra={}){const c={ME:{id:'owner',role:'owner'},PROFILES:[],Intl,Date,Map,Set,hubT:(k,d)=>d,esc:s=>String(s??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x])),...extra};vm.createContext(c);vm.runInContext(apply+bounds+pages+payroll+summary,c);return c;}
 const employee=(id,name=id)=>({user_id:id,name,dept:'진료팀',role:'staff'});
 function fixture(){return {month:'2026-09',status:'집계중',employees:[employee('a','직원 A'),employee('b','직원 B'),employee('z','기록 없는 직원')],rows:[
  {id:1,user_id:'a',work_date:'2026-09-01',source:'fp',clock_in:'09:05',clock_out:'18:10',late_min:5,early_min:0,overtime_min:10},
@@ -66,4 +66,27 @@ test('늦게 도착한 이전 월 응답은 선택한 새 월의 요약·개인 
 });
 test('월 요약 진입은 원장에게만 노출하고 엑셀 다운로드는 최신 조회 결과를 사용한다',async()=>{
  const f=fixture(),{c,writes}=uiContext(database({att:f.rows,manual:f.manualRows,resolutions:f.resolutions}));assert.ok(c.attMonthlyCardHtml().includes('attMonthlyMonth'));c.ME.role='chief';assert.equal(c.attMonthlyCardHtml(),'');await c.exportAttMonthly();assert.equal(writes.length,0);c.ME.role='owner';await c.exportAttMonthly();assert.equal(writes.length,1);assert.equal(writes[0][1],'월근태요약_2026-09.xlsx');
+});
+
+test('회신용 조회만 전날 야간 근무를 승인 보정해 가져오고 월 요약 합계는 유지',async()=>{
+ const att=[{user_id:'past',work_date:'2026-09-30',source:'fp',clock_in:'23:00',clock_out:'01:00',overtime_min:60},{user_id:'now',work_date:'2026-10-02',source:'fp',clock_in:'09:00',clock_out:'18:00'}],resolutions=[{user_id:'past',work_date:'2026-09-30',approved_at:'2026-10-01T00:00:00Z',clock_in:'23:00',clock_out:'02:00',source:'issue_adjustment'}],sb=database({att,resolutions}),c=ctx({sb,PROFILES:[{...employee('past'),active:false},employee('now')]});
+ const m=await c.fetchAttMonthlyData('2026-10',true),past=m.employees.find(p=>p.userId==='past');
+ assert.equal(past.days.length,0);assert.equal(past.summary.workedDays,0);assert.equal(past.carryDays.length,1);assert.equal(past.carryDays[0].clockOut,'02:00');
+ assert.ok(sb.calls.filter(r=>r.table!=='att_months').every(r=>r.filters[0][2]==='2026-09-30'));
+ const reply=require('../payroll-reply.js').payrollReplyModel(plain(m),[{user_id:'past',effective_from:'2026-01-01',hourly_enabled:true}]);assert.equal(reply.hourly[0].weekdayWork,2);assert.ok(reply.basis.some(r=>r[0]==='past'&&r[2]==='2026-09-30'));
+ const normal=await c.fetchAttMonthlyData('2026-10');assert.equal(normal.employees.find(p=>p.userId==='past').carryDays,undefined);
+});
+
+test('회신 시급 시각은 최신 정정·소명 중 시각과 ID로 고르고 일반 요약을 보존한다',()=>{
+ const c=ctx(),row={user_id:'a',work_date:'2026-09-04',source:'fp',clock_in:'23:00',clock_out:'08:00'},manual={...row,id:'9007199254740993',status:'원장확정',hourly_correction:true,created_at:'2026-09-05T01:00:00.123456Z',clock_out:'07:00'},resolution={...row,id:'9007199254740992',source:'issue_adjustment',approved_at:'2026-09-05T01:00:00.123456Z',clock_out:'06:00'};
+ const model=(m=[manual],r=[resolution])=>c.attMonthlyModel({month:'2026-09',rows:[row],manualRows:m,resolutions:r,employees:[employee('a')],forReply:true}).employees[0];
+ assert.equal(model().replyDays[0].clockOut,'07:00');
+ c.hubT=(k,d)=>k==='pay.reply.hourly_correction_basis'?'고친 시각':d;assert.equal(model().replyDays[0].basis,'고친 시각');
+ assert.equal(model().days[0].clockOut,'06:00','일반 월 요약의 소명 적용은 그대로 둠');
+ assert.equal(model([manual],[{...resolution,approved_at:'2026-09-05T01:00:00.123457Z'}]).replyDays[0].clockOut,'06:00');
+ assert.equal(model([{...manual,created_at:'2026-09-05T10:00:00.123457+09:00'}]).replyDays[0].clockOut,'07:00');
+ assert.equal(model([{...manual,status:'대기'}],[]).replyDays[0].clockOut,'08:00');
+ assert.equal(model([{...manual,hourly_correction:false}],[]).replyDays[0].clockOut,'08:00');
+ assert.equal(model([],[{...resolution,approved_at:null}]).replyDays[0].clockOut,'06:00','DB처럼 null 시각도 보정 후보임');
+ assert.equal(model([manual],[{...resolution,approved_at:null}]).replyDays[0].clockOut,'06:00');
 });

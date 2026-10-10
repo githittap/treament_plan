@@ -208,7 +208,7 @@ test('아래줄은 고른 묶음의 탭들이고, 자식 있는 탭은 자기 �
 });
 
 test('옛 탭 id·딥링크는 그대로이고, 상담 화면 2개가 메뉴에 올라왔다', () => {
-  assert.match(hr, /function go\(k\)\{if\(k==='leavestatus'\)\{k='calendar';CAL_VIEW='leave';\}TAB=k;renderNav\(\);render\(\);\}/);
+  assert.match(hr, /function go\(k\)\{[^\n]*if\(k==='leavestatus'\)\{k='calendar';CAL_VIEW='leave';\}TAB=k;renderNav\(\);render\(\);\}/);
   assert.match(hr, /onclick="go\(\\'consult\\'\)"/);   // 홈 카드의 상담일지 바로가기는 그대로
   const h = harness({ role: 'owner', tab: 'consult' });
   h.ctx.renderNav();

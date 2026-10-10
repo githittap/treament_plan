@@ -119,7 +119,7 @@ function tablesDefault(){
     marketing_expense_events:{list:MKT_EVENTS},marketing_month_budgets:{single:{month:'2026-10-01',amount_krw:100000}},marketing_merchant_rules:{list:MKT_RULES},marketing_foreign_charge_links:{list:MKT_LINKS},
     owner_boards:{list:OWNER_BOARD_ROWS,single:{html:'<html><head></head><body>판</body></html>',synced_at:'2026-09-30T01:02:00Z'}},
     wage_info:{list:WAGES},
-    payroll_rows:{list:[{id:1,user_id:'u1'}],single:PAY_ROW_SAVED},payroll_row_archive:{list:[{archive_id:1}]},
+    payroll_rows:{list:[{id:1,user_id:'u1'}],single:PAY_ROW_SAVED},payroll_row_archive:{list:[{archive_id:1,archived_at:'2026-10-01T00:00:00+00:00'}]},
     payroll_uploads:{list:[{id:'up1',file_name:'급여<대장>.xlsx',size_bytes:10,sha256:'abc',uploaded_at:'2026-10-01T01:00:00Z',storage_path:'a/b.xlsx'}],single:{file_name:'f.xlsx',storage_path:'a/b.xlsx',sha256:'abc'}},
     attendance:{list:[{work_date:'2026-10-01',source:'fp',clock_in:'10:00',clock_out:'19:00',overtime_min:30,evening:false,is_holiday:false}]},
     attendance_manual_entries:{list:[]},attendance_issue_resolutions:{list:[]},
@@ -132,7 +132,7 @@ function makeSb(over,rec){
   const tables=Object.assign(tablesDefault(),o.tables||{});
   const sb={
     from(t){return chain(tables[t]||{list:[],single:null},rec,t,limits);},
-    rpc(name,args){rpcCalls.push([name,args]);const r=(o.rpc||{})[name];return Promise.resolve(r!==undefined?(typeof r==='function'?r(args):r):{data:3,error:null});},
+    rpc(name,args){rpcCalls.push([name,args]);if(name==='payroll_save_month')return Promise.resolve({data:3,error:tables.payroll_rows.error||null});const r=(o.rpc||{})[name];return Promise.resolve(r!==undefined?(typeof r==='function'?r(args):r):{data:3,error:null});},
     storage:{from(b){return {upload(p){stor.push(['upload',b,String(p).replace(/[0-9a-f-]{36}/,'UUID')]);return Promise.resolve({error:(o.storage&&o.storage.upload)||null});},download(p){stor.push(['download',b,p]);return Promise.resolve((o.storage&&o.storage.download)||{data:null,error:{message:'없음<파일>'}});}};}},
     functions:{invoke(name,args){fn.push([name,JSON.parse(JSON.stringify(args))]);return Promise.resolve({data:{ok:true,message:'삭제함'},error:null});}}
   };
@@ -204,7 +204,8 @@ async function renderAll(html,opts){
         await ctx.HubUi.load({from(){const api={select(){return api;},then(res,rej){return Promise.resolve(o.loadFail?{data:null,error:{message:'x'}}:{data:o.textRows,error:null}).then(res,rej);}};return api;}});
       }
     }
-    vm.runInContext('let BADGE={notice:2};let MY_PAYSLIPS=[];let DEP_RANGE="month";let PAY_VIEW="ledger",PAY_MONTH="",PAY_ROWS=[],PAY_COLUMNS=[],PAY_MESSAGE="",PAY_WAGE_LATEST={},PAY_SOURCE_FILE=null;let PAY_SLIP_USER="",PAY_SLIP_HTML="";let SETTINGS={};let PAYMENT_RECEIPT_PREVIEWS=[];let EMPLOYEE_CONTRACT_PREVIEWS={};let CONTRACT_SHOW_CANCELLED=false;\n'
+    if(text.includes('payrollParseMain(aoa)')){vm.runInContext(fs.readFileSync(path.join(__dirname,'../../payroll-bonus.js'),'utf8').split('function bonusT(')[0].replace("if(typeof globalThis!=='undefined')globalThis.HUB_BONUS_CATALOG=true;",'')+fs.readFileSync(path.join(__dirname,'../../payroll-ledger-extra.js'),'utf8'),ctx);}
+    vm.runInContext('let BADGE={notice:2};let MY_PAYSLIPS=[];let DEP_RANGE="month";let PAY_VIEW="ledger",PAY_MONTH="",PAY_ROWS=[],PAY_COLUMNS=[],PAY_MESSAGE="",PAY_WAGE_LATEST={},PAY_SOURCE_FILE=null,PAY_SAVING=false,PAY_BUSY="",PAY_READ_ID=0;let PAY_SLIP_USER="",PAY_SLIP_HTML="";let SETTINGS={};let PAYMENT_RECEIPT_PREVIEWS=[];let EMPLOYEE_CONTRACT_PREVIEWS={};let CONTRACT_SHOW_CANCELLED=false;\n'
       +hubTLine+'\n'+hubNLine+'\n'+hubTELine+'\n'+timeSrc+'\n'+helperSrc+'\n'+setStatusSrc+'\n'
       +homeSrc+'\n'+confSrc+'\n'+aiPaySrc+'\n'+ownerSrc+'\n'+jgSrc+'\n'+contractStatusSrc+'\n'+payReqSrc+'\n'+prevEmpSrc+'\n'+docCardSrc+'\n'
       +';this.api={renderHome,renderDeposit,renderConfid,filterConfid,submitConfidRecord,aiUsagePanelHtml,aiCostSectionHtml,aiExternalSectionHtml,aiSessionSectionHtml,aiUsageSummary,aiUsageWindow,'
@@ -372,7 +373,7 @@ async function renderAll(html,opts){
       ['ok',[['성명','기본급','식대','지급액계','공제액계','차인지급액'],['김직원',3000000,200000,3200000,100000,3100000],['없는사람',1,2,3,4,5]],null],
       ['mapfail',[['성명','기본급','차인지급액'],['김직원',1,2]],{tables:{app_settings:{error:{message:'매핑<오류>'}}}}]]){
     const r=await asRole('owner',null,sbOver);
-    const res=await r.api.buildPayrollPreview(aoa);await flush();
+    const res=await r.api.buildPayrollPreview(aoa,{month:r.api.get('PAY_MONTH'),id:0});await flush();
     out['pay.preview.'+name]=jj([res,r.api.get('PAY_MESSAGE'),r.statuses,r.log]);
   }
   for(const [name,state,sbOver] of [['empty',{},null],['rows',{rows:true,file:true,msg:'메시지<m>'},null],['upload_err',{rows:true},{tables:{payroll_uploads:{error:{message:'목록<오류>'},list:[]}}}],['no_saved',{},{tables:{payroll_rows:{list:[]},payroll_row_archive:{list:[]},payroll_uploads:{list:[]}}}]]){
@@ -393,7 +394,7 @@ async function renderAll(html,opts){
     if(state.rows)r.api.set('PAY_ROWS',state.rows);
     if(state.file)r.api.set('PAY_SOURCE_FILE',state.file);
     await r.api.savePayrollRows();await flush();
-    out['pay.saverows.'+name]=jj([r.api.get('PAY_MESSAGE'),r.log,r.statuses,r.rec,r.ctx.sb.stor]);
+    out['pay.saverows.'+name]=jj([r.api.get('PAY_MESSAGE'),r.log,r.statuses,r.rec,r.ctx.sb.stor,r.ctx.sb.rpcCalls]);
   }
   for(const [name,file,sbOver] of [['bad_ext',{name:'a.txt',size:5,type:'t',arrayBuffer:async()=>new ArrayBuffer(1)},null],['too_big',{name:'a.xlsx',size:20971521,type:'t',arrayBuffer:async()=>new ArrayBuffer(1)},null],['record_fail',{name:'a.xlsx',size:5,type:'t',arrayBuffer:async()=>new ArrayBuffer(1)},{tables:{payroll_uploads:{error:{message:'등록<오류>'}}}}]]){
     const r=await asRole('owner',null,sbOver);

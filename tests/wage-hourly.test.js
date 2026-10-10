@@ -35,10 +35,15 @@ test('새 시급 문구는 모두 기존 허브 설정에 등록되며 캐시 �
  const js=read('wage-hourly.js'),texts=read('hub-texts.js'),hr=read('hr.html');
  const keys=[...js.matchAll(/wageT\('([^']+)'/g)].map(m=>m[1]);
  keys.forEach(k=>assert.ok(texts.includes("'wh."+k+"'"),k));
- assert.match(hr,/wage-hourly.js\?v=20261004/);assert.match(hr,/await wageHourlyHome\(/);assert.match(hr,/await renderWageHourly\(/);
+ assert.match(hr,/wage-hourly.js\?v=2026101004/);assert.match(hr,/await wageHourlyHome\(/);assert.match(hr,/await renderWageHourly\(/);
  assert.match(hr,/hub-texts.js\?v=202610\d{4}/);
 });
 test('설정 화면은 평일·주말 시급·가입 여부·공제율을 입력할 수 있다',()=>{
  const config={settings:{categories:[{code:'weekday',label:'평일',days:[1,2,3,4,5],dates:[]},{code:'weekend',label:'주말',days:[0,6],dates:[]}],deductions:{pension:0.0475,health:0.03595,ltc_health:0.1314,employment:0.009,local_income:0.1},income_tax:[]},employees:[{user_id:'self',name:'합성직원',enabled:true,rates:{weekday:10000,weekend:12000},insured:false,effective_from:'2026-10-01'}]};
  const h=ctx('owner').api.wageHourlyConfigHtml(config);assert.match(h,/10000/);assert.match(h,/12000/);assert.match(h,/4.75/);assert.match(h,/4대보험/);
+});
+
+test('회신 시간 칸의 지정값은 화면에 보이고 저장 설정으로 다시 읽힘',()=>{
+ const c=ctx('owner'),r={code:'holiday',label:'공휴일',days:[],dates:['2026-09-05'],reply_column:'weekday'};assert.match(c.wageHourlyCategoryRows([r]),/value="weekday" selected/);
+ const values={'.wh-category-label':{value:r.label},'.wh-category-dates':{value:r.dates[0]},'.wh-category-reply':{value:'weekday'}};c.document={querySelectorAll:()=>[{dataset:{code:r.code},querySelector:k=>values[k],querySelectorAll:()=>[]}]};const read=c.wageHourlyReadCategories()[0];assert.equal(read.reply_column,'weekday');assert.equal(read.dates[0],r.dates[0]);
 });

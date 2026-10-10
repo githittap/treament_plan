@@ -82,8 +82,9 @@ try{
   await as('staff');r=await month();eq(r.users[0].net,null);eq(r.users[0].needs_review,true);
   await as('owner');await q(`select public.wage_hourly_correct('${ids.staff}','2026-10-06','09:00','09:00','누락 확인: 근무 없음')`);
   r=await month();eq(r.users[0].net,27666);
-  const special={...changed,categories:[...changed.categories,{code:'holiday',label:'공휴일',days:[],dates:['2026-10-05']}]};
+  const special={...changed,categories:[...changed.categories,{code:'holiday',label:'공휴일',days:[],dates:['2026-10-05'],reply_column:'weekday'}]};
   await q(`select public.wage_hourly_save_config('${JSON.stringify(special)}')`);
+  eq((await q('select public.wage_hourly_config() v'))[0].v.settings.categories.find(c=>c.code==='holiday').reply_column,'weekday');
   await q(`select public.wage_hourly_save_employee('${ids.staff}','2026-10-01',true,'{"weekday":10000,"weekend":15000,"holiday":18000}',true)`);
   r=await month();eq(r.users[0].days.find(d=>d.date==='2026-10-05').net,20400);
   await q(`select public.wage_hourly_save_config('${JSON.stringify(changed)}')`);
