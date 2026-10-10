@@ -12,6 +12,7 @@
  *                    새 그림은 slideNNN.<해시8자>.webp 라는 새 이름으로 올려 옛 그림을 덮어쓰지 않음(옛 그림은 보관함에 남음)
  *   --append         이미 올라간 덱(--deck-id 필수)에 「아직 가져온 적 없는」 srcSlide 의 장만 뒤에 덧붙임. 덱 JSON 의 importedSrc(지금까지 가져온 srcSlide 목록)에 있는 장은
  *                    지금 덱에 없어도(허브에서 지운 것) 다시 붙이지 않음. importedSrc 가 없는 옛 덱은 현재 장들의 srcSlide 로 시작함
+ *   --init-imported  (--append 와 함께) importedSrc 가 없는 옛 덱에서만 필요. 없이는 --append 를 거절함. 현재 덱의 가장 큰 srcSlide 이하 번호는 모두 가져온 것으로 봄
  *   --force-src 84,85  (--append 와 함께) 지운 장이라도 정말 다시 넣고 싶은 장 번호
  *   (--update-images 와 --append 는 함께 쓸 수 있음)
  * 안전 규칙
@@ -51,7 +52,7 @@ export function parseArgs(argv) {
     if (!k.startsWith('--')) throw new Error('알 수 없는 인수: ' + k);
     const name = k.slice(2);
     if (valued.has(name)) { if (i + 1 >= argv.length) throw new Error(k + ' 값이 없음'); a.opt[name] = argv[++i]; }
-    else if (['dry-run', 'execute', 'update-images', 'append'].includes(name)) a.flags.add(name);
+    else if (['dry-run', 'execute', 'update-images', 'append', 'init-imported'].includes(name)) a.flags.add(name);
     else throw new Error('알 수 없는 옵션: ' + k);
   }
   return a;
@@ -70,13 +71,19 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /* 올릴 계획 만들기(파일 읽기만, 네트워크 없음) */
 /* only: 충돌 재시도용 고정 목록({append:Set, update:Set} — 첫 조회 때 정한 대상). 있으면 그 목록 밖의 장은 건드리지 않음(그 사이 허브에서 지운 장을 되살리지 않음) */
-export function buildPlan({ deck, imagesDir, mode, existing, only = null, force = null, fsImpl = fs }) {
+export function buildPlan({ deck, imagesDir, mode, existing, only = null, force = null, initImported = false, fsImpl = fs }) {
   const bySrc = new Map();
   (existing ? existing.slides : []).forEach((s, i) => { if (s.srcSlide != null) bySrc.set(s.srcSlide, i); });
   const items = [], problems = [], skipped = [], hubGone = [];
   const result = existing ? JSON.parse(JSON.stringify(existing)) : { meta: { title: deck.title || '' }, slides: [] };
-  /* importedSrc: 지금까지 가져온 srcSlide 목록 — 허브에서 지운 장도 남아 있어 --append 가 되살리지 않음. 없는 옛 덱은 현재 장들의 srcSlide 로 시작 */
-  if (existing && !Array.isArray(result.importedSrc)) result.importedSrc = existing.slides.map(s => s.srcSlide).filter(v => v != null);
+  /* importedSrc: 지금까지 가져온 srcSlide 목록 — 허브에서 지운 장도 남아 있어 --append 가 되살리지 않음.
+     없는 옛 덱은 --append 를 거절하고 --init-imported 를 요구함(옛 덱은 이미 지운 장을 알 수 없어 새 장으로 착각해 되살릴 수 있음).
+     --init-imported 는 보수적으로: 현재 장들의 가장 큰 srcSlide 이하 번호는 전부 「가져온 적 있음」으로 보고 그 뒤 번호만 새 장으로 붙임 */
+  if (existing && mode.append && !Array.isArray(result.importedSrc)) {
+    if (!initImported) throw new Error('이 덱에는 importedSrc(가져온 장 목록)가 없어 --append 를 거절함 — 지운 장을 새 장으로 착각해 되살릴 수 있기 때문. 그래도 진행하려면 --init-imported 를 함께 줌(현재 덱의 가장 큰 srcSlide 이하 번호는 모두 가져온 것으로 보고 그보다 큰 번호만 붙임). 더 앞 번호를 넣으려면 --force-src');
+    const nums = existing.slides.map(s => s.srcSlide).filter(v => Number.isInteger(v)), mx = nums.length ? Math.max(...nums) : 0;
+    result.importedSrc = Array.from({ length: mx }, (_, i) => i + 1);
+  }
   const imported = new Set(result.importedSrc || []);
   deck.slides.forEach((s, i) => {
     const file = s.image && s.image.file;
@@ -114,9 +121,12 @@ export function applyPlan(plan, deckId) {
       const s = JSON.parse(JSON.stringify(it.slide)); s.image = image; slides.push(s);
     }
   }
-  const done = new Set(plan.result.importedSrc || []);
-  for (const it of plan.items) if (it.srcSlide != null && it.action !== 'update') done.add(it.srcSlide);
-  plan.result.importedSrc = [...done].sort((x, y) => x - y);
+  /* 목록이 이미 있거나(append·새 덱) 새로 가져온 장이 있을 때만 갱신 — update-images 만 한 옛 덱에는 목록을 새로 만들지 않음(빈 목록이 「다 가져옴」으로 오해되지 않게) */
+  if (Array.isArray(plan.result.importedSrc) || plan.items.some(it => it.action !== 'update')) {
+    const done = new Set(plan.result.importedSrc || []);
+    for (const it of plan.items) if (it.srcSlide != null && it.action !== 'update') done.add(it.srcSlide);
+    plan.result.importedSrc = [...done].sort((x, y) => x - y);
+  }
   return warnings;
 }
 function mb(n) { return (n / 1048576).toFixed(2) + 'MB'; }
@@ -129,7 +139,8 @@ export async function run(argv, deps = {}) {
   const existingMode = mode.updateImages || mode.append;
   const execute = a.flags.has('execute') && !a.flags.has('dry-run');
   if (existingMode && !UUID.test(a.opt['deck-id'] || '')) throw new Error('--update-images / --append 는 --deck-id <uuid> 가 필요함');
-  const force = new Set();
+  const force = new Set(), initImported = a.flags.has('init-imported');
+  if (initImported && !mode.append) throw new Error('--init-imported 는 --append 와 함께만 씀');
   if (a.opt['force-src'] != null) {
     if (!mode.append) throw new Error('--force-src 는 --append 와 함께만 씀');
     for (const t of a.opt['force-src'].split(',')) { if (!/^\d+$/.test(t.trim())) throw new Error('--force-src 는 84,85 처럼 장 번호 목록이어야 함'); force.add(+t.trim()); }
@@ -165,7 +176,7 @@ export async function run(argv, deps = {}) {
     // 시험 출력용: 기존 덱 없이 후보 전체를 보여 줌
     plan = buildPlan({ deck, imagesDir: a.opt.images, mode, existing: null, force, fsImpl });
     plan.items.forEach(it => { it.action = mode.updateImages ? 'update?' : 'append?'; if (mode.updateImages) it.uploadName = it.file.replace(/\.webp$/i, '') + '.' + it.sha.slice(0, 8) + '.webp'; });
-  } else plan = buildPlan({ deck, imagesDir: a.opt.images, mode, existing: existingRow && existingRow.deck, force, fsImpl });
+  } else plan = buildPlan({ deck, imagesDir: a.opt.images, mode, existing: existingRow && existingRow.deck, force, initImported, fsImpl });
 
   const total = plan.items.reduce((n, it) => n + it.bytes, 0);
   log(`${execute ? '[실행]' : '[dry-run]'} 덱 id ${deckId} · 모드 ${existingMode ? [mode.updateImages && 'update-images', mode.append && 'append'].filter(Boolean).join('+') : '새 덱'} · 올릴 그림 ${plan.items.length}장 ${mb(total)} · 건너뜀 ${plan.skipped.length}장`);
@@ -231,7 +242,7 @@ export async function run(argv, deps = {}) {
     log(`충돌: 읽은 뒤 허브에서 덱이 고쳐짐 — 다시 읽어 처음 정한 대상만 다시 적용 — 그 사이 지워진 장은 되살리지 않음(${attempt}/3)`);
     existingRow = await readRow();
     if (!existingRow) throw new Error('덱이 그 사이 지워졌음: ' + deckId);
-    plan = buildPlan({ deck, imagesDir: a.opt.images, mode, existing: existingRow.deck, only: pinned, force, fsImpl });
+    plan = buildPlan({ deck, imagesDir: a.opt.images, mode, existing: existingRow.deck, only: pinned, force, initImported, fsImpl });
     if (plan.problems.length) throw new Error('다시 읽은 뒤 문제: ' + plan.problems.join(' / '));
   }
   log(`완료: 그림 올림 ${stat.uploaded}장 · 이미 있어 건너뜀 ${stat.same}장 (${mb(total)}) · 덱 ${existingMode ? '갱신' : '추가(비공개)'} ${deckId}`);

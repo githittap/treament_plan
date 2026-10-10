@@ -139,17 +139,17 @@ test('[5] --append 중간 실패 뒤 같은 명령 재실행: 이미 올린 같�
   const { run } = await load(); const dir = workdir();
   const base = { meta: { title: 't' }, slides: [{ type: 'photo', title: '직접', image: { path: `${ID}/mine.webp`, w: 1, h: 1 }, marks: [] }] };
   const sb = fakeSb({ rows: { [ID]: hubRow(base) } }); sb.failUploadAt = 2;
-  await assert.rejects(run(args(dir, '--execute', '--append', '--deck-id', ID, '--concurrency', '1'), { fetch: sb.fetch, log() { }, env }), e => /HTTP 500/.test(e.message) && /같은 그림은 건너뛰고 이어서/.test(e.message));
+  await assert.rejects(run(args(dir, '--execute', '--append', '--init-imported', '--deck-id', ID, '--concurrency', '1'), { fetch: sb.fetch, log() { }, env }), e => /HTTP 500/.test(e.message) && /같은 그림은 건너뛰고 이어서/.test(e.message));
   assert.deepEqual(Object.keys(sb.objects), [`${ID}/slide001.webp`], '첫 장만 올라가 있음'); assert.equal(sb.rows[ID].deck.slides.length, 1, '표는 아직 그대로');
   const out = [];
-  const r = await run(args(dir, '--execute', '--append', '--deck-id', ID, '--concurrency', '1'), { fetch: sb.fetch, log: s => out.push(s), env });
+  const r = await run(args(dir, '--execute', '--append', '--init-imported', '--deck-id', ID, '--concurrency', '1'), { fetch: sb.fetch, log: s => out.push(s), env });
   assert.equal(r.same, 1, '이미 올라간 같은 사진은 건너뜀'); assert.equal(r.uploads, 2); assert.equal(sb.upsertRequests, 0);
   assert.deepEqual(sb.rows[ID].deck.slides.map(s => s.srcSlide), [undefined, 1, 2, 3]); assert.match(out.join('\n'), /이미 있어 건너뜀 1장/);
   // 같은 이름인데 내용이 다른 사진이 있으면 멈춤(덮지 않음)
   const bad = fakeSb({ rows: { [ID]: hubRow(base) }, objects: { [`${ID}/slide002.webp`]: 'DIFFERENT' } });
-  await assert.rejects(run(args(dir, '--execute', '--append', '--deck-id', ID), { fetch: bad.fetch, log() { }, env }), /덮어쓰지 않고 멈춤/); assert.equal(bad.objects[`${ID}/slide002.webp`].toString(), 'DIFFERENT');
+  await assert.rejects(run(args(dir, '--execute', '--append', '--init-imported', '--deck-id', ID), { fetch: bad.fetch, log() { }, env }), /덮어쓰지 않고 멈춤/); assert.equal(bad.objects[`${ID}/slide002.webp`].toString(), 'DIFFERENT');
   // 이미 반영된(srcSlide 가 표에 있는) 장은 다시 하면 건너뜀 — 연속 두 번 실행해도 장이 중복되지 않음
-  const again = await run(args(dir, '--execute', '--append', '--deck-id', ID), { fetch: sb.fetch, log() { }, env }); assert.equal(again.plan.items.length, 0); assert.equal(sb.rows[ID].deck.slides.length, 4);
+  const again = await run(args(dir, '--execute', '--append', '--init-imported', '--deck-id', ID), { fetch: sb.fetch, log() { }, env }); assert.equal(again.plan.items.length, 0); assert.equal(sb.rows[ID].deck.slides.length, 4);
 });
 
 test('실제 가져오기 결과 deck.json(317장) dry-run: 그림이 모두 있고 합계가 50MB 안쪽 · 없으면 건너뜀(PC에 결과가 있을 때만)', async (t) => {
@@ -167,24 +167,24 @@ test('[2차-2] 충돌 재시도에서 그 사이 허브에서 지운 장을 되�
   // (a) --append: 입력 [1,2,3], 기존 [1,2] → 첫 조회 때 붙일 대상은 [3]. 원장이 1을 지운 뒤 재시도 → 1이 새 장으로 되살아나면 안 됨 → [2,3]
   let n = 0;
   const a = fakeSb({ rows: { [ID]: hubRow({ meta: { title: 't' }, slides: [ex(1), ex(2)] }) }, hooks: { beforePatch: st => { if (n++ === 0) { st.rows[ID].deck.slides = st.rows[ID].deck.slides.filter(s => s.srcSlide !== 1); st.rows[ID].updated_at = '2026-10-10T00:00:09+00:00'; } } } });
-  const ra = await run(args(dir, '--execute', '--append', '--deck-id', ID), { fetch: a.fetch, log() { }, env });
+  const ra = await run(args(dir, '--execute', '--append', '--init-imported', '--deck-id', ID), { fetch: a.fetch, log() { }, env });
   assert.equal(ra.attempts, 2); assert.deepEqual(srcs(a.rows[ID].deck), [2, 3], '지워진 1은 되살아나지 않고, 첫 조회 때 정한 3만 붙음');
   assert.equal(a.rows[ID].deck.slides[0].marks[0].text, '내 글 2');
   assert.ok(!a.objects[`${ID}/slide001.webp`], '되살리지 않았으니 1번 그림도 올리지 않음');
   // (b) --update-images + --append: 입력 [1,2,3], 기존 [1,2] → 1·2 그림 교체, 3 추가. 원장이 1을 지움 → 재시도: 1은 되살리지 않고(교체도 없음) 2·3만 반영 → [2,3]
   n = 0;
   const b = fakeSb({ rows: { [ID]: hubRow({ meta: { title: 't' }, slides: [ex(1), ex(2)] }) }, hooks: { beforePatch: st => { if (n++ === 0) { st.rows[ID].deck.slides = st.rows[ID].deck.slides.filter(s => s.srcSlide !== 1); st.rows[ID].updated_at = '2026-10-10T00:00:09+00:00'; } } } });
-  await run(args(dir, '--execute', '--update-images', '--append', '--deck-id', ID), { fetch: b.fetch, log() { }, env });
+  await run(args(dir, '--execute', '--update-images', '--append', '--init-imported', '--deck-id', ID), { fetch: b.fetch, log() { }, env });
   const bd = b.rows[ID].deck; assert.deepEqual(srcs(bd), [2, 3]);
   assert.match(bd.slides[0].image.path, /slide002\.[0-9a-f]{8}\.webp$/, '2는 그림만 교체'); assert.equal(bd.slides[0].marks[0].text, '내 글 2'); assert.equal(bd.slides[1].image.path, `${ID}/slide003.webp`);
   // (c) 대조: 재시도에서 지워진 게 없으면 처음 정한 대로 [1,2,3]
   n = 0;
   const c = fakeSb({ rows: { [ID]: hubRow({ meta: { title: 't' }, slides: [ex(1), ex(2)] }) }, hooks: { beforePatch: st => { if (n++ === 0) st.rows[ID].updated_at = '2026-10-10T00:00:09+00:00'; } } });
-  await run(args(dir, '--execute', '--append', '--deck-id', ID), { fetch: c.fetch, log() { }, env }); assert.deepEqual(srcs(c.rows[ID].deck), [1, 2, 3]);
+  await run(args(dir, '--execute', '--append', '--init-imported', '--deck-id', ID), { fetch: c.fetch, log() { }, env }); assert.deepEqual(srcs(c.rows[ID].deck), [1, 2, 3]);
   // (d) 그 사이 원장이 같은 srcSlide 장을 직접 넣었으면 중복해서 또 붙이지 않음
   n = 0;
   const d = fakeSb({ rows: { [ID]: hubRow({ meta: { title: 't' }, slides: [ex(1), ex(2)] }) }, hooks: { beforePatch: st => { if (n++ === 0) { st.rows[ID].deck.slides.push(ex(3)); st.rows[ID].updated_at = '2026-10-10T00:00:09+00:00'; } } } });
-  await run(args(dir, '--execute', '--append', '--deck-id', ID), { fetch: d.fetch, log() { }, env }); assert.deepEqual(srcs(d.rows[ID].deck), [1, 2, 3]);
+  await run(args(dir, '--execute', '--append', '--init-imported', '--deck-id', ID), { fetch: d.fetch, log() { }, env }); assert.deepEqual(srcs(d.rows[ID].deck), [1, 2, 3]);
 });
 
 test('[3차-2] --append 는 importedSrc(가져온 적 있는 srcSlide) 에 없는 장만 붙인다 — 허브에서 지운 장은 새 명령·새 실행에서도 되살아나지 않고, --force-src 로만 다시 넣는다', async () => {
@@ -211,12 +211,30 @@ test('[3차-2] --append 는 importedSrc(가져온 적 있는 srcSlide) 에 없�
   assert.deepEqual(srcs(fl.rows[ID].deck), [2, 3], '지운 1은 되살아나지 않고 새 장 3만 붙음'); assert.deepEqual(fl.rows[ID].deck.importedSrc, [1, 2, 3]);
   // (5) importedSrc 가 없는 옛 덱: 현재 장들의 srcSlide 로 시작해 저장, --update-images 만 해도 목록이 생김
   const old = fakeSb({ rows: { [ID]: hubRow({ meta: { title: 't' }, slides: [ex(1), ex(2)] }) } });
-  await run(args(dir, '--execute', '--append', '--deck-id', ID), { fetch: old.fetch, log() { }, env }); assert.deepEqual(old.rows[ID].deck.importedSrc, [1, 2, 3]);
+  await assert.rejects(run(args(dir, '--execute', '--append', '--deck-id', ID), { fetch: old.fetch, log() { }, env }), /importedSrc.*--init-imported/); assert.equal(old.calls.filter(c => c.method === 'POST').length, 0, '거절은 사진을 올리기 전');
+  await run(args(dir, '--execute', '--append', '--init-imported', '--deck-id', ID), { fetch: old.fetch, log() { }, env }); assert.deepEqual(old.rows[ID].deck.importedSrc, [1, 2, 3]);
   const old2 = fakeSb({ rows: { [ID]: hubRow({ meta: { title: 't' }, slides: [ex(1)] }) } });
-  await run(args(dir, '--execute', '--update-images', '--deck-id', ID), { fetch: old2.fetch, log() { }, env }); assert.deepEqual(old2.rows[ID].deck.importedSrc, [1]);
+  await run(args(dir, '--execute', '--update-images', '--deck-id', ID), { fetch: old2.fetch, log() { }, env }); assert.equal(old2.rows[ID].deck.importedSrc, undefined, 'update-images 만 한 옛 덱에는 목록을 새로 만들지 않음');
   // (6) --force-src 는 --append 와 함께만, 장 번호 목록 모양만
   await assert.rejects(run(args(dir, '--force-src', '2'), { log() { } }), /--append 와 함께/);
   await assert.rejects(run(args(dir, '--append', '--deck-id', ID, '--force-src', 'a,b'), { log() { } }), /장 번호 목록/);
   // 제작기가 덱을 저장할 때 importedSrc 를 지우지 않음
   const maker = fs.readFileSync(path.join(root, '설명덱_제작기.html'), 'utf8'); assert.match(maker, /const c = JSON\.parse\(JSON\.stringify\(d\)\);/, '덱 전체를 복사해 저장(importedSrc 보존)');
+});
+
+test('[4차-3] 업로더: importedSrc 없는 덱의 --append 는 거절하고 --init-imported 때만 보수적으로 시작(가장 큰 srcSlide 이하 번호는 가져온 것으로 봄)', async () => {
+  const { run } = await load(); const dir = workdir();
+  fs.copyFileSync(path.join(dir, 'images', 'slide001.webp'), path.join(dir, 'images', 'slide004.webp'));
+  const dj = JSON.parse(fs.readFileSync(path.join(dir, 'deck.json'), 'utf8')); dj.slides.push({ ...dj.slides[0], srcSlide: 4, image: { file: 'slide004.webp' }, title: '장4' }); fs.writeFileSync(path.join(dir, 'deck.json'), JSON.stringify(dj));
+  const old = () => ({ meta: { title: 't' }, slides: [{ type: 'photo', title: '허브 1', srcSlide: 1, image: imgOf(1), marks: [] }, { type: 'photo', title: '허브 3', srcSlide: 3, image: imgOf(3), marks: [] }] });   // 2는 옛날에 허브에서 지워짐(목록 없음)
+  const a = fakeSb({ rows: { [ID]: hubRow(old()) } });
+  await assert.rejects(run(args(dir, '--execute', '--append', '--deck-id', ID), { fetch: a.fetch, log() { }, env }), /importedSrc.*--append 를 거절.*--init-imported/);
+  assert.equal(a.calls.filter(c => c.method !== 'GET').length, 0, '거절은 아무것도 올리거나 쓰기 전'); assert.equal(a.rows[ID].deck.importedSrc, undefined);
+  const b = fakeSb({ rows: { [ID]: hubRow(old()) } }), out = [];
+  await run(args(dir, '--execute', '--append', '--init-imported', '--deck-id', ID), { fetch: b.fetch, log: s => out.push(s), env });
+  assert.deepEqual(b.rows[ID].deck.slides.map(s => s.srcSlide), [1, 3, 4], '옛날에 지워진 2(가장 큰 번호 3 이하)는 되살리지 않고, 그보다 큰 새 번호 4만 붙음');
+  assert.deepEqual(b.rows[ID].deck.importedSrc, [1, 2, 3, 4]); assert.ok(out.some(l => /다시 붙이지 않음: 장 2/.test(l)));
+  // 앞 번호를 정말 넣고 싶으면 --force-src
+  await run(args(dir, '--execute', '--append', '--init-imported', '--force-src', '2', '--deck-id', ID), { fetch: fakeSb({ rows: { [ID]: hubRow(old()) } }).fetch, log() { }, env });
+  await assert.rejects(run(args(dir, '--execute', '--init-imported', '--deck-id', ID), { fetch: a.fetch, log() { }, env }), /--append 와 함께/);
 });

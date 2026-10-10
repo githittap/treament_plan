@@ -198,6 +198,7 @@
   .hub-bar input[type=checkbox]{width:16px; height:16px; accent-color:var(--gold);}
   .hub-bar .hub-state{color:#9fb6cc; font-weight:600; min-width:60px;}
   .hub-bar .hub-state.dirty{color:var(--gold);}
+  .hub-bar .btn[hidden]{display:none;}
   .view-frame{position:fixed; inset:0; width:100%; height:100%; border:0; background:#0f2942; z-index:90;}
   .hub-fail{height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; text-align:center; color:#cfe0f0; font-size:15px; line-height:1.7;}
 
@@ -275,6 +276,7 @@
         <select id="catSel" title="분류"></select>
         <label title="켜고 저장하면 직원에게 보여요"><input type="checkbox" id="pubChk">공개</label>
         <span class="hub-state" id="hubState"></span>
+        <button class="btn ghost" id="backupBtn" hidden title="저장이 막혔을 때 내 덱을 파일로 내려받아 둠">내 덱 백업</button>
       </div>
       <div class="top-actions">
         <button class="btn ghost" id="newBtn"><span class="ico">✦</span>새로</button>
@@ -1078,7 +1080,7 @@ const B = {
   pvPrev:q('#pvPrev'), pvLab:q('#pvLab'), pvNext:q('#pvNext'), pvReset:q('#pvReset'), frame:q('#previewFrame'),
   picker:q('#picker'), fileInput:q('#fileInput'), toast:q('#toast'), help:q('#helpOverlay'), closeHelp:q('#closeHelp2'),
   slideCSS:q('#slideCSS'), engineSrc:q('#engineSrc'),
-  hubBar:q('#hubBar'), catSel:q('#catSel'), pubChk:q('#pubChk'), hubState:q('#hubState')
+  hubBar:q('#hubBar'), catSel:q('#catSel'), pubChk:q('#pubChk'), hubState:q('#hubState'), backupBtn:q('#backupBtn')
 };
 const SLIDE_CSS = B.slideCSS.content ? B.slideCSS.content.textContent : B.slideCSS.innerHTML;
 const PHGEO_SRC = q('#phGeoSrc').textContent;
@@ -1315,7 +1317,8 @@ function normalize(d){
 }
 
 /* ---- 미리보기 / 내보내기 HTML 생성 ---- */
-function deckData(){ return {meta:{title:deck.meta.title||''}, slides:deck.slides.map(s=> s.type==='photo' ? Object.assign({}, s, {image: s.image ? {src:imgUrl(s.image), w:s.image.w, h:s.image.h} : null}) : s)}; }
+/* 덱 최상위의 모르는 필드(importedSrc 등)도 그대로 둠 — 내보내기·미리보기·불러오기에서 잃지 않게 */
+function deckData(){ return Object.assign({}, deck, {meta:Object.assign({}, deck.meta, {title:deck.meta.title||''}), slides:deck.slides.map(s=> s.type==='photo' ? Object.assign({}, s, {image: s.image ? {src:imgUrl(s.image), w:s.image.w, h:s.image.h} : null}) : s)}); }
 const SKELETON = '<div class="app"><header class="topbar"><div class="brand"><span class="mark">설명덱</span><span class="deck-title" id="deckTitle"></span></div><div class="top-actions"><button class="chip-btn" id="fsBtn" title="전체화면 (F)">⛶ 전체화면</button><button class="chip-btn" id="helpBtn" title="도움말 (?)">? 사용법</button></div></header><main class="stage-wrap" id="stageWrap"><section class="stage" id="stage" aria-live="polite"></section></main><footer class="controls"><button class="nav-btn" id="prevBtn" aria-label="이전">‹</button><div class="center"><div class="dots" id="dots"></div><div class="meta"><span class="beats" id="beats"></span><span class="counter" id="counter"></span></div></div><button class="nav-btn" id="nextBtn" aria-label="다음">›</button></footer></div><div class="overlay" id="overlay"><div class="sheet"><h2>사용법</h2><p class="lead">개념을 한 장씩, 요소를 하나 둘씩 눌러가며 설명하는 도구입니다.</p><div class="keys"><kbd>클릭 · →</kbd><span>다음 단계 / 다음 장</span><kbd>←</kbd><span>이전</span><kbd>Home · End</kbd><span>처음 / 마지막</span><kbd>F</kbd><span>전체화면</span></div><button class="close" id="closeHelp">닫기</button></div></div>';
 function generateDeckHTML(boot, deckObj){
   const data = JSON.stringify(deckObj || deckData()).replace(/<\//g, '<\\/');
@@ -1611,15 +1614,23 @@ function commitPhoto(s, wanted, image){
 const PH_PENDING = new WeakMap();   /* 슬라이드 → 그 슬라이드의 최신 사진 올리기 요청 번호(올리는 중 표시에도 씀) */
 let phSeq = 0;
 /* 돌려주는 값: 'ok'(적용) · 'stale'(더 새 요청이 있어 버림) · 'gone'(undo·삭제로 덱에서 빠진 슬라이드라 버림) */
-async function attachPhoto(s, file){
+const PH_JOBS = new Set();   /* 올리는 중인 사진 작업들 — 서버 저장은 이게 다 끝나길 기다리고, 닫기 경고에도 씀 */
+function attachPhoto(s, file){
+  if(HUB.on) markDirty();   /* 올리기 시작부터 「저장 안 됨」 */
+  const job = attachPhotoRun(s, file);
+  PH_JOBS.add(job); const clear = ()=>{ PH_JOBS.delete(job); }; job.then(clear, clear);
+  return job;
+}
+async function attachPhotoRun(s, file){
   const req = ++phSeq; PH_PENDING.set(s, req);
   try{
     const r = await downscale(file);
     const image = (HUB.on && HUB.canEdit) ? {path: await hubUpload(r.blob), w:r.w, h:r.h} : {src: await blobToDataUrl(r.blob), w:r.w, h:r.h};
-    if(commitPhoto(s, ()=> PH_PENDING.get(s) === req, image)) return 'ok';
+    if(commitPhoto(s, ()=> PH_PENDING.get(s) === req, image)){ if(HUB.on) markDirty(); return 'ok'; }
     return deck.slides.includes(s) ? 'stale' : 'gone';
   } finally { if(PH_PENDING.get(s) === req) PH_PENDING.delete(s); }
 }
+async function hubWaitPhotos(){ while(PH_JOBS.size) await Promise.allSettled([...PH_JOBS]); }
 
 /* ---- 사진 슬라이드 편집 화면 ---- */
 const PE = {s:null, tool:'arrow', sel:null, pend:null, hover:null, drag:null, pop:null, stage:null, svg:null, lay:null, rows:null, btns:{}, W:0, H:0};
@@ -1968,7 +1979,7 @@ B.help.addEventListener('click', e=>{ if(e.target===B.help) B.help.classList.rem
 /* ============ 직원허브 연결 (허브에서 ?deck=<id> / ?new=1 / ?deck=<id>&view=1 로 열었을 때만 켜짐 · 허브 밖에서는 지금까지처럼 이 브라우저 저장 + 파일 내보내기) ============ */
 const QS = new URLSearchParams(location.search);
 const HUB_CATS = ['진료실','데스크','상담','행정','통역','기공실'];
-const HUB = {on:false, view:QS.get('view') === '1', sb:null, role:'', uid:'', canEdit:false, id:'', exists:false, published:false, category:'', dirty:false, rev:0, saving:false};
+const HUB = {on:false, view:QS.get('view') === '1', sb:null, role:'', uid:'', canEdit:false, id:'', exists:false, published:false, category:'', dirty:false, rev:0, saving:false, version:null, conflict:false};
 const HUB_SB_URL = 'https://texevhsxttfoqkrucfzl.supabase.co';   /* hr.html 과 같은 주소·공개(anon) 키 — ortho.html 이 쓰는 방식 그대로 */
 const HUB_SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRleGV2aHN4dHRmb3FrcnVjZnpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMTMyNTIsImV4cCI6MjA5ODc4OTI1Mn0.v6zejbNx4Z4otGNc8hQeQum4c_wdst1azUkLx6s_9CM';
 function newUuid(){
@@ -2019,23 +2030,39 @@ async function hubUploadInline(){
   }
   if(deck.slides.some(photoNeedsUpload)) throw new Error('사진이 계속 바뀌어 올리지 못했어요. 잠시 뒤 다시 저장해 주세요');
 }
+/* 충돌: 서버 덱을 덮지 않고, 「저장 안 됨」을 유지하고, 내 덱을 파일로 내려받아 백업하게 안내 */
+function hubConflict(){
+  HUB.conflict = true;
+  if(B.hubState){ B.hubState.textContent = '충돌 — 저장 안 됨'; B.hubState.classList.add('dirty'); }
+  if(B.backupBtn) B.backupBtn.hidden = false;
+  toast('다른 곳에서 바뀌었어요. 서버 덱은 그대로 두었어요. 지금 내용은 「내 덱 백업」으로 내려받아 두고, 새로 불러온 뒤 다시 고쳐 주세요', 'err');
+}
 async function hubSave(){
   if(!deck.slides.length){ toast('슬라이드를 먼저 추가하세요', 'err'); return; }
   if(HUB.saving) return;
   HUB.saving = true; B.saveBtn.disabled = true;
   try{
+    if(PH_JOBS.size){ toast('사진 올리는 중 — 끝나면 저장해요'); await hubWaitPhotos(); }   /* 올리는 중인 사진은 끝난 뒤의 최신 사진으로 저장 */
     const rev0 = HUB.rev;   /* 저장을 시작한 때의 변경 번호 — 사진 올리는 동안 고친 것도 「저장 안 됨」으로 남김 */
     await hubUploadInline();
     const row = {title:deck.meta.title || '(제목 없음)', category:HUB.category || null, deck:deckForStore(deck), published:!!HUB.published};
+    /* 이미 있는 덱은 열 때(또는 마지막 저장 때) 받은 updated_at 이 그대로일 때만 덮음 — 그 사이 다른 곳(업로더·다른 사람)이 바꿨으면 0행 → 충돌 */
     const r = HUB.exists
-      ? await HUB.sb.from('manual_decks').update(row).eq('id', HUB.id).select('id')
-      : await HUB.sb.from('manual_decks').insert(Object.assign({id:HUB.id}, row)).select('id');
+      ? await HUB.sb.from('manual_decks').update(row).eq('id', HUB.id).eq('updated_at', HUB.version).select('id,updated_at')
+      : await HUB.sb.from('manual_decks').insert(Object.assign({id:HUB.id}, row)).select('id,updated_at');
     if(r.error) throw r.error;
-    if(!r.data || !r.data.length) throw new Error('저장 권한이 없어요 (원장·실장만 저장할 수 있어요)');
-    HUB.exists = true;
+    if(!r.data || !r.data.length){
+      if(HUB.exists){
+        const cur = await HUB.sb.from('manual_decks').select('updated_at').eq('id', HUB.id).maybeSingle();
+        if(cur.data && cur.data.updated_at !== HUB.version){ const ce2 = new Error('conflict'); ce2.conflict = true; throw ce2; }
+        if(!cur.data) throw new Error('이 매뉴얼을 찾을 수 없어요 (지워졌거나 권한이 없어요)');
+      }
+      throw new Error('저장 권한이 없어요 (원장·실장만 저장할 수 있어요)');
+    }
+    HUB.exists = true; HUB.version = r.data[0].updated_at; HUB.conflict = false; if(B.backupBtn) B.backupBtn.hidden = true;
     if(HUB.rev === rev0){ setDirty(false); toast(HUB.published ? '저장했어요 — 직원에게 공개 중이에요' : '저장했어요 — 아직 비공개예요'); }
     else toast('저장했어요 — 저장하는 동안 고친 내용은 아직 저장 안 됐어요. 다시 저장해 주세요', 'err');
-  }catch(e){ toast('저장 실패: '+(e.message || e), 'err'); }
+  }catch(e){ if(e && e.conflict) hubConflict(); else toast('저장 실패: '+(e.message || e), 'err'); }
   HUB.saving = false; B.saveBtn.disabled = false;
 }
 function hubStarterDeck(){
@@ -2064,12 +2091,12 @@ async function hubBoot(){
   if(isNew){
     HUB.id = newUuid(); HUB.exists = false; deck = normalize(hubStarterDeck()); HUB.published = false; HUB.category = '';
   } else {
-    const r = await HUB.sb.from('manual_decks').select('id,title,category,deck,published').eq('id', HUB.id).maybeSingle();
+    const r = await HUB.sb.from('manual_decks').select('id,title,category,deck,published,updated_at').eq('id', HUB.id).maybeSingle();
     if(r.error) return hubFail('매뉴얼을 불러오지 못했어요: '+r.error.message);
     if(!r.data) return hubFail('매뉴얼을 찾을 수 없어요. (비공개이거나 지워졌을 수 있어요)');
     deck = normalize(r.data.deck && typeof r.data.deck === 'object' ? r.data.deck : {meta:{title:r.data.title}, slides:[]});
     if(!deck.meta.title) deck.meta.title = r.data.title || '';
-    HUB.exists = true; HUB.published = !!r.data.published; HUB.category = r.data.category || '';
+    HUB.exists = true; HUB.version = r.data.updated_at; HUB.published = !!r.data.published; HUB.category = r.data.category || '';
   }
   HUB.on = true; sel = 0; resetHistory();
   await hubResolveImages();
@@ -2080,10 +2107,11 @@ async function hubBoot(){
   B.catSel.onchange = ()=>{ HUB.category = B.catSel.value; markDirty(); };
   B.pubChk.onchange = ()=>{ HUB.published = B.pubChk.checked; markDirty(); toast(HUB.published ? '저장하면 직원에게 공개돼요' : '저장하면 비공개로 바뀌어요'); };
   B.hubBar.hidden = false; B.newBtn.hidden = true; B.tutorialBtn.hidden = true;
+  B.backupBtn.onclick = ()=> B.exportBtn.click();
   B.saveBtn.innerHTML = '<span class="ico">❒</span>서버에 저장';
   renderAll(); bootPreview(); setDirty(!HUB.exists);
 }
-window.addEventListener('beforeunload', e=>{ if(HUB.on && HUB.dirty && !HUB.view){ e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', e=>{ if(HUB.on && (HUB.dirty || PH_JOBS.size) && !HUB.view){ e.preventDefault(); e.returnValue = ''; } });
 
 /* ---- 초기화 ---- */
 (function init(){
