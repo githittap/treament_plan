@@ -11,7 +11,7 @@ const engineSrc = between(maker, '<script type="text/plain" id="engineSrc">', '<
 const photoEngine = engineSrc.slice(engineSrc.indexOf('/* ---- 사진 슬라이드: 사진 + 화살표'), engineSrc.indexOf('const BUILDERS'));
 
 const geo = (() => { const ctx = {}; vm.createContext(ctx); vm.runInContext(geoSrc + ';this.api={phFit,phArrow,phLabelPos,phSafeColor,phLabelFont,phAvoid,phFxOk};', ctx); return ctx.api; })();
-const pure = (() => { const ctx = { PHG: geo }; vm.createContext(ctx); vm.runInContext(pureSrc + ';this.api={rnd2,clampPct,roleCanEdit,isTypingTarget,phNormalize,phBendAdd,phBendRemove,phSwapMarks,deckForStore,snapEncode,snapDecode,shortcutAction};', ctx); return ctx.api; })();
+const pure = (() => { const ctx = { PHG: geo }; vm.createContext(ctx); vm.runInContext(pureSrc + ';this.api={rnd2,clampPct,roleCanEdit,isTypingTarget,phNormalize,phBendAdd,phBendRemove,phSwapMarks,deckForStore,snapEncode,snapDecode,shortcutAction,zoomAt};', ctx); return ctx.api; })();
 
 /* ---- 아주 작은 가짜 화면(DOM): 엔진의 buildPhoto/phBind를 노드에서 돌리기 위함 ---- */
 function fakeNode(tag, cls) {
@@ -922,4 +922,42 @@ test('[B1] 소스 확인: 붙여넣기·글 편집 칸·꾸미기 줄·장 이�
   assert.match(maker, /id="loadBtn" title="「발표 파일 만들기」로 만든 \.html 또는 \.json 파일만 열려요"/);
   assert.match(maker, /꺾임점은 6개까지예요/); assert.match(maker, /sn\.placeholder = '바로'/); assert.match(maker, /순서: 비우면 바로 나옴 · 숫자 = 클릭 몇 번째에 나올지/);
   assert.match(fnSrc(maker, 'function peRedraw'), /if\(!\(step >= 1\)\) return;/, '번호 배지는 순서 1 이상만');
+});
+
+test('[B2] zoomAt: 배율 1~6 자름 · 커서 아래 점 고정 · 이동 범위 · 1배면 0', () => {
+  const Z = pure.zoomAt, VW = 800, VH = 400;
+  assert.deepEqual(clone(Z(2, -100, -50, 400, 200, 0.5, VW, VH)), { z: 1, tx: 0, ty: 0 }, '1 미만은 1로 자르고 1배면 이동 0');
+  assert.equal(Z(1, 0, 0, 100, 100, 9, VW, VH).z, 6, '6 초과는 6');
+  assert.equal(Z(1, 0, 0, 100, 100, NaN, VW, VH).z, 1, '숫자가 아니면 1');
+  // 커서 아래 점 고정(자르기에 안 걸리는 경우): 판 위 점의 틀 좌표 = tx + 판좌표*z
+  const a = Z(2, -400, -200, 500, 250, 3, VW, VH), px = (500 + 400) / 2, py = (250 + 200) / 2;
+  assert.ok(Math.abs(a.tx + px * a.z - 500) < 1e-9 && Math.abs(a.ty + py * a.z - 250) < 1e-9, '커서 아래 점이 그대로');
+  // 범위: tx in [VW-VW*z, 0], ty in [VH-VH*z, 0]
+  for (const [cx, cy, nz] of [[0, 0, 4], [VW, VH, 4], [VW / 2, VH / 2, 2.5], [10, 390, 6]]) {
+    const r = Z(1, 0, 0, cx, cy, nz, VW, VH);
+    assert.ok(r.tx <= 0 && r.tx >= VW - VW * r.z && r.ty <= 0 && r.ty >= VH - VH * r.z, '범위 ' + cx + ',' + cy);
+  }
+  assert.equal(Z(1, 0, 0, 0, 0, 4, VW, VH).tx, 0, '왼쪽 위 기준 확대는 0');
+  assert.equal(Z(1, 0, 0, VW, VH, 4, VW, VH).tx, VW - VW * 4, '오른쪽 아래 기준은 끝까지');
+  // 이동만(nz=z): 너무 멀리 끌어도 범위 안으로
+  assert.deepEqual(clone(Z(3, 500, -9999, 0, 0, 3, VW, VH)), { z: 3, tx: 0, ty: VH - VH * 3 });
+  assert.deepEqual(clone(Z(3, -300, -100, 0, 0, 3, VW, VH)), { z: 3, tx: -300, ty: -100 }, '범위 안 이동은 그대로');
+});
+
+test('[B2] 소스 확인: 접기 단추·pe-view·peXY 보정·Space·붙여넣기 닫기·peDeco 이름', () => {
+  assert.match(maker, /id="pvFold" title="미리보기 접기 — 편집 칸이 넓어져요"/); assert.match(maker, /id="pvOn" type="button" hidden/);
+  assert.match(maker, /\.work\.pv-off\{grid-template-columns:236px minmax\(320px,1fr\);\}/); assert.match(maker, /\.work, \.work\.pv-off\{grid-template-columns:200px 1fr/);
+  assert.match(maker, /seolmyeongdeok:pvOff/); const pv = between(maker, 'function pvSet', 'B.pvFold.onclick');
+  assert.match(pv, /try\{ localStorage\.setItem/); assert.match(maker, /try\{ off = localStorage\.getItem\(PV_KEY\) === '1'; \}catch/);
+  assert.match(maker, /\.pe-view\{position:relative;[^}]*overflow:hidden/); assert.match(maker, /\.pe-stage\{position:absolute; left:0; top:0; width:100%; height:100%; transform-origin:0 0/);
+  const ed = fnSrc(maker, 'function photoEditor');
+  assert.match(ed, /ce\('div','pe-view'\)/); assert.match(ed, /calc\(\(100vh - 250px\) \* /); assert.ok(!/58\*/.test(ed), '옛 58vh 크기 줄이 없음');
+  assert.match(ed, /sidOf\(s\) !== PE\.zsid/); assert.match(ed, /\{passive:false\}/); assert.match(ed, /e\.ctrlKey/); assert.match(ed, /e\.button === 1/); assert.match(ed, /PE\.space/);
+  assert.match(ed, /if\(PE\.z > 1\) panStart\(e\)/); assert.match(ed, /observe\(vw\)/); assert.match(ed, /Ctrl\+휠 또는 ＋\/－ = 확대/);
+  assert.match(fnSrc(maker, 'function peXY'), /\(e\.clientX-r\.left\)\*\(PE\.W \|\| r\.width\)\/\(r\.width \|\| 1\)/);
+  assert.match(fnSrc(maker, 'function peApplyView'), /zoomAt\(PE\.z, PE\.tx, PE\.ty/);
+  assert.match(maker, /e\.code === 'Space'[^\n]*peSpace\(true\)/); assert.match(maker, /document\.addEventListener\('keyup'/);
+  const paste = between(maker, "document.addEventListener('paste'", "document.addEventListener('keydown'");
+  assert.match(paste, /e\.preventDefault\(\);\s*if\(PE\.pop\) peClosePop\(\);/);
+  const deco = fnSrc(maker, 'function peDeco'); assert.ok(!/\bsel\b/.test(deco.replace(/\/\*[\s\S]*?\*\//g, '').replace(/'[^']*'/g, '')), 'peDeco 안에 전역 sel 을 가리는 이름이 없음');
 });
