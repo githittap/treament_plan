@@ -11,7 +11,7 @@ const engineSrc = between(maker, '<script type="text/plain" id="engineSrc">', '<
 const photoEngine = engineSrc.slice(engineSrc.indexOf('/* ---- 사진 슬라이드: 사진 + 화살표'), engineSrc.indexOf('const BUILDERS'));
 
 const geo = (() => { const ctx = {}; vm.createContext(ctx); vm.runInContext(geoSrc + ';this.api={phFit,phArrow,phLabelPos,phSafeColor,phLabelFont,phAvoid,phFxOk};', ctx); return ctx.api; })();
-const pure = (() => { const ctx = { PHG: geo }; vm.createContext(ctx); vm.runInContext(pureSrc + ';this.api={rnd2,clampPct,roleCanEdit,isTypingTarget,phNormalize,phNextStep,phSwapMarks,deckForStore,snapEncode,snapDecode,shortcutAction};', ctx); return ctx.api; })();
+const pure = (() => { const ctx = { PHG: geo }; vm.createContext(ctx); vm.runInContext(pureSrc + ';this.api={rnd2,clampPct,roleCanEdit,isTypingTarget,phNormalize,phBendAdd,phBendRemove,phSwapMarks,deckForStore,snapEncode,snapDecode,shortcutAction};', ctx); return ctx.api; })();
 
 /* ---- 아주 작은 가짜 화면(DOM): 엔진의 buildPhoto/phBind를 노드에서 돌리기 위함 ---- */
 function fakeNode(tag, cls) {
@@ -121,6 +121,8 @@ test('편집 단축키: 글 입력 칸(입력·글상자·선택칸·편집영�
   assert.equal(pure.shortcutAction(k('KeyQ', { target: { tagName: 'DIV', isContentEditable: true } }), ctx), null);
   const want = { KeyQ: 'tool-arrow', KeyT: 'tool-text', KeyA: 'tool-select', KeyE: 'tool-erase', KeyR: 'bend', Delete: 'delete', Escape: 'cancel', ArrowDown: 'slide-next', ArrowUp: 'slide-prev' };
   for (const [code, act] of Object.entries(want)) assert.equal(pure.shortcutAction(k(code), ctx), act, code);
+  assert.equal(pure.shortcutAction(k('KeyR', { shiftKey: true }), ctx), 'straighten', 'Shift+R = 곧게 펴기');
+  assert.equal(pure.shortcutAction(k('KeyR', { shiftKey: true, target: { tagName: 'TEXTAREA' } }), ctx), null, '입력 칸에선 Shift+R도 무반응');
   assert.equal(pure.shortcutAction(k('KeyZ', { ctrlKey: true }), ctx), 'undo');
   assert.equal(pure.shortcutAction(k('KeyZ', { ctrlKey: true, shiftKey: true }), ctx), 'redo');
   assert.equal(pure.shortcutAction(k('KeyY', { ctrlKey: true }), ctx), 'redo');
@@ -131,15 +133,16 @@ test('편집 단축키: 글 입력 칸(입력·글상자·선택칸·편집영�
   assert.equal(pure.shortcutAction(k('Delete'), { photo: true, hasSel: false }), null, '선택한 게 없으면 Delete 무반응(슬라이드를 실수로 안 지움)');
   assert.equal(pure.shortcutAction(k('KeyQ', { altKey: true }), ctx), null);
   assert.equal(pure.shortcutAction(k('KeyQ'), { photo: true, blocked: true }), null, '도움말 창이 열려 있으면 무반응');
-  assert.ok(maker.includes('다시 R = 펴기') && !/다시 [JKD] = /.test(maker), '꺾기 안내도 새 글쇠(R)');
+  assert.ok(maker.includes('R 한 번 더 = 꺾임 더하기 · Shift+R = 펴기 · 꺾임점 두 번 누르면 빼기') && !/다시 [JKD] = /.test(maker), '꺾기 안내도 새 글쇠(R·Shift+R)');
   // 화면 연결: 안내 칸 + 도움말 표 + 보기용 keydown과 따로(제작기 문서 vs 미리보기 문서)
   assert.match(maker, /id="keyHint"/); assert.match(maker, /편집 단축키 \(글 입력 칸에서는 안 먹어요\)/);
   for (const key of ['Ctrl+Z', 'Ctrl+Y', 'Ctrl+E', 'Delete', 'Esc', '↓ / ↑', 'Q', 'R']) assert.ok(maker.includes('<kbd>' + key + '</kbd>'), key);
 });
 
-test('표시 순서 바꾸기·다음 단계 번호', () => {
+test('표시 순서 바꾸기', () => {
   const m = clone(PHOTO.marks);
-  assert.equal(pure.phNextStep(m), 4); assert.equal(pure.phNextStep([]), 1);
+  assert.ok(!/phNextStep/.test(maker), '순서 기본 0 — 다음 단계 번호 함수는 없어짐');
+  assert.match(maker, /kind:'arrow', pts:\[a0, p\], text:'', step:0/); assert.match(maker, /kind:'label', x:p\[0\], y:p\[1\], text:'', step:0/);
   assert.equal(pure.phSwapMarks(m, 0, 1), true);
   assert.deepEqual(clone(m.map(x => [x.id, x.step])), [['b', 1], ['a', 2], ['c', 3], ['d', 3]], '자리와 등장 순서를 함께 맞바꿈');
   assert.equal(pure.phSwapMarks(m, 0, -1), false);
@@ -252,7 +255,8 @@ test('가져온 덱 모양(PPT 가져오기): 글 상자 x·y는 왼쪽 위 기�
   // 저장·복원: 가져온 모양이 정규화에서 안 깨짐
   const n = pure.phNormalize({ type: 'photo', image: { path: 'p/a.webp' }, srcSlide: 84, marks: clone(imp.marks) }, () => 'i');
   assert.equal(n.srcSlide, 84); assert.equal(n.marks[0].w, 9.44); assert.equal(n.marks[1].size, 16); assert.equal(n.marks[3].pts.length, 5); assert.equal(n.marks[3].color, '#ff0000'); assert.equal(n.marks[2].w, undefined);
-  assert.match(maker, /이미 여러 번 꺾인 화살표예요/, '꺾기(K)는 2↔3점만 — 가져온 여러 점 꺾은선을 펴서 망가뜨리지 않음');
+  assert.ok(!/이미 여러 번 꺾인 화살표예요/.test(maker), '꺾기는 점을 더하기만 함 — 가져온 여러 점 꺾은선도 안 망가뜨림');
+  assert.equal(pure.phBendAdd(clone(imp.marks[3].pts)).length, 6, '5점 꺾은선에도 점 하나 더');
 });
 
 /* ---- Codex 검증 지적 재현 시험 ---- */
@@ -397,8 +401,8 @@ test('[3차-1] 사진 붙이기: 최신 요청만 적용(먼저 시작한 파란
   // (4) 서버 모드 아님(허브 밖): 데이터주소로 붙고 같은 원칙
   ctx.HUB.on = false; const p4 = await ctx.attachPhoto(clone0, { name: 'local' }); assert.equal(p4, 'ok'); assert.match(clone0.image.src, /^data:image\/png;base64,local$/);
   // 화면 연결: 올리는 중 단추 표시 · 적용 성공일 때만 미리보기·저장 표시 · 지금 보는 장일 때만 다시 그림
-  const form = fnSrc(mainJs, 'FORMS.photo = s=>');
-  assert.match(form, /PH_PENDING\.has\(sidOf\(s\)\) \? '⏳ 사진 올리는 중/); assert.match(form, /if\(res === 'ok'\)\{ bootPreview\(\); scheduleAutosave\(\); \}/); assert.match(form, /if\(deck\.slides\[sel\] && deck\.slides\[sel\]\.sid === s\.sid\) renderEditor\(\);/);
+  const form = fnSrc(mainJs, 'FORMS.photo = s=>'), pick = fnSrc(mainJs, 'async function photoPick');   // 고르기·붙여넣기가 같이 쓰는 photoPick 에 갱신 규칙이 있음
+  assert.match(form, /PH_PENDING\.has\(sidOf\(s\)\) \? '⏳ 사진 올리는 중/); assert.match(pick, /if\(res === 'ok'\)\{ bootPreview\(\); scheduleAutosave\(\); \}/); assert.match(pick, /if\(deck\.slides\[sel\] && deck\.slides\[sel\]\.sid === s\.sid\) renderEditor\(\);/);
   assert.equal(/ub\.disabled = true/.test(form), false, '다시 누르면 새 사진으로 교체되므로 단추를 막지 않음');
   // hubUploadInline: 같은 원칙(commitPhoto) — 올리는 중 덱에서 빠진 슬라이드엔 경로를 안 붙이고 남은 슬라이드만 이어서 올림
   const dataUrl = t => 'data:image/png;base64,' + Buffer.from(t).toString('base64'), up = [];
@@ -886,4 +890,36 @@ test('A4 엔진 buildPhoto: fx 클래스가 붙고 · 모르는 fx는 무시 · 
 
 test('A7 발표 파일 만들기: 사진 담는 중 n/전체 알림 + 못 담은 사진 수 알림', () => {
   assert.ok(maker.includes("'사진 담는 중 '+(++n)+'/'+todo.length")); assert.ok(maker.includes("'장을 못 담았어요'")); assert.ok(maker.includes('if(!r.ok) throw 0'));
+});
+
+test('[B1] 꺾임점 더하기·빼기(phBendAdd·phBendRemove)', () => {
+  const two = [[10, 10], [50, 10]];
+  const a = pure.phBendAdd(two);
+  assert.deepEqual(clone(a), [[10, 10], [30, 10], [50, 10]], '2점 → 3점, 가운데는 중점'); assert.deepEqual(clone(two), [[10, 10], [50, 10]], '원본은 안 바뀜');
+  const b = pure.phBendAdd([[0, 0], [10, 0], [10, 40]]);
+  assert.deepEqual(clone(b), [[0, 0], [10, 0], [10, 20], [10, 40]], '가장 긴 구간(둘째 구간) 가운데에 끼움');
+  const eight = Array.from({ length: 8 }, (_, i) => [i * 10, 0]);
+  assert.equal(pure.phBendAdd(eight), null, '점이 8개면 더 못 늘림'); assert.equal(pure.phBendAdd(eight.slice(0, 7)).length, 8);
+  assert.deepEqual(clone(pure.phBendAdd([[1.111, 1.111], [2.226, 2.226]])[1]), [1.67, 1.67], 'rnd2');
+  const r = pure.phBendRemove(a, 1);
+  assert.deepEqual(clone(r), [[10, 10], [50, 10]], '가운데 점이 빠짐'); assert.equal(a.length, 3, '원본은 안 바뀜');
+  for (const i of [0, 2, -1, 3, 9]) assert.equal(pure.phBendRemove(a, i), a, '처음·끝·범위 밖은 원래 배열 그대로 ' + i);
+});
+
+test('[B1] 소스 확인: 붙여넣기·글 편집 칸·꾸미기 줄·장 이동·이름표·불러오기 안내', () => {
+  const paste = between(maker, "document.addEventListener('paste'", "document.addEventListener('keydown'");
+  assert.ok(paste.includes("x.kind === 'file' && /^image\\//.test(x.type)")); assert.match(paste, /isTypingTarget\(e\.target\) && items\.some\(x=> x\.type === 'text\/plain'\)/);
+  assert.match(paste, /HUB\.view \|\| B\.help\.classList\.contains\('show'\)/); assert.match(paste, /snap\(\); s = blank\('photo'\)/);
+  assert.match(paste, /photoPick\(s, file, msg\);[^\n]*\n\s*renderList\(\); renderEditor\(\)/);
+  assert.match(fnSrc(maker, 'FORMS.photo = s=>'), /photoPick\(s, file\)/); assert.match(fnSrc(maker, 'async function photoPick'), /attachPhoto\(s, file\)/);
+  const pop = fnSrc(maker, 'function peOpenPop');
+  assert.match(pop, /ce\('textarea','pe-pop'\)/); assert.match(pop, /ev\.key === 'Enter' && !ev\.shiftKey/); assert.match(pop, /Shift\+Enter 줄바꿈/);
+  const deco = fnSrc(maker, 'function peDeco');
+  assert.ok(!/peRenderRows/.test(deco.replace(/\/\*[\s\S]*?\*\//g, '')), '꾸미기 칸은 줄을 다시 그리지 않음(색 창 유지)');
+  assert.match(deco, /type = 'color'/); assert.match(deco, /'지금 '\+cur/); assert.match(deco, /delete m\.color; delete m\.bg; delete m\.size; delete m\.fx; peChanged\(\)/);
+  assert.match(maker, /id="slideGo"/); assert.match(maker, /1~'\+N\+' 사이 번호를 넣어 주세요/);
+  assert.match(maker, /<h2>편집<\/h2><span class="hint">여기서 고쳐요/); assert.match(maker, /직원에게 이렇게 보여요/);
+  assert.match(maker, /id="loadBtn" title="「발표 파일 만들기」로 만든 \.html 또는 \.json 파일만 열려요"/);
+  assert.match(maker, /꺾임점은 6개까지예요/); assert.match(maker, /sn\.placeholder = '바로'/); assert.match(maker, /순서: 비우면 바로 나옴 · 숫자 = 클릭 몇 번째에 나올지/);
+  assert.match(fnSrc(maker, 'function peRedraw'), /if\(!\(step >= 1\)\) return;/, '번호 배지는 순서 1 이상만');
 });

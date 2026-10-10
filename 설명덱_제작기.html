@@ -229,7 +229,13 @@
   .pe-lbl.ar{cursor:pointer; opacity:.95;}
   .pe-lbl.sel{border-color:#ff9f1c; box-shadow:0 0 0 3px rgba(255,159,28,.45);}
   .pe-badge{position:absolute; transform:translate(-50%,-50%); min-width:19px; height:19px; padding:0 4px; border-radius:10px; background:var(--navy); color:#fff; font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; pointer-events:none; border:1.5px solid #fff;}
-  .pe-pop{position:absolute; z-index:5; width:min(260px,70%); border:2px solid var(--gold); border-radius:8px; padding:6px 9px; font-size:14px; background:#fff; color:var(--ink);}
+  .pe-pop{position:absolute; z-index:5; width:min(260px,70%); border:2px solid var(--gold); border-radius:8px; padding:6px 9px; font:inherit; font-size:14px; line-height:1.4; resize:none; background:#fff; color:var(--ink);}
+  .slide-go{width:64px; border:1px solid var(--line); border-radius:7px; padding:3px 6px; font-size:12px; font-family:inherit;}
+  .pe-mrow textarea.input{resize:vertical; font-family:inherit; line-height:1.4;}
+  .pe-deco{display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; margin-top:6px; padding-left:26px; font-size:11px; font-weight:700; color:var(--gray);}
+  .pe-deco label{display:inline-flex; align-items:center; gap:4px;}
+  .pe-deco input[type=color]{width:26px; height:22px; padding:0; border:1px solid var(--line); border-radius:5px; background:#fff; cursor:pointer;}
+  .pe-deco select{font-size:11.5px; padding:2px 4px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink);}
   .pe-help{font-size:11.5px; color:var(--gray); margin:6px 0 0; line-height:1.5;}
   .pe-marks .rep-row{padding:8px 10px;}
   .pe-mrow{display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
@@ -280,7 +286,7 @@
       </div>
       <div class="top-actions">
         <button class="btn ghost" id="newBtn"><span class="ico">✦</span>새로</button>
-        <button class="btn ghost" id="loadBtn"><span class="ico">↥</span>불러오기</button>
+        <button class="btn ghost" id="loadBtn" title="「발표 파일 만들기」로 만든 .html 또는 .json 파일만 열려요"><span class="ico">↥</span>불러오기</button>
         <button class="btn ghost" id="saveBtn"><span class="ico">❒</span>저장</button>
         <button class="btn ghost" id="tutorialBtn"><span class="ico">📖</span>튜토리얼</button>
         <button class="btn ghost" id="helpBtn2">?</button>
@@ -291,7 +297,7 @@
     <div class="work">
       <!-- SLIDES -->
       <section class="panel col-slides">
-        <div class="panel-head"><h2>슬라이드</h2><span class="hint" id="slideCount"></span></div>
+        <div class="panel-head"><h2>슬라이드</h2><input type="number" min="1" class="slide-go" id="slideGo" placeholder="장 이동" title="번호를 치고 Enter"><span class="hint" id="slideCount"></span></div>
         <div class="panel-body">
           <div class="slide-list" id="slideList"></div>
           <button class="add-slide" id="addSlideBtn">＋ 슬라이드 추가</button>
@@ -301,7 +307,7 @@
       <!-- EDITOR -->
       <section class="panel col-editor">
         <div class="panel-head">
-          <div class="editor-head"><span class="type-badge" id="typeBadge">편집</span></div>
+          <div class="editor-head"><h2>편집</h2><span class="hint">여기서 고쳐요</span><span class="type-badge" id="typeBadge">편집</span></div>
           <div class="mini-actions" id="miniActions"></div>
         </div>
         <div class="panel-body" id="editor"></div>
@@ -311,7 +317,7 @@
       <!-- PREVIEW -->
       <section class="panel col-preview">
         <div class="panel-head">
-          <h2>미리보기</h2>
+          <h2>미리보기</h2><span class="hint">직원에게 이렇게 보여요</span>
           <div class="prev-controls">
             <button class="pv-btn" id="pvPrev" title="이전 단계">‹</button>
             <span class="step-lab" id="pvLab">–</span>
@@ -1117,7 +1123,7 @@ render(!!BOOT.atEnd);
 /* ============ 설명덱 제작기 ============ */
 const q = s => document.querySelector(s);
 const B = {
-  deckName:q('#deckName'), newBtn:q('#newBtn'), loadBtn:q('#loadBtn'), saveBtn:q('#saveBtn'),
+  slideGo:q('#slideGo'), deckName:q('#deckName'), newBtn:q('#newBtn'), loadBtn:q('#loadBtn'), saveBtn:q('#saveBtn'),
   helpBtn:q('#helpBtn2'), exportBtn:q('#exportBtn'), tutorialBtn:q('#tutorialBtn'), slideList:q('#slideList'), slideCount:q('#slideCount'),
   addBtn:q('#addSlideBtn'), typeBadge:q('#typeBadge'), miniActions:q('#miniActions'), editor:q('#editor'),
   pvPrev:q('#pvPrev'), pvLab:q('#pvLab'), pvNext:q('#pvNext'), pvReset:q('#pvReset'), frame:q('#previewFrame'),
@@ -1177,7 +1183,20 @@ function phNormalize(s, mkId){
   });
   return s;
 }
-function phNextStep(marks){ return marks.reduce((mx, m)=> Math.max(mx, m.step|0), 0) + 1; }
+/* 꺾임점 더하기: 가장 긴 구간(퍼센트 좌표 거리) 가운데에 점 하나 — 점이 8개면 null(원본은 안 바뀜) */
+function phBendAdd(pts){
+  if(pts.length >= 8) return null;
+  let bi = 0, bd = -1;
+  for(let i = 1; i < pts.length; i++){ const d = Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]); if(d > bd){ bd = d; bi = i; } }
+  const a = pts[bi-1], b = pts[bi], out = pts.map(p=> [p[0], p[1]]);
+  out.splice(bi, 0, [rnd2((a[0]+b[0])/2), rnd2((a[1]+b[1])/2)]);
+  return out;
+}
+/* 꺾임점 빼기: 처음·끝이 아닌 i번 점만 뺌(처음·끝·범위 밖이면 원래 배열 그대로) */
+function phBendRemove(pts, i){
+  if(!(i > 0 && i < pts.length-1)) return pts;
+  return pts.filter((_, k)=> k !== i).map(p=> [rnd2(p[0]), rnd2(p[1])]);
+}
 /* 순서 바꾸기: 목록 자리와 등장 순서(step)를 함께 맞바꿈 */
 function phSwapMarks(marks, i, j){
   if(i < 0 || j < 0 || i >= marks.length || j >= marks.length || i === j) return false;
@@ -1221,7 +1240,7 @@ function shortcutAction(e, ctx){
     case 'KeyT': return 'tool-text';
     case 'KeyA': return 'tool-select';
     case 'KeyE': return 'tool-erase';
-    case 'KeyR': return 'bend';
+    case 'KeyR': return e.shiftKey ? 'straighten' : 'bend';
     case 'Delete': return ctx.hasSel ? 'delete' : null;
     case 'Escape': return 'cancel';
   }
@@ -1722,11 +1741,17 @@ function peRemove(mid){
 function peBend(){
   const m = peCur();
   if(!m || m.kind !== 'arrow'){ toast('꺾을 화살표를 먼저 고르세요 (A 로 선택)', 'err'); return; }
-  if(m.pts.length > 3){ toast('이미 여러 번 꺾인 화살표예요 — 꺾임점 손잡이를 끌어 모양을 고쳐요'); return; }
-  snap();
-  if(m.pts.length === 2){ const a = m.pts[0], b = m.pts[1]; m.pts = [a, [rnd2((a[0]+b[0])/2), rnd2((a[1]+b[1])/2)], b]; toast('가운데 손잡이를 끌어 꺾으세요 (다시 R = 펴기)'); }
-  else { m.pts = [m.pts[0], m.pts[m.pts.length-1]]; toast('곧게 폈어요'); }
+  const np = phBendAdd(m.pts);
+  if(!np){ toast('꺾임점은 6개까지예요'); return; }
+  snap(); m.pts = np;
+  toast('꺾임점을 끌어 모양을 잡으세요 · R 한 번 더 = 꺾임 더하기 · Shift+R = 펴기 · 꺾임점 두 번 누르면 빼기');
   peChanged();
+}
+function peStraighten(){
+  const m = peCur();
+  if(!m || m.kind !== 'arrow'){ toast('펼 화살표를 먼저 고르세요 (A 로 선택)', 'err'); return; }
+  if(m.pts.length <= 2) return;
+  snap(); m.pts = [m.pts[0], m.pts[m.pts.length-1]]; toast('곧게 폈어요'); peChanged();
 }
 function pePct(e){ const r = PE.stage.getBoundingClientRect(); return [rnd2(clampPct((e.clientX-r.left)/r.width*100)), rnd2(clampPct((e.clientY-r.top)/r.height*100))]; }
 function peXY(e){ const r = PE.stage.getBoundingClientRect(); return [e.clientX-r.left, e.clientY-r.top]; }
@@ -1754,7 +1779,7 @@ function peRedraw(){
   svg.setAttribute('viewBox', '0 0 '+W+' '+H); svg.innerHTML = ''; lay.innerHTML = '';
   const sw = Math.max(3, Math.min(6, W/150));
   const mk = (tag, cls, attrs)=>{ const n = document.createElementNS('http://www.w3.org/2000/svg', tag); if(cls) n.setAttribute('class', cls); Object.keys(attrs||{}).forEach(k=> n.setAttribute(k, attrs[k])); return n; };
-  const badge = (x, y, step)=>{ const b = ce('div','pe-badge'); b.textContent = step; b.style.left = x+'px'; b.style.top = y+'px'; lay.appendChild(b); };
+  const badge = (x, y, step)=>{ if(!(step >= 1)) return; const b = ce('div','pe-badge'); b.textContent = step; b.style.left = x+'px'; b.style.top = y+'px'; lay.appendChild(b); };
   const items = [], dm = PE.drag ? PE.drag.m : null;   /* 글 상자 자리 모음 — 발표 화면과 같은 phAvoid 로 겹치면 비킴(끄는 중인 글은 계산에서 빼고 손가락 자리 그대로) */
   s.marks.forEach(m=>{
     const on = (m.id === PE.sel);
@@ -1772,7 +1797,7 @@ function peRedraw(){
         items.push({m:m, l:l, c:0, fix:false, r:{x:x, y:y, w:l.offsetWidth, h:l.offsetHeight}});
       }
       badge(g.tail.x, g.tail.y, m.step);
-      if(on) m.pts.forEach((p, i)=> svg.appendChild(mk('circle', 'pe-handle'+(m.pts.length === 3 && i === 1 ? ' mid' : ''), {cx:p[0]*W/100, cy:p[1]*H/100, r:7})));
+      if(on) m.pts.forEach((p, i)=> svg.appendChild(mk('circle', 'pe-handle'+(i > 0 && i < m.pts.length-1 ? ' mid' : ''), {cx:p[0]*W/100, cy:p[1]*H/100, r:7})));
     } else {
       const l = ce('div','pe-lbl'+(on?' sel':'')); l.textContent = m.text; l.dataset.mid = m.id;
       l.style.left = (m.x*W/100)+'px'; l.style.top = (m.y*H/100)+'px';
@@ -1797,12 +1822,12 @@ function peRedraw(){
 }
 function peOpenPop(m){
   peClosePop();
-  const inp = ce('input','pe-pop'); inp.type = 'text'; inp.maxLength = 200; inp.value = m.text || '';
-  inp.placeholder = m.kind === 'arrow' ? '화살표 설명 (없으면 Enter)' : '설명 글 (Enter로 확정)';
+  const inp = ce('textarea','pe-pop'); inp.rows = 2; inp.style.resize = 'none'; inp.maxLength = 300; inp.value = m.text || '';
+  inp.placeholder = m.kind === 'arrow' ? '화살표 설명 (없으면 Enter)' : '설명 글 (Enter 확정 · Shift+Enter 줄바꿈)';
   const pt = m.kind === 'arrow' ? m.pts[m.pts.length-1] : [m.x, m.y];
   inp.style.left = Math.min(pt[0], 55)+'%'; inp.style.top = Math.min(pt[1]+4, 88)+'%';
   inp.addEventListener('input', ()=>{ m.text = inp.value; peRedraw(); schedulePreview(); });
-  inp.addEventListener('keydown', ev=>{ if(ev.isComposing) return; if(ev.key === 'Enter' || ev.key === 'Escape'){ ev.preventDefault(); ev.stopPropagation(); peClosePop(); if(PE.stage) PE.stage.focus(); } });
+  inp.addEventListener('keydown', ev=>{ if(ev.isComposing) return; if((ev.key === 'Enter' && !ev.shiftKey) || ev.key === 'Escape'){ ev.preventDefault(); ev.stopPropagation(); peClosePop(); if(PE.stage) PE.stage.focus(); } });
   inp.addEventListener('blur', ()=> peClosePop());
   PE.stage.appendChild(inp); PE.pop = {el:inp, m:m};
   setTimeout(()=> inp.focus(), 0);
@@ -1813,6 +1838,33 @@ function peClosePop(){
   if(p.m.kind === 'label' && !String(p.m.text || '').trim()){ PE.s.marks = PE.s.marks.filter(x=> x !== p.m); if(PE.sel === p.m.id) PE.sel = null; }
   peChanged();
 }
+/* 줄 아래 꾸미기 줄: 글 = 글자색·배경색·크기·효과, 화살표 = 색·효과, 「기본으로」 = 전부 지움.
+   바꿀 때 peRenderRows 를 부르지 않음(색 고르는 창이 열린 채 줄이 다시 그려지면 창이 닫힘) */
+const PE_SIZES = [[20,'조금 크게'], [28,'크게'], [40,'아주 크게']];
+const PE_FX_LABEL = [['','기본(미끄러지듯)'], ['fade','나타나기'], ['zoom','확대'], ['pop','튀어오르기']];
+const PE_FX_ARROW = [['','기본(그려지듯)'], ['fade','나타나기']];
+function peHex6(c, def){ const v = PHG.phSafeColor(c); if(/^#[0-9a-fA-F]{6}$/.test(v)) return v.toLowerCase(); if(/^#[0-9a-fA-F]{3}$/.test(v)) return '#'+v[1]+v[1]+v[2]+v[2]+v[3]+v[3]; return def; }
+function peDeco(m){
+  const d = ce('div','pe-deco');
+  const add = (t, c)=>{ const w = ce('label'); w.appendChild(document.createTextNode(t)); w.appendChild(c); d.appendChild(w); };
+  const put = (k, v)=>{ if(v === '' || v == null) delete m[k]; else m[k] = v; peRedraw(); schedulePreview(); };
+  const col = (k, def)=>{ const c = ce('input'); c.type = 'color'; c.value = peHex6(m[k], def); c.addEventListener('input', ()=>{ snapOnce(c); put(k, c.value); }); return c; };
+  const sel = (opts, cur, k, num)=>{ const s = ce('select'); opts.forEach(o=>{ const op = ce('option'); op.value = o[0]; op.textContent = o[1]; if(String(o[0]) === String(cur)) op.selected = true; s.appendChild(op); }); s.addEventListener('change', ()=>{ snap(); put(k, num && s.value !== '' ? +s.value : s.value); }); return s; };
+  if(m.kind === 'arrow'){
+    add('화살표 색', col('color', '#e5383b'));
+    add('효과', sel(PE_FX_ARROW, m.fx || '', 'fx'));
+  } else {
+    add('글자색', col('color', '#16222f')); add('배경색', col('bg', '#ffffff'));
+    const sz = PE_SIZES.map(o=> [o[0], o[1]]); const cur = m.size > 0 ? m.size : '';
+    if(cur !== '' && !sz.some(o=> o[0] === cur)) sz.unshift([cur, '지금 '+cur]);   /* 가져온 글처럼 목록에 없는 크기는 그 값을 그대로 보여 줌 */
+    add('크기', sel([['', '기본']].concat(sz), cur, 'size', true));
+    add('효과', sel(PE_FX_LABEL, m.fx || '', 'fx'));
+  }
+  const rs = ce('button','mini-btn'); rs.type = 'button'; rs.textContent = '기본으로'; rs.title = '색·크기·효과를 처음 모양으로';
+  rs.onclick = ()=>{ snap(); delete m.color; delete m.bg; delete m.size; delete m.fx; peChanged(); };
+  d.appendChild(rs);
+  return d;
+}
 function peRenderRows(){
   const rep = PE.rows, s = PE.s; if(!rep || !rep.isConnected) return;
   rep.innerHTML = '';
@@ -1821,11 +1873,11 @@ function peRenderRows(){
     const row = ce('div','rep-row'+(m.id === PE.sel ? ' pe-sel' : ''));
     const r = ce('div','pe-mrow');
     r.appendChild(ce('span','kind', m.kind === 'arrow' ? '➚' : 'Ｔ'));
-    const ti = ce('input','input'); ti.type = 'text'; ti.value = m.text || ''; ti.placeholder = m.kind === 'arrow' ? '(화살표만 · 글 없음)' : '설명 글';
+    const ti = ce('textarea','input'); ti.rows = 1; ti.style.resize = 'vertical'; ti.value = m.text || ''; ti.placeholder = m.kind === 'arrow' ? '(화살표만 · 글 없음)' : '설명 글 (Enter = 줄바꿈)';
     ti.addEventListener('input', ()=>{ snapOnce(ti); m.text = ti.value; peRedraw(); schedulePreview(); });
     r.appendChild(ti);
     const stp = ce('span','stp'); stp.appendChild(document.createTextNode('순서'));
-    const sn = ce('input','input num'); sn.type = 'number'; sn.min = '0'; sn.value = m.step;
+    const sn = ce('input','input num'); sn.type = 'number'; sn.min = '0'; sn.value = m.step ? m.step : ''; sn.placeholder = '바로';
     sn.addEventListener('input', ()=>{ snapOnce(sn); m.step = Math.max(0, parseInt(sn.value, 10) || 0); peRedraw(); schedulePreview(); });
     stp.appendChild(sn); r.appendChild(stp);
     const mv = ce('div','rr-move');
@@ -1834,8 +1886,8 @@ function peRenderRows(){
     mv.appendChild(up); mv.appendChild(dn); r.appendChild(mv);
     const del = ce('button','rr-del'); del.type = 'button'; del.textContent = '×'; del.title = '삭제'; del.onclick = ()=>{ snap(); peRemove(m.id); };
     r.appendChild(del);
-    row.appendChild(r);
-    row.addEventListener('click', e=>{ if(e.target.closest('input,button')) return; PE.sel = m.id; peRedraw(); peRenderRows(); });
+    row.appendChild(r); row.appendChild(peDeco(m));
+    row.addEventListener('click', e=>{ if(e.target.closest('input,button,select,textarea')) return; PE.sel = m.id; peRedraw(); peRenderRows(); });
     rep.appendChild(row);
   });
 }
@@ -1848,6 +1900,7 @@ function photoEditor(s){
     b.onclick = ()=> peSetTool(t[0]); PE.btns[t[0]] = b; bar.appendChild(b);
   });
   const bb = ce('button','pe-tool'); bb.type = 'button'; bb.innerHTML = '⤳ 꺾기<kbd>R</kbd>'; bb.onclick = peBend; bar.appendChild(bb);
+  const sb = ce('button','pe-tool'); sb.type = 'button'; sb.innerHTML = '⟍ 펴기<kbd>Shift+R</kbd>'; sb.onclick = peStraighten; bar.appendChild(sb);
   wrap.appendChild(bar);
   const st = ce('div','pe-stage t-'+PE.tool); st.tabIndex = 0;
   const a = (s.image.w && s.image.h) ? s.image.w/s.image.h : 1.5;
@@ -1875,12 +1928,12 @@ function photoEditor(s){
       const a0 = PE.pend;
       if(Math.hypot((p[0]-a0[0])*PE.W/100, (p[1]-a0[1])*PE.H/100) < 12){ toast('끝점을 조금 더 멀리 눌러 주세요'); return; }
       snap(); PE.pend = null; PE.hover = null;
-      const m = {id:id(), kind:'arrow', pts:[a0, p], text:'', step:phNextStep(s.marks)};
+      const m = {id:id(), kind:'arrow', pts:[a0, p], text:'', step:0};
       s.marks.push(m); PE.sel = m.id; peChanged(); peOpenPop(m); return;
     }
     if(tool === 'text'){
       e.preventDefault(); snap();
-      const m = {id:id(), kind:'label', x:p[0], y:p[1], text:'', step:phNextStep(s.marks)};
+      const m = {id:id(), kind:'label', x:p[0], y:p[1], text:'', step:0};
       s.marks.push(m); PE.sel = m.id; peChanged(); peOpenPop(m); return;
     }
     const hit = peHit(e);
@@ -1911,14 +1964,28 @@ function photoEditor(s){
   });
   const dragEnd = ()=>{ if(PE.drag){ const moved = PE.drag.moved; PE.drag = null; if(moved) schedulePreview(); } };
   st.addEventListener('pointerup', dragEnd); st.addEventListener('pointercancel', dragEnd);
+  st.addEventListener('dblclick', e=>{   /* 꺾임점(처음·끝 아닌 손잡이) 두 번 누르면 그 점 빼기 */
+    const h = peHit(e); if(!h || h.part !== 'pt') return;
+    const np = phBendRemove(h.m.pts, h.i); if(np === h.m.pts) return;
+    snap(); h.m.pts = np; PE.pend = null; PE.hover = null; peChanged();
+  });
   wrap.appendChild(st);
-  wrap.appendChild(ce('p','pe-help','① 곧은 화살표: 사진을 두 번(시작점→끝점) 누르고 글을 적어요 ② 꺾으려면 화살표를 고른 뒤 「꺾기」 → 가운데 손잡이를 끌어요 ③ 화살표·글은 끌어서 옮겨요. 숫자 = 클릭 몇 번째에 나오는지예요.'));
+  wrap.appendChild(ce('p','pe-help','① 곧은 화살표: 사진을 두 번(시작점→끝점) 누르고 글을 적어요 ② 꺾으려면 화살표를 고른 뒤 「꺾기」(R) → 꺾임점을 끌어요. R을 또 누르면 꺾임점이 늘고, 「펴기」(Shift+R)는 곧게, 꺾임점을 두 번 누르면 그 점이 빠져요 ③ 화살표·글은 끌어서 옮겨요. 숫자 = 클릭 몇 번째에 나오는지(없으면 바로)예요.'));
   return wrap;
 }
 function marksField(s){
-  const f = ce('div','field pe-marks'); const lab = ce('label'); lab.textContent = '표시 목록'; const tip = ce('span','tip'); tip.textContent = '순서 = 발표 중 클릭할 때마다 하나씩 나옴'; lab.appendChild(tip); f.appendChild(lab);
+  const f = ce('div','field pe-marks'); const lab = ce('label'); lab.textContent = '표시 목록'; const tip = ce('span','tip'); tip.textContent = '순서: 비우면 바로 나옴 · 숫자 = 클릭 몇 번째에 나올지'; lab.appendChild(tip); f.appendChild(lab);
   const rep = ce('div','rep'); f.appendChild(rep); PE.rows = rep;
   return f;
+}
+/* 사진 고르기·붙여넣기 공통: 올리고(attachPhoto 는 부르는 즉시 「올리는 중」을 세움) 끝나면 화면 갱신 */
+async function photoPick(s, file, okMsg){
+  let res = '';
+  try{ res = await attachPhoto(s, file); if(res === 'ok') toast(okMsg || '사진을 넣었어요'); }
+  catch(e){ toast('사진을 못 넣었어요: '+(e.message || e), 'err'); }
+  if(deck.slides[sel] && deck.slides[sel].sid === s.sid) renderEditor();   /* 지금 보고 있는 장이면 버튼·사진 상태를 새로 그림 */
+  renderList();   /* 올리기 실패 표시(⚠)를 목록에도 반영 */
+  if(res === 'ok'){ bootPreview(); scheduleAutosave(); }
 }
 FORMS.photo = s=>{
   addField('상단 라벨','(선택)', mkInput(s.kicker, v=>s.kicker=v, ''));
@@ -1927,16 +1994,11 @@ FORMS.photo = s=>{
   const fi = ce('input'); fi.type = 'file'; fi.accept = 'image/*'; fi.style.display = 'none';
   const ub = ce('button','rep-add'); ub.type = 'button'; ub.style.width = '100%'; ub.textContent = PH_PENDING.has(sidOf(s)) ? '⏳ 사진 올리는 중… (다시 고르면 새 사진으로 바뀜)' : s.image ? '🖼 사진 바꾸기' : '🖼 사진 올리기';
   ub.onclick = ()=> fi.click();
-  fi.onchange = async ()=>{
+  fi.onchange = ()=>{
     const file = fi.files && fi.files[0]; fi.value = ''; if(!file) return;
     if(!/^image\//.test(file.type)){ toast('이미지 파일을 골라 주세요', 'err'); return; }
     ub.textContent = '⏳ 사진 올리는 중… (다시 고르면 새 사진으로 바뀜)';
-    let res = '';
-    try{ res = await attachPhoto(s, file); if(res === 'ok') toast('사진을 넣었어요'); }
-    catch(e){ toast('사진을 못 넣었어요: '+(e.message || e), 'err'); }
-    if(deck.slides[sel] && deck.slides[sel].sid === s.sid) renderEditor();   /* 지금 보고 있는 장이면 버튼·사진 상태를 새로 그림 */
-    renderList();   /* 올리기 실패 표시(⚠)를 목록에도 반영 */
-    if(res === 'ok'){ bootPreview(); scheduleAutosave(); }
+    photoPick(s, file);
   };
   f.appendChild(ub); f.appendChild(fi); B.editor.appendChild(f);
   if(PH_FAILED.has(s.sid)) B.editor.appendChild(ce('div','hintline','⚠ 사진 올리기 실패 — 위 「사진 바꾸기」로 다시 골라 주세요. 다시 고르기 전에는 서버 저장이 막혀요. ('+PH_FAILED.get(s.sid)+')'));
@@ -1951,6 +2013,12 @@ function pickSlide(i){
   sel = i; renderList(); renderEditor(); gotoPreview(i);
   const it = B.slideList.children[i]; if(it && it.scrollIntoView) it.scrollIntoView({block:'nearest'});
 }
+B.slideGo.addEventListener('keydown', e=>{
+  if(e.key !== 'Enter' || e.isComposing) return;
+  e.preventDefault(); const n = parseInt(B.slideGo.value, 10), N = deck.slides.length;
+  if(n >= 1 && n <= N){ pickSlide(n-1); B.slideGo.value = ''; }
+  else toast('1~'+N+' 사이 번호를 넣어 주세요', 'err');
+});
 function runShortcut(act){
   switch(act){
     case 'undo': undo(); break;
@@ -1963,6 +2031,7 @@ function runShortcut(act){
     case 'tool-select': peSetTool('select'); break;
     case 'tool-erase': peSetTool('erase'); break;
     case 'bend': peBend(); break;
+    case 'straighten': peStraighten(); break;
     case 'delete': if(PE.sel){ snap(); peRemove(PE.sel); } break;
     case 'cancel':
       if(PE.pop) peClosePop();
@@ -1971,6 +2040,23 @@ function runShortcut(act){
       break;
   }
 }
+/* 클립보드의 그림(Ctrl+V) → 사진 없는 사진 장이면 그 장에, 아니면 지금 장 뒤에 새 사진 장을 끼워 넣음. 입력 칸에서 글도 함께 오면 기본 동작(글 붙여넣기) */
+document.addEventListener('paste', e=>{
+  if(HUB.view || B.help.classList.contains('show')) return;
+  const items = Array.from((e.clipboardData && e.clipboardData.items) || []);
+  const it = items.find(x=> x.kind === 'file' && /^image\//.test(x.type)); if(!it) return;
+  if(isTypingTarget(e.target) && items.some(x=> x.type === 'text/plain')) return;
+  const file = it.getAsFile(); if(!file) return;
+  e.preventDefault();
+  let s = deck.slides[sel], msg = '사진을 붙여 넣었어요', fresh = false;
+  if(!(s && s.type === 'photo' && !s.image)){
+    snap(); s = blank('photo'); sidOf(s); fresh = true;
+    const at = deck.slides.length ? sel+1 : 0; deck.slides.splice(at, 0, s); sel = at; msg = '붙여 넣은 사진을 새 장에 넣었어요';
+  }
+  photoPick(s, file, msg);   /* 부른 즉시 「올리는 중」이 서므로 바로 다시 그리면 표시가 보임 */
+  renderList(); renderEditor();
+  if(fresh){ bootPreview(); scheduleAutosave(); }
+});
 document.addEventListener('keydown', e=>{
   if(HUB.view) return;
   if(B.help.classList.contains('show')){ if(e.key === 'Escape') B.help.classList.remove('show'); return; }
@@ -1984,7 +2070,7 @@ document.addEventListener('keydown', e=>{
 function renderEditor(){
   B.editor.innerHTML='';
   const s = deck.slides[sel];
-  if(!s){ B.editor.innerHTML='<div class="empty"><div class="big">◔</div><p>왼쪽에서 슬라이드를 추가하면<br>여기서 내용을 채울 수 있어요.</p></div>'; B.typeBadge.textContent='편집'; B.miniActions.innerHTML=''; return; }
+  if(!s){ B.editor.innerHTML='<div class="empty"><div class="big">◔</div><p>왼쪽에서 슬라이드를 추가하면<br>여기서 내용을 채울 수 있어요.</p></div>'; B.typeBadge.textContent=''; B.miniActions.innerHTML=''; return; }
   B.typeBadge.textContent = TYPES[s.type].name;
   B.miniActions.innerHTML='';
   const dup=ce('button','mini-btn'); dup.type='button'; dup.textContent='복제'; dup.onclick=dupSlide;
