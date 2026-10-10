@@ -1583,7 +1583,8 @@ function snap(){ REDO.length = 0; const t = snapNow(); if(UNDO[UNDO.length-1] ==
 /* 입력 칸은 칸마다 처음 고칠 때 한 번만 기록(칸을 벗어나면 다시 새로 셈) — 칸에 커서만 둔 것으로는 기록·다시를 건드리지 않음 */
 function snapOnce(el){ if(el._sn) return; el._sn = true; snap(); el.addEventListener('blur', ()=>{ el._sn = false; }, {once:true}); }
 /* 파일 불러오기·새로·튜토리얼·허브 덱 열기처럼 덱을 통째로 바꿀 땐 되돌리기·다시 기록을 비움 */
-function resetHistory(){ UNDO.length = 0; REDO.length = 0; SNAP_DATA.length = 0; }
+let DECK_GEN = 0;   /* 덱 세대 번호: 덱을 통째로 바꿀 때마다 올라감. 사진 올리기는 시작 때 세대를 기억해, 끝났을 때 세대가 다르면 다른 덱의 일이라 버림(같은 덱 안 되돌리기·다시는 세대 유지) */
+function resetHistory(){ UNDO.length = 0; REDO.length = 0; SNAP_DATA.length = 0; DECK_GEN++; PH_PENDING.clear(); PH_FAILED.clear(); PH_JOBS.clear(); }
 function restoreSnap(t){
   const o = snapDecode(t, SNAP_DATA); deck = o.d; deck.slides.forEach(sidOf); sel = Math.max(0, Math.min(o.s, deck.slides.length-1));
   B.deckName.value = deck.meta.title || ''; PE.sel = null; PE.pend = null; PE.drag = null;
@@ -1628,15 +1629,16 @@ function attachPhoto(s, file){
   return job;
 }
 async function attachPhotoRun(s, file){
-  const sid = sidOf(s), req = ++phSeq; PH_PENDING.set(sid, req); PH_FAILED.delete(sid);   /* 다시 고르면 실패 표시가 풀림 */
+  const sid = sidOf(s), req = ++phSeq, gen = DECK_GEN; PH_PENDING.set(sid, req); PH_FAILED.delete(sid);   /* 다시 고르면 실패 표시가 풀림 */
   try{
     const r = await downscale(file);
     const image = (HUB.on && HUB.canEdit) ? {path: await hubUpload(r.blob), w:r.w, h:r.h} : {src: await blobToDataUrl(r.blob), w:r.w, h:r.h};
+    if(gen !== DECK_GEN) return 'gone';   /* 그 사이 덱이 통째로 바뀜(파일 불러오기·새로·허브 덱 열기…) — 다른 덱의 일이라 적용·표시 안 함 */
     if(commitPhoto(sid, ()=> PH_PENDING.get(sid) === req, image)){ PH_FAILED.delete(sid); if(HUB.on) markDirty(); return 'ok'; }
     return slideById(sid) ? 'stale' : 'gone';
   } catch(e){
     /* 지금 덱에 있는 슬라이드(같은 sid)의 최신 요청이 실패했을 때만 표시(새 요청으로 대체됐거나 삭제·되돌리기로 슬라이드가 사라진 것의 실패는 무시) */
-    if(PH_PENDING.get(sid) === req && slideById(sid)) PH_FAILED.set(sid, (e && e.message) || '실패');
+    if(gen === DECK_GEN && PH_PENDING.get(sid) === req && slideById(sid)) PH_FAILED.set(sid, (e && e.message) || '실패');
     throw e;
   } finally { if(PH_PENDING.get(sid) === req) PH_PENDING.delete(sid); }
 }
@@ -2032,12 +2034,13 @@ function photoNeedsUpload(s){ return s.type === 'photo' && s.image && !s.image.p
 async function hubUploadInline(){
   /* 올리는 동안 사진이 바뀌었거나(같은 sid 슬라이드의 사진이 다른 것) 슬라이드가 덱에서 빠졌으면 옛 사진 경로를 적용하지 않고, 지금 덱에 남은 것만 이어서 올림 */
   for(let pass = 0; pass < 6; pass++){
-    const todo = deck.slides.filter(photoNeedsUpload);
+    const todo = deck.slides.filter(photoNeedsUpload), gen = DECK_GEN;
     if(!todo.length) return;
     for(const s of todo){
+      if(gen !== DECK_GEN) break;   /* 덱이 통째로 바뀌었으면 옛 덱의 남은 슬라이드는 건너뛰고 새 덱으로 다시 시작 */
       const sid = sidOf(s), orig = s.image;
       const path = await hubUpload(await (await fetch(orig.src)).blob());
-      commitPhoto(sid, ()=>{ const c = slideById(sid); return !!(c && c.image && !c.image.path && c.image.src === orig.src); }, {path:path, w:orig.w, h:orig.h});
+      commitPhoto(sid, ()=>{ const c = slideById(sid); return gen === DECK_GEN && !!(c && c.image && !c.image.path && c.image.src === orig.src); }, {path:path, w:orig.w, h:orig.h});
     }
   }
   if(deck.slides.some(photoNeedsUpload)) throw new Error('사진이 계속 바뀌어 올리지 못했어요. 잠시 뒤 다시 저장해 주세요');
