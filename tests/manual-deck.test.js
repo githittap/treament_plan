@@ -465,7 +465,7 @@ test('[4차-2] 사진 올리는 중 저장하면 끝난 뒤 최신 사진으로 
   assert.equal(c.HUB.dirty, true, '변경 번호는 기다리기 전에 잡으므로, 기다리는 동안 붙은 사진은 한 번 더 저장해야 「저장됨」(보수적)'); assert.ok(c.toasts.some(t => /다시 저장/.test(t[0])));
   c.HUB.exists = true; await c.hubSave(); assert.equal(c.HUB.dirty, false, '대기 없이 다시 저장하면 저장됨');
   // 닫기 경고: 첨부 중에도 뜸
-  assert.match(mainJs, /beforeunload', e=>\{ if\(HUB\.on \? \(\(HUB\.dirty \|\| PH_JOBS\.size\) && !HUB\.view\)/);   // 허브 모드 조건은 그대로(허브 밖 조건은 [8차] 에서 시험)
+  assert.match(mainJs, /function mdeckUnsavedNow\(\)\{ return HUB\.on \? \(\(HUB\.dirty \|\| PH_JOBS\.size > 0\) && !HUB\.view\) : \(PH_JOBS\.size > 0 \|\| asPending\); \}/);   // 허브 모드 조건은 그대로(허브 밖 조건은 [8차] 에서 시험)
   // 사진 선택기는 올리는 작업 목록(PH_JOBS)을 거침(직접 attachPhotoRun 을 부르지 않음)
   assert.doesNotMatch(fnSrc(mainJs, 'FORMS.photo = s=>'), /attachPhotoRun/);
 });
@@ -650,7 +650,7 @@ test('[8차-2] 허브 밖(이 브라우저 저장)에서도 사진 처리 중이
     blobToDataUrl: b => new Promise((ok, no) => { gates[b.name] = { ok: () => ok('data:image/png;base64,' + b.name), no: m => no(new Error(m)) }; }) });
   c.HUB.on = false;
   vm.runInContext(['let asTimer = 0, asPending = false; const LS_KEY = "k";', fnSrc(mainJs, 'function scheduleAutosave'), fnSrc(mainJs, 'function flushAutosave'), fnSrc(mainJs, 'async function waitPhotos'), fnSrc(mainJs, 'async function localSave')].join('\n'), c);
-  const reg = mainJs.slice(mainJs.indexOf("window.addEventListener('beforeunload'"), mainJs.indexOf('\n', mainJs.indexOf("document.addEventListener('visibilitychange'")) + 1);
+  const reg = mainJs.slice(mainJs.indexOf('function mdeckUnsavedNow'), mainJs.indexOf('\n', mainJs.indexOf("document.addEventListener('visibilitychange'")) + 1);
   vm.runInContext(reg, c);
   const ev = e => vm.runInContext(e, c), tick = () => new Promise(r => setTimeout(r, 20));
   const unload = () => { const e = { prevented: false, preventDefault() { this.prevented = true; } }; win.beforeunload(e); return e.prevented; };
@@ -686,4 +686,56 @@ test('[8차-2] 허브 밖(이 브라우저 저장)에서도 사진 처리 중이
   for (const k of Object.keys(store)) delete store[k];
   c.HUB.view = false; c.HUB.dirty = false; vm.runInContext('asPending = true', c); assert.equal(unload(), false, '허브 모드에서는 이 브라우저 자동저장 대기를 보지 않음'); vm.runInContext('flushAutosave()', c); // 허브 모드는 flush 도 안 함
   assert.equal(saved(), null);
+});
+
+test('[9차] 허브 안에서 화면을 바꾸거나 iframe 을 치우는 모든 경로가 제작기의 미저장 상태(mdeckUnsaved)를 공통 한 곳(toolsLeaveOk)에서 확인한다 — 취소하면 이동 중단, 다른 도구는 영향 없음', () => {
+  const GUARD_MSG = '저장 안 한 내용이 있어요. 나갈까요?';
+  // 시험용 허브 환경: iframe.tools-frame 목록과 confirm 응답을 바꿔 가며 같은 코드(hub-tools 블록)를 돌림
+  const mk = (frames, answer = false) => {
+    const confirms = [], renders = [], navs = [];
+    const ctx = { ME: { id: 'u', role: 'owner' }, esc: s => String(s == null ? '' : s), $: () => null, TAB: 'tools', PAY_VIEW: 'x', CAL_VIEW: 'all', renders, navs, confirms,
+      render() { renders.push(1); }, renderNav() { navs.push(1); }, confirm: m => { confirms.push(m); return answer; }, document: { querySelectorAll: sel => (sel === 'iframe.tools-frame' ? frames : []) },
+      hubT: (k, d, v) => (v ? String(d).replace(/\{([a-z_]+)\}/g, (m, n) => v[n]) : String(d)) };
+    vm.createContext(ctx);
+    const goSrc = hr.match(/function go\(k\)\{[^\r\n]+/)[0], recallSrc = hr.match(/async function recallShowJournal\(id\)\{[^\r\n]+/)[0];
+    vm.runInContext(toolsBlock + ';' + goSrc + ';' + recallSrc + ';this.api={toolsLeaveOk,openTool,closeTool,openToolFromHeader,mdeckOpen,mdeckBack,go,recallShowJournal,MDECK,get open(){return TOOLS_OPEN;},set open(v){TOOLS_OPEN=v;}};', ctx);
+    ctx.consultationEdit = async () => { };
+    return ctx;
+  };
+  const dirtyFrame = { contentWindow: { mdeckUnsaved: () => true } }, cleanFrame = { contentWindow: { mdeckUnsaved: () => false } }, otherTool = { contentWindow: {} };
+  const crossOrigin = { get contentWindow() { throw new Error('cross-origin'); } };
+  // 공통 확인: 도구가 함수를 안 내놓으면(다른 도구)·깨끗하면·접근 불가면 통과(확인창 없음), 미저장이면 확인창(글은 hubT 기본 글)
+  for (const frames of [[], [otherTool], [cleanFrame], [crossOrigin], [otherTool, cleanFrame]]) { const c = mk(frames); assert.equal(c.api.toolsLeaveOk(), true); assert.equal(c.confirms.length, 0, '확인창 없음'); }
+  { const c = mk([otherTool, dirtyFrame], false); assert.equal(c.api.toolsLeaveOk(), false); assert.deepEqual(c.confirms, [GUARD_MSG]); assert.equal(mk([dirtyFrame], true).api.toolsLeaveOk(), true); }
+  // 미저장일 때 모든 이동 경로: 취소하면 상태가 안 바뀌고 다시 그리지도 않음 / 확인하면 진행
+  const paths = {
+    go: c => c.api.go('home'), openTool: c => c.api.openTool('news'), closeTool: c => c.api.closeTool(), openToolFromHeader: c => c.api.openToolFromHeader('treatment_plan'),
+    mdeckOpen: c => c.api.mdeckOpen('list', ''), mdeckBack: c => c.api.mdeckBack(), recallShowJournal: c => c.api.recallShowJournal('j1')
+  };
+  for (const [name, run] of Object.entries(paths)) {
+    const no = mk([dirtyFrame], false); no.api.open = 'manual_deck'; no.api.MDECK.mode = 'edit'; no.api.MDECK.id = '11111111-1111-4111-8111-111111111111';
+    run(no); assert.equal(no.renders.length, 0, name + ': 취소하면 화면을 안 바꿈'); assert.equal(no.api.open, 'manual_deck', name + ': 열린 도구 그대로'); assert.equal(no.TAB, 'tools', name + ': 탭 그대로'); assert.equal(no.api.MDECK.mode, 'edit', name + ': 편집 화면 그대로'); assert.deepEqual(no.confirms, [GUARD_MSG], name);
+    const yes = mk([dirtyFrame], true); yes.api.open = 'manual_deck'; yes.api.MDECK.mode = 'edit'; run(yes); assert.ok(yes.renders.length >= 1, name + ': 확인하면 이동'); assert.deepEqual(yes.confirms, [GUARD_MSG]);
+    const clean = mk([cleanFrame], false); clean.api.open = 'manual_deck'; run(clean); assert.equal(clean.confirms.length, 0, name + ': 깨끗하면 확인창 없음'); assert.ok(clean.renders.length >= 1, name + ': 바로 이동');
+    const other = mk([otherTool], false); other.api.open = 'news'; run(other); assert.equal(other.confirms.length, 0, name + ': 다른 도구엔 영향 없음'); assert.ok(other.renders.length >= 1);
+  }
+  // 위 탭 메뉴(go)는 허브 탭을 실제로 바꾸는 쪽까지 막음, 상담일지 이동도 마찬가지
+  { const c = mk([dirtyFrame], false); c.api.go('home'); assert.equal(c.TAB, 'tools'); assert.equal(c.navs.length, 0); c.api.recallShowJournal('j'); assert.equal(c.TAB, 'tools'); const y = mk([dirtyFrame], true); y.api.go('home'); assert.equal(y.TAB, 'home'); }
+  // 전수 검사: TAB / TOOLS_OPEN 을 바꾸는 함수는 전부 확인 경로를 지나거나(go·openTool·closeTool·openToolFromHeader·recallShowJournal), 처음 화면 정하기·그리기 같은 내부용 허용 목록에 있음
+  const lines = hr.split(/\r?\n/); let fn = '(top)'; const found = {};
+  lines.forEach((l, i) => { const m = l.match(/^\s*(?:async\s+)?function\s+(\w+)/); if (m) fn = m[1]; if (/\bTOOLS_OPEN\s*=(?!=)|(^|[^A-Za-z_.])TAB\s*=(?!=)/.test(l) && !/^\s*(let|const) /.test(l)) (found[fn] = found[fn] || []).push(i + 1); });
+  const guarded = ['go', 'openTool', 'closeTool', 'openToolFromHeader', 'recallShowJournal'], internal = ['applyInboxFirst', 'applyTabFromUrl', 'render', 'renderTools', 'onAuthed'];
+  for (const name of Object.keys(found)) assert.ok(guarded.includes(name) || internal.includes(name), '확인을 안 거치는 이동 경로가 새로 생김: ' + name + ' (줄 ' + found[name].join(',') + ')');
+  for (const name of guarded) { const m = hr.match(new RegExp('(?:async )?function ' + name + '\\([^)]*\\)\\{[^\\r\\n]+')); assert.ok(m && /toolsLeaveOk\(\)/.test(m[0]), name + ' 이(가) toolsLeaveOk 를 부름'); }
+  assert.match(fnSrc(toolsBlock, 'function mdeckOpen'), /toolsLeaveOk\(\)/); assert.match(fnSrc(toolsBlock, 'function mdeckBack'), /mdeckOpen\('list',''\)/);
+  assert.match(hr, /\$\('#logoutBtn'\)\.addEventListener\('click',async\(\)=>\{if\(!toolsLeaveOk\(\)\)return;/, '로그아웃도 확인');
+  // 글은 글 고치기 키(mdeck.leave_unsaved)로, 옛 키는 없앰
+  assert.match(hr, /hubT\('mdeck\.leave_unsaved','저장 안 한 내용이 있어요\. 나갈까요\?'\)/); assert.ok(js.includes("add('mdeck.leave_unsaved'")); assert.ok(!js.includes('mdeck.leave_confirm') && !hr.includes('mdeck.leave_confirm'));
+  // 제작기: 하나의 함수를 window.mdeckUnsaved 로 내놓음 — 허브 모드(미저장·사진 처리 중·보기 전용 제외)와 허브 밖(사진 처리 중·자동저장 대기)
+  const env = { HUB: { on: true, dirty: false, view: false }, PH_JOBS: new Set(), asPending: false, window: { addEventListener() { } } };
+  vm.createContext(env); vm.runInContext(fnSrc(mainJs, 'function mdeckUnsavedNow') + ';window.mdeckUnsaved = mdeckUnsavedNow;', env);
+  const u = () => env.window.mdeckUnsaved(); assert.equal(u(), false);
+  env.HUB.dirty = true; assert.equal(u(), true, '허브: 저장 안 됨'); env.HUB.dirty = false; env.PH_JOBS.add({}); assert.equal(u(), true, '허브: 사진 처리 중'); env.PH_JOBS.clear(); env.HUB.dirty = true; env.HUB.view = true; assert.equal(u(), false, '보기 전용은 해당 없음');
+  env.HUB.on = false; env.HUB.view = false; assert.equal(u(), false); env.asPending = true; assert.equal(u(), true, '허브 밖: 자동저장 대기'); env.asPending = false; env.PH_JOBS.add({}); assert.equal(u(), true, '허브 밖: 사진 처리 중');
+  assert.match(mainJs, /window\.mdeckUnsaved = mdeckUnsavedNow;/); assert.match(mainJs, /beforeunload', e=>\{ if\(mdeckUnsavedNow\(\)\)/);
 });

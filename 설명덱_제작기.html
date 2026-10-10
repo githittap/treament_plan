@@ -2147,7 +2147,10 @@ async function hubBoot(){
   B.saveBtn.innerHTML = '<span class="ico">❒</span>서버에 저장';
   renderAll(); bootPreview(); setDirty(!HUB.exists);
 }
-window.addEventListener('beforeunload', e=>{ if(HUB.on ? ((HUB.dirty || PH_JOBS.size) && !HUB.view) : (PH_JOBS.size > 0 || asPending)){ e.preventDefault(); e.returnValue = ''; } });
+/* 저장 안 한 내용(또는 사진 처리 중·자동저장 대기)이 있는가 — 닫기 경고에도, 허브(hr.html)가 iframe 을 치우기 전 확인에도 씀 */
+function mdeckUnsavedNow(){ return HUB.on ? ((HUB.dirty || PH_JOBS.size > 0) && !HUB.view) : (PH_JOBS.size > 0 || asPending); }
+window.mdeckUnsaved = mdeckUnsavedNow;
+window.addEventListener('beforeunload', e=>{ if(mdeckUnsavedNow()){ e.preventDefault(); e.returnValue = ''; } });
 /* 허브 밖(이 브라우저 저장): 탭을 닫거나 숨기기 직전에 대기 중인 자동저장을 바로 실행 */
 window.addEventListener('pagehide', flushAutosave);
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'hidden') flushAutosave(); });
