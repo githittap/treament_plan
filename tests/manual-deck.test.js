@@ -112,28 +112,28 @@ test('글 크기: 사진 위 설명 글은 14px 이상, 확대해도 같은 크�
   assert.match(css, /\.pv\{[^}]*touch-action:none/);
 });
 
-test('편집 단축키: 글 입력 칸(입력·글상자·선택칸·편집영역)에서는 하나도 안 먹고, 그 밖에서는 치료계획 도구와 같은 글쇠', () => {
+test('편집 단축키: 글 입력 칸(입력·글상자·선택칸·편집영역)에서는 하나도 안 먹고, 그 밖에서는 원장이 정한 글쇠(Q 화살표·R 꺾기·Ctrl+E 복제·↑↓ 장 이동)', () => {
   const k = (code, extra) => Object.assign({ code, key: code.replace('Key', '').toLowerCase(), target: { tagName: 'DIV' } }, extra || {});
   const ctx = { photo: true, hasSel: true };
-  for (const tag of ['INPUT', 'TEXTAREA', 'SELECT']) for (const code of ['KeyJ', 'KeyT', 'KeyA', 'KeyE', 'KeyK', 'Delete', 'Escape', 'PageDown'])
+  for (const tag of ['INPUT', 'TEXTAREA', 'SELECT']) for (const code of ['KeyQ', 'KeyT', 'KeyA', 'KeyE', 'KeyR', 'Delete', 'Escape', 'ArrowDown'])
     assert.equal(pure.shortcutAction(k(code, { target: { tagName: tag } }), ctx), null, tag + ' ' + code);
   assert.equal(pure.shortcutAction(k('KeyZ', { ctrlKey: true, target: { tagName: 'INPUT' } }), ctx), null);
-  assert.equal(pure.shortcutAction(k('KeyJ', { target: { tagName: 'DIV', isContentEditable: true } }), ctx), null);
-  const want = { KeyJ: 'tool-arrow', KeyT: 'tool-text', KeyA: 'tool-select', KeyE: 'tool-erase', KeyK: 'bend', Delete: 'delete', Escape: 'cancel', PageDown: 'slide-next', PageUp: 'slide-prev' };
+  assert.equal(pure.shortcutAction(k('KeyQ', { target: { tagName: 'DIV', isContentEditable: true } }), ctx), null);
+  const want = { KeyQ: 'tool-arrow', KeyT: 'tool-text', KeyA: 'tool-select', KeyE: 'tool-erase', KeyR: 'bend', Delete: 'delete', Escape: 'cancel', ArrowDown: 'slide-next', ArrowUp: 'slide-prev' };
   for (const [code, act] of Object.entries(want)) assert.equal(pure.shortcutAction(k(code), ctx), act, code);
   assert.equal(pure.shortcutAction(k('KeyZ', { ctrlKey: true }), ctx), 'undo');
   assert.equal(pure.shortcutAction(k('KeyZ', { ctrlKey: true, shiftKey: true }), ctx), 'redo');
   assert.equal(pure.shortcutAction(k('KeyY', { ctrlKey: true }), ctx), 'redo');
-  assert.equal(pure.shortcutAction(k('KeyD', { ctrlKey: true }), ctx), 'dup');
-  assert.equal(pure.shortcutAction({ code: '', key: 'j', target: { tagName: 'DIV' } }, ctx), 'tool-arrow', '글쇠 코드가 없어도 글자로 인식');
-  assert.equal(pure.shortcutAction(k('KeyJ'), { photo: false }), null, '사진 슬라이드가 아니면 그리기 글쇠 무반응');
-  assert.equal(pure.shortcutAction(k('PageDown'), { photo: false }), 'slide-next', '장 이동·복제·되돌리기는 어느 장에서나');
+  assert.equal(pure.shortcutAction(k('KeyE', { ctrlKey: true }), ctx), 'dup');
+  assert.equal(pure.shortcutAction({ code: '', key: 'q', target: { tagName: 'DIV' } }, ctx), 'tool-arrow', '글쇠 코드가 없어도 글자로 인식');
+  assert.equal(pure.shortcutAction(k('KeyQ'), { photo: false }), null, '사진 슬라이드가 아니면 그리기 글쇠 무반응');
+  assert.equal(pure.shortcutAction(k('ArrowDown'), { photo: false }), 'slide-next', '장 이동·복제·되돌리기는 어느 장에서나');
   assert.equal(pure.shortcutAction(k('Delete'), { photo: true, hasSel: false }), null, '선택한 게 없으면 Delete 무반응(슬라이드를 실수로 안 지움)');
-  assert.equal(pure.shortcutAction(k('KeyJ', { altKey: true }), ctx), null);
-  assert.equal(pure.shortcutAction(k('KeyJ'), { photo: true, blocked: true }), null, '도움말 창이 열려 있으면 무반응');
+  assert.equal(pure.shortcutAction(k('KeyQ', { altKey: true }), ctx), null);
+  assert.equal(pure.shortcutAction(k('KeyQ'), { photo: true, blocked: true }), null, '도움말 창이 열려 있으면 무반응');
   // 화면 연결: 안내 칸 + 도움말 표 + 보기용 keydown과 따로(제작기 문서 vs 미리보기 문서)
   assert.match(maker, /id="keyHint"/); assert.match(maker, /편집 단축키 \(글 입력 칸에서는 안 먹어요\)/);
-  for (const key of ['Ctrl+Z', 'Ctrl+Y', 'Ctrl+D', 'Delete', 'Esc', 'PgDn / PgUp']) assert.ok(maker.includes('<kbd>' + key + '</kbd>'), key);
+  for (const key of ['Ctrl+Z', 'Ctrl+Y', 'Ctrl+E', 'Delete', 'Esc', '↓ / ↑', 'Q', 'R']) assert.ok(maker.includes('<kbd>' + key + '</kbd>'), key);
 });
 
 test('표시 순서 바꾸기·다음 단계 번호', () => {

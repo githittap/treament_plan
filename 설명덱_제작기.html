@@ -305,7 +305,7 @@
           <div class="mini-actions" id="miniActions"></div>
         </div>
         <div class="panel-body" id="editor"></div>
-        <div class="keyhint" id="keyHint"><span>⌨ 단축키</span><span><b>J</b>화살표</span><span><b>T</b>글</span><span><b>A</b>선택·이동</span><span><b>E</b>지우기</span><span><b>K</b>꺾기</span><span><b>Ctrl+Z/Y</b>되돌리기·다시</span><span><b>Ctrl+D</b>장 복제</span><span><b>Del</b>선택 지우기</span><span><b>Esc</b>취소</span><span><b>PgUp/PgDn</b>이전·다음 장</span></div>
+        <div class="keyhint" id="keyHint"><span>⌨ 단축키</span><span><b>Q</b>화살표</span><span><b>T</b>글</span><span><b>A</b>선택·이동</span><span><b>E</b>지우기</span><span><b>R</b>꺾기</span><span><b>Ctrl+Z/Y</b>되돌리기·다시</span><span><b>Ctrl+E</b>장 복제</span><span><b>Del</b>선택 지우기</span><span><b>Esc</b>취소</span><span><b>↑/↓</b>이전·다음 장</span></div>
       </section>
 
       <!-- PREVIEW -->
@@ -351,17 +351,17 @@
       </ul>
       <h3>편집 단축키 (글 입력 칸에서는 안 먹어요)</h3>
       <div class="keys">
-        <kbd>J</kbd><span>화살표 그리기 — 사진을 두 번(시작점·끝점) 눌러요</span>
+        <kbd>Q</kbd><span>화살표 그리기 — 사진을 두 번(시작점·끝점) 눌러요</span>
         <kbd>T</kbd><span>글 넣기 — 사진을 누른 자리에 설명 글</span>
         <kbd>A</kbd><span>선택·이동 — 화살표·글을 끌어 옮겨요</span>
         <kbd>E</kbd><span>지우기 — 누른 화살표·글을 지워요</span>
-        <kbd>K</kbd><span>꺾기 — 고른 화살표에 가운데 손잡이(다시 누르면 펴짐)</span>
+        <kbd>R</kbd><span>꺾기 — 고른 화살표에 가운데 손잡이(다시 누르면 펴짐)</span>
         <kbd>Ctrl+Z</kbd><span>되돌리기</span>
         <kbd>Ctrl+Y</kbd><span>다시 하기</span>
-        <kbd>Ctrl+D</kbd><span>지금 슬라이드 복제</span>
+        <kbd>Ctrl+E</kbd><span>지금 슬라이드 복제</span>
         <kbd>Delete</kbd><span>고른 화살표·글 지우기</span>
         <kbd>Esc</kbd><span>그리던 것 취소 · 선택 해제</span>
-        <kbd>PgDn / PgUp</kbd><span>다음 / 이전 슬라이드로</span>
+        <kbd>↓ / ↑</kbd><span>다음 / 이전 슬라이드로</span>
       </div>
       <button class="close" id="closeHelp2">닫기</button>
     </div>
@@ -1163,19 +1163,19 @@ function shortcutAction(e, ctx){
   if(mod && !e.altKey){
     if(c === 'KeyZ') return e.shiftKey ? 'redo' : 'undo';
     if(c === 'KeyY') return 'redo';
-    if(c === 'KeyD') return 'dup';
+    if(c === 'KeyE') return 'dup';
     return null;
   }
   if(e.altKey) return null;
-  if(c === 'PageDown') return 'slide-next';
-  if(c === 'PageUp') return 'slide-prev';
+  if(c === 'ArrowDown') return 'slide-next';
+  if(c === 'ArrowUp') return 'slide-prev';
   if(!ctx.photo) return null;
   switch(c){
-    case 'KeyJ': return 'tool-arrow';
+    case 'KeyQ': return 'tool-arrow';
     case 'KeyT': return 'tool-text';
     case 'KeyA': return 'tool-select';
     case 'KeyE': return 'tool-erase';
-    case 'KeyK': return 'bend';
+    case 'KeyR': return 'bend';
     case 'Delete': return ctx.hasSel ? 'delete' : null;
     case 'Escape': return 'cancel';
   }
@@ -1654,7 +1654,7 @@ async function hubWaitPhotos(){ while(PH_JOBS.size) await Promise.allSettled([..
 
 /* ---- 사진 슬라이드 편집 화면 ---- */
 const PE = {s:null, tool:'arrow', sel:null, pend:null, hover:null, drag:null, pop:null, stage:null, svg:null, lay:null, rows:null, btns:{}, W:0, H:0};
-const PE_TOOLS = [['arrow','➚ 화살표','J'], ['text','Ｔ 글 넣기','T'], ['select','✥ 선택·이동','A'], ['erase','⌫ 지우기','E']];
+const PE_TOOLS = [['arrow','➚ 화살표','Q'], ['text','Ｔ 글 넣기','T'], ['select','✥ 선택·이동','A'], ['erase','⌫ 지우기','E']];
 function peCur(){ return PE.s ? (PE.s.marks.find(m=> m.id === PE.sel) || null) : null; }
 function distSeg(p, a, b){
   const dx = b[0]-a[0], dy = b[1]-a[1], l2 = dx*dx + dy*dy;
@@ -1762,7 +1762,7 @@ function peClosePop(){
 function peRenderRows(){
   const rep = PE.rows, s = PE.s; if(!rep || !rep.isConnected) return;
   rep.innerHTML = '';
-  if(!s.marks.length){ rep.appendChild(ce('div','hintline','사진 위를 눌러 화살표(J)나 글(T)을 넣어 보세요. 화살표는 시작점·끝점 두 번 누르면 돼요.')); return; }
+  if(!s.marks.length){ rep.appendChild(ce('div','hintline','사진 위를 눌러 화살표(Q)나 글(T)을 넣어 보세요. 화살표는 시작점·끝점 두 번 누르면 돼요.')); return; }
   s.marks.forEach((m, i)=>{
     const row = ce('div','rep-row'+(m.id === PE.sel ? ' pe-sel' : ''));
     const r = ce('div','pe-mrow');
@@ -1793,7 +1793,7 @@ function photoEditor(s){
     const b = ce('button','pe-tool'+(PE.tool === t[0] ? ' on' : '')); b.type = 'button'; b.innerHTML = t[1]+'<kbd>'+t[2]+'</kbd>';
     b.onclick = ()=> peSetTool(t[0]); PE.btns[t[0]] = b; bar.appendChild(b);
   });
-  const bb = ce('button','pe-tool'); bb.type = 'button'; bb.innerHTML = '⤳ 꺾기<kbd>K</kbd>'; bb.onclick = peBend; bar.appendChild(bb);
+  const bb = ce('button','pe-tool'); bb.type = 'button'; bb.innerHTML = '⤳ 꺾기<kbd>R</kbd>'; bb.onclick = peBend; bar.appendChild(bb);
   wrap.appendChild(bar);
   const st = ce('div','pe-stage t-'+PE.tool); st.tabIndex = 0;
   const a = (s.image.w && s.image.h) ? s.image.w/s.image.h : 1.5;
