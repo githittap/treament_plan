@@ -155,7 +155,9 @@ export async function run(argv, deps = {}) {
   let key = '', existingRow = null;
   const names = ['SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_URL'];
   if (execute) {
-    const env = { ...readEnvFile(a.opt['keys-file'] || DEFAULT_ENV, names, fsImpl), ...(deps.env || {}) };
+    // 키 파일에 없으면 실행 환경변수(이 프로세스 안에서만)로도 받음 — 값은 출력·저장하지 않음
+    const procKey = deps.env ? {} : (process.env.SUPABASE_SERVICE_ROLE_KEY ? { SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY } : {});
+    const env = { ...readEnvFile(a.opt['keys-file'] || DEFAULT_ENV, names, fsImpl), ...procKey, ...(deps.env || {}) };
     key = env.SUPABASE_SERVICE_ROLE_KEY || '';
     if (!key) throw new Error('키 이름 SUPABASE_SERVICE_ROLE_KEY 가 비어 있음 — 원장이 ' + (a.opt['keys-file'] || DEFAULT_ENV) + ' 에 채워야 함');
   }
