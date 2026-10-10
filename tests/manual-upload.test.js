@@ -186,3 +186,37 @@ test('[2차-2] 충돌 재시도에서 그 사이 허브에서 지운 장을 되�
   const d = fakeSb({ rows: { [ID]: hubRow({ meta: { title: 't' }, slides: [ex(1), ex(2)] }) }, hooks: { beforePatch: st => { if (n++ === 0) { st.rows[ID].deck.slides.push(ex(3)); st.rows[ID].updated_at = '2026-10-10T00:00:09+00:00'; } } } });
   await run(args(dir, '--execute', '--append', '--deck-id', ID), { fetch: d.fetch, log() { }, env }); assert.deepEqual(srcs(d.rows[ID].deck), [1, 2, 3]);
 });
+
+test('[3차-2] --append 는 importedSrc(가져온 적 있는 srcSlide) 에 없는 장만 붙인다 — 허브에서 지운 장은 새 명령·새 실행에서도 되살아나지 않고, --force-src 로만 다시 넣는다', async () => {
+  const { run } = await load(); const dir = workdir();
+  const ex = n => ({ type: 'photo', title: '허브 ' + n, srcSlide: n, image: imgOf(n), marks: [] });
+  const srcs = d => d.slides.map(s => s.srcSlide);
+  // (1) 새 덱: 가져온 장 번호가 importedSrc 로 저장됨
+  const nd = fakeSb(); await run(args(dir, '--execute', '--deck-id', ID), { fetch: nd.fetch, log() { }, env });
+  assert.deepEqual(nd.rows[ID].deck.importedSrc, [1, 2, 3]);
+  // (2) 원장이 2를 지운 뒤 같은 --append 를 새로 실행 → 2는 안 붙고 그림도 안 올림, 안내가 나옴
+  nd.rows[ID].deck.slides = nd.rows[ID].deck.slides.filter(s => s.srcSlide !== 2); nd.rows[ID].updated_at = '2026-10-10T03:00:00+00:00';
+  const out = [], r2 = await run(args(dir, '--execute', '--append', '--deck-id', ID), { fetch: nd.fetch, log: s => out.push(s), env });
+  assert.deepEqual(srcs(nd.rows[ID].deck), [1, 3]); assert.deepEqual(nd.rows[ID].deck.importedSrc, [1, 2, 3]); assert.equal(r2.plan.items.length, 0);
+  assert.ok(out.some(l => /다시 붙이지 않음: 장 2/.test(l) && /--force-src 2/.test(l)), '왜 안 붙였는지·되살리는 방법 안내');
+  // (3) 정말 다시 넣고 싶을 때: --force-src 2 → 뒤에 붙음, 다른 지운 장은 여전히 안 붙음
+  nd.rows[ID].deck.slides = nd.rows[ID].deck.slides.filter(s => s.srcSlide !== 1); nd.rows[ID].updated_at = '2026-10-10T03:01:00+00:00';
+  await run(args(dir, '--execute', '--append', '--force-src', '2', '--deck-id', ID), { fetch: nd.fetch, log() { }, env });
+  assert.deepEqual(srcs(nd.rows[ID].deck), [3, 2], '2만 되살림(1은 지운 채)'); assert.deepEqual(nd.rows[ID].deck.importedSrc, [1, 2, 3]);
+  // (4) 실패 뒤 원장이 장을 지우고 같은 명령을 새로 돌림(고정 대상이 실행 메모리에만 있던 문제): 처음 입력 [1,2,3], 기존 [1,2](importedSrc [1,2]) → 올리다 실패 → 원장이 1 삭제 → 다시 실행
+  const fl = fakeSb({ rows: { [ID]: hubRow({ meta: { title: 't' }, slides: [ex(1), ex(2)], importedSrc: [1, 2] }) } }); fl.failUploadAt = 1;
+  await assert.rejects(run(args(dir, '--execute', '--append', '--deck-id', ID, '--concurrency', '1'), { fetch: fl.fetch, log() { }, env }), /HTTP 500/);
+  fl.rows[ID].deck.slides = fl.rows[ID].deck.slides.filter(s => s.srcSlide !== 1); fl.rows[ID].updated_at = '2026-10-10T03:02:00+00:00';
+  await run(args(dir, '--execute', '--append', '--deck-id', ID, '--concurrency', '1'), { fetch: fl.fetch, log() { }, env });
+  assert.deepEqual(srcs(fl.rows[ID].deck), [2, 3], '지운 1은 되살아나지 않고 새 장 3만 붙음'); assert.deepEqual(fl.rows[ID].deck.importedSrc, [1, 2, 3]);
+  // (5) importedSrc 가 없는 옛 덱: 현재 장들의 srcSlide 로 시작해 저장, --update-images 만 해도 목록이 생김
+  const old = fakeSb({ rows: { [ID]: hubRow({ meta: { title: 't' }, slides: [ex(1), ex(2)] }) } });
+  await run(args(dir, '--execute', '--append', '--deck-id', ID), { fetch: old.fetch, log() { }, env }); assert.deepEqual(old.rows[ID].deck.importedSrc, [1, 2, 3]);
+  const old2 = fakeSb({ rows: { [ID]: hubRow({ meta: { title: 't' }, slides: [ex(1)] }) } });
+  await run(args(dir, '--execute', '--update-images', '--deck-id', ID), { fetch: old2.fetch, log() { }, env }); assert.deepEqual(old2.rows[ID].deck.importedSrc, [1]);
+  // (6) --force-src 는 --append 와 함께만, 장 번호 목록 모양만
+  await assert.rejects(run(args(dir, '--force-src', '2'), { log() { } }), /--append 와 함께/);
+  await assert.rejects(run(args(dir, '--append', '--deck-id', ID, '--force-src', 'a,b'), { log() { } }), /장 번호 목록/);
+  // 제작기가 덱을 저장할 때 importedSrc 를 지우지 않음
+  const maker = fs.readFileSync(path.join(root, '설명덱_제작기.html'), 'utf8'); assert.match(maker, /const c = JSON\.parse\(JSON\.stringify\(d\)\);/, '덱 전체를 복사해 저장(importedSrc 보존)');
+});

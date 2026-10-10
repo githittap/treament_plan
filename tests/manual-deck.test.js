@@ -345,10 +345,10 @@ test('[2차-1] 사진 올리는 동안 같은 슬라이드의 사진을 바꿔�
   const toasts = [], uploaded = [], gates = {}, rows = [];
   const ctx = { deck: { meta: { title: 't' }, slides: [{ type: 'photo', image: { src: dataUrl('BLACK'), w: 1, h: 1 }, marks: [] }] },
     HUB: { rev: 0, dirty: false, saving: false, exists: false, id: 'i', category: '', published: false, sb: null }, B: { saveBtn: { disabled: false }, hubState: { textContent: '', classList: { toggle() { } } } },
-    toast: (m, t) => toasts.push([m, t]), deckForStore: d => JSON.parse(JSON.stringify(d)), fetch,
+    toast: (m, t) => toasts.push([m, t]), snap() { }, deckForStore: d => JSON.parse(JSON.stringify(d)), fetch,
     hubUpload: async blob => { const t = await blob.text(); uploaded.push(t); await new Promise(r => { gates[t] = r; if (t !== 'BLACK') r(); }); return 'p/' + t; } };
   vm.createContext(ctx);
-  vm.runInContext([fnSrc(mainJs, 'function markDirty'), fnSrc(mainJs, 'function setDirty'), fnSrc(mainJs, 'async function hubUploadInline'), fnSrc(mainJs, 'async function hubSave')].join('\n') + ';this.hubSave=hubSave;this.markDirty=markDirty;', ctx);
+  vm.runInContext([fnSrc(mainJs, 'function markDirty'), fnSrc(mainJs, 'function setDirty'), fnSrc(mainJs, 'function photoNeedsUpload'), fnSrc(mainJs, 'function commitPhoto'), fnSrc(mainJs, 'async function hubUploadInline'), fnSrc(mainJs, 'async function hubSave')].join('\n') + ';this.hubSave=hubSave;this.markDirty=markDirty;', ctx);
   const done = { data: [{ id: 'i' }], error: null };
   ctx.HUB.sb = { from: () => ({ insert: row => ({ select: async () => { rows.push(JSON.parse(JSON.stringify(row))); return done; } }), update: () => ({ eq: () => ({ select: async () => done }) }) }) };
   ctx.markDirty();
@@ -366,4 +366,41 @@ test('[2차-1] 사진 올리는 동안 같은 슬라이드의 사진을 바꿔�
   await ctx.hubSave(); assert.deepEqual(uploaded, ['GREEN']); assert.equal(rows[1].deck.slides[0].image.path, 'p/GREEN'); assert.equal(ctx.HUB.dirty, false);
   // 변경 번호는 업로드 시작 전에 기억(업로드 뒤에 기억하면 업로드 중 고친 것을 저장됨으로 착각)
   const src = fnSrc(mainJs, 'async function hubSave'); assert.ok(src.indexOf('const rev0 = HUB.rev') < src.indexOf('await hubUploadInline()'));
+});
+
+test('[3차-1] 사진 붙이기: 최신 요청만 적용(먼저 시작한 파란 사진이 늦게 끝나도 빨간 사진이 남음) · undo 등으로 덱에서 빠진 슬라이드엔 안 붙임 · 올리는 중 표시 · hubUploadInline 도 같은 원칙', async () => {
+  const gates = {}, snaps = [], toasts = [];
+  const ctx = { deck: { meta: {}, slides: [{ type: 'photo', image: null, marks: [] }, { type: 'photo', image: null, marks: [] }] }, HUB: { on: true, canEdit: true }, toast: (m, t) => toasts.push([m, t]), snap: () => snaps.push(1),
+    downscale: async f => ({ blob: { name: f.name }, w: 1, h: 1 }), blobToDataUrl: async b => 'data:image/png;base64,' + b.name,
+    hubUpload: async blob => { await new Promise(r => { gates[blob.name] = r; }); return 'p/' + blob.name; }, fetch };
+  vm.createContext(ctx);
+  vm.runInContext(['const PH_PENDING = new WeakMap(); let phSeq = 0;', fnSrc(mainJs, 'function commitPhoto'), fnSrc(mainJs, 'async function attachPhoto'), 'this.attachPhoto=attachPhoto;this.PH_PENDING=PH_PENDING;'].join('\n'), ctx);
+  const tick = () => new Promise(r => setTimeout(r, 5));
+  const [s0, s1] = ctx.deck.slides;
+  // (1) 파랑 업로드 시작 → (다른 장을 갔다 와) 빨강 선택 → 빨강 먼저 완료 → 파랑 늦게 완료: 최신(빨강)이 남아야 함
+  const pBlue = ctx.attachPhoto(s0, { name: 'blue' }); await tick();
+  assert.equal(ctx.PH_PENDING.has(s0), true, '올리는 중 표시용 상태가 있음'); assert.equal(ctx.PH_PENDING.has(s1), false, '다른 슬라이드는 영향 없음');
+  const pRed = ctx.attachPhoto(s0, { name: 'red' }); await tick();
+  gates.red(); assert.equal(await pRed, 'ok'); assert.equal(s0.image.path, 'p/red');
+  gates.blue(); assert.equal(await pBlue, 'stale', '늦게 끝난 옛 요청은 버림'); assert.equal(s0.image.path, 'p/red', '최신 선택이 유실되지 않음');
+  assert.equal(ctx.PH_PENDING.has(s0), false, '끝나면 올리는 중 상태가 사라짐'); assert.equal(snaps.length, 1, '적용된 한 번만 되돌리기 기록');
+  // (2) 같은 순서인데 파랑이 먼저 끝나면 파랑이 아니라 빨강(최신)만 남음
+  s0.image = null; const p1 = ctx.attachPhoto(s0, { name: 'blue2' }); await tick(); const p2 = ctx.attachPhoto(s0, { name: 'red2' }); await tick();
+  gates.blue2(); assert.equal(await p1, 'stale'); assert.equal(s0.image, null, '아직 최신 요청이 안 끝났으니 파랑은 적용 안 됨'); gates.red2(); assert.equal(await p2, 'ok'); assert.equal(s0.image.path, 'p/red2');
+  // (3) 업로드 중 UNDO/삭제로 이 슬라이드가 덱에서 떨어짐 → 옛 객체에 붙이지 않고 'gone'(성공 안내용 'ok' 아님), 덱의 복사본은 그대로
+  const copy = JSON.parse(JSON.stringify(s1)); const p3 = ctx.attachPhoto(s1, { name: 'x' }); await tick();
+  ctx.deck.slides = [s0, copy]; gates.x(); assert.equal(await p3, 'gone'); assert.equal(s1.image, null); assert.equal(copy.image, null);
+  // (4) 서버 모드 아님(허브 밖): 데이터주소로 붙고 같은 원칙
+  ctx.HUB.on = false; const p4 = await ctx.attachPhoto(s0, { name: 'local' }); assert.equal(p4, 'ok'); assert.match(s0.image.src, /^data:image\/png;base64,local$/);
+  // 화면 연결: 올리는 중 단추 표시 · 적용 성공일 때만 미리보기·저장 표시 · 지금 보는 장일 때만 다시 그림
+  const form = fnSrc(mainJs, 'FORMS.photo = s=>');
+  assert.match(form, /PH_PENDING\.has\(s\) \? '⏳ 사진 올리는 중/); assert.match(form, /if\(res === 'ok'\)\{ bootPreview\(\); scheduleAutosave\(\); \}/); assert.match(form, /if\(deck\.slides\[sel\] === s\) renderEditor\(\);/);
+  assert.equal(/ub\.disabled = true/.test(form), false, '다시 누르면 새 사진으로 교체되므로 단추를 막지 않음');
+  // hubUploadInline: 같은 원칙(commitPhoto) — 올리는 중 덱에서 빠진 슬라이드엔 경로를 안 붙이고 남은 슬라이드만 이어서 올림
+  const dataUrl = t => 'data:image/png;base64,' + Buffer.from(t).toString('base64'), up = [];
+  const c2 = { deck: { meta: {}, slides: [{ type: 'photo', image: { src: dataUrl('A'), w: 1, h: 1 } }, { type: 'photo', image: { src: dataUrl('B'), w: 1, h: 1 } }] }, snap() { }, fetch, hubUpload: null };
+  c2.hubUpload = async blob => { const t = await blob.text(); up.push(t); if (t === 'A') c2.deck.slides.shift(); return 'p/' + t; };   // A 를 올리는 중에 A 슬라이드가 덱에서 빠짐
+  vm.createContext(c2); vm.runInContext([fnSrc(mainJs, 'function photoNeedsUpload'), fnSrc(mainJs, 'function commitPhoto'), fnSrc(mainJs, 'async function hubUploadInline'), 'this.f=hubUploadInline;'].join('\n'), c2);
+  const gone = c2.deck.slides[0]; await c2.f();
+  assert.deepEqual(up, ['A', 'B']); assert.equal(c2.deck.slides.length, 1); assert.equal(c2.deck.slides[0].image.path, 'p/B'); assert.match(gone.image.src, /^data:/, '빠진 슬라이드엔 경로를 붙이지 않음');
 });

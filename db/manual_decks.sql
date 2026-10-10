@@ -55,6 +55,7 @@ insert into storage.buckets (id,name,public,file_size_limit,allowed_mime_types)
 values ('manual-media','manual-media',false,5242880,array['image/webp','image/jpeg','image/png'])
 on conflict (id) do update set public=false,file_size_limit=5242880,allowed_mime_types=array['image/webp','image/jpeg','image/png'];
 
+-- 공개 덱 폴더의 사진은 승인 직원 누구나 읽음(덱이 지금 쓰지 않는 사진·옛 사진 포함). 비공개 덱 폴더는 원장·실장만.
 drop policy if exists manual_media_select on storage.objects;
 create policy manual_media_select on storage.objects for select to authenticated using (
   bucket_id='manual-media'
