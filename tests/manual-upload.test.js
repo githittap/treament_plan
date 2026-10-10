@@ -1,7 +1,9 @@
-// tools/pptx_import/upload_deck.mjs 시험 — 가짜 supabase(fetch 대체)와 실제 가져오기 그림 몇 장으로: dry-run은 아무것도 안 보냄 · 새 덱 · --update-images(화살표·글 보존) · --append
-const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), os = require('node:os'), path = require('node:path'), { pathToFileURL } = require('node:url');
+// tools/pptx_import/upload_deck.mjs 시험 — 가짜 supabase(fetch 대체: 표·보관함·updated_at 조건부 저장 흉내)와 실제 가져오기 그림 몇 장으로
+// dry-run은 아무것도 안 보냄 · 새 덱 · 덮어쓰기 없음(1) · --update-images 허브 수정 보존·충돌 재시도(3) · --append 중간 실패 뒤 이어서(5)
+const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), os = require('node:os'), path = require('node:path'), crypto = require('node:crypto'), { pathToFileURL } = require('node:url');
 const root = path.join(__dirname, '..');
 const load = () => import(pathToFileURL(path.join(root, 'tools/pptx_import/upload_deck.mjs')).href);
+const sha8 = b => crypto.createHash('sha256').update(b).digest('hex').slice(0, 8);
 
 /* 최소 WebP(VP8 손실): 가로·세로만 맞으면 됨 */
 function webp(w, h, extra = 0) {
@@ -16,69 +18,138 @@ function workdir() {
   fs.writeFileSync(path.join(dir, 'deck.json'), JSON.stringify({ title: '원내 물품 정리', slides: [slide(1), slide(2), slide(3)] }));
   return dir;
 }
-function fakeSb(rowsById = {}) {
-  const calls = [];
-  const fetch = async (url, opt = {}) => {
-    calls.push({ url, method: opt.method || 'GET', headers: opt.headers, body: opt.body });
-    const json = v => ({ ok: true, status: 200, json: async () => v });
-    if (/\/rest\/v1\/manual_decks\?id=eq\./.test(url) && !opt.method) { const id = url.match(/eq\.([0-9a-f-]+)/)[1]; return json(rowsById[id] ? [rowsById[id]] : []); }
-    return { ok: true, status: 201, json: async () => ({}) };
-  };
-  return { fetch, calls };
-}
 const ID = '11111111-1111-4111-8111-111111111111';
 const env = { SUPABASE_SERVICE_ROLE_KEY: 'TEST-ONLY-NOT-A-REAL-KEY' };
+const args = (dir, ...more) => ['--deck', path.join(dir, 'deck.json'), '--images', path.join(dir, 'images'), ...more];
+
+/* 가짜 supabase: 표(updated_at 조건부 PATCH)·보관함(같은 이름 올리면 중복 오류, upsert 요청은 기록) */
+function fakeSb({ rows = {}, objects = {}, hooks = {} } = {}) {
+  const st = { rows: JSON.parse(JSON.stringify(rows)), objects: Object.fromEntries(Object.entries(objects).map(([k, v]) => [k, Buffer.from(v)])), calls: [], upsertRequests: 0, tick: 0, failUploadAt: null, uploadsSeen: 0 };
+  const res = (status, body, extra = {}) => ({ ok: status < 300, status, json: async () => body, text: async () => (typeof body === 'string' ? body : JSON.stringify(body)), arrayBuffer: async () => extra.buf ? extra.buf.buffer.slice(extra.buf.byteOffset, extra.buf.byteOffset + extra.buf.length) : new ArrayBuffer(0) });
+  st.fetch = async (url, opt = {}) => {
+    const method = opt.method || 'GET'; st.calls.push({ url, method, headers: opt.headers, body: opt.body });
+    const obj = url.match(/\/storage\/v1\/object\/manual-media\/(.+)$/);
+    if (obj) {
+      const name = decodeURIComponent(obj[1]);
+      if (method === 'GET') return st.objects[name] ? res(200, '', { buf: st.objects[name] }) : res(404, 'nf');
+      if (opt.headers['x-upsert'] === 'true') st.upsertRequests++;
+      st.uploadsSeen++;
+      if (st.failUploadAt && st.uploadsSeen === st.failUploadAt) return res(500, 'boom');
+      if (st.objects[name]) return res(400, { statusCode: '409', error: 'Duplicate', message: 'The resource already exists' });
+      st.objects[name] = Buffer.from(opt.body); return res(200, { Key: name });
+    }
+    const q = url.match(/\/rest\/v1\/manual_decks(?:\?(.*))?$/);
+    const idq = q && q[1] && q[1].match(/id=eq\.([0-9a-f-]+)/);
+    if (method === 'GET') { const r = idq && st.rows[idq[1]]; return res(200, r ? [JSON.parse(JSON.stringify(r))] : []); }
+    if (method === 'POST') {
+      const b = JSON.parse(opt.body); if (hooks.beforeInsert) hooks.beforeInsert(st, b);
+      if (st.rows[b.id]) return res(409, { code: '23505' });
+      st.rows[b.id] = { ...b, updated_at: '2026-10-10T01:00:00.000001+00:00' }; return res(201, '');
+    }
+    if (method === 'PATCH') {
+      if (hooks.beforePatch) hooks.beforePatch(st);
+      const row = st.rows[idq[1]], at = decodeURIComponent(q[1].match(/updated_at=eq\.([^&]+)/)[1]);
+      if (!row || row.updated_at !== at) return res(200, []);
+      Object.assign(row, JSON.parse(opt.body)); row.updated_at = '2026-10-10T02:00:0' + (++st.tick) + '+00:00'; return res(200, [JSON.parse(JSON.stringify(row))]);
+    }
+    throw new Error('예상 못한 요청 ' + method + ' ' + url);
+  };
+  return st;
+}
+const hubRow = (deck, extra) => ({ id: ID, title: '고친 덱', published: false, updated_at: '2026-10-09T00:00:00+00:00', deck, ...extra });
+const imgOf = (n, h = 900) => ({ path: `${ID}/slide00${n}.webp`, w: 1600, h });
 
 test('dry-run(기본): 목록·용량만 출력하고 네트워크·키를 쓰지 않는다 · 실행(--execute)에 키 이름이 없으면 이름만 알리고 멈춘다', async () => {
   const { run, webpSize } = await load(); const dir = workdir(), sb = fakeSb(), out = [];
-  const r = await run(['--deck', path.join(dir, 'deck.json'), '--images', path.join(dir, 'images')], { fetch: sb.fetch, log: s => out.push(s), uuid: () => ID });
+  const r = await run(args(dir), { fetch: sb.fetch, log: s => out.push(s), uuid: () => ID });
   assert.equal(r.executed, false); assert.equal(sb.calls.length, 0, '아무것도 안 보냄');
   assert.match(out.join('\n'), /올릴 그림 3장/); assert.ok(out.some(l => l.includes(`manual-media/${ID}/slide001.webp`)));
   assert.deepEqual(webpSize(webp(1600, 900)), { w: 1600, h: 900 });
-  await run(['--deck', path.join(dir, 'deck.json'), '--images', path.join(dir, 'images'), '--dry-run', '--execute'], { fetch: sb.fetch, log() { } }).then(x => assert.equal(x.executed, false), () => assert.fail());
-  await assert.rejects(run(['--deck', path.join(dir, 'deck.json'), '--images', path.join(dir, 'images'), '--execute', '--keys-file', path.join(dir, 'none.env')], { fetch: sb.fetch, log() { }, env: {} }), /SUPABASE_SERVICE_ROLE_KEY/);
+  assert.equal((await run(args(dir, '--dry-run', '--execute'), { fetch: sb.fetch, log() { } })).executed, false);
+  await assert.rejects(run(args(dir, '--execute', '--keys-file', path.join(dir, 'none.env')), { fetch: sb.fetch, log() { }, env: {} }), /SUPABASE_SERVICE_ROLE_KEY/);
   assert.equal(sb.calls.length, 0);
-  await assert.rejects(run(['--deck', path.join(dir, 'deck.json'), '--images', path.join(dir, 'images'), '--update-images'], { log() { } }), /--deck-id/);
+  await assert.rejects(run(args(dir, '--update-images'), { log() { } }), /--deck-id/);
 });
 
-test('새 덱: 그림 3장을 manual-media/<id>/slideNNN.webp 로 올리고 manual_decks 에 비공개 한 행 · image.path/w/h 채움 · 키는 헤더로만, 출력에 없음', async () => {
+test('새 덱: 그림 3장을 manual-media/<id>/slideNNN.webp 로 올리고 manual_decks 에 비공개 한 행 · image.path/w/h 채움 · 키는 헤더로만 · upsert 요청 없음', async () => {
   const { run } = await load(); const dir = workdir(), sb = fakeSb(), out = [];
-  const r = await run(['--deck', path.join(dir, 'deck.json'), '--images', path.join(dir, 'images'), '--execute', '--category', '진료실'], { fetch: sb.fetch, log: s => out.push(s), env, uuid: () => ID });
-  assert.equal(r.executed, true);
-  const ups = sb.calls.filter(c => /storage\/v1\/object\/manual-media/.test(c.url));
-  assert.deepEqual(ups.map(c => c.url.split('manual-media/')[1]).sort(), [`${ID}/slide001.webp`, `${ID}/slide002.webp`, `${ID}/slide003.webp`]);
-  assert.ok(ups.every(c => c.method === 'POST' && c.headers['Content-Type'] === 'image/webp' && c.headers['x-upsert'] === 'true' && c.headers.Authorization === 'Bearer ' + env.SUPABASE_SERVICE_ROLE_KEY));
-  const ins = sb.calls.filter(c => /rest\/v1\/manual_decks$/.test(c.url));
-  assert.equal(ins.length, 1); const row = JSON.parse(ins[0].body);
-  assert.equal(row.id, ID); assert.equal(row.title, '원내 물품 정리'); assert.equal(row.published, false); assert.equal(row.category, '진료실');
-  assert.deepEqual(row.deck.slides.map(s => s.image), [1, 2, 3].map(n => ({ path: `${ID}/slide00${n}.webp`, w: 1600, h: n === 3 ? 800 : 900 })));
-  assert.equal(row.deck.slides[0].marks[1].pts.length, 4, '꺾은 화살표·색·글 상자 크기는 그대로'); assert.equal(row.deck.slides[0].marks[0].w, 9); assert.equal(row.deck.slides[1].srcSlide, 2);
-  assert.ok(!out.join('\n').includes(env.SUPABASE_SERVICE_ROLE_KEY) && !JSON.stringify(ins[0].body).includes('TEST-ONLY'), '키 값이 출력·내용에 없음');
+  const r = await run(args(dir, '--execute', '--category', '진료실'), { fetch: sb.fetch, log: s => out.push(s), env, uuid: () => ID });
+  assert.equal(r.executed, true); assert.equal(sb.upsertRequests, 0, '덮어쓰기(upsert) 요청이 한 번도 없음');
+  assert.deepEqual(Object.keys(sb.objects).sort(), [`${ID}/slide001.webp`, `${ID}/slide002.webp`, `${ID}/slide003.webp`]);
+  const ups = sb.calls.filter(c => c.method === 'POST' && /storage/.test(c.url)); assert.ok(ups.every(c => c.headers['Content-Type'] === 'image/webp' && c.headers['x-upsert'] === 'false' && c.headers.Authorization === 'Bearer ' + env.SUPABASE_SERVICE_ROLE_KEY));
+  const row = sb.rows[ID];
+  assert.equal(row.title, '원내 물품 정리'); assert.equal(row.published, false); assert.equal(row.category, '진료실');
+  assert.deepEqual(row.deck.slides.map(s => s.image), [imgOf(1), imgOf(2), imgOf(3, 800)]);
+  assert.equal(row.deck.slides[0].marks[1].pts.length, 4); assert.equal(row.deck.slides[0].marks[0].w, 9); assert.equal(row.deck.slides[1].srcSlide, 2);
+  assert.ok(!out.join('\n').includes(env.SUPABASE_SERVICE_ROLE_KEY) && !sb.calls.some(c => String(c.body).includes('TEST-ONLY')), '키 값이 출력·내용에 없음');
 });
 
-test('--update-images: srcSlide 가 같은 장은 바탕 그림만 바꾸고 허브에서 고친 화살표·글·제목은 보존 · 없는 장은 건너뜀 · 비율이 바뀌면 경고', async () => {
+test('[1] 새 덱 모드: 이미 있는 --deck-id 는 사진을 올리기 전에 거절 · 같은 이름의 다른 사진은 덮어쓰지 않고 멈춤 · 같은 사진은 건너뜀 · 만드는 순간 생긴 경쟁에서도 사진 안 덮음', async () => {
   const { run } = await load(); const dir = workdir();
-  const edited = { meta: { title: '고친 덱' }, slides: [
-    { type: 'photo', title: '허브에서 고친 제목', notes: '메모', srcSlide: 1, image: { path: `${ID}/slide001.webp`, w: 1600, h: 900 }, marks: [{ id: 'm', kind: 'arrow', pts: [[50, 50], [60, 60]], text: '내가 붙인 화살표', step: 1 }] },
-    { type: 'photo', title: '장3', srcSlide: 3, image: { path: `${ID}/slide003.webp`, w: 1600, h: 900 }, marks: [] },
-    { type: 'photo', title: '직접 만든 장', image: { path: `${ID}/mine.webp`, w: 10, h: 10 }, marks: [] }] };
-  const sb = fakeSb({ [ID]: { id: ID, title: '고친 덱', deck: edited, published: true } }), out = [];
-  await run(['--deck', path.join(dir, 'deck.json'), '--images', path.join(dir, 'images'), '--execute', '--update-images', '--deck-id', ID], { fetch: sb.fetch, log: s => out.push(s), env });
-  const ups = sb.calls.filter(c => /storage\/v1\/object/.test(c.url)); assert.deepEqual(ups.map(c => c.url.split('/').pop()).sort(), ['slide001.webp', 'slide003.webp'], '기존 장 1·3만(2는 허브에 없어 건너뜀)');
-  const patch = sb.calls.find(c => c.method === 'PATCH'); assert.ok(patch.url.endsWith('id=eq.' + ID)); const deck = JSON.parse(patch.body).deck;
-  assert.equal(deck.slides.length, 3, '새 장을 덧붙이지 않음'); assert.equal(deck.slides[0].title, '허브에서 고친 제목'); assert.equal(deck.slides[0].marks[0].text, '내가 붙인 화살표'); assert.equal(deck.slides[0].notes, '메모');
-  assert.deepEqual(deck.slides[0].image, { path: `${ID}/slide001.webp`, w: 1600, h: 900 }); assert.equal(deck.slides[1].image.h, 800); assert.equal(deck.slides[2].image.path, `${ID}/mine.webp`);
-  assert.ok(out.some(l => /장 3: 그림 비율이 바뀜/.test(l)), '비율 경고'); assert.ok(!JSON.parse(patch.body).title && !('published' in JSON.parse(patch.body)), '제목·공개 여부는 건드리지 않음');
+  // (a) 덱이 이미 있음 → 사진 요청 0건
+  const a = fakeSb({ rows: { [ID]: hubRow({ meta: { title: 'x' }, slides: [] }) } });
+  await assert.rejects(run(args(dir, '--execute', '--deck-id', ID), { fetch: a.fetch, log() { }, env }), /이미 있는 덱 id/);
+  assert.equal(a.calls.filter(c => /storage/.test(c.url)).length, 0, '사진 올리기 전에 거절'); assert.equal(Object.keys(a.rows).length, 1);
+  // (b) 보관함에 같은 이름의 다른 사진 → 덮지 않고 멈춤(원래 내용 그대로, 표에는 아무 행도 안 생김)
+  const b = fakeSb({ objects: { [`${ID}/slide001.webp`]: 'SOMEONE ELSES PHOTO' } });
+  await assert.rejects(run(args(dir, '--execute', '--deck-id', ID), { fetch: b.fetch, log() { }, env }), /덮어쓰지 않고 멈춤/);
+  assert.equal(b.objects[`${ID}/slide001.webp`].toString(), 'SOMEONE ELSES PHOTO'); assert.equal(b.upsertRequests, 0); assert.equal(Object.keys(b.rows).length, 0);
+  // (c) 같은 사진이 이미 있으면(앞선 실행이 끊김) 건너뛰고 이어서 완료
+  const same = fs.readFileSync(path.join(dir, 'images', 'slide001.webp'));
+  const c = fakeSb({ objects: { [`${ID}/slide001.webp`]: same } });
+  const rc = await run(args(dir, '--execute', '--deck-id', ID), { fetch: c.fetch, log() { }, env }); assert.equal(rc.same, 1); assert.equal(rc.uploads, 2); assert.ok(c.rows[ID]);
+  // (d) 확인 뒤 ~ 삽입 사이에 같은 id 덱이 생김(경쟁) → 삽입 거절, 사진은 upsert 없이 올렸으니 남의 사진을 못 덮음
+  const d = fakeSb({ hooks: { beforeInsert: (st) => { st.rows[ID] = hubRow({ meta: { title: '남이 먼저' }, slides: [] }); } } });
+  await assert.rejects(run(args(dir, '--execute', '--deck-id', ID), { fetch: d.fetch, log() { }, env }), /그 사이 같은 id/);
+  assert.equal(d.rows[ID].title, '고친 덱'); assert.equal(d.upsertRequests, 0);
 });
 
-test('--append: srcSlide 가 없는 새 장만 뒤에 덧붙이고 기존 장은 그대로(업로드도 새 장 것만, 덮어쓰기 없음)', async () => {
+test('[3] --update-images: 읽은 뒤 허브에서 고친 제목·화살표·메모를 덮지 않는다 — updated_at 조건부 저장, 충돌이면 다시 읽어 그림 경로만 다시 적용, 4번 실패하면 멈춤', async () => {
   const { run } = await load(); const dir = workdir();
-  const edited = { meta: { title: 't' }, slides: [{ type: 'photo', title: '수정됨', srcSlide: 1, image: { path: `${ID}/slide001.webp`, w: 1600, h: 900 }, marks: [] }, { type: 'photo', title: '둘째', srcSlide: 2, image: { path: `${ID}/slide002.webp`, w: 1600, h: 900 }, marks: [] }] };
-  const sb = fakeSb({ [ID]: { id: ID, title: 't', deck: edited, published: false } });
-  await run(['--deck', path.join(dir, 'deck.json'), '--images', path.join(dir, 'images'), '--execute', '--append', '--deck-id', ID], { fetch: sb.fetch, log() { }, env });
-  const ups = sb.calls.filter(c => /storage\/v1\/object/.test(c.url)); assert.deepEqual(ups.map(c => c.url.split('/').pop()), ['slide003.webp']); assert.equal(ups[0].headers['x-upsert'], 'false');
-  const deck = JSON.parse(sb.calls.find(c => c.method === 'PATCH').body).deck;
-  assert.deepEqual(deck.slides.map(s => s.srcSlide), [1, 2, 3]); assert.equal(deck.slides[0].title, '수정됨'); assert.equal(deck.slides[2].image.path, `${ID}/slide003.webp`); assert.equal(deck.slides[2].marks[1].color, '#ff0000');
+  const hub = () => ({ meta: { title: '고친 덱' }, slides: [{ type: 'photo', title: '허브에서 고친 제목', notes: '메모', srcSlide: 1, image: imgOf(1), marks: [{ id: 'm', kind: 'arrow', pts: [[50, 50], [60, 60]], text: '내가 붙인 화살표', step: 1 }] },
+    { type: 'photo', title: '장3', srcSlide: 3, image: imgOf(3), marks: [] }, { type: 'photo', title: '직접 만든 장', image: { path: `${ID}/mine.webp`, w: 10, h: 10 }, marks: [] }] });
+  // 정상(충돌 없음): 그림 1·3만 새 이름(해시)으로 올라가고 옛 그림은 그대로, 허브에서 고친 내용 보존
+  const ok = fakeSb({ rows: { [ID]: hubRow(hub()) }, objects: { [`${ID}/slide001.webp`]: 'OLD1', [`${ID}/slide003.webp`]: 'OLD3' } });
+  const out = [];
+  const r = await run(args(dir, '--execute', '--update-images', '--deck-id', ID), { fetch: ok.fetch, log: s => out.push(s), env });
+  const b1 = fs.readFileSync(path.join(dir, 'images', 'slide001.webp')), b3 = fs.readFileSync(path.join(dir, 'images', 'slide003.webp'));
+  assert.deepEqual(Object.keys(ok.objects).sort(), [`${ID}/slide001.${sha8(b1)}.webp`, `${ID}/slide001.webp`, `${ID}/slide003.${sha8(b3)}.webp`, `${ID}/slide003.webp`].sort(), '새 이름으로 올림(옛 그림 안 덮음·안 지움)');
+  assert.equal(ok.objects[`${ID}/slide001.webp`].toString(), 'OLD1'); assert.equal(ok.upsertRequests, 0);
+  const d = ok.rows[ID].deck; assert.equal(d.slides.length, 3); assert.equal(d.slides[0].title, '허브에서 고친 제목'); assert.equal(d.slides[0].marks[0].text, '내가 붙인 화살표'); assert.equal(d.slides[0].notes, '메모');
+  assert.deepEqual(d.slides[0].image, { path: `${ID}/slide001.${sha8(b1)}.webp`, w: 1600, h: 900 }); assert.equal(d.slides[1].image.h, 800); assert.equal(d.slides[2].image.path, `${ID}/mine.webp`);
+  assert.ok(out.some(l => /장 3: 그림 비율이 바뀜/.test(l)), '비율 경고'); assert.equal(r.attempts, 1); assert.equal(ok.rows[ID].title, '고친 덱', '표 제목·공개 여부는 안 건드림');
+  const patch = ok.calls.find(c => c.method === 'PATCH'); assert.match(patch.url, /updated_at=eq\.2026-10-09T00%3A00%3A00%2B00%3A00/, 'PATCH 는 읽은 시점의 updated_at 조건이 붙음'); assert.deepEqual(Object.keys(JSON.parse(patch.body)), ['deck']);
+  // 충돌: 첫 PATCH 직전에 원장이 허브에서 제목·화살표를 고침 → 그 내용이 살아 있고 그림만 바뀜(재시도 1번)
+  let edits = 0;
+  const hooks = { beforePatch: st => { if (edits++ === 0) { const row = st.rows[ID]; row.deck.slides[0].title = '그 사이 새로 고친 제목'; row.deck.slides[0].marks.push({ id: 'n', kind: 'label', x: 5, y: 5, text: '그 사이 넣은 글', step: 2 }); row.updated_at = '2026-10-10T00:00:05+00:00'; } } };
+  const cf = fakeSb({ rows: { [ID]: hubRow(hub()) }, hooks }), out2 = [];
+  const r2 = await run(args(dir, '--execute', '--update-images', '--deck-id', ID), { fetch: cf.fetch, log: s => out2.push(s), env });
+  assert.equal(r2.attempts, 2); assert.ok(out2.some(l => /충돌/.test(l)));
+  const d2 = cf.rows[ID].deck; assert.equal(d2.slides[0].title, '그 사이 새로 고친 제목'); assert.equal(d2.slides[0].marks.length, 2); assert.equal(d2.slides[0].marks[1].text, '그 사이 넣은 글');
+  assert.equal(d2.slides[0].image.path, `${ID}/slide001.${sha8(b1)}.webp`, '그림 경로는 새 것');
+  assert.equal(cf.calls.filter(c => c.method === 'POST' && /storage/.test(c.url) && /slide001\./.test(c.url)).length, 1, '충돌 재시도에서 같은 그림을 또 올리지 않음');
+  // 계속 충돌: 4번 시도 뒤 멈추고, 허브 쪽 내용은 한 글자도 안 덮음
+  const always = fakeSb({ rows: { [ID]: hubRow(hub()) }, hooks: { beforePatch: st => { st.rows[ID].updated_at = '2026-10-10T00:00:0' + (++edits % 9) + '+00:00x'; st.rows[ID].deck.slides[0].title = '계속 고치는 중 ' + edits; } } });
+  await assert.rejects(run(args(dir, '--execute', '--update-images', '--deck-id', ID), { fetch: always.fetch, log() { }, env }), /4번 시도했으나 저장하지 못함/);
+  assert.match(always.rows[ID].deck.slides[0].title, /^계속 고치는 중/); assert.equal(always.rows[ID].deck.slides[0].image.path, `${ID}/slide001.webp`, '그림 경로도 안 바뀜');
+  assert.equal(always.calls.filter(c => c.method === 'PATCH').length, 4);
+});
+
+test('[5] --append 중간 실패 뒤 같은 명령 재실행: 이미 올린 같은 사진은 건너뛰고 이어서 완료 · 내용이 다르면 멈춤 · 안내 문구는 실제 동작과 맞음', async () => {
+  const { run } = await load(); const dir = workdir();
+  const base = { meta: { title: 't' }, slides: [{ type: 'photo', title: '직접', image: { path: `${ID}/mine.webp`, w: 1, h: 1 }, marks: [] }] };
+  const sb = fakeSb({ rows: { [ID]: hubRow(base) } }); sb.failUploadAt = 2;
+  await assert.rejects(run(args(dir, '--execute', '--append', '--deck-id', ID, '--concurrency', '1'), { fetch: sb.fetch, log() { }, env }), e => /HTTP 500/.test(e.message) && /같은 그림은 건너뛰고 이어서/.test(e.message));
+  assert.deepEqual(Object.keys(sb.objects), [`${ID}/slide001.webp`], '첫 장만 올라가 있음'); assert.equal(sb.rows[ID].deck.slides.length, 1, '표는 아직 그대로');
+  const out = [];
+  const r = await run(args(dir, '--execute', '--append', '--deck-id', ID, '--concurrency', '1'), { fetch: sb.fetch, log: s => out.push(s), env });
+  assert.equal(r.same, 1, '이미 올라간 같은 사진은 건너뜀'); assert.equal(r.uploads, 2); assert.equal(sb.upsertRequests, 0);
+  assert.deepEqual(sb.rows[ID].deck.slides.map(s => s.srcSlide), [undefined, 1, 2, 3]); assert.match(out.join('\n'), /이미 있어 건너뜀 1장/);
+  // 같은 이름인데 내용이 다른 사진이 있으면 멈춤(덮지 않음)
+  const bad = fakeSb({ rows: { [ID]: hubRow(base) }, objects: { [`${ID}/slide002.webp`]: 'DIFFERENT' } });
+  await assert.rejects(run(args(dir, '--execute', '--append', '--deck-id', ID), { fetch: bad.fetch, log() { }, env }), /덮어쓰지 않고 멈춤/); assert.equal(bad.objects[`${ID}/slide002.webp`].toString(), 'DIFFERENT');
+  // 이미 반영된(srcSlide 가 표에 있는) 장은 다시 하면 건너뜀 — 연속 두 번 실행해도 장이 중복되지 않음
+  const again = await run(args(dir, '--execute', '--append', '--deck-id', ID), { fetch: sb.fetch, log() { }, env }); assert.equal(again.plan.items.length, 0); assert.equal(sb.rows[ID].deck.slides.length, 4);
 });
 
 test('실제 가져오기 결과 deck.json(317장) dry-run: 그림이 모두 있고 합계가 50MB 안쪽 · 없으면 건너뜀(PC에 결과가 있을 때만)', async (t) => {

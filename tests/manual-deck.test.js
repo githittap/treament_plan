@@ -148,11 +148,11 @@ test('허브 연결: 허브에서 ?deck/?new 로 열 때만 켜지고, 편집은
   assert.equal(pure.roleCanEdit('owner'), true); assert.equal(pure.roleCanEdit('chief'), true);
   for (const r of ['manager', 'staff', 'deputy', '', undefined]) assert.equal(pure.roleCanEdit(r), false, String(r));
   assert.match(maker, /if\(HUB\.view \|\| QS\.get\('deck'\) \|\| QS\.get\('new'\)\)/, '주소에 deck/new가 있을 때만 허브 모드');
-  assert.match(maker, /function scheduleAutosave\(\)\{ if\(HUB\.on\)\{ setDirty\(true\); return; \}/, '허브 모드에선 이 브라우저 저장을 건드리지 않음');
+  assert.match(maker, /function scheduleAutosave\(\)\{ if\(HUB\.on\)\{ markDirty\(\); return; \}/, '허브 모드에선 이 브라우저 저장을 건드리지 않음');
   assert.match(maker, /B\.saveBtn\.onclick=\(\)=>\{ if\(HUB\.on\)\{ hubSave\(\); return; \} try\{ localStorage/, '허브 모드 저장 = 서버, 아니면 기존 localStorage');
   assert.match(maker, /if\(!HUB\.view && !HUB\.canEdit\) return hubFail/, '편집 화면은 원장·실장만');
   assert.match(maker, /from\('manual_decks'\)/); assert.match(maker, /from\('manual-media'\)/);
-  assert.match(maker, /window\.parent\.sb/, '허브의 로그인 세션 재사용');
+  assert.match(maker, /window\.parent\.hubSb/, '허브의 로그인 세션 재사용(허브가 window.hubSb 로 내놓음)');
   assert.match(maker, /1600\/long/, '사진은 긴 변 1600px로 줄임'); assert.match(maker, /'image\/webp', 0\.85/);
 });
 
@@ -252,4 +252,90 @@ test('가져온 덱 모양(PPT 가져오기): 글 상자 x·y는 왼쪽 위 기�
   const n = pure.phNormalize({ type: 'photo', image: { path: 'p/a.webp' }, srcSlide: 84, marks: clone(imp.marks) }, () => 'i');
   assert.equal(n.srcSlide, 84); assert.equal(n.marks[0].w, 9.44); assert.equal(n.marks[1].size, 16); assert.equal(n.marks[3].pts.length, 5); assert.equal(n.marks[3].color, '#ff0000'); assert.equal(n.marks[2].w, undefined);
   assert.match(maker, /이미 여러 번 꺾인 화살표예요/, '꺾기(K)는 2↔3점만 — 가져온 여러 점 꺾은선을 펴서 망가뜨리지 않음');
+});
+
+/* ---- Codex 검증 지적 재현 시험 ---- */
+function fnSrc(src, head) { // 함수 머리(head)부터 짝이 맞는 닫는 중괄호까지(시험 대상 함수 안에는 문자열·정규식 속 중괄호가 없음)
+  const i = src.indexOf(head); assert.ok(i >= 0, head); let j = src.indexOf('{', i), d = 0;
+  for (; j < src.length; j++) { if (src[j] === '{') d++; else if (src[j] === '}' && --d === 0) break; }
+  return src.slice(i, j + 1);
+}
+const mainJs = maker.slice(maker.lastIndexOf('<script>') + 8, maker.lastIndexOf('</script>'));
+
+test('[2] 서버 저장 중에 고친 내용은 「저장됨」으로 바뀌지 않는다 — 변경 번호가 저장 시작 때와 같을 때만 dirty=false', async () => {
+  const mk = () => {
+    const toasts = [];
+    const ctx = { deck: { meta: { title: 't' }, slides: [{ type: 'cover' }] }, HUB: { rev: 0, dirty: false, saving: false, exists: false, id: 'i', category: '', published: false, sb: null },
+      B: { saveBtn: { disabled: false }, hubState: { textContent: '', classList: { toggle() { } } } }, toasts, toast: (m, t) => toasts.push([m, t]), deckForStore: d => d, hubUploadInline: async () => { }, gate: null };
+    vm.createContext(ctx);
+    vm.runInContext([fnSrc(mainJs, 'function markDirty'), fnSrc(mainJs, 'function setDirty'), fnSrc(mainJs, 'async function hubSave')].join('\n') + ';this.hubSave=hubSave;this.markDirty=markDirty;', ctx);
+    const done = () => ctx.gate.then(() => ({ data: [{ id: 'i' }], error: null }));
+    ctx.HUB.sb = { from: () => ({ insert: () => ({ select: done }), update: () => ({ eq: () => ({ select: done }) }) }) };
+    return ctx;
+  };
+  // 저장 도중 고침 → 저장 끝나도 dirty 유지(+「다시 저장」 안내)
+  let c = mk(), release; c.gate = new Promise(r => { release = r; });
+  c.markDirty(); assert.equal(c.HUB.dirty, true);
+  const p = c.hubSave(); await new Promise(r => setTimeout(r, 5));   // 저장 요청이 나가 응답을 기다리는 중
+  c.markDirty();               // 저장 요청이 나간 뒤 사용자가 글을 고침
+  release(); await p;
+  assert.equal(c.HUB.dirty, true, '저장 중에 고친 내용은 아직 저장 안 됨'); assert.equal(c.HUB.exists, true);
+  assert.ok(c.toasts.some(t => /다시 저장/.test(t[0]) && t[1] === 'err'));
+  // 대조: 고친 게 없으면 저장됨
+  c = mk(); c.gate = Promise.resolve(); c.markDirty(); await c.hubSave();
+  assert.equal(c.HUB.dirty, false); assert.ok(c.toasts.some(t => /저장했어요/.test(t[0])));
+  // 저장 중 다시 저장 누르기는 무시(겹쳐 저장 안 함)
+  c = mk(); let n = 0; c.gate = new Promise(r => { release = r; }); const orig = c.HUB.sb.from; c.HUB.sb.from = () => { n++; return orig(); };
+  const p1 = c.hubSave(), p2 = c.hubSave(); release(); await Promise.all([p1, p2]); assert.equal(n, 1);
+  // 분류·공개 바꾸기도 변경 번호를 올림, 모든 편집이 지나가는 scheduleAutosave 에서도 올라감
+  assert.match(mainJs, /B\.catSel\.onchange = \(\)=>\{ HUB\.category = B\.catSel\.value; markDirty\(\); \}/); assert.match(mainJs, /B\.pubChk\.onchange = \(\)=>\{ HUB\.published = B\.pubChk\.checked; markDirty\(\);/);
+  assert.match(mainJs, /function scheduleAutosave\(\)\{ if\(HUB\.on\)\{ markDirty\(\); return; \}/);
+});
+
+test('[4] 되돌리기 뒤 일반 입력을 하면 다시(Ctrl+Y) 기록이 비워져 새 입력이 사라지지 않는다 · 덱을 통째로 바꿀 땐 기록 초기화', () => {
+  const toasts = [];
+  const ctx = { deck: { meta: { title: 'A' }, slides: [{ type: 'cover', title: 'A' }] }, sel: 0, PE: {}, B: { deckName: { value: '' } }, toasts, toast: m => toasts.push(m), renderAll() { }, bootPreview() { }, scheduleAutosave() { },
+    HUB: { on: false }, pvTimer: 0, setTimeout: () => 0, clearTimeout() { } };
+  vm.createContext(ctx);
+  vm.runInContext(pureSrc + ';' + ['const UNDO=[],REDO=[],SNAP_DATA=[];', fnSrc(mainJs, 'function snapNow'), fnSrc(mainJs, 'function snap()'), fnSrc(mainJs, 'function snapOnce'), fnSrc(mainJs, 'function resetHistory'), fnSrc(mainJs, 'function restoreSnap'), fnSrc(mainJs, 'function undo'), fnSrc(mainJs, 'function redo'), fnSrc(mainJs, 'function schedulePreview'),
+    'this.api={snap,snapOnce,undo,redo,schedulePreview,resetHistory,UNDO,REDO,SNAP_DATA};'].join('\n'), ctx);
+  const a = ctx.api, title = () => ctx.deck.slides[0].title, input = () => ({ listeners: {}, addEventListener(t, f) { this.listeners[t] = f; } });
+  // 제목을 A→B→C 로 두 번 고치며 기록, 한 번 되돌림(B) → 다시 목록에 C
+  a.snap(); ctx.deck.slides[0].title = 'B'; a.snap(); ctx.deck.slides[0].title = 'C';
+  a.undo(); assert.equal(title(), 'B'); assert.equal(a.REDO.length, 1);
+  // 되돌린 뒤 일반 입력(칸에 글자 입력: snapOnce → 값 바꿈 → schedulePreview)
+  const el = input(); a.snapOnce(el); ctx.deck.slides[0].title = 'X'; a.schedulePreview();
+  assert.equal(a.REDO.length, 0, '새 입력이 다시(REDO) 기록을 비움');
+  a.redo(); assert.equal(title(), 'X', '다시 실행해도 새 입력이 사라지지 않음(옛 C 로 덮이지 않음)'); assert.ok(toasts.includes('다시 할 작업이 없어요'));
+  // 입력 직전 상태로 되돌아옴
+  a.undo(); assert.equal(title(), 'B'); assert.equal(a.REDO.length, 1);
+  // 칸에 커서만 두는 것(포커스)으로는 기록·다시를 건드리지 않음
+  assert.equal(/addEventListener\('focus', *snap\)/.test(mainJs), false, '포커스만으로 snap(다시 기록 삭제) 하지 않음');
+  // 한 칸은 처음 고칠 때 한 번만 기록, 칸을 벗어나면 다시 셈
+  const e2 = input(); a.snapOnce(e2); const n1 = a.UNDO.length; a.snapOnce(e2); assert.equal(a.UNDO.length, n1); e2.listeners.blur(); assert.equal(e2._sn, false);
+  // schedulePreview 만 지나가는 편집(체크칸·선택칸 등)도 REDO 비움
+  a.undo(); assert.ok(a.REDO.length > 0); a.schedulePreview(); assert.equal(a.REDO.length, 0);
+  // 덱 통째 교체: 불러오기·새로·튜토리얼·허브 덱 열기에서 기록 초기화
+  a.snap(); a.resetHistory(); assert.deepEqual([a.UNDO.length, a.REDO.length, a.SNAP_DATA.length], [0, 0, 0]);
+  assert.match(fnSrc(mainJs, 'function loadDeck'), /resetHistory\(\)/);
+  assert.match(mainJs, /B\.newBtn\.onclick=\(\)=>\{[^\n]*deck=starterDeck\(\); resetHistory\(\);/);
+  assert.match(mainJs, /B\.tutorialBtn\.onclick=\(\)=>\{[^\n]*normalize\(tutorialDeck\(\)\); resetHistory\(\);/); assert.match(mainJs, /HUB\.on = true; sel = 0; resetHistory\(\);/); assert.match(mainJs, /restored \? normalize\(restored\) : normalize\(tutorialDeck\(\)\); resetHistory\(\);/);
+  // 입력 만드는 도우미들이 모두 기록 경계를 지남
+  for (const f of ['function mkInput', 'function mkArea', 'function mkNum']) assert.match(fnSrc(mainJs, f), /snapOnce\(/, f);
+  for (const f of ['function mkChk', 'function mkSel']) assert.match(fnSrc(mainJs, f), /snap\(\); on\(/, f);
+  assert.match(mainJs, /B\.deckName\.addEventListener\('input', \(\)=>\{ snapOnce\(B\.deckName\)/);
+});
+
+test('허브 로그인 세션: 허브가 window.hubSb 로 내놓은 같은 클라이언트를 쓰고, 따로 만드는 클라이언트(새 창)는 hr.html과 같은 주소·공개키·기본 저장소 키로 만든다', () => {
+  const hrUrl = hr.match(/const SB_URL = '([^']+)'/)[1], hrKey = hr.match(/const SB_KEY = '([^']+)'/)[1];
+  assert.equal(maker.match(/const HUB_SB_URL = '([^']+)'/)[1], hrUrl); assert.equal(maker.match(/const HUB_SB_KEY = '([^']+)'/)[1], hrKey, '같은 공개(anon) 키');
+  // 두 쪽 모두 createClient 에 옵션(storageKey 등)을 안 줌 → 기본 저장소 키(주소에서 만들어짐)가 같아 같은 출처에서 로그인 세션을 서로 읽음
+  assert.match(hr, /supabase\.createClient\(SB_URL, SB_KEY\)/); assert.match(maker, /window\.supabase\.createClient\(HUB_SB_URL, HUB_SB_KEY\)/);
+  // hr.html 의 const sb 는 window.sb 가 아니므로(parent.sb 로 안 보임) window.hubSb 로 내놓음
+  assert.match(hr, /const sb = \(typeof supabase!=='undefined'\) \? supabase\.createClient\(SB_URL, SB_KEY\) : null;\r?\nwindow\.hubSb = sb;/);
+  assert.match(fnSrc(mainJs, 'async function hubClient'), /window\.parent\.hubSb/); assert.doesNotMatch(fnSrc(mainJs, 'async function hubClient'), /parent\.sb\b/);
+  assert.doesNotMatch(fnSrc(mainJs, 'async function hubRole'), /parent\.ME/, '허브의 let ME 는 안 보이므로 쓰지 않고 profiles 에서 역할을 읽음');
+  // 같은 동작 확인: const 는 전역 객체(window)의 속성이 아니고, window.xxx = 로 내놓은 것만 iframe(parent)에서 보임
+  const ctx = {}; vm.createContext(ctx); vm.runInContext('const sb = {};', ctx); assert.equal(ctx.sb, undefined, 'const 는 전역 객체 속성이 아님');
+  vm.runInContext('this.hubSb = {};', ctx); assert.ok(ctx.hubSb);
 });

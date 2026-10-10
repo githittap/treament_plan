@@ -1339,8 +1339,8 @@ function bootPreview(){
   const si = Math.min(sel, deck.slides.length-1);
   B.frame.srcdoc = generateDeckHTML({si, atEnd:false});
 }
-function schedulePreview(){ clearTimeout(pvTimer); pvTimer=setTimeout(bootPreview, 280); scheduleAutosave(); }
-function scheduleAutosave(){ if(HUB.on){ setDirty(true); return; } clearTimeout(asTimer); asTimer=setTimeout(()=>{ try{ localStorage.setItem(LS_KEY, JSON.stringify(deck)); }catch(_){} }, 900); }
+function schedulePreview(){ REDO.length=0; clearTimeout(pvTimer); pvTimer=setTimeout(bootPreview, 280); scheduleAutosave(); }
+function scheduleAutosave(){ if(HUB.on){ markDirty(); return; } clearTimeout(asTimer); asTimer=setTimeout(()=>{ try{ localStorage.setItem(LS_KEY, JSON.stringify(deck)); }catch(_){} }, 900); }
 function postFrame(m){ try{ B.frame.contentWindow.postMessage(m,'*'); }catch(_){} }
 function gotoPreview(i){ postFrame({cmd:'goto', si:i, atEnd:false}); }
 window.addEventListener('message', e=>{ const d=e.data||{}; if(d.type==='deckState'){ pvState=d; updatePvLab(); } });
@@ -1408,11 +1408,11 @@ function delSlide(){
 }
 
 /* ---- 입력 헬퍼 ---- */
-function mkInput(val,on,ph){ const i=ce('input','input'); i.type='text'; i.value=val||''; if(ph)i.placeholder=ph; i.addEventListener('input',()=>{ on(i.value); schedulePreview(); }); return i; }
-function mkArea(val,on,ph){ const t=ce('textarea','textarea'); t.value=val||''; if(ph)t.placeholder=ph; t.addEventListener('input',()=>{ on(t.value); schedulePreview(); }); return t; }
-function mkNum(val,on){ const i=ce('input','input num'); i.type='number'; i.min='0'; i.value=(val==null?0:val); i.addEventListener('input',()=>{ on(i.value===''?0:Math.max(0,parseInt(i.value,10)||0)); schedulePreview(); }); return i; }
-function mkChk(labelText,checked,on){ const l=ce('label','chk'); const c=ce('input'); c.type='checkbox'; c.checked=!!checked; c.addEventListener('change',()=>{ on(c.checked); schedulePreview(); }); l.appendChild(c); l.appendChild(document.createTextNode(labelText)); return l; }
-function mkSel(opts,val,on){ const s=ce('select','select'); opts.forEach(o=>{ const op=ce('option'); op.value=o.v; op.textContent=o.t; if(o.v===(val||'')) op.selected=true; s.appendChild(op); }); s.addEventListener('change',()=>{ on(s.value); schedulePreview(); }); return s; }
+function mkInput(val,on,ph){ const i=ce('input','input'); i.type='text'; i.value=val||''; if(ph)i.placeholder=ph; i.addEventListener('input',()=>{ snapOnce(i); on(i.value); schedulePreview(); }); return i; }
+function mkArea(val,on,ph){ const t=ce('textarea','textarea'); t.value=val||''; if(ph)t.placeholder=ph; t.addEventListener('input',()=>{ snapOnce(t); on(t.value); schedulePreview(); }); return t; }
+function mkNum(val,on){ const i=ce('input','input num'); i.type='number'; i.min='0'; i.value=(val==null?0:val); i.addEventListener('input',()=>{ snapOnce(i); on(i.value===''?0:Math.max(0,parseInt(i.value,10)||0)); schedulePreview(); }); return i; }
+function mkChk(labelText,checked,on){ const l=ce('label','chk'); const c=ce('input'); c.type='checkbox'; c.checked=!!checked; c.addEventListener('change',()=>{ snap(); on(c.checked); schedulePreview(); }); l.appendChild(c); l.appendChild(document.createTextNode(labelText)); return l; }
+function mkSel(opts,val,on){ const s=ce('select','select'); opts.forEach(o=>{ const op=ce('option'); op.value=o.v; op.textContent=o.t; if(o.v===(val||'')) op.selected=true; s.appendChild(op); }); s.addEventListener('change',()=>{ snap(); on(s.value); schedulePreview(); }); return s; }
 function fieldWrap(labelText, tip, control, mb){ const f=ce('div','field'); if(mb!=null) f.style.marginBottom=mb; const l=ce('label'); l.textContent=labelText; if(tip){ const t=ce('span','tip'); t.textContent=tip; l.appendChild(t); } f.appendChild(l); f.appendChild(control); return f; }
 function addField(labelText, tip, control){ B.editor.appendChild(fieldWrap(labelText, tip, control)); }
 function labeledNum(label,val,on){ const w=ce('span'); w.style.cssText='display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:var(--ink);'; w.appendChild(document.createTextNode(label)); w.appendChild(mkNum(val,on)); return w; }
@@ -1573,7 +1573,11 @@ function noteField(s){
 /* ---- 되돌리기(Ctrl+Z) · 다시(Ctrl+Y): 슬라이드 단위 작업과 사진 표시 작업을 기록 ---- */
 const UNDO = [], REDO = [], SNAP_DATA = [];
 function snapNow(){ return snapEncode({d:deck, s:sel}, SNAP_DATA); }
-function snap(){ const t = snapNow(); if(UNDO[UNDO.length-1] === t) return; UNDO.push(t); if(UNDO.length > 40) UNDO.shift(); REDO.length = 0; }
+function snap(){ REDO.length = 0; const t = snapNow(); if(UNDO[UNDO.length-1] === t) return; UNDO.push(t); if(UNDO.length > 40) UNDO.shift(); }
+/* 입력 칸은 칸마다 처음 고칠 때 한 번만 기록(칸을 벗어나면 다시 새로 셈) — 칸에 커서만 둔 것으로는 기록·다시를 건드리지 않음 */
+function snapOnce(el){ if(el._sn) return; el._sn = true; snap(); el.addEventListener('blur', ()=>{ el._sn = false; }, {once:true}); }
+/* 파일 불러오기·새로·튜토리얼·허브 덱 열기처럼 덱을 통째로 바꿀 땐 되돌리기·다시 기록을 비움 */
+function resetHistory(){ UNDO.length = 0; REDO.length = 0; SNAP_DATA.length = 0; }
 function restoreSnap(t){
   const o = snapDecode(t, SNAP_DATA); deck = o.d; sel = Math.max(0, Math.min(o.s, deck.slides.length-1));
   B.deckName.value = deck.meta.title || ''; PE.sel = null; PE.pend = null; PE.drag = null;
@@ -1721,11 +1725,11 @@ function peRenderRows(){
     const r = ce('div','pe-mrow');
     r.appendChild(ce('span','kind', m.kind === 'arrow' ? '➚' : 'Ｔ'));
     const ti = ce('input','input'); ti.type = 'text'; ti.value = m.text || ''; ti.placeholder = m.kind === 'arrow' ? '(화살표만 · 글 없음)' : '설명 글';
-    ti.addEventListener('focus', snap); ti.addEventListener('input', ()=>{ m.text = ti.value; peRedraw(); schedulePreview(); });
+    ti.addEventListener('input', ()=>{ snapOnce(ti); m.text = ti.value; peRedraw(); schedulePreview(); });
     r.appendChild(ti);
     const stp = ce('span','stp'); stp.appendChild(document.createTextNode('순서'));
     const sn = ce('input','input num'); sn.type = 'number'; sn.min = '0'; sn.value = m.step;
-    sn.addEventListener('focus', snap); sn.addEventListener('input', ()=>{ m.step = Math.max(0, parseInt(sn.value, 10) || 0); peRedraw(); schedulePreview(); });
+    sn.addEventListener('input', ()=>{ snapOnce(sn); m.step = Math.max(0, parseInt(sn.value, 10) || 0); peRedraw(); schedulePreview(); });
     stp.appendChild(sn); r.appendChild(stp);
     const mv = ce('div','rr-move');
     const up = ce('button'); up.type = 'button'; up.textContent = '↑'; up.title = '위로(먼저 나옴)'; up.disabled = (i === 0); up.onclick = ()=>{ snap(); phSwapMarks(s.marks, i, i-1); peChanged(); };
@@ -1910,12 +1914,12 @@ function toast(msg, type){ B.toast.textContent=msg; B.toast.className='toast sho
 
 /* ---- 저장 / 불러오기 / 내보내기 ---- */
 function download(name, text){ const b=new Blob([text],{type:'text/html;charset=utf-8'}); const u=URL.createObjectURL(b); const a=ce('a'); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),1500); }
-function loadDeck(data){ if(!data || !Array.isArray(data.slides)) throw new Error('bad'); deck=normalize(data); sel=0; B.deckName.value=deck.meta.title||''; renderAll(); bootPreview(); scheduleAutosave(); }
+function loadDeck(data){ if(!data || !Array.isArray(data.slides)) throw new Error('bad'); deck=normalize(data); resetHistory(); sel=0; B.deckName.value=deck.meta.title||''; renderAll(); bootPreview(); scheduleAutosave(); }
 
-B.deckName.addEventListener('input', ()=>{ deck.meta.title=B.deckName.value; schedulePreview(); });
+B.deckName.addEventListener('input', ()=>{ snapOnce(B.deckName); deck.meta.title=B.deckName.value; schedulePreview(); });
 B.saveBtn.onclick=()=>{ if(HUB.on){ hubSave(); return; } try{ localStorage.setItem(LS_KEY, JSON.stringify(deck)); toast('저장했어요 — 이 브라우저에서 이어서 작업할 수 있어요'); }catch(e){ toast('저장 실패 (용량 초과일 수 있어요)','err'); } };
-B.newBtn.onclick=()=>{ if(deck.slides.length && !confirm('지금 내용을 지우고 새로 시작할까요?\n(저장·내보내기 안 한 변경은 사라집니다)')) return; deck=starterDeck(); sel=0; B.deckName.value=deck.meta.title; renderAll(); bootPreview(); scheduleAutosave(); toast('새 덱을 시작했어요'); };
-B.tutorialBtn.onclick=()=>{ if(deck.slides.length && !confirm('지금 내용을 지우고 사용법 튜토리얼을 열까요?\n(저장·내보내기 안 한 변경은 사라집니다)')) return; deck=normalize(tutorialDeck()); sel=0; B.deckName.value=deck.meta.title; renderAll(); bootPreview(); scheduleAutosave(); toast('튜토리얼을 불러왔어요'); };
+B.newBtn.onclick=()=>{ if(deck.slides.length && !confirm('지금 내용을 지우고 새로 시작할까요?\n(저장·내보내기 안 한 변경은 사라집니다)')) return; deck=starterDeck(); resetHistory(); sel=0; B.deckName.value=deck.meta.title; renderAll(); bootPreview(); scheduleAutosave(); toast('새 덱을 시작했어요'); };
+B.tutorialBtn.onclick=()=>{ if(deck.slides.length && !confirm('지금 내용을 지우고 사용법 튜토리얼을 열까요?\n(저장·내보내기 안 한 변경은 사라집니다)')) return; deck=normalize(tutorialDeck()); resetHistory(); sel=0; B.deckName.value=deck.meta.title; renderAll(); bootPreview(); scheduleAutosave(); toast('튜토리얼을 불러왔어요'); };
 B.loadBtn.onclick=()=> B.fileInput.click();
 B.fileInput.onchange=()=>{
   const f=B.fileInput.files&&B.fileInput.files[0]; if(!f) return;
@@ -1950,7 +1954,7 @@ B.help.addEventListener('click', e=>{ if(e.target===B.help) B.help.classList.rem
 /* ============ 직원허브 연결 (허브에서 ?deck=<id> / ?new=1 / ?deck=<id>&view=1 로 열었을 때만 켜짐 · 허브 밖에서는 지금까지처럼 이 브라우저 저장 + 파일 내보내기) ============ */
 const QS = new URLSearchParams(location.search);
 const HUB_CATS = ['진료실','데스크','상담','행정','통역','기공실'];
-const HUB = {on:false, view:QS.get('view') === '1', sb:null, role:'', uid:'', canEdit:false, id:'', exists:false, published:false, category:'', dirty:false};
+const HUB = {on:false, view:QS.get('view') === '1', sb:null, role:'', uid:'', canEdit:false, id:'', exists:false, published:false, category:'', dirty:false, rev:0, saving:false};
 const HUB_SB_URL = 'https://texevhsxttfoqkrucfzl.supabase.co';   /* hr.html 과 같은 주소·공개(anon) 키 — ortho.html 이 쓰는 방식 그대로 */
 const HUB_SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRleGV2aHN4dHRmb3FrcnVjZnpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMTMyNTIsImV4cCI6MjA5ODc4OTI1Mn0.v6zejbNx4Z4otGNc8hQeQum4c_wdst1azUkLx6s_9CM';
 function newUuid(){
@@ -1960,13 +1964,15 @@ function newUuid(){
   return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20);
 }
 async function hubClient(){
-  try{ if(window.parent !== window && window.parent.sb) return window.parent.sb; }catch(_){}   /* 허브 안: 허브의 로그인 세션을 그대로 씀 */
+  try{ if(window.parent !== window && window.parent.hubSb) return window.parent.hubSb; }catch(_){}   /* 허브 안: 허브(hr.html)가 window.hubSb 로 내놓은 같은 클라이언트 = 같은 로그인 세션 */
   if(!window.supabase){
     await new Promise((ok, no)=>{ const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'; sc.onload = ok; sc.onerror = ()=> no(new Error('로그인 도구를 불러오지 못했어요')); document.head.appendChild(sc); });
   }
   return window.supabase.createClient(HUB_SB_URL, HUB_SB_KEY);
 }
 function hubFail(msg){ document.body.innerHTML = '<div class="hub-fail">'+escapeHtml(msg)+'</div>'; }
+/* 변경 번호: 고칠 때마다 올라감. 저장은 시작 때 번호를 기억했다가, 끝났을 때 번호가 그대로일 때만 「저장됨」으로 바꿈 */
+function markDirty(){ HUB.rev++; setDirty(true); }
 function setDirty(v){ HUB.dirty = !!v; if(B.hubState){ B.hubState.textContent = v ? '저장 안 됨' : '저장됨'; B.hubState.classList.toggle('dirty', !!v); } }
 async function hubResolveImages(){
   if(!HUB.sb) return;
@@ -1995,19 +2001,22 @@ async function hubUploadInline(){
 }
 async function hubSave(){
   if(!deck.slides.length){ toast('슬라이드를 먼저 추가하세요', 'err'); return; }
-  B.saveBtn.disabled = true;
+  if(HUB.saving) return;
+  HUB.saving = true; B.saveBtn.disabled = true;
   try{
     await hubUploadInline();
+    const rev0 = HUB.rev;   /* 이 번호까지의 내용이 아래 row 에 담김 */
     const row = {title:deck.meta.title || '(제목 없음)', category:HUB.category || null, deck:deckForStore(deck), published:!!HUB.published};
     const r = HUB.exists
       ? await HUB.sb.from('manual_decks').update(row).eq('id', HUB.id).select('id')
       : await HUB.sb.from('manual_decks').insert(Object.assign({id:HUB.id}, row)).select('id');
     if(r.error) throw r.error;
     if(!r.data || !r.data.length) throw new Error('저장 권한이 없어요 (원장·실장만 저장할 수 있어요)');
-    HUB.exists = true; setDirty(false);
-    toast(HUB.published ? '저장했어요 — 직원에게 공개 중이에요' : '저장했어요 — 아직 비공개예요');
+    HUB.exists = true;
+    if(HUB.rev === rev0){ setDirty(false); toast(HUB.published ? '저장했어요 — 직원에게 공개 중이에요' : '저장했어요 — 아직 비공개예요'); }
+    else toast('저장했어요 — 저장하는 동안 고친 내용은 아직 저장 안 됐어요. 다시 저장해 주세요', 'err');
   }catch(e){ toast('저장 실패: '+(e.message || e), 'err'); }
-  B.saveBtn.disabled = false;
+  HUB.saving = false; B.saveBtn.disabled = false;
 }
 function hubStarterDeck(){
   return {meta:{title:'새 업무매뉴얼'}, slides:[
@@ -2016,7 +2025,6 @@ function hubStarterDeck(){
   ]};
 }
 async function hubRole(){
-  try{ if(window.parent !== window && window.parent.ME && window.parent.ME.role) return window.parent.ME.role; }catch(_){}
   const r = await HUB.sb.from('profiles').select('role').eq('user_id', HUB.uid).maybeSingle();
   return (r.data && r.data.role) || 'staff';
 }
@@ -2043,14 +2051,14 @@ async function hubBoot(){
     if(!deck.meta.title) deck.meta.title = r.data.title || '';
     HUB.exists = true; HUB.published = !!r.data.published; HUB.category = r.data.category || '';
   }
-  HUB.on = true; sel = 0;
+  HUB.on = true; sel = 0; resetHistory();
   await hubResolveImages();
   if(HUB.view){ hubShowViewer(); return; }
   B.deckName.value = deck.meta.title || '';
   B.catSel.innerHTML = '<option value="">분류 없음</option>'+HUB_CATS.map(c=> '<option value="'+c+'">'+c+'</option>').join('');
   B.catSel.value = HUB.category; B.pubChk.checked = HUB.published;
-  B.catSel.onchange = ()=>{ HUB.category = B.catSel.value; setDirty(true); };
-  B.pubChk.onchange = ()=>{ HUB.published = B.pubChk.checked; setDirty(true); toast(HUB.published ? '저장하면 직원에게 공개돼요' : '저장하면 비공개로 바뀌어요'); };
+  B.catSel.onchange = ()=>{ HUB.category = B.catSel.value; markDirty(); };
+  B.pubChk.onchange = ()=>{ HUB.published = B.pubChk.checked; markDirty(); toast(HUB.published ? '저장하면 직원에게 공개돼요' : '저장하면 비공개로 바뀌어요'); };
   B.hubBar.hidden = false; B.newBtn.hidden = true; B.tutorialBtn.hidden = true;
   B.saveBtn.innerHTML = '<span class="ico">❒</span>서버에 저장';
   renderAll(); bootPreview(); setDirty(!HUB.exists);
@@ -2063,7 +2071,7 @@ window.addEventListener('beforeunload', e=>{ if(HUB.on && HUB.dirty && !HUB.view
   if(HUB.view || QS.get('deck') || QS.get('new')){ document.querySelector('.app').style.visibility='hidden'; hubBoot().then(()=>{ const a=document.querySelector('.app'); if(a) a.style.visibility=''; }); return; }
   let restored=null;
   try{ const raw=localStorage.getItem(LS_KEY); if(raw){ const p=JSON.parse(raw); if(p && Array.isArray(p.slides) && p.slides.length) restored=p; } }catch(_){}
-  deck = restored ? normalize(restored) : normalize(tutorialDeck());
+  deck = restored ? normalize(restored) : normalize(tutorialDeck()); resetHistory();
   sel=0; B.deckName.value=deck.meta.title||'';
   renderAll(); bootPreview();
 })();
