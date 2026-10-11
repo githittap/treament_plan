@@ -11,7 +11,7 @@ const engineSrc = between(maker, '<script type="text/plain" id="engineSrc">', '<
 const photoEngine = engineSrc.slice(engineSrc.indexOf('/* ---- 사진 슬라이드: 사진 + 화살표'), engineSrc.indexOf('const BUILDERS'));
 
 const geo = (() => { const ctx = {}; vm.createContext(ctx); vm.runInContext(geoSrc + ';this.api={phFit,phArrow,phLabelPos,phSafeColor,phLabelFont,phAvoid,phFxOk,phCircle,phCircleOk};', ctx); return ctx.api; })();
-const pure = (() => { const ctx = { PHG: geo }; vm.createContext(ctx); vm.runInContext(pureSrc + ';this.api={rnd2,clampPct,roleCanEdit,isTypingTarget,phNormalize,phBendAdd,phBendRemove,phSwapMarks,deckForStore,snapEncode,snapDecode,shortcutAction,zoomAt,popPlace,themeNorm};', ctx); return ctx.api; })();
+const pure = (() => { const ctx = { PHG: geo }; vm.createContext(ctx); vm.runInContext(pureSrc + ';this.api={rnd2,clampPct,roleCanEdit,isTypingTarget,phNormalize,phBendAdd,phBendRemove,phSwapMarks,deckForStore,snapEncode,snapDecode,shortcutAction,zoomAt,popPlace,themeNorm,spaceGo};', ctx); return ctx.api; })();
 
 /* ---- 아주 작은 가짜 화면(DOM): 엔진의 buildPhoto/phBind를 노드에서 돌리기 위함 ---- */
 function fakeNode(tag, cls) {
@@ -1144,8 +1144,8 @@ test('[3차-2] Space = 다음 장, Ctrl+Space = 이전 장 (↑/↓ 유지) · �
   assert.ok(src.length > 200, '처리기 소스를 찾음');
   const mkEnv = (slide, hubView) => {
     const h = { keydown: [], keyup: [] }, log = [];
-    const ctx = { HUB: { view: !!hubView }, B: { help: { classList: { contains: () => false, remove() { } } } }, deck: { slides: [slide] }, sel: 0, PE: { sel: null, space: false }, SPK: { on: false, used: false },
-      document: { addEventListener: (t, f) => h[t].push(f) }, window: { addEventListener() { } }, shortcutAction: pure.shortcutAction, isTypingTarget: pure.isTypingTarget,
+    const ctx = { HUB: { view: !!hubView }, B: { help: { classList: { contains: () => !!ctx.helpOpen, remove() { } } } }, deck: { slides: [slide] }, sel: 0, PE: { sel: null, space: false }, SPK: { on: false, used: false },
+      document: { addEventListener: (t, f) => h[t].push(f), activeElement: null }, window: { addEventListener() { } }, spaceGo: pure.spaceGo, pickerOpen: false, shortcutAction: pure.shortcutAction, isTypingTarget: pure.isTypingTarget,
       runShortcut: a => log.push(a), peSpace(on) { ctx.PE.space = on; }, log, h };
     vm.createContext(ctx); vm.runInContext(src, ctx);
     const down = (code, ex) => { const e = Object.assign({ code, key: code === 'Space' ? ' ' : code, target: { tagName: 'DIV' }, repeat: false, prevented: 0, preventDefault() { this.prevented++; } }, ex || {}); h.keydown.forEach(f => f(e)); return e; };
@@ -1170,7 +1170,7 @@ test('[3차-2] Space = 다음 장, Ctrl+Space = 이전 장 (↑/↓ 유지) · �
   env = mkEnv(photo); env.down('Space', { target: { tagName: 'TEXTAREA' } }); env.up('Space'); assert.deepEqual(env.log, [], '입력 칸에선 그냥 글자'); assert.equal(env.ctx.SPK.on, false);
   env = mkEnv(photo, true); env.down('Space'); env.up('Space'); assert.deepEqual(env.log, [], '허브 보기 전용 화면에선 편집 글쇠 없음');
   // panStart 가 Space 중에만 used 를 켬(소스 확인) · 창 흐려지면 취소
-  const ps = mainJs.match(/const panStart = e=>\{[^\n]*/)[0]; assert.match(ps, /if\(PE\.space\) SPK\.used = true/);
+  const ps = mainJs.match(/const panStart = e=>\{[^\n]*/)[0]; assert.ok(!/SPK\.used/.test(ps), '누르기만 해서는 「끌었다」로 안 침(Codex 지적 1)');
   assert.match(mainJs, /window\.addEventListener\('blur', \(\)=>\{ SPK\.on = false; peSpace\(false\); \}\)/);
   assert.match(maker, /<b>Space<\/b>다음 장/); assert.match(maker, /<b>Ctrl\+Space<\/b>이전 장/); assert.match(maker, /<kbd>Ctrl\+Space<\/kbd>/);
   // 발표 화면(엔진)도 Ctrl+Space = 이전
@@ -1311,4 +1311,97 @@ test('[3차-7] 어두운 화면: 기본 어둡게 · 밝게/어둡게 단추 · 
   vm.runInContext(pureSrc + ';' + [fnSrc(mainJs, 'function imgUrl'), fnSrc(mainJs, 'function deckData'), gsrc, 'this.g=generateDeckHTML;'].join('\n'), ctx);
   assert.match(ctx.g({ si: 0, atEnd: false }), /^<!DOCTYPE html><html lang="ko" data-theme="light">/); ctx.THEME = 'dark'; assert.match(ctx.g({ si: 0, atEnd: false }), /<html lang="ko" data-theme="dark">/);
   assert.match(fnSrc(mainJs, 'function hubShowViewer'), /generateDeckHTML\(/);
+});
+
+/* ---- Codex 검증 지적(3차 2회) 재현 시험 ---- */
+test('[Codex 3차-1] Space 「끌었다」 판정은 실제 이동 4px 이상만 — 클릭만 하고 떼면 다음 장, 4px 넘게 끌고 떼면 안 넘어감', () => {
+  const ed = fnSrc(mainJs, 'function photoEditor');
+  const stmt = ed.match(/if\(PE\.space && Math\.hypot\(e\.clientX - PE\.pan\.x, e\.clientY - PE\.pan\.y\) >= 4\) SPK\.used = true;/); assert.ok(stmt, 'pointermove 안에 이동 거리 판정');
+  const run = (dx, dy, space) => { const ctx = { e: { clientX: 100 + dx, clientY: 50 + dy }, PE: { space, pan: { x: 100, y: 50 } }, SPK: { used: false }, Math }; vm.createContext(ctx); vm.runInContext(stmt[0], ctx); return ctx.SPK.used; };
+  assert.equal(run(0, 0, true), false, '클릭만(움직임 0)'); assert.equal(run(2, 2, true), false, '2.8px 떨림은 클릭'); assert.equal(run(3, 0, true), false); assert.equal(run(4, 0, true), true, '4px'); assert.equal(run(0, -12, true), true, '끌어 이동'); assert.equal(run(30, 30, false), false, 'Space 가 아닌 이동(가운데 단추)은 상관없음');
+  assert.ok(!/SPK\.used/.test(mainJs.match(/const panStart = e=>\{[^\n]*/)[0]), '누르는 순간(panStart)엔 표시 안 함');
+  // 끝에서 끝까지(진짜 처리기): 눌렀다 → 클릭(움직임 없음) → 뗌 = 다음 장
+  const src = mainJs.slice(mainJs.search(/document\.addEventListener\('keydown', e=>\{\s*if\(HUB\.view\) return;/), mainJs.indexOf('/* 미리보기 칸 접기'));
+  const h = { keydown: [], keyup: [] }, log = [];
+  const ctx = { HUB: { view: false }, B: { help: { classList: { contains: () => false, remove() { } } } }, deck: { slides: [{ type: 'photo', image: { src: 'x' } }] }, sel: 0, PE: { sel: null, space: false, pop: null }, SPK: { on: false, used: false },
+    document: { addEventListener: (t, f) => h[t].push(f), activeElement: null }, window: { addEventListener() { } }, spaceGo: pure.spaceGo, pickerOpen: false, shortcutAction: pure.shortcutAction, isTypingTarget: pure.isTypingTarget, runShortcut: a => log.push(a), peSpace(on) { ctx.PE.space = on; } };
+  vm.createContext(ctx); vm.runInContext(src, ctx);
+  const down = () => h.keydown.forEach(f => f({ code: 'Space', key: ' ', target: { tagName: 'DIV' }, repeat: false, preventDefault() { } })), up = () => h.keyup.forEach(f => f({ code: 'Space', key: ' ', target: { tagName: 'DIV' }, preventDefault() { } }));
+  down(); up(); assert.deepEqual(log, ['slide-next'], '움직임 없이 뗌 → 다음 장');
+});
+
+test('[Codex 3차-2] Space 를 누른 뒤 뗄 때까지 입력 칸 포커스·도움말·글 입력 창·장 종류 창·허브 보기가 되면 장 이동 예약 취소', () => {
+  const g = pure.spaceGo, ok = { used: false, typing: false, help: false, pop: false, picker: false, view: false };
+  assert.equal(g(ok), true); for (const k of ['used', 'typing', 'help', 'pop', 'picker', 'view']) assert.equal(g(Object.assign({}, ok, { [k]: true })), false, k + ' 이면 취소');
+  const src = mainJs.slice(mainJs.search(/document\.addEventListener\('keydown', e=>\{\s*if\(HUB\.view\) return;/), mainJs.indexOf('/* 미리보기 칸 접기'));
+  const mk = () => { const h = { keydown: [], keyup: [] }, log = [];
+    const ctx = { HUB: { view: false }, B: { help: { classList: { contains: () => !!ctx.helpOpen, remove() { } } } }, deck: { slides: [{ type: 'photo', image: { src: 'x' } }] }, sel: 0, PE: { sel: null, space: false, pop: null }, SPK: { on: false, used: false },
+      document: { addEventListener: (t, f) => h[t].push(f), activeElement: null }, window: { addEventListener() { } }, spaceGo: pure.spaceGo, pickerOpen: false, shortcutAction: pure.shortcutAction, isTypingTarget: pure.isTypingTarget, runShortcut: a => log.push(a), peSpace(on) { ctx.PE.space = on; } };
+    vm.createContext(ctx); vm.runInContext(src, ctx);
+    return { ctx, log, down: () => h.keydown.forEach(f => f({ code: 'Space', key: ' ', target: { tagName: 'DIV' }, repeat: false, preventDefault() { } })), up: (t) => h.keyup.forEach(f => f({ code: 'Space', key: ' ', target: t || { tagName: 'DIV' }, preventDefault() { } })) }; };
+  let e = mk(); e.down(); e.up(); assert.deepEqual(e.log, ['slide-next'], '아무 일 없으면 이동');
+  e = mk(); e.down(); e.ctx.document.activeElement = { tagName: 'TEXTAREA' }; e.up(); assert.deepEqual(e.log, [], '그 사이 입력 칸에 포커스'); assert.equal(e.ctx.SPK.on, false, '상태는 정리됨'); assert.equal(e.ctx.PE.space, false);
+  e = mk(); e.down(); e.up({ tagName: 'INPUT' }); assert.deepEqual(e.log, [], '떼는 자리가 입력 칸');
+  e = mk(); e.down(); e.ctx.helpOpen = true; e.up(); assert.deepEqual(e.log, [], '그 사이 도움말 열림');
+  e = mk(); e.down(); e.ctx.PE.pop = { el: {} }; e.up(); assert.deepEqual(e.log, [], '그 사이 글 입력 창 열림');
+  e = mk(); e.down(); e.ctx.pickerOpen = true; e.up(); assert.deepEqual(e.log, [], '그 사이 장 종류 창 열림');
+  e = mk(); e.down(); e.ctx.HUB.view = true; e.up(); assert.deepEqual(e.log, [], '허브 보기 전용');
+  e = mk(); e.down(); e.up(); e.up(); assert.deepEqual(e.log, ['slide-next'], '한 번만');
+  assert.match(mainJs, /isTypingTarget\(e\.target\) \|\| isTypingTarget\(document\.activeElement\)/);
+});
+
+test('[Codex 3차-3] 관계도 파란 강조(desk)·허브 상자: 그라데이션 양 끝 모두 흰 제목·설명 글자 대비 4.5 이상(어두운 테마·밝은 테마)', () => {
+  const css = between(maker, '<template id="slideCSS">', '</template>');
+  const dark = css.match(/:root\{([^}]*)\}/)[1], light = css.match(/:root\[data-theme="light"\]\{([^}]*)\}/)[1];
+  const v = (b, k) => (b.match(new RegExp('--' + k + ':(#[0-9a-fA-F]{6});')) || [])[1];
+  const L = h => { const f = x => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }; return 0.2126 * f(parseInt(h.slice(1, 3), 16)) + 0.7152 * f(parseInt(h.slice(3, 5), 16)) + 0.0722 * f(parseInt(h.slice(5, 7), 16)); };
+  const cr = (a, b) => (Math.max(L(a), L(b)) + 0.05) / (Math.min(L(a), L(b)) + 0.05);
+  const deskRule = css.match(/\.node\.desk \.box\{background:linear-gradient\(165deg,var\(--(\w[\w-]*)\),var\(--(\w[\w-]*)\)\);[^}]*color:#fff/); assert.ok(deskRule, 'desk 상자는 desk-a → desk-b 그라데이션 + 흰 글자');
+  const hubRule = css.match(/\.node\.hub \.box\{background:linear-gradient\(165deg,var\(--(\w[\w-]*)\),var\(--(\w[\w-]*)\)\);[^}]*color:#fff/); assert.ok(hubRule, 'hub 상자 그라데이션 + 흰 글자');
+  assert.match(css, /\.node\.desk \.box \.lab\{color:#fff/); assert.match(css, /\.node\.hub \.box \.lab\{color:#fff/);
+  const deskSub = css.match(/\.node\.desk \.box \.sub\{color:var\(--([\w-]+)\)/)[1], hubSub = css.match(/\.node\.hub \.box \.sub\{color:var\(--([\w-]+)\)/)[1];
+  for (const [name, b] of [['어두운', dark], ['밝은', light]]) {
+    for (const [rule, sub] of [[deskRule, deskSub], [hubRule, hubSub]]) for (const end of [rule[1], rule[2]]) {
+      const bg = v(b, end), lab = cr('#ffffff', bg), sb = cr(v(b, sub), bg);
+      assert.ok(bg && lab >= 4.5, name + ' ' + end + ' 흰 제목 ' + (bg && lab.toFixed(2))); assert.ok(sb >= 4.5, name + ' ' + end + ' 설명 ' + sb.toFixed(2));
+    }
+  }
+  assert.equal(v(dark, 'desk-a') !== v(dark, 'blue'), true, '어두운 테마의 밝은 파랑(--blue)을 상자 바탕으로 안 씀');
+});
+
+test('[Codex 3차-4] 원 그리기 중 장을 바꾸면(↓ → pickSlide → photoEditor/renderEditor) PE.draw 가 비워져 새 장에 이전 원이 안 생김', () => {
+  const ed = fnSrc(mainJs, 'function photoEditor'), init = ed.match(/PE\.s = s; PE\.sel = null;[^\n]*/)[0];
+  assert.match(init, /PE\.draw = null/);
+  const ctx = { PE: { draw: { c: [10, 10], r: 40 }, zsid: null, z: 1, tx: 0, ty: 0 }, sidOf: s => s.sid, s: { sid: 'B' } }; vm.createContext(ctx); vm.runInContext(init, ctx);
+  assert.equal(ctx.PE.draw, null, '새 장 편집 판을 열면 그리던 원 버려짐'); assert.equal(ctx.PE.s.sid, 'B');
+  assert.match(fnSrc(mainJs, 'function renderEditor'), /PE\.zsid = null; PE\.draw = null/, '사진 판 없는 장으로 가도 버림');
+  const de = ed.match(/const drawEnd = e=>\{[\s\S]*?\n  \};/)[0]; assert.match(de, /if\(PE\.s !== s\) return;/, '그리는 사이 장이 바뀌었으면 만들지 않음');
+  // 끝까지: 장 A 에서 그리다 장 B 로 → 옛 장의 놓기 처리기가 와도 B 에 원이 안 생김
+  const mk = () => { const A = { sid: 'A', marks: [] }, Bs = { sid: 'B', marks: [] }, cx = { PE: { draw: { c: [50, 50], r: 60, s: A }, s: A, W: 600, H: 400, sel: null }, s: A, toast() { }, peRedraw() { }, peChanged() { }, snap() { }, id: () => 'cid', rnd2: v => Math.round(v * 100) / 100, Math, A, Bs };
+    vm.createContext(cx); vm.runInContext(de.replace('const drawEnd', 'this.drawEnd'), cx); return cx; };
+  let c = mk(); c.drawEnd({ type: 'pointerup' }); assert.equal(c.A.marks.length, 1, '같은 장이면 만들어짐(기준 동작)');
+  c = mk(); c.PE.s = c.Bs; c.PE.draw = null; c.drawEnd({ type: 'pointerup' }); assert.equal(c.A.marks.length + c.Bs.marks.length, 0, '초기화된 뒤엔 아무 것도 안 만듦');
+  c = mk(); c.PE.s = c.Bs; c.drawEnd({ type: 'pointerup' }); assert.equal(c.Bs.marks.length, 0, '다른 장이 열린 뒤 놓기가 와도 새 장엔 안 생김'); assert.equal(c.PE.draw, null);
+});
+
+test('[Codex 3차-5] 발표 엔진: Space·Ctrl+Space 는 키를 계속 눌러도(repeat) 1장만, 처음 누를 때는 정상 · 다른 키 동작은 그대로', () => {
+  const i0 = engineSrc.indexOf("document.addEventListener('keydown'"), src = engineSrc.slice(i0, engineSrc.indexOf('if(window.parent', i0));
+  const log = [], ctx = { overlay: null, next: () => log.push('next'), prev: () => log.push('prev'), goSlide: i => log.push('go' + i), slides: [1, 2, 3], fsBtn: null, toggleHelp() { }, h: null, document: { addEventListener: (t, f) => { ctx.h = f; } } };
+  vm.createContext(ctx); vm.runInContext(src, ctx);
+  const key = (k, ex) => { let pd = 0; ctx.h(Object.assign({ key: k, repeat: false, ctrlKey: false, preventDefault() { pd++; } }, ex || {})); return pd; };
+  key(' '); assert.deepEqual(log, ['next']); key(' ', { repeat: true }); key(' ', { repeat: true }); assert.deepEqual(log, ['next'], 'Space 반복은 무시');
+  key(' ', { ctrlKey: true }); assert.deepEqual(log, ['next', 'prev']); assert.equal(key(' ', { ctrlKey: true, repeat: true }), 1, '반복도 기본 동작(스크롤)은 막음'); assert.deepEqual(log, ['next', 'prev'], 'Ctrl+Space 반복도 1장');
+  key('ArrowRight'); key('ArrowRight', { repeat: true }); assert.deepEqual(log.slice(2), ['next', 'next'], '화살표는 예전처럼 반복 허용');
+  key('ArrowLeft'); key('Home'); assert.deepEqual(log.slice(4), ['prev', 'go0']);
+});
+
+test('[Codex 3차-6] 발표 화면 밝은 값: 색 변수가 자기 자신을 가리키지 않고(--x:var(--x)) 원래 값이 복원됨', () => {
+  for (const [name, c] of [['편집', between(maker, '<style>', '</style>')], ['발표', between(maker, '<template id="slideCSS">', '</template>')]]) {
+    const self = c.match(/--([a-z0-9-]+):var\(--\1\)/g); assert.equal(self, null, name + ' 자기참조: ' + self);
+    const light = c.match(/:root\[data-theme="light"\]\{([^}]*)\}/)[1];
+    for (const m of light.matchAll(/--([a-z0-9-]+):([^;]+);/g)) assert.ok(!/var\(/.test(m[2]) || m[2].replace(/var\(--([a-z0-9-]+)\)/g, '').trim() !== m[2], name + ' --' + m[1]);
+  }
+  const css = between(maker, '<template id="slideCSS">', '</template>'), light = css.match(/:root\[data-theme="light"\]\{([^}]*)\}/)[1];
+  assert.match(light, /--warn-line:#efc9c4;/); assert.match(light, /--same-line:#c9b3b0;/); assert.match(light, /--note-line:#cfe0f2;/); assert.match(light, /--same-ink:#7d5a56;/); assert.match(light, /--gold-text:#9a6a1e; --gold-text2:#8a5c17;/);
+  assert.match(css, /\.note\.warn\{[^}]*border-color:var\(--warn-line\)/); assert.match(css, /\.node\.same \.box\{[^}]*border-color:var\(--same-line\)/);
 });
