@@ -226,6 +226,9 @@
   .pe-line{fill:none; stroke:#e5383b; stroke-linecap:round; stroke-linejoin:round; filter:drop-shadow(0 0 2px rgba(255,255,255,.9));}
   .pe-line.sel{stroke:#ff9f1c;}
   .pe-line.tmp{stroke-dasharray:6 6; opacity:.85;}
+  .pe-ring{fill:none; stroke:#e5383b; filter:drop-shadow(0 0 2px rgba(255,255,255,.9));}
+  .pe-ring.sel{stroke:#ff9f1c;}
+  .pe-ring.tmp{stroke-dasharray:6 6; opacity:.85;}
   .pe-head{fill:#e5383b; stroke:#fff; stroke-width:1;}
   .pe-head.sel{fill:#ff9f1c;}
   .pe-handle{fill:#fff; stroke:#ff9f1c; stroke-width:2.5;}
@@ -317,7 +320,7 @@
           <div class="mini-actions" id="miniActions"></div>
         </div>
         <div class="panel-body" id="editor"></div>
-        <div class="keyhint" id="keyHint"><span>⌨ 단축키</span><span><b>Q</b>화살표</span><span><b>T</b>글</span><span><b>A</b>선택·이동</span><span><b>E</b>지우기</span><span><b>R</b>꺾기</span><span><b>Shift+R</b>펴기</span><span><b>Ctrl+Z/Y</b>되돌리기·다시</span><span><b>Ctrl+E</b>장 복제</span><span><b>Del</b>선택 지우기</span><span><b>Esc</b>취소</span><span><b>↑/↓</b>이전·다음 장</span><span><b>Ctrl+V</b>사진 붙여넣기</span><span><b>Ctrl+휠</b>확대</span><span><b>Space+끌기</b>이동</span></div>
+        <div class="keyhint" id="keyHint"><span>⌨ 단축키</span><span><b>Q</b>화살표</span><span><b>O</b>원</span><span><b>T</b>글</span><span><b>A</b>선택·이동</span><span><b>E</b>지우기</span><span><b>R</b>꺾기</span><span><b>Shift+R</b>펴기</span><span><b>Ctrl+Z/Y</b>되돌리기·다시</span><span><b>Ctrl+E</b>장 복제</span><span><b>Del</b>선택 지우기</span><span><b>Esc</b>취소</span><span><b>Space</b>다음 장</span><span><b>Ctrl+Space</b>이전 장</span><span><b>↑/↓</b>이전·다음 장</span><span><b>Ctrl+V</b>사진 붙여넣기</span><span><b>Ctrl+휠</b>확대</span><span><b>Space+끌기</b>이동</span></div>
       </section>
 
       <!-- PREVIEW -->
@@ -361,12 +364,13 @@
       <ul>
         <li><b>사진 넣기</b> — 사진을 올리거나 Ctrl+V로 붙여넣어요. 빈 사진 장이면 그 장에, 아니면 뒤에 새 장이 생겨요</li>
         <li><b>화살표 (Q)</b> — 사진을 두 번 눌러요(시작점 → 끝점)</li>
-        <li><b>글 (T)</b> — 사진을 누른 자리에 글. Enter로 확정, Shift+Enter는 줄바꿈</li>
+        <li><b>글 (T)</b> — 사진을 누른 자리에 글. Enter로 확정, Shift+Enter는 줄바꿈. 글 한 상자를 넣고 나면 자동으로 선택(A)으로 돌아가요</li>
+        <li><b>원 (O)</b> — 원의 가운데를 누른 채 바깥으로 끌어요. 선택(A)에서 테두리를 끌면 옮기고, 색·효과는 줄 아래에서 바꿔요</li>
         <li><b>선택 (A)</b> — 화살표·글을 끌어 옮겨요</li>
         <li><b>꺾기 (R)</b> — 고른 화살표에 꺾임점이 더해져요. 점을 끌어 모양을 만들고, R을 또 누르면 한 번 더 꺾여요. Shift+R은 다시 펴요. 꺾임점을 두 번 누르면 빠져요</li>
         <li><b>순서 칸</b> — 비우면 바로 보이고, 숫자 = 클릭 몇 번째에 나올지</li>
         <li><b>꾸미기</b> — 줄 아래에서 글자색·배경색·크기·효과를 바꿔요(‘기본으로’로 되돌림). 글이 서로 겹치면 자동으로 비켜 앉아요</li>
-        <li><b>확대·이동</b> — Ctrl+휠 또는 ＋/－로 확대해요. 이동은 확대 중 빈 곳 끌기(A) 또는 Space+끌기</li>
+        <li><b>확대·이동</b> — Ctrl+휠 또는 ＋/－로 확대해요. 이동은 확대 중 빈 곳 끌기(A) 또는 Space를 누른 채 끌기(끌지 않고 떼면 다음 장)</li>
         <li><b>편집 칸 넓히기</b> — 미리보기의 ‘접기 ▸’를 누르면 편집 칸이 넓어져요</li>
         <li><b>장 이동</b> — 왼쪽 위 ‘장 이동’ 칸에 번호를 치고 Enter</li>
       </ul>
@@ -380,7 +384,8 @@
       <h3>편집 단축키 (글 입력 칸에서는 안 먹어요)</h3>
       <div class="keys">
         <kbd>Q</kbd><span>화살표 그리기 — 사진을 두 번(시작점·끝점) 눌러요</span>
-        <kbd>T</kbd><span>글 넣기 — 사진을 누른 자리에 설명 글</span>
+        <kbd>O</kbd><span>원 그리기 — 가운데를 누른 채 바깥으로 끌어요</span>
+        <kbd>T</kbd><span>글 넣기 — 사진을 누른 자리에 설명 글(한 번 넣으면 선택으로 돌아와요)</span>
         <kbd>A</kbd><span>선택·이동 — 화살표·글을 끌어 옮겨요</span>
         <kbd>E</kbd><span>지우기 — 누른 화살표·글을 지워요</span>
         <kbd>R</kbd><span>꺾기 — 고른 화살표에 꺾임점 더하기</span>
@@ -390,6 +395,8 @@
         <kbd>Ctrl+E</kbd><span>지금 슬라이드 복제</span>
         <kbd>Delete</kbd><span>고른 화살표·글 지우기</span>
         <kbd>Esc</kbd><span>그리던 것 취소 · 선택 해제</span>
+        <kbd>Space</kbd><span>다음 슬라이드로 (끌지 않고 뗄 때)</span>
+        <kbd>Ctrl+Space</kbd><span>이전 슬라이드로</span>
         <kbd>↓ / ↑</kbd><span>다음 / 이전 슬라이드로</span>
         <kbd>Ctrl+V</kbd><span>클립보드 사진 붙여넣기</span>
         <kbd>Ctrl+휠</kbd><span>사진 확대·축소</span>
@@ -505,8 +512,8 @@
   .pv-box{position:absolute; --iz:1;}
   .pv-img{display:block; width:100%; height:100%; object-fit:fill; pointer-events:none; -webkit-user-drag:none;}
   .pv-svg{position:absolute; left:0; top:0; width:100%; height:100%; overflow:visible; pointer-events:none;}
-  .ph-arrow{fill:none; stroke:#e5383b; stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:var(--len,1000); stroke-dashoffset:var(--len,1000); opacity:0; filter:drop-shadow(0 0 2px rgba(255,255,255,.95)); transition:stroke-dashoffset .75s var(--ease), opacity .05s linear;}
-  .ph-arrow.on{stroke-dashoffset:0; opacity:1;}
+  .ph-arrow,.ph-ring{fill:none; stroke:#e5383b; stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:var(--len,1000); stroke-dashoffset:var(--len,1000); opacity:0; filter:drop-shadow(0 0 2px rgba(255,255,255,.95)); transition:stroke-dashoffset .75s var(--ease), opacity .05s linear;}
+  .ph-arrow.on,.ph-ring.on{stroke-dashoffset:0; opacity:1;}
   .ph-head{fill:#e5383b; stroke:#fff; stroke-width:1; stroke-linejoin:round; opacity:0; transition:opacity .25s linear 0s;}
   .ph-head.on{opacity:1; transition-delay:.55s;}
   .ph-lbl{position:absolute; width:0; height:0; z-index:4; pointer-events:none; transform:scale(var(--iz,1)); transform-origin:0 0;}
@@ -515,6 +522,7 @@
   .ph-lbl.on .ph-lbl-box{opacity:1; transform:none;}
   /* 등장 효과(fx): 화살표 fade = 그려지지 않고 나타남 · 글 fade/zoom/pop */
   .ph-arrow.fx-fade{stroke-dasharray:none; stroke-dashoffset:0; transition:opacity .5s var(--ease);}
+  .ph-ring.fx-fade{stroke-dasharray:none; stroke-dashoffset:0; transition:opacity .5s var(--ease);}
   .ph-head.fx-fade{transition:opacity .5s var(--ease);}
   .ph-head.fx-fade.on{transition-delay:0s;}
   .ph-lbl-box.fx-fade{transform:none;}
@@ -584,8 +592,8 @@
     .rv,.link{transition:opacity .2s linear !important;}
     .rv:not(.on){transform:none;}
     .link:not(.on){stroke-dashoffset:0; opacity:0;}
-    .ph-arrow,.ph-head,.ph-lbl-box{transition:opacity .2s linear !important;}
-    .ph-arrow{stroke-dashoffset:0;}
+    .ph-arrow,.ph-ring,.ph-head,.ph-lbl-box{transition:opacity .2s linear !important;}
+    .ph-arrow,.ph-ring{stroke-dashoffset:0;}
     .ph-lbl-box,.ph-lbl-box.fx-zoom,.ph-lbl-box.fx-pop{transform:none;}
     .node.rv:not(.on){transform:translate(-50%,-50%);}
   }
@@ -611,8 +619,12 @@ function phArrow(pts,bw,bh,sw){
 }
 /* 글 상자(너비 w·높이 h)를 점에 붙이는 이동값. bx,by가 0이면 점 한가운데(자유 글), 아니면 그 방향(화살표 꼬리 뒤쪽)으로 비켜 앉음 */
 function phSafeColor(c){ return (typeof c==='string' && /^#[0-9a-fA-F]{3,8}$/.test(c)) ? c : ''; }
-/* 가져온 글 상자: size(pt)는 슬라이드 폭 960pt 기준으로 사진 폭에 비례해 줄이되 폰에서도 14px 아래로는 안 내려감. size가 없으면 null(기본 15px) */
-function phLabelFont(size,bw){ return size>0 ? Math.max(14, Math.round(size*bw/960*10)/10) : null; }
+/* 가져온 글 상자: size(pt)는 슬라이드 폭 960pt 기준으로 사진 폭에 비례해 줄이되 폰에서도 14px 아래로는 안 내려감. size가 없으면 null(기본 15px).
+   fmin(8~14, 「작게」 단계만 가짐)이 있으면 그 값이 14px 대신 최소 크기 → 작게 단계가 실제로 작아짐. fmin이 없는 기존 글은 그대로 */
+function phLabelFont(size,bw,fmin){ var lo = fmin>0 ? Math.min(14, Math.max(8, fmin)) : 14; return size>0 ? Math.max(lo, Math.round(size*bw/960*10)/10) : null; }
+/* 원: 중심 x,y는 사진 폭·높이의 %, 반지름 r은 사진 폭의 % (사진 틀 비율이 고정이라 어떤 화면에서도 원 모양 유지). 잘못된 값(숫자 아님·음수·0)은 거름 */
+function phCircleOk(m){ return !!m && typeof m.x==='number' && typeof m.y==='number' && typeof m.r==='number' && isFinite(m.x) && isFinite(m.y) && isFinite(m.r) && m.r>=0.01; }
+function phCircle(m,bw,bh){ var r=m.r*bw/100; return {cx:m.x*bw/100, cy:m.y*bh/100, r:r, len:2*Math.PI*r}; }
 /* 글 상자 기준점: w가 있는 글(가져온 글 상자)은 x,y가 상자 왼쪽 위 모서리, 없으면(제작기에서 넣은 글) 한가운데 */
 function phLabelTL(m){ return m.w!=null; }
 function phLabelPos(w,h,bx,by,gap){
@@ -620,8 +632,8 @@ function phLabelPos(w,h,bx,by,gap){
   var t=Math.min(bx?(w/2)/Math.abs(bx):Infinity, by?(h/2)/Math.abs(by):Infinity)+(gap==null?8:gap);
   return [bx*t-w/2, by*t-h/2];
 }
-/* 등장 효과: 화살표는 fade(나타남)만, 글은 fade·zoom(확대)·pop(튀어오름). 기본(빈 값)은 지우고 저장 안 함 */
-function phFxOk(kind,fx){ return (kind==='arrow' ? ['fade'] : ['fade','zoom','pop']).indexOf(fx)>=0; }
+/* 등장 효과: 화살표·원은 fade(나타남)만, 글은 fade·zoom(확대)·pop(튀어오름). 기본(빈 값)은 지우고 저장 안 함 */
+function phFxOk(kind,fx){ return (kind==='arrow'||kind==='circle' ? ['fade'] : ['fade','zoom','pop']).indexOf(fx)>=0; }
 /* 글 상자끼리 안 겹치게. fixed=안 움직이는 상자들, movable=차례로 자리 잡는 상자들({x,y,w,h} px, 왼쪽 위 기준), bnd=[왼,오른,위,아래].
    앞서 놓인 상자와 gap(기본 4px) 안으로 닿으면 겹친 상자의 아래·위·오른쪽·왼쪽 중 원래 자리에서 가장 가까운 빈 자리(bnd 안)로 비킴 — 없으면 그대로. 같은 입력 → 같은 출력 */
 function phAvoid(fixed,movable,bnd,gap){
@@ -860,7 +872,7 @@ function buildPhoto(s){
   if(s.image && s.image.src) im.src = s.image.src;
   const svg = svgEl('svg','pv-svg');
   box.appendChild(im); box.appendChild(svg); inn.appendChild(box); pv.appendChild(inn); body.appendChild(pv);
-  const ph = {s:s, pv:pv, inn:inn, box:box, im:im, svg:svg, arrows:[], labels:[], z:1, tx:0, ty:0, W:0, H:0, bw:0, bh:0};
+  const ph = {s:s, pv:pv, inn:inn, box:box, im:im, svg:svg, arrows:[], circles:[], labels:[], z:1, tx:0, ty:0, W:0, H:0, bw:0, bh:0};
   (s.marks || []).forEach(m=>{
     const step = (m.step|0);
     if(m.kind === 'arrow' && m.pts && m.pts.length >= 2){
@@ -872,6 +884,11 @@ function buildPhoto(s){
       if(col){ line.style.stroke = col; head.style.fill = col; }
       if(m.text){ rec.lbl = phMkLabel(m.text, step, fx ? m.fx : ''); box.appendChild(rec.lbl.root); }
       ph.arrows.push(rec);
+    } else if(m.kind === 'circle' && phCircleOk(m)){
+      const fx = phFxOk('circle', m.fx) ? ' fx-'+m.fx : '';
+      const c = svgEl('circle','ph-ring'+fx); c.dataset.step = step; svg.appendChild(c);
+      const col = phSafeColor(m.color); if(col) c.style.stroke = col;
+      ph.circles.push({m:m, c:c});
     } else if(m.kind === 'label' && m.text){
       const l = phMkLabel(m.text, step, phFxOk('label', m.fx) ? m.fx : ''); box.appendChild(l.root); ph.labels.push({m:m, l:l});
       const tc = phSafeColor(m.color); if(tc) l.bx.style.color = tc;
@@ -907,8 +924,12 @@ function phLayout(ph){
     r.head.setAttribute('points', g.head);
     if(r.lbl) items.push({i:ph.s.marks.indexOf(r.m), l:r.lbl, fix:false, p:phPlaceLabel(r.lbl, g.tail.x, g.tail.y, g.tail.bx, g.tail.by, maxW, bnd)});
   });
+  ph.circles.forEach(r=>{
+    const g = phCircle(r.m, f.bw, f.bh);
+    r.c.setAttribute('cx', g.cx); r.c.setAttribute('cy', g.cy); r.c.setAttribute('r', g.r); r.c.setAttribute('stroke-width', sw); r.c.style.setProperty('--len', g.len);
+  });
   ph.labels.forEach(r=>{
-    const m = r.m, tl = phLabelTL(m), fs = phLabelFont(m.size, f.bw);
+    const m = r.m, tl = phLabelTL(m), fs = phLabelFont(m.size, f.bw, m.fmin);
     r.l.bx.style.fontSize = fs ? fs+'px' : '';
     items.push({i:ph.s.marks.indexOf(m), l:r.l, fix:!!tl, p:phPlaceLabel(r.l, m.x*f.bw/100, m.y*f.bh/100, 0, 0, maxW, bnd, tl ? {w:m.w*f.bw/100, h:(m.h||0)*f.bh/100} : null)});
   });
@@ -1117,6 +1138,7 @@ if(fsBtn) fsBtn.onclick=()=>{ const a=document.querySelector('.app'); if(!docume
 
 document.addEventListener('keydown', e=>{
   if(overlay && overlay.classList.contains('show')){ if(e.key==='Escape') toggleHelp(false); return; }
+  if(e.key === ' ' && e.ctrlKey){ e.preventDefault(); prev(); return; }   /* Ctrl+Space = 이전 */
   switch(e.key){
     case 'ArrowRight': case ' ': case 'Enter': case 'PageDown': e.preventDefault(); next(); break;
     case 'ArrowLeft': case 'PageUp': case 'Backspace': e.preventDefault(); prev(); break;
@@ -1160,7 +1182,7 @@ const B = {
 const SLIDE_CSS = B.slideCSS.content ? B.slideCSS.content.textContent : B.slideCSS.innerHTML;
 const PHGEO_SRC = q('#phGeoSrc').textContent;
 const ENGINE = PHGEO_SRC + '\n' + B.engineSrc.textContent;
-const PHG = new Function(PHGEO_SRC + ';return {phFit:phFit, phArrow:phArrow, phLabelPos:phLabelPos, phSafeColor:phSafeColor, phLabelFont:phLabelFont, phLabelTL:phLabelTL, phAvoid:phAvoid, phFxOk:phFxOk};')();
+const PHG = new Function(PHGEO_SRC + ';return {phFit:phFit, phArrow:phArrow, phLabelPos:phLabelPos, phSafeColor:phSafeColor, phLabelFont:phLabelFont, phLabelTL:phLabelTL, phAvoid:phAvoid, phFxOk:phFxOk, phCircle:phCircle, phCircleOk:phCircleOk};')();
 const LS_KEY = 'seolmyeongdeok:autosave:v1';
 
 const TYPES = {
@@ -1189,16 +1211,17 @@ function rnd2(v){ return Math.round(v*100)/100; }
 function clampPct(v){ return Math.max(0, Math.min(100, +v || 0)); }
 function roleCanEdit(role){ return role === 'owner' || role === 'chief'; }
 function isTypingTarget(t){ return !!t && (t.isContentEditable === true || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || '')); }
-/* 사진 슬라이드 모양 맞추기: 화살표 점은 2~3개(비율), 글은 x·y(비율), 모두 id·step 보장 */
+/* 사진 슬라이드 모양 맞추기: 화살표 점은 2~3개(비율), 글은 x·y(비율), 원은 중심 x·y + 반지름 r(사진 폭 %, 0 초과), 모두 id·step 보장 */
 function phNormalize(s, mkId){
   s.kicker = s.kicker || ''; s.title = s.title || ''; s.notes = s.notes || '';
   s.image = (s.image && (s.image.path || s.image.src)) ? s.image : null;
-  s.marks = (Array.isArray(s.marks) ? s.marks : []).filter(m=> m && (m.kind === 'arrow' ? Array.isArray(m.pts) && m.pts.length >= 2 : true));
+  s.marks = (Array.isArray(s.marks) ? s.marks : []).filter(m=> m && (m.kind === 'arrow' ? Array.isArray(m.pts) && m.pts.length >= 2 : m.kind === 'circle' ? PHG.phCircleOk(m) : true));   /* 값이 잘못된 원(숫자 아님·반지름 0 이하)은 뺌 */
   s.marks.forEach(m=>{
     if(!m.id) m.id = mkId();
     m.step = Math.max(0, parseInt(m.step, 10) || 0);
     m.text = m.text == null ? '' : String(m.text);
     if(m.kind === 'arrow') m.pts = m.pts.map(p=> [rnd2(clampPct(p[0])), rnd2(clampPct(p[1]))]);
+    else if(m.kind === 'circle'){ m.x = rnd2(clampPct(m.x)); m.y = rnd2(clampPct(m.y)); m.r = Math.max(0.01, rnd2(Math.min(100, m.r))); }
     else {
       m.kind = 'label'; m.x = rnd2(clampPct(m.x)); m.y = rnd2(clampPct(m.y));
       if(m.w != null) m.w = rnd2(clampPct(m.w)); if(m.h != null) m.h = rnd2(clampPct(m.h));
@@ -1206,6 +1229,7 @@ function phNormalize(s, mkId){
     if(m.color != null && !PHG.phSafeColor(m.color)) delete m.color;   /* 안전한 색(#rgb·#rrggbb…)이 아니면 지움 */
     if(m.bg != null && !PHG.phSafeColor(m.bg)) delete m.bg;
     if(m.fx != null && !PHG.phFxOk(m.kind, m.fx)) delete m.fx;   /* 허용한 등장 효과만 */
+    if(m.fmin != null && !(m.kind === 'label' && m.size > 0 && typeof m.fmin === 'number' && m.fmin >= 8 && m.fmin <= 14)) delete m.fmin;   /* 「작게」 단계의 최소 글자 크기(px) — 글에 size 가 있을 때만 */
   });
   return s;
 }
@@ -1245,7 +1269,7 @@ function snapEncode(obj, list){
 function snapDecode(str, list){
   return JSON.parse(str, (k, v)=> (k === 'src' && typeof v === 'string' && v.indexOf('@@d:') === 0) ? list[+v.slice(4)] : v);
 }
-/* 편집 단축키(치료계획 도구와 같은 글쇠). 글 입력 칸에서는 아무것도 안 함 → 돌려주는 값: 동작 이름 또는 null
+/* 편집 단축키(치료계획 도구와 같은 글쇠 + Space 다음 장·Ctrl+Space 이전 장). 글 입력 칸에서는 아무것도 안 함 → 돌려주는 값: 동작 이름 또는 null
    ctx: blocked(도움말 창 등이 열림) · photo(지금 장이 사진이 올라간 사진 슬라이드) · hasSel(선택한 표시가 있음) */
 function shortcutAction(e, ctx){
   if(ctx.blocked || isTypingTarget(e.target)) return null;
@@ -1255,9 +1279,11 @@ function shortcutAction(e, ctx){
     if(c === 'KeyZ') return e.shiftKey ? 'redo' : 'undo';
     if(c === 'KeyY') return 'redo';
     if(c === 'KeyE') return 'dup';
+    if(c === 'Space') return 'slide-prev';
     return null;
   }
   if(e.altKey) return null;
+  if(c === 'Space') return ctx.photo ? 'space-hold' : 'slide-next';   /* 사진 판이 있으면 「누른 채 끌기 = 이동」과 같은 글쇠라 떼는 순간 끌지 않았을 때만 다음 장 */
   if(c === 'ArrowDown') return 'slide-next';
   if(c === 'ArrowUp') return 'slide-prev';
   if(!ctx.photo) return null;
@@ -1265,6 +1291,7 @@ function shortcutAction(e, ctx){
     case 'KeyQ': return 'tool-arrow';
     case 'KeyT': return 'tool-text';
     case 'KeyA': return 'tool-select';
+    case 'KeyO': return 'tool-circle';
     case 'KeyE': return 'tool-erase';
     case 'KeyR': return e.shiftKey ? 'straighten' : 'bend';
     case 'Delete': return ctx.hasSel ? 'delete' : null;
@@ -1778,9 +1805,9 @@ async function attachPhotoRun(s, file){
 async function hubWaitPhotos(){ while(PH_JOBS.size) await Promise.allSettled([...PH_JOBS]); }
 
 /* ---- 사진 슬라이드 편집 화면 ---- */
-const PE = {s:null, tool:'arrow', sel:null, pend:null, hover:null, drag:null, pop:null, stage:null, svg:null, lay:null, rows:null, btns:{}, W:0, H:0,
+const PE = {s:null, tool:'arrow', sel:null, pend:null, hover:null, drag:null, draw:null, pop:null, stage:null, svg:null, lay:null, rows:null, btns:{}, W:0, H:0,
   view:null, zlab:null, z:1, tx:0, ty:0, zsid:null, space:false, pan:null};
-const PE_TOOLS = [['arrow','➚ 화살표','Q'], ['text','Ｔ 글 넣기','T'], ['select','✥ 선택·이동','A'], ['erase','⌫ 지우기','E']];
+const PE_TOOLS = [['arrow','➚ 화살표','Q'], ['circle','◯ 원','O'], ['text','Ｔ 글 넣기','T'], ['select','✥ 선택·이동','A'], ['erase','⌫ 지우기','E']];
 function peCur(){ return PE.s ? (PE.s.marks.find(m=> m.id === PE.sel) || null) : null; }
 function distSeg(p, a, b){
   const dx = b[0]-a[0], dy = b[1]-a[1], l2 = dx*dx + dy*dy;
@@ -1789,6 +1816,7 @@ function distSeg(p, a, b){
 }
 function peCls(){ if(PE.stage) PE.stage.className = 'pe-stage t-'+PE.tool+(PE.space ? ' sp' : '')+(PE.pan ? ' panning' : ''); }
 function peSpace(on){ if(PE.space === on) return; PE.space = on; peCls(); }
+const SPK = {on:false, used:false};   /* Space 를 누르고 있는 중(on) · 그 사이 끌어 이동했는지(used) — 끌지 않고 떼면 다음 장 */
 /* 확대·이동(편집 화면만): 판(.pe-stage)에 translate+scale, 바깥 틀(.pe-view)이 넘친 부분을 숨김 */
 function peApplyView(){
   const v = PE.view, st = PE.stage; if(!v || !st) return;
@@ -1806,7 +1834,7 @@ function peZoom(nz, cx, cy){
   PE.z = c.z; PE.tx = c.tx; PE.ty = c.ty; peApplyView();
 }
 function peSetTool(name){
-  PE.tool = name; PE.pend = null; PE.hover = null;
+  PE.tool = name; PE.pend = null; PE.hover = null; PE.draw = null;
   peCls();
   Object.keys(PE.btns).forEach(k=> PE.btns[k].classList.toggle('on', k === name));
   peRedraw();
@@ -1844,6 +1872,11 @@ function peHit(e){
   }
   let best = null, bd = 11;
   s.marks.forEach(m=>{
+    if(m.kind === 'circle'){
+      const g = PHG.phCircle(m, W, H), d = Math.abs(Math.hypot(xy[0]-g.cx, xy[1]-g.cy) - g.r);   /* 원은 테두리 가까이를 눌러야 잡힘 */
+      if(d < bd){ bd = d; best = {m:m, part:'body'}; }
+      return;
+    }
     if(m.kind !== 'arrow') return;
     const P = m.pts.map(q=> [q[0]*W/100, q[1]*H/100]);
     for(let i = 1; i < P.length; i++){ const d = distSeg(xy, P[i-1], P[i]); if(d < bd){ bd = d; best = {m:m, part:'body'}; } }
@@ -1877,10 +1910,16 @@ function peRedraw(){
       }
       badge(g.tail.x, g.tail.y, m.step);
       if(on) m.pts.forEach((p, i)=> svg.appendChild(mk('circle', 'pe-handle'+(i > 0 && i < m.pts.length-1 ? ' mid' : ''), {cx:p[0]*W/100, cy:p[1]*H/100, r:7})));
+    } else if(m.kind === 'circle'){
+      const g = PHG.phCircle(m, W, H), col = on ? '' : PHG.phSafeColor(m.color);
+      const rg = mk('circle', 'pe-ring'+(on?' sel':''), {cx:g.cx, cy:g.cy, r:g.r, 'stroke-width':sw});
+      if(col) rg.style.stroke = col;
+      svg.appendChild(rg);
+      badge(Math.max(0, g.cx), Math.max(0, g.cy - g.r), m.step);
     } else {
       const l = ce('div','pe-lbl'+(on?' sel':'')); l.textContent = m.text; l.dataset.mid = m.id;
       l.style.left = (m.x*W/100)+'px'; l.style.top = (m.y*H/100)+'px';
-      const fs = PHG.phLabelFont(m.size, W), tc = PHG.phSafeColor(m.color), bg = PHG.phSafeColor(m.bg);
+      const fs = PHG.phLabelFont(m.size, W, m.fmin), tc = PHG.phSafeColor(m.color), bg = PHG.phSafeColor(m.bg);
       if(fs) l.style.fontSize = fs+'px'; if(tc) l.style.color = tc; if(bg) l.style.background = bg;
       const tl = PHG.phLabelTL(m);
       if(tl){ l.style.transform = 'none'; l.style.minWidth = (m.w*W/100)+'px'; l.style.minHeight = ((m.h||0)*H/100)+'px'; l.style.maxWidth = 'none'; }
@@ -1894,6 +1933,10 @@ function peRedraw(){
   PE.disp = {};   /* 비켜 앉은 자유 글의 보이는 가운데(비율) — 끌기 시작할 때 이 자리에서 출발(튀지 않게) */
   mv.forEach((o, k)=>{ o.r.x = nw[k].x; o.r.y = nw[k].y; o.l.style.left = (o.c ? o.r.x + o.r.w/2 : o.r.x)+'px'; o.l.style.top = (o.c ? o.r.y + o.r.h/2 : o.r.y)+'px'; if(o.c) PE.disp[o.m.id] = [rnd2(clampPct((o.r.x + o.r.w/2)/W*100)), rnd2(clampPct((o.r.y + o.r.h/2)/H*100))]; });
   items.forEach(o=>{ if(o.badge) badge(o.r.x, o.r.y, o.m.step); });
+  if(PE.draw && PE.draw.r > 0){   /* 원 그리는 중 — 누른 점이 중심, 끌어 나간 거리가 반지름 */
+    const c = PE.draw.c, tmp = mk('circle', 'pe-ring tmp', {cx:c[0]*W/100, cy:c[1]*H/100, r:PE.draw.r, 'stroke-width':sw}); svg.appendChild(tmp);
+    svg.appendChild(mk('circle', 'pe-handle', {cx:c[0]*W/100, cy:c[1]*H/100, r:4}));
+  }
   if(PE.pend && PE.hover){
     const a = PE.pend, b = PE.hover;
     svg.appendChild(mk('path', 'pe-line tmp', {d:'M'+(a[0]*W/100)+' '+(a[1]*H/100)+' L'+(b[0]*W/100)+' '+(b[1]*H/100), 'stroke-width':sw}));
@@ -1925,10 +1968,12 @@ function peClosePop(){
   const p = PE.pop; if(!p) return;
   PE.pop = null; p.el.remove();
   if(p.m.kind === 'label' && !String(p.m.text || '').trim()){ PE.s.marks = PE.s.marks.filter(x=> x !== p.m); if(PE.sel === p.m.id) PE.sel = null; }
+  if(p.m.kind === 'label' && PE.tool === 'text') peSetTool('select');   /* 글 한 상자를 확정·취소하면 선택·이동(A)으로 돌아감 — 화살표(Q)·원(O)은 그대로 */
   peChanged();
 }
 /* 줄 아래 꾸미기 줄: 글 = 글자색·배경색·크기·효과, 화살표 = 색·효과, 「기본으로」 = 전부 지움.
    바꿀 때 peRenderRows 를 부르지 않음(색 고르는 창이 열린 채 줄이 다시 그려지면 창이 닫힘) */
+const PE_SIZES_SMALL = [[8,'아주 작게',10], [11,'작게',12]];   /* [pt, 이름, 최소 px(fmin)] — 기본(15px)보다 작게: 사진 폭 1200px 이하에서 작게 ≈ 12~13px · 아주 작게 ≈ 10px */
 const PE_SIZES = [[28,'조금 크게'], [40,'크게'], [56,'아주 크게']];   /* pt(슬라이드 폭 960 기준) — 사진 폭 600px 근처에서도 기본(15px)보다 커 보이게 */
 const PE_FX_LABEL = [['','기본(미끄러지듯)'], ['fade','나타나기'], ['zoom','확대'], ['pop','튀어오르기']];
 const PE_FX_ARROW = [['','기본(그려지듯)'], ['fade','나타나기']];
@@ -1939,32 +1984,37 @@ function peDeco(m){
   const put = (k, v)=>{ if(v === '' || v == null) delete m[k]; else m[k] = v; peRedraw(); schedulePreview(); };
   const col = (k, def)=>{ const c = ce('input'); c.type = 'color'; c.value = peHex6(m[k], def); c.addEventListener('input', ()=>{ snapOnce(c); put(k, c.value); }); return c; };
   const pick = (opts, cur, k, num)=>{ const s = ce('select'); opts.forEach(o=>{ const op = ce('option'); op.value = o[0]; op.textContent = o[1]; if(String(o[0]) === String(cur)) op.selected = true; s.appendChild(op); }); s.addEventListener('change', ()=>{ snap(); put(k, num && s.value !== '' ? +s.value : s.value); }); return s; };
-  if(m.kind === 'arrow'){
-    add('화살표 색', col('color', '#e5383b'));
+  if(m.kind === 'arrow' || m.kind === 'circle'){
+    add(m.kind === 'circle' ? '원 색' : '화살표 색', col('color', '#e5383b'));
     add('효과', pick(PE_FX_ARROW, m.fx || '', 'fx'));
   } else {
     add('글자색', col('color', '#16222f')); add('배경색', col('bg', '#ffffff'));
-    const sz = PE_SIZES.map(o=> [o[0], o[1]]); const cur = m.size > 0 ? m.size : '';
-    if(cur !== '' && !sz.some(o=> o[0] === cur)) sz.unshift([cur, '지금 '+cur]);   /* 가져온 글처럼 목록에 없는 크기는 그 값을 그대로 보여 줌 */
-    add('크기', pick([['', '기본']].concat(sz), cur, 'size', true));
+    const sz = PE_SIZES_SMALL.concat(PE_SIZES).map(o=> [o[0]+'|'+(o[2] || ''), o[1]]); const cur = m.size > 0 ? m.size : '', ck = cur === '' ? '' : cur+'|'+(m.fmin || '');
+    if(ck !== '' && !sz.some(o=> o[0] === ck)) sz.unshift([ck, '지금 '+cur]);   /* 가져온 글처럼 목록에 없는 크기는 그 값을 그대로 보여 줌 */
+    const zs = ce('select'); [['', '기본']].concat(sz).forEach(o=>{ const op = ce('option'); op.value = o[0]; op.textContent = o[1]; if(o[0] === ck) op.selected = true; zs.appendChild(op); });
+    zs.addEventListener('change', ()=>{ snap(); const v = zs.value.split('|'); if(!v[0]){ delete m.size; delete m.fmin; } else { m.size = +v[0]; if(v[1]) m.fmin = +v[1]; else delete m.fmin; } peRedraw(); schedulePreview(); });   /* 「작게」 단계는 크기와 함께 최소 글자 크기(fmin)도 저장 */
+    add('크기', zs);
     add('효과', pick(PE_FX_LABEL, m.fx || '', 'fx'));
   }
   const rs = ce('button','mini-btn'); rs.type = 'button'; rs.textContent = '기본으로'; rs.title = '색·크기·효과를 처음 모양으로';
-  rs.onclick = ()=>{ snap(); delete m.color; delete m.bg; delete m.size; delete m.fx; peChanged(); };
+  rs.onclick = ()=>{ snap(); delete m.fmin; delete m.color; delete m.bg; delete m.size; delete m.fx; peChanged(); };
   d.appendChild(rs);
   return d;
 }
 function peRenderRows(){
   const rep = PE.rows, s = PE.s; if(!rep || !rep.isConnected) return;
   rep.innerHTML = '';
-  if(!s.marks.length){ rep.appendChild(ce('div','hintline','사진 위를 눌러 화살표(Q)나 글(T)을 넣어 보세요. 화살표는 시작점·끝점 두 번 누르면 돼요.')); return; }
+  if(!s.marks.length){ rep.appendChild(ce('div','hintline','사진 위를 눌러 화살표(Q)나 글(T)을 넣어 보세요. 화살표는 시작점·끝점 두 번 누르면 돼요. 원(O)은 가운데를 누른 채 끌어요.')); return; }
   s.marks.forEach((m, i)=>{
     const row = ce('div','rep-row'+(m.id === PE.sel ? ' pe-sel' : ''));
     const r = ce('div','pe-mrow');
-    r.appendChild(ce('span','kind', m.kind === 'arrow' ? '➚' : 'Ｔ'));
-    const ti = ce('textarea','input'); ti.rows = 1; ti.style.resize = 'vertical'; ti.value = m.text || ''; ti.placeholder = m.kind === 'arrow' ? '(화살표만 · 글 없음)' : '설명 글 (Enter = 줄바꿈)';
-    ti.addEventListener('input', ()=>{ snapOnce(ti); m.text = ti.value; peRedraw(); schedulePreview(); });
-    r.appendChild(ti);
+    r.appendChild(ce('span','kind', m.kind === 'arrow' ? '➚' : m.kind === 'circle' ? '◯' : 'Ｔ'));
+    if(m.kind === 'circle'){ const cn = ce('span','input'); cn.style.cssText = 'border:0;background:none;font-size:12.5px;color:var(--gray);'; cn.textContent = '원 (반지름 '+m.r+'%)'; r.appendChild(cn); }
+    else {
+      const ti = ce('textarea','input'); ti.rows = 1; ti.style.resize = 'vertical'; ti.value = m.text || ''; ti.placeholder = m.kind === 'arrow' ? '(화살표만 · 글 없음)' : '설명 글 (Enter = 줄바꿈)';
+      ti.addEventListener('input', ()=>{ snapOnce(ti); m.text = ti.value; peRedraw(); schedulePreview(); });
+      r.appendChild(ti);
+    }
     const stp = ce('span','stp'); stp.appendChild(document.createTextNode('순서'));
     const sn = ce('input','input num'); sn.type = 'number'; sn.min = '0'; sn.value = m.step ? m.step : ''; sn.placeholder = '바로';
     sn.addEventListener('input', ()=>{ snapOnce(sn); m.step = Math.max(0, parseInt(sn.value, 10) || 0); peRedraw(); schedulePreview(); });
@@ -2019,7 +2069,7 @@ function photoEditor(s){
     const r = vw.getBoundingClientRect(), dy = Math.max(-100, Math.min(100, e.deltaY*(e.deltaMode === 1 ? 33 : 1)));
     peZoom(PE.z*Math.exp(-dy*0.0025), e.clientX-r.left, e.clientY-r.top);
   }, {passive:false});
-  const panStart = e=>{ PE.pan = {x:e.clientX, y:e.clientY, tx:PE.tx, ty:PE.ty}; peCls(); try{ st.setPointerCapture(e.pointerId); }catch(_){} };
+  const panStart = e=>{ if(PE.space) SPK.used = true; PE.pan = {x:e.clientX, y:e.clientY, tx:PE.tx, ty:PE.ty}; peCls(); try{ st.setPointerCapture(e.pointerId); }catch(_){} };
 
   st.addEventListener('pointerdown', e=>{
     const mid = e.pointerType === 'mouse' && e.button === 1;
@@ -2036,6 +2086,9 @@ function photoEditor(s){
       snap(); PE.pend = null; PE.hover = null;
       const m = {id:id(), kind:'arrow', pts:[a0, p], text:'', step:0};
       s.marks.push(m); PE.sel = m.id; peChanged(); peOpenPop(m); return;
+    }
+    if(tool === 'circle'){
+      e.preventDefault(); PE.draw = {c:p, r:0}; try{ st.setPointerCapture(e.pointerId); }catch(_){} return;
     }
     if(tool === 'text'){
       e.preventDefault(); snap();
@@ -2055,6 +2108,7 @@ function photoEditor(s){
       const c = zoomAt(PE.z, PE.pan.tx + e.clientX - PE.pan.x, PE.pan.ty + e.clientY - PE.pan.y, 0, 0, PE.z, vw.clientWidth, vw.clientHeight);
       PE.tx = c.tx; PE.ty = c.ty; peApplyView(); return;
     }
+    if(PE.draw){ const q = peXY(e), c = PE.draw.c; PE.draw.r = Math.hypot(q[0]-c[0]*PE.W/100, q[1]-c[1]*PE.H/100); peRedraw(); return; }
     const d = PE.drag;
     if(d){
       const p = pePct(e);
@@ -2064,7 +2118,7 @@ function photoEditor(s){
         const sp = d.part === 'label' && PE.disp && PE.disp[d.m.id]; if(sp){ d.orig.x = sp[0]; d.orig.y = sp[1]; }   /* 비켜 앉아 보이던 자리에서 끌기 시작 */
       }
       const dx = p[0]-d.start[0], dy = p[1]-d.start[1];
-      if(d.part === 'label'){ d.m.x = rnd2(clampPct(d.orig.x+dx)); d.m.y = rnd2(clampPct(d.orig.y+dy)); }
+      if(d.part === 'label' || d.m.kind === 'circle'){ d.m.x = rnd2(clampPct(d.orig.x+dx)); d.m.y = rnd2(clampPct(d.orig.y+dy)); }   /* 글·원은 기준점(글 위치·원 중심)만 옮김 */
       else if(d.part === 'pt'){ d.m.pts[d.i] = p; }
       else {
         const xs = d.orig.pts.map(q=> q[0]), ys = d.orig.pts.map(q=> q[1]);
@@ -2076,6 +2130,16 @@ function photoEditor(s){
     }
     if(PE.pend){ PE.hover = pePct(e); peRedraw(); }
   });
+  const drawEnd = e=>{   /* 원 그리기 끝: 너무 작게 끈 것(실수 클릭, 반지름 8px 미만)은 만들지 않음 */
+    const dw = PE.draw; if(!dw) return; PE.draw = null;
+    if(e.type === 'pointerup'){
+      if(dw.r < 8){ toast('원은 가운데를 누른 채 바깥으로 끌어 그려요'); peRedraw(); return; }
+      snap();
+      const m = {id:id(), kind:'circle', x:dw.c[0], y:dw.c[1], r:Math.max(0.01, rnd2(Math.min(100, dw.r/PE.W*100))), step:0};
+      s.marks.push(m); PE.sel = m.id; peChanged();
+    } else peRedraw();
+  };
+  st.addEventListener('pointerup', drawEnd); st.addEventListener('pointercancel', drawEnd);
   const dragEnd = ()=>{ if(PE.pan){ PE.pan = null; peCls(); } if(PE.drag){ const moved = PE.drag.moved; PE.drag = null; peRedraw(); if(moved) schedulePreview(); } };   /* 놓으면 끌던 글도 다시 겹침 계산에 넣어 그림 */
   st.addEventListener('pointerup', dragEnd); st.addEventListener('pointercancel', dragEnd);
   st.addEventListener('dblclick', e=>{   /* 꺾임점(처음·끝 아닌 손잡이) 두 번 누르면 그 점 빼기 */
@@ -2084,7 +2148,7 @@ function photoEditor(s){
     snap(); h.m.pts = np; PE.pend = null; PE.hover = null; peChanged();
   });
   wrap.appendChild(vw);
-  wrap.appendChild(ce('p','pe-help','① 곧은 화살표: 사진을 두 번(시작점→끝점) 누르고 글을 적어요 ② 꺾으려면 화살표를 고른 뒤 「꺾기」(R) → 꺾임점을 끌어요. R을 또 누르면 꺾임점이 늘고, 「펴기」(Shift+R)는 곧게, 꺾임점을 두 번 누르면 그 점이 빠져요 ③ 화살표·글은 끌어서 옮겨요. 숫자 = 클릭 몇 번째에 나오는지(없으면 바로)예요. ④ Ctrl+휠 또는 ＋/－ = 확대 · 확대 중 빈 곳 끌기(A)·Space+끌기 = 이동'));
+  wrap.appendChild(ce('p','pe-help','① 곧은 화살표: 사진을 두 번(시작점→끝점) 누르고 글을 적어요 ② 꺾으려면 화살표를 고른 뒤 「꺾기」(R) → 꺾임점을 끌어요. R을 또 누르면 꺾임점이 늘고, 「펴기」(Shift+R)는 곧게, 꺾임점을 두 번 누르면 그 점이 빠져요 ③ 화살표·글은 끌어서 옮겨요. 숫자 = 클릭 몇 번째에 나오는지(없으면 바로)예요. ④ 원: O 를 고르고 가운데를 누른 채 바깥으로 끌어요 ⑤ Ctrl+휠 또는 ＋/－ = 확대 · 확대 중 빈 곳 끌기(A)·Space+끌기 = 이동 · Space(끌지 않고 뗌) = 다음 장 · Ctrl+Space = 이전 장'));
   return wrap;
 }
 function marksField(s){
@@ -2144,6 +2208,7 @@ function runShortcut(act){
     case 'slide-next': pickSlide(sel+1); break;
     case 'slide-prev': pickSlide(sel-1); break;
     case 'tool-arrow': peSetTool('arrow'); break;
+    case 'tool-circle': peSetTool('circle'); break;
     case 'tool-text': peSetTool('text'); break;
     case 'tool-select': peSetTool('select'); break;
     case 'tool-erase': peSetTool('erase'); break;
@@ -2152,6 +2217,7 @@ function runShortcut(act){
     case 'delete': if(PE.sel){ snap(); peRemove(PE.sel); } break;
     case 'cancel':
       if(PE.pop) peClosePop();
+      else if(PE.draw){ PE.draw = null; peRedraw(); }
       else if(PE.pend){ PE.pend = null; PE.hover = null; peRedraw(); }
       else if(PE.sel){ PE.sel = null; peRedraw(); peRenderRows(); }
       break;
@@ -2179,14 +2245,16 @@ document.addEventListener('keydown', e=>{
   if(HUB.view) return;
   if(B.help.classList.contains('show')){ if(e.key === 'Escape') B.help.classList.remove('show'); return; }
   const s = deck.slides[sel];
-  if(e.code === 'Space' && !e.ctrlKey && !e.metaKey && !e.altKey && !isTypingTarget(e.target) && s && s.type === 'photo' && s.image){ e.preventDefault(); peSpace(true); return; }   /* Space 누른 채 끌기 = 이동 */
   const act = shortcutAction(e, {blocked:false, photo:!!(s && s.type === 'photo' && s.image), hasSel:!!PE.sel});
   if(!act) return;
-  e.preventDefault(); runShortcut(act);
+  e.preventDefault();
+  if(act === 'space-hold'){ if(e.code === 'Space' && !e.repeat){ SPK.on = true; SPK.used = false; peSpace(true); } return; }   /* Space 누른 채 끌기 = 이동 · 끌지 않고 떼면 keyup 에서 다음 장 */
+  if(e.code === 'Space' && e.repeat) return;   /* 키를 계속 눌러도 한 장만 넘어감 */
+  runShortcut(act);
 });
 
-document.addEventListener('keyup', e=>{ if(e.code === 'Space' && PE.space){ e.preventDefault(); peSpace(false); } });
-window.addEventListener('blur', ()=> peSpace(false));
+document.addEventListener('keyup', e=>{ if(e.code === 'Space' && SPK.on){ e.preventDefault(); const go = !SPK.used; SPK.on = false; peSpace(false); if(go) runShortcut('slide-next'); } });
+window.addEventListener('blur', ()=>{ SPK.on = false; peSpace(false); });
 /* 미리보기 칸 접기·펴기 — 이 브라우저에만 기억 */
 const PV_KEY = 'seolmyeongdeok:pvOff';
 function pvSet(off, save){

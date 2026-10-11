@@ -10,7 +10,7 @@ const geoSrc = between(maker, '<script type="text/plain" id="phGeoSrc">', '</scr
 const engineSrc = between(maker, '<script type="text/plain" id="engineSrc">', '</script>');
 const photoEngine = engineSrc.slice(engineSrc.indexOf('/* ---- 사진 슬라이드: 사진 + 화살표'), engineSrc.indexOf('const BUILDERS'));
 
-const geo = (() => { const ctx = {}; vm.createContext(ctx); vm.runInContext(geoSrc + ';this.api={phFit,phArrow,phLabelPos,phSafeColor,phLabelFont,phAvoid,phFxOk};', ctx); return ctx.api; })();
+const geo = (() => { const ctx = {}; vm.createContext(ctx); vm.runInContext(geoSrc + ';this.api={phFit,phArrow,phLabelPos,phSafeColor,phLabelFont,phAvoid,phFxOk,phCircle,phCircleOk};', ctx); return ctx.api; })();
 const pure = (() => { const ctx = { PHG: geo }; vm.createContext(ctx); vm.runInContext(pureSrc + ';this.api={rnd2,clampPct,roleCanEdit,isTypingTarget,phNormalize,phBendAdd,phBendRemove,phSwapMarks,deckForStore,snapEncode,snapDecode,shortcutAction,zoomAt,popPlace};', ctx); return ctx.api; })();
 
 /* ---- 아주 작은 가짜 화면(DOM): 엔진의 buildPhoto/phBind를 노드에서 돌리기 위함 ---- */
@@ -1107,4 +1107,172 @@ test('[2차 Codex 3차 지적] 글 입력 창 자리 popPlace: 아래 → 자리
   c = P(500, 120, 260, 54, [300, 900, 100, 146], win); assert.ok(inside(c, 260, 54, win));          // 칸 높이 46 < 창 54 → 브라우저 창 안
   c = P(500, 690, 260, 54, [300, 900, 650, 700], win); assert.ok(inside(c, 260, 54, win));
   for (let ay = -50; ay <= 760; ay += 37) for (const r of [reg, [300, 900, 100, 140], null]) { const k = P(450, ay, 260, 54, r, win); assert.ok(inside(k, 260, 54, win), 'ay=' + ay); }
+});
+
+/* ---- 3차: 글 한 번 쓰면 A 로 · Space/Ctrl+Space 장 넘기기 · 작게 단계 · 원 그리기 (2026-10-12) ---- */
+test('[3차-1] 글(T) 한 상자를 확정·취소하면 선택·이동(A)으로 돌아가고, 화살표(Q)·원(O)은 도구를 그대로 둔다', () => {
+  const mk = (tool, m) => {
+    const calls = [], el = { removed: false, remove() { this.removed = true; } };
+    const ctx = { PE: { tool, pop: { el, m }, s: { marks: [m] }, sel: m.id, pend: null, hover: null, draw: null, btns: {} }, peCls() { }, peRedraw() { calls.push('redraw'); }, peChanged() { calls.push('changed'); }, calls };
+    vm.createContext(ctx);
+    vm.runInContext([fnSrc(mainJs, 'function peSetTool'), fnSrc(mainJs, 'function peClosePop'), 'this.peClosePop=peClosePop;'].join('\n'), ctx);
+    return ctx;
+  };
+  let c = mk('text', { id: 'a', kind: 'label', text: '확정한 글' }); c.peClosePop();
+  assert.equal(c.PE.tool, 'select', '글 확정 → A'); assert.equal(c.PE.sel, 'a', '넣은 글은 선택된 채'); assert.equal(c.PE.pop, null);
+  c = mk('text', { id: 'b', kind: 'label', text: '   ' }); c.peClosePop();
+  assert.equal(c.PE.tool, 'select', '빈 글(취소)도 A'); assert.equal(c.PE.s.marks.length, 0, '빈 글은 지워짐');
+  c = mk('arrow', { id: 'c', kind: 'arrow', pts: [[1, 1], [9, 9]], text: '화살표 글' }); c.peClosePop(); assert.equal(c.PE.tool, 'arrow', '화살표 도구는 그대로');
+  c = mk('circle', { id: 'd', kind: 'label', text: 'x' }); c.peClosePop(); assert.equal(c.PE.tool, 'circle', '글 도구가 아니면 건드리지 않음');
+  c = mk('select', { id: 'e', kind: 'label', text: 'x' }); c.peClosePop(); assert.equal(c.PE.tool, 'select');
+  const pd = fnSrc(mainJs, 'function peClosePop'); assert.match(pd, /peSetTool\('select'\)/);
+});
+
+test('[3차-2] Space = 다음 장, Ctrl+Space = 이전 장 (↑/↓ 유지) · 입력 칸에선 글자 · 누른 채 끌면 이동(장 안 넘김) · 키 반복은 한 장만', () => {
+  const k = (code, extra) => Object.assign({ code, key: code === 'Space' ? ' ' : code.replace('Key', '').toLowerCase(), target: { tagName: 'DIV' } }, extra || {});
+  const sa = pure.shortcutAction;
+  assert.equal(sa(k('Space'), { photo: false }), 'slide-next', '사진 판이 없으면 Space 바로 다음 장');
+  assert.equal(sa(k('Space'), { photo: true }), 'space-hold', '사진 판이 있으면 떼는 순간에 정함');
+  assert.equal(sa(k('Space', { ctrlKey: true }), { photo: false }), 'slide-prev'); assert.equal(sa(k('Space', { ctrlKey: true }), { photo: true }), 'slide-prev'); assert.equal(sa(k('Space', { metaKey: true }), { photo: true }), 'slide-prev');
+  for (const tag of ['INPUT', 'TEXTAREA', 'SELECT']) for (const ex of [{}, { ctrlKey: true }]) assert.equal(sa(k('Space', Object.assign({ target: { tagName: tag } }, ex)), { photo: true }), null, tag + ' 에선 그냥 글자');
+  assert.equal(sa(k('Space', { target: { tagName: 'DIV', isContentEditable: true } }), { photo: false }), null);
+  assert.equal(sa(k('Space'), { photo: false, blocked: true }), null, '도움말 창이 열려 있으면 무반응');
+  assert.equal(sa(k('Space', { altKey: true }), { photo: false }), null);
+  assert.equal(sa(k('ArrowDown'), { photo: true }), 'slide-next'); assert.equal(sa(k('ArrowUp'), { photo: true }), 'slide-prev', '↑/↓ 그대로');
+  // 진짜 keydown/keyup 처리기를 가짜 화면에서 돌림
+  const i0 = mainJs.search(/document\.addEventListener\('keydown', e=>\{\s*if\(HUB\.view\) return;/), src = mainJs.slice(i0, mainJs.indexOf('/* 미리보기 칸 접기'));
+  assert.ok(src.length > 200, '처리기 소스를 찾음');
+  const mkEnv = (slide, hubView) => {
+    const h = { keydown: [], keyup: [] }, log = [];
+    const ctx = { HUB: { view: !!hubView }, B: { help: { classList: { contains: () => false, remove() { } } } }, deck: { slides: [slide] }, sel: 0, PE: { sel: null, space: false }, SPK: { on: false, used: false },
+      document: { addEventListener: (t, f) => h[t].push(f) }, window: { addEventListener() { } }, shortcutAction: pure.shortcutAction, isTypingTarget: pure.isTypingTarget,
+      runShortcut: a => log.push(a), peSpace(on) { ctx.PE.space = on; }, log, h };
+    vm.createContext(ctx); vm.runInContext(src, ctx);
+    const down = (code, ex) => { const e = Object.assign({ code, key: code === 'Space' ? ' ' : code, target: { tagName: 'DIV' }, repeat: false, prevented: 0, preventDefault() { this.prevented++; } }, ex || {}); h.keydown.forEach(f => f(e)); return e; };
+    const up = (code, ex) => { const e = Object.assign({ code, key: code, target: { tagName: 'DIV' }, preventDefault() { } }, ex || {}); h.keyup.forEach(f => f(e)); return e; };
+    return { ctx, down, up, log };
+  };
+  // (가) 사진 판 없는 장: 누르면 바로 다음 장, 계속 눌러도 한 장만, Ctrl+Space 는 이전
+  let env = mkEnv({ type: 'cover' });
+  let ev = env.down('Space'); assert.deepEqual(env.log, ['slide-next']); assert.equal(ev.prevented, 1, '스크롤·단추 눌림 막음');
+  env.down('Space', { repeat: true }); env.down('Space', { repeat: true }); assert.deepEqual(env.log, ['slide-next'], '키 반복(auto-repeat)으로 여러 장 안 넘어감'); env.up('Space'); assert.deepEqual(env.log, ['slide-next']);
+  env.down('Space', { ctrlKey: true }); assert.deepEqual(env.log, ['slide-next', 'slide-prev']); env.down('Space', { ctrlKey: true, repeat: true }); assert.equal(env.log.length, 2, 'Ctrl+Space 반복도 한 장');
+  env.down('ArrowDown'); env.down('ArrowDown'); assert.deepEqual(env.log.slice(2), ['slide-next', 'slide-next'], '↓ 는 예전처럼 반복 허용');
+  // (나) 사진 판이 있는 장: 누르면 이동 준비, 끌지 않고 떼면 다음 장 한 번
+  const photo = { type: 'photo', image: { src: 'x' } };
+  env = mkEnv(photo); env.down('Space'); assert.deepEqual(env.log, [], '누르는 순간엔 장을 안 넘김'); assert.equal(env.ctx.PE.space, true, '이동 준비'); assert.equal(env.ctx.SPK.on, true);
+  env.down('Space', { repeat: true }); env.down('Space', { repeat: true }); assert.deepEqual(env.log, []); env.up('Space'); assert.deepEqual(env.log, ['slide-next'], '끌지 않고 뗌 → 다음 장 한 번'); assert.equal(env.ctx.PE.space, false);
+  env.up('Space'); assert.deepEqual(env.log, ['slide-next'], '떼는 이벤트가 또 와도 다시 안 넘김');
+  // 끌었으면(SPK.used = panStart 가 켬) 장 안 넘김
+  env = mkEnv(photo); env.down('Space'); env.ctx.SPK.used = true; env.up('Space'); assert.deepEqual(env.log, [], '끌어 이동했으면 장 안 넘김'); assert.equal(env.ctx.PE.space, false);
+  env.down('Space'); assert.equal(env.ctx.SPK.used, false, '다음에 누를 땐 다시 새로 시작'); env.up('Space'); assert.deepEqual(env.log, ['slide-next']);
+  // 입력 칸·허브 보기 화면
+  env = mkEnv(photo); env.down('Space', { target: { tagName: 'TEXTAREA' } }); env.up('Space'); assert.deepEqual(env.log, [], '입력 칸에선 그냥 글자'); assert.equal(env.ctx.SPK.on, false);
+  env = mkEnv(photo, true); env.down('Space'); env.up('Space'); assert.deepEqual(env.log, [], '허브 보기 전용 화면에선 편집 글쇠 없음');
+  // panStart 가 Space 중에만 used 를 켬(소스 확인) · 창 흐려지면 취소
+  const ps = mainJs.match(/const panStart = e=>\{[^\n]*/)[0]; assert.match(ps, /if\(PE\.space\) SPK\.used = true/);
+  assert.match(mainJs, /window\.addEventListener\('blur', \(\)=>\{ SPK\.on = false; peSpace\(false\); \}\)/);
+  assert.match(maker, /<b>Space<\/b>다음 장/); assert.match(maker, /<b>Ctrl\+Space<\/b>이전 장/); assert.match(maker, /<kbd>Ctrl\+Space<\/kbd>/);
+  // 발표 화면(엔진)도 Ctrl+Space = 이전
+  assert.match(engineSrc, /e\.key === ' ' && e\.ctrlKey\)\{ e\.preventDefault\(\); prev\(\); return; \}/);
+});
+
+test('[3차-3] 글자 크기 「작게」 단계: 작게·아주 작게가 실제로 작아지고(최소 10px 가량), 기존 글(size 만 있거나 없음)은 그대로', () => {
+  const F = geo.phLabelFont;
+  for (const bw of [327, 600, 1000, 1600]) for (const sz of [8, 12, 16, 28, 40, 56]) assert.equal(F(sz, bw), Math.max(14, Math.round(sz * bw / 960 * 10) / 10), '기존 값은 그대로 ' + sz + '/' + bw);
+  assert.equal(F(16, 327), 14, '기존: 폰 폭에서 14px'); assert.equal(F(0, 1000), null); assert.equal(F(undefined, 1000), null);
+  assert.equal(F(11, 327, 12), 12, '작게: 폰 폭에서도 12px (14px 아님)'); assert.equal(F(8, 327, 10), 10, '아주 작게: 10px');
+  for (const bw of [500, 600, 800, 1000, 1200]) { const a = F(11, bw, 12), b = F(8, bw, 10); assert.ok(a < 15 && b < 15, '기본 15px 보다 작음 ' + bw); assert.ok(b <= a && b >= 10 && a >= 12, '아주 작게 ≤ 작게 ' + bw); }
+  assert.equal(F(11, 600, 3), 8, 'fmin 은 8px 밑으로 안 내려감'); assert.equal(F(11, 327, 99), 14, 'fmin 은 14px 위로 안 올라감(= 기존 최소)');
+  const PS = JSON.parse(mainJs.match(/const PE_SIZES_SMALL = (\[[^;]*\]);/)[1].replace(/'/g, '"'));
+  assert.deepEqual(PS.map(o => o[1]), ['아주 작게', '작게']); assert.ok(PS.every(o => o[2] >= 8 && o[2] <= 14));
+  const sizes = JSON.parse(mainJs.match(/const PE_SIZES = (\[[^;]*\]);/)[1].replace(/'/g, '"')); assert.deepEqual(sizes.map(o => o[1]), ['조금 크게', '크게', '아주 크게'], '기존 단계는 그대로');
+  // 정규화: fmin 은 size 있는 글의 8~14 숫자만
+  const n = pure.phNormalize({ type: 'photo', image: { path: 'p' }, marks: [
+    { kind: 'label', x: 1, y: 1, text: 'a', size: 11, fmin: 12 }, { kind: 'label', x: 1, y: 1, text: 'b', fmin: 12 }, { kind: 'label', x: 1, y: 1, text: 'c', size: 11, fmin: 40 },
+    { kind: 'label', x: 1, y: 1, text: 'd', size: 11, fmin: '12' }, { kind: 'label', x: 1, y: 1, text: 'e', size: 16 }, { kind: 'arrow', pts: [[1, 1], [2, 2]], fmin: 12 }] }, () => 'i').marks;
+  assert.equal(n[0].fmin, 12); assert.equal(n[1].fmin, undefined, 'size 없으면 지움'); assert.equal(n[2].fmin, undefined); assert.equal(n[3].fmin, undefined); assert.equal(n[4].fmin, undefined); assert.equal(n[4].size, 16); assert.equal(n[5].fmin, undefined);
+  // 발표 엔진: 작게 단계는 fmin 으로, 기존 글은 14px 최소
+  const ctx = engineCtx(), body = ctx.buildPhoto(clone({ type: 'photo', title: 't', image: { src: 'x', w: 1600, h: 900 }, marks: [
+    { id: 'a', kind: 'label', x: 10, y: 10, text: '작게', size: 11, fmin: 12, step: 0 }, { id: 'b', kind: 'label', x: 30, y: 30, text: '옛 글', size: 11, step: 0 }, { id: 'c', kind: 'label', x: 60, y: 60, text: '기본', step: 0 }] }));
+  const ph = body._ph; ph.pv.clientWidth = 500; ph.pv.clientHeight = 300; ph.im.naturalWidth = 1600; ph.im.naturalHeight = 900; ctx.phLayout(ph);
+  assert.equal(ph.labels[0].l.bx.style.fontSize, '12px', '작게: 12px'); assert.equal(ph.labels[1].l.bx.style.fontSize, '14px', 'fmin 없는 옛 글은 14px 그대로'); assert.equal(ph.labels[2].l.bx.style.fontSize, '');
+  // 소스: 편집기 그리기·꾸미기 줄·기본으로
+  assert.match(fnSrc(mainJs, 'function peRedraw'), /PHG\.phLabelFont\(m\.size, W, m\.fmin\)/); assert.match(fnSrc(mainJs, 'function peDeco'), /PE_SIZES_SMALL\.concat\(PE_SIZES\)/);
+  assert.match(fnSrc(mainJs, 'function peDeco'), /delete m\.fmin; delete m\.color; delete m\.bg; delete m\.size; delete m\.fx; peChanged\(\)/);
+});
+
+test('[3차-4] 원(kind:circle) 저장 모양: 중심 x·y(%) + 반지름 r(사진 폭 %) · 잘못된 값은 걸러냄 · 효과는 fade 만', () => {
+  const base = { type: 'photo', image: { path: 'p/a.webp' } };
+  const mkm = ms => pure.phNormalize(Object.assign(clone(base), { marks: clone(ms) }), () => 'nid').marks;
+  const ok = mkm([{ kind: 'circle', x: 33.333, y: 66.666, r: 12.3456, step: 2, color: '#ff0000', fx: 'fade' }]);
+  assert.equal(ok.length, 1); assert.deepEqual([ok[0].kind, ok[0].x, ok[0].y, ok[0].r, ok[0].step, ok[0].color, ok[0].fx, ok[0].id], ['circle', 33.33, 66.67, 12.35, 2, '#ff0000', 'fade', 'nid']);
+  assert.equal(mkm([{ kind: 'circle', x: 10, y: 10, r: 5, fx: 'zoom' }])[0].fx, undefined, '확대·튀어오르기는 글만'); assert.equal(mkm([{ kind: 'circle', x: 10, y: 10, r: 5, color: 'red;x' }])[0].color, undefined);
+  assert.equal(mkm([{ kind: 'circle', x: 10, y: 10, r: 5 }])[0].step, 0, '순서 기본 0');
+  assert.equal(mkm([{ kind: 'circle', x: -20, y: 150, r: 500, step: 1 }]).map(m => [m.x, m.y, m.r]).join(), '0,100,100', '중심은 사진 안으로, 반지름은 100% 까지');
+  const bad = [{ kind: 'circle', x: 10, y: 10, r: -5 }, { kind: 'circle', x: 10, y: 10, r: 0 }, { kind: 'circle', x: 10, y: 10, r: NaN }, { kind: 'circle', x: 10, y: 10, r: Infinity }, { kind: 'circle', x: 10, y: 10, r: '5' },
+    { kind: 'circle', x: 10, y: 10 }, { kind: 'circle', x: NaN, y: 10, r: 5 }, { kind: 'circle', x: 10, y: 'a', r: 5 }, { kind: 'circle', x: null, y: 10, r: 5 }, { kind: 'circle', x: 10, y: 10, r: 0.001 }, { kind: 'circle', r: 5 }, { kind: 'circle' }];
+  assert.equal(mkm(bad).length, 0, '음수·0·NaN·무한대·문자·빠진 값은 모두 걸러짐');
+  assert.equal(mkm(bad.concat([{ kind: 'label', x: 5, y: 5, text: '남음' }])).length, 1, '다른 표시는 영향 없음');
+  const JSONbad = JSON.parse('{"kind":"circle","x":10,"y":10,"r":null}'); assert.equal(mkm([JSONbad]).length, 0, 'JSON 의 null 반지름');
+  // 저장·불러오기·되돌리기 기록은 평범한 JSON 이라 그대로 돌아옴
+  const s0 = pure.phNormalize(Object.assign(clone(base), { marks: [{ kind: 'circle', x: 20, y: 30, r: 8, step: 1 }] }), () => 'k'), list = [];
+  const back = pure.snapDecode(pure.snapEncode({ d: { slides: [s0] }, s: 0 }, list), list).d.slides[0];
+  const J = JSON.stringify; assert.equal(J(back.marks), J(s0.marks)); assert.equal(J(pure.phNormalize(clone(s0), () => 'z').marks), J(s0.marks), '정규화를 또 해도 같음');
+  assert.equal(J(pure.deckForStore({ slides: [clone(s0)] }).slides[0].marks), J(s0.marks), '서버 저장 모양에도 그대로');
+  assert.equal(geo.phFxOk('circle', 'fade'), true); assert.equal(geo.phFxOk('circle', 'zoom'), false); assert.equal(geo.phFxOk('arrow', 'fade'), true); assert.equal(geo.phFxOk('label', 'pop'), true);
+  assert.equal(geo.phCircleOk({ x: 1, y: 1, r: 0.01 }), true); assert.equal(geo.phCircleOk({ x: 1, y: 1, r: 0.009 }), false); assert.equal(geo.phCircleOk(null), false);
+});
+
+test('[3차-5] 원은 어떤 화면에서도 원: 반지름은 사진 폭 기준 → 가로·세로 같은 길이 · 발표 엔진이 그림(단계·효과·색) · 이상한 값은 그리지 않음', () => {
+  for (const [bw, bh] of [[327, 184], [1000, 562.5], [800, 800], [500, 1000]]) {
+    const g = geo.phCircle({ x: 25, y: 40, r: 10 }, bw, bh);
+    assert.ok(Math.abs(g.cx - bw * 0.25) < 1e-9 && Math.abs(g.cy - bh * 0.4) < 1e-9 && Math.abs(g.r - bw * 0.1) < 1e-9, '중심·반지름 ' + bw + 'x' + bh);
+    assert.ok(Math.abs(g.len - 2 * Math.PI * g.r) < 1e-9, '둘레');
+  }
+  const ctx = engineCtx(), body = ctx.buildPhoto(clone({ type: 'photo', title: 't', image: { src: 'x', w: 1600, h: 900 }, marks: [
+    { id: 'a', kind: 'circle', x: 25, y: 40, r: 10, step: 2, fx: 'fade', color: '#00aa00' }, { id: 'b', kind: 'circle', x: 70, y: 60, r: 5, step: 0, fx: 'zoom', color: 'red;x' },
+    { id: 'c', kind: 'circle', x: 50, y: 50, r: -3, step: 1 }, { id: 'd', kind: 'circle', x: NaN, y: 50, r: 3, step: 1 }, { id: 'e', kind: 'circle', x: 50, y: 50, r: '3', step: 1 }] }));
+  const ph = body._ph, rings = []; walk(body, n => { if (/ph-ring/.test(n.className)) rings.push(n); });
+  assert.equal(rings.length, 2, '잘못된 원은 그리지 않음'); assert.equal(ph.circles.length, 2);
+  assert.equal(rings[0].className, 'ph-ring fx-fade'); assert.equal(rings[0].dataset.step, 2, '단계(step)에 맞춰 나옴'); assert.equal(rings[0].style.stroke, '#00aa00');
+  assert.equal(rings[1].className, 'ph-ring', '허용 안 되는 효과는 무시'); assert.equal(rings[1].dataset.step, 0); assert.equal(rings[1].style.stroke, undefined, '이상한 색은 무시');
+  const on = st => { let k = 0; walk(body, n => { if (/ph-ring/.test(n.className) && +n.dataset.step <= st) k++; }); return k; };
+  assert.deepEqual([0, 1, 2].map(on), [1, 1, 2], '엔진 apply() 규칙: 단계가 되면 켜짐');
+  ph.pv.clientWidth = 1000; ph.pv.clientHeight = 600; ph.im.naturalWidth = 1600; ph.im.naturalHeight = 900; ctx.phLayout(ph);
+  const a = rings[0].attrs; assert.equal(a.cx, 250); assert.equal(a.cy, 225); assert.equal(a.r, 100, '반지름 = 사진 폭(1000) × 10%'); assert.equal(+a['stroke-width'] > 0, true);
+  assert.ok(Math.abs(+rings[0].style.props['--len'] - 2 * Math.PI * 100) < 1e-6, '그려지는 길이 = 둘레');
+  ph.pv.clientWidth = 400; ph.pv.clientHeight = 600; ctx.phLayout(ph);   // 세로로 긴 화면: 사진 폭 400 → 반지름 40, 가로세로 모두 같은 r
+  assert.equal(rings[0].attrs.r, 40); assert.equal(rings[0].attrs.cx, 100);
+  // CSS: 링도 화살표처럼 그려지고(draw), fade 는 나타남, 동작 줄이기에서는 투명도만
+  const css = between(maker, '<template id="slideCSS">', '</template>');
+  assert.match(css, /\.ph-arrow,\.ph-ring\{fill:none; stroke:#e5383b/); assert.match(css, /\.ph-arrow\.on,\.ph-ring\.on\{stroke-dashoffset:0; opacity:1;\}/); assert.match(css, /\.ph-ring\.fx-fade\{stroke-dasharray:none/);
+  assert.match(css, /prefers-reduced-motion[\s\S]*\.ph-arrow,\.ph-ring,\.ph-head,\.ph-lbl-box\{transition:opacity \.2s linear !important;\}/);
+  // 허브 보기 전용 화면도 같은 generateDeckHTML(엔진 포함)을 씀
+  assert.match(fnSrc(mainJs, 'function hubShowViewer'), /generateDeckHTML\(/);
+});
+
+test('[3차-6] 원 편집: 도구 단추·O 글쇠 · 끌어서 그리기(누른 점=중심) · 너무 작은 끌기는 안 만듦 · 선택·이동·지우기·꾸미기·줄', () => {
+  assert.equal(pure.shortcutAction({ code: 'KeyO', key: 'o', target: { tagName: 'DIV' } }, { photo: true }), 'tool-circle'); assert.equal(pure.shortcutAction({ code: 'KeyO', key: 'o', target: { tagName: 'TEXTAREA' } }, { photo: true }), null);
+  assert.equal(pure.shortcutAction({ code: 'KeyO', key: 'o', target: { tagName: 'DIV' } }, { photo: false }), null, '사진 판이 없으면 무반응');
+  assert.equal(pure.shortcutAction({ code: 'KeyO', key: 'o', ctrlKey: true, target: { tagName: 'DIV' } }, { photo: true }), null, 'Ctrl+O 는 건드리지 않음');
+  const keys = ['KeyQ', 'KeyT', 'KeyA', 'KeyE', 'KeyR', 'KeyO']; assert.equal(new Set(keys.map(c => pure.shortcutAction({ code: c, key: c.slice(3).toLowerCase(), target: { tagName: 'DIV' } }, { photo: true, hasSel: true }))).size, 6, '기존 글쇠와 안 겹침');
+  assert.ok(mainJs.includes("['circle','◯ 원','O']")); assert.match(mainJs, /case 'tool-circle': peSetTool\('circle'\)/);
+  const ed = fnSrc(mainJs, 'function photoEditor');
+  assert.match(ed, /if\(tool === 'circle'\)\{[^}]*PE\.draw = \{c:p, r:0\}/, '누른 점 = 중심'); assert.match(ed, /PE\.draw\.r = Math\.hypot\(q\[0\]-c\[0\]\*PE\.W\/100, q\[1\]-c\[1\]\*PE\.H\/100\)/, '끈 거리 = 반지름(px)');
+  assert.match(ed, /if\(dw\.r < 8\)\{ toast\(/, '8px 미만 끌기는 만들지 않음'); assert.match(ed, /dw\.r\/PE\.W\*100/, '반지름은 사진 폭 % 로 저장'); assert.match(ed, /kind:'circle', x:dw\.c\[0\], y:dw\.c\[1\]/);
+  assert.match(ed, /e\.type === 'pointerup'/, '취소(pointercancel)는 안 만듦'); assert.match(ed, /snap\(\);\s*const m = \{id:id\(\), kind:'circle'/, '되돌리기 기록을 먼저');
+  assert.match(ed, /d\.part === 'label' \|\| d\.m\.kind === 'circle'/, '원은 중심만 옮김');
+  assert.match(fnSrc(mainJs, 'function peSetTool'), /PE\.draw = null/); assert.match(fnSrc(mainJs, 'function runShortcut'), /else if\(PE\.draw\)\{ PE\.draw = null/);
+  const rows = fnSrc(mainJs, 'function peRenderRows'); assert.match(rows, /m\.kind === 'circle' \? '◯'/); assert.match(rows, /'원 \(반지름 '\+m\.r\+'%\)'/);
+  assert.match(fnSrc(mainJs, 'function peDeco'), /m\.kind === 'arrow' \|\| m\.kind === 'circle'/); assert.match(fnSrc(mainJs, 'function peDeco'), /'원 색'/);
+  const red = fnSrc(mainJs, 'function peRedraw'); assert.match(red, /m\.kind === 'circle'/); assert.match(red, /PHG\.phCircle\(m, W, H\)/); assert.match(red, /pe-ring tmp/);
+  // 눌러 고르기·지우기: peHit 이 원 테두리 가까이를 잡음 (원 안쪽·먼 곳은 안 잡음)
+  const ctx = { PHG: geo, PE: { s: { marks: [{ id: 'c', kind: 'circle', x: 50, y: 50, r: 10 }] }, W: 1000, H: 500, sel: null }, peXY: e => [e.x, e.y], peCur: () => null }; vm.createContext(ctx);
+  vm.runInContext([fnSrc(mainJs, 'function distSeg'), fnSrc(mainJs, 'function peHit'), 'this.peHit=peHit;'].join('\n'), ctx);
+  const hit = (x, y) => ctx.peHit({ x, y, target: null });
+  assert.equal(hit(600, 250).m.id, 'c', '오른쪽 테두리(반지름 100px)'); assert.equal(hit(500, 150).m.id, 'c', '위쪽 테두리'); assert.equal(hit(595, 250).m.id, 'c', '테두리 5px 안쪽');
+  assert.equal(hit(500, 250), null, '원 안쪽 한가운데는 안 잡음'); assert.equal(hit(700, 250), null, '먼 곳'); assert.equal(hit(600, 250).part, 'body');
+  // 안내 문구
+  assert.match(maker, /<b>O<\/b>원<\/span>/); assert.match(maker, /<kbd>O<\/kbd><span>원 그리기/); assert.match(maker, /<li><b>원 \(O\)<\/b>/);
 });
