@@ -11,7 +11,7 @@ const engineSrc = between(maker, '<script type="text/plain" id="engineSrc">', '<
 const photoEngine = engineSrc.slice(engineSrc.indexOf('/* ---- 사진 슬라이드: 사진 + 화살표'), engineSrc.indexOf('const BUILDERS'));
 
 const geo = (() => { const ctx = {}; vm.createContext(ctx); vm.runInContext(geoSrc + ';this.api={phFit,phArrow,phLabelPos,phSafeColor,phLabelFont,phAvoid,phFxOk,phCircle,phCircleOk};', ctx); return ctx.api; })();
-const pure = (() => { const ctx = { PHG: geo }; vm.createContext(ctx); vm.runInContext(pureSrc + ';this.api={rnd2,clampPct,roleCanEdit,isTypingTarget,phNormalize,phBendAdd,phBendRemove,phSwapMarks,deckForStore,snapEncode,snapDecode,shortcutAction,zoomAt,popPlace};', ctx); return ctx.api; })();
+const pure = (() => { const ctx = { PHG: geo }; vm.createContext(ctx); vm.runInContext(pureSrc + ';this.api={rnd2,clampPct,roleCanEdit,isTypingTarget,phNormalize,phBendAdd,phBendRemove,phSwapMarks,deckForStore,snapEncode,snapDecode,shortcutAction,zoomAt,popPlace,themeNorm};', ctx); return ctx.api; })();
 
 /* ---- 아주 작은 가짜 화면(DOM): 엔진의 buildPhoto/phBind를 노드에서 돌리기 위함 ---- */
 function fakeNode(tag, cls) {
@@ -477,7 +477,7 @@ test('[4차-2] 사진 올리는 중 저장하면 끝난 뒤 최신 사진으로 
 
 test('[4차-3] HTML 내보내기·다시 불러오기가 덱 최상위 필드(importedSrc 등)를 잃지 않는다', () => {
   const ctx = { deck: { meta: { title: 'T', extraMeta: 1 }, slides: [{ type: 'cover', title: 'c', srcSlide: 7 }, { type: 'photo', title: 'p', srcSlide: 8, image: { path: 'd/a.webp', w: 2, h: 1 }, marks: [{ id: 'm', kind: 'label', x: 1, y: 2, w: 3, h: 4, text: 't', step: 1, custom: 'keep' }], unknownSlideField: 'z' }],
-    importedSrc: [1, 2, 3, 7, 8], unknownTop: { a: 1 } }, IMG_URL: {}, SLIDE_CSS: '', ENGINE: '', SKELETON: '', escapeHtml: s => s, id: () => 'gen' };
+    importedSrc: [1, 2, 3, 7, 8], unknownTop: { a: 1 } }, IMG_URL: {}, SLIDE_CSS: '', THEME: 'dark', ENGINE: '', SKELETON: '', escapeHtml: s => s, id: () => 'gen' };
   vm.createContext(ctx);
   vm.runInContext(pureSrc + ';' + [fnSrc(mainJs, 'function imgUrl'), fnSrc(mainJs, 'function deckData'), fnSrc(mainJs, 'function generateDeckHTML'), fnSrc(mainJs, 'function normalize'), 'this.api={deckData,generateDeckHTML,normalize};'].join('\n'), ctx);
   const html = ctx.api.generateDeckHTML({ si: 0, atEnd: false });
@@ -583,7 +583,7 @@ test('[7차] 덱을 통째로 바꾸면(파일 다시 불러오기·허브 덱 �
   const dataUrl = t => 'data:image/png;base64,' + Buffer.from(t).toString('base64'), tick = () => new Promise(r => setTimeout(r, 20));
   const gates = {};
   const mkEnv = () => {
-    const c = saveEnv({ sel: 0, PE: {}, renderAll() { }, bootPreview() { }, renderList() { }, renderEditor() { }, scheduleAutosave() { }, clone: o => JSON.parse(JSON.stringify(o)), IMG_URL: {}, SLIDE_CSS: '', ENGINE: '', SKELETON: '', escapeHtml: s => s,
+    const c = saveEnv({ sel: 0, PE: {}, renderAll() { }, bootPreview() { }, renderList() { }, renderEditor() { }, scheduleAutosave() { }, clone: o => JSON.parse(JSON.stringify(o)), IMG_URL: {}, SLIDE_CSS: '', THEME: 'dark', ENGINE: '', SKELETON: '', escapeHtml: s => s,
       deck: { meta: { title: '원본' }, slides: [{ type: 'photo', sid: 'S1', title: '장', image: { src: dataUrl('A'), w: 1, h: 1 }, marks: [] }] },
       hubUpload: async blob => { if (blob.name === 'B' || blob.name === 'C') return new Promise((ok, no) => { gates[blob.name] = { ok: () => ok('p/' + blob.name), no: m => no(new Error(m)) }; }); return 'p/' + (await blob.text()); } });
     c.B.deckName = { value: '' };
@@ -1275,4 +1275,40 @@ test('[3차-6] 원 편집: 도구 단추·O 글쇠 · 끌어서 그리기(누른
   assert.equal(hit(500, 250), null, '원 안쪽 한가운데는 안 잡음'); assert.equal(hit(700, 250), null, '먼 곳'); assert.equal(hit(600, 250).part, 'body');
   // 안내 문구
   assert.match(maker, /<b>O<\/b>원<\/span>/); assert.match(maker, /<kbd>O<\/kbd><span>원 그리기/); assert.match(maker, /<li><b>원 \(O\)<\/b>/);
+});
+
+test('[3차-7] 어두운 화면: 기본 어둡게 · 밝게/어둡게 단추 · 저장소 실패해도 동작 · 흰 판이 변수로 바뀜 · 사진·글 상자 라벨은 그대로 · 발표 파일에도 같은 값', () => {
+  assert.equal(pure.themeNorm('light'), 'light'); assert.equal(pure.themeNorm('dark'), 'dark'); for (const v of [null, undefined, '', 'x', 1]) assert.equal(pure.themeNorm(v), 'dark', '없음·이상한 값은 어둡게');
+  // 시작 코드: 읽기가 던져도(저장소 막힘) 어둡게로 시작, 쓰기가 던져도 단추는 동작
+  const startSrc = between(mainJs, "let THEME = 'dark';", 'applyTheme();\n');
+  const mkT = ls => { const ctx = { themeNorm: pure.themeNorm, localStorage: ls, document: { documentElement: { dataset: {} } }, B: { themeBtn: { textContent: '' } } }; vm.createContext(ctx); vm.runInContext("const THEME_KEY = 'k'; let THEME = 'dark';" + startSrc + 'applyTheme();this.get=()=>THEME;', ctx); return ctx; };
+  let t = mkT({ getItem() { throw new Error('blocked'); } }); assert.equal(t.get(), 'dark'); assert.equal(t.document.documentElement.dataset.theme, 'dark'); assert.equal(t.B.themeBtn.textContent, '☀ 밝게', '어두운 상태에선 「밝게」 단추');
+  t = mkT({ getItem: () => 'light' }); assert.equal(t.get(), 'light'); assert.equal(t.document.documentElement.dataset.theme, 'light'); assert.equal(t.B.themeBtn.textContent, '☾ 어둡게');
+  t = mkT({ getItem: () => null }); assert.equal(t.get(), 'dark');
+  const btn = mainJs.match(/B\.themeBtn\.onclick=\(\)=>\{[^\n]*/)[0]; assert.match(btn, /try\{ localStorage\.setItem\(THEME_KEY, THEME\); \}catch\(_\)\{\}/); assert.match(btn, /applyTheme\(\); bootPreview\(\)/, '미리보기도 새 값으로 다시 만듦'); assert.match(maker, /id="themeBtn"/);
+  // 편집 화면·발표 화면 모두: 기본(:root)은 어두운 값, 밝게는 data-theme="light"
+  const style = between(maker, '<style>', '</style>'), css = between(maker, '<template id="slideCSS">', '</template>');
+  for (const [name, c] of [['편집', style], ['발표', css]]) {
+    assert.match(c, /:root\{\s*color-scheme:dark;/, name + ' 기본 어둡게'); assert.match(c, /:root\[data-theme="light"\]\{\s*color-scheme:light;/, name + ' 밝은 값 보존');
+    const dark = c.match(/:root\{([^}]*)\}/)[1], light = c.match(/:root\[data-theme="light"\]\{([^}]*)\}/)[1];
+    const v = (b, k) => (b.match(new RegExp('--' + k + ':(#[0-9a-fA-F]{6});')) || [])[1];
+    const L = h => { const f = x => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }; return 0.2126 * f(parseInt(h.slice(1, 3), 16)) + 0.7152 * f(parseInt(h.slice(3, 5), 16)) + 0.0722 * f(parseInt(h.slice(5, 7), 16)); };
+    const cr = (a, b) => (Math.max(L(a), L(b)) + 0.05) / (Math.min(L(a), L(b)) + 0.05);
+    assert.ok(L(v(dark, 'card')) < 0.05 && L(v(dark, 'paper')) < 0.05, name + ' 어두운 판'); assert.ok(L(v(light, 'card')) > 0.9, name + ' 밝은 판은 예전 그대로');
+    for (const [fg, bg] of [['ink', 'card'], ['ink', 'paper'], ['gray', 'card'], ['blue', 'card'], ['head', 'card'], ['danger', 'danger-soft'], ['blue', 'blue-soft']]) assert.ok(cr(v(dark, fg), v(dark, bg)) >= 4.5, name + ' 대비 ' + fg + '/' + bg + ' ' + cr(v(dark, fg), v(dark, bg)).toFixed(1));
+    assert.ok(cr('#ffffff', v(dark, 'navy')) >= 4.5, name + ' 어두운 판 위 남색 단추의 흰 글자');
+  }
+  // 흰 바탕이 남아 있지 않음(라벨·SVG 제외)
+  for (const [name, c] of [['편집', style.replace(/:root\[data-theme="light"\]\{[^}]*\}/, '')], ['발표', css.replace(/:root\[data-theme="light"\]\{[^}]*\}/, '')]]) {
+    const whites = c.split('\n').filter(l => /background:#fff\b|background:#ffffff|#ffffff 0%/.test(l)).filter(l => !/^\s*\.(pe-lbl|ph-lbl-box)\{/.test(l)); assert.deepEqual(whites, [], name + ' 흰 바탕 남음: ' + whites.join(' | ').slice(0, 120));
+  }
+  assert.match(style, /\.pe-lbl\{[^}]*background:#fff; color:#16222f/, '편집 글 상자 라벨은 흰 바탕 그대로'); assert.match(css, /\.ph-lbl-box\{background:#fff; color:#16222f; border:2px solid var\(--gold\)/, '발표 글 상자 라벨도 그대로');
+  assert.match(css, /\.stage\{[^}]*linear-gradient\(180deg,var\(--stage-top\) 0%,var\(--paper\) 100%\)/); assert.match(css, /\.cmp \.col\{[^}]*background:var\(--card\)/); assert.match(css, /\.check\{[^}]*background:var\(--card\)/); assert.match(css, /\.sheet\{background:var\(--card\)/);
+  assert.match(style, /\.panel\{\s*background:var\(--pane\)/); assert.match(style, /\.slide-item\{[^}]*background:var\(--card\)/); assert.match(style, /\.pe-pop\{[^}]*background:var\(--card\); color:var\(--ink\)/); assert.match(style, /\.slide-go\{[^}]*background:var\(--card\)/);
+  // 발표 파일·미리보기·허브 보기는 만들 때의 값을 <html data-theme> 로 가짐 (같은 generateDeckHTML)
+  const gsrc = fnSrc(mainJs, 'function generateDeckHTML'); assert.match(gsrc, /<html lang="ko" data-theme="' \+ THEME \+ '">/);
+  const ctx = { ...{ deck: { meta: { title: 't' }, slides: [] }, IMG_URL: {}, SLIDE_CSS: '', ENGINE: '', SKELETON: '', escapeHtml: s => s, THEME: 'light' } }; vm.createContext(ctx);
+  vm.runInContext(pureSrc + ';' + [fnSrc(mainJs, 'function imgUrl'), fnSrc(mainJs, 'function deckData'), gsrc, 'this.g=generateDeckHTML;'].join('\n'), ctx);
+  assert.match(ctx.g({ si: 0, atEnd: false }), /^<!DOCTYPE html><html lang="ko" data-theme="light">/); ctx.THEME = 'dark'; assert.match(ctx.g({ si: 0, atEnd: false }), /<html lang="ko" data-theme="dark">/);
+  assert.match(fnSrc(mainJs, 'function hubShowViewer'), /generateDeckHTML\(/);
 });
