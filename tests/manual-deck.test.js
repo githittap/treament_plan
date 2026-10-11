@@ -1402,7 +1402,7 @@ test('[Codex 3차-6] 발표 화면 밝은 값: 색 변수가 자기 자신을 �
     for (const m of light.matchAll(/--([a-z0-9-]+):([^;]+);/g)) assert.ok(!/var\(/.test(m[2]) || m[2].replace(/var\(--([a-z0-9-]+)\)/g, '').trim() !== m[2], name + ' --' + m[1]);
   }
   const css = between(maker, '<template id="slideCSS">', '</template>'), light = css.match(/:root\[data-theme="light"\]\{([^}]*)\}/)[1];
-  assert.match(light, /--warn-line:#efc9c4;/); assert.match(light, /--same-line:#c9b3b0;/); assert.match(light, /--note-line:#cfe0f2;/); assert.match(light, /--same-ink:#7d5a56;/); assert.match(light, /--gold-text:#9a6a1e; --gold-text2:#8a5c17;/);
+  assert.match(light, /--warn-line:#efc9c4;/); assert.match(light, /--same-line:#c9b3b0;/); assert.match(light, /--note-line:#cfe0f2;/); assert.match(light, /--same-ink:#7d5a56;/); assert.match(light, /--gold-text:#8a5c17; --gold-text2:#8a5c17;/);
   assert.match(css, /\.note\.warn\{[^}]*border-color:var\(--warn-line\)/); assert.match(css, /\.node\.same \.box\{[^}]*border-color:var\(--same-line\)/);
 });
 
@@ -1454,4 +1454,38 @@ test('[Codex 3차 2회차-2] Space 이동 예약은 덱 세대(DECK_GEN)에 묶�
   e.down(); assert.equal(e.ctx.SPK.gen, 6); e.up(); assert.deepEqual(e.log, ['slide-next'], '새 덱에서 다시 누르면 정상');
   // 진짜 resetHistory 가 DECK_GEN 을 올림(덱을 통째로 바꾸는 모든 길이 거침)
   assert.match(fnSrc(mainJs, 'function resetHistory'), /DECK_GEN\+\+/);
+});
+
+test('[Codex 3차 3회차] CSS 에서 「바탕 + 글자색」 조합을 전부 뽑아 양 테마 대비 4.5 이상 확인 — 알림(toast)·경고·배지·태그·카드·표 포함, 같은 유형 재발 방지', () => {
+  const style = between(maker, '<style>', '</style>'), css = between(maker, '<template id="slideCSS">', '</template>');
+  const hexOf = h => { h = h.replace('#', ''); if (h.length === 3) h = h.split('').map(c => c + c).join(''); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)); };
+  const L = rgb => { const f = x => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }; return 0.2126 * f(rgb[0]) + 0.7152 * f(rgb[1]) + 0.0722 * f(rgb[2]); };
+  const cr = (a, b) => (Math.max(L(a), L(b)) + 0.05) / (Math.min(L(a), L(b)) + 0.05);
+  const varsOf = (c, theme) => { const b = theme === 'dark' ? c.match(/:root\{([^}]*)\}/)[1] : c.match(/:root\[data-theme="light"\]\{([^}]*)\}/)[1]; const o = {}; for (const m of b.matchAll(/--([a-z0-9-]+):(#[0-9a-fA-F]{3,6});/g)) o[m[1]] = hexOf(m[2]); return o; };
+  const colorsOf = (val, V) => { const out = []; for (const m of val.matchAll(/var\(--([\w-]+)\)|#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/g)) { if (m[1]) { assert.ok(V[m[1]], '정의 안 된 색 변수 --' + m[1]); out.push({ rgb: V[m[1]], a: 1, t: 'var(--' + m[1] + ')' }); } else if (m[0][0] === '#') out.push({ rgb: hexOf(m[0]), a: 1, t: m[0] }); else { const p = m[0].match(/\(([^)]*)\)/)[1].split(',').map(parseFloat); out.push({ rgb: p.slice(0, 3), a: p.length > 3 ? p[3] : 1, t: m[0] }); } } return out; };
+  const rulesOf = c => { const t = c.replace(/\/\*[\s\S]*?\*\//g, ''), out = []; for (const m of t.matchAll(/([^{}]+)\{([^{}]*)\}/g)) { const sel = m[1].trim(); if (/^:root|^@|^from|^to|^\d+%/.test(sel) || /keyframes/.test(sel)) continue; const d = {}; for (const x of m[2].matchAll(/(?:^|;)\s*(background|background-color|color)\s*:\s*([^;]+)/g)) d[x[1] === 'background-color' ? 'background' : x[1]] = x[2].trim(); out.push({ sel, d }); } return out; };
+  // 검사에서 뺀 곳(이유): 글자가 없는 장식·사진 판·페이지 바탕, 어두운 머리줄 위 글자(항상 어두운 바탕), 마우스 올림 상태(앞 시험이 따로 검사)
+  const DECOR = /\.(dot|beat|pulse|swatch|frame-shell|view-frame|pe-view|pe-stage|pv)\b|#previewFrame|^body$|:hover|:focus|:active|::?(before|after)/;
+  const ON_DARK_HEADER = /^\.(brand|topbar|hub-bar|top-actions|chip-btn|nav-btn|counter|meta)\b/;
+  const INHERIT_FG = { '.toast.err': '#ffffff' };   // 자기 글자색 없이 바탕만 바꾸는 규칙은 어떤 글자색을 물려받는지 적음
+  const seen = [];
+  for (const [name, c, surf] of [['편집', style, ['card', 'pane', 'paper']], ['발표', css, ['card', 'paper', 'stage-top']]]) {
+    const all = rulesOf(c);
+    for (const theme of ['dark', 'light']) {
+      const V = varsOf(c, theme), bad = [], bgOfSel = sel => { let t = sel.replace(/::?[\w-]+(\([^)]*\))?$/, ''); const toks = t.split(/\s+/); for (let n = toks.length; n >= 1; n--) { const pre = toks.slice(0, n).join(' '); const r = all.find(x => x.sel === pre && x.d.background); if (r) return colorsOf(r.d.background, V).filter(x => x.a >= 1); } return null; };
+      const check = (label, fg, bgs) => { for (const b of bgs) { const f = fg.a < 1 ? fg.rgb.map((x, i) => x * fg.a + b.rgb[i] * (1 - fg.a)) : fg.rgb, k = cr(f, b.rgb); seen.push(k); if (k < 4.5) bad.push(label + ' ' + fg.t + ' / ' + b.t + ' = ' + k.toFixed(2)); } };
+      for (const r of all) {
+        const { background: bg, color: fg } = r.d, sel = r.sel.replace(/\s+/g, ' ');
+        if (DECOR.test(sel) || ON_DARK_HEADER.test(sel)) continue;
+        if (bg && fg) { const B = colorsOf(bg, V).filter(x => x.a >= 1); for (const f of colorsOf(fg, V)) check(sel, f, B); }
+        else if (bg) { const f = INHERIT_FG[sel] ? { rgb: hexOf(INHERIT_FG[sel]), a: 1, t: INHERIT_FG[sel] } : { rgb: V.ink, a: 1, t: 'var(--ink)' }; const B = colorsOf(bg, V).filter(x => x.a >= 1); if (/\.(tbl tr\.hub td|slide-item|node \.box|cmp \.col|check|stage|panel|note|ph-notes|keyhint|picker|sheet|input|rep-row|add-slide|rep-add|mini-btn|pv-btn|rr-move|pe-tool|pe-pop|hintline|type-badge|toast|cover-motif)\b/.test(sel) || INHERIT_FG[sel]) check(sel, f, B); }
+        else if (fg) { const pre = bgOfSel(sel); for (const f of colorsOf(fg, V)) { if (f.a < 1 || !/var\(/.test(f.t)) continue; check(sel + ' (글)', f, pre || surf.map(n => ({ rgb: V[n], t: n }))); } }
+      }
+      assert.deepEqual(bad, [], name + ' ' + theme + ' 대비 4.5 미만: ' + bad.join(' ; '));
+    }
+  }
+  assert.ok(seen.length > 150, '조합을 충분히 뽑았음: ' + seen.length);
+  // 알림: 일반·오류 모두 흰 글자, 오류 바탕은 밝은 --danger 가 아닌 진한 --danger-solid
+  assert.match(style, /\.toast\{[^}]*background:var\(--navy\); color:#fff/); assert.match(style, /\.toast\.err\{background:var\(--danger-solid\);\}/);
+  for (const theme of ['dark', 'light']) { const V = varsOf(style, theme); assert.ok(cr(hexOf('#ffffff'), V['danger-solid']) >= 4.5, theme + ' 오류 알림'); assert.ok(cr(hexOf('#ffffff'), V.navy) >= 4.5, theme + ' 일반 알림'); }
 });
