@@ -1145,7 +1145,7 @@ test('[3차-2] Space = 다음 장, Ctrl+Space = 이전 장 (↑/↓ 유지) · �
   const mkEnv = (slide, hubView) => {
     const h = { keydown: [], keyup: [] }, log = [];
     const ctx = { HUB: { view: !!hubView }, B: { help: { classList: { contains: () => !!ctx.helpOpen, remove() { } } } }, deck: { slides: [slide] }, sel: 0, PE: { sel: null, space: false }, SPK: { on: false, used: false },
-      document: { addEventListener: (t, f) => h[t].push(f), activeElement: null }, window: { addEventListener() { } }, spaceGo: pure.spaceGo, pickerOpen: false, shortcutAction: pure.shortcutAction, isTypingTarget: pure.isTypingTarget,
+      document: { addEventListener: (t, f) => h[t].push(f), activeElement: null }, window: { addEventListener() { } }, spaceGo: pure.spaceGo, pickerOpen: false, DECK_GEN: 0, shortcutAction: pure.shortcutAction, isTypingTarget: pure.isTypingTarget,
       runShortcut: a => log.push(a), peSpace(on) { ctx.PE.space = on; }, log, h };
     vm.createContext(ctx); vm.runInContext(src, ctx);
     const down = (code, ex) => { const e = Object.assign({ code, key: code === 'Space' ? ' ' : code, target: { tagName: 'DIV' }, repeat: false, prevented: 0, preventDefault() { this.prevented++; } }, ex || {}); h.keydown.forEach(f => f(e)); return e; };
@@ -1324,7 +1324,7 @@ test('[Codex 3차-1] Space 「끌었다」 판정은 실제 이동 4px 이상만
   const src = mainJs.slice(mainJs.search(/document\.addEventListener\('keydown', e=>\{\s*if\(HUB\.view\) return;/), mainJs.indexOf('/* 미리보기 칸 접기'));
   const h = { keydown: [], keyup: [] }, log = [];
   const ctx = { HUB: { view: false }, B: { help: { classList: { contains: () => false, remove() { } } } }, deck: { slides: [{ type: 'photo', image: { src: 'x' } }] }, sel: 0, PE: { sel: null, space: false, pop: null }, SPK: { on: false, used: false },
-    document: { addEventListener: (t, f) => h[t].push(f), activeElement: null }, window: { addEventListener() { } }, spaceGo: pure.spaceGo, pickerOpen: false, shortcutAction: pure.shortcutAction, isTypingTarget: pure.isTypingTarget, runShortcut: a => log.push(a), peSpace(on) { ctx.PE.space = on; } };
+    document: { addEventListener: (t, f) => h[t].push(f), activeElement: null }, window: { addEventListener() { } }, spaceGo: pure.spaceGo, pickerOpen: false, DECK_GEN: 0, shortcutAction: pure.shortcutAction, isTypingTarget: pure.isTypingTarget, runShortcut: a => log.push(a), peSpace(on) { ctx.PE.space = on; } };
   vm.createContext(ctx); vm.runInContext(src, ctx);
   const down = () => h.keydown.forEach(f => f({ code: 'Space', key: ' ', target: { tagName: 'DIV' }, repeat: false, preventDefault() { } })), up = () => h.keyup.forEach(f => f({ code: 'Space', key: ' ', target: { tagName: 'DIV' }, preventDefault() { } }));
   down(); up(); assert.deepEqual(log, ['slide-next'], '움직임 없이 뗌 → 다음 장');
@@ -1336,7 +1336,7 @@ test('[Codex 3차-2] Space 를 누른 뒤 뗄 때까지 입력 칸 포커스·�
   const src = mainJs.slice(mainJs.search(/document\.addEventListener\('keydown', e=>\{\s*if\(HUB\.view\) return;/), mainJs.indexOf('/* 미리보기 칸 접기'));
   const mk = () => { const h = { keydown: [], keyup: [] }, log = [];
     const ctx = { HUB: { view: false }, B: { help: { classList: { contains: () => !!ctx.helpOpen, remove() { } } } }, deck: { slides: [{ type: 'photo', image: { src: 'x' } }] }, sel: 0, PE: { sel: null, space: false, pop: null }, SPK: { on: false, used: false },
-      document: { addEventListener: (t, f) => h[t].push(f), activeElement: null }, window: { addEventListener() { } }, spaceGo: pure.spaceGo, pickerOpen: false, shortcutAction: pure.shortcutAction, isTypingTarget: pure.isTypingTarget, runShortcut: a => log.push(a), peSpace(on) { ctx.PE.space = on; } };
+      document: { addEventListener: (t, f) => h[t].push(f), activeElement: null }, window: { addEventListener() { } }, spaceGo: pure.spaceGo, pickerOpen: false, DECK_GEN: 0, shortcutAction: pure.shortcutAction, isTypingTarget: pure.isTypingTarget, runShortcut: a => log.push(a), peSpace(on) { ctx.PE.space = on; } };
     vm.createContext(ctx); vm.runInContext(src, ctx);
     return { ctx, log, down: () => h.keydown.forEach(f => f({ code: 'Space', key: ' ', target: { tagName: 'DIV' }, repeat: false, preventDefault() { } })), up: (t) => h.keyup.forEach(f => f({ code: 'Space', key: ' ', target: t || { tagName: 'DIV' }, preventDefault() { } })) }; };
   let e = mk(); e.down(); e.up(); assert.deepEqual(e.log, ['slide-next'], '아무 일 없으면 이동');
@@ -1404,4 +1404,54 @@ test('[Codex 3차-6] 발표 화면 밝은 값: 색 변수가 자기 자신을 �
   const css = between(maker, '<template id="slideCSS">', '</template>'), light = css.match(/:root\[data-theme="light"\]\{([^}]*)\}/)[1];
   assert.match(light, /--warn-line:#efc9c4;/); assert.match(light, /--same-line:#c9b3b0;/); assert.match(light, /--note-line:#cfe0f2;/); assert.match(light, /--same-ink:#7d5a56;/); assert.match(light, /--gold-text:#9a6a1e; --gold-text2:#8a5c17;/);
   assert.match(css, /\.note\.warn\{[^}]*border-color:var\(--warn-line\)/); assert.match(css, /\.node\.same \.box\{[^}]*border-color:var\(--same-line\)/);
+});
+
+test('[Codex 3차 2회차-1] 모든 단추의 마우스 올림(hover)·포커스 상태 글 대비 4.5 이상 — 어두운·밝은 테마 모두, 규칙이 실제로 그 색을 쓰는지도 확인', () => {
+  const style = between(maker, '<style>', '</style>'), css = between(maker, '<template id="slideCSS">', '</template>');
+  const hexOf = h => { h = h.replace('#', ''); if (h.length === 3) h = h.split('').map(c => c + c).join(''); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)); };
+  const L = rgb => { const f = x => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }; return 0.2126 * f(rgb[0]) + 0.7152 * f(rgb[1]) + 0.0722 * f(rgb[2]); };
+  const cr = (a, b) => (Math.max(L(a), L(b)) + 0.05) / (Math.min(L(a), L(b)) + 0.05);
+  const over = (fg, a, bg) => bg.map((c, i) => Math.round(fg[i] * a + c * (1 - a)));   // 반투명 흰색을 배경 위에 얹은 색
+  const vars = (c, theme) => { const b = theme === 'dark' ? c.match(/:root\{([^}]*)\}/)[1] : c.match(/:root\[data-theme="light"\]\{([^}]*)\}/)[1]; const o = {}; for (const m of b.matchAll(/--([a-z0-9-]+):(#[0-9a-fA-F]{3,6});/g)) o[m[1]] = hexOf(m[2]); return o; };
+  const has = (c, re, what) => assert.match(c, re, '규칙이 바뀌었는지 확인: ' + what);
+  // 규칙이 시험이 가정한 색을 그대로 쓰는지(어긋나면 시험을 같이 고쳐야 함)
+  has(style, /\.btn:hover\{background:rgba\(255,255,255,\.13\);\}/, '.btn:hover'); has(style, /\.btn\{[^}]*color:#dbe8f4/, '.btn 글자'); has(style, /\.btn\.primary\{[^}]*color:#241505/, '.btn.primary 글자'); has(style, /\.btn\.primary:hover\{filter:brightness\(1\.06\);\}/, '.btn.primary:hover');
+  has(style, /\.mini-btn:hover\{border-color:var\(--blue-line\); color:var\(--blue\);\}/, '.mini-btn:hover'); has(style, /\.mini-btn\{[^}]*background:var\(--card\)/, '.mini-btn 바탕'); has(style, /\.mini-btn\.danger:hover\{[^}]*color:var\(--danger\); background:var\(--danger-soft\);\}/, '.mini-btn.danger:hover');
+  has(style, /\.add-slide:hover\{background:var\(--blue-soft\);/, '.add-slide:hover'); has(style, /\.rep-add:hover\{background:var\(--blue-soft\);/, '.rep-add:hover'); has(style, /\.picker button:hover\{background:var\(--blue-soft\);\}/, '.picker button:hover');
+  has(style, /\.rep-row \.rr-del:hover\{color:var\(--danger\); background:var\(--danger-soft\);\}/, '.rr-del:hover'); has(style, /\.rr-move button:hover\{color:var\(--blue\);/, '.rr-move button:hover'); has(style, /\.pv-btn:hover\{border-color:var\(--blue\); color:var\(--blue\);\}/, '.pv-btn:hover'); has(style, /\.pe-tool:hover\{border-color:var\(--blue-line\); color:var\(--blue\);\}/, '.pe-tool:hover');
+  has(style, /\.sheet \.close\{[^}]*background:var\(--navy\); color:#fff/, '.sheet .close'); has(style, /\.sheet \.close:hover\{background:var\(--close-hover\);\}/, '.sheet .close:hover(편집)'); has(css, /\.sheet \.close:hover\{background:var\(--close-hover\);\}/, '.sheet .close:hover(발표)');
+  has(style, /\.deck-name:focus\{[^}]*background:rgba\(255,255,255,\.1\);\}/, '.deck-name:focus'); has(css, /\.chip-btn:hover\{background:rgba\(255,255,255,\.13\);\}/, '.chip-btn:hover'); has(css, /\.chip-btn\{[^}]*color:#dbe8f4/, '.chip-btn 글자'); has(css, /\.nav-btn:hover\{background:rgba\(255,255,255,\.18\);\}/, '.nav-btn:hover'); has(css, /\.nav-btn\{[^}]*color:#fff/, '.nav-btn 글자');
+  assert.ok(!/:hover\{[^}]*background:var\(--blue\)\}/.test(style + css), '흰 글자 위에 밝은 --blue 를 바탕으로 쓰는 hover 가 없음');
+  const bodyLightest = hexOf('#1c476f');   // 머리줄·발표 머리의 배경 그라데이션에서 가장 밝은 점
+  for (const theme of ['dark', 'light']) {
+    const E = vars(style, theme), S = vars(css, theme), chk = (name, fg, bg) => assert.ok(cr(fg, bg) >= 4.5, theme + ' ' + name + ' ' + cr(fg, bg).toFixed(2));
+    const W = [255, 255, 255];
+    chk('.btn:hover 글자', hexOf('#dbe8f4'), over(W, 0.13, bodyLightest)); chk('.chip-btn:hover 글자', hexOf('#dbe8f4'), over(W, 0.13, bodyLightest)); chk('.nav-btn:hover 글자', W, over(W, 0.18, bodyLightest));
+    chk('.deck-name:focus 글자', hexOf('#eef5fc'), over(W, 0.1, bodyLightest));
+    for (const end of ['#d99a3e', '#c07f24']) chk('.btn.primary:hover 글자(밝기 1.06배, ' + end + ')', hexOf('#241505'), hexOf(end).map(c => Math.min(255, Math.round(c * 1.06))));
+    for (const [c, V, tag] of [[style, E, '편집']]) {
+      chk(tag + ' .mini-btn:hover', V.blue, V.card); chk(tag + ' .pv-btn/.rr-move/.pe-tool:hover', V.blue, V.card); chk(tag + ' .mini-btn.danger:hover', V.danger, V['danger-soft']);
+      chk(tag + ' .add-slide/.rep-add:hover', V.blue, V['blue-soft']); chk(tag + ' .picker button:hover', V.ink, V['blue-soft']); chk(tag + ' .rr-del:hover', V.danger, V['danger-soft']);
+      chk(tag + ' .sheet .close 기본', W, V.navy); chk(tag + ' .sheet .close:hover', W, V['close-hover']);
+    }
+    chk('발표 .sheet .close 기본', W, S.navy); chk('발표 .sheet .close:hover', W, S['close-hover']);
+    chk('.rr-del 기본(편집)', E.gray, E.card);
+  }
+});
+
+test('[Codex 3차 2회차-2] Space 이동 예약은 덱 세대(DECK_GEN)에 묶임 — 누른 채 덱이 통째로 바뀌면(파일 불러오기·새로·허브 덱 열기) 떼어도 이동 안 함', () => {
+  const g = pure.spaceGo, ok = { used: false, typing: false, help: false, pop: false, picker: false, view: false, deckChanged: false };
+  assert.equal(g(ok), true); assert.equal(g(Object.assign({}, ok, { deckChanged: true })), false);
+  const src = mainJs.slice(mainJs.search(/document\.addEventListener\('keydown', e=>\{\s*if\(HUB\.view\) return;/), mainJs.indexOf('/* 미리보기 칸 접기'));
+  assert.match(src, /SPK\.gen = DECK_GEN/); assert.match(src, /deckChanged:SPK\.gen !== DECK_GEN/);
+  const mk = () => { const h = { keydown: [], keyup: [] }, log = [];
+    const ctx = { HUB: { view: false }, B: { help: { classList: { contains: () => false, remove() { } } } }, deck: { slides: [{ type: 'photo', image: { src: 'x' } }] }, sel: 0, PE: { sel: null, space: false, pop: null }, SPK: { on: false, used: false, gen: 0 }, DECK_GEN: 5,
+      document: { addEventListener: (t, f) => h[t].push(f), activeElement: null }, window: { addEventListener() { } }, spaceGo: pure.spaceGo, pickerOpen: false, shortcutAction: pure.shortcutAction, isTypingTarget: pure.isTypingTarget, runShortcut: a => log.push(a), peSpace(on) { ctx.PE.space = on; } };
+    vm.createContext(ctx); vm.runInContext(src, ctx);
+    return { ctx, log, down: () => h.keydown.forEach(f => f({ code: 'Space', key: ' ', target: { tagName: 'DIV' }, repeat: false, preventDefault() { } })), up: () => h.keyup.forEach(f => f({ code: 'Space', key: ' ', target: { tagName: 'DIV' }, preventDefault() { } })) }; };
+  let e = mk(); e.down(); e.up(); assert.deepEqual(e.log, ['slide-next'], '덱이 안 바뀌면 이동');
+  e = mk(); e.down(); assert.equal(e.ctx.SPK.gen, 5, '누를 때의 세대를 기억'); e.ctx.DECK_GEN = 6; e.up(); assert.deepEqual(e.log, [], '누른 채 덱이 바뀌면 이동 안 함'); assert.equal(e.ctx.SPK.on, false); assert.equal(e.ctx.PE.space, false);
+  e.down(); assert.equal(e.ctx.SPK.gen, 6); e.up(); assert.deepEqual(e.log, ['slide-next'], '새 덱에서 다시 누르면 정상');
+  // 진짜 resetHistory 가 DECK_GEN 을 올림(덱을 통째로 바꾸는 모든 길이 거침)
+  assert.match(fnSrc(mainJs, 'function resetHistory'), /DECK_GEN\+\+/);
 });

@@ -10,7 +10,7 @@
   /* 기본 = 어둡게(눈이 덜 피로함). 머리줄 「밝게」 단추로 <html data-theme="light"> 가 되면 아래 밝은 값 */
   :root{
     color-scheme:dark;
-    --navy:#2a5c8f; --navy-2:#24507f; --navy-3:#1f4d78; --head:#e8eff7;
+    --navy:#2a5c8f; --navy-2:#24507f; --navy-3:#1f4d78; --head:#e8eff7; --close-hover:#3470ad;
     --blue:#7fb5ee; --blue-soft:#1c3b5d; --blue-line:#37597f;
     --ink:#e8eff7; --gray:#a9bbce; --line:#2d4660;
     --paper:#0e2033; --card:#17304a; --pane:#0f2236; --row:#132a42; --soft:#1d3650; --dash:#3d5b7c; --thumb:#34506b;
@@ -20,7 +20,7 @@
   }
   :root[data-theme="light"]{
     color-scheme:light;
-    --navy:#0f2942; --navy-2:#16385a; --navy-3:#1f4d78; --head:#0f2942;
+    --navy:#0f2942; --navy-2:#16385a; --navy-3:#1f4d78; --head:#0f2942; --close-hover:#1d5fa8;
     --blue:#1d5fa8; --blue-soft:#e8f1fb; --blue-line:#b8cbe0;
     --ink:#1c2733; --gray:#64748b; --line:#dbe3ec;
     --paper:#f5f7fa; --card:#ffffff; --pane:#f3f6fa; --row:#fbfdff; --soft:#eef3f8; --dash:#c2cfdd; --thumb:#cdd8e4;
@@ -284,7 +284,7 @@
   .sheet kbd{font-family:inherit; font-weight:700; font-size:12px; background:var(--paper); border:1px solid var(--line);
     border-bottom-width:2px; border-radius:6px; padding:3px 8px; color:var(--ink); justify-self:start;}
   .sheet .close{margin-top:22px; width:100%; padding:12px; border:none; border-radius:10px; background:var(--navy); color:#fff; font-weight:700; cursor:pointer;}
-  .sheet .close:hover{background:var(--blue);}
+  .sheet .close:hover{background:var(--close-hover);}
 
   @media (max-width:1040px){
     .work, .work.pv-off{grid-template-columns:200px 1fr; grid-template-rows:1fr;}
@@ -423,7 +423,7 @@
   /* 기본 = 어둡게. 내보낸 파일·허브 보기도 만들 때 <html data-theme> 로 정함 */
   :root{
     color-scheme:dark;
-    --navy:#2a5c8f; --navy-2:#24507f; --navy-3:#1f4d78; --head:#e8eff7;
+    --navy:#2a5c8f; --navy-2:#24507f; --navy-3:#1f4d78; --head:#e8eff7; --close-hover:#3470ad;
     --blue:#7fb5ee; --blue-soft:#1c3b5d; --blue-line:#37597f;
     --ink:#e8eff7; --gray:#a9bbce; --line:#2d4660;
     --paper:#10253a; --card:#17304a; --stage-top:#1a3652; --soft:#1d3650; --dash:#3d5b7c;
@@ -434,7 +434,7 @@
   }
   :root[data-theme="light"]{
     color-scheme:light;
-    --navy:#0f2942; --navy-2:#16385a; --navy-3:#1f4d78; --head:#0f2942;
+    --navy:#0f2942; --navy-2:#16385a; --navy-3:#1f4d78; --head:#0f2942; --close-hover:#1d5fa8;
     --blue:#1d5fa8; --blue-soft:#e8f1fb; --blue-line:#b8cbe0;
     --ink:#1c2733; --gray:#64748b; --line:#dbe3ec;
     --paper:#f5f7fa; --card:#ffffff; --stage-top:#ffffff; --soft:#eef2f7; --dash:#c6d2df;
@@ -603,7 +603,7 @@
   .keys{display:grid; grid-template-columns:auto 1fr; gap:8px 14px; font-size:14px; align-items:center;}
   .keys kbd{font-family:inherit; font-weight:700; font-size:12px; background:var(--paper); border:1px solid var(--line); border-bottom-width:2px; border-radius:6px; padding:3px 8px; color:var(--ink); justify-self:start;}
   .sheet .close{margin-top:22px; width:100%; padding:12px; border:none; border-radius:10px; background:var(--navy); color:#fff; font:inherit; font-weight:700; cursor:pointer;}
-  .sheet .close:hover{background:var(--blue);}
+  .sheet .close:hover{background:var(--close-hover);}
   @media (max-width:720px){
     .cmp{grid-template-columns:1fr;}
     .node .box{min-width:104px; max-width:150px; padding:9px 10px;}
@@ -1331,8 +1331,8 @@ function shortcutAction(e, ctx){
   }
   return null;
 }
-/* Space 를 떼는 순간 다음 장으로 갈지: 끌지 않았고(used) 그 사이 입력 칸(typing)·도움말(help)·글 입력 창(pop)·장 종류 창(picker)·허브 보기(view)가 안 열렸을 때만 */
-function spaceGo(st){ return !st.used && !st.typing && !st.help && !st.pop && !st.picker && !st.view; }
+/* Space 를 떼는 순간 다음 장으로 갈지: 끌지 않았고(used) 그 사이 입력 칸(typing)·도움말(help)·글 입력 창(pop)·장 종류 창(picker)·허브 보기(view)가 안 열리고 덱이 통째로 안 바뀌었을(deckChanged: 누른 때와 DECK_GEN 이 다름) 때만 */
+function spaceGo(st){ return !st.used && !st.typing && !st.help && !st.pop && !st.picker && !st.view && !st.deckChanged; }
 /* 사진 편집 판 확대: 틀 좌표 (cx,cy) 아래 점은 그대로 두고 배율 nz(1~6)로 바꾼 뒤, 판이 틀 밖으로 비지 않게 이동값을 자름. 이동만 할 땐 nz=z */
 function zoomAt(z, tx, ty, cx, cy, nz, VW, VH){
   z = +z > 0 ? +z : 1;
@@ -1850,7 +1850,7 @@ function distSeg(p, a, b){
 }
 function peCls(){ if(PE.stage) PE.stage.className = 'pe-stage t-'+PE.tool+(PE.space ? ' sp' : '')+(PE.pan ? ' panning' : ''); }
 function peSpace(on){ if(PE.space === on) return; PE.space = on; peCls(); }
-const SPK = {on:false, used:false};   /* Space 를 누르고 있는 중(on) · 그 사이 끌어 이동했는지(used) — 끌지 않고 떼면 다음 장 */
+const SPK = {on:false, used:false, gen:0};   /* Space 를 누르고 있는 중(on) · 그 사이 끌어 이동했는지(used) — 끌지 않고 떼면 다음 장 */
 /* 확대·이동(편집 화면만): 판(.pe-stage)에 translate+scale, 바깥 틀(.pe-view)이 넘친 부분을 숨김 */
 function peApplyView(){
   const v = PE.view, st = PE.stage; if(!v || !st) return;
@@ -2284,7 +2284,7 @@ document.addEventListener('keydown', e=>{
   const act = shortcutAction(e, {blocked:false, photo:!!(s && s.type === 'photo' && s.image), hasSel:!!PE.sel});
   if(!act) return;
   e.preventDefault();
-  if(act === 'space-hold'){ if(e.code === 'Space' && !e.repeat){ SPK.on = true; SPK.used = false; peSpace(true); } return; }   /* Space 누른 채 끌기 = 이동 · 끌지 않고 떼면 keyup 에서 다음 장 */
+  if(act === 'space-hold'){ if(e.code === 'Space' && !e.repeat){ SPK.on = true; SPK.used = false; SPK.gen = DECK_GEN; peSpace(true); } return; }   /* Space 누른 채 끌기 = 이동 · 끌지 않고 떼면 keyup 에서 다음 장 */
   if(e.code === 'Space' && e.repeat) return;   /* 키를 계속 눌러도 한 장만 넘어감 */
   runShortcut(act);
 });
@@ -2293,7 +2293,7 @@ document.addEventListener('keyup', e=>{
   if(e.code !== 'Space' || !SPK.on) return;
   e.preventDefault(); SPK.on = false; peSpace(false);
   /* 누른 뒤 떼기 전에 입력 칸 포커스·도움말·글 입력 창·장 종류 창·허브 보기가 되면 장 이동 예약을 취소 */
-  if(spaceGo({used:SPK.used, typing:isTypingTarget(e.target) || isTypingTarget(document.activeElement), help:B.help.classList.contains('show'), pop:!!PE.pop, picker:pickerOpen, view:HUB.view})) runShortcut('slide-next');
+  if(spaceGo({used:SPK.used, typing:isTypingTarget(e.target) || isTypingTarget(document.activeElement), help:B.help.classList.contains('show'), pop:!!PE.pop, picker:pickerOpen, view:HUB.view, deckChanged:SPK.gen !== DECK_GEN})) runShortcut('slide-next');
 });
 window.addEventListener('blur', ()=>{ SPK.on = false; peSpace(false); });
 /* 미리보기 칸 접기·펴기 — 이 브라우저에만 기억 */
