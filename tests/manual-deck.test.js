@@ -1456,36 +1456,47 @@ test('[Codex 3차 2회차-2] Space 이동 예약은 덱 세대(DECK_GEN)에 묶�
   assert.match(fnSrc(mainJs, 'function resetHistory'), /DECK_GEN\+\+/);
 });
 
-test('[Codex 3차 3회차] CSS 에서 「바탕 + 글자색」 조합을 전부 뽑아 양 테마 대비 4.5 이상 확인 — 알림(toast)·경고·배지·태그·카드·표 포함, 같은 유형 재발 방지', () => {
+test('[Codex 3차 4회차] CSS 에서 「바탕 + 글자색」 조합을 전부 뽑아 양 테마 대비 4.5 이상 — 반투명(rgba 알파·opacity)은 바탕에 합성해 계산, 머리줄·입력 안내(placeholder)·옵션·표지 글자 포함', () => {
   const style = between(maker, '<style>', '</style>'), css = between(maker, '<template id="slideCSS">', '</template>');
   const hexOf = h => { h = h.replace('#', ''); if (h.length === 3) h = h.split('').map(c => c + c).join(''); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)); };
   const L = rgb => { const f = x => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }; return 0.2126 * f(rgb[0]) + 0.7152 * f(rgb[1]) + 0.0722 * f(rgb[2]); };
   const cr = (a, b) => (Math.max(L(a), L(b)) + 0.05) / (Math.min(L(a), L(b)) + 0.05);
+  const mix = (fg, a, bg) => fg.map((x, i) => x * a + bg[i] * (1 - a));   // 반투명 fg(알파 a)를 바탕 bg 위에 얹은 실제 색
   const varsOf = (c, theme) => { const b = theme === 'dark' ? c.match(/:root\{([^}]*)\}/)[1] : c.match(/:root\[data-theme="light"\]\{([^}]*)\}/)[1]; const o = {}; for (const m of b.matchAll(/--([a-z0-9-]+):(#[0-9a-fA-F]{3,6});/g)) o[m[1]] = hexOf(m[2]); return o; };
   const colorsOf = (val, V) => { const out = []; for (const m of val.matchAll(/var\(--([\w-]+)\)|#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/g)) { if (m[1]) { assert.ok(V[m[1]], '정의 안 된 색 변수 --' + m[1]); out.push({ rgb: V[m[1]], a: 1, t: 'var(--' + m[1] + ')' }); } else if (m[0][0] === '#') out.push({ rgb: hexOf(m[0]), a: 1, t: m[0] }); else { const p = m[0].match(/\(([^)]*)\)/)[1].split(',').map(parseFloat); out.push({ rgb: p.slice(0, 3), a: p.length > 3 ? p[3] : 1, t: m[0] }); } } return out; };
-  const rulesOf = c => { const t = c.replace(/\/\*[\s\S]*?\*\//g, ''), out = []; for (const m of t.matchAll(/([^{}]+)\{([^{}]*)\}/g)) { const sel = m[1].trim(); if (/^:root|^@|^from|^to|^\d+%/.test(sel) || /keyframes/.test(sel)) continue; const d = {}; for (const x of m[2].matchAll(/(?:^|;)\s*(background|background-color|color)\s*:\s*([^;]+)/g)) d[x[1] === 'background-color' ? 'background' : x[1]] = x[2].trim(); out.push({ sel, d }); } return out; };
-  // 검사에서 뺀 곳(이유): 글자가 없는 장식·사진 판·페이지 바탕, 어두운 머리줄 위 글자(항상 어두운 바탕), 마우스 올림 상태(앞 시험이 따로 검사)
+  const rulesOf = c => { const t = c.replace(/\/\*[\s\S]*?\*\//g, ''), out = []; for (const m of t.matchAll(/([^{}]+)\{([^{}]*)\}/g)) { const sel = m[1].trim().replace(/\s+/g, ' '); if (/^:root|^@|^from|^to|^\d+%/.test(sel) || /keyframes/.test(sel)) continue; const d = {}; for (const x of m[2].matchAll(/(?:^|;)\s*(background|background-color|color|opacity)\s*:\s*([^;]+)/g)) d[x[1] === 'background-color' ? 'background' : x[1]] = x[2].trim(); out.push({ sel, d }); } return out; };
+  const BODY = ['#1c476f', '#10314f', '#0f2942', '#0b1e31', '#0c2136'].map(hexOf);   // 페이지 바탕 그라데이션(밝은·어두운 테마 모두 항상 어두움) — 가장 밝은 점부터 어두운 점
+  // 검사에서 뺀 곳(이유): 글자 없는 장식·사진 판·페이지 바탕, 마우스 올림·포커스(앞 시험이 따로 검사), 가상 요소 장식
   const DECOR = /\.(dot|beat|pulse|swatch|frame-shell|view-frame|pe-view|pe-stage|pv)\b|#previewFrame|^body$|:hover|:focus|:active|::?(before|after)/;
-  const ON_DARK_HEADER = /^\.(brand|topbar|hub-bar|top-actions|chip-btn|nav-btn|counter|meta)\b/;
-  const INHERIT_FG = { '.toast.err': '#ffffff' };   // 자기 글자색 없이 바탕만 바꾸는 규칙은 어떤 글자색을 물려받는지 적음
-  const seen = [];
+  const ON_DARK = /^\.(controls|hub-fail|brand|topbar|hub-bar|top-actions|chip-btn|nav-btn|counter|meta|deck-name|btn)\b/;   // 어두운 페이지 바탕 위에 바로 놓이는 머리줄·단추
+  const INHERIT_FG = { '.toast.err': '#ffffff' };   // 자기 글자색 없이 바탕만 바꾸는 규칙이 물려받는 글자색
+  // 투명도(opacity)가 0~1 사이인 글자: 합성해서 검사할 짝(글자, 바탕)을 반드시 적어야 함. 애니메이션·상태(숨김 0·보임 1·끌기·꺼짐·svg)는 제외
+  const OP_EXEMPT = /dragging|\.tmp|\[disabled\]|:disabled|\.rv|\.link|\.ph-|\.node\.hub|\.on\b|\.show\b|\.diagram-canvas|\.tbl tr\.rv|\.node\.rv/;
+  const OP_CASES = { '.pe-tool kbd': V => [[V.ink, V.card], [[255, 255, 255], V.navy]], '.pe-lbl.ar': () => [[hexOf('#16222f'), [255, 255, 255]]] };
+  let seen = 0, opSeen = 0;
   for (const [name, c, surf] of [['편집', style, ['card', 'pane', 'paper']], ['발표', css, ['card', 'paper', 'stage-top']]]) {
     const all = rulesOf(c);
     for (const theme of ['dark', 'light']) {
-      const V = varsOf(c, theme), bad = [], bgOfSel = sel => { let t = sel.replace(/::?[\w-]+(\([^)]*\))?$/, ''); const toks = t.split(/\s+/); for (let n = toks.length; n >= 1; n--) { const pre = toks.slice(0, n).join(' '); const r = all.find(x => x.sel === pre && x.d.background); if (r) return colorsOf(r.d.background, V).filter(x => x.a >= 1); } return null; };
-      const check = (label, fg, bgs) => { for (const b of bgs) { const f = fg.a < 1 ? fg.rgb.map((x, i) => x * fg.a + b.rgb[i] * (1 - fg.a)) : fg.rgb, k = cr(f, b.rgb); seen.push(k); if (k < 4.5) bad.push(label + ' ' + fg.t + ' / ' + b.t + ' = ' + k.toFixed(2)); } };
+      const V = varsOf(c, theme), bad = [];
+      const bgRule = sel => { const toks = sel.replace(/::?[\w-]+(\([^)]*\))?$/, '').split(' '); for (let n = toks.length; n >= 1; n--) { const pre = toks.slice(0, n).join(' '), r = all.find(x => x.sel === pre && x.d.background); if (r) return r.d.background; } return null; };
+      const surfaces = (sel, own) => { const onDark = ON_DARK.test(sel), bg = own || bgRule(sel); let list; if (bg) list = colorsOf(bg, V); else list = onDark ? BODY.map(rgb => ({ rgb, a: 1, t: 'body' })) : surf.map(n => ({ rgb: V[n], a: 1, t: n })); const out = []; for (const b of list) { if (b.a < 1) for (const base of (onDark ? BODY : surf.map(n => V[n]))) out.push({ rgb: mix(b.rgb, b.a, base), t: b.t }); else out.push(b); } return out; };
+      const check = (label, f, bgs, opacity) => { for (const b of bgs) { const fg = f.a < 1 ? mix(f.rgb, f.a, b.rgb) : f.rgb, k = cr(opacity < 1 ? mix(fg, opacity, b.rgb) : fg, b.rgb); seen++; if (k < 4.5) bad.push(label + ' ' + f.t + ' / ' + b.t + ' = ' + k.toFixed(2)); } };
       for (const r of all) {
-        const { background: bg, color: fg } = r.d, sel = r.sel.replace(/\s+/g, ' ');
-        if (DECOR.test(sel) || ON_DARK_HEADER.test(sel)) continue;
-        if (bg && fg) { const B = colorsOf(bg, V).filter(x => x.a >= 1); for (const f of colorsOf(fg, V)) check(sel, f, B); }
-        else if (bg) { const f = INHERIT_FG[sel] ? { rgb: hexOf(INHERIT_FG[sel]), a: 1, t: INHERIT_FG[sel] } : { rgb: V.ink, a: 1, t: 'var(--ink)' }; const B = colorsOf(bg, V).filter(x => x.a >= 1); if (/\.(tbl tr\.hub td|slide-item|node \.box|cmp \.col|check|stage|panel|note|ph-notes|keyhint|picker|sheet|input|rep-row|add-slide|rep-add|mini-btn|pv-btn|rr-move|pe-tool|pe-pop|hintline|type-badge|toast|cover-motif)\b/.test(sel) || INHERIT_FG[sel]) check(sel, f, B); }
-        else if (fg) { const pre = bgOfSel(sel); for (const f of colorsOf(fg, V)) { if (f.a < 1 || !/var\(/.test(f.t)) continue; check(sel + ' (글)', f, pre || surf.map(n => ({ rgb: V[n], t: n }))); } }
+        const { background: bg, color: fg, opacity: op } = r.d, sel = r.sel;
+        const opv = op == null ? 1 : parseFloat(op);
+        if (opv > 0 && opv < 1 && !OP_EXEMPT.test(sel)) { assert.ok(OP_CASES[sel], name + ' 반투명(opacity:' + op + ') 글자 ' + sel + ' 는 시험에 합성 짝을 적어야 함'); for (const [f, b] of OP_CASES[sel](V)) { opSeen++; const k = cr(mix(f, opv, b), b); assert.ok(k >= 4.5, name + ' ' + theme + ' ' + sel + ' opacity ' + op + ' 합성 대비 ' + k.toFixed(2)); } }
+        if (DECOR.test(sel)) continue;
+        if (bg && fg) { const B = surfaces(sel, bg); for (const f of colorsOf(fg, V)) check(sel, f, B, 1); }
+        else if (bg) { if (INHERIT_FG[sel] || /\.(tbl tr\.hub td|slide-item|node \.box|cmp \.col|check|stage|panel|note|ph-notes|keyhint|picker|sheet|input|rep-row|add-slide|rep-add|mini-btn|pv-btn|rr-move|pe-tool|pe-pop|hintline|type-badge|toast|cover-motif)\b/.test(sel)) check(sel, INHERIT_FG[sel] ? { rgb: hexOf(INHERIT_FG[sel]), a: 1, t: INHERIT_FG[sel] } : { rgb: V.ink, a: 1, t: 'var(--ink)' }, surfaces(sel, bg), 1); }
+        else if (fg) { const B = surfaces(sel, null); for (const f of colorsOf(fg, V)) check(sel + ' (글)', f, B, 1); }
       }
       assert.deepEqual(bad, [], name + ' ' + theme + ' 대비 4.5 미만: ' + bad.join(' ; '));
     }
   }
-  assert.ok(seen.length > 150, '조합을 충분히 뽑았음: ' + seen.length);
-  // 알림: 일반·오류 모두 흰 글자, 오류 바탕은 밝은 --danger 가 아닌 진한 --danger-solid
+  assert.ok(seen > 250 && opSeen >= 6, '조합을 충분히 뽑았음: ' + seen + ' / 반투명 ' + opSeen);
+  // 표지·머리줄 글자: 투명도 없이 바로 지정하거나 합성해도 통과해야 함(위 검사에 포함) — 옛 값(.cover-motif opacity .9 · .meta .55 · placeholder #7f97ad)이 다시 생기지 않음
+  assert.ok(!/\.cover-motif span\{[^}]*opacity:/.test(css), '표지 모티프 글자에 opacity 없음'); assert.ok(!/\.empty \.big\{[^}]*opacity/.test(style));
+  assert.match(style, /\.deck-name::placeholder\{color:#c3d3e3;\}/); assert.match(style, /\.hub-bar select option\{color:var\(--ink\); background:var\(--card\);\}/, '선택 목록 글자·바탕을 같은 테마 색으로');
+  // 알림: 일반·오류 모두 흰 글자, 오류 바탕은 진한 --danger-solid
   assert.match(style, /\.toast\{[^}]*background:var\(--navy\); color:#fff/); assert.match(style, /\.toast\.err\{background:var\(--danger-solid\);\}/);
-  for (const theme of ['dark', 'light']) { const V = varsOf(style, theme); assert.ok(cr(hexOf('#ffffff'), V['danger-solid']) >= 4.5, theme + ' 오류 알림'); assert.ok(cr(hexOf('#ffffff'), V.navy) >= 4.5, theme + ' 일반 알림'); }
 });
