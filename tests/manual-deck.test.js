@@ -1416,6 +1416,8 @@ test('[Codex 3차 2회차-1] 모든 단추의 마우스 올림(hover)·포커스
   const has = (c, re, what) => assert.match(c, re, '규칙이 바뀌었는지 확인: ' + what);
   // 규칙이 시험이 가정한 색을 그대로 쓰는지(어긋나면 시험을 같이 고쳐야 함)
   has(style, /\.btn:hover\{background:rgba\(255,255,255,\.13\);\}/, '.btn:hover'); has(style, /\.btn\{[^}]*color:#dbe8f4/, '.btn 글자'); has(style, /\.btn\.primary\{[^}]*color:#241505/, '.btn.primary 글자'); has(style, /\.btn\.primary:hover\{filter:brightness\(1\.06\);\}/, '.btn.primary:hover');
+  has(style, /\.pe-tool kbd\{[^}]*color:var\(--gray\);/, '.pe-tool kbd 글자'); has(style, /\.pe-tool\.on kbd\{color:#dbe8f4;\}/, '.pe-tool.on kbd'); has(style, /\.slide-item\.dragging\{border-style:dashed; border-color:var\(--gold\); background:var\(--soft\);\}/, '.slide-item.dragging');
+  assert.ok(!/\.pe-tool kbd\{[^}]*opacity/.test(style) && !/\.slide-item\.dragging\{[^}]*opacity/.test(style), '도구 단추 kbd·끌기 중 목록 칸에 opacity 없음(합성하면 대비 미달)');
   has(style, /\.mini-btn:hover\{border-color:var\(--blue-line\); color:var\(--blue\);\}/, '.mini-btn:hover'); has(style, /\.mini-btn\{[^}]*background:var\(--card\)/, '.mini-btn 바탕'); has(style, /\.mini-btn\.danger:hover\{[^}]*color:var\(--danger\); background:var\(--danger-soft\);\}/, '.mini-btn.danger:hover');
   has(style, /\.add-slide:hover\{background:var\(--blue-soft\);/, '.add-slide:hover'); has(style, /\.rep-add:hover\{background:var\(--blue-soft\);/, '.rep-add:hover'); has(style, /\.picker button:hover\{background:var\(--blue-soft\);\}/, '.picker button:hover');
   has(style, /\.rep-row \.rr-del:hover\{color:var\(--danger\); background:var\(--danger-soft\);\}/, '.rr-del:hover'); has(style, /\.rr-move button:hover\{color:var\(--blue\);/, '.rr-move button:hover'); has(style, /\.pv-btn:hover\{border-color:var\(--blue\); color:var\(--blue\);\}/, '.pv-btn:hover'); has(style, /\.pe-tool:hover\{border-color:var\(--blue-line\); color:var\(--blue\);\}/, '.pe-tool:hover');
@@ -1430,6 +1432,7 @@ test('[Codex 3차 2회차-1] 모든 단추의 마우스 올림(hover)·포커스
     chk('.deck-name:focus 글자', hexOf('#eef5fc'), over(W, 0.1, bodyLightest));
     for (const end of ['#d99a3e', '#c07f24']) chk('.btn.primary:hover 글자(밝기 1.06배, ' + end + ')', hexOf('#241505'), hexOf(end).map(c => Math.min(255, Math.round(c * 1.06))));
     for (const [c, V, tag] of [[style, E, '편집']]) {
+      chk(tag + ' .pe-tool kbd(hover 때도 --gray 그대로)', V.gray, V.card); chk(tag + ' .pe-tool.on kbd', hexOf('#dbe8f4'), V.navy); chk(tag + ' .slide-item.dragging 글', V.ink, V.soft); chk(tag + ' .slide-item.dragging 종류 글', V.gray, V.soft);
       chk(tag + ' .mini-btn:hover', V.blue, V.card); chk(tag + ' .pv-btn/.rr-move/.pe-tool:hover', V.blue, V.card); chk(tag + ' .mini-btn.danger:hover', V.danger, V['danger-soft']);
       chk(tag + ' .add-slide/.rep-add:hover', V.blue, V['blue-soft']); chk(tag + ' .picker button:hover', V.ink, V['blue-soft']); chk(tag + ' .rr-del:hover', V.danger, V['danger-soft']);
       chk(tag + ' .sheet .close 기본', W, V.navy); chk(tag + ' .sheet .close:hover', W, V['close-hover']);
@@ -1471,8 +1474,8 @@ test('[Codex 3차 4회차] CSS 에서 「바탕 + 글자색」 조합을 전부 
   const ON_DARK = /^\.(controls|hub-fail|brand|topbar|hub-bar|top-actions|chip-btn|nav-btn|counter|meta|deck-name|btn)\b/;   // 어두운 페이지 바탕 위에 바로 놓이는 머리줄·단추
   const INHERIT_FG = { '.toast.err': '#ffffff' };   // 자기 글자색 없이 바탕만 바꾸는 규칙이 물려받는 글자색
   // 투명도(opacity)가 0~1 사이인 글자: 합성해서 검사할 짝(글자, 바탕)을 반드시 적어야 함. 애니메이션·상태(숨김 0·보임 1·끌기·꺼짐·svg)는 제외
-  const OP_EXEMPT = /dragging|\.tmp|\[disabled\]|:disabled|\.rv|\.link|\.ph-|\.node\.hub|\.on\b|\.show\b|\.diagram-canvas|\.tbl tr\.rv|\.node\.rv/;
-  const OP_CASES = { '.pe-tool kbd': V => [[V.ink, V.card], [[255, 255, 255], V.navy]], '.pe-lbl.ar': () => [[hexOf('#16222f'), [255, 255, 255]]] };
+  const OP_EXEMPT = /\.tmp|\[disabled\]|:disabled|\.rv|\.link|\.ph-|\.node\.hub|\.on\b|\.show\b|\.diagram-canvas|\.tbl tr\.rv|\.node\.rv/;
+  const OP_CASES = { '.pe-lbl.ar': () => [[hexOf('#16222f'), [255, 255, 255]]] };
   let seen = 0, opSeen = 0;
   for (const [name, c, surf] of [['편집', style, ['card', 'pane', 'paper']], ['발표', css, ['card', 'paper', 'stage-top']]]) {
     const all = rulesOf(c);
@@ -1493,7 +1496,7 @@ test('[Codex 3차 4회차] CSS 에서 「바탕 + 글자색」 조합을 전부 
       assert.deepEqual(bad, [], name + ' ' + theme + ' 대비 4.5 미만: ' + bad.join(' ; '));
     }
   }
-  assert.ok(seen > 250 && opSeen >= 6, '조합을 충분히 뽑았음: ' + seen + ' / 반투명 ' + opSeen);
+  assert.ok(seen > 250 && opSeen >= 2, '조합을 충분히 뽑았음: ' + seen + ' / 반투명 ' + opSeen);
   // 표지·머리줄 글자: 투명도 없이 바로 지정하거나 합성해도 통과해야 함(위 검사에 포함) — 옛 값(.cover-motif opacity .9 · .meta .55 · placeholder #7f97ad)이 다시 생기지 않음
   assert.ok(!/\.cover-motif span\{[^}]*opacity:/.test(css), '표지 모티프 글자에 opacity 없음'); assert.ok(!/\.empty \.big\{[^}]*opacity/.test(style));
   assert.match(style, /\.deck-name::placeholder\{color:#c3d3e3;\}/); assert.match(style, /\.hub-bar select option\{color:var\(--ink\); background:var\(--card\);\}/, '선택 목록 글자·바탕을 같은 테마 색으로');
