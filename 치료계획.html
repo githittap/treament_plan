@@ -3428,7 +3428,8 @@ function implantRecorderLineOf(r, addPeriodFn, measureOut){
     '경과관찰':'경과관찰.',
     '2nd op':'2nd op.'
   };
-  const meas = r.memoMeasure ? (measureOut || defaultMeasureOut)[r.memoMeasure] : '';
+  const measMap = measureOut || defaultMeasureOut;
+  const meas = r.memoMeasure ? (Object.prototype.hasOwnProperty.call(measMap, r.memoMeasure) ? measMap[r.memoMeasure] : (r.memoMeasure + '.')) : '';
   if(meas) line += ` ${meas}`;
   if(r.memoForce) line += ` (${r.memoForce})`;
   if(r.memoEtc) line += ` ${r.memoEtc}`;
@@ -3454,16 +3455,64 @@ const ImplantRecorder = (function(){
   let advance = null;  // 현재 단계의 진행 동작 (다음/추가)
   function onKey(e){
     if(modal.style.display==='none') return;
-    const inEtc = document.activeElement && document.activeElement.id==='irEtc';
+    const ae = document.activeElement;
+    const inEtc = ae && (ae.id==='irEtc' || ae.hasAttribute('data-add'));
     if(e.key==='Enter'){
+      if(e.isComposing) return;
       if(inEtc && advance){ e.preventDefault(); advance(); }  // 기타(자유입력) 칸에서만 Enter=등록
       return;
     }
     if(e.key===' ' && !inEtc){ e.preventDefault(); if(advance) advance(); }  // 그 외엔 Space=다음
   }
-  const IMPLANT_TYPES = ['EV','ST','DT','BD','EV mini','ST mini','BD nc'];
-  const IMPLANT_ACTIONS = ['발치','GBR','상악동거상'];
-  const IMPLANT_INSTALLS = ['베이스5.5','베이스4.5'];
+  // 선택 버튼 목록은 원장이 화면에서 추가·삭제(✎ 목록 편집) — 이 브라우저(localStorage)에 저장, 아래는 처음 기본값
+  const OPT_KEY = 'implantRecorderOpts_v1';
+  const OPT_DEFAULT = {
+    types:['EV','ST','DT','BD','EV mini','ST mini','BD nc'],
+    actions:['발치','GBR','상악동거상'],
+    installs:['베이스5.5','베이스4.5'],
+    months:['2.5','3','4','6'],
+    moreMonths:['5','7','8','9','6w','1'],
+    measures:['ISQ + SCAN','ISQ만 측정','경과관찰','2nd op','IST + SCAN'],
+    forces:['0N','5N','10N','20N','30N이상']
+  };
+  const MONTH_RE = /^([1-9]\d?(\.5)?|[1-9]\d?w)$/;
+  let OPT = JSON.parse(JSON.stringify(OPT_DEFAULT));
+  try{
+    const saved = JSON.parse(localStorage.getItem(OPT_KEY));
+    if(saved && typeof saved==='object') Object.keys(OPT_DEFAULT).forEach(k=>{ if(Array.isArray(saved[k])) OPT[k]=saved[k].filter(x=>typeof x==='string' && (!/months/i.test(k) || MONTH_RE.test(x))); });
+  }catch(e){}
+  function saveOpt(){ try{ localStorage.setItem(OPT_KEY, JSON.stringify(OPT)); }catch(e){} }
+  let editOpt = false;
+  const escA = s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  function monthLabel(v){ return v==='6w' ? '6주뒤' : v==='1' ? '한달뒤' : /w$/.test(v) ? v.replace('w','주뒤') : v+'M'; }
+  // key 목록을 버튼으로. 편집 중이면 각 버튼 옆 ✕와 맨 끝 추가 입력칸
+  function optBtns(key, attr, isSel, labelFn){
+    let h = OPT[key].map(v=>
+      `<button class="ir-btn${isSel(v)?' sel':''}" data-${attr}="${escA(v)}">${escA(labelFn?labelFn(v):v)}</button>`
+      + (editOpt?`<button class="ir-btn" data-rm="${key}" data-v="${escA(v)}" style="padding:2px 6px;margin-left:-4px;color:#c33;">✕</button>`:'')).join('');
+    if(editOpt && key!=='moreMonths') h += `<span style="white-space:nowrap;"><input class="ir-input" data-add="${key}" placeholder="${key==='months'?'예: 2.5 / 8 / 10w':'직접 추가'}" style="width:110px;display:inline-block;"><button class="ir-btn" data-addbtn="${key}">＋</button></span>`;
+    return h;
+  }
+  function editToggleHtml(){ return `<button class="ir-btn" id="irEditToggle" style="float:right;font-size:11px;">${editOpt?'✔ 편집 끝':'✎ 목록 편집'}</button>`; }
+  function wireOpt(){
+    const t = document.getElementById('irEditToggle');
+    const keepEtc = ()=>{ const e = document.getElementById('irEtc'); if(e) draft.memoEtc = e.value; };  // 목록 편집으로 다시 그려도 쓰던 기타 메모 유지
+    if(t) t.onclick = ()=>{ keepEtc(); editOpt=!editOpt; render(); };
+    body.querySelectorAll('[data-rm]').forEach(b=>{
+      b.onclick = ()=>{ keepEtc(); OPT[b.dataset.rm] = OPT[b.dataset.rm].filter(x=>x!==b.dataset.v); saveOpt(); render(); };
+    });
+    body.querySelectorAll('[data-addbtn]').forEach(b=>{
+      const k = b.dataset.addbtn;
+      const inp = body.querySelector(`[data-add="${k}"]`);
+      const add = ()=>{
+        const v = inp.value.trim();
+        if(!v || OPT[k].includes(v) || (k==='months' && !MONTH_RE.test(v))) return;
+        keepEtc(); OPT[k].push(v); saveOpt(); render();
+      };
+      b.onclick = add;
+      inp.onkeydown = e=>{ if(e.key==='Enter' && !e.isComposing){ e.preventDefault(); e.stopPropagation(); add(); } };
+    });
+  }
   const FDI_ROWS = [
     [18,17,16,15,14,13,12,11, 21,22,23,24,25,26,27,28],
     [48,47,46,45,44,43,42,41, 31,32,33,34,35,36,37,38]
@@ -3499,7 +3548,7 @@ const ImplantRecorder = (function(){
     return fmt(target);
   }
   function newDraft(){ return {date:todayStr(), type:null, teeth:[], months:null, memoMeasure:null, memoForce:null, memoEtc:''}; }
-  function goStep(n){ step = n; render(); }
+  function goStep(n){ const e = document.getElementById('irEtc'); if(e && draft) draft.memoEtc = e.value; step = n; render(); }
   function open(){ draft = newDraft(); editingIndex = null; step = 1; showMoreMonths = false; modal.style.display='flex'; document.addEventListener('keydown', onKey); render(); }
   function close(){ modal.style.display='none'; document.removeEventListener('keydown', onKey); }
   function render(){
@@ -3513,26 +3562,28 @@ const ImplantRecorder = (function(){
     body.innerHTML = `
       <div class="ir-section">
         <h4>1 / 5 · 식립 날짜</h4>
-        <input id="irDate" class="ir-input" type="text" value="${draft.date}" placeholder="YYYY-MM-DD">
+        <input id="irDate" class="ir-input" type="text" value="${escA(draft.date)}" placeholder="YYYY-MM-DD">
         <div style="font-size:11px;color:#888;margin-top:6px;">오늘 날짜가 자동 입력됩니다. 수정 후 Space 또는 다음.</div>
       </div>
       <div style="text-align:right;"><button class="ir-primary" id="irNext">다음 ▶</button></div>`;
     const inp = document.getElementById('irDate');
-    const next = ()=>{ draft.date = inp.value.trim(); goStep(2); };
+    const next = ()=>{
+      const v = inp.value.trim(), d = new Date(v + 'T00:00:00');
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(v) || isNaN(d) || fmt(d)!==v){ inp.style.outline='2px solid #ff6b6b'; inp.focus(); return; }  // 잘못된 날짜는 다음으로 안 넘어감
+      draft.date = v; goStep(2);
+    };
     advance = next;
     document.getElementById('irNext').onclick = next;
     inp.focus();
   }
   function renderType(){
-    const btns = IMPLANT_TYPES.map(t=>
-      `<button class="ir-btn${draft.type===t?' sel':''}" data-t="${t}">${t}</button>`).join('');
-    const actBtns = IMPLANT_ACTIONS.map(t=>
-      `<button class="ir-btn${draft.type===t?' sel':''}" data-t="${t}">${t}</button>`).join('');
-    const installBtns = IMPLANT_INSTALLS.map(t=>
-      `<button class="ir-btn${draft.type===t?' sel':''}" data-t="${t}">${t}</button>`).join('');
+    const isT = t=>draft.type===t;
+    const btns = optBtns('types','t',isT);
+    const actBtns = optBtns('actions','t',isT);
+    const installBtns = optBtns('installs','t',isT);
     body.innerHTML = `
       <div class="ir-section">
-        <h4>2 / 5 · 임플란트 종류</h4>
+        <h4>2 / 5 · 임플란트 종류${editToggleHtml()}</h4>
         <div>${btns}</div>
         <div style="font-size:12px;color:#666;margin:10px 0 4px;">행위</div>
         <div>${actBtns}</div>
@@ -3546,6 +3597,7 @@ const ImplantRecorder = (function(){
     body.querySelectorAll('[data-t]').forEach(b=>{
       b.onclick = ()=>{ draft.type = b.dataset.t; render(); };
     });
+    wireOpt();
     document.getElementById('irBack').onclick = ()=>goStep(1);
     advance = ()=>goStep(3);
     document.getElementById('irNext').onclick = advance;
@@ -3564,7 +3616,7 @@ const ImplantRecorder = (function(){
     });
     body.innerHTML = `
       <div class="ir-section">
-        <h4>3 / 5 · 치식 선택 (FDI) — ${draft.type}</h4>
+        <h4>3 / 5 · 치식 선택 (FDI) — ${escA(draft.type)}</h4>
         ${grid}
         <div style="font-size:12px;color:#555;margin-top:8px;">선택: <b>${draft.teeth.join(' ') || '없음'}</b></div>
       </div>
@@ -3585,19 +3637,17 @@ const ImplantRecorder = (function(){
     document.getElementById('irNext').onclick = advance;
   }
   function renderMonths(){
-    const baseItems = [{v:2.5,l:'2.5M'},{v:3,l:'3M'},{v:4,l:'4M'},{v:6,l:'6M'}];
-    const moreItems = [{v:5,l:'5M'},{v:7,l:'7M'},{v:8,l:'8M'},{v:9,l:'9M'},{v:'6w',l:'6주뒤'},{v:1,l:'한달뒤'}];
-    const mk = it=>`<button class="ir-btn${draft.months===it.v?' sel':''}" data-m="${it.v}">${it.l}</button>`;
-    let btns = baseItems.map(mk).join('');
-    if(showMoreMonths){
-      btns += moreItems.map(mk).join('');
+    const isM = v=>draft.months!=null && String(draft.months)===v;
+    let btns = optBtns('months','m',isM,monthLabel);
+    if(showMoreMonths || editOpt){
+      btns += optBtns('moreMonths','m',isM,monthLabel);
     } else {
       btns += `<button class="ir-btn" id="irMore">＋</button>`;
     }
     const isqDate = draft.months!=null ? addPeriod(draft.date, draft.months) : '';
     body.innerHTML = `
       <div class="ir-section">
-        <h4>4 / 5 · 경과 개월수</h4>
+        <h4>4 / 5 · 경과 개월수${editToggleHtml()}</h4>
         <div>${btns}</div>
         <div style="font-size:12px;color:#555;margin-top:8px;">ISQ&SCAN 예정일: <b>${isqDate||'—'}</b></div>
       </div>
@@ -3610,35 +3660,35 @@ const ImplantRecorder = (function(){
     });
     const moreBtn = document.getElementById('irMore');
     if(moreBtn) moreBtn.onclick = ()=>{ showMoreMonths = true; render(); };
+    wireOpt();
     document.getElementById('irBack').onclick = ()=>goStep(3);
     advance = ()=>goStep(5);
     document.getElementById('irNext').onclick = advance;
   }
   function renderMemo(){
-    const measures = ['ISQ + SCAN','ISQ만 측정','경과관찰','2nd op','IST + SCAN'];
-    const forces = ['0N','5N','10N','20N','30N이상'];
-    const mBtns = measures.map(v=>`<button class="ir-btn${draft.memoMeasure===v?' sel':''}" data-meas="${v}">${v}</button>`).join('');
-    const fBtns = forces.map(v=>`<button class="ir-btn${draft.memoForce===v?' sel':''}" data-force="${v}">${v}</button>`).join('');
+    const mBtns = optBtns('measures','meas',v=>draft.memoMeasure===v);
+    const fBtns = optBtns('forces','force',v=>draft.memoForce===v);
     body.innerHTML = `
       <div class="ir-section">
-        <h4>5 / 5 · 메모 (선택)</h4>
+        <h4>5 / 5 · 메모 (선택)${editToggleHtml()}</h4>
         <div style="font-size:12px;color:#666;margin:2px 0 4px;">측정</div>
         <div>${mBtns}</div>
         <div style="font-size:12px;color:#666;margin:10px 0 4px;">초기고정</div>
         <div>${fBtns}</div>
         <div style="font-size:12px;color:#666;margin:10px 0 4px;">기타</div>
-        <input id="irEtc" class="ir-input" type="text" value="${draft.memoEtc}" placeholder="자유 입력(선택)">
+        <input id="irEtc" class="ir-input" type="text" value="${escA(draft.memoEtc)}" placeholder="자유 입력(선택)">
       </div>
       <div style="display:flex;justify-content:space-between;">
         <button class="ir-btn" id="irBack">◀ 이전</button>
         <button class="ir-primary" id="irAdd">${editingIndex===null?'기록 추가 ✔':'수정 완료 ✔'}</button>
       </div>`;
     body.querySelectorAll('[data-meas]').forEach(b=>{
-      b.onclick = ()=>{ draft.memoMeasure = (draft.memoMeasure===b.dataset.meas?null:b.dataset.meas); render(); };
+      b.onclick = ()=>{ draft.memoEtc = document.getElementById('irEtc').value; draft.memoMeasure = (draft.memoMeasure===b.dataset.meas?null:b.dataset.meas); render(); };
     });
     body.querySelectorAll('[data-force]').forEach(b=>{
-      b.onclick = ()=>{ draft.memoForce = (draft.memoForce===b.dataset.force?null:b.dataset.force); render(); };
+      b.onclick = ()=>{ draft.memoEtc = document.getElementById('irEtc').value; draft.memoForce = (draft.memoForce===b.dataset.force?null:b.dataset.force); render(); };
     });
+    wireOpt();
     document.getElementById('irBack').onclick = ()=>goStep(4);
     const add = ()=>{
       draft.memoEtc = document.getElementById('irEtc').value.trim();
@@ -3660,7 +3710,7 @@ const ImplantRecorder = (function(){
   }
   function buildText(){ return records.map(lineOf).join('\n'); }
   function editPart(label, stepNo, index){
-    return `<button type="button" class="ir-edit-part" data-edit-index="${index}" data-edit-step="${stepNo}" style="background:none;border:0;padding:0;color:inherit;font:inherit;cursor:pointer;text-align:left;">${label}</button>`;
+    return `<button type="button" class="ir-edit-part" data-edit-index="${index}" data-edit-step="${stepNo}" style="background:none;border:0;padding:0;color:inherit;font:inherit;cursor:pointer;text-align:left;">${escA(label)}</button>`;
   }
   function recordHtml(r, index){
     let html = editPart(r.date, 1, index);
@@ -3675,7 +3725,7 @@ const ImplantRecorder = (function(){
       const period = addPeriod(r.date, r.months);
       if(period) html += ` > ${editPart(period, 4, index)}`;
     }
-    const meas = r.memoMeasure ? MEASURE_OUT[r.memoMeasure] : '';
+    const meas = r.memoMeasure ? (Object.prototype.hasOwnProperty.call(MEASURE_OUT, r.memoMeasure) ? MEASURE_OUT[r.memoMeasure] : (r.memoMeasure + '.')) : '';
     if(meas) html += ` ${editPart(meas, 5, index)}`;
     if(r.memoForce) html += ` ${editPart('('+r.memoForce+')', 5, index)}`;
     if(r.memoEtc) html += ` ${editPart(r.memoEtc, 5, index)}`;
@@ -3711,7 +3761,7 @@ const ImplantRecorder = (function(){
         draft = JSON.parse(JSON.stringify(records[index]));
         editingIndex = index;
         step = Number(b.dataset.editStep);
-        showMoreMonths = step===4 && ![2.5,3,4,6].includes(draft.months);
+        showMoreMonths = step===4 && OPT.moreMonths.includes(String(draft.months));
         render();
       };
     });

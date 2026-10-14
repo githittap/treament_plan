@@ -16,13 +16,13 @@ function loadTestHelpers() {
 }
 
 test('임플란트 행위와 장착 그룹에 새 선택값이 포함된다', () => {
-  assert.match(html, /const IMPLANT_ACTIONS = \['발치','GBR','상악동거상'\]/);
-  assert.match(html, /const IMPLANT_INSTALLS = \['베이스5\.5','베이스4\.5'\]/);
+  assert.match(html, /actions:\['발치','GBR','상악동거상'\]/);
+  assert.match(html, /installs:\['베이스5\.5','베이스4\.5'\]/);
   assert.match(html, /<div[^>]*>장착<\/div>/);
 });
 
 test('메모 측정에 IST + SCAN이 있고 최종 출력은 IST & SCAN.으로 보존된다', () => {
-  assert.match(html, /const measures = \['ISQ \+ SCAN','ISQ만 측정','경과관찰','2nd op','IST \+ SCAN'\]/);
+  assert.match(html, /measures:\['ISQ \+ SCAN','ISQ만 측정','경과관찰','2nd op','IST \+ SCAN'\]/);
   assert.match(html, /'IST \+ SCAN':'IST & SCAN\.'/);
 
   const { implantRecorderLineOf: lineOf } = loadTestHelpers();
@@ -36,6 +36,18 @@ test('메모 측정에 IST + SCAN이 있고 최종 출력은 IST & SCAN.으로 �
     memoEtc: ''
   }, () => '');
   assert.equal(line, '2026-09-19 (GBR #26) IST & SCAN.');
+});
+
+test('원장이 추가한 측정 항목은 이름 뒤에 마침표를 붙여 출력된다', () => {
+  const { implantRecorderLineOf: lineOf } = loadTestHelpers();
+  const line = lineOf({ date: '2026-10-13', type: 'EV', teeth: ['36'], months: null, memoMeasure: '파노', memoForce: null, memoEtc: '' }, () => '');
+  assert.equal(line, '2026-10-13 (EV #36) 파노.');
+});
+
+test('측정 항목 이름이 constructor 같아도 그대로 이름+마침표로 출력된다', () => {
+  const { implantRecorderLineOf: lineOf } = loadTestHelpers();
+  const line = lineOf({ date: '2026-10-13', type: null, teeth: [], months: null, memoMeasure: 'constructor', memoForce: null, memoEtc: '' }, () => '');
+  assert.equal(line, '2026-10-13 constructor.');
 });
 
 test('행위와 장착은 기존 단일 선택 기록 방식으로 출력된다', () => {
