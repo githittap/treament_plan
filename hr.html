@@ -4564,13 +4564,16 @@ async function renderOwnerBoards(m){
   const {data,error}=await sb.from('owner_boards').select('slug,sha256,synced_at');
   m.innerHTML=ownerBoardsPanelHtml(data,error);
 }
-function closeOwnerBoard(){const viewer=document.getElementById('ownerBoardViewer');if(viewer){viewer.replaceChildren();viewer.hidden=true;}}
+let ownerBoardOpenSeq=0;
+function closeOwnerBoard(){ownerBoardOpenSeq++;const viewer=document.getElementById('ownerBoardViewer');if(viewer){viewer.replaceChildren();viewer.hidden=true;}}
 async function openOwnerBoard(slug){
   if(ME.role!=='owner')return;
   const board=OWNER_BOARDS.find(item=>item.slug===slug);if(!board)return;
   const viewer=document.getElementById('ownerBoardViewer');if(!viewer)return;
+  const seq=++ownerBoardOpenSeq;
   viewer.hidden=false;viewer.innerHTML='<div class="empty">'+esc(h7T('ob.loading','판을 불러오는 중…'))+'</div>';
   const {data,error}=await sb.from('owner_boards').select('html,synced_at').eq('slug',board.slug).maybeSingle();
+  if(seq!==ownerBoardOpenSeq)return;
   if(error||!data){viewer.innerHTML=ownerBoardsMissing(error)?'<div class="hint">'+esc(h7T('ob.preparing','원장 보기판이 준비 중입니다.'))+'</div>':`<div class="cal-error">${esc(h7T('ob.view_err','판을 불러오지 못했습니다: {detail}',{detail:error?.message||h7T('ob.not_synced','아직 PC에서 올라오지 않음')}))}</div>`;return;}
   viewer.innerHTML=`<div class="owner-board-view-head"><div><strong>${esc(ownerBoardTexts(board).title)}</strong><div class="sub">${esc(h7T('ob.synced','마지막으로 올라온 때 {when}',{when:data.synced_at?ownerBoardsTimestamp(data.synced_at):h7T('ob.unknown_time','확인되지 않음')}))}</div><div class="sub">${esc(h7T('ob.png_note','PNG 저장은 PC 판에서만 됨 · 허브에서는 PDF 저장을 쓰세요'))}</div></div><button type="button" class="mini" onclick="closeOwnerBoard()">${esc(h7T('ob.btn_close','닫기'))}</button></div><div class="owner-board-frame-slot"></div>`;
   const frame=document.createElement('iframe');frame.setAttribute('sandbox','allow-scripts allow-downloads allow-modals');frame.setAttribute('referrerpolicy','no-referrer');frame.setAttribute('title',h7T('ob.frame_title','{title} 보기',{title:ownerBoardTexts(board).title}));frame.style.width='100%';frame.style.maxWidth='100%';frame.style.height='max(480px, calc(100vh - 140px))';frame.style.border='1px solid var(--line)';frame.style.borderRadius='8px';frame.style.background='#fff';frame.srcdoc=ownerBoardSrcdoc(ownerBoardHumanizeTimes(data.html));

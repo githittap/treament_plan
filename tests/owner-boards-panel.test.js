@@ -101,3 +101,9 @@ test('홈 모음판 자리는 원장에게만 만들고, 그 화면(m) 안에서
   assert.match(home,/m\.isConnected\?m\.querySelector\('#homeOwnerBoards'\):null/,'자기 화면 안에서만 찾음');
   assert.doesNotMatch(home,/getElementById\('homeOwnerBoards'\)/,'전역 검색 금지');
 });
+
+test('판을 빠르게 연달아 열어도 늦게 온 앞 판 응답이 마지막 선택을 덮지 않는다',()=>{
+  const code=html.match(/let ownerBoardOpenSeq=0;[\s\S]*?async function openOwnerBoard[\s\S]*?\n\}/)?.[0];
+  assert.ok(code);assert.match(code,/const seq=\+\+ownerBoardOpenSeq/);assert.match(code,/if\(seq!==ownerBoardOpenSeq\)return;/);
+  assert.match(code,/function closeOwnerBoard\(\)\{ownerBoardOpenSeq\+\+;/,'닫으면 늦은 응답도 버림');
+});
