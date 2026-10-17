@@ -37,14 +37,14 @@ test('원장이 아니면 원장 전용 문구만 보이고 표를 조회하지 
   for(const word of ['rules_map','codex_flow','AI 규칙 관계도','클로드→코덱스 브라우저 흐름'])assert.ok(!m.innerHTML.includes(word),'원장이 아니면 새 판 카드가 없음: '+word);
 });
 
-test('목록은 여섯 판과 마지막 올라온 때를 표시하고 HTML 본문은 조회하지 않는다',async()=>{
+test('목록은 아홉 판과 마지막 올라온 때를 표시하고 HTML 본문은 조회하지 않는다',async()=>{
   const h=panel({listResult:{data:[{slug:'busd_ledger',synced_at:'2026-09-30T01:02:00Z'},{slug:'pin_board',synced_at:null},{slug:'inbox',synced_at:'2026-10-02T12:49:00Z'},{slug:'rules_map',synced_at:'2026-10-08T01:00:00Z'},{slug:'codex_flow',synced_at:null}],error:null}}),m={innerHTML:''};await h.api.renderOwnerBoards(m);
   assert.deepEqual(h.calls,[{table:'owner_boards',select:'slug,sha256,synced_at'}]);
-  for(const title of ['📒 뻐스디 장부','📌 명심판','📖 박제 단어장','📥 인박스 경고','🧭 AI 규칙 관계도','🔀 클로드→코덱스 브라우저 흐름'])assert.ok(m.innerHTML.includes(title));
+  for(const title of ['📒 뻐스디 장부','📌 명심판','📖 박제 단어장','📥 인박스 경고','🧭 AI 규칙 관계도','🔀 클로드→코덱스 브라우저 흐름','🛠️ 학습 도구 사용법','🧑‍⚕️ 원장 종합판','🔤 신호어 모음'])assert.ok(m.innerHTML.includes(title));
   assert.ok(m.innerHTML.includes('마지막으로 올라온 때 '));assert.ok(m.innerHTML.includes('아직 PC에서 올라오지 않음'));
   assert.match(m.innerHTML,/data-owner-board="busd_ledger"/);assert.match(m.innerHTML,/data-owner-board="pin_board"/);assert.match(m.innerHTML,/data-owner-board="wordbook"/);assert.match(m.innerHTML,/data-owner-board="inbox"/);assert.match(m.innerHTML,/data-owner-board="rules_map"/);assert.match(m.innerHTML,/data-owner-board="codex_flow"/);
   assert.ok(m.innerHTML.includes('AI가 남긴 최근 경고·대기'));assert.ok(m.innerHTML.includes('마지막으로 올라온 때 2026.10.2 오후 9시 49분'),'인박스 판도 허브 시간 꼴');
-  assert.deepEqual(JSON.parse(JSON.stringify(h.api.OWNER_BOARDS.map(b=>b.slug))),['busd_ledger','pin_board','wordbook','inbox','rules_map','codex_flow'],'다섯째·여섯째(끝) 자리');
+  assert.deepEqual(JSON.parse(JSON.stringify(h.api.OWNER_BOARDS.map(b=>b.slug))),['busd_ledger','pin_board','wordbook','inbox','tool_guide','owner_summary','signal_words','rules_map','codex_flow'],'모음판 순서(메인 줄 → 그 밖 줄)');
   assert.ok(m.innerHTML.includes('AI 규칙·지침이 어떤 순서로 이기는지'));assert.ok(m.innerHTML.includes('클로드가 코덱스 브라우저에 일을 넘기는 길'));assert.ok(m.innerHTML.includes('마지막으로 올라온 때 2026.10.8 오전 10시'),'규칙 관계도 판도 허브 시간 꼴');
 });
 test('인박스 경고 판을 열면 같은 격리 iframe으로 보여 주고 제목·창 이름이 인박스 판이다',async()=>{

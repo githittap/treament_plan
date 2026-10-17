@@ -103,5 +103,29 @@ try{
   assert.deepEqual(await slugCheck(),["CHECK ((slug = ANY (ARRAY['busd_ledger'::text, 'pin_board'::text, 'wordbook'::text, 'inbox'::text])))"],'새 판 행이 없으면 넷째 판까지로 되돌림');
   assert.equal((await q('select count(*)::int n from public.owner_boards'))[0].n,3,'기존 판 자료는 그대로');
   await db.exec(rulesMigration);assert.equal((await slugCheck())[0].includes("'codex_flow'::text"),true,'되돌린 뒤 다시 적용 가능');
+  // 2026-10-17 모음판 일곱째~아홉째 판 tool_guide·owner_summary·signal_words: 여섯 판 표에는 owner_boards_more.sql을 돌려야 받는다.
+  const moreMigration=fs.readFileSync(path.join(root,'db/owner_boards_more.sql'),'utf8');
+  const moreRollback=fs.readFileSync(path.join(root,'db/owner_boards_more_rollback.sql'),'utf8');
+  assert.doesNotMatch(moreMigration,/(delete|drop table|truncate)/i,'제약 바꾸기만 — 자료 지우기 없음');
+  assert.doesNotMatch(moreRollback,/(delete|drop table|truncate)/i,'되돌리기도 행을 지우지 않음');
+  await db.exec(rulesMigration);
+  await db.exec('set role service_role;');
+  for(const slug of ['tool_guide','owner_summary','signal_words']){await assert.rejects(q(`select public.owner_board_put('${slug}','<html>x</html>','${hash}',null)`),/owner_boards_slug_check/,'여섯 판 표는 '+slug+'를 거절');await db.exec('rollback');}
+  await db.exec('reset role;');
+  await db.exec(moreMigration);await db.exec(moreMigration);
+  assert.equal((await slugCheck())[0].includes("'signal_words'::text"),true);
+  await db.exec('set role service_role;');
+  for(const slug of ['tool_guide','owner_summary','signal_words'])await q(`select public.owner_board_put('${slug}','<!doctype html><html>${slug}</html>','${hash}',now())`);
+  await assert.rejects(q(`select public.owner_board_put('other','<html>x</html>','${hash}',null)`),/owner_boards_slug_check/);await db.exec('rollback');
+  await db.exec('reset role;');
+  await setUser(owner);assert.equal((await q("select slug from public.owner_boards where slug in('tool_guide','owner_summary','signal_words')")).length,3,'원장은 새 세 판도 봄');
+  await setUser(staff);assert.equal((await q("select * from public.owner_boards where slug in('tool_guide','owner_summary','signal_words')")).length,0,'직원은 새 세 판을 못 봄');
+  await db.exec('reset role;');
+  await assert.rejects(db.exec(moreRollback),/남아 있어 되돌리기를 중단/);await db.exec('rollback');
+  assert.equal((await slugCheck())[0].includes("'signal_words'::text"),true,'중단되면 검사는 아홉 판 그대로');
+  await db.exec("delete from public.owner_boards where slug in('tool_guide','owner_summary','signal_words');");
+  await db.exec(moreRollback);
+  assert.equal((await slugCheck())[0].includes("'signal_words'::text"),false,'새 판 행이 없으면 여섯 판으로 되돌림');
+  await db.exec(moreMigration);assert.equal((await slugCheck())[0].includes("'signal_words'::text"),true,'되돌린 뒤 다시 적용 가능');
   console.log('PGLITE_OWNER_BOARDS_PASS');
 }finally{await db.close();}
