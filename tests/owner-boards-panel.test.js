@@ -124,3 +124,9 @@ test('판 안 #목차 링크는 기본 이동(허브 주소로 바뀜)을 막고
   ev=click('file:///C:/a.html');assert.equal(ev.prevented,false,'PC 파일 링크는 그대로');
   ev=click(null);assert.equal(ev.prevented,false,'링크 아닌 곳 클릭은 무시');
 });
+
+test('모음판 카드는 넓은 화면(1100px 이상)에서 한 줄 5장 — 메인 줄 5장이 한 줄에 들어가고 좁은 화면 규칙은 그대로',()=>{
+  assert.match(html,/@media\(min-width:1100px\)\{\.owner-board-grid\{grid-template-columns:repeat\(5,minmax\(0,1fr\)\)\}\}/);
+  assert.match(html,/@media\(max-width:640px\)\{\.owner-board-grid\{grid-template-columns:minmax\(0,1fr\)\}/);
+  assert.equal(JSON.parse(JSON.stringify(panel().api.OWNER_BOARDS)).filter(b=>!b.more).length,5,'메인 줄 5장');
+});
