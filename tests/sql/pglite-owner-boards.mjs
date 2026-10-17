@@ -106,8 +106,8 @@ try{
   // 2026-10-17 모음판 일곱째~아홉째 판 tool_guide·owner_summary·signal_words: 여섯 판 표에는 owner_boards_more.sql을 돌려야 받는다.
   const moreMigration=fs.readFileSync(path.join(root,'db/owner_boards_more.sql'),'utf8');
   const moreRollback=fs.readFileSync(path.join(root,'db/owner_boards_more_rollback.sql'),'utf8');
-  assert.doesNotMatch(moreMigration,/(delete|drop table|truncate)/i,'제약 바꾸기만 — 자료 지우기 없음');
-  assert.doesNotMatch(moreRollback,/(delete|drop table|truncate)/i,'되돌리기도 행을 지우지 않음');
+  assert.doesNotMatch(moreMigration,/\b(delete|drop table|truncate)\b/i,'제약 바꾸기만 — 자료 지우기 없음');
+  assert.doesNotMatch(moreRollback,/\b(delete|drop table|truncate)\b/i,'되돌리기도 행을 지우지 않음');
   await db.exec(rulesMigration);
   await db.exec('set role service_role;');
   for(const slug of ['tool_guide','owner_summary','signal_words']){await assert.rejects(q(`select public.owner_board_put('${slug}','<html>x</html>','${hash}',null)`),/owner_boards_slug_check/,'여섯 판 표는 '+slug+'를 거절');await db.exec('rollback');}

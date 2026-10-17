@@ -22,10 +22,17 @@ test('판 이름(slug) 목록이 Edge·화면(OWNER_BOARDS)·DB 검사(새로 �
   assert.deepEqual(checkList(read('db/owner_boards.sql')),four,'새로 만들 때 SQL은 넷째 판까지(그 뒤 rules.sql로 여섯 판)');
   assert.deepEqual(checkList(read('db/owner_boards_inbox.sql')),four);
   assert.deepEqual(checkList(read('db/owner_boards_inbox_rollback.sql')),four.filter(s=>s!=='inbox'));
-  for(const rb of [read('db/owner_boards_rules_rollback.sql'),read('db/owner_boards_more_rollback.sql')]){assert.match(rb,/raise exception/i,'새 판 행이 있으면 중단');assert.doesNotMatch(rb,/(delete|truncate|drop table)/i,'되돌리기 SQL은 행을 지우지 않음');}
+  for(const rb of [read('db/owner_boards_rules_rollback.sql'),read('db/owner_boards_more_rollback.sql')]){assert.match(rb,/raise exception/i,'새 판 행이 있으면 중단');assert.doesNotMatch(rb,/\b(delete|truncate|drop table)\b/i,'되돌리기 SQL은 행을 지우지 않음');}
 });
 test('최대 4MB UTF-8 HTML을 받고 NUL을 지운 뒤 저장 바이트를 계산한다',()=>{const r=parseOwnerBoardHtml(bytes('<!DOCTYPE HTML><html>가'+String.fromCharCode(0)+'나</html>'));assert.equal(r.ok,true);assert.equal(r.html,'<!DOCTYPE HTML><html>가나</html>');assert.equal(r.bytes,Buffer.byteLength(r.html));assert.equal(parseOwnerBoardHtml(bytes('<html>'+('x'.repeat(MAX_BODY_BYTES-13))+'</html>')).ok,true);assert.equal(parseOwnerBoardHtml(bytes('<html>'+('x'.repeat(MAX_BODY_BYTES))+'</html>')).error,'too_large');});
 test('잘못된 UTF-8, HTML이 아닌 본문, 4MB 초과를 거절한다',()=>{assert.equal(parseOwnerBoardHtml(Uint8Array.from([0x3c,0x68,0x74,0x6d,0x6c,0x3e,0xc3,0x28])).error,'invalid_utf8');assert.equal(parseOwnerBoardHtml(bytes('plain text')).error,'invalid_html');assert.equal(parseOwnerBoardHtml(new Uint8Array(MAX_BODY_BYTES+1)).error,'too_large');});
 test('HTML doctype 검사와 SHA-256은 정리된 문자열 기준이며 sha는 소문자 64자리다',async()=>{const r=parseOwnerBoardHtml(bytes('<!dOcTyPe html><p>한글</p>'));assert.equal(r.ok,true);const h=await sha256Hex(r.html);assert.match(h,/^[0-9a-f]{64}$/);assert.equal(sameHex(h,h.toUpperCase()),true);assert.equal(sameHex(h,'z'.repeat(64)),false);});
 test('X-Source-Mtime은 ISO 시각만 받으며 생략은 null로 둔다',()=>{assert.deepEqual(validSourceMtime(null),{ok:true,value:null});assert.equal(validSourceMtime('2026-09-30T02:00:00Z').ok,true);assert.equal(validSourceMtime('2026-02-30T02:00:00Z').ok,false);assert.equal(validSourceMtime('yesterday').ok,false);});
 test('Edge 함수는 POST·토큰 확인·본문 제한·RPC 저장 순서와 비밀 비기록 조건을 갖춘다',()=>{const edge=fs.readFileSync(path.join(process.cwd(),'supabase/functions/owner-board-sync/index.ts'),'utf8');assert.match(edge,/req\.method!=='POST'/);assert.match(edge,/token\.length<32\|\|token\.length>256/);assert.match(edge,/sameHex\(await sha256Hex\(token\),String\(secret\.value\)\)/);assert.match(edge,/reader\.cancel\(\)/);assert.match(edge,/parseOwnerBoardHtml/);assert.match(edge,/owner_board_put/);assert.match(edge,/verify_jwt:true/);assert.doesNotMatch(edge,/console\.(log|error)\s*\(/);});
+test('삭제 방지 시험의 정규식은 실제 삭제 구문을 잡고 시험 파일에 제어문자(백스페이스)가 없다',()=>{
+  const re=/\b(delete|truncate|drop table)\b/i;
+  for(const bad of ['delete from public.owner_boards','truncate public.owner_boards','drop table x'])assert.match(bad,re);
+  for(const f of ['tests/owner-board-sync.test.js','tests/sql/pglite-owner-boards.mjs'])assert.equal(fs.readFileSync(path.join(process.cwd(),f),'utf8').includes(String.fromCharCode(8)),false,f);
+  const rb=fs.readFileSync(path.join(process.cwd(),'db/owner_boards_more_rollback.sql'),'utf8').replace(/^--.*$/gm,'');
+  assert.doesNotMatch(rb,re,'되돌리기 SQL 본문(주석 뺀)에 삭제 구문 없음');
+});
