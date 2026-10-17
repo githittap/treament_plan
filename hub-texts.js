@@ -1920,6 +1920,7 @@ function hubTextDefsChapter7(add){
   add('aiu.ext_th_okfail',S4,'사용량 현황판 — 외부 AI 날짜별 표 머리: 성공 / 실패 칸','성공 / 실패');
   add('aiu.ext_th_money',S4,'사용량 현황판 — 외부 AI 날짜별 표 머리: 금액 칸','금액');
   add('aiu.ext_rows_empty',S4,'사용량 현황판 — 외부 AI 날짜별 기록이 하나도 없을 때','날짜별 기록이 없습니다.');
+  add('aiu.ext_paid',S4,'사용량 현황판 — 외부 AI 카드의 실제 결제(카드 문자) 줄. {month}는 월, {won}은 원 금액','💳 {month} 실제 결제 ₩{won}',['month','won']);
   add('aiu.ext_note',S4,'사용량 현황판 — 외부 AI 구역 맨 아래 작은 글. {since}는 금액 기록 시작일(코드에 고정)','금액은 {since}부터 기록합니다(그 전 날짜는 금액 기록 전). 청구액이 아니라 쓴 토큰을 정가로 환산한 값입니다.',['since']);
   add('aiu.sess_title',S4,'사용량 현황판 — 「Codex 대화 효율 점검」 구역 제목','🩺 Codex 대화 효율 점검');
   add('aiu.sess_sub',S4,'사용량 현황판 — 「대화 효율 점검」 제목 옆 작은 글','오늘 · 돈이 새는 대화');

@@ -73,3 +73,11 @@ test('외부 AI 스냅샷은 알려진 필드만 남기고, 최신 60일·ai 8�
 test('외부 AI SQL은 kind 허용 목록에 external_ai만 더하고 되돌림은 그 한 줄만 지우며 다른 객체를 건드리지 않는다',()=>{const sql=read('db/ai_usage_snapshots_external_ai.sql'),rollback=read('db/ai_usage_snapshots_external_ai_rollback.sql');assert.match(sql,/drop constraint if exists ai_usage_snapshots_kind_check/i);assert.match(sql,/add constraint ai_usage_snapshots_kind_check check\(kind in\('platform_cost','codex_sessions','external_ai'\)\)/i);assert.match(rollback,/delete from public\.ai_usage_snapshots where kind='external_ai'/i);assert.match(rollback,/add constraint ai_usage_snapshots_kind_check check\(kind in\('platform_cost','codex_sessions'\)\)/i);for(const s of [sql,rollback]){assert.doesNotMatch(s,/drop table|create policy|drop policy|grant |revoke |notice|storage\.|deposits|bucket/i);assert.match(s,/public\.ai_usage_snapshots/);}assert.equal(read('db/ai_usage_snapshots.sql').includes('external_ai'),false,'기존 마이그레이션은 고치지 않습니다.');});
 
 test('Edge Function은 external_ai kind를 스냅샷으로 받고 화면은 external_ai 스냅샷을 원장 확인 뒤 읽기만 한다',()=>{const edge=read('supabase/functions/ai-usage-sync/index.ts');assert.match(edge,/\['external_ai',validateExternalAi\]/);assert.match(edge,/validateExternalAi,validatePlatformCost/);const body=html.match(/async function renderAicost\(m\)\{[\s\S]*?\r?\n\}\r?\n/)?.[0];assert.match(body,/\.in\('kind',\['platform_cost','codex_sessions','external_ai'\]\)/);assert.match(body,/external:snap\.external_ai\|\|null,externalError:snapshotError\?snapshotError\.message:''/);assert.ok(body.indexOf("if(ME.role!=='owner')")<body.indexOf("'external_ai'"),'원장 확인 전에 조회합니다.');});
+
+test('외부 AI 카드는 이번 달 실제 결제(카드 문자)를 키미·딥시크·스텝5 카드에만 붙이고 0원·없는 AI에는 안 붙인다',()=>{
+  const h=helpers(),ext={fx:1500,generated:'g',totals:{kimi:{calls:35,ok:29,fail:6,costed_calls:2,krw:91},deepseek:{calls:1,ok:1,fail:0,costed_calls:1,krw:5},luna:{calls:1,ok:0,fail:1,costed_calls:0,krw:0}},days:{}};
+  const out=h.aiExternalSectionHtml({external:ext,error:'',paid:{Kimi:133489,DeepSeek:0,Claude:99999},paidMonth:'2026-10'});
+  assert.match(out,/data-ai-external-paid="kimi"[^>]*><b>💳 2026-10 실제 결제 ₩133,489<\/b>/);
+  assert.equal((out.match(/data-ai-external-paid=/g)||[]).length,1,'0원·매핑 없는 AI(deepseek 0원·luna)에는 줄 없음');
+  assert.doesNotMatch(h.aiExternalSectionHtml({external:ext,error:''}),/data-ai-external-paid/,'결제 값이 없으면 줄 없음(옛 화면 그대로)');
+});
