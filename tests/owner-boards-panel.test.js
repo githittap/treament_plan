@@ -1,5 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const root=path.join(__dirname,'..'),html=fs.readFileSync(path.join(root,'hr.html'),'utf8');
+/* 허브가 판 HTML에 끼우는 것(숨길 단추 style + 판 안 #목차 링크 script) — hr.html의 style 상수를 그대로 꺼내 씀 */
+const INJECT=(()=>{const m=html.match(/style='(<style>.*?<\\\/script>)';/);assert.ok(m,'주입 상수가 없습니다.');return vm.runInNewContext("'"+m[1]+"'");})();
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 function panel({role='owner',listResult={data:[],error:null},oneResult={data:null,error:null}}={}){
   const calls=[],slot={children:[],appendChild(node){this.children.push(node);}},viewer={hidden:true,innerHTML:'',replaceChildren(){this.children=[];this.cleared=true;},querySelector(selector){assert.equal(selector,'.owner-board-frame-slot');return slot;}};
@@ -72,13 +74,13 @@ test('owner_boards 표가 없으면 준비 중 안내로 처리한다',()=>{
 
 test('판 HTML은 정확한 격리 sandbox의 iframe srcdoc 속성으로만 보여 준다',async()=>{
   const htmlValue='<script>parent.secret="x"</script><p>판 본문</p>',h=panel({oneResult:{data:{html:htmlValue,synced_at:'2026-09-30T01:02:00Z'},error:null}});
-  await h.api.openOwnerBoard('busd_ledger');const frame=h.slot.children[0];assert.ok(frame);assert.equal(frame.attrs.sandbox,'allow-scripts allow-downloads allow-modals');assert.equal(frame.attrs.referrerpolicy,'no-referrer');assert.equal(frame.attrs.title,'📒 뻐스디 장부 보기');assert.equal(frame.srcdoc,'<style>#btn-png,button[onclick="savePdf()"],button[onclick="savePng()"]{display:none!important}</style>'+htmlValue);assert.match(h.viewer.innerHTML,/PNG 저장은 PC 판에서만 됨 · 허브에서는 PDF 저장을 쓰세요/);assert.equal(h.calls[0].select,'html,synced_at');assert.deepEqual(h.calls[0].eq,['slug','busd_ledger']);
+  await h.api.openOwnerBoard('busd_ledger');const frame=h.slot.children[0];assert.ok(frame);assert.equal(frame.attrs.sandbox,'allow-scripts allow-downloads allow-modals');assert.equal(frame.attrs.referrerpolicy,'no-referrer');assert.equal(frame.attrs.title,'📒 뻐스디 장부 보기');assert.equal(frame.srcdoc,INJECT+htmlValue);assert.match(h.viewer.innerHTML,/PNG 저장은 PC 판에서만 됨 · 허브에서는 PDF 저장을 쓰세요/);assert.equal(h.calls[0].select,'html,synced_at');assert.deepEqual(h.calls[0].eq,['slug','busd_ledger']);
   assert.doesNotMatch(frame.attrs.sandbox,/allow-same-origin|allow-top-navigation|allow-popups-to-escape-sandbox/);
   assert.doesNotMatch(html.match(/\/\* owner-boards:test-start \*\/[\s\S]*?\/\* owner-boards:test-end \*\//)[0],/localStorage|sessionStorage/);
 });
 
 test('PNG 숨김 style은 head·body·doctype 구조를 보존하며 한 번만 끼운다',()=>{
-  const {api}=panel(),style='<style>#btn-png,button[onclick="savePdf()"],button[onclick="savePng()"]{display:none!important}</style>';
+  const {api}=panel(),style=INJECT;
   const withHead='<!doctype html><html><head><title>x</title></head><body>내용</body></html>';
   assert.equal(api.ownerBoardSrcdoc(withHead),'<!doctype html><html><head><title>x</title>'+style+'</head><body>내용</body></html>');
   const withBody='<html><body class="x">내용</body></html>';
@@ -106,4 +108,19 @@ test('판을 빠르게 연달아 열어도 늦게 온 앞 판 응답이 마지�
   const code=html.match(/let ownerBoardOpenSeq=0;[\s\S]*?async function openOwnerBoard[\s\S]*?\n\}/)?.[0];
   assert.ok(code);assert.match(code,/const seq=\+\+ownerBoardOpenSeq/);assert.match(code,/if\(seq!==ownerBoardOpenSeq\)return;/);
   assert.match(code,/function closeOwnerBoard\(\)\{ownerBoardOpenSeq\+\+;/,'닫으면 늦은 응답도 버림');
+});
+
+test('판 안 #목차 링크는 기본 이동(허브 주소로 바뀜)을 막고 같은 판의 해당 id로만 스크롤한다',()=>{
+  assert.match(INJECT,/<style>#btn-png,button\[onclick="savePdf\(\)"\],button\[onclick="savePng\(\)"\]\{display:none!important\}<\/style>/);
+  const script=INJECT.match(/<script>([\s\S]*)<\/script>/)[1];let handler,scrolled=[];
+  const target={scrollIntoView(){scrolled.push('x');}};
+  const document={addEventListener(type,fn){assert.equal(type,'click');handler=fn;},getElementById:id=>id==='easy'||id==='쉽게'?target:null};
+  vm.runInNewContext(script,{document,decodeURIComponent});assert.equal(typeof handler,'function');
+  const click=href=>{const ev={prevented:false,preventDefault(){this.prevented=true;},target:{closest:()=>href==null?null:{getAttribute:()=>href}}};handler(ev);return ev;};
+  let ev=click('#easy');assert.equal(ev.prevented,true);assert.equal(scrolled.length,1);
+  ev=click('#%EC%89%BD%EA%B2%8C');assert.equal(ev.prevented,true);assert.equal(scrolled.length,2,'한글 id도 이동');
+  ev=click('#none');assert.equal(ev.prevented,true,'없는 id도 허브 주소로 새지 않게 막음');assert.equal(scrolled.length,2);
+  ev=click('https://example.com/x');assert.equal(ev.prevented,false,'바깥 링크는 그대로');
+  ev=click('file:///C:/a.html');assert.equal(ev.prevented,false,'PC 파일 링크는 그대로');
+  ev=click(null);assert.equal(ev.prevented,false,'링크 아닌 곳 클릭은 무시');
 });
