@@ -94,3 +94,10 @@ test('표가 없거나 판 행이 없으면 조회 실패 없이 준비·미등�
 });
 
 test('닫기는 보기 영역을 비우고 숨긴다',()=>{const h=panel();h.viewer.hidden=false;h.api.closeOwnerBoard();assert.equal(h.viewer.hidden,true);assert.equal(h.viewer.cleared,true);});
+
+test('홈 모음판 자리는 원장에게만 만들고, 그 화면(m) 안에서만 찾아 옛 홈 응답이 새 홈을 건드리지 못한다',()=>{
+  const home=html.slice(html.indexOf('async function renderHome(m){'),html.indexOf('/* ── 입금 ── */'));
+  assert.match(home,/\$\{ME\.role==='owner'\?'<div id="homeOwnerBoards"><\/div>':''\}/,'원장에게만 자리');
+  assert.match(home,/m\.isConnected\?m\.querySelector\('#homeOwnerBoards'\):null/,'자기 화면 안에서만 찾음');
+  assert.doesNotMatch(home,/getElementById\('homeOwnerBoards'\)/,'전역 검색 금지');
+});

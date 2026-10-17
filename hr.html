@@ -1172,7 +1172,7 @@ async function renderHome(m){
   ${MY_PAYSLIPS.length?`<div class="card"><h2>${esc(hubT('home.slip_title','💰 내 명세서'))}</h2>${MY_PAYSLIPS.map(s=>`<div class="rowflex" style="justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line)"><span>${esc(s.month)}</span><button class="mini" onclick="openMyPayslip(${s.id})">${esc(hubT('home.slip_btn','보기'))}</button></div>`).join('')}</div>`:''}
   ${typeof wageHourlyHome==='function'?await wageHourlyHome():''}${homeInboxCard}
   ${canManageConsultation()?'<div class="card" style="padding:12px 14px"><div class="rowflex" style="justify-content:space-between;align-items:center;gap:10px"><div><h2 style="margin-bottom:3px">'+esc(hubT('home.consult_title','🗂 상담일지'))+'</h2><div class="hint">매니저·실장·원장만 상담 기록을 입력·조회·수정합니다.</div></div><button class="mini" onclick="go(\'consult\')">상담일지 열기</button></div></div>':''}`);
-  if(ME.role==='owner'){const slot=document.getElementById('homeOwnerBoards');if(slot)await renderOwnerBoards(slot);}
+  if(ME.role==='owner'){const slot=m.isConnected?m.querySelector('#homeOwnerBoards'):null;if(slot)await renderOwnerBoards(slot);}
   refreshBadges();
 }
 
