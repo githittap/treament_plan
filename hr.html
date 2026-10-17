@@ -4523,7 +4523,7 @@ function h7N(k,d){return typeof hubN==='function'?hubN(k,d):d;}
 function h7L(k,obj){const def=Object.keys(obj).map(function(c){return {code:c,label:obj[c]};});const items=typeof hubList==='function'?hubList(k,def):def;const m={};items.forEach(function(i){m[i.code]=i.label;});return m;}
 const OWNER_BOARD_TAB={key:'ownerboards',label:'📒 원장 보기판',roles:['owner']};
 function ownerBoardSrcdoc(html){
-  const source=String(html||''),style='<style>#btn-png{display:none!important}</style>';
+  const source=String(html||''),style='<style>#btn-png,button[onclick="savePdf()"],button[onclick="savePng()"]{display:none!important}</style>';
   if(/<\/head\s*>/i.test(source))return source.replace(/<\/head\s*>/i,style+'$&');
   if(/<body(?:\s[^>]*)?>/i.test(source))return source.replace(/<body(?:\s[^>]*)?>/i,tag=>tag+style);
   if(/^\s*<!doctype html\b[^>]*>/i.test(source))return source.replace(/^(\s*<!doctype html\b[^>]*>)/i,tag=>tag+style);

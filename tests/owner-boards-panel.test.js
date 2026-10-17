@@ -72,13 +72,13 @@ test('owner_boards 표가 없으면 준비 중 안내로 처리한다',()=>{
 
 test('판 HTML은 정확한 격리 sandbox의 iframe srcdoc 속성으로만 보여 준다',async()=>{
   const htmlValue='<script>parent.secret="x"</script><p>판 본문</p>',h=panel({oneResult:{data:{html:htmlValue,synced_at:'2026-09-30T01:02:00Z'},error:null}});
-  await h.api.openOwnerBoard('busd_ledger');const frame=h.slot.children[0];assert.ok(frame);assert.equal(frame.attrs.sandbox,'allow-scripts allow-downloads allow-modals');assert.equal(frame.attrs.referrerpolicy,'no-referrer');assert.equal(frame.attrs.title,'📒 뻐스디 장부 보기');assert.equal(frame.srcdoc,'<style>#btn-png{display:none!important}</style>'+htmlValue);assert.match(h.viewer.innerHTML,/PNG 저장은 PC 판에서만 됨 · 허브에서는 PDF 저장을 쓰세요/);assert.equal(h.calls[0].select,'html,synced_at');assert.deepEqual(h.calls[0].eq,['slug','busd_ledger']);
+  await h.api.openOwnerBoard('busd_ledger');const frame=h.slot.children[0];assert.ok(frame);assert.equal(frame.attrs.sandbox,'allow-scripts allow-downloads allow-modals');assert.equal(frame.attrs.referrerpolicy,'no-referrer');assert.equal(frame.attrs.title,'📒 뻐스디 장부 보기');assert.equal(frame.srcdoc,'<style>#btn-png,button[onclick="savePdf()"],button[onclick="savePng()"]{display:none!important}</style>'+htmlValue);assert.match(h.viewer.innerHTML,/PNG 저장은 PC 판에서만 됨 · 허브에서는 PDF 저장을 쓰세요/);assert.equal(h.calls[0].select,'html,synced_at');assert.deepEqual(h.calls[0].eq,['slug','busd_ledger']);
   assert.doesNotMatch(frame.attrs.sandbox,/allow-same-origin|allow-top-navigation|allow-popups-to-escape-sandbox/);
   assert.doesNotMatch(html.match(/\/\* owner-boards:test-start \*\/[\s\S]*?\/\* owner-boards:test-end \*\//)[0],/localStorage|sessionStorage/);
 });
 
 test('PNG 숨김 style은 head·body·doctype 구조를 보존하며 한 번만 끼운다',()=>{
-  const {api}=panel(),style='<style>#btn-png{display:none!important}</style>';
+  const {api}=panel(),style='<style>#btn-png,button[onclick="savePdf()"],button[onclick="savePng()"]{display:none!important}</style>';
   const withHead='<!doctype html><html><head><title>x</title></head><body>내용</body></html>';
   assert.equal(api.ownerBoardSrcdoc(withHead),'<!doctype html><html><head><title>x</title>'+style+'</head><body>내용</body></html>');
   const withBody='<html><body class="x">내용</body></html>';
