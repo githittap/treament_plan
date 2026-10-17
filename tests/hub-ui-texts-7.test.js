@@ -12,7 +12,7 @@ const {renderAll}=require('./fixtures/hub7-harness.cjs');
 const golden=Object.assign(JSON.parse(read('tests/fixtures/hub7-golden-f95b951.json')),JSON.parse(read('tests/fixtures/billing-monthly-golden.json')),JSON.parse(read('tests/fixtures/ai-cost-display-golden.json')));
 const clone=x=>JSON.parse(JSON.stringify(x));
 const CH7=/^(home|dep|cf|aic|mkt|aiu|ob|pay|slip|acct|jg|save|payreq|empdoc)\./;
-const COUNT=329+2-1+2+4-1; // 기존 글 + 인박스 판 글 2 - 원문 열 이름 1(화면에서 숨겼음) + 루커 단추 글·주소 2(10-08) + 다섯째·여섯째 판(AI 규칙 관계도·클로드→코덱스 브라우저 흐름) 글 4(10-08).
+const COUNT=329+2-1+2+4-1+1; // 기존 글 + 인박스 판 글 2 - 원문 열 이름 1(화면에서 숨겼음) + 루커 단추 글·주소 2(10-08) + 다섯째·여섯째 판(AI 규칙 관계도·클로드→코덱스 브라우저 흐름) 글 4(10-08).
 /* 2026-10-02 원장 보기판에 넷째 판(📥 인박스 경고)을 더함 — 옛 화면(f95b951)과의 차이는 기본 글 카드 한 장뿐이어야 한다.
    옛 화면 대조는 그 카드(그대로·JSON 한 번·두 번 감싼 꼴)만 빼고 글자 하나까지 같은지 본다. 카드가 실제로 붙는지는 아래 따로 시험. */
 const INBOX_CARD='<button type="button" class="card owner-board-card" data-owner-board="inbox" onclick="openOwnerBoard(\'inbox\')"><strong>📥 인박스 경고</strong><span>AI가 남긴 최근 경고·대기</span><small>아직 PC에서 올라오지 않음</small></button>';
@@ -25,7 +25,13 @@ const FLOW_CARD=boardCard('codex_flow','🔀 클로드→코덱스 브라우저 
 const LOOKER_URL='https://datastudio.google.com/reporting/9c7dbbdd-aace-474d-9a7f-3e71bb663f7c';
 const LOOKER_BTN='<div class="rowflex" style="margin:4px 0 10px"><a class="hbtn pri" style="text-decoration:none;display:inline-block" id="ownerLookerBtn" href="'+LOOKER_URL+'" target="_blank" rel="noopener noreferrer">📊 루커 분석 열기</a></div>';
 const INBOX_FORMS=[INBOX_CARD,esc1(INBOX_CARD),esc1(esc1(INBOX_CARD)),RULES_CARD,esc1(RULES_CARD),esc1(esc1(RULES_CARD)),FLOW_CARD,esc1(FLOW_CARD),esc1(esc1(FLOW_CARD)),LOOKER_BTN,esc1(LOOKER_BTN),esc1(esc1(LOOKER_BTN))];
-const dropInbox=out=>Object.fromEntries(Object.entries(out).map(([k,v])=>[k,typeof v==='string'&&k.startsWith('ob.')?INBOX_FORMS.reduce((s,f)=>s.split(f).join(''),v):v]));
+/* 2026-10-17 모음판: 제목 「🗂️ 모음판」 · 둘째 줄 소제목(그 밖에 자주 보는 것) — 옛 화면 대조에서는 옛 제목으로 되돌리고 소제목 칸 사이를 이어 붙인다. */
+const MORE_SPLICE='</div><h3 class="sub" style="margin:16px 0 0">그 밖에 자주 보는 것</h3><div class="owner-board-grid">';
+const oldLook=s=>[MORE_SPLICE,esc1(MORE_SPLICE),esc1(esc1(MORE_SPLICE))].reduce((t,f)=>t.split(f).join(''),s).split('🗂️ 모음판').join('📒 원장 보기판');
+/* 홈(원장)에 모음판 자리 한 칸 — 옛 화면 대조에서는 그 칸만 뺀다. */
+const HOME_SLOT='<div id="homeOwnerBoards"></div>';
+const dropSlot=v=>[HOME_SLOT,esc1(HOME_SLOT),esc1(esc1(HOME_SLOT))].reduce((s,f)=>s.split(f).join(''),v);
+const dropInbox=out=>Object.fromEntries(Object.entries(out).map(([k,v])=>[k,typeof v==='string'&&k.startsWith('ob.')?oldLook(INBOX_FORMS.reduce((s,f)=>s.split(f).join(''),v)):typeof v==='string'&&k==='home.owner'?dropSlot(v):v]));
 const NUM_KEYS=['home.payslip_limit','dep.list_limit','aic.history_months','aic.auto_limit','aiu.model_days','aiu.cost_months','aiu.external_days','aiu.session_limit'];
 const LIST_KEYS=['list.approval_status','list.contract_status','list.pay_wage_types','list.marketing_categories','list.ai_billing_platforms','list.ai_cost_platforms','list.ai_external_names'];
 const sha=s=>crypto.createHash('sha256').update(s).digest('hex');
@@ -160,12 +166,12 @@ test('원장 보기판 넷째~여섯째 판(📥 인박스 경고 · 🧭 AI 규
     assert.equal(p.split(INBOX_CARD).length-1,1,'판 목록마다 인박스 카드 한 장');
     assert.equal(p.split(RULES_CARD).length-1,1,'판 목록마다 규칙 관계도 카드 한 장');
     assert.equal(p.split(FLOW_CARD).length-1,1,'판 목록마다 코덱스 흐름 카드 한 장');
-    assert.ok(p.includes(INBOX_CARD+RULES_CARD+FLOW_CARD+'</div><div id="ownerBoardViewer" hidden></div>'),'네 판 다음 다섯째·여섯째(목록 끝)');
+    assert.ok(p.includes(INBOX_CARD+MORE_SPLICE+RULES_CARD+FLOW_CARD+'</div><div id="ownerBoardViewer" hidden></div>'),'네 판 다음 다섯째·여섯째(목록 끝)');
   }
   for(const k of ['ob.render.owner','ob.render.owner_missing','ob.render.owner_err'])for(const c of [INBOX_CARD,RULES_CARD,FLOW_CARD])assert.equal(out[k].split(esc1(c)).length-1,1,k+' 원장 화면에 한 장');
   for(const w of ['inbox','rules_map','codex_flow','AI 규칙 관계도','코덱스 브라우저 흐름'])assert.ok(!out['ob.render.nonowner'].includes(w),'원장이 아니면 카드 없음: '+w);
   const changed=Object.keys(golden).filter(k=>out[k]!==golden[k]).sort();
-  assert.deepEqual(changed,['ob.panel','ob.render.owner','ob.render.owner_err','ob.render.owner_missing'],'카드가 붙는 곳 말고는 그대로');
+  assert.deepEqual(changed,['home.owner','ob.panel','ob.render.owner','ob.render.owner_err','ob.render.owner_missing'],'카드가 붙는 곳 말고는 그대로');
 });
 test('원장 보기판 루커 단추: 원장 화면 맨 위에 새 창 단추 한 개 · 원장 아니면 없음 · 글·주소는 글 고치기 값 · https 아닌 주소면 숨김',async()=>{
   const base=await renderAll(hr,{engine:false});
