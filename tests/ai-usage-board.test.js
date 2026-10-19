@@ -95,8 +95,8 @@ test('Edge 외부 AI 스냅샷은 balances를 USD·CNY·숫자만 남기고 다�
   const {validateExternalAi}=await import('../supabase/functions/ai-usage-sync/payload.mjs');
   const b={fx:1500,generated:'g',days:{},totals:{kimi:{calls:1,ok:1,fail:0,tin:0,tout:0,krw:0,costed_calls:0}},balances:{kimi:{currency:'USD',available:48.36414,voucher:0,cash:-2.5,at:'2026-10-20 00:44',extra:'drop'},bad:{currency:'EUR',available:1},'Bad Key':{currency:'USD',available:1},str:{currency:'USD',available:'9'}}};
   const r=validateExternalAi(b);assert.equal(r.ok,true);
-  assert.deepEqual(Object.keys(r.value.balances).sort(),['kimi','str']);
+  assert.deepEqual(Object.keys(r.value.balances),['kimi'],'available이 숫자가 아니면(문자열·null·true·누락·음수·NaN) 항목을 버림 — 0으로 바꿔 보이지 않음');
   assert.deepEqual(r.value.balances.kimi,{currency:'USD',available:48.36414,voucher:0,cash:-2.5,at:'2026-10-20 00:44'});
-  assert.equal(r.value.balances.str.available,0,'숫자가 아니면 0');
+  for(const bad of ['9',null,true,undefined,-1,NaN,Infinity,1e10])assert.equal('balances' in validateExternalAi({...b,balances:{kimi:{currency:'USD',available:bad}}}).value,false,'비정상 available: '+String(bad));
   assert.equal('balances' in validateExternalAi({...b,balances:undefined}).value,false,'balances 없으면 필드도 없음');
 });
