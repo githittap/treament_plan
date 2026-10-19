@@ -80,6 +80,9 @@ export function validateExternalAi(b){
   const totals=Object.create(null);
   if(plain(b.totals))for(const [k,a] of Object.entries(b.totals).slice(0,MAX_EXT_AIS))if(EXT_AI.test(k)&&plain(a))totals[k]=extEntry(a,false);
   if(!Object.keys(days).length&&!Object.keys(totals).length)return bad('invalid_external');
-  return sized({generated:text(b.generated,32),fx:Math.round(b.fx*1e6)/1e6,days,totals});
+  // 잔액(키미 등): 통화는 USD·CNY만, 금액은 숫자만. cash는 음수(미납)도 허용.
+  const balances=Object.create(null);
+  if(plain(b.balances))for(const [k,a] of Object.entries(b.balances).slice(0,MAX_EXT_AIS))if(EXT_AI.test(k)&&plain(a)&&(a.currency==='USD'||a.currency==='CNY'))balances[k]={currency:a.currency,available:amount(a.available,1e9),voucher:amount(a.voucher,1e9),cash:typeof a.cash==='number'&&Number.isFinite(a.cash)&&Math.abs(a.cash)<=1e9?Math.round(a.cash*1e6)/1e6:0,at:text(a.at,32)};
+  return sized({generated:text(b.generated,32),fx:Math.round(b.fx*1e6)/1e6,days,totals,...(Object.keys(balances).length?{balances}:{})});
 }
 export function sameHex(a,b){a=String(a||'').toLowerCase();b=String(b||'').toLowerCase();if(!a||a.length!==b.length||!HEX.test(a)||!HEX.test(b))return false;let diff=0;for(let i=0;i<a.length;i++)diff|=a.charCodeAt(i)^b.charCodeAt(i);return diff===0;}

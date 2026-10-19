@@ -12,7 +12,7 @@ const {renderAll}=require('./fixtures/hub7-harness.cjs');
 const golden=Object.assign(JSON.parse(read('tests/fixtures/hub7-golden-f95b951.json')),JSON.parse(read('tests/fixtures/billing-monthly-golden.json')),JSON.parse(read('tests/fixtures/ai-cost-display-golden.json')));
 const clone=x=>JSON.parse(JSON.stringify(x));
 const CH7=/^(home|dep|cf|aic|mkt|aiu|ob|pay|slip|acct|jg|save|payreq|empdoc)\./;
-const COUNT=329+2-1+2+4-1+1+6+1; // 기존 글 + 인박스 판 글 2 - 원문 열 이름 1(화면에서 숨겼음) + 루커 단추 글·주소 2(10-08) + 다섯째·여섯째 판(AI 규칙 관계도·클로드→코덱스 브라우저 흐름) 글 4(10-08).
+const COUNT=329+2-1+2+4-1+1+6+1+1; // 기존 글 + 인박스 판 글 2 - 원문 열 이름 1(화면에서 숨겼음) + 루커 단추 글·주소 2(10-08) + 다섯째·여섯째 판(AI 규칙 관계도·클로드→코덱스 브라우저 흐름) 글 4(10-08).
 /* 2026-10-02 원장 보기판에 넷째 판(📥 인박스 경고)을 더함 — 옛 화면(f95b951)과의 차이는 기본 글 카드 한 장뿐이어야 한다.
    옛 화면 대조는 그 카드(그대로·JSON 한 번·두 번 감싼 꼴)만 빼고 글자 하나까지 같은지 본다. 카드가 실제로 붙는지는 아래 따로 시험. */
 const INBOX_CARD='<button type="button" class="card owner-board-card" data-owner-board="inbox" onclick="openOwnerBoard(\'inbox\')"><strong>📥 인박스 경고</strong><span>AI가 남긴 최근 경고·대기</span><small>아직 PC에서 올라오지 않음</small></button>';
@@ -36,8 +36,9 @@ const oldLook=s=>[MORE_SPLICE,esc1(MORE_SPLICE),esc1(esc1(MORE_SPLICE))].reduce(
 const HOME_SLOT='<div id="homeOwnerBoards"></div>';
 const dropSlot=v=>[HOME_SLOT,esc1(HOME_SLOT),esc1(esc1(HOME_SLOT))].reduce((s,f)=>s.split(f).join(''),v);
 /* 2026-10-17 외부 AI 카드에 「💳 이번 달 실제 결제」 줄(카드 문자 합계)을 더함 — 옛 화면 대조에서는 그 줄만 뺀다. */
+const BAL_LINE=/<div style=(\\*)"margin-top:4px\1" data-ai-external-balance=.*?<\/div>/g;
 const PAID_LINE=/<div style=(\\*)"margin-top:4px\1" data-ai-external-paid=.*?<\/b><\/div>/g;
-const dropInbox=out=>Object.fromEntries(Object.entries(out).map(([k,v])=>[k,typeof v==='string'&&k==='aiu.panels'?v.replace(PAID_LINE,''):typeof v==='string'&&k.startsWith('ob.')?oldLook(INBOX_FORMS.reduce((s,f)=>s.split(f).join(''),v)):typeof v==='string'&&k==='home.owner'?dropSlot(v):v]));
+const dropInbox=out=>Object.fromEntries(Object.entries(out).map(([k,v])=>[k,typeof v==='string'&&k==='aiu.panels'?v.replace(PAID_LINE,'').replace(BAL_LINE,''):typeof v==='string'&&k.startsWith('ob.')?oldLook(INBOX_FORMS.reduce((s,f)=>s.split(f).join(''),v)):typeof v==='string'&&k==='home.owner'?dropSlot(v):v]));
 const NUM_KEYS=['home.payslip_limit','dep.list_limit','aic.history_months','aic.auto_limit','aiu.model_days','aiu.cost_months','aiu.external_days','aiu.session_limit'];
 const LIST_KEYS=['list.approval_status','list.contract_status','list.pay_wage_types','list.marketing_categories','list.ai_billing_platforms','list.ai_cost_platforms','list.ai_external_names'];
 const sha=s=>crypto.createHash('sha256').update(s).digest('hex');

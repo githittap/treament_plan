@@ -298,7 +298,7 @@ async function renderAll(html,opts){
     const noAstra=r.api.aiUsageSummary([USAGE_ROWS[0]],win.start,win.end);
     const P=(a)=>r.api.aiUsagePanelHtml(Object.assign({start:win.start,end:win.end,error:''},a));
     out['aiu.panels']=jj([
-      P({summary:sum,cost:SNAP_COST,external:SNAP_EXT,sessions:SNAP_SESS,paid:{DeepSeek:5000,Kimi:0},paidMonth:'2026-10'}),P({summary:empty}),P({summary:noAstra,cost:null,external:null,sessions:null}),
+      P({summary:sum,cost:SNAP_COST,external:Object.assign({},SNAP_EXT,{balances:{deepseek:{currency:'USD',available:12.5,voucher:0,cash:12.5,at:'2026-10-20 00:00'}}}),sessions:SNAP_SESS,paid:{DeepSeek:5000,Kimi:0},paidMonth:'2026-10'}),P({summary:empty}),P({summary:noAstra,cost:null,external:null,sessions:null}),
       P({summary:null,error:'사용량<e>',costError:'비용e',externalError:'외부e',sessionsError:'점검e'}),
       P({summary:sum,cost:{agents:null},external:{totals:{},days:{}},sessions:{generated:'g',flagged:[]}}),
       P({summary:sum,cost:SNAP_COST,external:{generated:'g',fx:1500,totals:{deepseek:{calls:1,ok:1,fail:0,costed_calls:1,krw:5}},days:{'2026-10-01':{deepseek:{calls:1,ok:1,fail:0,costed_calls:1,krw:5}}}},sessions:null})

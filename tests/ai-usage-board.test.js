@@ -81,3 +81,22 @@ test('외부 AI 카드는 이번 달 실제 결제(카드 문자)를 키미·딥
   assert.equal((out.match(/data-ai-external-paid=/g)||[]).length,1,'0원·매핑 없는 AI(deepseek 0원·luna)에는 줄 없음');
   assert.doesNotMatch(h.aiExternalSectionHtml({external:ext,error:''}),/data-ai-external-paid/,'결제 값이 없으면 줄 없음(옛 화면 그대로)');
 });
+
+test('외부 AI 카드는 키미 등 잔액 줄(US$·≈₩ / 위안)을 그 AI 카드에만 붙이고, 값이 없거나 깨지면 줄이 없다',()=>{
+  const h=helpers(),base={fx:1500,generated:'g',totals:{kimi:{calls:1,ok:1,fail:0,costed_calls:0,krw:0},deepseek:{calls:1,ok:1,fail:0,costed_calls:0,krw:0}},days:{}};
+  const out=h.aiExternalSectionHtml({external:{...base,balances:{kimi:{currency:'USD',available:48.36414,voucher:0,cash:48.36414,at:'x'},ghost:{currency:'USD',available:5}}},error:''});
+  assert.match(out,/data-ai-external-balance="kimi">🪙 잔액 US\$48\.36 \(≈₩72,546\)</);
+  assert.equal((out.match(/data-ai-external-balance=/g)||[]).length,1,'잔액이 없는 딥시크·카드 없는 ghost에는 줄 없음');
+  assert.match(h.aiExternalSectionHtml({external:{...base,balances:{kimi:{currency:'CNY',available:10}}},error:''}),/잔액 ¥10\.00</);
+  assert.doesNotMatch(h.aiExternalSectionHtml({external:{...base,balances:{kimi:{currency:'USD',available:'x'}}},error:''}),/data-ai-external-balance/);
+  assert.doesNotMatch(h.aiExternalSectionHtml({external:base,error:''}),/data-ai-external-balance/);
+});
+test('Edge 외부 AI 스냅샷은 balances를 USD·CNY·숫자만 남기고 다른 값은 버린다', async()=>{
+  const {validateExternalAi}=await import('../supabase/functions/ai-usage-sync/payload.mjs');
+  const b={fx:1500,generated:'g',days:{},totals:{kimi:{calls:1,ok:1,fail:0,tin:0,tout:0,krw:0,costed_calls:0}},balances:{kimi:{currency:'USD',available:48.36414,voucher:0,cash:-2.5,at:'2026-10-20 00:44',extra:'drop'},bad:{currency:'EUR',available:1},'Bad Key':{currency:'USD',available:1},str:{currency:'USD',available:'9'}}};
+  const r=validateExternalAi(b);assert.equal(r.ok,true);
+  assert.deepEqual(Object.keys(r.value.balances).sort(),['kimi','str']);
+  assert.deepEqual(r.value.balances.kimi,{currency:'USD',available:48.36414,voucher:0,cash:-2.5,at:'2026-10-20 00:44'});
+  assert.equal(r.value.balances.str.available,0,'숫자가 아니면 0');
+  assert.equal('balances' in validateExternalAi({...b,balances:undefined}).value,false,'balances 없으면 필드도 없음');
+});
