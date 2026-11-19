@@ -8,10 +8,13 @@ const {renderAll,tablesFor}=require('./fixtures/hub3-harness.cjs');
 const golden={...JSON.parse(read('tests/fixtures/hub3-golden-84053a7.json')),...JSON.parse(read('tests/fixtures/p7-leave-golden.json')),...JSON.parse(read('tests/fixtures/schedule-halfday-golden.json'))}; // 승인된 반차만 보이는 근무표·P7 연차 원장 카드는 새 기준, 나머지는 옛 기준 유지
 const clone=x=>JSON.parse(JSON.stringify(x));
 // 반차 전용 다섯 키는 schedule-halfday.test.js에서 실제 설정 엔진·세 화면으로 확인함.
-const CH3=/^(?!sched\.half\.)(?!(?:att\.(?:week|staff_month)\.|leave\.(?:change\.|my\.(?:used|pending|unit)$)))(att|sched|leave)\./;
+const CH3=/^(?!sched\.half\.)(?!(?:att\.(?:week|staff_month)\.|leave\.(?:edit\.|change\.|my\.(?:used|pending|unit)$)))(att|sched|leave)\./;
 // P7에서 허용된 시간 입력 연결 속성과 숨긴 모바일 입력만 제외해 PC의 기존 글·배치를 계속 대조한다.
 function attendanceLegacyLayout(value){return String(value)
+  .replace('["leave_protected_ledger_ids",{}],','')
   .replace(/<button class="mini(?: rej)?" onclick="requestLeaveChange\(\d+,'(?:cancel|half)'\)">[^<]*<\/button>\s?/g,'')
+  .replace(/<button class="mini" onclick="editApprovedLeaveDates\(\d+\)">[^<]*<\/button>\s?/g,'')
+  .replace(/<details class="hint"><summary>개별 연차 기록 \(\d+건\)<\/summary>[\s\S]*?<\/details>/g,'')
   .replace(/\n    <div class="card" id="manualWeekCard">[\s\S]*?<div id="manualWeekMsg" class="msg"><\/div><\/div>/g,'')
   .replace(/<div id="staffAttMonthContainer"><\/div>/g,'')
   .replace(/<div class="rowflex"><div class="stat"><div class="sub">사용<\/div>[\s\S]*?(?=<div class="stat"><div class="sub">잔여<\/div>)/g,'<div class="rowflex">')

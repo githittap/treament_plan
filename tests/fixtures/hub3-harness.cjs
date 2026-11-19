@@ -164,7 +164,7 @@ function makeSb(over){
   const rpcCalls=[];
   const sb={
     from(t){const spec=Object.prototype.hasOwnProperty.call(o.tables||{},t)?o.tables[t]:tablesFor(t);return chain(spec||{list:[],single:null});},
-    rpc(name,args){rpcCalls.push([name,args]);const r=(o.rpc||{})[name];return Promise.resolve(r!==undefined?(typeof r==='function'?r(args):r):{data:[{}],error:null});},
+    rpc(name,args){rpcCalls.push([name,args]);const r=(o.rpc||{})[name];if(name==='leave_protected_ledger_ids')return {order(){return this;},range(){return Promise.resolve(r!==undefined?(typeof r==='function'?r(args):r):{data:[],error:null});}};return Promise.resolve(r!==undefined?(typeof r==='function'?r(args):r):{data:[{}],error:null});},
     storage:{from(bucket){return (o.storage&&o.storage.from?o.storage.from(bucket):null)||{upload:async()=>({error:null}),createSignedUrl:async()=>({data:{signedUrl:'https://example.invalid/file'},error:null})};}}
   };
   sb.rpcCalls=rpcCalls;

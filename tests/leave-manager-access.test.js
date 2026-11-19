@@ -45,8 +45,8 @@ assert.match(html, /if\(ME\.role!=='owner'\)return;[\s\S]*app_settings/);
 assert.match(html, /leaveAct\(\$\{r\.id\},'rej'\)[\s\S]*canApproveLeave\(\)/);
 assert.match(html, /ME\.role==='manager'&&canApproveLeave\(\)[\s\S]*cancelApprovedLeave/);
 assert.match(html, /function uploadLeaveApplicationDocument\(\)[\s\S]*leave_requests'[\s\S]*targetUserId\+'\/tmp\/'\+request\.id\+'\//);
-assert.match(html, /function leaveLedgerHistoryHtml\(error\)[\s\S]*ME\.role!=='manager'\|\|!canManageLeave\(\)[\s\S]*leave\.ledger\.history_th_note/);
-assert.match(html, /managerDetails=ME\.role==='manager'&&canManageLeave\(\)[\s\S]*sb\.from\('leave_ledger'\)\.select\('user_id,kind,days,note,created_at'\)/);
+assert.match(html, /function leaveLedgerHistoryHtml\(error,metadataError\)[\s\S]*!canManageLeave\(\)[\s\S]*leave\.ledger\.history_th_note/);
+assert.match(html, /fetchAttendancePages\(\(\)=>sb\.from\('leave_ledger'\)\.select\('id,user_id,kind,days,note,ref,effective_date,created_at'\)/);
 assert.match(html, /function deleteLeaveApplicationDocument\(id\)[\s\S]*storage\.from\('leave-docs'\)\.remove\(\[doc\.storage_path\]\)[\s\S]*from\('leave_application_documents'\)\.delete/);
 const uploadFunction = html.slice(
   html.indexOf('async function uploadLeaveApplicationDocument('),
