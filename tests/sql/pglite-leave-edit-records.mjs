@@ -72,9 +72,19 @@ try {
  await q("select * from process_leave_change(2,'approve')");
  await q("select * from process_leave_request(4,'cancel_approved')");
  assert.equal(Number((await q("select sum(case when kind='사용' then -days else days end) n from leave_ledger where ref=4"))[0].n),0);
+ await q('reset role');await db.exec(`insert into leave_requests(id,user_id,type,date_from,date_to,days,status) values(5,'${id(3)}','연차','2099-02-01','2099-02-01',1,'승인');insert into leave_ledger(user_id,kind,days,ref,note) values('${id(3)}','사용',1,5,'one'),('${id(3)}','사용',1,5,'two');`);await actor(1);
+ await assert.rejects(edit(5,'2099-02-02','2099-02-02'),/usage link missing or duplicated/);
+ assert.equal((await q('select date_from::text d from leave_requests where id=5'))[0].d,'2099-02-01');
+ await q('reset role');await db.exec(`insert into leave_requests(id,user_id,type,date_from,date_to,days,status) values(6,'${id(3)}','연차','2099-03-02','2099-03-02',1,'승인');insert into leave_ledger(user_id,kind,days,ref,note) values('${id(3)}','사용',1,6,'연차');insert into app_settings(key,value) values('leave.half_day_value','0.7');`);
+ await actor(1);await edit(6,'2099-03-02','2099-03-02','반차',"'09:00~13:00'");
+ assert.equal(Number((await q('select days from leave_requests where id=6'))[0].days),0.7);
+ assert.equal(Number((await q("select sum(case when kind='사용' then -days else days end) n from leave_ledger where ref=6"))[0].n),-0.7);
+ await edit(6,'2099-03-02','2099-03-02','연차');
+ assert.equal(Number((await q('select days from leave_requests where id=6'))[0].days),1);
+ assert.equal(Number((await q("select sum(case when kind='사용' then -days else days end) n from leave_ledger where ref=6"))[0].n),-1);
  for(const n of [3,4,5]){await actor(n);await assert.rejects(edit(1,'2026-01-05','2026-01-05'),/not allowed/);await assert.rejects(manual(5,'부여','1'),/not allowed/);}
  await actor(1);await manual(5,'부여','2');await assert.rejects(q('select * from leave_edit_audit'),/permission denied/);
- await q('reset role');assert.equal((await q('select count(*)::int n from leave_edit_audit'))[0].n,6);
+ await q('reset role');assert.equal((await q('select count(*)::int n from leave_edit_audit'))[0].n,8);
  assert.equal((await q('select chief_by from leave_requests where id=1'))[0].chief_by,'승인자');
  await assert.rejects(db.exec(fs.readFileSync('db/leave_edit_records_rollback.sql','utf8')),/rollback stopped/);await db.exec('rollback');
  console.log('PGLITE_LEAVE_EDIT_RECORDS_PASS');
