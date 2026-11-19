@@ -21,13 +21,15 @@ function attendanceLegacyLayout(value){return String(value)
   .replace(/ class="rowflex manual-clock-desktop"/g,' class="rowflex"')
   .replace(/ onchange="syncManualClock\('(In|Out)',false\)"/g,'')
   .replace(/<input type="time" class="manual-clock-mobile" id="manualClock(In|Out)Time"[^>]*>/g,'')
-  .replace(/ id="manualAttendanceSubmit"/g,'');}
+  .replace(/ id="manualAttendanceSubmit"/g,'')
+  .replace(/<details class="hint"><summary>최근 연차 적립 실행 기록<\/summary>[\s\S]*?<\/details>/g,'');}
 const P7_DATE_TEXT_KEYS=new Set(['att.manual.confirm_discard','att.manual.m_loading','att.manual.m_load_fail']);
 const MANAGER_ONLY_LEAVE_TEXT_KEYS=new Set(['leave.pend.btn_ok_manager','leave.m_ok_confirm_manager','leave.grant.manual',
   'leave.ledger.history_title','leave.ledger.history_load_fail','leave.ledger.history_th_name','leave.ledger.history_th_date','leave.ledger.history_th_kind','leave.ledger.history_th_days','leave.ledger.history_th_note','leave.ledger.history_empty',
   // 매니저 수기 기록과 원장 설정은 leave-manager-access.test.js에서 실제 호출함.
   'leave.m_grant_kind','leave.m_grant_days_prompt','leave.m_grant_days_invalid','leave.m_grant_note',
-  'leave.settings.title','leave.settings.hint','leave.settings.access','leave.settings.approve','leave.settings.save','leave.settings.fail']);
+  'leave.settings.title','leave.settings.hint','leave.settings.access','leave.settings.approve','leave.settings.accrue','leave.settings.save','leave.settings.fail',
+  'leave.acc.history_title','leave.acc.history_empty','leave.acc.history_fail','leave.acc.history_actor','leave.acc.history_auto']);
 
 
 function helpers(){
@@ -67,7 +69,7 @@ const dynRows=defs=>defs.map(d=>({key:d.key,value:'«'+d.key+'»'+(d.vars?' '+d.
 /* ───────────── 1. 기본 글 목록 ───────────── */
 test('차례 3 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 14개(출퇴근·근태차이 8 · 근무표 2 · 연차 4)',()=>{
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
-  assert.equal(defs.length,460,'차례 3 글 키 수(P7 매니저 승인 문구·개별 연차 원장 상세·관리자 화면 글 포함)');
+  assert.equal(defs.length,466,'차례 3 글 키 수(매니저 월 적립 스위치·실행 기록 포함)');
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
   for(const d of defs){
     assert.match(d.key,/^[a-z][a-z0-9_.]{1,80}$/,d.key);
@@ -179,7 +181,7 @@ test('표에 값이 있으면 그 글: 고쳐 쓰는 글 355개가 모두 화면
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
   const stat=new Set([...hr.matchAll(/\bdata-hub(?:k|ph)="([a-z0-9_.]+)"/g)].map(m=>m[1]));
   const dyn=defs.filter(d=>!stat.has(d.key)&&!P7_DATE_TEXT_KEYS.has(d.key)); // 날짜 전환 글 3개는 attendance-date-switch.test.js의 실제 호출로 확인함
-  assert.equal(dyn.length,438);
+  assert.equal(dyn.length,444);
   const out=await renderAll(hr,{engine:true,textRows:dynRows(dyn),settings:{}});
   const b2Defs=defs.filter(d=>/^att\.issue\.p_date$|^att\.issueform\.|^att\.myissue\.|^att\.issue\.(?:evidence_|admin_evidence|awaiting_staff|auto_clock_)/.test(d.key));
   const b2Observed=await require('./fixtures/hub3-harness.cjs').observeAttendanceIssueB2(hr,{textRows:dynRows(b2Defs)});

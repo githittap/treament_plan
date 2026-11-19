@@ -4,7 +4,7 @@ const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/\r\n/
 function leaveHarness(){
  let resolve;const button={disabled:false},main={isConnected:true},rows={querySelectorAll:()=>[{dataset:{laIndex:'0'}}]},message={textContent:''};
  const elements={main,laAsOf:{value:'2026-10-10'},laRows:rows,laApply:button,laMsg:message};
- const c={ME:{role:'owner'},LEAVE_ACCRUAL_GENERATION:0,LEAVE_ACCRUAL_AS_OF:'2026-10-10',LEAVE_ACCRUAL_PREVIEW:[{user_id:'example-staff',due_date:'2026-10-10',grant_days:1}],$:s=>elements[s.slice(1)],confirm:()=>true,hubT:(k,d)=>d,setStatus(){},render(){throw Error('분리된 화면 다시 그리기');},sb:{rpc:()=>new Promise(r=>resolve=r)}};
+  const c={ME:{role:'owner'},canAccrueLeave:()=>true,LEAVE_ACCRUAL_GENERATION:0,LEAVE_ACCRUAL_AS_OF:'2026-10-10',LEAVE_ACCRUAL_PREVIEW:[{user_id:'example-staff',due_date:'2026-10-10',grant_days:1}],$:s=>elements[s.slice(1)],confirm:()=>true,hubT:(k,d)=>d,setStatus(){},render(){throw Error('분리된 화면 다시 그리기');},sb:{rpc:()=>new Promise(r=>resolve=r)}};
  vm.createContext(c);vm.runInContext(fnSrc(read('hr.html'),'applyLeaveAccrual'),c);
  return {c,main,button,release:error=>resolve({data:[{granted_days:1,created_runs:1}],error})};
 }

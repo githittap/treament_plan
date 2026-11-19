@@ -33,7 +33,7 @@ assert.match(sql, /revoke all on function public\.apply_monthly_leave_accruals\(
 assert.match(sql, /revoke all on function public\.apply_monthly_leave_accruals\(date,jsonb,boolean\) from public,anon/);
 assert.match(sql, /insert into public\.leave_ledger/);
 assert.doesNotMatch(sql, /auth\.role\s*\(/);
-assert.match(html,/const accrualHtml=ME\.role==='owner'/);
+assert.match(html,/const accrualHtml=canAccrueLeave\(\)\?/);
 assert.match(html,/async function previewLeaveAccrual\(\)[\s\S]*?sb\.rpc\('preview_monthly_leave_accruals',\{p_as_of:asOf\}\)/);
 assert.match(html,/async function applyLeaveAccrual\(\)[\s\S]*?if\(!confirm\([\s\S]*?sb\.rpc\('apply_monthly_leave_accruals',\{p_as_of:LEAVE_ACCRUAL_AS_OF,p_attendance_confirmations:confirmations,p_apply_confirmed:true\}\)/);
 assert.match(html,/LEAVE_ACCRUAL_AS_OF=asOf;LEAVE_ACCRUAL_PREVIEW=data\|\|\[\]/);
@@ -45,7 +45,7 @@ const flow=html.slice(html.indexOf('async function previewLeaveAccrual(){'),html
 const elements={laAsOf:{value:'2026-09-25'},laMsg:{textContent:''},laRows:{innerHTML:'',querySelectorAll:()=>[{dataset:{laIndex:'0'}}]},laApply:{disabled:true},main:{}};
 const events=[];
 let approved=false;
-const context={ME:{role:'owner'},LEAVE_ACCRUAL_GENERATION:0,LEAVE_ACCRUAL_PREVIEW:[],LEAVE_ACCRUAL_AS_OF:'',today:()=> '2026-09-25',esc:String,$:selector=>elements[selector.slice(1)],setStatus:()=>{},confirm:()=>{events.push('confirm');return approved;},render:async()=>{events.push('render');},sb:{rpc:async name=>{events.push(name);return name==='preview_monthly_leave_accruals'?{data:[{user_id:'staff',user_name:'직원',hire_date:'2026-08-18',due_date:'2026-09-18',accrual_kind:'monthly',target_days:1,existing_credit_days:0,grant_days:1,past:true,already_recorded:false}]}:{data:[{granted_days:1}]};}}};
+const context={ME:{role:'owner'},canAccrueLeave:()=>true,LEAVE_ACCRUAL_GENERATION:0,LEAVE_ACCRUAL_PREVIEW:[],LEAVE_ACCRUAL_AS_OF:'',today:()=> '2026-09-25',esc:String,$:selector=>elements[selector.slice(1)],setStatus:()=>{},confirm:()=>{events.push('confirm');return approved;},render:async()=>{events.push('render');},sb:{rpc:async name=>{events.push(name);return name==='preview_monthly_leave_accruals'?{data:[{user_id:'staff',user_name:'직원',hire_date:'2026-08-18',due_date:'2026-09-18',accrual_kind:'monthly',target_days:1,existing_credit_days:0,grant_days:1,past:true,already_recorded:false}]}:{data:[{granted_days:1}]};}}};
 vm.runInNewContext(`${flow}\nthis.preview=previewLeaveAccrual;this.apply=applyLeaveAccrual;`,context);
 await context.preview();
 assert.equal(elements.laApply.disabled,false);

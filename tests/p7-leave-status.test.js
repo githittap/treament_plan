@@ -12,7 +12,7 @@ function setup(options={}){
     hubT:(key,def,vars)=>Object.entries(vars||{}).reduce((s,[k,v])=>s.replaceAll('{'+k+'}',v),(options.texts||{})[key]||def),
     stampDate:s=>String(s).startsWith('2026-09-18')?'2026.09.18':String(s).slice(0,10),
     hubSetting:(key,def)=>settings[key]??def,$,alert:s=>alerts.push(s),confirm:()=>options.confirm!==false,render:async()=>calls.push("render"),setStatus:()=>{},sb:{
-      from(table){calls.push(table);const query={columns:'',start:0,size:1000},chain={select(columns){query.columns=columns;return chain;},gte:()=>chain,lt:()=>chain,order:()=>chain,range(start,end){query.start=start;query.size=end-start+1;return chain;},then(resolve){const all=table==='v_leave_balance'?balances:(table==='leave_ledger'&&query.columns.includes('created_at')?ledgerHistory:ledger),data=all.slice(query.start,query.start+query.size),error=table==='leave_ledger'&&query.columns.includes('created_at')&&options.ledgerHistoryError?{message:'상세 조회실패'}:options.loadError?{message:'조회실패'}:null;return Promise.resolve({data,error}).then(resolve);}};return chain;},
+       from(table){calls.push(table);const query={columns:'',start:0,size:1000},chain={select(columns){query.columns=columns;return chain;},gte:()=>chain,lt:()=>chain,order:()=>chain,limit(n){query.size=n;return chain;},range(start,end){query.start=start;query.size=end-start+1;return chain;},then(resolve){const all=table==='v_leave_balance'?balances:table==='leave_accrual_runs'?(options.accrualRuns||[]):(table==='leave_ledger'&&query.columns.includes('created_at')?ledgerHistory:ledger),data=all.slice(query.start,query.start+query.size),error=table==='leave_ledger'&&query.columns.includes('created_at')&&options.ledgerHistoryError?{message:'상세 조회실패'}:options.loadError?{message:'조회실패'}:null;return Promise.resolve({data,error}).then(resolve);}};return chain;},
       async rpc(name,args){calls.push([name,args]);if(name==='get_monthly_leave_accrual_candidates')return options.candidateError?{error:{message:'후보조회실패'}}:{data:options.candidates||[],error:null};return options.rpcError?{error:{message:'저장실패'}}:{data:[{target_balance:args.p_target}],error:null};}
     }};
   const accessStart=html.indexOf('/* leave-manager-access-ui:test-start */'),accessEnd=html.indexOf('/* leave-manager-access-ui:test-end */');
@@ -51,7 +51,7 @@ test('숨김 설정은 빈 목록과 와일드카드를 지원하고 잘못된 �
 });
 
 const candidateRun={run_id:1,user_id:'a',due_date:'2026-10-18',days:1,candidate_dates:['2026-09-21','2026-09-22'],revoked_at:null};
-test('자동 월차 후보는 원장만 날짜 목록과 취소 버튼을 볼 수 있고 취소 확인 뒤 RPC를 부른다',async()=>{
+test('자동 월차 후보는 원장과 허용된 매니저가 날짜 목록과 취소 버튼을 볼 수 있고 취소 확인 뒤 RPC를 부른다',async()=>{
   const t=setup({candidates:[candidateRun]}),out=await t.api.renderEmployeeLeaveStatus();
   assert.match(out,/결근 후보 2일/);assert.match(out,/2026-09-21, 2026-09-22/);assert.match(out,/onclick="revokeMonthlyLeaveAccrual\(0\)"/);
   await t.api.revokeMonthlyLeaveAccrual(0);
@@ -72,10 +72,22 @@ test('자동 월차 후보는 원장만 날짜 목록과 취소 버튼을 볼 �
 test('월차 빼기 확인 취소·이미 뺀 기록·RPC 실패·빠른 중복 클릭을 구분한다',async()=>{
   const cancelled=setup({confirm:false,candidates:[candidateRun]});await cancelled.api.renderEmployeeLeaveStatus();await cancelled.api.revokeMonthlyLeaveAccrual(0);
   assert.equal(cancelled.calls.some(c=>Array.isArray(c)&&c[0]==='revoke_monthly_leave_accrual'),false);
-  const revoked=setup({candidates:[{...candidateRun,revoked_at:'2026-10-19'}]});const out=await revoked.api.renderEmployeeLeaveStatus();assert.match(out,/월차를 뺐습니다/);assert.doesNotMatch(out,/monthlyRevoke_/);await revoked.api.revokeMonthlyLeaveAccrual(0);assert.equal(revoked.calls.length,3);
+   const revoked=setup({candidates:[{...candidateRun,revoked_at:'2026-10-19'}]});const out=await revoked.api.renderEmployeeLeaveStatus();assert.match(out,/월차를 뺐습니다/);assert.doesNotMatch(out,/monthlyRevoke_/);const before=revoked.calls.length;await revoked.api.revokeMonthlyLeaveAccrual(0);assert.equal(revoked.calls.length,before);
   const failed=setup({rpcError:true,candidates:[candidateRun]});await failed.api.renderEmployeeLeaveStatus();await failed.api.revokeMonthlyLeaveAccrual(0);assert.match(failed.alerts[0],/월차를 빼지 못했습니다: 저장실패/);assert.equal(failed.$('#monthlyRevoke_0').disabled,false);
   const duplicate=setup({candidates:[candidateRun]});await duplicate.api.renderEmployeeLeaveStatus();await Promise.all([duplicate.api.revokeMonthlyLeaveAccrual(0),duplicate.api.revokeMonthlyLeaveAccrual(0)]);assert.equal(duplicate.calls.filter(c=>Array.isArray(c)&&c[0]==='revoke_monthly_leave_accrual').length,1);
   const missing=setup({candidateError:true});assert.match(await missing.api.renderEmployeeLeaveStatus(),/후보조회실패/);
+});
+test('매니저 월 적립 스위치를 켜면 후보·실행 기록이 보이고 끄면 사라진다',async()=>{
+  const settings={'leave.manager_access_enabled':'true','leave.manager_can_accrue':'true'};
+  const run={id:3,user_id:'a',due_date:'2026-10-18',days:1,attendance_confirmed_by:'b',executed_by_name:'이매니저',executed_by_role:'manager'};
+  const t=setup({role:'manager',settings,candidates:[candidateRun],accrualRuns:[run]});
+  const html=await t.api.renderEmployeeLeaveStatus();
+  assert.match(html,/monthlyRevoke_0/);assert.match(html,/실행: 매니저 이매니저/);
+  await t.api.revokeMonthlyLeaveAccrual(0);
+  assert.equal(t.calls.some(c=>Array.isArray(c)&&c[0]==='revoke_monthly_leave_accrual'),true);
+  t.c.SETTINGS['leave.manager_can_accrue']='false';
+  const blocked=await t.api.renderEmployeeLeaveStatus();
+  assert.doesNotMatch(blocked,/monthlyRevoke_0|실행: 매니저/);
 });
 test('월차 방식은 두 값만 저장하고 글·설명·선택지 이름을 허브 글 설정에서 읽는다',()=>{
   const code=fs.readFileSync('hub-texts.js','utf8').match(/\/\* hub-texts:test-start \*\/[\s\S]*?\/\* hub-texts:test-end \*\//)[0];

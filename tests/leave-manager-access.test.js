@@ -32,9 +32,14 @@ assert.deepEqual(permissions('manager', { 'leave.manager_access_enabled': 'true'
 assert.equal(permissions('chief', {}).canApproveLeave, true);
 assert.equal(permissions('owner', {}).canManageLeave, true);
 
-assert.match(html, /if\(ME\.role!=='owner'\)return;[\s\S]*preview_monthly_leave_accruals/);
-assert.match(html, /ME\.role==='owner'\?monthlyLeaveCandidatesHtml/);
-assert.match(html, /if\(ME\.role!=='owner'\)return;[\s\S]*apply_monthly_leave_accruals/);
+assert.match(html, /if\(!canAccrueLeave\(\)\)return;[\s\S]*preview_monthly_leave_accruals/);
+assert.match(html, /canAccrueLeave\(\)\?monthlyLeaveCandidatesHtml/);
+assert.match(html, /if\(!canAccrueLeave\(\)\|\|!LEAVE_ACCRUAL_AS_OF[\s\S]*apply_monthly_leave_accruals/);
+const accruePermission=new Function('ME','SETTINGS','SETTINGS_LOAD_OK',helpers+';return canAccrueLeave();');
+assert.equal(accruePermission({role:'manager'},{'leave.manager_access_enabled':'true','leave.manager_can_accrue':'true'},true),true);
+assert.equal(accruePermission({role:'manager'},{'leave.manager_access_enabled':'false','leave.manager_can_accrue':'true'},true),false);
+assert.equal(accruePermission({role:'manager'},{'leave.manager_access_enabled':'true','leave.manager_can_accrue':'false'},true),false);
+assert.equal(accruePermission({role:'staff'},{'leave.manager_access_enabled':'true','leave.manager_can_accrue':'true'},true),false);
 assert.match(html, /leaveManagerSettingsCard\(\)/);
 assert.match(html, /if\(ME\.role!=='owner'\)return;[\s\S]*app_settings/);
 assert.match(html, /leaveAct\(\$\{r\.id\},'rej'\)[\s\S]*canApproveLeave\(\)/);
@@ -166,11 +171,11 @@ test('uploadLeaveApplicationDocument uses real ed controls and preserves self up
   assert.match(mismatchedStaffRequest.elements['#edMsg'].textContent, /본인 연차 신청만 선택/);
 });
 
-test('owner can render and save the two switches with edited hub text', async () => {
+test('owner can render and save the three switches with edited hub text', async () => {
   const start=html.indexOf('function leaveManagerSettingsCard(');
   const end=html.indexOf('async function saveAbsenceSettings(',start);
   assert.ok(start>=0&&end>start);
-  const elements={'#leaveManagerAccessEnabled':{checked:false},'#leaveManagerCanApprove':{checked:true},'#leaveManagerSettingsMsg':{}};
+  const elements={'#leaveManagerAccessEnabled':{checked:false},'#leaveManagerCanApprove':{checked:true},'#leaveManagerCanAccrue':{checked:true},'#leaveManagerSettingsMsg':{}};
   const settings={}, writes=[];
   let error={message:'test error'};
   const ctx=vm.createContext({
@@ -180,13 +185,13 @@ test('owner can render and save the two switches with edited hub text', async ()
   });
   vm.runInContext(html.slice(start,end),ctx);
   const card=ctx.leaveManagerSettingsCard();
-  for(const suffix of ['title','hint','access','approve','save'])assert.ok(card.includes('«leave.settings.'+suffix+'»'));
+  for(const suffix of ['title','hint','access','approve','accrue','save'])assert.ok(card.includes('«leave.settings.'+suffix+'»'));
   await ctx.saveLeaveManagerSettings();
   assert.equal(elements['#leaveManagerSettingsMsg'].textContent,'«leave.settings.fail»');
   assert.deepEqual(settings,{});
   error=null;
   await ctx.saveLeaveManagerSettings();
-  assert.deepEqual(settings,{'leave.manager_access_enabled':'false','leave.manager_can_approve':'true'});
+  assert.deepEqual(settings,{'leave.manager_access_enabled':'false','leave.manager_can_approve':'true','leave.manager_can_accrue':'true'});
   ctx.ME.role='manager';
   await ctx.saveLeaveManagerSettings();
   assert.equal(writes.length,2);
