@@ -69,7 +69,7 @@ const dynRows=defs=>defs.map(d=>({key:d.key,value:'«'+d.key+'»'+(d.vars?' '+d.
 /* ───────────── 1. 기본 글 목록 ───────────── */
 test('차례 3 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 14개(출퇴근·근태차이 8 · 근무표 2 · 연차 4)',()=>{
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
-  assert.equal(defs.length,466,'차례 3 글 키 수(매니저 월 적립 스위치·실행 기록 포함)');
+  assert.equal(defs.length,480,'차례 3 글 키 수(올해 생긴 연차 문구 14개 포함)');
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
   for(const d of defs){
     assert.match(d.key,/^[a-z][a-z0-9_.]{1,80}$/,d.key);
@@ -142,7 +142,7 @@ test('숫자·목록 기본값: 연차·소명 숫자 5개와 연차 유형·근
 });
 
 /* ───────────── 2. 기본값만 있을 때 옛 화면과 똑같음 ───────────── */
-test('기본값만 있을 때: 허브 설정 엔진이 아예 없어도 세 화면이 옛 화면(84053a7)과 글자 하나까지 같다',async()=>{
+test('기본값만 있을 때: 허브 설정 엔진이 아예 없어도 세 화면이 기준 화면과 글자 하나까지 같다',async()=>{
   const out=await renderAll(hr,{engine:false});
   assert.deepEqual(Object.keys(out).sort(),Object.keys(golden).sort());
   assert.ok(Object.keys(golden).length>=140,'대조 항목 수');
@@ -177,11 +177,11 @@ test('시험이 실제로 잡는지: 화면 글을 한 글자만 바꾸면 대�
 });
 
 /* ───────────── 3. 표에 값이 있으면 그 글 ───────────── */
-test('표에 값이 있으면 그 글: 고쳐 쓰는 글 355개가 모두 화면(제목·표 머리·단추·알림창·확인창·메시지)에 나온다',async()=>{
+test('표에 값이 있으면 그 글: 고쳐 쓰는 글이 화면(제목·표 머리·단추·알림창·확인창·메시지)에 나온다',async()=>{
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
   const stat=new Set([...hr.matchAll(/\bdata-hub(?:k|ph)="([a-z0-9_.]+)"/g)].map(m=>m[1]));
   const dyn=defs.filter(d=>!stat.has(d.key)&&!P7_DATE_TEXT_KEYS.has(d.key)); // 날짜 전환 글 3개는 attendance-date-switch.test.js의 실제 호출로 확인함
-  assert.equal(dyn.length,444);
+  assert.equal(dyn.length,458);
   const out=await renderAll(hr,{engine:true,textRows:dynRows(dyn),settings:{}});
   const b2Defs=defs.filter(d=>/^att\.issue\.p_date$|^att\.issueform\.|^att\.myissue\.|^att\.issue\.(?:evidence_|admin_evidence|awaiting_staff|auto_clock_)/.test(d.key));
   const b2Observed=await require('./fixtures/hub3-harness.cjs').observeAttendanceIssueB2(hr,{textRows:dynRows(b2Defs)});
@@ -196,7 +196,23 @@ test('표에 값이 있으면 그 글: 고쳐 쓰는 글 355개가 모두 화면
   const cObservedText=cObserved.join('\n');
   const cObservedMissing=cDefs.filter(d=>!cObservedText.includes('«'+d.key+'»')).map(d=>d.key);
   assert.equal(cObservedMissing.length,0,'C 차이 글은 관리자·직원·오류·빈 상태·엑셀의 실제 렌더에 모두 나타남 '+cObservedMissing.join(', '));
-  const all=Object.values(out).join('\n')+'\n'+b2Observed+'\n'+cObservedText;
+  const earnedProbe=await renderAll(hr,{probe:true,engine:true,textRows:dynRows(dyn),settings:{}});
+  const earned=await earnedProbe.asMgr('owner',null,{
+    tables:{leave_year_earned_override:{list:[{user_id:'u1',year:2026,earned_days:4.5}]}},
+    rpc:{set_leave_year_earned:{data:[],error:null},clear_leave_year_earned:{error:{message:'복귀 실패'}}}
+  });
+  const earnedHtml=await earned.api.renderEmployeeLeaveStatus();
+  const saveEarned=vm.runInContext('saveLeaveYearEarned',earned.ctx);
+  earned.dom.$('#leaveEarnedTarget_0').value='-1';
+  await saveEarned(0);
+  earned.dom.$('#leaveEarnedTarget_0').value='8';
+  await saveEarned(0);
+  await saveEarned(0,true);
+  const earnedReadFail=await earnedProbe.asMgr('owner',null,{
+    tables:{leave_year_earned_override:{error:{message:'보정 읽기 실패'}}}
+  });
+  const failedEarnedHtml=await earnedReadFail.api.renderEmployeeLeaveStatus();
+  const all=[...Object.values(out),b2Observed,cObservedText,earnedHtml,failedEarnedHtml,...earned.log].join('\n');
   const legacyMissing=dyn.filter(d=>!MANAGER_ONLY_LEAVE_TEXT_KEYS.has(d.key)&&!b2Defs.some(x=>x.key===d.key)&&!all.includes('«'+d.key+'»')).map(d=>d.key);
   const visibleMissing=b2Defs.filter(d=>d.key!=='att.myissue.th_evidence'&&!MANAGER_ONLY_LEAVE_TEXT_KEYS.has(d.key)&&!all.includes('«'+d.key+'»')).map(d=>d.key);
   assert.equal(legacyMissing.length,0,'기존 화면 글은 기존 관측 그대로 검사: '+legacyMissing.join(', '));

@@ -8,15 +8,15 @@ function setup(options={}){
   const profiles=[{user_id:'a',name:'이채연',hire_date:'2026-09-18',active:true},{user_id:'b',name:'abc',hire_date:'2025-01-01',active:true},{user_id:'c',name:'입사일없음',active:true},{user_id:'d',name:'퇴사',hire_date:'2025-01-01',active:false}];
   const balances=[{user_id:'a',balance:8},{user_id:'b',balance:3}],ledgerHistory=options.ledgerHistory||[{user_id:'a',kind:'부여',days:10,note:'기존 연차',created_at:'2026-09-18T00:00:00Z'}];
   const ledger=[{user_id:'a',kind:'부여',days:10},{user_id:'a',kind:'사용',days:2},{user_id:'a',kind:'조정',days:1}];
-  const c={ME:{role:options.role||'owner'},SETTINGS:Object.assign({'leave.manager_access_enabled':'false','leave.manager_can_approve':'false'},settings),SETTINGS_LOAD_OK:true,PROFILES:profiles,nameOf:id=>profiles.find(p=>p.user_id===id)?.name||id,today:()=> '2026-10-03',suggestGrantDays:()=>15,esc:s=>String(s??'').replaceAll('<','&lt;').replaceAll('"','&quot;'),
+  const c={Date:class extends Date{constructor(...args){super(...(args.length?args:[options.now||'2026-10-03T09:00:00+09:00']));}},ME:{role:options.role||'owner',id:options.userId},SETTINGS:Object.assign({'leave.manager_access_enabled':'false','leave.manager_can_approve':'false'},settings),SETTINGS_LOAD_OK:true,PROFILES:profiles,nameOf:id=>profiles.find(p=>p.user_id===id)?.name||id,today:()=> '2026-10-03',suggestGrantDays:()=>15,esc:s=>String(s??'').replaceAll('<','&lt;').replaceAll('"','&quot;'),
     hubT:(key,def,vars)=>Object.entries(vars||{}).reduce((s,[k,v])=>s.replaceAll('{'+k+'}',v),(options.texts||{})[key]||def),
     stampDate:s=>String(s).startsWith('2026-09-18')?'2026.09.18':String(s).slice(0,10),
     hubSetting:(key,def)=>settings[key]??def,$,alert:s=>alerts.push(s),confirm:()=>options.confirm!==false,render:async()=>calls.push("render"),setStatus:()=>{},sb:{
-       from(table){calls.push(table);const query={columns:'',start:0,size:1000},chain={select(columns){query.columns=columns;return chain;},gte:()=>chain,lt:()=>chain,order:()=>chain,limit(n){query.size=n;return chain;},range(start,end){query.start=start;query.size=end-start+1;return chain;},then(resolve){const all=table==='v_leave_balance'?balances:table==='leave_accrual_runs'?(options.accrualRuns||[]):(table==='leave_ledger'&&query.columns.includes('created_at')?ledgerHistory:ledger),data=all.slice(query.start,query.start+query.size),error=table==='leave_ledger'&&query.columns.includes('created_at')&&options.ledgerHistoryError?{message:'상세 조회실패'}:options.loadError?{message:'조회실패'}:null;return Promise.resolve({data,error}).then(resolve);}};return chain;},
-      async rpc(name,args){calls.push([name,args]);if(name==='get_monthly_leave_accrual_candidates')return options.candidateError?{error:{message:'후보조회실패'}}:{data:options.candidates||[],error:null};return options.rpcError?{error:{message:'저장실패'}}:{data:[{target_balance:args.p_target}],error:null};}
+       from(table){calls.push(table);const query={columns:'',start:0,size:1000},chain={select(columns){query.columns=columns;return chain;},gte:()=>chain,lt:()=>chain,eq(key,value){query[key]=value;return chain;},order:()=>chain,limit(n){query.size=n;return chain;},range(start,end){query.start=start;query.size=end-start+1;return chain;},then(resolve){const all=table==='v_leave_balance'?balances:table==='leave_accrual_runs'?(options.accrualRuns||[]):table==='leave_year_earned_override'?(options.earnedRows||[]).filter(r=>r.year===query.year):(table==='leave_ledger'&&query.columns.includes('created_at')?ledgerHistory:ledger),data=all.slice(query.start,query.start+query.size),error=table==='leave_year_earned_override'&&options.earnedLoadError?{message:'보정 조회 실패'}:table==='leave_ledger'&&query.columns.includes('created_at')&&options.ledgerHistoryError?{message:'상세 조회실패'}:options.loadError?{message:'조회실패'}:null;return Promise.resolve({data,error}).then(resolve);}};return chain;},
+      async rpc(name,args){calls.push([name,args]);if(name==='get_monthly_leave_accrual_candidates')return options.candidateError?{error:{message:'후보조회실패'}}:{data:options.candidates||[],error:null};return options.rpcError?{error:{message:'저장실패'}}:{data:name==='set_leave_year_earned'?[{earned_days:args.p_days,updated_by_name:'수정자'}]:[{target_balance:args.p_target}],error:null};}
     }};
   const accessStart=html.indexOf('/* leave-manager-access-ui:test-start */'),accessEnd=html.indexOf('/* leave-manager-access-ui:test-end */');
-  vm.createContext(c);vm.runInContext(html.slice(paginationStart,paginationEnd)+'\n'+html.slice(accessStart,accessEnd)+'\n'+html.slice(start,end)+';this.api={renderEmployeeLeaveStatus,openLeaveBalanceEditor,updateLeaveBalancePreview,saveLeaveBalance,monthlyLeaveCandidatesHtml,revokeMonthlyLeaveAccrual};',c);
+  vm.createContext(c);vm.runInContext(html.slice(paginationStart,paginationEnd)+'\n'+html.slice(accessStart,accessEnd)+'\n'+html.slice(start,end)+';this.api={renderEmployeeLeaveStatus,openLeaveBalanceEditor,updateLeaveBalancePreview,saveLeaveBalance,saveLeaveYearEarned:typeof saveLeaveYearEarned==="function"?saveLeaveYearEarned:null,monthlyLeaveCandidatesHtml,revokeMonthlyLeaveAccrual};',c);
   return {c,$,calls,alerts,api:c.api};
 }
 test('직원별 실제 잔액·올해 발생·사용을 보여 주고 기타 계정은 접는다',async()=>{
@@ -94,4 +94,81 @@ test('월차 방식은 두 값만 저장하고 글·설명·선택지 이름을 
   const c={};vm.createContext(c);vm.runInContext(code+';this.validate=hubSettingValidate;this.def=hubSettingDefByKey("monthly_leave_attendance_mode");this.textDef=hubTextDefByKey;',c);
   assert.equal(c.def.def,'auto');for(const value of ['auto','published_schedule'])assert.equal(c.validate(c.def,value).ok,true);for(const value of ['','unknown','true'])assert.equal(c.validate(c.def,value).ok,false);
   for(const key of [c.def.labelKey,c.def.whereKey,...c.def.options.map(o=>o.labelKey)])assert.ok(c.textDef(key));
+});
+
+test('올해 생긴 보정값은 0도 표시하고 해당 연도의 편집자와 설정 문구를 표시한다',async()=>{
+  const t=setup({earnedRows:[{user_id:'a',year:2026,earned_days:'0',updated_by_name:'<수정자>'},{user_id:'b',year:2025,earned_days:'99'}],texts:{'leave.status.earned_manual':'편집 {name}'}});
+  const out=await t.api.renderEmployeeLeaveStatus();
+  assert.match(out,/<th>사용함<\/th>/);
+  assert.match(out,/id="leaveEarned_0">0일<div class="sub">편집 &lt;수정자>/);
+  assert.doesNotMatch(out,/>99일</);
+  assert.match(out,/id="leaveEarnedClear_0"[^>]*onclick="saveLeaveYearEarned\(0,true\)"/);
+  t.api.openLeaveBalanceEditor(0);
+  assert.equal(t.$('#leaveEarnedTarget_0').value,'');
+});
+
+test('올해 생긴 값 저장과 초기화는 잔액 RPC 없이 동작하고 0일도 저장한다',async()=>{
+  const t=setup();await t.api.renderEmployeeLeaveStatus();
+  t.api.openLeaveBalanceEditor(0);
+  await t.api.saveLeaveYearEarned(0);
+  assert.equal(t.calls.filter(c=>Array.isArray(c)&&c[0]==='set_leave_year_earned').length,0);
+  t.$('#leaveEarnedTarget_0').value='0.25';await t.api.saveLeaveYearEarned(0);
+  assert.match(t.alerts.at(-1),/0\.5일/);
+  assert.equal(t.calls.filter(c=>Array.isArray(c)&&c[0]==='set_leave_year_earned').length,0);
+  t.$('#leaveEarnedTarget_0').value='0';t.$('#leaveNote_0').value='메모';
+  t.$('#leaveTarget_0').value='12';
+  await Promise.all([t.api.saveLeaveYearEarned(0),t.api.saveLeaveYearEarned(0)]);
+  const writes=t.calls.filter(c=>Array.isArray(c)&&c[0]==='set_leave_year_earned');
+  assert.equal(writes.length,1);assert.equal(writes[0][1].p_days,0);
+  assert.equal(writes[0][1].p_year,2026);assert.equal('p_note' in writes[0][1],false);
+  assert.match(t.$('#leaveEarned_0').innerHTML,/0일.*직접 고침 · 수정자/);
+  assert.equal(t.$('#leaveEarnedClear_0').hidden,false);
+  assert.equal(t.$('#leaveTarget_0').value,'12');
+  await t.api.saveLeaveYearEarned(0,true);
+  assert.equal(t.calls.at(-1)[0],'clear_leave_year_earned');
+  assert.equal(t.$('#leaveEarned_0').innerHTML,'10일');
+  assert.equal(t.$('#leaveEarnedClear_0').hidden,true);
+  assert.equal(t.calls.some(c=>Array.isArray(c)&&c[0]==='set_leave_balance'),false);
+});
+
+test('매니저 본인 행과 보정 조회 실패에서는 올해 생긴 값을 바꿀 수 없다',async()=>{
+  const m=setup({role:'manager',userId:'a',settings:{'leave.manager_access_enabled':'true'}});
+  const out=await m.api.renderEmployeeLeaveStatus();
+  assert.doesNotMatch(out,/openLeaveBalanceEditor\(0\)|leaveEarnedSave_0/);
+  assert.match(out,/openLeaveBalanceEditor\(1\)/);
+  m.$('#leaveEarnedTarget_0').value='5';await m.api.saveLeaveYearEarned(0);
+  assert.equal(m.calls.some(c=>Array.isArray(c)&&c[0]==='set_leave_year_earned'),false);
+  const f=setup({earnedLoadError:true});const error=await f.api.renderEmployeeLeaveStatus();
+  assert.match(error,/올해 생긴 연차를 확인하지 못했습니다/);
+  assert.match(error,/saveLeaveBalance\(0\)/);
+  assert.doesNotMatch(error,/leaveEarnedSave_0/);
+  f.$('#leaveEarnedTarget_0').value='5';await f.api.saveLeaveYearEarned(0);
+  assert.equal(f.calls.some(c=>Array.isArray(c)&&c[0]==='set_leave_year_earned'),false);
+});
+
+test('연도는 서울 자정 기준과 같고 보정 쓰기 오류는 기존 표시를 유지한다',async()=>{
+  const t=setup({now:'2026-12-31T15:30:00Z',earnedRows:[{user_id:'a',year:2027,earned_days:7,updated_by_name:'전임자'}],rpcError:true});
+  const html=await t.api.renderEmployeeLeaveStatus();
+  assert.match(html,/id="leaveEarned_0">7일/);
+  assert.match(html,/2027년에 생긴 연차를/);
+  const cell=t.$('#leaveEarned_0'),before=html.match(/<td id="leaveEarned_0">([\s\S]*?)<\/td>/)[1];
+  assert.match(before,/7일.*직접 고침 · 전임자/);
+  cell.innerHTML=before;
+  t.$('#leaveEarnedTarget_0').value='8';await t.api.saveLeaveYearEarned(0);
+  assert.equal(t.calls.at(-1)[1].p_year,2027);
+  assert.match(t.alerts.at(-1),/올해 생긴 연차를 저장하지 못했습니다/);
+  assert.equal(cell.innerHTML,before);
+  assert.equal(t.$('#leaveEarnedSave_0').disabled,false);
+});
+
+test('올해 생긴 연차 문구 전부를 설정에서 편집할 수 있고 자리표시자 계약이 일치한다',()=>{
+  const code=fs.readFileSync('hub-texts.js','utf8').match(/\/\* hub-texts:test-start \*\/[\s\S]*?\/\* hub-texts:test-end \*\//)[0];
+  const c={};vm.createContext(c);vm.runInContext(code+';this.textDef=hubTextDefByKey;',c);
+  const keys=[...new Set([...html.matchAll(/hubT\('(leave\.status\.earned_[a-z_]+)'/g)].map(m=>m[1]))];
+  assert.ok(keys.length>0);
+  for(const key of keys){
+    const def=c.textDef(key);assert.ok(def,key);
+    assert.deepEqual(Array.from(def.vars||[]),[...def.def.matchAll(/\{([a-z_]+)\}/g)].map(m=>m[1]),key);
+  }
+  assert.equal(c.textDef('leave.status.used').def,'사용함');
 });
