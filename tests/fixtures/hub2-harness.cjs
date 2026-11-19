@@ -44,6 +44,9 @@ async function renderAll(html,opts){
   const out={};
   const workSrc=region(text,'/* ── 업무자료 ── */','/* work-documents:render-end */',true);
   const onboSrc=region(text,'/* onboarding-guide:test-start */','async function submitOnbo(',false);
+  const leaveAccessSrc=text.includes('/* leave-manager-access-ui:test-start */')
+    ? region(text,'/* leave-manager-access-ui:test-start */','/* leave-manager-access-ui:test-end */',false)
+    : '';
   const hubJs=o.engine?lf(fs.readFileSync(path.join(__dirname,'..','..','hub-texts.js'),'utf8')):null;
   const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const md=s=>s?String(s).slice(5).replace('-','/'):'';
@@ -51,7 +54,7 @@ async function renderAll(html,opts){
   async function makeCtx(srcs,extra){
     const dom=makeDom(),alerts=[];
     const ctx={P9_PLEDGES:new Map(),loadContractPledges:async()=>{},initPledgeCanvas(){},renderSecurityPledgeDocuments:async()=>{},console,esc,md,$:dom.$,PROFILES,ME:{id:'u1',name:'김직원',role:'staff',dept:'진료실'},
-      isLead:()=>['chief','owner'].includes(ctx.ME.role),isMgr:()=>['manager','chief','owner'].includes(ctx.ME.role),isLeaveDocsLead:()=>['manager','chief','owner'].includes(ctx.ME.role),
+      SETTINGS_LOAD_OK:true,SETTINGS:o.settings||{},isLead:()=>['chief','owner'].includes(ctx.ME.role),isMgr:()=>['manager','chief','owner'].includes(ctx.ME.role),isLeaveDocsLead:()=>['manager','chief','owner'].includes(ctx.ME.role),
       nameOf:uid=>{const p=PROFILES.find(x=>x.user_id===uid);return p?p.name:(uid||'').slice(0,6);},
       contractDate:s=>s?String(s).slice(0,10):'-',contractTitle:r=>r.title||'근로계약서',
       today:()=>'2026-10-03',setStatus(){},render(){},refreshBadges(){},show(){},hide(){},alert:m=>alerts.push(String(m)),prompt:()=>'사유입니다',confirm:()=>true,
@@ -76,6 +79,7 @@ async function renderAll(html,opts){
         await ctx.HubUi.load({from(){const api={select(){return api;},then(res,rej){return Promise.resolve(o.loadFail?{data:null,error:{message:'x'}}:{data:o.textRows,error:null}).then(res,rej);}};return api;}});
       }
     }
+    if(leaveAccessSrc)vm.runInContext(leaveAccessSrc,ctx);
     for(const s of srcs)vm.runInContext(s,ctx);
     return {ctx,dom,alerts};
   }
@@ -214,8 +218,9 @@ async function renderAll(html,opts){
   await flow('doc.storagefail',()=>({$:docDom(),sb:{storage:{from:()=>({upload:async()=>fail('저장소실패')})}}}),'uploadEmployeeDocument');
   await flow('doc.insertfail',()=>({$:docDom(),sb:{storage:{from:()=>({upload:async()=>({error:null}),remove:async()=>({})})},from:()=>({insert:async()=>fail('목록실패')})}}),'uploadEmployeeDocument');
   await flow('leavedoc.norequest',()=>({$:docDom(d=>{d.$('#edLeaveRequest').value='';})}),'uploadLeaveApplicationDocument');
-  await flow('leavedoc.upfail',()=>({$:docDom(),sb:{storage:{from:()=>({upload:async()=>fail('연차올리기실패')})}}}),'uploadLeaveApplicationDocument');
-  await flow('leavedoc.savefail',()=>({$:docDom(),sb:{storage:{from:()=>({upload:async()=>({error:null}),remove:async()=>({})})},from:()=>({insert:async()=>fail('연차저장실패')})}}),'uploadLeaveApplicationDocument');
+  const leaveLookup=()=>chain({data:{id:31,user_id:'u1'},error:null});
+  await flow('leavedoc.upfail',()=>({$:docDom(),sb:{storage:{from:()=>({upload:async()=>fail('연차올리기실패')})},from:leaveLookup}}),'uploadLeaveApplicationDocument');
+  await flow('leavedoc.savefail',()=>({$:docDom(),sb:{storage:{from:()=>({upload:async()=>({error:null}),remove:async()=>({})})},from:table=>table==='leave_requests'?leaveLookup():{insert:async()=>fail('연차저장실패')}}}),'uploadLeaveApplicationDocument');
   const payDom=(vals)=>{const d=makeDom();Object.entries(vals).forEach(([k,v])=>{d.$(k).value=v;});d.$('#paymentFiles').files=[];return d.$;};
   await flow('pay.missing',()=>({$:payDom({'#paymentItem':'','#paymentAmount':'0'})}),'submitPaymentRequest');
   await flow('pay.rpcfail',()=>({$:payDom({'#paymentItem':'소모품','#paymentAmount':'1000','#paymentBank':'국민','#paymentHolder':'홍','#paymentAccount':'1'}),sb:{rpc:async()=>fail('요청실패')}}),'submitPaymentRequest');

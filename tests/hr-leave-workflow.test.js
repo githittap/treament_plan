@@ -12,7 +12,7 @@ test('연차 처리는 원자적 RPC를 사용한다', () => {
   assert.match(html, /'set_leave_balance'/);
   assert.match(html, /if\(kind==='부여'\)\{[\s\S]*?await previewLeaveAccrual\(\)/);
   assert.match(html, /sb\.rpc\('set_leave_balance'/);
-  assert.doesNotMatch(html, /sb\.rpc\('grant_leave_entry'/);
+  assert.match(html, /sb\.rpc\('grant_leave_entry'/);
   assert.match(sql, /select \* into r[\s\S]+for update/);
   assert.match(sql, /not exists\(select 1 from public\.leave_ledger as ll where ll\.ref=p_id and ll\.kind='사용'\)/);
   assert.match(sql, /pg_advisory_xact_lock\(hashtextextended\(r\.user_id::text,0\)\)/);
@@ -62,7 +62,7 @@ test('chief는 대기와 1차승인 모두 조회하고 승인 RPC로 처리한�
 });
 
 test('승인완료 취소는 owner RPC로 복구하고 오류를 확인한다', () => {
-  assert.match(html, /ME\.role==='owner'\?`<button[^`]+cancelApprovedLeave/);
+  assert.match(html, /ME\.role==='owner'\|\|\(ME\.role==='manager'&&canApproveLeave\(\)&&!isManagerOwnLeave\(r\.user_id\)\)[^\n]+cancelApprovedLeave/);
   assert.match(html, /p_action:'cancel_approved'/);
   assert.match(html, /승인 취소·복구 실패/);
 });

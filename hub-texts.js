@@ -751,6 +751,14 @@ function hubTextDefsChapter2(add){
   add('onbo.docs.m_save_fail',S7,'서류 목록 저장에 실패했을 때 — {detail}은 이유','서류 목록 저장 실패: {detail}',['detail']);
   add('onbo.docs.m_leave_pick',S7,'연차 신청을 안 골랐을 때 뜨는 글','내 연차 신청을 먼저 선택하세요.');
   add('onbo.docs.m_leave_save_fail',S7,'연차 증빙 저장에 실패했을 때 — {detail}은 이유','연차 신청 증빙 저장 실패: {detail}',['detail']);
+  add('onbo.docs.f_manager_leave_req',S7,'매니저가 직원 연차 증빙을 올릴 때 신청 선택 칸 이름','직원 연차 신청');
+  add('onbo.docs.m_leave_request_fail',S7,'연차 신청을 불러오지 못했을 때 — {detail}은 이유','연차 신청을 불러오지 못했습니다: {detail}',['detail']);
+  add('onbo.docs.m_leave_self_only',S7,'직원 본인 신청이 아닌 항목을 고른 직원에게 뜨는 글','본인 연차 신청만 선택할 수 있습니다.');
+  add('onbo.docs.a_leave_delete_button',S7,'연차 증빙 목록의 삭제 단추 글','삭제');
+  add('onbo.docs.a_leave_delete_confirm',S7,'연차 증빙 삭제 전 확인창 — {name}은 직원 이름, {file}은 파일 이름','{name}님의 {file}을 삭제할까요?',['name','file']);
+  add('onbo.docs.a_leave_label',S7,'연차 증빙 파일 이름을 모를 때 삭제 확인창에 표시','연차 신청 증빙');
+  add('onbo.docs.a_leave_delete_storage_fail',S7,'연차 증빙 파일 삭제 실패 알림 — {detail}은 이유','파일 삭제 실패: {detail}',['detail']);
+  add('onbo.docs.a_leave_delete_row_fail',S7,'파일은 지웠지만 목록 삭제가 실패했을 때 — {detail}은 이유','파일은 삭제됐지만 서류 목록 삭제에 실패했습니다. 관리자에게 알려 주세요: {detail}',['detail']);
   add('onbo.docs.a_not_found',S7,'서류를 못 찾았을 때 뜨는 알림','서류를 찾지 못했습니다.');
   add('onbo.docs.a_leave_not_found',S7,'연차 증빙을 못 찾았을 때 뜨는 알림','연차 신청 증빙을 찾지 못했습니다.');
   add('onbo.docs.a_open_fail',S7,'파일을 못 열었을 때 뜨는 알림 — {detail}은 이유','파일을 열지 못했습니다: {detail}',['detail']);
@@ -1142,6 +1150,7 @@ function hubTextDefsChapter3(add){
   add('leave.pend.th_reason','🌿 연차 › 내 연차·신청 내역·승인','승인 대기 표 머리 — 사유','사유');
   add('leave.pend.special','🌿 연차 › 내 연차·신청 내역·승인','승인 대기 표 — 특별사정으로 신청한 건의 표시','특별사정');
   add('leave.pend.btn_ok','🌿 연차 › 내 연차·신청 내역·승인','승인 대기 표 — 실장 최종 승인 단추','실장 최종 승인');
+  add('leave.pend.btn_ok_manager','🌿 연차 › 내 연차·신청 내역·승인','매니저 승인 대기 표 — 최종 승인 단추','매니저 최종 승인');
   add('leave.pend.empty','🌿 연차 › 내 연차·신청 내역·승인','승인 대기 카드 — 대기 건이 없을 때','대기 없음');
   add('leave.arch.title','🌿 연차 › 내 연차·신청 내역·승인','승인 내역 카드 제목(실장·원장)','📚 승인 내역');
   add('leave.arch.th_approver','🌿 연차 › 내 연차·신청 내역·승인','승인 내역 표 머리 — 승인자·승인일','승인자·승인일');
@@ -1159,6 +1168,7 @@ function hubTextDefsChapter3(add){
   add('leave.m_cancel_fail','🌿 연차 › 내 연차·신청 내역·승인','내 대기 신청 취소 실패({msg}는 서버 오류)','취소 실패: {msg}',['msg']);
   add('leave.m_cancel_unknown','🌿 연차 › 내 연차·신청 내역·승인','내 대기 신청 취소 — 결과를 확인 못 했을 때','취소 결과를 확인하지 못했습니다.');
   add('leave.m_ok_confirm','🌿 연차 › 내 연차·신청 내역·승인','실장 최종 승인 누르면 뜨는 확인창','실장 최종 승인하시겠습니까?');
+  add('leave.m_ok_confirm_manager','🌿 연차 › 내 연차·신청 내역·승인','매니저 최종 승인 누르면 뜨는 확인창','매니저 최종 승인하시겠습니까?');
   add('leave.m_rej_confirm','🌿 연차 › 내 연차·신청 내역·승인','연차 반려 누르면 뜨는 확인창','이 연차 신청을 반려하시겠습니까?');
   add('leave.m_act_fail','🌿 연차 › 내 연차·신청 내역·승인','연차 승인·반려 처리 실패({msg}는 서버 오류)','처리 실패: {msg}',['msg']);
   add('leave.m_act_unknown','🌿 연차 › 내 연차·신청 내역·승인','연차 승인·반려 — 결과를 확인 못 했을 때','처리 결과를 확인하지 못했습니다. 새로고침 후 확인하세요.');
@@ -1228,6 +1238,14 @@ function hubTextDefsChapter3(add){
   add('leave.status.other','🌿 연차 › 연차 부여·자동 적립(원장)','직원별 연차 현황 — 그 밖의 계정 {n}개','그 밖의 계정 {n}개',['n']);
   add('leave.status.invalid','🌿 연차 › 연차 부여·자동 적립(원장)','직원별 연차 현황 — 남은 연차는 0 이상, 0.5일 단위로 입력하세요.','남은 연차는 0 이상, 0.5일 단위로 입력하세요.');
   add('leave.status.preview','🌿 연차 › 연차 부여·자동 적립(원장)','직원별 연차 현황 — 지금 {before}일 → 바꾸면 {after}일 ({delta}일)','지금 {before}일 → 바꾸면 {after}일 ({delta}일)',['before','after','delta']);
+  add('leave.ledger.history_title','🌿 연차 › 연차 부여·자동 적립(원장)','매니저 직원별 연차 현황 — 개별 기록 펼치기','개별 연차 기록');
+  add('leave.ledger.history_load_fail','🌿 연차 › 연차 부여·자동 적립(원장)','매니저 직원별 연차 현황 — 개별 기록 조회 실패({msg}는 서버 오류)','개별 기록을 불러오지 못했습니다: {msg}',['msg']);
+  add('leave.ledger.history_th_name','🌿 연차 › 연차 부여·자동 적립(원장)','개별 연차 기록 표 머리 — 직원','직원');
+  add('leave.ledger.history_th_date','🌿 연차 › 연차 부여·자동 적립(원장)','개별 연차 기록 표 머리 — 일자','일자');
+  add('leave.ledger.history_th_kind','🌿 연차 › 연차 부여·자동 적립(원장)','개별 연차 기록 표 머리 — 종류','종류');
+  add('leave.ledger.history_th_days','🌿 연차 › 연차 부여·자동 적립(원장)','개별 연차 기록 표 머리 — 일수','일수');
+  add('leave.ledger.history_th_note','🌿 연차 › 연차 부여·자동 적립(원장)','개별 연차 기록 표 머리 — 메모','메모');
+  add('leave.ledger.history_empty','🌿 연차 › 연차 부여·자동 적립(원장)','개별 연차 기록이 없을 때','연차 기록이 없습니다.');
   add('leave.status.note','🌿 연차 › 연차 부여·자동 적립(원장)','직원별 연차 현황 — 남은 연차 변경: {days}일','남은 연차 변경: {days}일',['days']);
   add('leave.acc.title','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 카드 제목(원장)','📆 1년 된 직원의 연차 15일을 확인하고 넣기');
   add('leave.acc.hint','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 카드 설명','1년 미만 월차는 매달 자동으로 생깁니다. 1년이 된 직원의 15일과 아직 확인되지 않은 지난 기간은 여기에서 개근·재직을 확인하고 넣습니다. 이미 넣은 연차는 두 번 넣지 않습니다.');
@@ -1239,6 +1257,17 @@ function hubTextDefsChapter3(add){
   add('leave.m_grant_days','🌿 연차 › 연차 부여·자동 적립(원장)','연차 부여 — 일수를 잘못 넣었을 때','일수는 0 이상으로 입력하세요. 0일도 절대 잔액 조정값으로 기록할 수 있습니다.');
   add('leave.m_grant_fail','🌿 연차 › 연차 부여·자동 적립(원장)','연차 부여·잔액 설정 실패({msg}는 서버 오류)','연차 기록 실패: {msg}',['msg']);
   add('leave.m_grant_unknown','🌿 연차 › 연차 부여·자동 적립(원장)','연차 잔액 설정 — 결과를 확인 못 했을 때','잔액 설정 결과를 확인하지 못했습니다.');
+  add('leave.m_grant_kind','🌿 연차 › 연차 부여·자동 적립(원장)','매니저 수기 기록 — 기록 종류를 물을 때','기록 종류를 입력하세요: 부여 또는 조정');
+  add('leave.m_grant_days_prompt','🌿 연차 › 연차 부여·자동 적립(원장)','매니저 수기 기록 — 일수를 물을 때','일수를 입력하세요. 0 이상, 0.5일 단위입니다.');
+  add('leave.m_grant_days_invalid','🌿 연차 › 연차 부여·자동 적립(원장)','매니저 수기 기록 — 일수가 올바르지 않을 때','0 이상, 0.5일 단위로 입력하세요.');
+  add('leave.m_grant_note','🌿 연차 › 연차 부여·자동 적립(원장)','매니저 수기 기록 — 메모를 물을 때','메모를 입력하세요.');
+  add('leave.grant.manual','🌿 연차 › 연차 부여·자동 적립(원장)','매니저가 직원 연차를 수기로 기록하는 단추','수기 기록');
+  add('leave.settings.title','🌿 연차 › 연차 부여·자동 적립(원장)','허브 설정 — 매니저 연차 권한 카드 제목','매니저 연차 권한');
+  add('leave.settings.hint','🌿 연차 › 연차 부여·자동 적립(원장)','허브 설정 — 매니저 연차 권한 카드 설명','매니저가 보는 연차 자료와 승인 권한을 각각 조절합니다.');
+  add('leave.settings.access','🌿 연차 › 연차 부여·자동 적립(원장)','허브 설정 — 매니저 연차 보기·편집 체크 이름','매니저 연차 보기·편집');
+  add('leave.settings.approve','🌿 연차 › 연차 부여·자동 적립(원장)','허브 설정 — 매니저 연차 승인·반려 체크 이름','매니저 연차 승인·반려');
+  add('leave.settings.save','🌿 연차 › 연차 부여·자동 적립(원장)','허브 설정 — 매니저 연차 권한 저장 단추 글','저장');
+  add('leave.settings.fail','🌿 연차 › 연차 부여·자동 적립(원장)','허브 설정 — 저장 실패 알림({msg}는 이유)','저장 실패: {msg}',['msg']);
   add('leave.acc.m_bad_date','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 — 기준일이 틀렸을 때','오늘 이전의 올바른 기준일을 선택하세요.');
   add('leave.acc.m_loading','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 — 미리보기 불러오는 중','미리보기 불러오는 중…');
   add('leave.acc.m_prev_fail','🌿 연차 › 연차 부여·자동 적립(원장)','자동 연차 적립 — 미리보기 실패({msg}는 서버 오류)','연차 미리보기 실패: {msg}',['msg']);
@@ -2971,7 +3000,12 @@ function hubNotifyDefault(row,col){
   if(row==='suggestion_comment')return ['author','owner','commenters'].includes(col);
   return ({inquiry:['manager','desk'],leave_request:['owner','chief'],leave_result:['applicant'],approval:['owner','chief'],notice:['owner','chief','manager','desk'],document:['applicant'],payment:['owner','chief'],advertising:['owner','manager']})[row].includes(col);
 }
-function hubNotifyEnabled(row,col){const raw=hubSetting('notify.'+row+'.'+col,'');return raw==='true'?true:raw==='false'?false:hubNotifyDefault(row,col);}
+function hubNotifyEnabled(row,col){
+  const managerLeave=row==='leave_request'&&col==='manager';
+  if(managerLeave&&!hubSettingBoolean('leave.manager_access_enabled',false))return false;
+  const raw=hubSetting('notify.'+row+'.'+col,'');
+  return raw==='true'?true:raw==='false'?false:managerLeave||hubNotifyDefault(row,col);
+}
 function hubSuggestionNotifyHtml(){
   return '<div class="hub-row"><b>'+hubEsc(hubText('sug.cmt.notify_title','건의 댓글'))+'</b><div class="rowflex">'+[['author','건의 작성자'],['owner','원장'],['commenters','앞선 댓글자']].map(c=>'<label><input type="checkbox" data-hub-suggestion-notify="notify.suggestion_comment.'+c[0]+'"'+(hubNotifyEnabled('suggestion_comment',c[0])?' checked':'')+'> '+hubEsc(hubText('sug.cmt.notify_'+c[0],c[1]))+'</label>').join('')+'</div></div>';
 }
@@ -3045,7 +3079,7 @@ function hubTextDefsP7(add){
   HUB_MANUAL_GROUPS.forEach(it=>add('p7.manual.group.'+it[0],S,'매뉴얼 직무 이름',it[1]));
 }
 function hubP7SettingsHtml(){
-  return '<section><h3>'+hubEsc(hubText('p7.notify.title','🔔 알림 받는 사람'))+'</h3><p>'+hubEsc(hubText('p7.notify.hint','칸을 켜거나 끄면 다음 알림부터 반영됩니다. 결재·결제 요청의 기본 알림은 현재 처리 단계의 담당자에게 갑니다.'))+'</p><div class="tblwrap"><table><thead><tr><th></th>'+HUB_NOTIFY_COLS.map(c=>'<th>'+hubEsc(hubText('p7.notify.col.'+c[0],c[1]))+'</th>').join('')+'</tr></thead><tbody>'+HUB_NOTIFY_ROWS.map(r=>'<tr><th>'+hubEsc(hubText('p7.notify.row.'+r[0],r[1]))+'</th>'+HUB_NOTIFY_COLS.map(c=>'<td><input type="checkbox" data-hub-notify="notify.'+r[0]+'.'+c[0]+'" aria-label="'+hubEsc(hubText('p7.notify.row.'+r[0],r[1])+' '+hubText('p7.notify.col.'+c[0],c[1]))+'"'+(hubNotifyEnabled(r[0],c[0])?' checked':'')+'></td>').join('')+'</tr>').join('')+'</tbody></table></div>'+hubSuggestionNotifyHtml()+'<span id="hubNotifyMsg" role="status"></span></section><section><h3>'+hubEsc(hubText('p7.manual.title','📚 직무별 매뉴얼 주소'))+'</h3><p>'+hubEsc(hubText('p7.manual.hint','주소를 비우면 기존 공용 매뉴얼을 사용합니다.'))+'</p>'+HUB_MANUAL_GROUPS.map(g=>'<div class="hub-row"><label>'+hubEsc(hubText('p7.manual.group.'+g[0],g[1]))+' <input type="url" id="hubManual_'+g[0]+'" value="'+hubEsc(hubSetting('manual.url.'+g[0],''))+'"></label> <button class="mini stamp" data-hub-manual="'+g[0]+'">'+hubEsc(hubText('p7.save','저장'))+'</button><span id="hubManualMsg_'+g[0]+'" role="status"></span></div>').join('')+'</section>';
+  return '<section><h3>'+hubEsc(hubText('p7.notify.title','🔔 알림 받는 사람'))+'</h3><p>'+hubEsc(hubText('p7.notify.hint','칸을 켜거나 끄면 다음 알림부터 반영됩니다. 결재·결제 요청의 기본 알림은 현재 처리 단계의 담당자에게 갑니다.'))+'</p><div class="tblwrap"><table><thead><tr><th></th>'+HUB_NOTIFY_COLS.map(c=>'<th>'+hubEsc(hubText('p7.notify.col.'+c[0],c[1]))+'</th>').join('')+'</tr></thead><tbody>'+HUB_NOTIFY_ROWS.map(r=>'<tr><th>'+hubEsc(hubText('p7.notify.row.'+r[0],r[1]))+'</th>'+HUB_NOTIFY_COLS.map(c=>'<td><input type="checkbox" data-hub-notify="notify.'+r[0]+'.'+c[0]+'" aria-label="'+hubEsc(hubText('p7.notify.row.'+r[0],r[1])+' '+hubText('p7.notify.col.'+c[0],c[1]))+'"'+(hubNotifyEnabled(r[0],c[0])?' checked':'')+(r[0]==='leave_request'&&c[0]==='manager'&&!hubSettingBoolean('leave.manager_access_enabled',false)?' disabled':'')+'></td>').join('')+'</tr>').join('')+'</tbody></table></div>'+hubSuggestionNotifyHtml()+'<span id="hubNotifyMsg" role="status"></span></section><section><h3>'+hubEsc(hubText('p7.manual.title','📚 직무별 매뉴얼 주소'))+'</h3><p>'+hubEsc(hubText('p7.manual.hint','주소를 비우면 기존 공용 매뉴얼을 사용합니다.'))+'</p>'+HUB_MANUAL_GROUPS.map(g=>'<div class="hub-row"><label>'+hubEsc(hubText('p7.manual.group.'+g[0],g[1]))+' <input type="url" id="hubManual_'+g[0]+'" value="'+hubEsc(hubSetting('manual.url.'+g[0],''))+'"></label> <button class="mini stamp" data-hub-manual="'+g[0]+'">'+hubEsc(hubText('p7.save','저장'))+'</button><span id="hubManualMsg_'+g[0]+'" role="status"></span></div>').join('')+'</section>';
 }
 async function hubNotifyWrite(sb,key,enabled){
   if(!(HUB_NOTIFY_ROWS.some(r=>HUB_NOTIFY_COLS.some(c=>key==='notify.'+r[0]+'.'+c[0]))||['author','owner','commenters'].some(c=>key==='notify.suggestion_comment.'+c))||typeof enabled!=='boolean')return {ok:false,reason:'invalid'};

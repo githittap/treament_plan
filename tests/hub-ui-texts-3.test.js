@@ -23,6 +23,11 @@ function attendanceLegacyLayout(value){return String(value)
   .replace(/<input type="time" class="manual-clock-mobile" id="manualClock(In|Out)Time"[^>]*>/g,'')
   .replace(/ id="manualAttendanceSubmit"/g,'');}
 const P7_DATE_TEXT_KEYS=new Set(['att.manual.confirm_discard','att.manual.m_loading','att.manual.m_load_fail']);
+const MANAGER_ONLY_LEAVE_TEXT_KEYS=new Set(['leave.pend.btn_ok_manager','leave.m_ok_confirm_manager','leave.grant.manual',
+  'leave.ledger.history_title','leave.ledger.history_load_fail','leave.ledger.history_th_name','leave.ledger.history_th_date','leave.ledger.history_th_kind','leave.ledger.history_th_days','leave.ledger.history_th_note','leave.ledger.history_empty',
+  // 매니저 수기 기록과 원장 설정은 leave-manager-access.test.js에서 실제 호출함.
+  'leave.m_grant_kind','leave.m_grant_days_prompt','leave.m_grant_days_invalid','leave.m_grant_note',
+  'leave.settings.title','leave.settings.hint','leave.settings.access','leave.settings.approve','leave.settings.save','leave.settings.fail']);
 
 
 function helpers(){
@@ -62,7 +67,7 @@ const dynRows=defs=>defs.map(d=>({key:d.key,value:'«'+d.key+'»'+(d.vars?' '+d.
 /* ───────────── 1. 기본 글 목록 ───────────── */
 test('차례 3 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 14개(출퇴근·근태차이 8 · 근무표 2 · 연차 4)',()=>{
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
-  assert.equal(defs.length,439,'차례 3 글 키 수(고쳐 쓰는 글 295 + 모달 속 고정 글 19 · P7 이름 보기 추가)');
+  assert.equal(defs.length,460,'차례 3 글 키 수(P7 매니저 승인 문구·개별 연차 원장 상세·관리자 화면 글 포함)');
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
   for(const d of defs){
     assert.match(d.key,/^[a-z][a-z0-9_.]{1,80}$/,d.key);
@@ -130,7 +135,8 @@ test('숫자·목록 기본값: 연차·소명 숫자 5개와 연차 유형·근
   assert.match(hr,/<select id="lvType"><option>연차<\/option><option>반차<\/option><option>조퇴<\/option><option>기타<\/option><\/select>/,'신청 창 기본 선택칸(기존 시험이 이 줄을 찾음)');
   assert.equal(L('list.work_depts').addable,false);assert.equal(L('list.leave_types').addable,false);
   assert.ok(S('leave.same_day_limit').where.includes('DB에는 없어요'));
-  assert.match(hr,/hub-texts\.js\?v=202610\d{4}/,'캐시 번호를 새 값으로 올림(차례 4에서 2026100109 → 2026100110, 차례 5에서 → 2026100111, 차례 6에서 → 2026100112, 차례 7에서 → 2026100113, 10-02 원장요청 5건에서 → 2026100221, 10-02 인박스 판에서 → 2026100223)');
+  const version=Number(hr.match(/hub-texts\.js\?v=(\d{10})/)?.[1]);
+  assert.ok(version>=2026100223,'현재 허브 글을 불러올 수 있도록 캐시 버전을 유지함');
 });
 
 /* ───────────── 2. 기본값만 있을 때 옛 화면과 똑같음 ───────────── */
@@ -173,7 +179,7 @@ test('표에 값이 있으면 그 글: 고쳐 쓰는 글 355개가 모두 화면
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
   const stat=new Set([...hr.matchAll(/\bdata-hub(?:k|ph)="([a-z0-9_.]+)"/g)].map(m=>m[1]));
   const dyn=defs.filter(d=>!stat.has(d.key)&&!P7_DATE_TEXT_KEYS.has(d.key)); // 날짜 전환 글 3개는 attendance-date-switch.test.js의 실제 호출로 확인함
-  assert.equal(dyn.length,417);
+  assert.equal(dyn.length,438);
   const out=await renderAll(hr,{engine:true,textRows:dynRows(dyn),settings:{}});
   const b2Defs=defs.filter(d=>/^att\.issue\.p_date$|^att\.issueform\.|^att\.myissue\.|^att\.issue\.(?:evidence_|admin_evidence|awaiting_staff|auto_clock_)/.test(d.key));
   const b2Observed=await require('./fixtures/hub3-harness.cjs').observeAttendanceIssueB2(hr,{textRows:dynRows(b2Defs)});
@@ -189,8 +195,8 @@ test('표에 값이 있으면 그 글: 고쳐 쓰는 글 355개가 모두 화면
   const cObservedMissing=cDefs.filter(d=>!cObservedText.includes('«'+d.key+'»')).map(d=>d.key);
   assert.equal(cObservedMissing.length,0,'C 차이 글은 관리자·직원·오류·빈 상태·엑셀의 실제 렌더에 모두 나타남 '+cObservedMissing.join(', '));
   const all=Object.values(out).join('\n')+'\n'+b2Observed+'\n'+cObservedText;
-  const legacyMissing=dyn.filter(d=>!b2Defs.some(x=>x.key===d.key)&&!all.includes('«'+d.key+'»')).map(d=>d.key);
-  const visibleMissing=b2Defs.filter(d=>d.key!=='att.myissue.th_evidence'&&!all.includes('«'+d.key+'»')).map(d=>d.key);
+  const legacyMissing=dyn.filter(d=>!MANAGER_ONLY_LEAVE_TEXT_KEYS.has(d.key)&&!b2Defs.some(x=>x.key===d.key)&&!all.includes('«'+d.key+'»')).map(d=>d.key);
+  const visibleMissing=b2Defs.filter(d=>d.key!=='att.myissue.th_evidence'&&!MANAGER_ONLY_LEAVE_TEXT_KEYS.has(d.key)&&!all.includes('«'+d.key+'»')).map(d=>d.key);
   assert.equal(legacyMissing.length,0,'기존 화면 글은 기존 관측 그대로 검사: '+legacyMissing.join(', '));
   assert.equal(visibleMissing.length,0,'B2 양식·카드·관리자 표·증거 목록은 실제 관측 렌더로 검사: '+visibleMissing.join(', '));
   // 자리표시자는 화면이 채워 넣음

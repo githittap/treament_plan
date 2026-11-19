@@ -1,20 +1,22 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const html=fs.readFileSync('hr.html','utf8');
 function setup(options={}){
-  const start=html.indexOf('/* leave-status:test-start */'),end=html.indexOf('/* leave-status:test-end */');
+  const start=html.indexOf('/* leave-status:test-start */'),end=html.indexOf('/* leave-status:test-end */'),paginationStart=html.indexOf('async function fetchAttendancePages('),paginationEnd=html.indexOf('\nlet ATT_DIFF_LAST',paginationStart);
   assert.ok(start>=0&&end>start,'직원별 잔액·미리보기 실행 코드가 있어야 함');
   const elements={},calls=[],alerts=[],settings=options.settings||{};
   const $=id=>elements[id]||(elements[id]={value:'',textContent:'',innerHTML:'',hidden:true,disabled:false});
   const profiles=[{user_id:'a',name:'이채연',hire_date:'2026-09-18',active:true},{user_id:'b',name:'abc',hire_date:'2025-01-01',active:true},{user_id:'c',name:'입사일없음',active:true},{user_id:'d',name:'퇴사',hire_date:'2025-01-01',active:false}];
-  const balances=[{user_id:'a',balance:8},{user_id:'b',balance:3}];
+  const balances=[{user_id:'a',balance:8},{user_id:'b',balance:3}],ledgerHistory=options.ledgerHistory||[{user_id:'a',kind:'부여',days:10,note:'기존 연차',created_at:'2026-09-18T00:00:00Z'}];
   const ledger=[{user_id:'a',kind:'부여',days:10},{user_id:'a',kind:'사용',days:2},{user_id:'a',kind:'조정',days:1}];
-  const c={ME:{role:options.role||'owner'},PROFILES:profiles,today:()=> '2026-10-03',suggestGrantDays:()=>15,esc:s=>String(s??'').replaceAll('<','&lt;').replaceAll('"','&quot;'),
+  const c={ME:{role:options.role||'owner'},SETTINGS:Object.assign({'leave.manager_access_enabled':'false','leave.manager_can_approve':'false'},settings),SETTINGS_LOAD_OK:true,PROFILES:profiles,nameOf:id=>profiles.find(p=>p.user_id===id)?.name||id,today:()=> '2026-10-03',suggestGrantDays:()=>15,esc:s=>String(s??'').replaceAll('<','&lt;').replaceAll('"','&quot;'),
     hubT:(key,def,vars)=>Object.entries(vars||{}).reduce((s,[k,v])=>s.replaceAll('{'+k+'}',v),(options.texts||{})[key]||def),
+    stampDate:s=>String(s).startsWith('2026-09-18')?'2026.09.18':String(s).slice(0,10),
     hubSetting:(key,def)=>settings[key]??def,$,alert:s=>alerts.push(s),confirm:()=>options.confirm!==false,render:async()=>calls.push("render"),setStatus:()=>{},sb:{
-      from(table){calls.push(table);const chain={select:()=>chain,gte:()=>chain,lt:()=>chain,then(resolve){return Promise.resolve({data:table==='v_leave_balance'?balances:ledger,error:options.loadError?{message:'조회실패'}:null}).then(resolve);}};return chain;},
+      from(table){calls.push(table);const query={columns:'',start:0,size:1000},chain={select(columns){query.columns=columns;return chain;},gte:()=>chain,lt:()=>chain,order:()=>chain,range(start,end){query.start=start;query.size=end-start+1;return chain;},then(resolve){const all=table==='v_leave_balance'?balances:(table==='leave_ledger'&&query.columns.includes('created_at')?ledgerHistory:ledger),data=all.slice(query.start,query.start+query.size),error=table==='leave_ledger'&&query.columns.includes('created_at')&&options.ledgerHistoryError?{message:'상세 조회실패'}:options.loadError?{message:'조회실패'}:null;return Promise.resolve({data,error}).then(resolve);}};return chain;},
       async rpc(name,args){calls.push([name,args]);if(name==='get_monthly_leave_accrual_candidates')return options.candidateError?{error:{message:'후보조회실패'}}:{data:options.candidates||[],error:null};return options.rpcError?{error:{message:'저장실패'}}:{data:[{target_balance:args.p_target}],error:null};}
     }};
-  vm.createContext(c);vm.runInContext(html.slice(start,end)+';this.api={renderEmployeeLeaveStatus,openLeaveBalanceEditor,updateLeaveBalancePreview,saveLeaveBalance,monthlyLeaveCandidatesHtml,revokeMonthlyLeaveAccrual};',c);
+  const accessStart=html.indexOf('/* leave-manager-access-ui:test-start */'),accessEnd=html.indexOf('/* leave-manager-access-ui:test-end */');
+  vm.createContext(c);vm.runInContext(html.slice(paginationStart,paginationEnd)+'\n'+html.slice(accessStart,accessEnd)+'\n'+html.slice(start,end)+';this.api={renderEmployeeLeaveStatus,openLeaveBalanceEditor,updateLeaveBalancePreview,saveLeaveBalance,monthlyLeaveCandidatesHtml,revokeMonthlyLeaveAccrual};',c);
   return {c,$,calls,alerts,api:c.api};
 }
 test('직원별 실제 잔액·올해 발생·사용을 보여 주고 기타 계정은 접는다',async()=>{
@@ -54,9 +56,18 @@ test('자동 월차 후보는 원장만 날짜 목록과 취소 버튼을 볼 �
   assert.match(out,/결근 후보 2일/);assert.match(out,/2026-09-21, 2026-09-22/);assert.match(out,/onclick="revokeMonthlyLeaveAccrual\(0\)"/);
   await t.api.revokeMonthlyLeaveAccrual(0);
   const call=t.calls.find(c=>Array.isArray(c)&&c[0]==='revoke_monthly_leave_accrual');assert.equal(call[1].p_run_id,1);assert.equal(call[1].p_reason,'결근 후보 확인 후 월차 취소');assert.equal(t.calls.at(-1),'render');
-  for(const role of ['chief','manager','staff']){
+  for(const role of ['chief','staff']){
     const other=setup({role,candidates:[candidateRun]});assert.equal(await other.api.renderEmployeeLeaveStatus(),'');assert.equal(other.api.monthlyLeaveCandidatesHtml('a'),'');await other.api.revokeMonthlyLeaveAccrual(0);assert.equal(other.calls.length,0);
   }
+  const manager=setup({role:'manager',settings:{'leave.manager_access_enabled':'true','leave.manager_can_approve':'true'},candidates:[candidateRun],texts:{'leave.ledger.history_title':'설정한 기록 제목','leave.ledger.history_th_name':'설정한 직원 머리','leave.ledger.history_th_date':'설정한 일자 머리','leave.ledger.history_th_kind':'설정한 종류 머리','leave.ledger.history_th_days':'설정한 일수 머리','leave.ledger.history_th_note':'설정한 메모 머리'}});
+  const managerHtml=await manager.api.renderEmployeeLeaveStatus();assert.match(managerHtml,/직원별 연차 현황/);assert.match(managerHtml,/설정한 기록 제목 \(1건\)[\s\S]*2026\.09\.18[\s\S]*기존 연차/);for(const label of ['설정한 직원 머리','설정한 일자 머리','설정한 종류 머리','설정한 일수 머리','설정한 메모 머리'])assert.match(managerHtml,new RegExp(label));assert.doesNotMatch(managerHtml,/monthlyRevoke_/);
+  const empty=setup({role:'manager',settings:{'leave.manager_access_enabled':'true'},ledgerHistory:[],texts:{'leave.ledger.history_empty':'설정한 빈 목록 안내'}});assert.match(await empty.api.renderEmployeeLeaveStatus(),/설정한 빈 목록 안내/);
+  const failed=setup({role:'manager',settings:{'leave.manager_access_enabled':'true'},ledgerHistoryError:true,texts:{'leave.ledger.history_load_fail':'설정한 조회 실패 안내'}});assert.match(await failed.api.renderEmployeeLeaveStatus(),/설정한 조회 실패 안내/);
+  const manyRows=Array.from({length:501},(_,i)=>({user_id:'a',kind:'부여',days:1,note:'page-'+i,created_at:'2026-09-18T00:00:00Z'}));
+  const paginated=setup({role:'manager',settings:{'leave.manager_access_enabled':'true'},ledgerHistory:manyRows}),paginatedHtml=await paginated.api.renderEmployeeLeaveStatus();
+  assert.match(paginatedHtml,/개별 연차 기록 \(501건\)/);assert.equal(paginated.calls.filter(name=>name==='leave_ledger').length,3,'요약 1회와 상세 2페이지를 조회');
+  assert.equal(manager.api.monthlyLeaveCandidatesHtml('a'),'');await manager.api.revokeMonthlyLeaveAccrual(0);
+  assert.equal(manager.calls.some(c=>Array.isArray(c)&&c[0]==='revoke_monthly_leave_accrual'),false);
 });
 test('월차 빼기 확인 취소·이미 뺀 기록·RPC 실패·빠른 중복 클릭을 구분한다',async()=>{
   const cancelled=setup({confirm:false,candidates:[candidateRun]});await cancelled.api.renderEmployeeLeaveStatus();await cancelled.api.revokeMonthlyLeaveAccrual(0);

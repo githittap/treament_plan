@@ -67,7 +67,11 @@ try {
  for(const f of files){
   const t=fs.readFileSync(f,'utf8');
   assert.ok(!/expiry_alert_days/.test(t),f+' 에 만료 알림 일수 키가 있으면 화면 설정과 어긋남');
-  assert.ok(!/(expir|만료)[^\n]{0,80}interval\s*'(14|30|60) days'/i.test(t)&&!/interval\s*'(14|30|60) days'[^\n]{0,80}(expir|만료)/i.test(t),f+' 에 계약 만료 알림 일수가 박혀 있으면 화면 설정과 어긋남');
+  // 카드 SMS 원문 보관 기한은 근로계약 만료 설정과 별개다.
+  const contractScan=path.basename(f)==='card_ledger_v1.sql'
+   ? t.replace(/create table if not exists public\.card_sms_failed_raw\s*\([\s\S]*?\n\);/i,'')
+   : t;
+  assert.ok(!/(expir|만료)[^\n]{0,80}interval\s*'(14|30|60) days'/i.test(contractScan)&&!/interval\s*'(14|30|60) days'[^\n]{0,80}(expir|만료)/i.test(contractScan),f+' 에 계약 만료 알림 일수가 박혀 있으면 화면 설정과 어긋남');
  }
  assert.equal(fs.existsSync(path.join(root,'db/hub_ui_texts_6.sql')),false,'새 SQL 없음');
  console.log('PGLITE_HUB_UI_TEXTS_6_PASS');

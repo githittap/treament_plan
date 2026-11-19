@@ -1280,7 +1280,7 @@ test('[3차-6] 원 편집: 도구 단추·O 글쇠 · 끌어서 그리기(누른
 test('[3차-7] 어두운 화면: 기본 어둡게 · 밝게/어둡게 단추 · 저장소 실패해도 동작 · 흰 판이 변수로 바뀜 · 사진·글 상자 라벨은 그대로 · 발표 파일에도 같은 값', () => {
   assert.equal(pure.themeNorm('light'), 'light'); assert.equal(pure.themeNorm('dark'), 'dark'); for (const v of [null, undefined, '', 'x', 1]) assert.equal(pure.themeNorm(v), 'dark', '없음·이상한 값은 어둡게');
   // 시작 코드: 읽기가 던져도(저장소 막힘) 어둡게로 시작, 쓰기가 던져도 단추는 동작
-  const startSrc = between(mainJs, "let THEME = 'dark';", 'applyTheme();\n');
+  const startSrc = between(mainJs.replace(/\r\n/g, '\n'), "let THEME = 'dark';", 'applyTheme();\n');
   const mkT = ls => { const ctx = { themeNorm: pure.themeNorm, localStorage: ls, document: { documentElement: { dataset: {} } }, B: { themeBtn: { textContent: '' } } }; vm.createContext(ctx); vm.runInContext("const THEME_KEY = 'k'; let THEME = 'dark';" + startSrc + 'applyTheme();this.get=()=>THEME;', ctx); return ctx; };
   let t = mkT({ getItem() { throw new Error('blocked'); } }); assert.equal(t.get(), 'dark'); assert.equal(t.document.documentElement.dataset.theme, 'dark'); assert.equal(t.B.themeBtn.textContent, '☀ 밝게', '어두운 상태에선 「밝게」 단추');
   t = mkT({ getItem: () => 'light' }); assert.equal(t.get(), 'light'); assert.equal(t.document.documentElement.dataset.theme, 'light'); assert.equal(t.B.themeBtn.textContent, '☾ 어둡게');

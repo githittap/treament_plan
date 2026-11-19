@@ -14,8 +14,11 @@ assert.match(sql, /alter table public\.leave_application_documents enable row le
 assert.match(sql, /grant select,insert,delete on table public\.leave_application_documents to authenticated/);
 assert.match(sql, /revoke all on table public\.leave_application_documents from public,anon/);
 assert.match(sql, /insert into storage\.buckets \(id,name,public\) values \('leave-docs','leave-docs',false\) on conflict do nothing/);
-assert.match(html, /function leaveApplicationDocumentsCard\(/);
+assert.match(html, /function employeeDocumentsCard\(/);
+assert.match(html, /employeeDocumentsCard\(docs\|\|\[\],docsError,contractRows,contractsError,leaveDocs\|\|\[\]/);
 assert.match(html, /function uploadLeaveApplicationDocument\(/);
+assert.match(html, /id="edLeaveRequest"[\s\S]*id="edFile"[\s\S]*id="edMsg"/);
+assert.doesNotMatch(html, /id="ladRequest"|id="ladFile"|id="ladMsg"/);
 assert.match(html, /leave_application_documents/);
 assert.match(html, /leave-docs/);
 assert.doesNotMatch(html, /document_category:documentCategory/);

@@ -2,8 +2,9 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 function setup(extra={}){
   const html=fs.readFileSync('hr.html','utf8'),block=html.match(/\/\* suggestion-six:start \*\/[\s\S]*?\/\* suggestion-six:end \*\//);
   assert.ok(block,'건의 구현 코드가 있어야 함');
-  const c={ME:{id:'me',role:'staff'},today:()=> '2026-10-06',esc:s=>String(s??''),hubT:(k,d,v)=>Object.entries(v||{}).reduce((s,[k,x])=>s.replaceAll('{'+k+'}',x),d),...extra};
-  vm.createContext(c);vm.runInContext((html.match(/^function leaveLedgerTotals[^\r\n]+/m)?.[0]||'')+';'+block[0],c);return c;
+  const c={ME:{id:'me',role:'staff'},SETTINGS:{'leave.manager_access_enabled':'true','leave.manager_can_approve':'true'},SETTINGS_LOAD_OK:true,today:()=> '2026-10-06',esc:s=>String(s??''),hubT:(k,d,v)=>Object.entries(v||{}).reduce((s,[k,x])=>s.replaceAll('{'+k+'}',x),d),...extra};
+  const accessStart=html.indexOf('/* leave-manager-access-ui:test-start */'),accessEnd=html.indexOf('/* leave-manager-access-ui:test-end */');
+  vm.createContext(c);vm.runInContext(html.slice(accessStart,accessEnd)+';'+(html.match(/^function leaveLedgerTotals[^\r\n]+/m)?.[0]||'')+';'+block[0],c);return c;
 }
 test('승인된 본인 미래 연차만 취소·반차 변경 요청 단추가 열린다',()=>{
   const c=setup(),r={id:1,user_id:'me',status:'승인',type:'연차',date_from:'2026-10-07',date_to:'2026-10-07'};
@@ -79,7 +80,7 @@ test('취소·반차 요청은 필수 사유를 검증하고 성공 때만 화�
 });
 
 test('변경 결재 실패와 확인 취소는 재조회하지 않고, 성공 뒤 중복 클릭을 막는다',async()=>{
- const calls=[],messages=[],c=setup({confirm:()=>false,alert:m=>messages.push(m),render:async()=>calls.push('render'),refreshBadges:async()=>calls.push('badge'),sb:{rpc:async()=>{calls.push('rpc');return {data:[{status:'승인'}]};}}});
+ const calls=[],messages=[],c=setup({ME:{id:'me',role:'chief'},confirm:()=>false,alert:m=>messages.push(m),render:async()=>calls.push('render'),refreshBadges:async()=>calls.push('badge'),sb:{rpc:async()=>{calls.push('rpc');return {data:[{status:'승인'}]};}}});
  await c.processLeaveChange(1,'approve');assert.equal(calls.length,0);c.confirm=()=>true;
  await Promise.all([c.processLeaveChange(1,'approve'),c.processLeaveChange(1,'approve')]);assert.equal(calls.filter(x=>x==='rpc').length,1);
  c.sb.rpc=async()=>({error:{message:'원본 변경됨'}});calls.length=0;await c.processLeaveChange(2,'approve');assert.equal(calls.length,0);assert.match(messages[0],/원본 변경됨/);

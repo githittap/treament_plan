@@ -24,6 +24,10 @@ test('P7 상태 저장 단추의 실제 함수는 상태·날짜·사유를 RPC�
 test('P7 알림 40칸·매뉴얼 4주소는 설정으로 저장하며 실패하면 메모리를 바꾸지 않는다',async()=>{
  const c={};vm.runInNewContext(js.match(/\/\* hub-texts:test-start \*\/([\s\S]*?)\/\* hub-texts:test-end \*\//)[1]+';this.h={hubNotifyEnabled,hubNotifyWrite,hubManualWrite,hubP7SettingsHtml,hubSetting,hubSettingSetValues,hubTextDefs};',c);const h=c.h;
  assert.equal(h.hubNotifyEnabled('inquiry','chief'),false);assert.equal(h.hubNotifyEnabled('leave_request','chief'),true);
+ assert.equal(h.hubNotifyEnabled('leave_request','manager'),false);
+ h.hubSettingSetValues({'leave.manager_access_enabled':'true'});assert.equal(h.hubNotifyEnabled('leave_request','manager'),true);
+ h.hubSettingSetValues({'leave.manager_access_enabled':'true','notify.leave_request.manager':'false'});assert.equal(h.hubNotifyEnabled('leave_request','manager'),false);
+ h.hubSettingSetValues({'leave.manager_access_enabled':'false','notify.leave_request.manager':'true'});assert.equal(h.hubNotifyEnabled('leave_request','manager'),false);
  assert.equal((h.hubP7SettingsHtml().match(/data-hub-notify=/g)||[]).length,40);assert.equal((h.hubP7SettingsHtml().match(/data-hub-manual=/g)||[]).length,4);
  const calls=[],sb={from:table=>({upsert:async row=>{calls.push({table,row});return {error:null};}})};
  assert.equal((await h.hubNotifyWrite(sb,'notify.inquiry.chief',true)).ok,true);assert.equal(h.hubNotifyEnabled('inquiry','chief'),true);

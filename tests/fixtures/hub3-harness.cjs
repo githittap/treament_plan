@@ -177,7 +177,7 @@ async function renderAll(html,opts){
   const timeSrc=(text.match(/\/\* hub-time:test-start \*\/[\s\S]*?\/\* hub-time:test-end \*\//)||[''])[0]; /* 허브 시간 표시 공통 함수(이 작업 이후의 hr.html에만 있음 — 없으면 빈 글) */
   const out={};
   const hubHelpers=text.includes('function hubN(')?region(text,'function hubN(','/* hub-texts.js(원장이 고치는 허브 글·목록)를 못 불러와도',false):''; // 옛 화면에는 없음
-  const helperSrc=hubHelpers+'\n'+region(text,'function jongeop(','\n}\n',true)+'\n'+region(text,'const nameOf=uid=>','const SHIFTS={work:',false)+text.slice(text.indexOf('const SHIFTS={work:'),text.indexOf('\n',text.indexOf('const SHIFTS={work:'))+1);
+  const helperSrc=hubHelpers+'\n'+region(text,'function jongeop(','\n}\n',true)+'\n'+region(text,'const nameOf=uid=>','const SHIFTS={work:',false)+text.slice(text.indexOf('const SHIFTS={work:'),text.indexOf('\n',text.indexOf('const SHIFTS={work:'))+1)+'\n'+region(text,'/* leave-manager-access-ui:test-start */','/* leave-manager-access-ui:test-end */',false);
   const bigSrc=region(text,'/* ── 출퇴근 ── */','/* ── 결재함 ── */',false);
   const hubJs=o.engine?lf(fs.readFileSync(path.join(__dirname,'..','..','hub-texts.js'),'utf8')):null;
   const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -430,7 +430,7 @@ async function renderAll(html,opts){
     ['cancelok_declined','cancelApprovedLeave',[3],{},false],['cancelok_fail','cancelApprovedLeave',[3],{process_leave_request:{error:{message:'복구<실패>'}}},true],['cancelok_unknown','cancelApprovedLeave',[3],{process_leave_request:{data:[],error:null}},true],['cancelok_ok','cancelApprovedLeave',[3],{process_leave_request:{data:[{request_id:3}],error:null}},true]
   ]){
     const sbOver=name.startsWith('cancelok')?{rpc,tables:{leave_requests:{single:{id:3,user_id:'u1',status:'승인',date_from:'2026-10-08',date_to:'2026-10-08'}}}}:{rpc};
-    const r=await asMgr('chief',{__confirm:confirmOk},sbOver);await r.api[fn](...args);out['leave.'+name]=JSON.stringify([r.log,r.statuses]);
+    const r=await asMgr(name.startsWith('cancelok')?'owner':'chief',{__confirm:confirmOk},sbOver);await r.api[fn](...args);out['leave.'+name]=JSON.stringify([r.log,r.statuses]);
   }
   {
     const r=await asMgr('owner');await r.api.renderEmployeeLeaveStatus();r.api.openLeaveBalanceEditor(0);
@@ -444,7 +444,7 @@ async function renderAll(html,opts){
     out['leave.status.error']=await e.api.renderEmployeeLeaveStatus();
   }
   {
-    const r0=await asMgr('chief',null,{tables:{leave_requests:{single:{id:3,user_id:'u1',status:'대기'}}}});await r0.api.cancelApprovedLeave(3);out['leave.cancelok_state']=JSON.stringify(r0.log);
+    const r0=await asMgr('owner',null,{tables:{leave_requests:{single:{id:3,user_id:'u1',status:'대기'}}}});await r0.api.cancelApprovedLeave(3);out['leave.cancelok_state']=JSON.stringify(r0.log);
     for(const [name,vals,rpc] of [['bad_days',{'#gvKind':'조정','#gvDays':'-1'},{}],['fail',{'#gvKind':'조정','#gvDays':'3'},{set_leave_balance:{error:{message:'기록<실패>'}}}],['unknown',{'#gvKind':'조정','#gvDays':'3'},{set_leave_balance:{data:[],error:null}}],['ok',{'#gvKind':'조정','#gvDays':'3'},{set_leave_balance:{data:[{ok:1}],error:null}}],['grant',{'#gvKind':'부여','#gvDays':'1'},{preview_monthly_leave_accruals:{data:[],error:null}}]]){
       const d=makeDom();d.$('#gvUser').value='u1';Object.entries(vals).forEach(([k,v])=>{d.$(k).value=v;});d.$('#gvNote').value='';
       const r=await asMgr('owner',{$:d.$},{rpc});await r.api.grantLeave();out['leave.grant.'+name]=JSON.stringify([r.log,r.statuses,d.$('#laMsg').textContent]);
