@@ -1088,6 +1088,9 @@ async function render(){
   if(typeof HubHelp!=='undefined')HubHelp.watch(m,()=>mountHubTabHelp(m));
   m.innerHTML='<div class="empty">불러오는 중…</div>';hubStaticFill();apprKindSelectFill();
   try{
+    const tabAtEntry=TAB;
+    if(TAB==='workdocs'||TAB==='owner')await loadDentwebTexts();
+    if(TAB!==tabAtEntry)return;
     if(TAB==='home')await renderHome(m);
     else if(TAB==='ai'){if(window.AIAssistants)await window.AIAssistants.render(m,{sb,me:ME});else m.innerHTML='<div class="card"><div class="empty">AI 도우미를 불러오지 못했습니다. 새로고침해 주세요.</div></div>';}
     else if(TAB==='att')await renderAtt(m);
@@ -2644,11 +2647,120 @@ function hubT(k,d,v){return typeof hubText==='function'?hubText(k,d,v):(v?String
 async function subscribePushNotifications(){const msg=$('#pushMsg');try{if(!PUSH_VAPID_PUBLIC_KEY){msg.textContent=hubT('workdoc.push.m_not_ready','발송키 준비 중입니다. 준비되면 다시 시도하세요.');return;}if(!navigator.serviceWorker||!window.PushManager){msg.textContent=hubT('workdoc.push.m_unsupported','이 브라우저는 알림을 지원하지 않습니다.');return;}const permission=await Notification.requestPermission();if(permission!=='granted'){msg.textContent=hubT('workdoc.push.m_denied','알림 권한이 거부되어 등록할 수 없습니다.');return;}const registration=await navigator.serviceWorker.ready;let subscription=await registration.pushManager.getSubscription();if(!subscription)subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(PUSH_VAPID_PUBLIC_KEY)});const {error}=await sb.from('push_subscriptions').upsert({user_id:ME.id,endpoint:subscription.endpoint,subscription:subscription.toJSON()},{onConflict:'user_id,endpoint'});if(error){msg.textContent=hubT('workdoc.push.m_reg_fail','등록 실패: {detail}',{detail:error.message});return;}msg.textContent=hubT('workdoc.push.m_registered','이 기기에서 알림을 받도록 등록했습니다.');}catch(error){msg.textContent=hubT('workdoc.push.m_reg_error','등록 중 오류: {detail}',{detail:(error&&error.message||'다시 시도하세요.')});}}
 async function unsubscribePushNotifications(){const msg=$('#pushMsg');try{if(!navigator.serviceWorker){msg.textContent=hubT('workdoc.push.m_un_unsupported','이 브라우저는 Push 해제를 지원하지 않습니다.');return;}const registration=await navigator.serviceWorker.ready,subscription=await registration.pushManager.getSubscription();if(!subscription){msg.textContent=hubT('workdoc.push.m_un_none','이 브라우저의 구독이 없어 저장 기록을 일괄 삭제하지 않았습니다.');return;}const {error}=await sb.from('push_subscriptions').delete().eq('user_id',ME.id).eq('endpoint',subscription.endpoint);if(error){msg.textContent=hubT('workdoc.push.m_un_db_fail','해당 저장 기록 삭제 실패: {detail}; 브라우저 구독은 유지됐으니 다시 시도하세요.',{detail:error.message});return;}if(!await subscription.unsubscribe()){msg.textContent=hubT('workdoc.push.m_un_browser_fail','저장 기록은 삭제됐지만 브라우저 구독 해제에 실패했습니다. 이 버튼을 다시 눌러 해제를 재시도하세요.');return;}msg.textContent=hubT('workdoc.push.m_un_done','이 브라우저의 구독과 해당 저장 기록을 해제했습니다.');}catch(error){msg.textContent=hubT('workdoc.push.m_un_error','구독 해제 중 오류: {detail}',{detail:(error&&error.message||'다시 시도하세요.')});}}
 function hubT(k,d,v){return typeof hubText==='function'?hubText(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
+/* dentweb-integration:test-start */
+const DENTWEB_ROLES=['manager','chief','owner'];
+const DENTWEB_URL_KEY='dentweb.operations_url';
+const DENTWEB_READ_ROLES_KEY='dentweb.access.read_roles';
+const DENTWEB_OWNER_ONLY_KEY='dentweb.access.owner_only';
+const DENTWEB_TEXT_FIELDS=[
+  ['title','카드 제목','덴트웹 업무함'],
+  ['description','카드 안내','접수·예약 등 덴트웹 업무 자료를 확인합니다.'],
+  ['open_label','열기 버튼 문구','업무함 열기']
+];
+let DENTWEB_TEXTS={},DENTWEB_TEXTS_READY=false,DENTWEB_TEXTS_REQUEST=0;
+const dentwebTextKey=field=>`dentweb.card.${field}`;
+const dentwebCanConfigure=()=>Boolean(ME.id&&ME.approved===true&&ME.role==='owner');
+function dentwebOperationsUrl(value){
+  const raw=String(value??'').trim();
+  if(!/^https?:\/\/[^/?#@\\\s]+(?:\/operations\.html|\/)?$/i.test(raw))return '';
+  try{const url=new URL(raw);return url.pathname==='/'||url.pathname==='/operations.html'?url.href:'';}
+  catch(e){return '';}
+}
+function dentwebReadRoles(value){
+  try{
+    const roles=JSON.parse(value);
+    return Array.isArray(roles)&&roles.every(role=>DENTWEB_ROLES.includes(role))?roles:null;
+  }catch(e){return null;}
+}
+function dentwebTexts(){
+  return Object.fromEntries(DENTWEB_TEXT_FIELDS.map(([field,,fallback])=>[field,DENTWEB_TEXTS[dentwebTextKey(field)]||fallback]));
+}
+async function loadDentwebTexts(){
+  if(!ME.id||ME.approved!==true||!DENTWEB_ROLES.includes(ME.role))return;
+  const request=++DENTWEB_TEXTS_REQUEST;
+  DENTWEB_TEXTS_READY=false;
+  try{
+    const keys=DENTWEB_TEXT_FIELDS.map(([field])=>dentwebTextKey(field));
+    const {data,error}=await sb.from('hub_ui_texts').select('key,value').in('key',keys);
+    if(request!==DENTWEB_TEXTS_REQUEST||error||!Array.isArray(data))return;
+    DENTWEB_TEXTS=Object.fromEntries(data.map(({key,value})=>[key,value]));
+    DENTWEB_TEXTS_READY=true;
+  }catch(e){/* 문구 조회 실패 시 마지막 문구 또는 기본 문구를 표시한다. */}
+}
+function dentwebOperationsCard(){
+  if(!ME.id||ME.approved!==true||!DENTWEB_ROLES.includes(ME.role))return '';
+  const readRoles=SETTINGS_LOAD_OK?dentwebReadRoles(SETTINGS[DENTWEB_READ_ROLES_KEY]):null;
+  if(readRoles&&!readRoles.includes(ME.role))return '';
+  const url=readRoles&&SETTINGS[DENTWEB_OWNER_ONLY_KEY]==='true'?dentwebOperationsUrl(SETTINGS[DENTWEB_URL_KEY]):'';
+  const {title,description,open_label}=dentwebTexts();
+  return `<article class="workdoc-card" id="dentwebOperationsCard"><h3>${esc(title)}</h3><p>${esc(description)}</p>
+    <div class="sub">진료비·등록·삭제는 원장만 이용할 수 있습니다.</div>
+    ${url?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(open_label)}</a>`:'<div class="hint">설정 필요</div>'}</article>`;
+}
+function dentwebSettingsCard(){
+  if(!dentwebCanConfigure())return '';
+  const rawRoles=SETTINGS[DENTWEB_READ_ROLES_KEY],roles=dentwebReadRoles(rawRoles)??(rawRoles?[]:DENTWEB_ROLES);
+  const url=dentwebOperationsUrl(SETTINGS[DENTWEB_URL_KEY]),texts=dentwebTexts();
+  return `<div class="card"><h2>덴트웹 업무함 설정</h2>
+    <form onsubmit="event.preventDefault();saveDentwebAccess(this)">
+      <fieldset ${SETTINGS_LOAD_OK?'':'disabled'}>
+        <div class="fld"><label for="dentwebUrl">남부 업무함 주소</label><input id="dentwebUrl" name="operations_url" type="url" value="${esc(url)}" autocomplete="off"></div>
+        <p class="hint">서버 기본 주소 또는 /operations.html 주소를 입력하세요. 값을 비워 저장하면 링크가 닫힙니다.</p>
+        <div class="rowflex" role="group" aria-label="읽기 역할">읽기 역할 ${DENTWEB_ROLES.map(role=>`<label><input type="checkbox" name="read_roles" value="${role}"${roles.includes(role)?' checked':''}> ${role}</label>`).join('')}</div>
+        <p class="hint">허브 카드의 읽기 역할을 설정합니다. 진료비·등록·삭제는 원장만 이용할 수 있습니다.</p>
+        <button class="mini" type="submit">주소·읽기 역할 저장</button>
+      </fieldset>
+      <div class="msg" role="status">${SETTINGS_LOAD_OK?'':'설정을 불러오지 못했습니다. 새로고침 후 다시 시도하세요.'}</div>
+    </form>
+    <form onsubmit="event.preventDefault();saveDentwebTexts(this)">
+      <fieldset ${DENTWEB_TEXTS_READY?'':'disabled'}>
+        ${DENTWEB_TEXT_FIELDS.map(([field,label])=>`<div class="fld"><label for="dentweb-${field}">${label}</label><input id="dentweb-${field}" name="${field}" value="${esc(texts[field])}" maxlength="20000" required></div>`).join('')}
+        <button class="mini" type="submit">카드 문구 저장</button>
+      </fieldset>
+      <div class="msg" role="status">${DENTWEB_TEXTS_READY?'':'문구를 불러오지 못했습니다. 새로고침 후 다시 시도하세요.'}</div>
+    </form></div>`;
+}
+async function saveDentwebRows(form,table,rows){
+  const submit=form.querySelector('[type="submit"]'),message=form.querySelector('[role="status"]');
+  if(submit.disabled)return false;
+  submit.disabled=true;message.textContent='저장 중…';setStatus('saving');
+  try{
+    const {error}=await sb.from(table).upsert(rows,{onConflict:'key'});
+    if(error)throw error;
+    message.textContent='저장했습니다.';setStatus('saved');return true;
+  }catch(e){message.textContent='저장하지 못했습니다. 다시 시도하세요.';setStatus('error');return false;}
+  finally{submit.disabled=false;}
+}
+async function saveDentwebAccess(form){
+  if(!dentwebCanConfigure()||!SETTINGS_LOAD_OK)return;
+  const raw=form.elements.operations_url.value.trim(),url=dentwebOperationsUrl(raw);
+  if(raw&&!url){form.querySelector('[role="status"]').textContent='서버 기본 주소 또는 /operations.html 주소를 확인하세요.';return;}
+  const checked=Array.from(form.querySelectorAll('input[name="read_roles"]:checked'),input=>input.value);
+  const rows=[
+    {key:DENTWEB_URL_KEY,value:url},
+    {key:DENTWEB_READ_ROLES_KEY,value:JSON.stringify(DENTWEB_ROLES.filter(role=>checked.includes(role)))},
+    {key:DENTWEB_OWNER_ONLY_KEY,value:'true'}
+  ];
+  if(await saveDentwebRows(form,'app_settings',rows)){rows.forEach(({key,value})=>{SETTINGS[key]=value;});}
+}
+async function saveDentwebTexts(form){
+  if(!dentwebCanConfigure()||!DENTWEB_TEXTS_READY)return;
+  const rows=DENTWEB_TEXT_FIELDS.map(([field])=>({key:dentwebTextKey(field),value:form.elements[field].value.trim()}));
+  if(rows.some(({value})=>!value||value.length>20000)){form.querySelector('[role="status"]').textContent='카드 문구를 모두 입력하세요.';return;}
+  if(await saveDentwebRows(form,'hub_ui_texts',rows)){
+    ++DENTWEB_TEXTS_REQUEST; // 저장 전에 시작한 조회가 늦게 도착해도 방금 저장한 문구를 유지한다.
+    DENTWEB_TEXTS_READY=true;
+    rows.forEach(({key,value})=>{DENTWEB_TEXTS[key]=value;});
+  }
+}
+/* dentweb-integration:test-end */
+
 function renderWorkDocuments(m){
   if(WORK_DOC_GUIDE_OPEN){m.innerHTML=`<div class="card">${workDocumentsGuideHtml()}</div>`;return;}
   const visibleWorkDocuments=workDocumentsForProfile(workDocumentItems(),Object.assign({},ME,(typeof PROFILES!=='undefined'&&PROFILES.find(p=>p.user_id===ME.id))||{}));
   WORK_DOC_VISIBLE_ITEMS=visibleWorkDocuments;
-  m.innerHTML=`<div class="card"><h2>${esc(hubT('workdoc.title','📚 업무자료'))}</h2><p class="hint">${esc(hubT('workdoc.hint','직원 업무에 필요한 공개 자료를 한곳에서 확인합니다.'))}</p><div class="workdocs-grid"><article class="workdoc-card"><div class="workdoc-icon">🧭</div><div class="sub">${esc(hubT('workdoc.guide_card.label','직원용 안내'))}</div><h3>${esc(hubT('workdoc.guide_card.title','직원 허브 사용 설명서'))}</h3><p>${esc(hubT('workdoc.guide_card.desc','홈·근무표·연차·결재·서류함을 처음 사용하는 방법을 확인합니다.'))}</p><button type="button" class="mini" onclick="showWorkDocumentsGuide()">${esc(hubT('workdoc.guide_card.button','업무자료 설명서 열기'))}</button></article></div><input id="workDocSearch" style="width:100%;margin-top:10px" type="search" placeholder="${esc(hubT('workdoc.search.placeholder','자료 검색'))}" value="${esc(WORK_DOC_QUERY)}" oninput="WORK_DOC_QUERY=this.value;renderWorkDocumentResults()"><div id="workDocResults" class="workdocs-grid">${workDocumentCards(visibleWorkDocuments)}</div></div>${pushNotificationCard()}`;
+  m.innerHTML=`<div class="card"><h2>${esc(hubT('workdoc.title','📚 업무자료'))}</h2><p class="hint">${esc(hubT('workdoc.hint','직원 업무에 필요한 공개 자료를 한곳에서 확인합니다.'))}</p><div class="workdocs-grid"><article class="workdoc-card"><div class="workdoc-icon">🧭</div><div class="sub">${esc(hubT('workdoc.guide_card.label','직원용 안내'))}</div><h3>${esc(hubT('workdoc.guide_card.title','직원 허브 사용 설명서'))}</h3><p>${esc(hubT('workdoc.guide_card.desc','홈·근무표·연차·결재·서류함을 처음 사용하는 방법을 확인합니다.'))}</p><button type="button" class="mini" onclick="showWorkDocumentsGuide()">${esc(hubT('workdoc.guide_card.button','업무자료 설명서 열기'))}</button></article>${dentwebOperationsCard()}</div><input id="workDocSearch" style="width:100%;margin-top:10px" type="search" placeholder="${esc(hubT('workdoc.search.placeholder','자료 검색'))}" value="${esc(WORK_DOC_QUERY)}" oninput="WORK_DOC_QUERY=this.value;renderWorkDocumentResults()"><div id="workDocResults" class="workdocs-grid">${workDocumentCards(visibleWorkDocuments)}</div></div>${pushNotificationCard()}`;
+
 }
 /* work-documents:render-end */
 /* hub-tools:test-start */
@@ -5355,8 +5467,10 @@ async function renderOwner(m){
     <select id="ovUser" onchange="renderOverrideRows()"><option value="">직원을 선택하세요</option>${PROFILES.filter(p=>p.approved!==false&&p.role!=='owner').map(p=>`<option value="${p.user_id}">${esc(p.name)} (${p.role})</option>`).join('')}</select>
     <div id="ovRows"></div>
   </div>
+  ${dentwebSettingsCard()}
   <div class="card"><h2>${esc(hubText('owner.next.title','다음 설계 예정/혹은 할일'))} <span class="sub">${esc(hubText('owner.next.sub','(설계 완료·구현 예정)'))}</span></h2>
     <div class="stub">${hubTextHtml('owner.next.body','M2 근무표·계약서 자동생성 · M3 급여 대시보드/명세서 발행·월말 평가·휴일근로 계산기 · M4 채용·입금피드·기공차트 통합\n— 백엔드(표)는 이미 준비됨. 화면만 순차 추가.')}</div>
+
   </div>`;
   previewEmployeeJobGroup();
   renderOverrideRows();
