@@ -53,7 +53,7 @@ const HUB_HELP_TARGETS={
   "onbo":[{"selector":".onboarding-guide"},{"labels":["제출함","서류 올리기","연차 증빙 올리기","체크리스트 정보 저장"]},null],
   "appr":[{"labels":["결재 올리기"],"selector":"button[onclick*=\"apMask\"]"},{"labels":["내가 올린 문서"]},{"labels":["내 결재 대기","도장(승인)"],"selector":"button[onclick*=\"apprAct(\"][onclick*=\"ok\"]"}],
   "leave":[{"selector":".stat:nth-child(3)"},{"labels":["연차 신청"],"selector":"button[onclick=\"openLeave()\"]"},{"labels":["신청서"],"selector":"button[onclick^=\"openLeaveForm(\"]"}],
-  "deposit":[{"labels":["오늘","7일","이번달"]},null,null],
+  "deposit":[{"labels":["오늘","7일","이번달"]},{"selector":"#depQ"},{"selector":"#depFrom"},{"labels":["더 보기"]},{"labels":["초기화"]}],
   "notice":[{"labels":["전문 ↗"]},{"labels":["공지 작성"]},{"labels":["삭제"]}],
   "suggestions":[{"labels":["건의 등록"]},null,{"labels":["수정","수정 저장"]}],
   "pay.ledger":[{"selector":"input[type=\"month\"]"},{"labels":["엑셀 업로드","수기 행 추가"]},{"labels":["급여대장 저장"]}],

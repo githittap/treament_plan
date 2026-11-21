@@ -125,6 +125,14 @@ tr.new td{background:var(--mint-dk)}
 .mini.stamp{background:var(--gold-bg);border-color:var(--gold);color:var(--gold)}
 .mini.rej{background:var(--red-bg);border-color:#5c2420;color:var(--red)}
 .empty{color:var(--gray);font-size:12.5px;padding:10px 2px}
+.dep-bar{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin:8px 0}
+.dep-bar .dep-q,.dep-bar .dep-actions{grid-column:1/-1}
+.dep-bar label{display:flex;flex-direction:column;gap:3px;min-width:0}
+.dep-bar .dep-actions{display:flex;gap:8px;flex-wrap:wrap}
+.dep-bar input{min-width:0;width:100%;box-sizing:border-box;min-height:40px}
+.dep-bar .hbtn,.dep-bar .mini{min-height:40px}
+@media(max-width:640px){.dep-bar input{font-size:16px}}
+@media(min-width:641px){.dep-bar{grid-template-columns:minmax(180px,1.4fr) repeat(2,minmax(140px,1fr)) auto;align-items:end}.dep-bar .dep-q,.dep-bar .dep-actions{grid-column:auto}}
 .owner-board-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px;margin-top:10px;min-width:0}.owner-board-card{display:flex;flex-direction:column;align-items:flex-start;gap:5px;width:100%;min-width:0;box-sizing:border-box;text-align:left;cursor:pointer;color:var(--ink)}.owner-board-card>span,.owner-board-card>small{max-width:100%;overflow-wrap:anywhere}.owner-board-card>span{color:var(--gray)}.owner-board-card>small{font-size:11px;color:var(--gray)}.owner-board-view-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:14px 0 8px;min-width:0}.owner-board-view-head>div{min-width:0;overflow-wrap:anywhere}.owner-board-frame-slot{width:100%;max-width:100%;min-width:0;overflow:hidden}.owner-board-frame-slot iframe{display:block;box-sizing:border-box}
 @media(max-width:640px){.owner-board-grid{grid-template-columns:minmax(0,1fr)}.owner-board-view-head{align-items:flex-start}}
 @media(min-width:1100px){.owner-board-grid{grid-template-columns:repeat(5,minmax(0,1fr))}}
@@ -449,7 +457,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 <script src="payroll-reply.js?v=2026101110"></script>
 <script src="payroll-compare.js?v=2026101110"></script>
 <script src="hub-help.js?v=2026101202"></script>
-<script src="hub-texts.js?v=2026111904"></script>
+<script src="hub-texts.js?v=2026112201"></script>
 <script src="hub-activity.js?v=2026101110"></script>
 <script src="security-pledge.js?v=20261003p9d"></script>
 <script src="wage-hourly.js?v=2026101110"></script>
@@ -952,8 +960,8 @@ const MENU=[
 ];
 let PAY_VIEW='ledger',PAY_MONTH='',PAY_ROWS=[],PAY_COLUMNS=[],PAY_MESSAGE='',PAY_WAGE_LATEST={},PAY_SOURCE_FILE=null,PAY_BUSY='',PAY_READ_ID=0;
 let PAY_SLIP_USER='',PAY_SLIP_HTML='',MY_PAYSLIPS=[];
-let DEP_RANGE='month';
-function setDepRange(r){DEP_RANGE=r;render();}
+let DEP_RANGE='month',DEP_Q='',DEP_FROM='',DEP_TO='',DEP_MORE=0;
+function setDepRange(r){DEP_RANGE=r;DEP_Q='';DEP_FROM='';DEP_TO='';DEP_MORE=0;render();}
 let BADGE={};
 let CONTRACT_ALERTS=[];
 let EMPLOYMENT_TERMS=[];
@@ -1191,31 +1199,80 @@ async function renderHome(m){
 }
 
 /* ── 입금 ── */
+/* deposit-search:test-start */
+const DEP_TZ_MS=9*60*60*1000,DEP_HARD_CAP=3000,DEP_Q_MAX=40;
+function depParseYmd(s){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s==null?'':s).trim());if(!m)return null;const y=+m[1],mo=+m[2],d=+m[3],t=new Date(Date.UTC(y,mo-1,d));if(y<2000||t.getUTCFullYear()!==y||t.getUTCMonth()!==mo-1||t.getUTCDate()!==d)return null;return {y,m0:mo-1,d};}
+function depYmdText(y,m0,d){const t=new Date(Date.UTC(y,m0,d)),p=n=>String(n).padStart(2,'0');return t.getUTCFullYear()+'-'+p(t.getUTCMonth()+1)+'-'+p(t.getUTCDate());}
+function depTzYmd(nowMs){const t=new Date(nowMs+DEP_TZ_MS);return depYmdText(t.getUTCFullYear(),t.getUTCMonth(),t.getUTCDate());}
+function depYmdLabel(s){const p=depParseYmd(s);return p?p.y+'.'+(p.m0+1)+'.'+p.d:'';}
+function depTzStartIso(y,m0,d){return new Date(Date.UTC(y,m0,d)-DEP_TZ_MS).toISOString();}
+function depRangeBounds(range,nowMs){const t=new Date(nowMs+DEP_TZ_MS),y=t.getUTCFullYear(),m=t.getUTCMonth(),d=t.getUTCDate(); if(range==='today')return {fromIso:depTzStartIso(y,m,d),toIso:depTzStartIso(y,m,d+1)}; if(range==='week')return {fromIso:depTzStartIso(y,m,d-7),toIso:depTzStartIso(y,m,d+1)}; return {fromIso:depTzStartIso(y,m,1),toIso:depTzStartIso(y,m+1,1)};}
+function depCustomBounds(fromRaw,toRaw){const f=String(fromRaw||'').trim(),t=String(toRaw||'').trim();if(!f&&!t)return {error:'empty'};let a=f?depParseYmd(f):null,b=t?depParseYmd(t):null;if(f&&!a||t&&!b)return {error:'format'};if(!a)a=b;if(!b)b=a;if(Date.UTC(a.y,a.m0,a.d)>Date.UTC(b.y,b.m0,b.d))return {error:'order'};return {from:depYmdText(a.y,a.m0,a.d),to:depYmdText(b.y,b.m0,b.d),fromIso:depTzStartIso(a.y,a.m0,a.d),toIso:depTzStartIso(b.y,b.m0,b.d+1)};}
+function depEscapeLike(s){return String(s).replace(/[\\%_]/g,'\\$&');}
+function depNormalizeQuery(raw){const s=String(raw==null?'':raw).normalize('NFC').replace(/\s+/g,' ').trim().slice(0,DEP_Q_MAX).trim();if(!s)return {kind:'none',text:''};const am=/^(?:₩\s*)?(\d{1,3}(?:,\d{3})+|\d+)\s*원?$/.exec(s);if(am){const digits=am[1].replace(/,/g,'');if(digits.length<=15)return {kind:'amount',text:s,digits};}return {kind:'text',text:s,like:depEscapeLike(s.replace(/\s+/g,''))};}
+function depOrFilter(digits){if(!/^\d{1,15}$/.test(String(digits)))return '';return 'amount.eq.'+Number(digits)+',account_tail.ilike.*'+digits+'*,payer_raw.ilike.*'+digits+'*';}
+function depResolveView(st,nowMs){const qn=depNormalizeQuery(st&&st.q),f=(st&&st.from)||'',t=(st&&st.to)||'';if(f||t){const b=depCustomBounds(f,t);if(b.error)return {error:b.error};return {mode:'custom',qn,from:b.from,to:b.to,fromIso:b.fromIso,toIso:b.toIso};}if(qn.kind!=='none')return {mode:'search_all',qn,from:'',to:'',fromIso:null,toIso:null};const b=depRangeBounds(st&&st.range,nowMs);return {mode:'range',qn,from:'',to:'',fromIso:b.fromIso,toIso:b.toIso};}
+function depLimit(base,more){const b=Math.max(1,Math.floor(Number(base))||300),k=Math.max(0,Math.floor(Number(more))||0);return Math.max(b,Math.min(b*(1+k),DEP_HARD_CAP));}
+function depTruncation(rowsLen,count,limit){const total=typeof count==='number'&&Number.isFinite(count)?count:null;return {total,truncated:total!==null?total>rowsLen:rowsLen>=limit};}
+function depServerCapped(rowsLen,total,limit){return typeof total==='number'&&Number.isFinite(total)&&rowsLen<Math.min(limit,total);}
+function depCanMore(rowsLen,total,baseLimit,more){const limit=depLimit(baseLimit,more);return !depServerCapped(rowsLen,total,limit)&&depLimit(baseLimit,(Number(more)||0)+1)>limit;}
+function depApplyPlan(q,v,limit){if(v.fromIso)q=q.gte('bank_dt',v.fromIso);if(v.toIso)q=q.lt('bank_dt',v.toIso);if(v.qn.kind==='amount')q=q.or(depOrFilter(v.qn.digits));else if(v.qn.kind==='text')q=q.ilike('payer_raw','%'+v.qn.like+'%');return q.order('bank_dt',{ascending:false}).order('id',{ascending:false}).limit(limit);}
+/* deposit-search:test-end */
+function depStateKey(){return [DEP_RANGE,DEP_Q,DEP_FROM,DEP_TO,DEP_MORE].join('\u0001');}
+function depApply(e){
+  if(e&&e.preventDefault)e.preventDefault();
+  const q=$('#depQ').value,f=$('#depFrom').value,t=$('#depTo').value,msg=$('#depMsg');
+  if(f||t){
+    const b=depCustomBounds(f,t);
+    if(b.error){if(msg)msg.textContent=b.error==='order'?hubT('dep.err_date_order','시작일이 종료일보다 늦습니다.'):hubT('dep.err_date_format','날짜를 올바르게 넣어 주세요.');return false;}
+  }
+  if(msg)msg.textContent='';
+  DEP_Q=q;DEP_FROM=f;DEP_TO=t;DEP_MORE=0;render();return false;
+}
+function depMore(){const y=window.scrollY,t=document.querySelector('#main .tblwrap'),ts=t?t.scrollTop:0;DEP_MORE++;Promise.resolve(render()).then(()=>{if(typeof window.scrollTo==='function')window.scrollTo(0,y);const n=document.querySelector('#main .tblwrap');if(n)n.scrollTop=ts;});}
+function depReset(){DEP_Q='';DEP_FROM='';DEP_TO='';DEP_RANGE='month';DEP_MORE=0;render();}
 async function renderDeposit(m){
   if(!canViewDeposit(ME)){m.innerHTML='<div class="card"><div class="empty">'+esc(hubT('dep.no_access','예치금은 데스크·실장·원장만 조회할 수 있습니다.'))+'</div></div>';return;}
-  const tabAtEntry=TAB;
-  const nowKst=new Date(Date.now()+9*60*60*1000);
-  const y=nowKst.getUTCFullYear(),mo=nowKst.getUTCMonth(),d=nowKst.getUTCDate();
-  const kstIso=(yy,mm,dd)=>new Date(Date.UTC(yy,mm,dd)-9*60*60*1000).toISOString();
-  let fromIso,toIso=kstIso(y,mo,d+1);
-  if(DEP_RANGE==='today')fromIso=kstIso(y,mo,d);
-  else if(DEP_RANGE==='week')fromIso=kstIso(y,mo,d-7);
-  else fromIso=kstIso(y,mo,1),toIso=kstIso(y,mo+1,1);
-  const {data:rows}=await sb.from('deposits').select('id,bank_dt,amount,payer_raw,is_card,account_tail')
-    .gte('bank_dt',fromIso).lt('bank_dt',toIso).order('bank_dt',{ascending:false}).order('id',{ascending:false}).limit(hubN('dep.list_limit',300));
-  if(TAB!==tabAtEntry||TAB!=='deposit')return;
+  const tabAtEntry=TAB,stateKey=depStateKey();
+  const nowMs=Date.now();
+  let view=depResolveView({range:DEP_RANGE,q:DEP_Q,from:DEP_FROM,to:DEP_TO},nowMs);
+  if(view.error)view=depResolveView({range:DEP_RANGE,q:'',from:'',to:''},nowMs);
+  const baseLimit=hubN('dep.list_limit',300),limit=depLimit(baseLimit,DEP_MORE);
+  const {data:rows,error,count}=await depApplyPlan(sb.from('deposits').select('id,bank_dt,amount,payer_raw,is_card,account_tail',{count:'exact'}),view,limit);
+  if(TAB!==tabAtEntry||TAB!=='deposit'||m.isConnected===false||depStateKey()!==stateKey)return;
+  const list=rows||[],trunc=error?{total:null,truncated:false}:depTruncation(list.length,count,limit);
+  const parts=[];
+  if(view.mode!=='range')parts.push(view.mode==='search_all'?hubT('dep.scope_all','전체 기간'):(view.from===view.to?hubT('dep.scope_day','{day}',{day:depYmdLabel(view.from)}):hubT('dep.scope_range','{from} ~ {to}',{from:depYmdLabel(view.from),to:depYmdLabel(view.to)})));
+  if(view.qn.kind!=='none')parts.push(hubT('dep.note_q','검색: {q}',{q:view.qn.text}));
+  if(!error){
+    if(trunc.truncated)parts.push(trunc.total!==null?hubT('dep.note_trunc','{n}건 표시 · 전체 {total}건',{n:list.length,total:trunc.total}):hubT('dep.note_trunc_unknown','{n}건 표시 · 더 있을 수 있음',{n:list.length}));
+    else if(view.mode!=='range')parts.push(hubT('dep.note_count','{n}건',{n:list.length}));
+  }
+  const tzToday=depTzYmd(nowMs);
+  const depBar='<!--dep-bar--><form class="dep-bar" role="search" onsubmit="return depApply(event)">'
+    +'<div class="dep-q"><input type="search" id="depQ" maxlength="40" autocomplete="off" enterkeyhint="search" value="'+esc(DEP_Q)+'" placeholder="'+esc(hubT('dep.search_ph','입금자 · 금액 · 계좌 끝자리'))+'" aria-label="'+esc(hubT('dep.search_ph','입금자 · 금액 · 계좌 끝자리'))+'"></div>'
+    +'<label><span class="hint">'+esc(hubT('dep.f_from','시작일'))+'</span><input type="date" id="depFrom" value="'+esc(DEP_FROM)+'" max="'+tzToday+'"></label>'
+    +'<label><span class="hint">'+esc(hubT('dep.f_to','종료일'))+'</span><input type="date" id="depTo" value="'+esc(DEP_TO)+'" max="'+tzToday+'"></label>'
+    +'<div class="dep-actions"><button type="submit" class="hbtn pri">'+esc(hubT('dep.btn_apply','조회'))+'</button><button type="button" class="mini" onclick="depReset()">'+esc(hubT('dep.btn_reset','초기화'))+'</button></div></form>'
+    +'<div class="hint">'+esc(hubT('dep.date_hint','날짜는 하나만 넣어도 됩니다(그 하루만 조회). 검색어만 넣으면 전체 기간에서 찾습니다.'))+'</div>'
+    +'<div class="msg" id="depMsg" role="alert" style="color:var(--red)"></div>'
+    +(parts.length?'<div class="hint" id="depNote">'+esc(parts.join(' · '))+'</div>':'')
+    +'<!--/dep-bar-->';
+  let depMoreHtml='';
+  if(trunc.truncated)depMoreHtml='<!--dep-more--><div class="hint" style="margin-top:8px">'+(depCanMore(list.length,trunc.total,baseLimit,DEP_MORE)?'<button type="button" class="mini" onclick="depMore()">'+esc(hubT('dep.btn_more','더 보기'))+'</button>':esc(hubT('dep.cap_hint','표시 한도({n}건)에 도달했습니다. 기간이나 검색어를 좁혀 주세요.',{n:list.length})))+'</div><!--/dep-more-->';
+  const tableHtml=error?'<div class="empty">'+esc(hubT('dep.load_err','입금 내역을 불러오지 못했습니다: {msg}',{msg:error.message||''}))+'</div>':list.length?`<div class="tblwrap"><table><tr><th>${esc(hubT('dep.th_time','시각'))}</th><th style="text-align:right">${esc(hubT('dep.th_amount','금액'))}</th><th>${esc(hubT('dep.th_payer','입금자'))}</th><th>${esc(hubT('dep.th_account','계좌'))}</th></tr>
+    ${list.map(r=>`<tr><td>${esc(hubFmtWhen(r.bank_dt))}</td><td style="text-align:right">₩${Number(r.amount).toLocaleString('ko-KR')}</td>
+      <td>${r.is_card?esc(hubT('dep.card_est','💳 카드결제(추정)'))+' <span class="sub">'+esc(r.payer_raw||'')+'</span>':esc(r.payer_raw||'')}</td><td>${esc(r.account_tail||'')}</td></tr>`).join('')}</table></div>`
+    :'<div class="empty">'+esc(view.mode==='range'?hubT('dep.empty','입금 내역이 없습니다 (자동 수집 대기)'):hubT('dep.empty_filtered','조건에 맞는 입금 내역이 없습니다'))+'</div>';
   m.innerHTML=`
   <div class="card"><h2>${esc(hubT('dep.title','💰 입금'))}</h2>
     <div class="hint" style="color:var(--gold)">${esc(hubT('dep.warn','⚠ 미검증 자동 알림 · 회계 원장이 아니며 수기 대조용'))}</div>
     <div class="chips" style="margin:10px 0">
-      <button class="mini ${DEP_RANGE==='today'?'stamp':''}" onclick="setDepRange('today')">${esc(hubT('dep.btn_today','오늘'))}</button>
-      <button class="mini ${DEP_RANGE==='week'?'stamp':''}" onclick="setDepRange('week')">${esc(hubT('dep.btn_week','7일'))}</button>
-      <button class="mini ${DEP_RANGE==='month'?'stamp':''}" onclick="setDepRange('month')">${esc(hubT('dep.btn_month','이번달'))}</button>
-    </div>
-    ${(rows||[]).length?`<div class="tblwrap"><table><tr><th>${esc(hubT('dep.th_time','시각'))}</th><th style="text-align:right">${esc(hubT('dep.th_amount','금액'))}</th><th>${esc(hubT('dep.th_payer','입금자'))}</th><th>${esc(hubT('dep.th_account','계좌'))}</th></tr>
-    ${(rows||[]).map(r=>`<tr><td>${esc(hubFmtWhen(r.bank_dt))}</td><td style="text-align:right">₩${Number(r.amount).toLocaleString('ko-KR')}</td>
-      <td>${r.is_card?esc(hubT('dep.card_est','💳 카드결제(추정)'))+' <span class="sub">'+esc(r.payer_raw||'')+'</span>':esc(r.payer_raw||'')}</td><td>${esc(r.account_tail||'')}</td></tr>`).join('')}</table></div>`
-    :'<div class="empty">'+esc(hubT('dep.empty','입금 내역이 없습니다 (자동 수집 대기)'))+'</div>'}
+      <button class="mini ${view.mode==='range'&&DEP_RANGE==='today'?'stamp':''}" onclick="setDepRange('today')">${esc(hubT('dep.btn_today','오늘'))}</button>
+      <button class="mini ${view.mode==='range'&&DEP_RANGE==='week'?'stamp':''}" onclick="setDepRange('week')">${esc(hubT('dep.btn_week','7일'))}</button>
+      <button class="mini ${view.mode==='range'&&DEP_RANGE==='month'?'stamp':''}" onclick="setDepRange('month')">${esc(hubT('dep.btn_month','이번달'))}</button>
+    </div>${depBar}
+    ${tableHtml}${depMoreHtml}
   </div>`;
 }
 

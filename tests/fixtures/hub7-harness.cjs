@@ -25,7 +25,7 @@ function fnSrc(text,name){
   const end=text.indexOf('\n}',m.index);
   return text.slice(ls,end+2);
 }
-function chain(spec,rec,table,limits){
+function chain(spec,rec,table,limits,filters){
   const s=spec||{};
   let mode='list';
   const p=new Proxy(function(){},{
@@ -35,7 +35,7 @@ function chain(spec,rec,table,limits){
         if(s.count!==undefined)out.count=s.count;
         return Promise.resolve(out).then(res,rej);
       };
-      return function(...a){if(limits&&k==='limit')limits.push([table,a[0]]);if(rec&&['insert','update','upsert','delete'].includes(k))rec.push([table,k,JSON.parse(JSON.stringify(a))]);if(k==='single'||k==='maybeSingle')mode='single';return p;};
+      return function(...a){if(limits&&k==='limit')limits.push([table,a[0]]);if(filters&&['gte','lt','ilike','or'].includes(k))filters.push([table,k,JSON.parse(JSON.stringify(a))]);if(rec&&['insert','update','upsert','delete'].includes(k))rec.push([table,k,JSON.parse(JSON.stringify(a))]);if(k==='single'||k==='maybeSingle')mode='single';return p;};
     },
     apply(){return p;}
   });
@@ -128,15 +128,15 @@ function tablesDefault(){
 }
 function makeSb(over,rec){
   const o=over||{};
-  const rpcCalls=[],stor=[],fn=[],limits=[];
+  const rpcCalls=[],stor=[],fn=[],limits=[],filters=[];
   const tables=Object.assign(tablesDefault(),o.tables||{});
   const sb={
-    from(t){return chain(tables[t]||{list:[],single:null},rec,t,limits);},
+    from(t){return chain(tables[t]||{list:[],single:null},rec,t,limits,filters);},
     rpc(name,args){rpcCalls.push([name,args]);if(name==='payroll_save_month')return Promise.resolve({data:3,error:tables.payroll_rows.error||null});const r=(o.rpc||{})[name];return Promise.resolve(r!==undefined?(typeof r==='function'?r(args):r):{data:3,error:null});},
     storage:{from(b){return {upload(p){stor.push(['upload',b,String(p).replace(/[0-9a-f-]{36}/,'UUID')]);return Promise.resolve({error:(o.storage&&o.storage.upload)||null});},download(p){stor.push(['download',b,p]);return Promise.resolve((o.storage&&o.storage.download)||{data:null,error:{message:'없음<파일>'}});}};}},
     functions:{invoke(name,args){fn.push([name,JSON.parse(JSON.stringify(args))]);return Promise.resolve({data:{ok:true,message:'삭제함'},error:null});}}
   };
-  sb.rpcCalls=rpcCalls;sb.stor=stor;sb.fn=fn;sb.limits=limits;
+  sb.rpcCalls=rpcCalls;sb.stor=stor;sb.fn=fn;sb.limits=limits;sb.filters=filters;
   return sb;
 }
 
@@ -205,18 +205,18 @@ async function renderAll(html,opts){
       }
     }
     if(text.includes('payrollParseMain(aoa)')){vm.runInContext(fs.readFileSync(path.join(__dirname,'../../payroll-bonus.js'),'utf8').split('function bonusT(')[0].replace("if(typeof globalThis!=='undefined')globalThis.HUB_BONUS_CATALOG=true;",'')+fs.readFileSync(path.join(__dirname,'../../payroll-ledger-extra.js'),'utf8'),ctx);}
-    vm.runInContext('let BADGE={notice:2};let MY_PAYSLIPS=[];let DEP_RANGE="month";let PAY_VIEW="ledger",PAY_MONTH="",PAY_ROWS=[],PAY_COLUMNS=[],PAY_MESSAGE="",PAY_WAGE_LATEST={},PAY_SOURCE_FILE=null,PAY_SAVING=false,PAY_BUSY="",PAY_READ_ID=0;let PAY_SLIP_USER="",PAY_SLIP_HTML="";let SETTINGS={};let PAYMENT_RECEIPT_PREVIEWS=[];let EMPLOYEE_CONTRACT_PREVIEWS={};let CONTRACT_SHOW_CANCELLED=false;\n'
+    vm.runInContext('let BADGE={notice:2};let MY_PAYSLIPS=[];let DEP_RANGE="month",DEP_Q="",DEP_FROM="",DEP_TO="",DEP_MORE=0;let PAY_VIEW="ledger",PAY_MONTH="",PAY_ROWS=[],PAY_COLUMNS=[],PAY_MESSAGE="",PAY_WAGE_LATEST={},PAY_SOURCE_FILE=null,PAY_SAVING=false,PAY_BUSY="",PAY_READ_ID=0;let PAY_SLIP_USER="",PAY_SLIP_HTML="";let SETTINGS={};let PAYMENT_RECEIPT_PREVIEWS=[];let EMPLOYEE_CONTRACT_PREVIEWS={};let CONTRACT_SHOW_CANCELLED=false;\n'
       +hubTLine+'\n'+hubNLine+'\n'+hubTELine+'\n'+timeSrc+'\n'+helperSrc+'\n'+setStatusSrc+'\n'
       +homeSrc+'\n'+confSrc+'\n'+aiPaySrc+'\n'+ownerSrc+'\n'+jgSrc+'\n'+contractStatusSrc+'\n'+payReqSrc+'\n'+prevEmpSrc+'\n'+docCardSrc+'\n'
-      +';this.api={renderHome,renderDeposit,renderConfid,filterConfid,submitConfidRecord,aiUsagePanelHtml,aiCostSectionHtml,aiExternalSectionHtml,aiSessionSectionHtml,aiUsageSummary,aiUsageWindow,'
+      +';this.api={renderHome,renderDeposit,depApply,depReset,depMore,renderConfid,filterConfid,submitConfidRecord,aiUsagePanelHtml,aiCostSectionHtml,aiExternalSectionHtml,aiSessionSectionHtml,aiUsageSummary,aiUsageWindow,'
       +'ownerBoardsPanelHtml,renderOwnerBoards,openOwnerBoard,renderAicost,saveAicost,saveMarketingBudget,renderMarketingExpensePanel,marketingCategoryOptions,'
       +'payTop,renderPay,renderPayWages,saveWageInfo,setPayMonth,addPayRow,buildPayrollPreview,parsePayrollXls,renderPayLedger,savePayrollRows,uploadPayrollOriginal,downloadPayrollOriginal,movePayrollMonth,archivePayrollMonth,restorePayrollMonth,'
       +'buildPayslipHtml,payslipStatusBadge,payslipCrossCheck,renderPaySlip,issuePayslip,'
       +'disableEmployeeAccountPreserveRecords,hardDeleteAccountPreserveRecords,revokeApproval,'
       +'renderJobGroupAdmin,previewEmployeeJobGroup,saveEmployeeJobGroupPreview,toggleJobGroupPerson,'
       +'contractDisplayStatus,paymentRequestCard,previewEmployeeContract,docCard,setStatus,'
-      +'set:(k,v)=>{if(k==="AICOST_MONTH")AICOST_MONTH=v;if(k==="PAY_VIEW")PAY_VIEW=v;if(k==="PAY_MONTH")PAY_MONTH=v;if(k==="PAY_ROWS")PAY_ROWS=v;if(k==="PAY_COLUMNS")PAY_COLUMNS=v;if(k==="PAY_MESSAGE")PAY_MESSAGE=v;if(k==="PAY_SOURCE_FILE")PAY_SOURCE_FILE=v;if(k==="PAY_SLIP_USER")PAY_SLIP_USER=v;if(k==="PAY_SLIP_HTML")PAY_SLIP_HTML=v;if(k==="DEP_RANGE")DEP_RANGE=v;if(k==="MY_PAYSLIPS")MY_PAYSLIPS=v;if(k==="PAYMENT_RECEIPT_PREVIEWS")PAYMENT_RECEIPT_PREVIEWS=v;if(k==="EMPLOYEE_CONTRACT_PREVIEWS")EMPLOYEE_CONTRACT_PREVIEWS=v;if(k==="BADGE")BADGE=v;},'
-      +'get:k=>({PAY_MESSAGE:PAY_MESSAGE,PAY_SLIP_HTML:PAY_SLIP_HTML,PAY_ROWS:PAY_ROWS,PAY_COLUMNS:PAY_COLUMNS,PAY_MONTH:PAY_MONTH,PAY_VIEW:PAY_VIEW,SETTINGS:SETTINGS,AICOST_MONTH:AICOST_MONTH,PAY_WAGE_LATEST:PAY_WAGE_LATEST})[k]};',ctx);
+      +'set:(k,v)=>{if(k==="AICOST_MONTH")AICOST_MONTH=v;if(k==="PAY_VIEW")PAY_VIEW=v;if(k==="PAY_MONTH")PAY_MONTH=v;if(k==="PAY_ROWS")PAY_ROWS=v;if(k==="PAY_COLUMNS")PAY_COLUMNS=v;if(k==="PAY_MESSAGE")PAY_MESSAGE=v;if(k==="PAY_SOURCE_FILE")PAY_SOURCE_FILE=v;if(k==="PAY_SLIP_USER")PAY_SLIP_USER=v;if(k==="PAY_SLIP_HTML")PAY_SLIP_HTML=v;if(k==="DEP_RANGE")DEP_RANGE=v;if(k==="DEP_Q")DEP_Q=v;if(k==="DEP_FROM")DEP_FROM=v;if(k==="DEP_TO")DEP_TO=v;if(k==="DEP_MORE")DEP_MORE=v;if(k==="MY_PAYSLIPS")MY_PAYSLIPS=v;if(k==="PAYMENT_RECEIPT_PREVIEWS")PAYMENT_RECEIPT_PREVIEWS=v;if(k==="EMPLOYEE_CONTRACT_PREVIEWS")EMPLOYEE_CONTRACT_PREVIEWS=v;if(k==="BADGE")BADGE=v;},'
+      +'get:k=>({PAY_MESSAGE:PAY_MESSAGE,PAY_SLIP_HTML:PAY_SLIP_HTML,PAY_ROWS:PAY_ROWS,PAY_COLUMNS:PAY_COLUMNS,PAY_MONTH:PAY_MONTH,PAY_VIEW:PAY_VIEW,SETTINGS:SETTINGS,AICOST_MONTH:AICOST_MONTH,PAY_WAGE_LATEST:PAY_WAGE_LATEST,DEP_RANGE:DEP_RANGE,DEP_Q:DEP_Q,DEP_FROM:DEP_FROM,DEP_TO:DEP_TO,DEP_MORE:DEP_MORE})[k]};',ctx);
     return {ctx,dom,log,statuses,rec,api:ctx.api};
   }
   const flush=()=>new Promise(res=>setImmediate(res));
@@ -245,6 +245,29 @@ async function renderAll(html,opts){
     r.api.set('DEP_RANGE',range);r.ctx.TAB='deposit';
     const m={innerHTML:''};await r.api.renderDeposit(m);await flush();
     out['dep.'+name]=snap(r,m);
+  }
+  /* 입금 검색·날짜 조회(2026-11-22) — 새 상태 화면. 조회 조건(gte/lt/ilike/or)과 한도(limit)도 함께 기록. */
+  const depRows=(n,from)=>Array.from({length:n},(_,i)=>({id:from-i,bank_dt:'2026-10-01T01:00:00Z',amount:1000,payer_raw:'가나다',is_card:false,account_tail:'1'}));
+  for(const [name,state,sbOver] of [
+    ['search_all',{DEP_Q:' 홍 길동 '},null],['search_amount',{DEP_Q:'₩50,000'},null],
+    ['custom_day',{DEP_FROM:'2026-09-30'},null],['custom_range_q',{DEP_FROM:'2026-09-01',DEP_TO:'2026-09-30',DEP_Q:'카드'},null],
+    ['trunc_known',{DEP_Q:'가나다'},{tables:{deposits:{list:depRows(300,300),count:500}}}],['trunc_unknown',{DEP_Q:'가나다'},{tables:{deposits:{list:depRows(300,300)}}}],
+    ['cap',{DEP_Q:'가나다',DEP_MORE:3},{tables:{deposits:{list:depRows(2,2),count:5000}}}],
+    ['search_empty',{DEP_Q:'zzz'},{tables:{deposits:{list:[]}}}],['load_error',{DEP_Q:'가나다'},{tables:{deposits:{error:{message:'권한<없음>'}}}}],
+    ['xss',{DEP_Q:'<img src=x onerror="a"> '+String.fromCharCode(39)+'q'+String.fromCharCode(39)+' '+String.fromCharCode(92)+'%_'},null]
+  ]){
+    const r=await asRole('owner',null,sbOver);
+    for(const k of Object.keys(state))r.api.set(k,state[k]);
+    r.ctx.TAB='deposit';
+    const m={innerHTML:''};await r.api.renderDeposit(m);await flush();
+    out['dep.'+name]=jj([m.innerHTML,r.dom.hist.filter(h=>h[0]!=='#main').map(h=>h.join('|')),r.log,r.statuses,r.rec,r.ctx.sb.filters,r.ctx.sb.limits]);
+  }
+  for(const [name,vals] of [['apply_err_format',{f:'2026-02-30',t:''}],['apply_err_order',{f:'2026-10-05',t:'2026-10-01'}],['apply_ok',{f:'2026-10-01',t:'',q:'홍'}]]){
+    const r=await asRole('owner');
+    r.ctx.TAB='deposit';
+    r.dom.$('#depQ').value=vals.q||'';r.dom.$('#depFrom').value=vals.f;r.dom.$('#depTo').value=vals.t;
+    let prevented=0;const ret=r.api.depApply({preventDefault(){prevented++;}});await flush();
+    out['dep.'+name]=jj([ret,prevented,r.dom.hist.map(h=>h.join('|')),r.log,[r.api.get('DEP_Q'),r.api.get('DEP_FROM'),r.api.get('DEP_TO'),r.api.get('DEP_MORE'),r.api.get('DEP_RANGE')]]);
   }
   /* ───────── 진료기록 ───────── */
   for(const [name,role,sbOver,q] of [['owner','owner',null,''],['staff','staff',null,''],['search','owner',null,'환자<a'],['search_none','owner',null,'zzz'],['empty','owner',{tables:{confidential_records:{list:[]}}},''],['error','owner',{tables:{confidential_records:{error:{message:'x'}}}},'']]){
