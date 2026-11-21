@@ -3,6 +3,7 @@
    · 운세 카드의 내용(한 줄 운세·행운의 색/아이템·등급 이름)과 모든 안내 글은 hub_ui_texts(키 intro.fortune_*)에 있어 원장이 「글 고치기」에서 고친다.
    · 상품 이름·금액·확률·개수(전체/월/일)·하루 횟수·켬끔은 원장이 카드 창의 「⚙️ 상품·확률 설정」에서 직접 고친다(DB fortune_prizes·fortune_settings — 코드에 박힌 값 없음).
    · 카드 모양(별 수·한 줄·색·숫자·아이템)은 서버가 준 seed로 정해 같은 날 어느 기기에서 열어도 같은 카드다. 당첨 여부는 서버가 정한 값만 믿는다(화면 난수 아님).
+   · 이달의 점술관(hub-intro.js)이 ctx.deckCard(seed)를 주면 한 줄 운세 대신 이달 카드 목록에서 seed로 고른 카드(이름·이모지·풀이)를 보여 준다. 같은 seed면 같은 카드이고 당첨은 여전히 서버만 정한다.
    · 글 목록(HUB_FORTUNE_TEXT_DEFS)은 hub-intro.js가 첫 화면 글 목록에 합쳐 「글 고치기」에 올린다. 이 파일은 hub-intro.js보다 먼저 불러온다.
 */
 (function(root){
@@ -151,6 +152,11 @@ const CSS=`
 .hf-starrow i{font-style:normal;opacity:.25}
 .hf-starlbl{font-size:11px;opacity:.65}
 .hf-line{font-size:14.5px;line-height:1.5;font-weight:600;margin:4px 0;word-break:keep-all}
+.hf-deck{flex:1;min-height:0;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;overflow:hidden}
+.hf-front.win .hf-deck{display:none} /* 당첨 카드는 상품권 자리를 위해 카드 이름·그림을 접음(풀이 글은 그대로) */
+.hf-deckt{font-size:10.5px;opacity:.6}
+.hf-deckE{font-size:46px;line-height:1.15}
+.hf-deckN{font-size:15px;font-weight:800}
 .hf-animal{flex:1;min-height:0;width:100%;display:flex;align-items:center;justify-content:center}
 .hf-animal img{max-height:100%;max-width:52%;object-fit:contain;filter:drop-shadow(0 4px 6px rgba(80,50,10,.35))}
 .hf-lucky{display:grid;grid-template-columns:auto 1fr;gap:3px 8px;font-size:12px;text-align:left;margin-top:auto;width:100%}
@@ -214,7 +220,7 @@ function rpc(sb,fn,args){return sb.rpc(fn,args||{}).then(function(r){if(r.error)
 
 let CUR=null; // 열려 있는 창 하나만
 
-/* ctx = {sb, host(요소), T(key,vars), isOwner, day, animalSrc, celebrate(level), onOpen(), onClose(), onDrawn(state)} */
+/* ctx = {sb, host(요소), T(key,vars), isOwner, day, animalSrc, deckCard(seed)·deckTitle(이달의 카드 목록, 선택), celebrate(level), onOpen(), onClose(), onDrawn(state)} */
 function open(ctx){
   if(CUR)return CUR;
   injectCss();
@@ -265,12 +271,14 @@ function renderMsg(text){
 function starsHtml(n){let h='';for(let i=1;i<=5;i++)h+=i<=n?'★':'<i>★</i>';return h;}
 function faceHtml(S,draw){
   const T=S.ctx.T,c=buildCard(draw.seed,cardSrc(S)),win=!!draw.prize_name;
+  const dc=typeof S.ctx.deckCard==='function'?S.ctx.deckCard(draw.seed):null; // 이달의 카드(없으면 옛 한 줄 운세·동물 그림)
   const sw=c.color.hex?'<span class="hf-sw" style="background:'+esc(c.color.hex)+'"></span>':'';
   return '<div class="hf-grade">'+esc(c.grade)+'</div>'
     +'<div class="hf-starrow" aria-label="'+esc(T('intro.fortune_stars'))+' '+c.stars+'">'+starsHtml(c.stars)+'</div>'
     +'<div class="hf-starlbl">'+esc(T('intro.fortune_stars'))+'</div>'
-    +'<div class="hf-line">'+esc(c.line)+'</div>'
-    +(S.ctx.animalSrc?'<div class="hf-animal"><img src="'+esc(S.ctx.animalSrc)+'" alt="" onerror="this.style.display=\'none\'"></div>':'')
+    +'<div class="hf-line">'+esc(dc&&dc.text?dc.text:c.line)+'</div>'
+    +(dc?'<div class="hf-deck"><div class="hf-deckt">'+esc(S.ctx.deckTitle||'')+'</div><div class="hf-deckE">'+esc(dc.emoji)+'</div><div class="hf-deckN">'+esc(dc.name)+'</div></div>':'')
+    +(!dc&&S.ctx.animalSrc?'<div class="hf-animal"><img src="'+esc(S.ctx.animalSrc)+'" alt="" onerror="this.style.display=\'none\'"></div>':'')
     +(win?voucherHtml(T,draw):'')
     +'<div class="hf-lucky"><b>'+esc(T('intro.fortune_color'))+'</b><span>'+sw+esc(c.color.name)+'</span><b>'+esc(T('intro.fortune_number'))+'</b><span>'+c.number+'</span><b>'+esc(T('intro.fortune_item'))+'</b><span>'+esc(c.item)+'</span></div>';
 }

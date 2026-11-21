@@ -449,8 +449,8 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 <div class="mask" id="attMonthlyMask"><div class="modal wide"><div class="rowflex att-monthly-actions" style="justify-content:space-between"><h3>월 근태 확인용 자료</h3><div><button class="mini" onclick="printAttMonthlyPerson()">인쇄</button> <button class="mini" onclick="hide('attMonthlyMask')">닫기</button></div></div><div id="attMonthlyPersonBody"></div></div></div>
 <footer>© 2026 Jung · 아산정플란트치과 · 무단 복제·배포 금지</footer>
 
-<script src="hub-fortune.js?v=2026100601"></script>
-<script src="hub-intro.js?v=2026100503"></script>
+<script src="hub-fortune.js?v=2026112201"></script>
+<script src="hub-intro.js?v=2026112201"></script>
 <script>window.HUB_RECALL_CATALOG=true;</script>
 <script src="card-ledger-ui.js?v=2026101110"></script>
 <script src="payroll-bonus.js?v=2026101110"></script>
@@ -6087,6 +6087,7 @@ function hubIntroOptions(){
         docs:oi.error||oc.error?null:(oi.data||[]).filter(i=>!done.has(i.id)).length,appr:st?(st.error?null:(st.data||[]).length):null,soon};
     },
     saveText:(k,v)=>HubUi.saveText(sb,k,v),resetText:k=>HubUi.resetText(sb,k),
+    onOpenTool:code=>openToolFromHeader(code),canOpenTool:code=>toolHeaderBtnVisible(code), // 첫 화면 「사주 정밀풀이」 단추 — 머리줄 도구 단추와 같은 방식으로 도구 탭의 그 도구를 열고, 못 여는 계정(대리 등)에는 단추를 숨김
     fortune:{sb:sb}}; // 운세 카드(hub-fortune.js) — 서버 함수 fortune_* 를 같은 로그인으로 부름
 }
 async function doLogin(){

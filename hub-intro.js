@@ -1,4 +1,7 @@
-/* hub-intro.js — 직원허브 첫 화면(요일별 3D 동물 + 파티클 + 오늘 정보 + 미니게임)
+/* hub-intro.js — 직원허브 첫 화면(이달의 점술관 + 파티클 + 오늘 정보 · 옛 요일별 3D 동물은 intro.oracle_hero_mode=animal)
+   · 기본(theme): 가운데에 이달의 점술관 카드(이모지+그라데이션을 캔버스로 그림, 새 그림 파일·three.js 없음)가 떠 있고 누르면 운세 카드 창(hub-fortune.js)이 열린다.
+     달마다 점술 종류·카드 목록·배경색·흩날리는 이모지·D-day가 바뀌고(글 키 intro.oracle_mMM_*), 오늘의 점괘 카드(계정+날짜로 정해지는 총운·업무운·인간관계운)가 치아 상식 카드 자리에 있다.
+     ?introMonth=N(1~12)로 달을 강제해 미리볼 수 있고, ?introHero=animal|theme 로 가운데 그림을 강제할 수 있다. 상품권 추첨은 서버 함수만 정한다(hub-fortune.js).
    · hr.html이 로그인 직후 HubIntro.show(옵션)으로 띄운다. 「허브 들어가기」를 누르면 3D를 완전히 끄고(그래픽 메모리 반환) 밑에 그려 둔 원래 허브가 보인다.
    · 화면 글은 전부 hub_ui_texts 표(키 intro.*). 원장은 첫 화면 오른쪽 위 「✏️ 문구 고치기」나 ⚙️ 허브 설정 › 글 고치기에서 고친다.
      글 목록(HUB_INTRO_TEXT_DEFS)은 hub-texts.js가 읽어 「글 고치기」 목록에도 올린다.
@@ -68,7 +71,103 @@ const DEFS=[
   ['intro.card_soon','카드 제목 — 다가오는 일정','📅 다가오는 일정'],
   ['intro.soon_empty','다가오는 일정이 없을 때','2주 안에 등록된 일정이 없어요'],
   ['intro.card_quote','카드 제목 — 오늘의 한마디','💬 오늘의 한마디'],
-  ['intro.card_fact','카드 제목 — 오늘의 치아 상식','🦷 오늘의 치아 상식'],
+  ['intro.card_oracle','카드 제목 — 오늘의 점괘(옛 「오늘의 치아 상식」 자리)','🔮 오늘의 점괘'],
+  ['intro.oracle_hero_mode','대문 가운데 그림 — theme(이달의 점술관 카드·기본) 또는 animal(옛 요일별 3D 동물로 되돌리기)','theme'],
+  ['intro.oracle_title','대문 큰 인사 위 작은 글 — {m}은 월, {name}은 그 달의 점술 이름','{m}월의 점술관 · {name}'],
+  ['intro.oracle_hint','대문 가운데 카드 아래 안내(카드를 누르면 운세 카드 창이 열림)','카드를 눌러 오늘의 한 장을 뽑아 보세요 ✨'],
+  ['intro.oracle_disclaimer','오늘의 점괘 카드 맨 아래 작은 글(재미로 보는 운세 안내)','재미로 보는 점괘예요. 믿거나 말거나 😄'],
+  ['intro.oracle_labels','오늘의 점괘 칸 이름 목록 — 한 줄에 하나, 위에서부터 총운·업무운·인간관계운·행운의 시간·행운의 색·행운의 숫자','총운\n업무운\n인간관계운\n행운의 시간\n행운의 색\n행운의 숫자'],
+  ['intro.oracle_read_total','오늘의 점괘 「총운」 문장 목록 — 한 줄에 하나(직원·날짜마다 하나가 정해져 나옴, 긍정·가벼운 농담만)',[
+    '오늘은 작은 일에도 기분 좋은 흐름이 이어지는 날이에요.',
+    '차분하게 시작하면 오후로 갈수록 운이 올라가요.',
+    '뜻밖의 좋은 소식이 슬쩍 다가오는 날이에요.',
+    '평소보다 웃음이 많아지는 하루가 될 거예요.',
+    '서두르지 않아도 제때 풀리는 일이 많아요.',
+    '오늘 한 선택이 나중에 고마운 선물이 돼요.',
+    '마음먹은 일을 시작하기 딱 좋은 에너지예요.',
+    '주변의 도움이 자연스럽게 모이는 날이에요.',
+    '가볍게 던진 말 한마디가 좋은 기운을 불러와요.',
+    '몸과 마음이 가벼워서 무엇이든 술술 돼요.',
+    '작은 여유가 큰 행운으로 돌아오는 날이에요.',
+    '하루 끝에 「오늘 괜찮았다」 싶은 날이에요.'
+  ].join('\n')],
+  ['intro.oracle_read_work','오늘의 점괘 「업무운」 문장 목록 — 한 줄에 하나',[
+    '꼼꼼함이 빛나는 날, 확인 한 번이 칭찬으로 돌아와요.',
+    '막혔던 일이 의외로 쉽게 정리돼요.',
+    '새로 배운 것이 바로 쓸모 있어지는 날이에요.',
+    '동료와 손발이 척척 맞아요.',
+    '우선순위를 정하면 일이 절반으로 줄어요.',
+    '오전에 중요한 일을 끝내면 오후가 여유로워요.',
+    '메모 한 줄이 실수를 막아 주는 날이에요.',
+    '부탁하면 기분 좋게 도와줄 사람이 있어요.',
+    '정리정돈을 하면 집중력이 두 배가 돼요.',
+    '작은 성과가 눈에 띄는 날이에요.',
+    '차근차근 하면 마감도 여유 있게 맞춰요.',
+    '오늘의 노력이 내일의 편안함이 돼요.'
+  ].join('\n')],
+  ['intro.oracle_read_people','오늘의 점괘 「인간관계운」 문장 목록 — 한 줄에 하나',[
+    '먼저 건네는 인사가 좋은 대화로 이어져요.',
+    '오랜만에 반가운 연락이 올 수 있어요.',
+    '칭찬 한마디가 상대의 하루를 바꿔요.',
+    '웃는 얼굴 덕분에 분위기가 부드러워져요.',
+    '점심시간에 나누는 수다가 활력이 돼요.',
+    '고맙다는 말이 평소보다 더 크게 돌아와요.',
+    '귀 기울여 들어주면 마음이 통해요.',
+    '사소한 배려가 오래 기억에 남아요.',
+    '함께 웃을 일이 하나쯤 생기는 날이에요.',
+    '가벼운 농담이 어색함을 풀어 줘요.',
+    '오늘 만나는 사람이 좋은 인연이 될 수 있어요.',
+    '따뜻한 말 한마디면 충분한 날이에요.'
+  ].join('\n')],
+  ['intro.oracle_lucky_time','오늘의 점괘 「행운의 시간」 목록 — 한 줄에 하나','오전 10시 무렵\n점심 먹고 난 직후\n오후 2시 무렵\n오후 3시 반 무렵\n퇴근 한 시간 전\n출근하자마자\n오전 11시 무렵\n오후 4시 무렵'],
+  ['intro.oracle_deck_default','범용 카드 목록 — 한 줄에 하나, 「카드 이름|이모지|풀이 한 줄」. 그 달 카드 목록을 비우거나 읽을 수 없을 때 대신 씀',[
+    '작은 행운|🍀|오늘은 작은 행운이 눈에 잘 띄는 날이에요.',
+    '따뜻한 한마디|💬|건네는 말이 그대로 좋은 기운이 돼요.',
+    '여유 한 잔|☕|잠깐의 휴식이 흐름을 바꿔요.',
+    '반짝 아이디어|💡|떠오른 생각을 바로 적어 두세요.',
+    '좋은 소식|📬|기다리던 소식이 가까이 와요.',
+    '든든한 응원|🤝|곁에 있는 사람이 힘이 돼요.',
+    '가벼운 걸음|👟|몸을 조금 움직이면 기분이 올라가요.',
+    '맛있는 보상|🍪|오늘의 수고에 작은 간식 하나!',
+    '웃음 부적|😊|웃는 얼굴이 오늘의 부적이에요.',
+    '맑은 하늘|🌤️|구름 뒤에서 해가 슬쩍 나와요.',
+    '새로운 시도|🎈|평소와 다른 방법이 잘 맞아요.',
+    '편안한 마무리|🌙|하루가 부드럽게 마무리돼요.'
+  ].join('\n')],
+  ['intro.oracle_dex_label','대문 카드 도감 줄 — {n}은 이번 달 모은 카드, {m}은 이번 달 전체 카드 수','📖 이달의 도감 {n}/{m}'],
+  ['intro.oracle_dday','대문 D-day 줄 — {label}은 행사 이름, {n}은 남은 날','{label}까지 D-{n}'],
+  ['intro.oracle_dday_today','대문 D-day 줄(그날) — {label}은 행사 이름','오늘은 {label}이에요 🎉'],
+  ['intro.oracle_zodiac_pick','띠·별자리 고르는 칸의 첫 글(고른 값은 이 기기에만 저장되고 서버로 안 보내짐)','내 띠·별자리 고르기 (이 기기에만 저장)'],
+  ['intro.oracle_zodiac_none','띠·별자리를 이미 골랐을 때 고르는 칸의 첫 글(눌러서 고른 것을 지움)','선택 안 함'],
+  ['intro.oracle_ddi_lines','띠별 한마디 목록 — 한 줄에 하나, 「띠 이름|한마디」(1월 새해 괘 때 보임)',[
+    '쥐🐭|올해는 부지런함이 복이 되는 해예요.',
+    '소🐮|꾸준히 걸어온 길이 열매를 맺어요.',
+    '호랑이🐯|용기 있는 도전이 좋은 결과로 이어져요.',
+    '토끼🐰|부드러운 말씨가 큰 인연을 불러와요.',
+    '용🐲|하늘 높이 오르는 기운이 있어요.',
+    '뱀🐍|차분한 판단이 빛을 보는 해예요.',
+    '말🐴|발걸음이 가벼워지고 일이 빨라져요.',
+    '양🐑|올해의 주인공! 따뜻한 마음이 복이 돼요.',
+    '원숭이🐵|재치가 통해서 막힌 일이 풀려요.',
+    '닭🐔|아침 일찍 시작한 일이 잘돼요.',
+    '개🐶|믿음직함 덕분에 사람이 모여요.',
+    '돼지🐷|넉넉한 마음에 복이 따라와요.'
+  ].join('\n')],
+  ['intro.oracle_ddi_my','내 띠 한마디 줄 — {z}는 띠 이름, {t}는 한마디','{z} 한마디 · {t}'],
+  ['intro.oracle_stars','별자리 이름 목록 — 한 줄에 하나(3월 별자리 순위에 쓰임, 12개)','양자리♈\n황소자리♉\n쌍둥이자리♊\n게자리♋\n사자자리♌\n처녀자리♍\n천칭자리♎\n전갈자리♏\n사수자리♐\n염소자리♑\n물병자리♒\n물고기자리♓'],
+  ['intro.oracle_star_top','별자리 순위 줄 — {a}·{b}·{c}는 1·2·3위 별자리','오늘의 별자리 순위 · 1위 {a} · 2위 {b} · 3위 {c}'],
+  ['intro.oracle_star_my','내 별자리 순위 줄 — {s}는 별자리, {n}은 순위','내 별자리 {s}는 오늘 {n}위!'],
+  ['intro.oracle_star_calm','내 별자리 줄(순위가 7위 밖일 때 — 순위 숫자 대신 보이는 긍정 한 줄) — {s}는 별자리','내 별자리 {s}는 오늘 느긋한 리듬이에요 ☕'],
+  ['intro.oracle_saju_btn','대문 사주 단추 글(눌러서 사주 도구를 열기)','🔮 사주 정밀풀이'],
+  ['intro.oracle_saju_note','사주 단추 아래 작은 안내 — 사주 도구가 입력한 내용을 원내 기록으로 저장함을 알림','사주 도구에 입력한 이름·생년월일은 원내 기록으로 저장돼요. 이 첫 화면은 생년월일을 받지 않아요.'],
+  ['intro.card_balance','점괘 카드 안 한 줄 제목 — 오늘의 밸런스 질문','오늘의 밸런스 질문'],
+  ['intro.oracle_balance_fmt','밸런스 질문 모양 — {a}·{b}는 두 선택지','{a} vs {b}'],
+  ['intro.balance','오늘의 밸런스 질문 목록 — 한 줄에 하나, 「A|B」. 음식·휴가·취미 같은 가벼운 소재만(갈등·정치·돈 이야기 금지)',[
+    '짜장면|짬뽕','치킨|피자','바다 여행|산 여행','아침형 인간|저녁형 인간','여름 휴가|겨울 휴가','고양이|강아지',
+    '커피|차','집콕 휴일|나들이 휴일','단 음식|짠 음식','책 읽기|영화 보기','국물 떡볶이|로제 떡볶이','캠핑|호캉스',
+    '면 먼저|국물 먼저','평생 여름|평생 겨울','점심은 한식|점심은 분식','혼자 여행|함께 여행','부먹|찍먹','민트초코 좋아|민트초코 싫어',
+    '아이스 커피|따뜻한 커피','등산|수영','국내 여행|해외 여행','밤 산책|아침 산책','삼겹살|소고기','달콤한 디저트|매콤한 야식'
+  ].join('\n')],
   ['intro.quotes','오늘의 한마디 목록 — 한 줄에 하나, 날마다 다음 줄이 보임',[
     '오늘의 작은 친절이 환자에겐 오래 남는 기억이 돼요.',
     '정성으로 꼼꼼히 — 우리가 매일 지키는 약속이에요.',
@@ -81,18 +180,6 @@ const DEFS=[
     '환자의 「덕분에 편했어요」가 우리의 보람이에요.',
     '오늘도 안전하게, 건강하게, 즐겁게!'
   ].join('\n')],
-  ['intro.facts','오늘의 치아 상식 목록 — 한 줄에 하나, 날마다 다음 줄이 보임',[
-    '치아 법랑질은 우리 몸에서 가장 단단한 조직이에요.',
-    '칫솔은 3개월쯤 쓰면 새것으로 바꾸는 게 좋아요.',
-    '임플란트가 뼈와 단단히 붙는 것을 「골유착」이라고 해요.',
-    '영구치는 사랑니까지 모두 32개예요.',
-    '양치는 한 번에 2~3분, 치아 안쪽 면까지 꼼꼼히!',
-    '치실은 칫솔이 닿지 않는 치아 사이를 닦아 줘요.',
-    '산성 음료를 마신 직후엔 물로 먼저 헹궈 주세요.',
-    '젖니는 보통 생후 6개월 무렵부터 나기 시작해요.',
-    '침은 음식 찌꺼기를 씻어 내고 산을 중화해 줘요.',
-    '스케일링은 보통 1년에 한 번 이상 권장돼요.'
-  ].join('\n')],
   ['intro.particle_words','빛 알갱이가 모여 만드는 글자 — 한 줄에 하나(짧을수록 또렷함)','좋은 하루\n오늘도 화이팅\n고마워요\n함께라서 좋아'],
   ['intro.streak','오른쪽 위 연속 방문 표시 — {n}은 연속 일수','🔥 {n}일 연속 방문'],
   ['intro.game_hint','게임 시작할 때 안내','15초! 떠다니는 충치균을 눌러 잡아요'],
@@ -101,6 +188,94 @@ const DEFS=[
   ['intro.edit','원장 전용 — 문구 고치기 단추','✏️ 문구 고치기'],
   ['intro.loading','정보 불러오는 중 글','불러오는 중…']
 ];
+/* ── 이달의 점술관 — 달마다 바뀌는 점술(코드 기본값). 원장은 글 고치기에서 달마다 바꾼다(키 intro.oracle_mMM_*, MM=01~12) ──
+   12~3월은 카드 목록까지 채웠고, 4~11월은 이름·색·이모지·D-day만 두고 카드 목록은 비워 두면 범용 카드 목록(intro.oracle_deck_default)을 쓴다. */
+const ORACLE_MONTHS={
+  12:{name:'🃏 올해의 마지막 타로',mode:'none',bg:'#2a1450,#150a30,#07031a,#e3b341',glyphs:'❄️ ⛄ ✨ 🎄',event:'12-25|크리스마스\n01-01|새해',deck:[
+    '바보|🃏|새로운 시작이 가벼운 마음에서 열려요. 일단 한 걸음!',
+    '마법사|🎩|가진 재주가 오늘은 평소보다 잘 먹혀요.',
+    '여사제|🌙|직감이 잘 맞는 날, 조용히 귀 기울여 보세요.',
+    '여황제|👑|넉넉한 마음이 주변을 환하게 만들어요.',
+    '황제|🏰|차근차근 세운 계획이 든든하게 받쳐 줘요.',
+    '교황|🔔|좋은 조언을 해 줄 사람이 가까이 있어요.',
+    '연인|💞|마음이 통하는 대화가 오가는 날이에요.',
+    '전차|🚗|막힘없이 쭉 나아가는 추진력이 생겨요.',
+    '힘|🦁|부드러운 미소가 가장 센 힘이에요.',
+    '은둔자|🕯️|잠깐의 혼자 시간이 좋은 아이디어를 줘요.',
+    '운명의 수레바퀴|🎡|흐름이 내 쪽으로 슬슬 돌아와요.',
+    '정의|⚖️|공정하게 한 일이 제대로 인정받아요.',
+    '매달린 사람|🙃|관점을 살짝 바꾸면 해법이 보여요.',
+    '끝과 시작|🍂|한 해를 잘 마무리하면 새 문이 열려요.',
+    '절제|🍵|천천히, 적당히가 오늘의 비법이에요.',
+    '달콤한 유혹|🍰|작은 간식 하나는 오늘의 정당한 보상!',
+    '새 출발|🌱|흐트러진 일도 오늘 다시 정리하기 좋아요.',
+    '별|⭐|바라던 일이 조금씩 가까워져요.',
+    '달|🌛|차분히 쉬면 내일의 기운이 채워져요.',
+    '태양|☀️|밝은 기운이 팀 전체로 번져요.',
+    '새 소식|📣|기다리던 좋은 소식이 슬쩍 다가와요.',
+    '세계|🌍|한 해의 마무리가 멋지게 완성돼요.'
+  ].join('\n')},
+  1:{name:'🎍 새해 한 줄 괘',mode:'ddi',bg:'#4a1010,#260808,#0f0303,#ffcf5a',glyphs:'🎍 ✨ 🏮 🐑',event:'2027-02-06|설날',deck:[
+    '봄바람 괘|🌱|막힌 일이 봄눈 녹듯 풀리는 한 해예요.',
+    '복주머니 괘|👛|작은 복이 차곡차곡 쌓여요.',
+    '청산유수 괘|🏞️|말과 일이 물 흐르듯 이어져요.',
+    '귀인 괘|🤝|도와주는 사람이 때맞춰 나타나요.',
+    '등용문 괘|🚪|배운 것이 빛을 보는 해예요.',
+    '함박웃음 괘|😄|웃을 일이 자주 생겨요.',
+    '순풍 괘|⛵|하는 일마다 뒤에서 바람이 밀어 줘요.',
+    '황금 괘|🌟|꾸준함이 보석처럼 반짝여요.',
+    '화합 괘|🍚|함께 나누는 밥상에서 복이 와요.',
+    '건강 괘|💪|몸도 마음도 단단해지는 해예요.',
+    '새싹 괘|🌿|시작한 일이 무럭무럭 자라요.',
+    '만사형통 괘|🎍|바라던 일이 하나씩 이뤄져요.'
+  ].join('\n')},
+  2:{name:'👛 오행 복주머니',mode:'none',bg:'#123a2e,#0a1f1a,#040d0b,#ffd36b',glyphs:'🌳 🔥 ⛰️ 🔔 💧',event:'2027-02-06|설날\n02-14|발렌타인데이',deck:[
+    '목(木) 새싹|🌳|새로운 시작에 좋은 기운이에요. 초록색과 과일이 행운!',
+    '목(木) 바람|🌿|부드럽게 번지는 기운이에요. 산책이 행운을 불러요.',
+    '화(火) 햇살|🔥|열정이 차오르는 날이에요. 빨간색과 따뜻한 차가 행운!',
+    '화(火) 온기|🌞|마음이 따뜻해지는 날이에요. 먼저 웃어 보세요.',
+    '토(土) 대지|⛰️|든든하고 안정적인 날이에요. 노란색과 고구마가 행운!',
+    '토(土) 곡식|🌾|차분히 쌓아 가기 좋은 날이에요. 정리정돈이 행운이에요.',
+    '금(金) 종소리|🔔|또렷하고 깔끔한 기운이에요. 흰색과 견과류가 행운!',
+    '금(金) 반짝임|✨|결단이 잘 서는 날이에요. 미뤄 둔 선택을 해 보세요.',
+    '수(水) 시냇물|💧|유연하게 흐르는 기운이에요. 남색과 물 한 컵이 행운!',
+    '수(水) 파도|🌊|생각이 깊어지는 날이에요. 메모 한 줄이 행운이에요.'
+  ].join('\n')},
+  3:{name:'⭐ 별자리 순위',mode:'star',bg:'#241a4d,#130d2e,#06041a,#b9a4ff',glyphs:'⭐ ✨ 🌙',event:'03-14|화이트데이',deck:[
+    '양자리|♈|시작하는 힘이 좋아요. 먼저 말을 걸어 보세요.',
+    '황소자리|♉|꾸준함이 보상받는 날. 맛있는 점심을 챙기세요.',
+    '쌍둥이자리|♊|대화 운이 좋아요. 수다가 아이디어가 돼요.',
+    '게자리|♋|마음이 따뜻해지는 날. 동료를 챙기면 복이 와요.',
+    '사자자리|♌|존재감이 빛나요. 자신 있게 나서 보세요.',
+    '처녀자리|♍|꼼꼼함이 빛나요. 정리하면 운이 열려요.',
+    '천칭자리|♎|균형이 잘 맞는 날. 중재 역할이 어울려요.',
+    '전갈자리|♏|집중력이 높아요. 미뤄 둔 일을 끝내기 좋아요.',
+    '사수자리|♐|가벼운 도전이 잘 맞아요. 새 방법을 써 보세요.',
+    '염소자리|♑|차근차근 쌓은 일이 인정받아요.',
+    '물병자리|♒|톡톡 튀는 아이디어가 환영받아요.',
+    '물고기자리|♓|감수성이 좋아요. 음악 한 곡이 힘이 돼요.'
+  ].join('\n')},
+  4:{name:'🌸 오늘의 꽃말',mode:'none',bg:'#3d1530,#210a1d,#0a0310,#ff9fc4',glyphs:'🌸 🌷 🍃',event:'04-05|식목일',deck:''},
+  5:{name:'💌 오늘의 소원 쪽지',mode:'none',bg:'#16401f,#0b2410,#04100a,#9be37a',glyphs:'💐 🍀 💌',event:'05-05|어린이날\n05-08|어버이날\n05-15|스승의날',deck:''},
+  6:{name:'🏖️ 오늘의 행선지 점',mode:'none',bg:'#0c3a47,#071f2b,#030d14,#5fe0e0',glyphs:'🌊 ⛱️ 🌴',event:'',deck:''}, // 현충일은 기념일이라 기본 D-day에서 뺌(원장이 글 고치기에서 넣을 수 있음)
+  7:{name:'🍜 오늘의 점심 점괘',mode:'none',bg:'#4a3d0a,#271f05,#0e0a02,#ffe066',glyphs:'🍜 🍚 🍙',event:'07-17|제헌절',deck:''},
+  8:{name:'🎧 오늘의 럭키 플레이리스트',mode:'none',bg:'#1a2b55,#0d1633,#060a1a,#6fc3ff',glyphs:'🎵 🎧 🌟',event:'2027-08-08|칠석\n08-15|광복절',deck:''},
+  9:{name:'🌕 보름달 소원 빌기',mode:'none',bg:'#14204a,#0a1030,#04061a,#ffe08a',glyphs:'🌕 ⭐ 🍁',event:'2027-09-15|추석',deck:''},
+  10:{name:'🎃 수상한 점쟁이',mode:'none',bg:'#4a2108,#26110a,#0e0605,#ff9a3c',glyphs:'🎃 🕸️ 🦇',event:'10-31|핼러윈',deck:''},
+  11:{name:'🔮 오늘의 부적',mode:'none',bg:'#3d1010,#210909,#0e0303,#ff8a5c',glyphs:'🍂 📚 🍁',event:'11-11|빼빼로데이',deck:''}
+};
+function monthKey(n){return (n<10?'0':'')+n;}
+(function(){
+  for(let n=1;n<=12;n++){
+    const o=ORACLE_MONTHS[n],k='intro.oracle_m'+monthKey(n)+'_',w=n+'월 ';
+    DEFS.push([k+'name',w+'점술 이름 — 대문 큰 인사 위 「○월의 점술관」 뒤에 붙음',o.name]);
+    DEFS.push([k+'deck',w+'카드 목록 — 한 줄에 하나, 「카드 이름|이모지|풀이 한 줄」(비워 두면 범용 카드 목록을 씀)',o.deck]);
+    DEFS.push([k+'bg',w+'대문 배경 색 — 쉼표로 3~4개(#색번호: 가운데·중간·가장자리·강조색)',o.bg]);
+    DEFS.push([k+'glyphs',w+'대문에 흩날리는 이모지 — 공백으로 구분(최대 8개)',o.glyphs]);
+    DEFS.push([k+'event',w+'D-day 목록 — 한 줄에 하나, 「YYYY-MM-DD|이름」(해마다 같은 날이면 「MM-DD|이름」). 가장 가까운 것 하나가 대문에 보임',o.event]);
+    DEFS.push([k+'mode',w+'띠·별자리 고르기 — none(없음)·ddi(띠)·star(별자리) 중 하나',o.mode]);
+  }
+})();
 if(root.HUB_FORTUNE_TEXT_DEFS)Array.prototype.push.apply(DEFS,root.HUB_FORTUNE_TEXT_DEFS); // hub-fortune.js의 운세 카드 글(없으면 건너뜀)
 const DEF_MAP={};DEFS.forEach(function(d){DEF_MAP[d[0]]=d[2];});
 root.HUB_INTRO_TEXT_DEFS=DEFS; // hub-texts.js 「글 고치기」 목록이 읽음
@@ -125,6 +300,101 @@ const ease={
   outElastic:function(t){if(t===0||t===1)return t;return Math.pow(2,-10*t)*Math.sin((t*10-.75)*(2*Math.PI)/3)+1;},
   outBounce:function(x){const n1=7.5625,d1=2.75;if(x<1/d1)return n1*x*x;if(x<2/d1)return n1*(x-=1.5/d1)*x+.75;if(x<2.5/d1)return n1*(x-=2.25/d1)*x+.9375;return n1*(x-=2.625/d1)*x+.984375;}
 };
+
+/* ════════════════ 이달의 점술관 — 순수 함수(화면·서버와 무관, tests/hub-oracle.test.js가 직접 시험) ════════════════ */
+function pad2(n){return (n<10?'0':'')+n;}
+// 글자 → 32비트 정수(FNV-1a). 같은 글자면 언제나 같은 수 — 점괘·덱 카드·낙하 이모지 모양을 정할 때만 쓴다(당첨과 무관).
+function hashStr(s){let h=0x811c9dc5;s=String(s==null?'':s);for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,0x01000193)>>>0;}return h>>>0;}
+// 한국 표준시(UTC+9) 기준 날짜 — 기기 시계가 다른 나라 시간이어도 달 경계가 서울 기준
+function seoulParts(d){const t=new Date((d||new Date()).getTime()+9*3600*1000);return {y:t.getUTCFullYear(),m:t.getUTCMonth()+1,d:t.getUTCDate()};}
+function dateKey(p){return p.y+'-'+pad2(p.m)+'-'+pad2(p.d);}
+// 이번 달(1~12). 주소의 ?introMonth=N(1~12)이 있으면 그 달로 미리보기
+function oracleMonth(now,search){
+  let f=null;try{f=new URLSearchParams(search==null?'':search).get('introMonth');}catch(e){}
+  if(f!=null&&/^(1[0-2]|[1-9])$/.test(f))return Number(f);
+  return seoulParts(now).m;
+}
+// 「이름|이모지|풀이」 줄 → [{name,emoji,text}] — 빈 줄은 건너뛰고 | 가 모자라도 깨지지 않음
+function parseDeck(text){
+  return String(text==null?'':text).split(/\r?\n/).map(function(l){return l.trim();}).filter(Boolean).map(function(l){
+    const p=l.split('|').map(function(s){return s.trim();});
+    return {name:p[0]||'',emoji:p[1]||'',text:p.slice(2).join('|').replace(/^\|+|\|+$/g,'').trim()};
+  }).filter(function(c){return c.name||c.emoji||c.text;});
+}
+// 같은 seed면 언제나 같은 카드(서버가 준 seed 하나로 모든 기기에서 같음)
+function pickDeckCard(deck,seed){
+  if(!deck||!deck.length)return null;
+  return deck[hashStr('deck|'+(Number(seed)>>>0))%deck.length];
+}
+// 「이름|한마디」 줄 → [{name,text}]
+function parsePairs(text){
+  return String(text==null?'':text).split(/\r?\n/).map(function(l){return l.trim();}).filter(Boolean).map(function(l){
+    const i=l.indexOf('|');return i<0?{name:l,text:''}:{name:l.slice(0,i).trim(),text:l.slice(i+1).trim()};
+  }).filter(function(p){return p.name;});
+}
+// 배경 색 목록 — #색번호만 받고(글 고치기 값이 화면 스타일에 들어가므로) 3~4개가 안 되면 대체 값
+const HEX_RE=/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/; // 올바른 CSS 색 길이(3·4·6·8자리)만
+function parseBg(text,fallback){
+  const c=String(text==null?'':text).split(/[,\s]+/).map(function(s){return s.trim();}).filter(function(s){return HEX_RE.test(s);});
+  if(c.length<3)return fallback.slice();
+  return c.slice(0,4);
+}
+// 흩날리는 이모지 목록(공백·쉼표 구분, 최대 8개, 글자 길이 제한)
+function parseGlyphs(text){
+  return String(text==null?'':text).split(/[\s,]+/).filter(function(s){return s&&s.length<=8;}).slice(0,8);
+}
+// 흩날리는 이모지 층 모양 — 개수는 count 이하, 값은 seedKey로 정해져 같은 날 같은 모양
+function fallSpecs(count,glyphs,seedKey){
+  const n=Math.max(0,Math.min(40,Math.floor(Number(count)||0)));
+  if(!glyphs||!glyphs.length)return [];
+  const out=[];
+  for(let i=0;i<n;i++){
+    const h=hashStr(seedKey+'|fall|'+i);
+    out.push({g:glyphs[h%glyphs.length],left:(h>>>3)%100,delay:-(((h>>>9)%140)/10),dur:9+((h>>>15)%80)/10,size:14+((h>>>20)%15),dx:((h>>>24)%21)-10});
+  }
+  return out;
+}
+// 「YYYY-MM-DD|이름」 또는 「MM-DD|이름」 줄 → 가장 가까운 앞날(오늘 포함) 하나 {label,n}. withinDays 안에 없으면 null
+function nextEvent(text,p,withinDays){
+  const today=Date.UTC(p.y,p.m-1,p.d),lim=withinDays==null?60:withinDays;let best=null;
+  parsePairs(text).forEach(function(e){
+    const m=/^(?:(\d{4})-)?(\d{1,2})-(\d{1,2})$/.exec(e.name);if(!m||!e.text)return;
+    const mo=Number(m[2]),da=Number(m[3]);if(mo<1||mo>12||da<1||da>31)return;
+    const years=m[1]?[Number(m[1])]:[p.y,p.y+1];
+    years.forEach(function(y){
+      const t=Date.UTC(y,mo-1,da),n=Math.round((t-today)/86400000);
+      if(n>=0&&n<=lim&&(!best||n<best.n))best={label:e.text,n:n};
+    });
+  });
+  return best;
+}
+// 이번 달 범위(문자열 날짜 비교용) — [from, to)
+function monthRange(y,m){const ny=m===12?y+1:y,nm=m===12?1:m+1;return {from:y+'-'+pad2(m)+'-01',to:ny+'-'+pad2(nm)+'-01'};}
+// 내가 뽑은 기록(draw_date·seed) → 이번 달 도감. 같은 카드는 한 번만 세고(하루 여러 번 뽑아도) 이번 달 밖 기록은 뺀다
+function dexFromDraws(rows,deck,y,m){
+  const r=monthRange(y,m),have={};
+  (rows||[]).forEach(function(x){
+    const d=String(x&&x.draw_date||'').slice(0,10);
+    if(d<r.from||d>=r.to)return;
+    if(!deck||!deck.length)return;
+    have[hashStr('deck|'+(Number(x.seed)>>>0))%deck.length]=1;
+  });
+  return {n:Object.keys(have).length,m:deck?deck.length:0};
+}
+// 오늘의 점괘 — 계정+날짜가 같으면 언제나 같은 문장(서버 저장 없음, 이 화면에서만 계산)
+function oracleReading(uid,key,lists){
+  const base=String(uid||'me')+'|'+key,pick=function(a,salt){return a&&a.length?a[hashStr(base+'|'+salt)%a.length]:'';};
+  return {total:pick(lists.total,'total'),work:pick(lists.work,'work'),people:pick(lists.people,'people'),
+    time:pick(lists.time,'time'),color:pick(lists.colors,'color'),number:1+hashStr(base+'|num')%99};
+}
+// 별자리 순위 — 날짜로 정해 모든 직원이 같은 순위
+function starRanking(names,key){
+  return (names||[]).map(function(n,i){return {n:n,i:i,h:hashStr(key+'|star|'+n)};}).sort(function(a,b){return a.h-b.h||a.i-b.i;}).map(function(x){return x.n;});
+}
+function dayNumber(p){return Math.floor(Date.UTC(p.y,p.m-1,p.d)/86400000);}
+const ORACLE_API={hashStr:hashStr,seoulParts:seoulParts,dateKey:dateKey,oracleMonth:oracleMonth,monthKey:monthKey,parseDeck:parseDeck,pickDeckCard:pickDeckCard,parsePairs:parsePairs,
+  parseBg:parseBg,parseGlyphs:parseGlyphs,fallSpecs:fallSpecs,nextEvent:nextEvent,monthRange:monthRange,dexFromDraws:dexFromDraws,oracleReading:oracleReading,starRanking:starRanking,dayNumber:dayNumber,months:ORACLE_MONTHS};
+root.HubIntroOracle=ORACLE_API;
 
 /* ── 언제 띄우나 ── */
 function seenKey(uid){return 'hubIntro.seen.'+(uid||'me');}
@@ -186,7 +456,7 @@ const CSS=`
 #hubIntro .hi-chip.hi-fortune.hot::after{content:'';width:7px;height:7px;border-radius:50%;background:#ff6b8b;box-shadow:0 0 8px #ff6b8b;animation:hi-fortune-dot 1.2s ease-in-out infinite}
 @keyframes hi-fortune-dot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.5);opacity:.55}}
 #hubIntro .hi-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:7px;margin-top:8px}
-#hubIntro .hi-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;perspective:900px}
+#hubIntro .hi-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) minmax(0,1.7fr);gap:12px;perspective:900px}
 #hubIntro .hi-card{position:relative;border-radius:16px;padding:13px 15px;min-width:0;overflow:hidden;
   background:linear-gradient(160deg,rgba(28,58,53,.62),rgba(9,24,22,.62));border:1px solid rgba(255,255,255,.10);
   backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 10px 30px rgba(0,0,0,.35);transform-style:preserve-3d;transition:transform .25s ease,border-color .25s;opacity:0;translate:0 18px}
@@ -239,6 +509,29 @@ const CSS=`
 #hubIntro .hi-edit .row .msg.err{color:#ff7b76}
 #hubIntro .hi-edit .search{width:100%;font:inherit;font-size:13px;color:#e6f2ef;background:#0d1715;border:1px solid #24332f;border-radius:8px;padding:8px 10px;box-sizing:border-box}
 #hubIntro .hi-edit .hb{font-size:12px;color:#9fc4bd;line-height:1.5}
+#hubIntro [hidden]{display:none!important}
+#hubIntro .hi-fall{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+#hubIntro .hi-fall i{position:absolute;top:-8vh;font-style:normal;opacity:.5;animation:hiFall linear infinite;will-change:transform}
+@keyframes hiFall{from{transform:translate3d(0,-8vh,0) rotate(0)}to{transform:translate3d(calc(var(--dx,0)*1vw),112vh,0) rotate(360deg)}}
+#hubIntro .hi-hero{position:absolute;inset:0;margin:auto;height:min(92%,380px);width:fit-content;border:0;padding:0;background:none;cursor:pointer;pointer-events:auto;animation:hiHero 3.6s ease-in-out infinite;-webkit-tap-highlight-color:transparent}
+#hubIntro .hi-hero img{display:block;height:100%;width:auto;border-radius:18px;filter:drop-shadow(0 14px 34px rgba(0,0,0,.55)) drop-shadow(0 0 22px color-mix(in srgb,var(--day) 55%,transparent))}
+#hubIntro .hi-hero:focus-visible{outline:2px solid var(--day);outline-offset:6px;border-radius:20px}
+#hubIntro .hi-hero.wig{animation:hiWig .5s ease}
+@keyframes hiHero{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-9px) rotate(1deg)}}
+@keyframes hiWig{0%,100%{transform:rotate(0)}25%{transform:rotate(-5deg) scale(1.03)}75%{transform:rotate(5deg) scale(1.03)}}
+#hubIntro.theme .hi-stage{min-height:110px}
+#hubIntro .hi-hintrow{display:flex;justify-content:center;align-items:baseline;gap:4px 12px;flex-wrap:wrap}
+#hubIntro .hi-dday{display:inline-block;vertical-align:top;font-size:12.5px;font-weight:700;color:#fff;padding:3px 12px;border-radius:999px;margin:0 0 4px 6px;background:color-mix(in srgb,var(--day) 26%,rgba(10,14,20,.6));border:1px solid color-mix(in srgb,var(--day) 65%,transparent)}
+#hubIntro .hi-dex{font-size:12px;color:var(--day);margin-top:3px;font-weight:600}
+#hubIntro .hi-chip.hi-saju{border-color:color-mix(in srgb,var(--day) 70%,transparent)}
+#hubIntro .hi-chip.hi-saju.big{font-size:15px;font-weight:700;padding:8px 18px;box-shadow:0 0 22px color-mix(in srgb,var(--day) 45%,transparent)}
+#hubIntro .oa-r{font-size:12.5px;line-height:1.45;color:#f2fbf9;margin-bottom:3px}
+#hubIntro .oa-r b,#hubIntro .oa-lucky b,#hubIntro .oa-bal b{color:var(--day);font-weight:700;margin-right:4px}
+#hubIntro .oa-lucky{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:11.5px;color:#cfe9e4;margin-top:3px}
+#hubIntro .oa-z{margin-top:4px;font-size:11.5px;color:#cfe9e4;line-height:1.4}
+#hubIntro select.oa-sel{margin-left:6px;font:inherit;font-size:11.5px;color:#e6f2ef;background:#0d1715;border:1px solid #24332f;border-radius:8px;padding:3px 6px;max-width:100%}
+#hubIntro .oa-bal{margin-top:5px;font-size:11.5px;color:#cfe9e4}
+#hubIntro .oa-dis{margin-top:4px;font-size:10.5px;color:#7fa9a2}
 @media (max-width:820px){
   #hubIntro .hi-cards{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:10px;margin:0 -16px;padding:2px 16px 4px;scrollbar-width:none;touch-action:pan-x}
   #hubIntro .hi-cards::-webkit-scrollbar{display:none}
@@ -254,8 +547,10 @@ const CSS=`
   #hubIntro .hi-chips{gap:5px}
 }
 @media (pointer:coarse){#hubIntro .hi-enter-hint{display:none}}
-@media (max-height:640px){#hubIntro .hi-hint,#hubIntro .hi-enter-hint{display:none}}
-@media (prefers-reduced-motion:reduce){#hubIntro .hi-greet h1,#hubIntro .hi-enter{animation:none}}
+@media (max-height:760px){#hubIntro .oa-dis{display:none}#hubIntro .hi-sajunote{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:min(92vw,520px)}#hubIntro .hi-ui{gap:6px}#hubIntro .hi-greet h1{font-size:clamp(20px,2.6vw,28px)}#hubIntro.theme .hi-stage{min-height:90px}}
+@media (max-height:690px){#hubIntro .oa-bal,#hubIntro .hi-dex{display:none}}
+@media (max-height:640px){#hubIntro .hi-hint:not(.hi-sajunote),#hubIntro .hi-enter-hint{display:none}#hubIntro .oa-z{display:none}}
+@media (prefers-reduced-motion:reduce){#hubIntro .hi-greet h1,#hubIntro .hi-enter{animation:none}#hubIntro .hi-fall{display:none}#hubIntro .hi-hero,#hubIntro .hi-hero.wig{animation:none}}
 `;
 function injectCss(){
   if(document.getElementById('hubIntroCss'))return;
@@ -288,8 +583,11 @@ function show(opts){
   CURRENT=S;
   const el=document.createElement('div');el.id='hubIntro';el.setAttribute('role','dialog');el.setAttribute('aria-label','직원허브 첫 화면');
   S.el=el;
-  el.innerHTML=uiHtml(opts);
+  setupOracle(S);
+  if(S.theme)el.classList.add('theme');
+  el.innerHTML=uiHtml(opts,S);
   setDayColor(S,S.day);
+  if(S.theme)applyThemeColors(S);
   document.body.appendChild(el);
   S.prevOverflow=document.documentElement.style.overflow;
   document.documentElement.style.overflow='hidden';
@@ -299,15 +597,156 @@ function show(opts){
   bindUi(S);
   updateStreak(S);
   loadInfo(S);
+  loadDex(S);
   S.enterBtn=el.querySelector('.hi-enter');
   setTimeout(function(){try{S.enterBtn.focus({preventScroll:true});}catch(e){}},400);
   bootGraphics(S);
   return S;
 }
 
-function uiHtml(opts){
+/* ── 이달의 점술관 화면 쪽 도우미 ── */
+function heroModeNow(){
+  let f=null;try{f=new URLSearchParams(location.search).get('introHero');}catch(e){}
+  const v=(f==='animal'||f==='theme')?f:String(T('intro.oracle_hero_mode')).trim().toLowerCase();
+  return v==='animal'?'animal':'theme'; // 모르는 값이면 기본(이달의 점술관)
+}
+function currentDeck(m){
+  let d=parseDeck(T('intro.oracle_m'+monthKey(m)+'_deck'));
+  if(!d.length)d=parseDeck(T('intro.oracle_deck_default'));
+  if(!d.length)d=parseDeck(DEF_MAP['intro.oracle_deck_default']);
+  return d;
+}
+function monthBg(m){const o=ORACLE_MONTHS[m];return parseBg(T('intro.oracle_m'+monthKey(m)+'_bg'),parseBg(o.bg,['#121a24','#0a0f15','#05070a','#2fd9c4']));}
+function monthGlyphs(m){
+  const g=parseGlyphs(T('intro.oracle_m'+monthKey(m)+'_glyphs'));
+  return g.length?g:parseGlyphs(ORACLE_MONTHS[m].glyphs);
+}
+/* 이번 달 정보와 대문 모양을 정함(theme=이달의 점술관 · animal=옛 3D 동물) */
+function setupOracle(S){
+  let search='';try{search=location.search;}catch(e){}
+  const now=new Date();
+  S.tier=deviceTier();
+  S.parts=seoulParts(now);S.dkey=dateKey(S.parts);
+  S.month=oracleMonth(now,search);S.mk=monthKey(S.month);
+  S.deck=currentDeck(S.month);
+  S.heroMode=heroModeNow();
+  S.theme=null;
+  if(S.heroMode==='theme'){
+    const bg=monthBg(S.month),glyphs=monthGlyphs(S.month);
+    S.theme={bg:bg,glyphs:glyphs,art:makeThemeArt(bg,glyphs,S.dkey)};
+    if(!S.theme.art){ // 색 값 탓에 못 그렸으면 기본 색으로 한 번 더(카드가 말없이 사라지지 않게)
+      const dbg=parseBg(ORACLE_MONTHS[S.month].bg,['#121a24','#0a0f15','#05070a','#2fd9c4']);
+      S.theme.art=makeThemeArt(dbg,glyphs,S.dkey);
+      if(S.theme.art)S.theme.bg=dbg;
+    }
+  }
+}
+function applyThemeColors(S){
+  const c=S.theme.bg;
+  S.el.style.setProperty('--day',c[3]||c[0]);
+  S.el.style.background='radial-gradient(120% 90% at 50% 38%,'+c[0]+' 0%,'+c[1]+' 55%,'+c[2]+' 100%)';
+}
+/* 카드 그림(이모지+그라데이션을 캔버스로 직접 그림 — 새 이미지 파일·외부 주소 없음). 못 그리면 빈 글자 */
+function makeThemeArt(bg,glyphs,seedKey){
+  try{
+    const W=300,H=440,c=document.createElement('canvas');c.width=W;c.height=H;
+    const x=c.getContext('2d');if(!x)return '';
+    const acc=bg[3]||bg[0],F='"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+    const rr=function(px,py,w,h,r){x.beginPath();x.moveTo(px+r,py);x.arcTo(px+w,py,px+w,py+h,r);x.arcTo(px+w,py+h,px,py+h,r);x.arcTo(px,py+h,px,py,r);x.arcTo(px,py,px+w,py,r);x.closePath();};
+    const g=x.createLinearGradient(0,0,W,H);g.addColorStop(0,bg[0]);g.addColorStop(.6,bg[1]);g.addColorStop(1,bg[2]);
+    rr(4,4,W-8,H-8,22);x.fillStyle=g;x.fill();
+    const rg=x.createRadialGradient(W/2,H*.46,10,W/2,H*.46,W*.7);rg.addColorStop(0,acc);rg.addColorStop(1,'rgba(0,0,0,0)');
+    x.save();x.globalAlpha=.55;x.fillStyle=rg;rr(4,4,W-8,H-8,22);x.fill();x.restore();
+    x.lineWidth=5;x.strokeStyle=acc;rr(4,4,W-8,H-8,22);x.stroke();
+    x.lineWidth=1.5;x.strokeStyle='rgba(255,255,255,.4)';rr(16,16,W-32,H-32,14);x.stroke();
+    x.textAlign='center';x.textBaseline='middle';
+    const pos=[[46,52],[W-46,52],[46,H-52],[W-46,H-52]];
+    x.globalAlpha=.85;x.font='30px '+F;
+    pos.forEach(function(p,i){x.fillText(glyphs[(hashStr(seedKey+'|art|'+i))%glyphs.length]||'',p[0],p[1]);});
+    x.globalAlpha=1;x.font='140px '+F;x.fillText(glyphs[0]||'🔮',W/2,H*.47);
+    return c.toDataURL('image/png');
+  }catch(e){return '';}
+}
+function heroHtml(S){
+  return S.theme.art?'<button type="button" class="hi-hero pe" data-hero aria-label="'+esc(T('intro.oracle_hint'))+'"><img src="'+esc(S.theme.art)+'" alt=""></button>':'';
+}
+function fallHtml(S){
+  if(S.tier.reduced)return '';
+  return '<div class="hi-fall" aria-hidden="true">'+fallSpecs(S.tier.low?14:26,S.theme.glyphs,S.dkey).map(function(f){
+    return '<i style="left:'+f.left+'%;font-size:'+f.size+'px;animation-duration:'+f.dur.toFixed(1)+'s;animation-delay:'+f.delay.toFixed(1)+'s;--dx:'+f.dx+'">'+esc(f.g)+'</i>';
+  }).join('')+'</div>';
+}
+function oracleLists(){
+  return {total:lines('intro.oracle_read_total'),work:lines('intro.oracle_read_work'),people:lines('intro.oracle_read_people'),time:lines('intro.oracle_lucky_time'),
+    colors:lines('intro.fortune_colors').map(function(l){return l.split('|')[0].trim();}).filter(Boolean)};
+}
+function zodiacKey(S){return 'hubIntro.zodiac.'+(S.opts.userId||'me');}
+/* 띠(1월)·별자리(3월) 고르기 — 고른 값은 이 기기 localStorage에만 저장, 서버로 안 보냄 */
+function zodiacHtml(S){
+  const mode=String(T('intro.oracle_m'+S.mk+'_mode')).trim().toLowerCase();
+  if(mode!=='ddi'&&mode!=='star')return '';
+  const saved=lsGet(zodiacKey(S),{})[mode]||'';
+  let names,msg;
+  if(mode==='ddi'){
+    const pairs=parsePairs(T('intro.oracle_ddi_lines'));names=pairs.map(function(p){return p.name;});
+    const mine=pairs.filter(function(p){return p.name===saved;})[0];
+    msg=mine?T('intro.oracle_ddi_my',{z:mine.name,t:mine.text}):'';
+  }else{
+    names=lines('intro.oracle_stars');
+    const rank=starRanking(names,S.dkey);
+    msg=rank.length>=3?T('intro.oracle_star_top',{a:rank[0],b:rank[1],c:rank[2]}):'';
+    const at=rank.indexOf(saved);
+    if(at>=0)msg+=' · '+(at<6?T('intro.oracle_star_my',{s:saved,n:at+1}):T('intro.oracle_star_calm',{s:saved})); // 7위 밖은 순위 숫자 대신 긍정 한 줄(나쁜 운 느낌 방지)
+  }
+  if(!names.length)return '';
+  const has=names.indexOf(saved)>=0; // 고른 게 있으면 첫 칸은 「선택 안 함」, 없으면 고르기 안내
+  return '<div class="oa-z">'+(msg?'<span>'+esc(msg)+'</span>':'')+'<select class="oa-sel" data-zodiac="'+mode+'" aria-label="'+esc(T('intro.oracle_zodiac_pick'))+'"><option value="">'+esc(has?T('intro.oracle_zodiac_none'):T('intro.oracle_zodiac_pick'))+'</option>'+
+    names.map(function(n){return '<option value="'+esc(n)+'"'+(n===saved?' selected':'')+'>'+esc(n)+'</option>';}).join('')+'</select></div>';
+}
+/* 오늘의 점괘 카드 — 계정+오늘 날짜로 정해지는 총운·업무운·인간관계운(서버에 저장하지 않는 재미용 글) */
+function renderOracle(S){
+  const box=S.el.querySelector('[data-slot="oracle"]');if(!box)return;
+  const L=lines('intro.oracle_labels'),r=oracleReading(S.opts.userId,S.dkey,oracleLists());
+  const lab=function(i){return esc(L[i]||'');};
+  const row=function(i,v){return v?'<div class="oa-r"><b>'+lab(i)+'</b>'+esc(v)+'</div>':'';};
+  let h=row(0,r.total)+row(1,r.work)+row(2,r.people);
+  h+='<div class="oa-lucky"><span><b>'+lab(3)+'</b>'+esc(r.time)+'</span><span><b>'+lab(4)+'</b>'+esc(r.color)+'</span><span><b>'+lab(5)+'</b>'+r.number+'</span></div>';
+  h+=zodiacHtml(S);
+  const bal=parsePairs(T('intro.balance'));
+  if(bal.length){const b=bal[dayNumber(S.parts)%bal.length];h+='<div class="oa-bal"><b>'+esc(T('intro.card_balance'))+'</b>'+esc(T('intro.oracle_balance_fmt',{a:b.name,b:b.text}))+'</div>';}
+  h+='<div class="oa-dis">'+esc(T('intro.oracle_disclaimer'))+'</div>';
+  box.innerHTML=h;box.setAttribute('data-ik-list','intro.oracle_read_total');
+}
+function renderDday(S){
+  const b=S.el.querySelector('[data-dday]');if(!b)return;
+  const ev=nextEvent(T('intro.oracle_m'+S.mk+'_event'),S.parts,60);
+  if(!ev){b.hidden=true;return;}
+  b.hidden=false;b.textContent=ev.n===0?T('intro.oracle_dday_today',{label:ev.label}):T('intro.oracle_dday',{label:ev.label,n:ev.n});
+}
+/* 이번 달 도감 — 내가 뽑은 기록(fortune_draws, 본인 행만 읽힘)에서 계산. 읽기 실패·운세 끔이면 줄을 숨김 */
+function renderDex(S){
+  const b=S.el&&S.el.querySelector('[data-dex]');if(!b)return;
+  const off=S.fortune&&!S.fortune.enabled&&!S.opts.isOwner;
+  if(!S.dexRows||off||!S.deck.length){b.hidden=true;return;}
+  const d=dexFromDraws(S.dexRows,S.deck,S.parts.y,S.month);
+  b.hidden=false;b.textContent=T('intro.oracle_dex_label',{n:d.n,m:d.m});
+}
+function loadDex(S){
+  const f=S.opts.fortune;if(!S.theme||!f||!f.sb||!S.opts.userId)return;
+  const r=monthRange(S.parts.y,S.month);
+  Promise.resolve(f.sb.from('fortune_draws').select('draw_date,seed').eq('user_id',S.opts.userId).gte('draw_date',r.from).lt('draw_date',r.to)).then(function(res){
+    if(S.destroyed)return;
+    S.dexRows=(res&&!res.error&&res.data)?res.data:null;
+    renderDex(S);
+  },function(){if(!S.destroyed){S.dexRows=null;renderDex(S);}});
+}
+
+function uiHtml(opts,S){
+  const th=!!(S&&S.theme);
+  const sajuOk=typeof opts.onOpenTool==='function'&&(typeof opts.canOpenTool!=='function'||!!opts.canOpenTool('saju'));
   return `
 <canvas class="hi-gl" aria-hidden="true"></canvas>
+${th?fallHtml(S):''}
 <div class="hi-vign"></div>
 <div class="hi-flash"></div>
 <div class="hi-ui">
@@ -324,23 +763,25 @@ function uiHtml(opts){
       ${opts.isOwner?'<button type="button" class="hi-chip pe hi-editbtn" data-ik-btn="intro.edit"></button>':''}
     </div>
   </div>
-  <div class="hi-stage"></div>
+  <div class="hi-stage">${th?heroHtml(S):''}</div>
   <div class="hi-greet">
-    <div class="hi-dayname pe" data-ik="dayname"></div>
+    <div class="hi-dayname pe" data-ik="dayname"></div>${th?'<span class="hi-dday pe" data-dday hidden></span>':''}
     <h1 class="pe" data-ik="greet"></h1>
     <div class="sub pe" data-ik="intro.sub"></div>
-    <div class="hi-hint pe" data-ik="intro.model_hint"></div>
+    <div class="hi-hintrow"><div class="hi-hint pe" data-ik="${th?'intro.oracle_hint':'intro.model_hint'}"></div>${th?'<div class="hi-dex pe" data-dex hidden></div>':''}</div>
     <div class="hi-chips">
-      ${DAY_ORDER.map(function(n){return '<button type="button" class="hi-chip pe day" data-day="'+n+'" data-ik="intro.day'+n+'_chip"></button>';}).join('')}
-      <button type="button" class="hi-chip pe" data-game data-ik="intro.chip_game"></button>
+      ${th?'':DAY_ORDER.map(function(n){return '<button type="button" class="hi-chip pe day" data-day="'+n+'" data-ik="intro.day'+n+'_chip"></button>';}).join('')}
+      ${th?'':'<button type="button" class="hi-chip pe" data-game data-ik="intro.chip_game"></button>'}
       ${(root.HubFortune&&opts.fortune&&opts.fortune.sb)?'<button type="button" class="hi-chip pe hi-fortune" data-fortune data-ik="intro.fortune_chip" style="display:none"></button>':''}
+      ${sajuOk?'<button type="button" class="hi-chip pe hi-saju'+(S&&S.month===1?' big':'')+'" data-saju data-ik="intro.oracle_saju_btn"></button>':''}
     </div>
+    ${sajuOk?'<div class="hi-hint pe hi-sajunote" data-ik="intro.oracle_saju_note"></div>':''}
   </div>
   <div class="hi-cards pe">
     <div class="hi-card"><h3 data-ik="intro.card_me"></h3><div class="hi-stats" data-slot="stats"><div class="hi-muted" data-ik="intro.loading"></div></div></div>
     <div class="hi-card"><h3 data-ik="intro.card_soon"></h3><div data-slot="soon"><div class="hi-muted" data-ik="intro.loading"></div></div></div>
     <div class="hi-card"><h3 data-ik="intro.card_quote"></h3><div class="hi-quote" data-slot="quote"></div></div>
-    <div class="hi-card"><h3 data-ik="intro.card_fact"></h3><div class="hi-quote" data-slot="fact"></div></div>
+    <div class="hi-card hi-oracle"><h3 data-ik="intro.card_oracle"></h3><div data-slot="oracle"></div></div>
   </div>
   <div class="hi-bottom">
     <button type="button" class="hi-enter"><span data-ik="intro.enter"></span><span class="arr">→</span></button>
@@ -367,13 +808,17 @@ function applyTexts(S){
   el.querySelectorAll('[data-ik]').forEach(function(n){
     const k=n.getAttribute('data-ik');
     if(k==='greet'){n.textContent=T(greetKey(),vars);n.setAttribute('data-ikey',greetKey());return;}
-    if(k==='dayname'){const dk='intro.day'+S.day+'_name';n.textContent=T(dk,vars);n.setAttribute('data-ikey',dk);return;}
+    if(k==='dayname'){
+      if(S.theme){n.textContent=T('intro.oracle_title',{m:S.month,name:T('intro.oracle_m'+S.mk+'_name')});n.setAttribute('data-ikey','intro.oracle_title');return;}
+      const dk='intro.day'+S.day+'_name';n.textContent=T(dk,vars);n.setAttribute('data-ikey',dk);return;
+    }
     if(k==='intro.streak'){n.textContent=T(k,{n:S.streak||1});return;}
     n.textContent=T(k,vars);
   });
   el.querySelectorAll('[data-ik-btn]').forEach(function(n){n.textContent=T(n.getAttribute('data-ik-btn'));});
   const q=el.querySelector('[data-slot="quote"]');if(q){q.textContent=pickDaily('intro.quotes',0);q.setAttribute('data-ik-list','intro.quotes');}
-  const f=el.querySelector('[data-slot="fact"]');if(f){f.textContent=pickDaily('intro.facts',3);f.setAttribute('data-ik-list','intro.facts');}
+  S.deck=currentDeck(S.month);
+  renderOracle(S);renderDday(S);renderDex(S);
   el.querySelectorAll('[data-day]').forEach(function(b){b.classList.toggle('act',Number(b.getAttribute('data-day'))===S.day);});
   if(S.info)renderInfo(S);
   if(S.g&&S.g.setWords)S.g.setWords(lines('intro.particle_words'));
@@ -462,13 +907,24 @@ function bindUi(S){
   on(document,'keydown',function(e){
     if(S.destroyed||S.fortuneOpen)return; // 운세 카드 창이 열려 있으면 Enter·Esc는 그 창이 처리
     const tag=(e.target&&e.target.tagName)||'';
-    if(tag==='TEXTAREA'||tag==='INPUT')return;
+    if(tag==='TEXTAREA'||tag==='INPUT'||tag==='SELECT')return;
+    if(e.key==='Enter'&&e.target&&e.target.closest&&e.target.closest('[data-hero],[data-saju]'))return; // 카드·사주 단추는 Enter로 누름(들어가기 아님)
     if(e.key==='Enter'||e.key==='Escape'){e.preventDefault();enter(S);}
   });
   el.querySelectorAll('[data-day]').forEach(function(b){on(b,'click',function(){selectDay(S,Number(b.getAttribute('data-day')));});});
   const gb=el.querySelector('[data-game]');if(gb)on(gb,'click',function(){if(S.g)S.g.startGame();});
   const fb=el.querySelector('[data-fortune]');
   if(fb){on(fb,'click',function(){openFortune(S);});loadFortuneChip(S);}
+  const hb=el.querySelector('[data-hero]');
+  if(hb)on(hb,'click',function(){hb.classList.remove('wig');void hb.offsetWidth;hb.classList.add('wig');if(S.opts.fortune&&root.HubFortune)openFortune(S);});
+  const sj=el.querySelector('[data-saju]');
+  if(sj)on(sj,'click',function(){let ok=false;try{ok=S.opts.onOpenTool('saju')!==false;}catch(e){}if(ok)enter(S);}); // 사주 도구를 연 뒤 첫 화면을 닫음
+  on(el,'change',function(e){ // 띠·별자리 고르기 — 이 기기에만 저장
+    const sel=e.target&&e.target.closest&&e.target.closest('[data-zodiac]');if(!sel)return;
+    const k=zodiacKey(S),st=lsGet(k,{}),mode=sel.getAttribute('data-zodiac');
+    if(sel.value)st[mode]=sel.value;else delete st[mode];
+    lsSet(k,st);renderOracle(S);
+  });
   // 카드 3D 기울기(마우스를 따라)
   el.querySelectorAll('.hi-card').forEach(function(c){
     on(c,'pointermove',function(e){
@@ -558,8 +1014,15 @@ function enter(S){
 }
 /* ── 운세 카드(hub-fortune.js) — 단추는 서버 상태를 읽은 뒤에만 보임(표가 없거나 꺼져 있으면 원장 말고는 안 보임) ── */
 function fortuneChipSet(S,st){
+  const on0=st&&(st.enabled||S.opts.isOwner);
+  // 운세 카드가 꺼져 있고 원장이 아니면 가운데 카드의 「눌러 보세요」 안내도 숨기고 카드를 눌러지지 않게 함
+  const hero=S.el&&S.el.querySelector('[data-hero]'),hint=S.el&&S.el.querySelector('.hi-hint[data-ik="intro.oracle_hint"]');
+  if(st){
+    if(hero){hero.disabled=!on0;hero.style.cursor=on0?'':'default';}
+    if(hint)hint.style.visibility=on0?'':'hidden';
+  }
   const b=S.el&&S.el.querySelector('[data-fortune]');if(!b)return;
-  const on=st&&(st.enabled||S.opts.isOwner);
+  const on=on0;
   b.style.display=on?'':'none';
   const done=st&&st.used_today>0&&st.used_today>=st.draws_per_day;
   const k=st&&st.used_today>0?'intro.fortune_chip_done':'intro.fortune_chip';
@@ -569,15 +1032,17 @@ function fortuneChipSet(S,st){
 }
 function loadFortuneChip(S){
   const f=S.opts.fortune;if(!f||!f.sb)return;
-  f.sb.rpc('fortune_status').then(function(r){if(S.destroyed||r.error||!r.data)return;S.fortune=r.data;fortuneChipSet(S,r.data);},function(){});
+  f.sb.rpc('fortune_status').then(function(r){if(S.destroyed||r.error||!r.data)return;S.fortune=r.data;fortuneChipSet(S,r.data);renderDex(S);},function(){});
 }
 function openFortune(S){
   const f=S.opts.fortune;if(!f||!root.HubFortune||S.destroyed)return;
-  root.HubFortune.open({sb:f.sb,host:S.el,T:T,isOwner:!!S.opts.isOwner,animalSrc:dayPng(todayN()),
+  root.HubFortune.open({sb:f.sb,host:S.el,T:T,isOwner:!!S.opts.isOwner,animalSrc:(S.theme&&S.theme.art)||dayPng(todayN()),
+    deckCard:S.theme?function(seed){return pickDeckCard(S.deck,seed);}:null, // 이달의 카드 목록에서 seed로 한 장(없으면 옛 한 줄 운세)
+    deckTitle:S.theme?T('intro.oracle_m'+S.mk+'_name'):'',
     celebrate:function(level){if(S.g&&S.g.celebrate)S.g.celebrate(level);},
     onOpen:function(){S.fortuneOpen=true;},
-    onClose:function(){S.fortuneOpen=false;loadFortuneChip(S);},
-    onDrawn:function(st){if(st)fortuneChipSet(S,st);}});
+    onClose:function(){S.fortuneOpen=false;loadFortuneChip(S);loadDex(S);},
+    onDrawn:function(st){if(st)fortuneChipSet(S,st);loadDex(S);}});
 }
 function destroy(S){
   if(S.destroyed)return;S.destroyed=true;
@@ -595,6 +1060,7 @@ function destroy(S){
 function bootGraphics(S){
   const tier=deviceTier();
   const canvas=S.el.querySelector('canvas.hi-gl');
+  if(S.theme){S.g=makeFallback(S,tier,false);return;} // 이달의 점술관: three.js·GLB를 불러오지 않고 가벼운 2D만
   let gl=null;
   try{const tc=document.createElement('canvas');gl=tc.getContext('webgl2')||tc.getContext('webgl');}catch(e){}
   if(!gl){S.g=makeFallback(S,tier,false);return;}
@@ -1202,9 +1668,9 @@ function makeFallback(S,tier,replaceCanvas){
   const el=S.el;let canvas=el.querySelector('canvas.hi-gl');
   if(replaceCanvas){const c=document.createElement('canvas');c.className='hi-gl';canvas.parentNode.replaceChild(c,canvas);canvas=c;}
   const x=canvas.getContext('2d');
-  const n=tier.low?260:520,pts=[];
-  for(let i=0;i<n;i++)pts.push({x:Math.random(),y:Math.random(),vx:0,vy:0,s:.6+Math.random()*2,c:['#2fd9c4','#eafffb','#e3b341','#6fb2ff'][(Math.random()*4)|0]});
-  const img=new Image();img.src=dayPng(S.day);
+  const n=tier.low?260:520,pts=[],theme=!!S.theme,pal=theme?[S.theme.bg[3]||'#2fd9c4','#eafffb','#ffe08a',S.theme.bg[3]||'#6fb2ff']:['#2fd9c4','#eafffb','#e3b341','#6fb2ff'];
+  for(let i=0;i<n;i++)pts.push({x:Math.random(),y:Math.random(),vx:0,vy:0,s:.6+Math.random()*2,c:pal[(Math.random()*4)|0]});
+  const img=new Image();if(!theme)img.src=dayPng(S.day); // 이달의 점술관은 카드 그림을 화면 단추(.hi-hero)로 그림
   let W=1,H=1,raf=0,disposed=false,paused=false,mx=-9,my=-9,t=0,last=performance.now();
   const sparks=[];
   const resize=function(){const pr=Math.min(devicePixelRatio||1,2);W=el.clientWidth;H=el.clientHeight;canvas.width=W*pr;canvas.height=H*pr;x.setTransform(pr,0,0,pr,0,0);};
@@ -1226,7 +1692,7 @@ function makeFallback(S,tier,replaceCanvas){
     });
     for(let i=sparks.length-1;i>=0;i--){const s=sparks[i];s.x+=s.vx;s.y+=s.vy;s.vy+=.08;s.l-=dt*1.2;if(s.l<=0){sparks.splice(i,1);continue;}x.globalAlpha=s.l;x.fillStyle=s.c;x.beginPath();x.arc(s.x,s.y,2,0,6.28);x.fill();}
     x.globalCompositeOperation='source-over';x.globalAlpha=1;
-    if(img.complete&&img.naturalWidth){
+    if(!theme&&img.complete&&img.naturalWidth){
       const sr=stage.getBoundingClientRect(),er=el.getBoundingClientRect(),h=Math.min(sr.height*.8,W*.5),w=h*img.naturalWidth/img.naturalHeight;
       const cx=W/2,cy=sr.top-er.top+sr.height/2;
       x.save();x.translate(cx,cy+Math.sin(t*1.2)*5);x.rotate(Math.sin(t*.9)*.04);x.shadowColor=DAY_COLORS[S.day]||'#fff';x.shadowBlur=30;x.drawImage(img,-w/2,-h/2,w,h);x.restore();
@@ -1249,6 +1715,7 @@ root.HubIntro={
   open:function(opts){return show(opts);},
   close:function(){if(CURRENT)enter(CURRENT);},
   _dbg:function(){return CURRENT&&CURRENT.g&&CURRENT.g.dbg?CURRENT.g.dbg():null;},
-  defs:DEFS
+  defs:DEFS,
+  oracle:ORACLE_API
 };
 })(typeof window!=='undefined'?window:globalThis);
