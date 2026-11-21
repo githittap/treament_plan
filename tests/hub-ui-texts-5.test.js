@@ -7,10 +7,11 @@ const root=path.join(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p),'
 const js=read('hub-texts.js'),hrRaw=read('hr.html'),hr=hrRaw.replace(/\r\n/g,'\n');
 const {renderAll}=require('./fixtures/hub5-harness.cjs');
 const golden=JSON.parse(read('tests/fixtures/hub5-golden-8829a7a.json'));
+const legacyComparableKeys=Object.keys(golden).filter(k=>k!=='inbox.dentweb.undo_ok'); // 이 동작은 B8에서 직접 CAS로 바뀌어 과거 RPC 로그와 비교하지 않음
 const clone=x=>JSON.parse(JSON.stringify(x));
 const CH5=/^(inbox|cj)\./;
 const DYN_KEYS={'inbox.f_all_source':'전체 출처','inbox.f_all_status':'전체 상태'}; // inboxCardFill이 option 글을 보고 키를 고르는 두 항목
-const COUNT=168;
+const COUNT=172;
 
 function helpers(){
   const block=js.match(/\/\* hub-texts:test-start \*\/[\s\S]*?\/\* hub-texts:test-end \*\//)?.[0];
@@ -52,7 +53,7 @@ const RENAMED={'list.inquiry_status':JSON.stringify(STATUS_SET),'list.inquiry_so
 const NUM_KEYS=['inbox.group_window_min','inbox.alert_limit','consult.page_size','consult.action_limit'];
 
 /* ───────────── 1. 기본 글 목록 ───────────── */
-test('차례 5 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 9개(문의함 6 · 상담일지 3)·168개',()=>{
+test('차례 5 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 9개(문의함 6 · 상담일지 3)·172개',()=>{
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH5.test(d.key));
   assert.equal(defs.length,COUNT,'차례 5 글 키 수');
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
@@ -135,36 +136,36 @@ test('기본값만 있을 때: 허브 설정 엔진이 아예 없어도 두 화�
   const out=await renderAll(hr,{engine:false});
   assert.deepEqual(Object.keys(out).sort(),Object.keys(golden).sort());
   assert.ok(Object.keys(golden).length>=110,'대조 항목 수');
-  for(const k of Object.keys(golden))assert.equal(out[k],golden[k],k);
+  for(const k of legacyComparableKeys)assert.equal(out[k],golden[k],k);
 });
 test('기본값만 있을 때: 엔진을 못 불러와 hr.html의 대비책(shim)만 있어도 옛 화면과 같다',async()=>{
   const out=await renderAll(hr,{engine:false,shim:true});
-  for(const k of Object.keys(golden))assert.equal(out[k],golden[k],k);
+  for(const k of legacyComparableKeys)assert.equal(out[k],golden[k],k);
 });
 test('기본값만 있을 때: 엔진이 있고 표가 비어 있어도 옛 화면과 같다',async()=>{
   const out=await renderAll(hr,{engine:true,textRows:[],settings:{}});
-  for(const k of Object.keys(golden))assert.equal(out[k],golden[k],k);
+  for(const k of legacyComparableKeys)assert.equal(out[k],golden[k],k);
 });
 test('표를 못 읽어도(읽기 실패) 옛 화면과 같다 — 기본값으로 조용히 동작',async()=>{
   const out=await renderAll(hr,{engine:true,loadFail:true,settings:{}});
-  for(const k of Object.keys(golden))assert.equal(out[k],golden[k],k);
+  for(const k of legacyComparableKeys)assert.equal(out[k],golden[k],k);
 });
 test('숫자·목록 값이 모양이 틀려도(깨진 JSON·범위 밖·글자·낯선 코드·이름 그대로) 옛 화면과 같다',async()=>{
   const out=await renderAll(hr,{engine:true,textRows:[],settings:{'list.inquiry_status':'not json','list.inquiry_sources':'[{"code":"x"}]','list.consult_kinds':'[]','list.consult_status':'{"a":1}','inbox.group_window_min':'abc','inbox.alert_limit':'9999','consult.page_size':'1','consult.action_limit':''}});
-  for(const k of Object.keys(golden))assert.equal(out[k],golden[k],k);
+  for(const k of legacyComparableKeys)assert.equal(out[k],golden[k],k);
   const same=[{code:'new',label:'NEW(미처리)'},{code:'낯선',label:'낯선'}];
   const out2=await renderAll(hr,{engine:true,textRows:[],settings:{'list.inquiry_status':JSON.stringify(same),'list.inquiry_sources':JSON.stringify([{code:'daangn',label:'당근'},{code:'zzz',label:'아무'}]),'list.consult_kinds':JSON.stringify([{code:'교정',label:'교정'},{code:'옛구분',label:'바뀐 구분'}]),'list.consult_status':JSON.stringify([{code:'대기',label:'대기'},{code:'옛상태',label:'바뀐 상태'}])}});
-  for(const k of Object.keys(golden))assert.equal(out2[k],golden[k],k+' 이름이 같거나 낯선 코드만 있으면 옛 화면과 같음');
+  for(const k of legacyComparableKeys)assert.equal(out2[k],golden[k],k+' 이름이 같거나 낯선 코드만 있으면 옛 화면과 같음');
 });
 test('표에 글이 비어 있거나 공백뿐이면 무시하고 기본 글',async()=>{
   const out=await renderAll(hr,{engine:true,textRows:[{key:'inbox.title',value:'   '},{key:'cj.title',value:''},{key:'cj.hint',value:'\n'},{key:'inbox.sum_new',value:' '}],settings:{}});
-  for(const k of Object.keys(golden))assert.equal(out[k],golden[k],k);
+  for(const k of legacyComparableKeys)assert.equal(out[k],golden[k],k);
 });
 test('시험이 실제로 잡는지: 화면 글을 한 글자만 바꾸면 대조가 실패한다(문의함·상담일지 각각)',async()=>{
   const cases=[
     ["inboxT('inbox.title','📥 통합 문의함')","inboxT('inbox.title','📥 통합 문의함!')",'inbox.render.staff'],
     ["inboxT('inbox.sum_recall','리콜')","inboxT('inbox.sum_recall','리콜 ')",'pure.summary'],
-    ["T('inbox.kb_check','확인 필요')","T('inbox.kb_check','확인필요')",'pure.booking_detail.manager'],
+    ["check=T('inbox.kb_check','확인 필요')","check=T('inbox.kb_check','확인필요')",'pure.booking_detail.manager'],
     ["inboxT('inbox.m_manual_ok','문의로 접수했습니다.')","inboxT('inbox.m_manual_ok','문의로 접수했습니다')",'inbox.manual.ok'],
     ["inboxT('inbox.err_replies','답변 이력 불러오기 실패: {msg}'","inboxT('inbox.err_replies','답변 이력 가져오기 실패: {msg}'",'inbox.select.replies_error'],
     ["cjT('cj.m_required','환자명, 상담일, 상담 내용은 필수입니다.')","cjT('cj.m_required','환자명, 상담일, 상담 내용은 필수입니다')",'cj.save.no_name'],
@@ -184,7 +185,7 @@ test('시험이 실제로 잡는지: 화면 글을 한 글자만 바꾸면 대�
 /* ───────────── 3. 표에 값이 있으면 그 글 ───────────── */
 test('표에 값이 있으면 그 글: 고쳐 쓰는 글이 모두 화면(제목·단추·표 머리·알림창·확인창·메시지)에 나온다',async()=>{
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH5.test(d.key));
-  const out=await renderAll(hr,{engine:true,textRows:dynRows(defs),settings:{}});
+  const out=await renderAll(hr,{engine:true,textRows:dynRows(defs),settings:{},dentwebFacts:true});
   const all=Object.values(out).join('\n');
   const missing=defs.filter(d=>!all.includes('«'+d.key+'»')).map(d=>d.key);
   assert.equal(missing.length,0,'값을 넣었는데 화면에 안 나오는 키: '+missing.join(', '));

@@ -232,6 +232,25 @@ test('ⓖ 목록 읽기: handled_by·handled_at도 읽고, 그 칸이 DB에 아�
   assert.match(old.dom.$('#inboxList').innerHTML,/inbox-desktop-list/);
   assert.doesNotMatch(reads(old.log,'consultation_inbox').pop().cols,/handled_by|dentweb/);
 });
+test('ⓖ 덴트웹 입력 취소는 현재 시각·입력자를 조건으로 삼고 오래된 화면이면 다시 읽는다',async()=>{
+  const t=boot('manager'),booking=row('kakao-cas',{source:'kakao',external_event_id:'kbook-synthetic',
+    dentweb_entered_at:'2026-11-03T06:00:00.123456Z',dentweb_entered_by:'u2'}),calls=[];
+  t.ctx.sb={from(table){const q={table,op:'select',payload:null,cols:null,filters:[]},api={
+    update(payload){q.op='update';q.payload=payload;return api;},eq(...args){q.filters.push(['eq',...args]);return api;},
+    like(...args){q.filters.push(['like',...args]);return api;},is(...args){q.filters.push(['is',...args]);return api;},
+    select(cols){q.cols=cols;return api;},maybeSingle(){calls.push(q);return Promise.resolve({data:null,error:null});}
+  };return api;},rpc(){throw new Error('undo must use conditional direct UPDATE');}};
+  const reload=[];t.ctx.inboxSelect=async id=>reload.push(['select',id]);t.ctx.inboxLoad=async()=>reload.push(['list']);
+  t.ctx.__dentwebBooking=booking;vm.runInContext('INBOX_SELECTED=__dentwebBooking;INBOX_DENTWEB_FIELDS_AVAILABLE=true',t.ctx);
+  await t.ctx.inboxSetDentwebEntered();
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].op,'update');assert.equal(calls[0].cols,'id');
+  assert.deepEqual(JSON.parse(JSON.stringify(calls[0].payload)),{dentweb_entered_at:null,dentweb_entered_by:null});
+  assert.deepEqual(calls[0].filters,[['eq','id',booking.id],['eq','source','kakao'],['like','external_event_id','kbook-%'],
+    ['is','journal_id',null],['eq','dentweb_entered_at',booking.dentweb_entered_at],['eq','dentweb_entered_by','u2']]);
+  assert.match(t.dom.$('#inboxDentwebMsg').textContent,/다른 화면에서 이미 바뀌었거나 변경 권한/);
+  assert.deepEqual(reload,[['list'],['select',booking.id]]);
+});
 test('상태·담당 저장과 상담일지 전환은 처리 칸(handled_*)을 보내지 않는다 — 처리한 사람은 DB 트리거가 남김',async()=>{
   const t=boot('manager');t.ctx.inboxLoad=async()=>{};
   t.ctx.__sel={ids:['p1','p2'],messages:[row('p1'),row('p2')]};vm.runInContext('INBOX_SELECTED=__sel;',t.ctx);

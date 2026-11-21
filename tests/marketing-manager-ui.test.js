@@ -6,7 +6,7 @@ const event=(id,merchant,key,category_override=null)=>({id,merchant,merchant_key
 const events=[event('ad','Marketing ad','googleads'),event('private','Private excluded','googleads','not_marketing'),event('unknown','Private unclassified','unknown'),{...event('failed','Private failure','unknown'),parse_status:'failed',received_at:'2026-10-01T00:00:00Z'}];
 function harness(role='manager',value='true',error=null){
   const calls=[],lteCalls=[],writes=[],nav={innerHTML:''},nav2={innerHTML:''};
-  const tables={app_settings:{data:value===null?null:{key:'marketing.manager_view_enabled',value},error},marketing_expense_events:{data:events},marketing_month_budgets:{data:{month:'2026-10-01',amount_krw:5000}},marketing_merchant_rules:{data:[{merchant_key:'googleads',category:'google'}]},marketing_foreign_charge_links:{data:[]}};
+  const tables={app_settings:{data:value===null?null:{key:'marketing.manager_view_enabled',value},error},marketing_expense_events:{data:events},marketing_month_budgets:{data:{month:'2026-10-01',amount_krw:5000}},marketing_merchant_rules:{data:[{merchant_key:'googleads',category:'google'}]},marketing_foreign_charge_links:{data:[]},dentweb_monthly_first_visits:{data:[]}};
   const ctx={ME:{id:'test',role},TAB_ROLES:{},TAB_OVERRIDES:{},BADGE:{},TAB:'aicost',today:()=> '2026-10-03',render(){},setStatus(){},hubT:(k,d,v)=>v?d.replace(/\{(\w+)\}/g,(m,k)=>v[k]??m):d,esc:s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'),formatLeaveTimestamp:v=>v,$:s=>s==='#nav'?nav:nav2,aicostMoney:v=>Number(v||0).toLocaleString('ko-KR'),
     sb:{from(table){calls.push(table);if(!tables[table])throw Error('unexpected private query '+table);const api={select(){return api;},eq(){return api;},lte(c,v){lteCalls.push([table,c,v]);return api;},limit(){return api;},maybeSingle(){return Promise.resolve(tables[table]);},order(){return api;},range(){return Promise.resolve(tables[table]);},upsert(){writes.push(table);return api;},update(){writes.push(table);return api;},delete(){writes.push(table);return api;},then(resolve,reject){return Promise.resolve(tables[table]).then(resolve,reject);}};return api;}}};
   vm.createContext(ctx);
@@ -25,7 +25,7 @@ test('manager opens real renderer with marketing only, no owner edits or private
   const h=harness(),m={innerHTML:''};await h.api.renderAicost(m);
   assert.match(m.innerHTML,/Marketing ad/);assert.match(m.innerHTML,/읽기 전용/);assert.match(m.innerHTML,/5,000/);
   assert.doesNotMatch(m.innerHTML,/Private|미분류|마케팅 아님|취소 검토|marketingOverride|marketingLink|marketingBudget|marketingRule|가맹점 기본 분류 수정|예산 저장|exportBillingExcel/);
-  assert.ok(h.calls.every(t=>t==='app_settings'||t.startsWith('marketing_')));assert.deepEqual(h.writes,[]);
+  assert.ok(h.calls.every(t=>t==='app_settings'||t.startsWith('marketing_')||t==='dentweb_monthly_first_visits'));assert.deepEqual(h.writes,[]);
   assert.equal(h.api.exportData().marketing.rows.length,1);
 });
 test('off, malformed setting and settings errors stop manager data queries and clear cached exports',async()=>{

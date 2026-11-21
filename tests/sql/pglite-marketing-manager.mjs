@@ -28,15 +28,25 @@ try{
   await db.exec(purchase('ad','Google Ads','googleads')+purchase('excluded','Private excluded','googleads','not_marketing')+purchase('unknown','Private unknown','unknown')+purchase('foreign','Foreign ad','foreign','google','INR')+purchase('charge','Linked ad','unknowncharge')+purchase('longest','Excluded subscription','googleadspremium')+purchase('literal','Literal match','googleadspercent'));
   await db.exec(`insert into public.marketing_merchant_rules(merchant_key,merchant_label,category) values ('googleadspremium','Private subscription','not_marketing'),('googleads%','Literal percent','not_marketing');
     insert into public.marketing_expense_events(event_hash,transaction_at,event_kind,parse_status,currency,amount_native,amount_krw,merchant,merchant_key,category_override,reversed_event_id)
-      select '${hashes.cancel}',transaction_at,'cancellation','recorded','KRW',-1000,-1000,'Ad refund','unknowncancel','not_marketing',id from public.marketing_expense_events where event_hash='${hashes.ad}';
+      select '${hashes.cancel}',transaction_at,'cancellation','recorded','KRW',-1000,-1000,'Ad refund','unknowncancel',null,id from public.marketing_expense_events where event_hash='${hashes.charge}';
     insert into public.marketing_expense_events(event_hash,event_kind,parse_status,failure_code) values ('${hashes.failed}','purchase','failed','unsupported_shape');
     insert into public.marketing_foreign_charge_links(foreign_event_id,krw_event_id,created_by) select f.id,k.id,'${ids.owner}' from public.marketing_expense_events f,public.marketing_expense_events k where f.event_hash='${hashes.foreign}' and k.event_hash='${hashes.charge}';
     insert into public.marketing_month_budgets(month,amount_krw) values ('2026-10-01',500000);`);
   // Run against the old policies first, without the new SQL, to demonstrate the missing manager access.
   if(!process.env.MARKETING_MANAGER_BASELINE)await db.exec(fs.readFileSync(draftPath,'utf8'));
+  const chainMigration=fs.readFileSync('db/marketing_manager_event_category_chain_20261122.sql','utf8');
+  const chainRollback=fs.readFileSync('db/marketing_manager_event_category_chain_20261122_rollback.sql','utf8');
+  await db.exec(chainMigration);await db.exec(chainMigration);
   await asUser('manager');
   assert.deepEqual(await visible(),['ad','foreign','charge','cancel','literal'].map(k=>hashes[k]).sort(),'manager reads only classified marketing rows (default on), including inherited categories');
   console.log('PASS manager default ON: 5 marketing rows; excluded, unknown, failed, longest exclusion hidden');
+  await root();
+  const cancelCategory=async()=> (await q(`select public.marketing_manager_event_category(id) as category from public.marketing_expense_events where event_hash='${hashes.cancel}'`))[0].category;
+  assert.equal(await cancelCategory(),'google','refund inherits through its recorded KRW charge to the linked foreign approval');
+  await root();await db.exec(chainRollback);await db.exec(chainRollback);
+  assert.equal(await cancelCategory(),null,'function-only rollback restores the previous one-hop result');
+  await db.exec(chainMigration);assert.equal(await cancelCategory(),'google','reapply restores category chain');
+  await asUser('manager');
   assert.equal((await q('select * from public.marketing_month_budgets')).length,1);
   assert.ok((await q('select category from public.marketing_merchant_rules')).every(r=>r.category!=='not_marketing'));
   assert.equal((await q('select * from public.marketing_foreign_charge_links')).length,1);
@@ -61,7 +71,7 @@ try{
     await root();console.log('PASS switch '+value+': owner 9, manager '+(value==='true'?5:0)+', staff 0; ancillary tables follow access');
   }
   await asUser('owner');await q("update public.marketing_expense_events set category_override='not_marketing' where event_hash='"+hashes.ad+"'");
-  await asUser('manager');assert.equal((await visible()).length,3,'recategorizing approval also hides its cancellation immediately');
+  await asUser('manager');assert.equal((await visible()).length,4,'refund follows its own linked charge, independently of another approval');
   await asUser('owner');await q("update public.marketing_expense_events set category_override='not_marketing' where event_hash='"+hashes.foreign+"'");
   await asUser('manager');assert.equal((await visible()).length,1,'recategorizing foreign approval hides linked KRW event');
   assert.equal((await q('select * from public.marketing_foreign_charge_links')).length,0,'hidden endpoints do not leak through links');

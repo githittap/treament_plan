@@ -1577,6 +1577,10 @@ function hubTextDefsChapter5(add){
   add('inbox.kb_title',I4,'카카오 예약 줄·상세의 맨 앞 글(뒤에 일정이나 상태가 이어 붙음)','📅 카카오 예약');
   add('inbox.kb_entered',I4,'카카오 예약 — 덴트웹에 입력을 마친 표시(상세 글 앞부분도 같음)','✅ 덴트웹 입력함');
   add('inbox.kb_not_entered',I4,'카카오 예약 목록 줄 — 덴트웹에 아직 안 넣은 표시','덴트웹 입력 전');
+  add('inbox.kb_match_appointment',I4,'카카오 예약 — 덴트웹 예약 대조 완료 표시','📅 덴트웹 예약 있음');
+  add('inbox.kb_match_visited',I4,'카카오 예약 — 덴트웹 내원 대조 완료 표시','✅ 내원함');
+  add('inbox.kb_match_review',I4,'카카오 예약 — 대조 후보가 겹치거나 정보가 부족할 때 표시','❓ 확인 필요');
+  add('inbox.kb_match_checked_at',I4,'카카오 예약 상세 — 덴트웹을 대조한 시각의 항목 이름','최근 대조 시각');
   add('inbox.kb_not_yet',I4,'카카오 예약 상세 — 덴트웹에 아직 안 넣었을 때 뜨는 글','아직 덴트웹 입력 전');
   add('inbox.kb_alert',I4,'카카오 예약 — 예약 내용을 못 읽었을 때 첫 줄이 비어 있으면 대신 보이는 글, 상세 칸 이름','예약 알림');
   add('inbox.kb_time_unknown',I4,'카카오 예약 목록 줄 — 일정도 받은 시각도 없을 때 대신 보이는 글','받은 시각 확인 필요');
@@ -2092,6 +2096,11 @@ function hubTextDefsChapter7(add){
   add('mkt.rules_hint',S6,'마케팅비 — 가맹점 기본 분류 아래 작은 글','기본 분류를 바꾸면 같은 가맹점의 지난달 내역에도 반영됨. 개별 분류가 우선 적용됨.');
   add('mkt.f_month',S6,'마케팅비 — 조회 월 칸 이름','조회 월');
   add('mkt.sum_label',S6,'마케팅비 — 큰 숫자 위 작은 글','이번 달 원화 합계');
+  add('mkt.first_visits_count',S6,'마케팅비 — 이번 달 덴트웹 첫 내원 수. {n}은 인원 수','첫 내원 {n}명',['n']);
+  add('mkt.cost_per_first_visit',S6,'마케팅비 — 이번 달 광고비를 첫 내원 수로 나눈 지표','광고비 ÷ 첫 내원');
+  add('mkt.first_visits_pending',S6,'마케팅비 — 이번 달 첫 내원 수를 아직 불러오지 못했을 때','덴트웹 첫 내원 집계 확인 필요');
+  add('mkt.first_visits_zero',S6,'마케팅비 — 집계된 첫 내원이 0명일 때','첫 내원이 0명이라 계산할 수 없습니다.');
+  add('mkt.first_visits_foreign_pending',S6,'마케팅비 — 미연결 외화 광고비 때문에 첫 내원당 광고비 계산을 보류할 때','외화 광고비 원화 확인 필요');
   add('mkt.f_budget',S6,'마케팅비 — 월 예산 칸 이름','월 예산');
   add('mkt.ph_budget',S6,'마케팅비 — 월 예산 칸 안 안내 글','입력 안 함');
   add('mkt.unit_won',S6,'마케팅비 — 월 예산 칸 뒤 단위 글','원');

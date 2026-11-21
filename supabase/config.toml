@@ -30,3 +30,7 @@ verify_jwt = true
 
 [functions.ai-assistant-chat]
 verify_jwt = true
+
+# 병원 서버의 전용 키를 핸들러에서 검사한다.
+[functions.dentweb-sync]
+verify_jwt = false

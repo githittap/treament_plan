@@ -12,7 +12,7 @@ const {renderAll}=require('./fixtures/hub7-harness.cjs');
 const golden=Object.assign(JSON.parse(read('tests/fixtures/hub7-golden-f95b951.json')),JSON.parse(read('tests/fixtures/billing-monthly-golden.json')),JSON.parse(read('tests/fixtures/ai-cost-display-golden.json')),JSON.parse(read('tests/fixtures/deposit-search-golden.json')));
 const clone=x=>JSON.parse(JSON.stringify(x));
 const CH7=/^(home|dep|cf|aic|mkt|aiu|ob|pay|slip|acct|jg|save|payreq|empdoc)\./;
-const COUNT=329+2-1+2+4-1+1+6+1+1+19; // 기존 글 + 인박스 판 글 2 - 원문 열 이름 1(화면에서 숨겼음) + 루커 단추 글·주소 2(10-08) + 다섯째·여섯째 판(AI 규칙 관계도·클로드→코덱스 브라우저 흐름) 글 4(10-08) + 입금 검색·날짜 조회 글 19(11-22).
+const COUNT=329+2-1+2+4-1+1+6+1+1+5+19; // 기존 글 + 출시 보정 글 5 + 입금 검색·날짜 조회 글 19(11-22).
 /* 2026-10-02 원장 보기판에 넷째 판(📥 인박스 경고)을 더함 — 옛 화면(f95b951)과의 차이는 기본 글 카드 한 장뿐이어야 한다.
    옛 화면 대조는 그 카드(그대로·JSON 한 번·두 번 감싼 꼴)만 빼고 글자 하나까지 같은지 본다. 카드가 실제로 붙는지는 아래 따로 시험. */
 const INBOX_CARD='<button type="button" class="card owner-board-card" data-owner-board="inbox" onclick="openOwnerBoard(\'inbox\')"><strong>📥 인박스 경고</strong><span>AI가 남긴 최근 경고·대기</span><small>아직 PC에서 올라오지 않음</small></button>';
@@ -38,11 +38,12 @@ const dropSlot=v=>[HOME_SLOT,esc1(HOME_SLOT),esc1(esc1(HOME_SLOT))].reduce((s,f)
 /* 2026-10-17 외부 AI 카드에 「💳 이번 달 실제 결제」 줄(카드 문자 합계)을 더함 — 옛 화면 대조에서는 그 줄만 뺀다. */
 const BAL_LINE=/<div style=(\\*)"margin-top:4px\1" data-ai-external-balance=.*?<\/div>/g;
 const PAID_LINE=/<div style=(\\*)"margin-top:4px\1" data-ai-external-paid=.*?<\/b><\/div>/g;
-/* 2026-11-22 입금 화면에 검색·날짜 조회 칸(<!--dep-bar-->)과 더 보기 칸(<!--dep-more-->)을 더함 — 옛 화면(f95b951) 대조에서는 그 칸만 뺀다.
-   새 상태(검색·날짜·잘림·오류)는 tests/fixtures/deposit-search-golden.json 이 따로 정답을 가진다. */
+/* 2026-11-22 입금 화면 검색·날짜 조회 칸과 더 보기 칸은 별도 정답으로 대조한다. */
 const OLD_DEP_KEYS=['dep.owner_month','dep.owner_today','dep.chief_week','dep.desk','dep.empty'];
 const dropDepBar=v=>typeof v==='string'?v.replace(/<!--dep-bar-->[\s\S]*?<!--\/dep-bar-->/g,'').replace(/<!--dep-more-->[\s\S]*?<!--\/dep-more-->/g,''):v;
-const dropInbox=out=>Object.fromEntries(Object.entries(out).map(([k,v])=>[k,OLD_DEP_KEYS.includes(k)?dropDepBar(v):typeof v==='string'&&k==='aiu.panels'?v.replace(PAID_LINE,'').replace(BAL_LINE,''):typeof v==='string'&&k.startsWith('ob.')?oldLook(INBOX_FORMS.reduce((s,f)=>s.split(f).join(''),v)):typeof v==='string'&&k==='home.owner'?dropSlot(v):v]));
+// 옛 화면 대조는 첫 내원 카드와 입금 검색 영역만 빼고 확인한다.
+const dropFirstVisits=v=>typeof v==='string'?v.replace(/<section id=(\\*)"marketingFirstVisits\1".*?<\/section>/g,''):v;
+const dropInbox=out=>Object.fromEntries(Object.entries(out).map(([k,v])=>[k,dropFirstVisits(OLD_DEP_KEYS.includes(k)?dropDepBar(v):typeof v==='string'&&k==='aiu.panels'?v.replace(PAID_LINE,'').replace(BAL_LINE,''):typeof v==='string'&&k.startsWith('ob.')?oldLook(INBOX_FORMS.reduce((s,f)=>s.split(f).join(''),v)):typeof v==='string'&&k==='home.owner'?dropSlot(v):v)]));
 const NUM_KEYS=['home.payslip_limit','dep.list_limit','aic.history_months','aic.auto_limit','aiu.model_days','aiu.cost_months','aiu.external_days','aiu.session_limit'];
 const LIST_KEYS=['list.approval_status','list.contract_status','list.pay_wage_types','list.marketing_categories','list.ai_billing_platforms','list.ai_cost_platforms','list.ai_external_names'];
 const sha=s=>crypto.createHash('sha256').update(s).digest('hex');
@@ -87,7 +88,7 @@ const run=(textRows,settings,o)=>renderAll(hr,Object.assign({engine:true,textRow
 const runOld=(textRows,settings,o)=>run(textRows,settings,o).then(dropInbox);
 
 /* ───────────── 1. 기본 글 목록 ───────────── */
-test('차례 7 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 14개·336개(차례 7 329 + 인박스 판 2 - 원문 열 1 + 루커 2 + 규칙·흐름 판 4) · 명세서 서식·위험 확인창은 ⚠️ 안내로 시작',()=>{
+test('차례 7 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 14개·349개 · 명세서 서식·위험 확인창은 ⚠️ 안내로 시작',()=>{
   const defs=ch7Defs();
   assert.equal(defs.length,COUNT,'차례 7 글 키 수');
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
@@ -182,7 +183,7 @@ test('원장 보기판 넷째~여섯째 판(📥 인박스 경고 · 🧭 AI 규
   }
   for(const k of ['ob.render.owner','ob.render.owner_missing','ob.render.owner_err'])for(const c of [INBOX_CARD,RULES_CARD,FLOW_CARD,TOOL_CARD,SUMMARY_CARD,SIGNAL_CARD])assert.equal(out[k].split(esc1(c)).length-1,1,k+' 원장 화면에 한 장');
   for(const w of ['inbox','rules_map','codex_flow','AI 규칙 관계도','코덱스 브라우저 흐름'])assert.ok(!out['ob.render.nonowner'].includes(w),'원장이 아니면 카드 없음: '+w);
-  const changed=Object.keys(golden).filter(k=>(OLD_DEP_KEYS.includes(k)?dropDepBar(out[k]):out[k])!==golden[k]).sort();
+const changed=Object.keys(golden).filter(k=>dropFirstVisits(OLD_DEP_KEYS.includes(k)?dropDepBar(out[k]):out[k])!==golden[k]).sort();
   assert.deepEqual(changed,['aiu.panels','home.owner','ob.panel','ob.render.owner','ob.render.owner_err','ob.render.owner_missing'],'카드가 붙는 곳 말고는 그대로');
 });
 test('원장 보기판 루커 단추: 원장 화면 맨 위에 새 창 단추 한 개 · 원장 아니면 없음 · 글·주소는 글 고치기 값 · https 아닌 주소면 숨김',async()=>{
@@ -238,9 +239,9 @@ test('시험이 실제로 잡는지: 화면 글을 한 글자만 바꾸면 대�
 });
 
 /* ───────────── 3. 표에 값이 있으면 그 글 ───────────── */
-test('표에 값이 있으면 그 글: 고쳐 쓰는 글 336개(차례 7 329 + 인박스 판 2 - 원문 열 1 + 루커 2 + 규칙·흐름 판 4)가 모두 화면에서 나오고, {자리표시자}가 채워진다',async()=>{
+test('표에 값이 있으면 그 글: 고쳐 쓰는 글 349개가 모두 화면에서 나오고, {자리표시자}가 채워진다',async()=>{
   const defs=ch7Defs().filter(d=>!/^ob\.looker_/.test(d.key)); // 루커 주소는 https가 아니면 단추를 숨기므로 아래 루커 시험에서 따로 봄
-  const out=await run(dynRows(defs),{});
+  const out=await run(dynRows(defs),{},{dentwebVisits:true});
   const all=allOut(out);
   const missing=defs.filter(d=>!all.includes('«'+d.key+'»')).map(d=>d.key);
   assert.deepEqual(clone(missing),[],'값을 넣었는데 화면에 안 나오는 키');

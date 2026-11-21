@@ -313,16 +313,17 @@ function ownerHarness(texts){
   const src=hr.match(/async function renderOwner\([\s\S]*?\r?\n\}\r?\n(?=async function setRole)/);assert.ok(src);
   const fill=hr.match(/\/\* account-filling:test-start \*\/([\s\S]*?)\/\* account-filling:test-end \*\//)[1];
   const del=hr.match(/\/\* account-delete-ui:test-start \*\/([\s\S]*?)\/\* account-delete-ui:test-end \*\//)[1];
+  const dentweb=hr.match(/\/\* dentweb-integration:test-start \*\/([\s\S]*?)\/\* dentweb-integration:test-end \*\//)[1];
   const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const TABS=[{key:'att',label:'출퇴근',roles:['staff','owner']},{key:'deposit',label:'입금',roles:['staff','owner']},{key:'sched',label:'근무표',roles:['staff','owner']},{key:'leave',label:'연차',roles:['staff','owner']},{key:'appr',label:'결재함',roles:['staff','owner']},{key:'notice',label:'공지',roles:['staff','owner']},{key:'onbo',label:'내 서류함',roles:['staff','owner']},{key:'ai',label:'🤖 AI 도우미',roles:['staff','owner']}];
-  const ctx={ME:{id:'o1',role:'owner'},PROFILES:[{user_id:'o1',name:'원장',role:'owner',approved:true,dept:'진료실'},{user_id:'s1',name:'김직원',role:'staff',approved:true,dept:'데스크'},{user_id:'s2',name:'신입',role:'staff',approved:false,dept:'교육팀',created_at:'2026-09-30T00:00:00Z',account_access_status:'활성'}],
+  const ctx={URL,SETTINGS:{},SETTINGS_LOAD_OK:true,ME:{id:'o1',role:'owner',approved:true},PROFILES:[{user_id:'o1',name:'원장',role:'owner',approved:true,dept:'진료실'},{user_id:'s1',name:'김직원',role:'staff',approved:true,dept:'데스크'},{user_id:'s2',name:'신입',role:'staff',approved:false,dept:'교육팀',created_at:'2026-09-30T00:00:00Z',account_access_status:'활성'}],
     SCHEDULE_PEOPLE:[{id:'p1',name:'미가입 명부',department:'진료실',active:true}],SCHEDULE_DEPARTMENTS:['Dr.','진료실','데스크','기공실','미지정','상담','행정'],BULK_ROLE_EDIT_GENERATION:0,BULK_ROLE_SELECTED:new Set(),BULK_ROLE_ALLOWED_ROLES:['staff','manager','chief','deputy'],
     TABS,TAB_ROLES:{},TAB_OVERRIDES:{},esc,md:s=>s?String(s).slice(5).replace('-','/'):'',today:()=>'2026-10-01',$:()=>null,renderJobGroupAdmin:()=>'',previewEmployeeJobGroup(){},renderOverrideRows(){},
     sb:{rpc:async()=>({data:[],error:null}),from(){const api={select(){return Promise.resolve({data:[]});}};return api;}}};
   vm.createContext(ctx);
   vm.runInContext(js,ctx);
   vm.runInContext(fs.readFileSync('security-pledge.js','utf8'),ctx);
-  vm.runInContext(fill+'\n'+del+'\n'+src[0]+'\nfunction tabLabel(k){const t=TABS.find(x=>x.key===k);return t?hubText("tab."+k,t.label):k;}\nthis.renderOwner=renderOwner;',ctx);
+  vm.runInContext(fill+'\n'+del+'\n'+dentweb+'\n'+src[0]+'\nfunction tabLabel(k){const t=TABS.find(x=>x.key===k);return t?hubText("tab."+k,t.label):k;}\nthis.renderOwner=renderOwner;',ctx);
   return ctx;
 }
 async function loadTexts(ctx,rows){await ctx.HubUi.load({from(){const api={select(){return api;},then(res,rej){return Promise.resolve({data:rows,error:null}).then(res,rej);}};return api;}});}
@@ -397,8 +398,9 @@ test('화면: 원장에게는 「📝 글 고치기 · 🔢 숫자·기준 · �
   assert.match(sec,/<input id="hubTxtSearch"/);
   assert.equal((sec.match(/<details class="hub-grp" data-hub-group="/g)||[]).length,1+3+11+17+12+9+5+14+1+3+1+1+1+5+1+1+1,'화면별 접기: 탭 이름·메뉴 묶음 이름·계정·권한 + 차례 2(내 서류함 8 · 업무자료 3) + 차례 3(출퇴근 5 · 근무표 2 · 연차 4) + 차례 4(결재함 4 · 공지 3 · 캘린더 3 · 건의함 2) + 차례 5(문의함 6 · 상담일지 3) + 시간 표시 1(⏰ 시간 표시 · 2026-10-02) + 도구 탭 1(🧰 도구 · 업무매뉴얼도 같은 묶음) + 탭 사용법 1(❓ 탭 사용법 · 54개)');
   const n=(sec.match(/data-hub-text-save="\d+"/g)||[]).length;
-  const leaveManagerTextCount=35,leaveYearEarnedTextCount=14,leaveEditTextCount=22,depSearchTextCount=19;
-  assert.equal(n,2052+leaveManagerTextCount+leaveYearEarnedTextCount+leaveEditTextCount+depSearchTextCount,'기존 글과 연차 관리 문구 모두에 저장 단추가 있음');
+const leaveManagerTextCount=35,leaveYearEarnedTextCount=14,leaveEditTextCount=22;
+  const dentwebInboxTextCount=4,dentwebMarketingTextCount=5,depSearchTextCount=19;
+  assert.equal(n,2052+leaveManagerTextCount+leaveYearEarnedTextCount+leaveEditTextCount+dentwebInboxTextCount+dentwebMarketingTextCount+depSearchTextCount,'기존 글과 덴트웹·입금 검색 문구에 저장 단추가 있음');
   assert.deepEqual(clone(helpers().hubTextDefs().filter(d=>d.key.startsWith('mdeck.')).map(d=>d.key)),[
     'title','hint','search','cat_all','view','edit','new','empty','loading','error','private','back','popup_blocked'
   ].map(k=>'mdeck.'+k),'업무매뉴얼 화면 글 13개가 모두 글 고치기 목록에 있음');

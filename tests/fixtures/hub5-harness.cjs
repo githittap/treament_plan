@@ -193,6 +193,13 @@ async function renderAll(html,opts){
         {message:'아무 말',received_at:'2026-09-30T05:00:00Z',status:'in_progress',dentweb_entered_by:'u2',dentweb_entered_at:'2026-09-30T03:30:00Z'}
       ].map(x=>b.api.inboxKakaoBookingDetailHtml(x)));
     }
+    if(o.dentwebFacts){
+      const row=INBOX_ROWS.find(x=>x.id==='kb1');
+      out['pure.dentweb_badges']=JSON.stringify([
+        r.api.inboxKakaoBookingDetailHtml({...row,dentweb_match:{appointment_found:true,visited:true,match_basis:'phone8_date',checked_at:'2026-10-05T01:00:00Z'}}),
+        r.api.inboxKakaoBookingDetailHtml({...row,dentweb_match:{match_basis:'ambiguous'}})
+      ]);
+    }
     out['pure.assignee_options']=JSON.stringify([r.api.inboxAssigneeOptions(null),r.api.inboxAssigneeOptions('u2')]);
     out['pure.cj_assignee_options']=JSON.stringify([r.api.consultationActionAssigneeOptions(null),r.api.consultationActionAssigneeOptions('u2'),r.api.consultationActionAssigneeOptions('zz')]);
     out['pure.cj_options']=JSON.stringify([r.api.consultationOptions(['교정','확정','원본'],'확정'),r.api.consultationOptions(['대기','미확정','부분확정','확정','종결'],'')]);
@@ -298,7 +305,7 @@ async function renderAll(html,opts){
     await run('set_ok',{id:'kb2',dentweb_entered_at:null});
     await run('set_fail',{id:'kb2',dentweb_entered_at:null},{sb:{rpc:{consultation_inbox_set_dentweb_entered:fail('덴트웹<실패>')}}});
     await run('undo_declined',{id:'kb1',dentweb_entered_at:'2026-09-30T03:30:00Z'},{confirm:false});
-    await run('undo_ok',{id:'kb1',dentweb_entered_at:'2026-09-30T03:30:00Z'},{confirm:true});
+    await run('undo_ok',{id:'kb1',dentweb_entered_at:'2026-09-30T03:30:00Z'},{confirm:true,sb:{tables:{consultation_inbox:{list:INBOX_ROWS,single:{id:'kb1'}}}}});
     await run('no_selected',null);
     await run('staff',{id:'kb2',dentweb_entered_at:null},{role:'staff'});
   }

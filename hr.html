@@ -236,7 +236,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
   .inbox-mobile-summary,.inbox-mobile-subject{margin-top:6px;overflow-wrap:anywhere}
 .inbox-mobile-summary{font-weight:700}
 .onboarding-guide-summary::after{content:' — 눌러서 보기'}.onboarding-guide-card[open] .onboarding-guide-summary::after{content:' — 눌러서 접기'}
-.inbox-booking-line{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}.inbox-booking-line strong,.inbox-booking-product{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.inbox-booking-product{margin-top:4px;color:var(--gray)}.inbox-booking-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.inbox-booking-original{white-space:pre-wrap;overflow-wrap:anywhere}.inbox-booking-fields{display:grid;grid-template-columns:minmax(78px,auto) 1fr;gap:8px;margin:8px 0}.inbox-booking-fields dt{font-weight:700}.inbox-booking-fields dd{margin:0;overflow-wrap:anywhere}.inbox-booking-actions .mini{flex:1;text-align:center}
+.inbox-booking-line{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}.inbox-booking-line strong,.inbox-booking-product{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.inbox-booking-facts{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}.inbox-booking-product{margin-top:4px;color:var(--gray)}.inbox-booking-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.inbox-booking-original{white-space:pre-wrap;overflow-wrap:anywhere}.inbox-booking-fields{display:grid;grid-template-columns:minmax(78px,auto) 1fr;gap:8px;margin:8px 0}.inbox-booking-fields dt{font-weight:700}.inbox-booking-fields dd{margin:0;overflow-wrap:anywhere}.inbox-booking-actions .mini{flex:1;text-align:center}
 @media(max-width:640px){.inbox-booking-actions{flex-direction:column}.inbox-booking-actions .mini{width:100%;box-sizing:border-box}.inbox-booking-fields{grid-template-columns:74px minmax(0,1fr)}.inbox-mobile-card .inbox-booking-line{align-items:flex-start;flex-direction:column}.inbox-mobile-card .inbox-booking-line .b{white-space:nowrap}}
 .inbox-filter-row{min-width:0}.inbox-filter-row>*{min-width:0;max-width:100%}@media(max-width:640px){.inbox-filter-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.inbox-filter-row select,.inbox-filter-row button{width:100%;min-width:0;box-sizing:border-box}.inbox-filter-row #inboxReservationFilter{grid-column:1/-1}}
   @media(max-width:640px){#inboxList .inbox-desktop-list{display:none}#inboxList .inbox-mobile-list{display:block}#inboxList .inbox-mobile-card{width:100%;box-sizing:border-box}}
@@ -3703,12 +3703,31 @@ function inboxKakaoBookingDetails(row){
   const lines=String(row?.message||'').split(/\r?\n/).map(line=>line.trim()).filter(Boolean),firstLine=lines[0]||inboxT('inbox.kb_alert','예약 알림');
   const valueFor=label=>{const re=new RegExp('^(?:'+label+')\\s*[:：]?\\s*(.*)$','i');for(let i=0;i<lines.length;i++){const m=lines[i].match(re);if(m)return m[1]||lines[i+1]||'';}return '';};
   const scheduleMatch=lines.map(line=>line.match(/((?:20\d{2}[.\/-]\d{1,2}[.\/-]\d{1,2}|\d{1,2}[.\/-]\d{1,2})\s*(?:\([월화수목금토일]\))?\s*\d{1,2}:\d{2})/)).find(Boolean);
-  let schedule=scheduleMatch?.[1]||valueFor('일정|예약일시|예약 일시|방문일시|예약일');
+  const normalized=(key,readOriginal)=>row?.[key]===undefined?readOriginal():row[key]||'';
+  let schedule=normalized('kakao_booking_schedule',()=>scheduleMatch?.[1]||valueFor('일정|예약일시|예약 일시|방문일시|예약일'));
   if(schedule){const m=schedule.match(/^(?:20\d{2}[.\/-])?(\d{1,2})[.\/-](\d{1,2})(\s*\([월화수목금토일]\))?\s*(\d{1,2}:\d{2})$/);if(m)schedule=`${Number(m[1])}/${String(m[2]).padStart(2,'0')}${m[3]||''} ${m[4]}`;}
-  const product=valueFor('상품명|예약 상품|예약상품|상품'),option=valueFor('옵션명|옵션'),name=valueFor('예약자명|예약자'),contact=valueFor('예약자 연락처|연락처|전화번호');
+  const product=normalized('kakao_booking_product',()=>valueFor('상품명|예약 상품|예약상품|상품'));
+  const name=normalized('kakao_booking_name',()=>valueFor('예약자명|예약자'));
+  const contact=normalized('kakao_booking_contact_digits',()=>valueFor('예약자 연락처|연락처|전화번호'));
+  const option=valueFor('옵션명|옵션');
   return {firstLine,schedule,product,option,name,contact,recognized:!!(schedule||product||option||name||contact)};
 }
-function inboxKakaoBookingListLines(row){const d=inboxKakaoBookingDetails(row),fallback=hubFmtWhen(row?.received_at)||inboxT('inbox.kb_time_unknown','받은 시각 확인 필요');return {top:d.schedule||fallback,bottom:(d.product||d.option)?[d.product,d.option].filter(Boolean).join(' · '):d.firstLine};}
+function inboxKakaoBookingListLines(row){
+  const d=inboxKakaoBookingDetails(row);
+  const fallback=row.kakao_booking_schedule===undefined?(hubFmtWhen(row.received_at)||inboxT('inbox.kb_time_unknown','받은 시각 확인 필요')):inboxT('inbox.kb_check','확인 필요');
+  return {top:d.schedule||fallback,bottom:(d.product||d.option)?[d.product,d.option].filter(Boolean).join(' · '):d.firstLine};
+}
+function inboxDentwebMatchBadges(row){
+  const match=row?.dentweb_match;
+  if(!inboxIsKakaoBooking(row)||!match)return '';
+  const badge=(style,label)=>'<span class="b '+style+'">'+esc(label)+'</span>';
+  if(match.match_basis==='ambiguous'||match.match_basis==='insufficient')
+    return badge('wait',inboxT('inbox.kb_match_review','❓ 확인 필요'));
+  return [
+    match.appointment_found===true?badge('ok',inboxT('inbox.kb_match_appointment','📅 덴트웹 예약 있음')):'',
+    match.visited===true?badge('ok',inboxT('inbox.kb_match_visited','✅ 내원함')):''
+  ].filter(Boolean).join(' ');
+}
 let INBOX_NOTES={replies:[],views:[]},INBOX_HANDLING_OPEN=null,INBOX_LAST_ROWS=[],INBOX_LIST_GROUPS={},INBOX_HANDLE_BUSY=false; /* 처리 칸: 목록에 보이는 묶음의 처리 메모(답변 기록)·열람 기록, 펼친 입력칸, 방금 읽은 문의 줄 */
 function inboxRole(){return typeof ME!=='undefined'&&ME?ME.role:'';}
 function inboxCanWriteNow(){return ['manager','chief','owner'].includes(inboxRole());}
@@ -3772,7 +3791,7 @@ async function consultationRenderActionQueue(){
   queue.innerHTML=rows.length?`<div class="tblwrap"><table><tr><th>${esc(cjT('cj.q_th_due','기한'))}</th><th>${esc(cjT('cj.th_patient','환자'))}</th><th>${esc(cjT('cj.th_next','다음 조치'))}</th><th>${esc(cjT('cj.q_th_who','담당자'))}</th><th></th></tr>${rows.map(row=>`<tr><td><span class="b ${consultationActionTiming(row,today())==='overdue'?'no':'wait'}">${esc(consultationActionTiming(row,today())==='overdue'?cjT('cj.q_overdue','기한 지남'):cjT('cj.q_today','오늘'))}</span> ${esc(row.action_due_on)}</td><td>${esc(row.patient_name||'')}</td><td>${esc(row.next_action||'')}</td><td>${esc(names.get(row.action_assignee_id)||cjT('cj.opt_unassigned','미지정'))}</td><td><button class="mini" data-consultation-action-id="${esc(row.id)}">${esc(cjT('cj.q_btn_open','열기'))}</button></td></tr>`).join('')}</table></div>${rows.length===limit?`<div class="hint">${esc(cjT('cj.q_limit_hint','최대 {n}건 표시 중임',{n:limit}))}</div>`:''}`:`<div class="empty">${esc(cjT('cj.q_empty','오늘 또는 기한이 지난 다음 조치가 없습니다.'))}</div>`;
   queue.querySelectorAll('[data-consultation-action-id]').forEach(button=>button.addEventListener('click',()=>consultationEdit(button.dataset.consultationActionId)));
 }
-let INBOX_DETAIL_GENERATION=0;
+let INBOX_DETAIL_GENERATION=0,INBOX_LOAD_GENERATION=0;
 let INBOX_FILTER={source:'',status:''},INBOX_SELECTED=null;
 let INBOX_ONLY_RESERVATIONS=false,INBOX_UNENTERED_RESERVATION_COUNT=0,INBOX_DENTWEB_FIELDS_AVAILABLE=false;
 const INBOX_STATUSES=[['new','신규'],['in_progress','확인 중'],['recall_1','리콜 1차'],['recall_2','리콜 2차'],['recall_3','리콜 3차'],['closed','처리됨'],['converted','전환됨']];
@@ -3788,10 +3807,11 @@ function inboxRenderList(rows){
   groups.forEach(group=>{const p=PROFILES.find(x=>x.user_id===group.assigned_to);group.assignee_name=p?.name||'-';});INBOX_LIST_GROUPS={};groups.forEach(group=>{INBOX_LIST_GROUPS[inboxGroupKey(group)]=group.messages.slice().sort((a,b)=>Date.parse(a.received_at)-Date.parse(b.received_at));});
   const onlyReservations=typeof INBOX_ONLY_RESERVATIONS!=='undefined'&&INBOX_ONLY_RESERVATIONS,counts=inboxGroupCounts(groups),items=(onlyReservations?bookings:[...groups,...bookings]).sort((a,b)=>Date.parse(b.received_at)-Date.parse(a.received_at)).slice(0,100);
   const bookingStatus=row=>row.dentweb_entered_at?'<span class="b ok">'+esc(inboxT('inbox.kb_entered','✅ 덴트웹 입력함'))+'</span>':'<span class="b wait">'+esc(inboxT('inbox.kb_not_entered','덴트웹 입력 전'))+'</span>';
+  const bookingFacts=row=>{const badges=inboxDentwebMatchBadges(row);return badges?'<div class="inbox-booking-facts">'+badges+'</div>':'';};
   const bookingLines=row=>{const lines=inboxKakaoBookingListLines(row);return {top:esc(lines.top),bottom:esc(lines.bottom)};};
   const owner=inboxRole()==='owner',handledMobile=row=>{const h=inboxHandledHtml(row);return h==='-'?'':'<div class="inbox-mobile-handled">'+h+'</div>';},viewsMobile=row=>{if(!owner)return '';const v=inboxViewsInfo(row);return '<div'+(v.title?' title="'+esc(v.title)+'"':'')+'>'+esc(inboxT('inbox.m_views','열람 {names}',{names:v.text}))+'</div>';},viewsCell=row=>{if(!owner)return '';const v=inboxViewsInfo(row);return '<td'+(v.title?' title="'+esc(v.title)+'"':'')+'>'+esc(v.text)+'</td>';};
-  const mobileRow=row=>{if(inboxIsKakaoBooking(row)){const lines=bookingLines(row);return '<div class="inbox-mobile-card inbox-kakao-booking"><div class="inbox-booking-line"><strong>'+kbTitle+' · '+lines.top+'</strong>'+bookingStatus(row)+'</div><div class="inbox-booking-product">'+lines.bottom+'</div><div><button class="mini" data-inbox-ids="'+esc(row.id)+'">'+detailBtn+'</button></div></div>';}const info=inboxStatusInfo(row.status);return '<div class="inbox-mobile-card '+(row.status==='new'?'inbox-new':'')+'"><div><strong>'+esc(inboxGroupSummary(row))+'</strong> <span class="b '+info.className+'">'+esc(info.label)+'</span></div><div>'+esc(hubFmtWhen(row.received_at)||unknownTime)+' · '+esc(inboxSourceLabel(row.source))+' · '+esc(inboxT('inbox.m_assignee','담당 {name}',{name:row.assignee_name}))+'</div>'+handledMobile(row)+viewsMobile(row)+'<div>'+(inboxNegative(row)?'<span class="b no">'+negKw+'</span> ':'')+esc(row.subject||'-')+'</div><div><button class="mini" data-inbox-ids="'+esc(row.ids.join(','))+'">'+detailBtn+'</button>'+inboxReplyLink(row)+'</div></div>';};
-  const desktopRow=row=>{if(inboxIsKakaoBooking(row)){const lines=bookingLines(row);return '<tr class="inbox-kakao-booking"><td colspan="3"><div class="inbox-booking-line"><strong>'+kbTitle+' · '+lines.top+'</strong>'+bookingStatus(row)+'</div><div class="inbox-booking-product">'+lines.bottom+'</div></td><td>-</td><td>-</td><td>-</td><td>-</td>'+(owner?'<td>-</td>':'')+'<td><button class="mini" data-inbox-ids="'+esc(row.id)+'">'+detailBtn+'</button></td></tr>';}const info=inboxStatusInfo(row.status);return '<tr class="'+(row.status==='new'?'inbox-new':'')+'"><td>'+esc(hubFmtWhen(row.received_at)||unknownTime)+'</td><td>'+esc(inboxSourceLabel(row.source))+'</td><td>'+esc(inboxGroupSummary(row))+'</td><td>'+(inboxNegative(row)?'<span class="b no">'+negKw+'</span> ':'')+esc(row.subject||'-')+'</td><td><span class="b '+info.className+'">'+esc(info.label)+'</span></td><td>'+inboxHandledHtml(row)+'</td><td>'+esc(row.assignee_name)+'</td>'+viewsCell(row)+'<td><button class="mini" data-inbox-ids="'+esc(row.ids.join(','))+'">'+detailBtn+'</button>'+inboxReplyLink(row)+'</td></tr>';};
+  const mobileRow=row=>{if(inboxIsKakaoBooking(row)){const lines=bookingLines(row);return '<div class="inbox-mobile-card inbox-kakao-booking"><div class="inbox-booking-line"><strong>'+kbTitle+' · '+lines.top+'</strong>'+bookingStatus(row)+'</div><div class="inbox-booking-product">'+lines.bottom+'</div>'+bookingFacts(row)+'<div><button class="mini" data-inbox-ids="'+esc(row.id)+'">'+detailBtn+'</button></div></div>';}const info=inboxStatusInfo(row.status);return '<div class="inbox-mobile-card '+(row.status==='new'?'inbox-new':'')+'"><div><strong>'+esc(inboxGroupSummary(row))+'</strong> <span class="b '+info.className+'">'+esc(info.label)+'</span></div><div>'+esc(hubFmtWhen(row.received_at)||unknownTime)+' · '+esc(inboxSourceLabel(row.source))+' · '+esc(inboxT('inbox.m_assignee','담당 {name}',{name:row.assignee_name}))+'</div>'+handledMobile(row)+viewsMobile(row)+'<div>'+(inboxNegative(row)?'<span class="b no">'+negKw+'</span> ':'')+esc(row.subject||'-')+'</div><div><button class="mini" data-inbox-ids="'+esc(row.ids.join(','))+'">'+detailBtn+'</button>'+inboxReplyLink(row)+'</div></div>';};
+  const desktopRow=row=>{if(inboxIsKakaoBooking(row)){const lines=bookingLines(row);return '<tr class="inbox-kakao-booking"><td colspan="3"><div class="inbox-booking-line"><strong>'+kbTitle+' · '+lines.top+'</strong>'+bookingStatus(row)+'</div><div class="inbox-booking-product">'+lines.bottom+'</div>'+bookingFacts(row)+'</td><td>-</td><td>-</td><td>-</td><td>-</td>'+(owner?'<td>-</td>':'')+'<td><button class="mini" data-inbox-ids="'+esc(row.id)+'">'+detailBtn+'</button></td></tr>';}const info=inboxStatusInfo(row.status);return '<tr class="'+(row.status==='new'?'inbox-new':'')+'"><td>'+esc(hubFmtWhen(row.received_at)||unknownTime)+'</td><td>'+esc(inboxSourceLabel(row.source))+'</td><td>'+esc(inboxGroupSummary(row))+'</td><td>'+(inboxNegative(row)?'<span class="b no">'+negKw+'</span> ':'')+esc(row.subject||'-')+'</td><td><span class="b '+info.className+'">'+esc(info.label)+'</span></td><td>'+inboxHandledHtml(row)+'</td><td>'+esc(row.assignee_name)+'</td>'+viewsCell(row)+'<td><button class="mini" data-inbox-ids="'+esc(row.ids.join(','))+'">'+detailBtn+'</button>'+inboxReplyLink(row)+'</td></tr>';};
   const summary='<div class="hint inbox-summary"><strong>'+esc(inboxStatusSummary(counts))+'</strong><br>'+esc(inboxT('inbox.status_hint','NEW = 아직 아무도 처리 안 함 · 진행중 = 담당자가 답하는 중 · 리콜 = 다시 연락할 문의 · 처리됨 = 담당자가 처리를 끝냄(답변·예약·광고 정리 등)'))+'</div>';
   const th=(k,d)=>'<th>'+esc(inboxT(k,d))+'</th>';
   const body=items.map(desktopRow).join('');el.innerHTML=summary+(body?'<div class="inbox-desktop-list tblwrap"><table><tr>'+th('inbox.th_time','수신')+th('inbox.th_source','출처')+th('inbox.th_sender','문의자')+th('inbox.th_subject','제목')+th('inbox.th_status','상태')+th('inbox.th_handled','처리')+th('inbox.th_assignee','담당')+(owner?th('inbox.th_views','열람'):'')+'<th></th></tr>'+body+'</table></div><div class="inbox-mobile-list">'+items.map(mobileRow).join('')+'</div>':'<div class="empty">'+esc(inboxT('inbox.empty','조건에 맞는 문의가 없습니다.'))+'</div>');
@@ -3799,17 +3819,61 @@ function inboxRenderList(rows){
   el.querySelectorAll('[data-inbox-ids]').forEach(button=>button.addEventListener('click',()=>inboxSelect(button.dataset.inboxIds.split(','))));
   el.onclick=ev=>{const button=ev.target&&ev.target.closest?ev.target.closest('button'):null;if(!button||!button.dataset)return;if(button.dataset.inboxHandle!==undefined){INBOX_DETAIL_GENERATION++;INBOX_HANDLING_OPEN=button.dataset.inboxHandle;inboxRenderList(INBOX_LAST_ROWS);const memo=el.querySelector('[data-inbox-handle-memo]');if(memo&&memo.focus)memo.focus();}else if(button.dataset.inboxHandleCancel!==undefined){INBOX_DETAIL_GENERATION++;INBOX_HANDLING_OPEN=null;inboxRenderList(INBOX_LAST_ROWS);}else if(button.dataset.inboxHandleSave!==undefined)inboxListHandleSave(button);}; /* 처리 칸 단추: 목록을 다시 그려도 한 번만 걸리게 한 곳에서 받음 */
 }
+async function inboxLoadDentwebMatches(rows){
+  const ids=rows.filter(inboxIsKakaoBooking).map(row=>row.id);
+  if(!ids.length)return new Map();
+  const visible=new Set(ids);
+  try{
+    const queries=[];
+    for(let offset=0;offset<ids.length;offset+=50){
+      queries.push(sb.from('dentweb_inbox_matches').select('inbox_id,appointment_found,visited,match_basis,checked_at').in('inbox_id',ids.slice(offset,offset+50)));
+    }
+    const results=await Promise.all(queries);
+    if(results.some(result=>result.error))return new Map();
+    return new Map(results.flatMap(result=>result.data||[]).filter(match=>visible.has(match.inbox_id)).map(match=>[match.inbox_id,match]));
+  }catch{return new Map();}
+}
 async function inboxLoad(){
+  const list=$('#inboxList'),generation=++INBOX_LOAD_GENERATION;
+  if(!list)return;
+  const current=()=>generation===INBOX_LOAD_GENERATION&&list===$('#inboxList');
   const columns='id,source,external_event_id,received_at,sender_name,contact,subject,message,status,assigned_to,journal_id';
   const load=fields=>{let q=sb.from('consultation_inbox').select(fields).order('received_at',{ascending:false}).limit(150);if(INBOX_FILTER.source)q=q.eq('source',INBOX_FILTER.source);if(INBOX_FILTER.status)q=q.eq('status',INBOX_FILTER.status);if(INBOX_ONLY_RESERVATIONS)q=q.eq('source','kakao').like('external_event_id','kbook-%');return q;};
-  const missingColumn=e=>!!e&&(['42703','PGRST204'].includes(e.code)||/column .* does not exist|could not find .* column/i.test(e.message||'')),handledCols=',handled_by,handled_at',dentwebCols=',dentweb_entered_at,dentweb_entered_by';
-  let result=await load(columns+handledCols+dentwebCols);INBOX_DENTWEB_FIELDS_AVAILABLE=!result.error;
-  if(missingColumn(result.error)){result=await load(columns+dentwebCols);INBOX_DENTWEB_FIELDS_AVAILABLE=!result.error;if(missingColumn(result.error)){result=await load(columns+handledCols);INBOX_DENTWEB_FIELDS_AVAILABLE=false;if(missingColumn(result.error))result=await load(columns);}} /* DB에 처리자 칸(handled_*)이나 덴트웹 칸이 아직 없을 때(올리기 전·되돌린 뒤)는 없는 칸만 빼고 다시 읽음 */
-  if(result.error){const el=$('#inboxList');if(el)el.innerHTML='<div class="cal-error">'+esc(inboxT('inbox.err_load','문의함 불러오기 실패: {msg}',{msg:result.error.message}))+'</div>';return;}
-  let countResult={count:null,error:null};if(INBOX_DENTWEB_FIELDS_AVAILABLE)countResult=await sb.from('consultation_inbox').select('id',{count:'exact',head:true}).eq('source','kakao').like('external_event_id','kbook-%').is('dentweb_entered_at',null);
-  INBOX_UNENTERED_RESERVATION_COUNT=countResult.error||countResult.count==null?(result.data||[]).filter(row=>inboxIsKakaoBooking(row)&&!row.dentweb_entered_at).length:countResult.count;
-  await inboxLoadNotes(result.data||[]);
-  INBOX_LAST_ROWS=result.data||[];inboxRenderList(INBOX_LAST_ROWS);
+  const missingColumn=e=>!!e&&(['42703','PGRST204'].includes(e.code)||/column .* does not exist|could not find .* column/i.test(e.message||''));
+  const handledCols=',handled_by,handled_at',dentwebCols=',dentweb_entered_at,dentweb_entered_by';
+  let bookingCols=',kakao_booking_name,kakao_booking_contact_digits,kakao_booking_schedule,kakao_booking_product';
+  const loadWithBooking=async fields=>{
+    const result=await load(fields+bookingCols);
+    if(!bookingCols||!missingColumn(result.error)||/handled_|dentweb_entered_/.test(result.error.message||''))return result;
+    bookingCols='';
+    return load(fields);
+  };
+  let result=await loadWithBooking(columns+handledCols+dentwebCols),hasStamp=!result.error;
+  if(missingColumn(result.error)){
+    result=await loadWithBooking(columns+dentwebCols);hasStamp=!result.error;
+    if(missingColumn(result.error)){
+      result=await loadWithBooking(columns+handledCols);hasStamp=false;
+      if(missingColumn(result.error))result=await loadWithBooking(columns);
+    }
+  }
+  if(!current())return;
+  if(result.error){
+    INBOX_DENTWEB_FIELDS_AVAILABLE=false;
+    list.innerHTML='<div class="cal-error">'+esc(inboxT('inbox.err_load','문의함 불러오기 실패: {msg}',{msg:result.error.message}))+'</div>';
+    return;
+  }
+  const rows=result.data||[];
+  const [countResult,notes,matches]=await Promise.all([
+    hasStamp?sb.from('consultation_inbox').select('id',{count:'exact',head:true}).eq('source','kakao').like('external_event_id','kbook-%').is('dentweb_entered_at',null):{count:null},
+    inboxLoadNotes(rows),
+    inboxLoadDentwebMatches(rows)
+  ]);
+  if(!current())return;
+  INBOX_DENTWEB_FIELDS_AVAILABLE=hasStamp;
+  INBOX_UNENTERED_RESERVATION_COUNT=countResult.error||countResult.count==null?rows.filter(row=>inboxIsKakaoBooking(row)&&!row.dentweb_entered_at).length:countResult.count;
+  INBOX_NOTES=notes;
+  INBOX_LAST_ROWS=rows.map(row=>matches.has(row.id)?{...row,dentweb_match:matches.get(row.id)}:row);
+  inboxRenderList(INBOX_LAST_ROWS);
 }
 async function inboxSelect(ids){
   const main=$('#main'),gen=++INBOX_DETAIL_GENERATION;
@@ -3817,8 +3881,10 @@ async function inboxSelect(ids){
   if(gen!==INBOX_DETAIL_GENERATION||main.isConnected===false)return;
   const messages=data,latest=messages[messages.length-1],el=$('#inboxDetail');if(!el)return;
   if(messages.length===1&&inboxIsKakaoBooking(latest)){
+    const matches=await inboxLoadDentwebMatches([latest]);
+    if(gen!==INBOX_DETAIL_GENERATION||main.isConnected===false||el!==$('#inboxDetail'))return;
     INBOX_SELECTED={...latest,id:latest.id,ids:[latest.id],messages,processable:inboxProcessableRows(messages)};
-    el.innerHTML=inboxKakaoBookingDetailHtml(latest);inboxScrollToDetail(el);
+    el.innerHTML=inboxKakaoBookingDetailHtml({...latest,dentweb_match:matches.get(latest.id)});inboxScrollToDetail(el);
     const seen=await sb.rpc('consultation_inbox_record_view',{p_inbox_id:latest.id});if(seen.error)setStatus('error');return;
   }
   const processable=inboxProcessableRows(messages),replyTarget=inboxReplyTarget(messages),editable=!!replyTarget;INBOX_SELECTED={...latest,id:replyTarget?.id,ids:processable.map(row=>row.id),messages,processable};const groupStatus=inboxGroupStatus(messages);const replyLink=inboxReplyLink(latest);
@@ -3827,15 +3893,16 @@ async function inboxSelect(ids){
 }
 async function inboxLoadHistory(ids){ids=Array.isArray(ids)?ids:[ids];const {data,error}=await sb.from('consultation_inbox_replies').select('inbox_id,reply,created_at,author_id').in('inbox_id',ids).order('created_at',{ascending:true});const el=$('#inboxReplies');if(el)el.innerHTML=error?`<div class="cal-error">${esc(inboxT('inbox.err_replies','답변 이력 불러오기 실패: {msg}',{msg:error.message}))}</div>`:(data||[]).map(r=>`<div class="hint">${esc(md(r.created_at))} · ${esc(nameOf(r.author_id))}: ${esc(r.reply)}</div>`).join('')||`<div class="hint">${esc(inboxT('inbox.replies_none','기록된 답변 없음'))}</div>`;if(ME.role==='owner'){const views=await sb.from('consultation_inbox_views').select('inbox_id,viewer_id,viewed_at').in('inbox_id',ids).order('viewed_at',{ascending:false}).limit(100),box=$('#inboxViews');if(box)box.innerHTML=views.error?`<div class="cal-error">${esc(inboxT('inbox.err_views','열람 이력 불러오기 실패: {msg}',{msg:views.error.message}))}</div>`:`<h4>${esc(inboxT('inbox.views_title','열람 이력 · 원장 전용'))}</h4>${(views.data||[]).map(v=>`<div class="hint">${esc(md(v.viewed_at))} · ${esc(nameOf(v.viewer_id))}</div>`).join('')}`;}}
 async function inboxLoadNotes(rows){
-  INBOX_NOTES={replies:[],views:[]};
+  const notes={replies:[],views:[]};
   const role=inboxRole(),canReply=inboxCanWrite(role),owner=role==='owner';
-  if(INBOX_ONLY_RESERVATIONS||(!canReply&&!owner))return;
+  if(INBOX_ONLY_RESERVATIONS||(!canReply&&!owner))return notes;
   const ids=inboxGroupRows((rows||[]).filter(row=>!inboxIsKakaoBooking(row))).slice(0,50).flatMap(group=>group.ids);
-  if(!ids.length)return;
+  if(!ids.length)return notes;
   const jobs=[];
-  if(canReply)jobs.push((async()=>{try{const r=await sb.from('consultation_inbox_replies').select('inbox_id,reply,created_at,author_id').in('inbox_id',ids).order('created_at',{ascending:true});if(!r.error)INBOX_NOTES.replies=r.data||[];}catch(e){}})());
-  if(owner)jobs.push((async()=>{try{const r=await sb.from('consultation_inbox_views').select('inbox_id,viewer_id,viewed_at').in('inbox_id',ids).order('viewed_at',{ascending:false}).limit(1000);if(!r.error)INBOX_NOTES.views=r.data||[];}catch(e){}})());
+  if(canReply)jobs.push((async()=>{try{const r=await sb.from('consultation_inbox_replies').select('inbox_id,reply,created_at,author_id').in('inbox_id',ids).order('created_at',{ascending:true});if(!r.error)notes.replies=r.data||[];}catch(e){}})());
+  if(owner)jobs.push((async()=>{try{const r=await sb.from('consultation_inbox_views').select('inbox_id,viewer_id,viewed_at').in('inbox_id',ids).order('viewed_at',{ascending:false}).limit(1000);if(!r.error)notes.views=r.data||[];}catch(e){}})());
   await Promise.all(jobs);
+  return notes;
 } /* 읽기에 실패해도 목록은 그대로 그림(처리 메모·열람 칸만 비어 보임). 직원은 메모를, 원장만 열람 기록을 읽음 */
 function inboxScrollToDetail(el){if(el&&typeof el.scrollIntoView==='function')el.scrollIntoView({behavior:'smooth',block:'start'});}
 function inboxBackToList(){const el=$('#inboxList');if(el&&typeof el.scrollIntoView==='function')el.scrollIntoView({behavior:'smooth',block:'start'});}
@@ -3881,17 +3948,37 @@ async function inboxDetailHandle(){if(!INBOX_SELECTED)return;const memo=$('#inbo
 function inboxKakaoBookingDetailHtml(row){
   const d=inboxKakaoBookingDetails(row),actor=row.dentweb_entered_by?nameOf(row.dentweb_entered_by):'';
   const T=inboxT,check=T('inbox.kb_check','확인 필요');
-  const fields=d.recognized?[[T('inbox.kb_f_schedule','일정'),d.schedule||formatLeaveTimestamp(row.received_at)||T('inbox.kb_f_received','받은 시각')],[T('inbox.kb_f_product','상품'),d.product||check],[T('inbox.kb_f_option','옵션'),d.option||T('inbox.kb_none','없음')],[T('inbox.kb_f_name','예약자'),d.name||check],[T('inbox.kb_f_contact','연락처'),d.contact||check]]:[[T('inbox.kb_alert','예약 알림'),d.firstLine],[T('inbox.kb_f_received','받은 시각'),formatLeaveTimestamp(row.received_at)||T('inbox.unknown_time','미상')]];
+  const receivedLabel=T('inbox.kb_f_received','받은 시각'),receivedAt=formatLeaveTimestamp(row.received_at);
+  const scheduleFallback=row.kakao_booking_schedule===undefined?(receivedAt||receivedLabel):check;
+  const fields=d.recognized?[[T('inbox.kb_f_schedule','일정'),d.schedule||scheduleFallback],[T('inbox.kb_f_product','상품'),d.product||check],[T('inbox.kb_f_option','옵션'),d.option||T('inbox.kb_none','없음')],[T('inbox.kb_f_name','예약자'),d.name||check],[T('inbox.kb_f_contact','연락처'),d.contact||check]]:[[T('inbox.kb_alert','예약 알림'),d.firstLine],[receivedLabel,receivedAt||T('inbox.unknown_time','미상')]];
+  if(d.recognized&&row.kakao_booking_schedule===null)fields.push([receivedLabel,receivedAt||T('inbox.unknown_time','미상')]);
   const entered=row.dentweb_entered_at?(esc(T('inbox.kb_entered','✅ 덴트웹 입력함'))+' · '+esc(formatKakaoDentwebStamp(row.dentweb_entered_at))+(actor?' · '+esc(actor):'')):esc(T('inbox.kb_not_yet','아직 덴트웹 입력 전'));
   const partner='https://partner-booking.kakao.com/',partnerLink='<a class="mini" href="'+partner+'" target="_blank" rel="noopener noreferrer">'+esc(T('inbox.kb_partner_open','카카오 파트너센터 열기'))+'</a>';
   const action=canWriteInbox()?'<div class="inbox-booking-actions"><button class="mini stamp" onclick="inboxSetDentwebEntered()">'+esc(row.dentweb_entered_at?T('inbox.kb_btn_undo','↩️ 덴트웹 입력 표시 되돌리기'):T('inbox.kb_btn_set','✅ 덴트웹에 입력함'))+'</button>'+partnerLink+'</div>':'<div class="inbox-booking-actions">'+partnerLink+'</div>';
-  return '<div class="hint">'+esc(T('inbox.kb_title','📅 카카오 예약'))+' · '+esc(inboxStatusInfo(row.status).label)+'</div><dl class="inbox-booking-fields">'+fields.map(([label,value])=>'<dt>'+esc(label)+'</dt><dd>'+esc(value)+'</dd>').join('')+'</dl><div class="hint">'+entered+'</div>'+action+'<div class="hint">'+esc(T('inbox.kb_confirm_hint','예약확정은 파트너센터에서'))+'</div><details><summary>'+esc(T('inbox.kb_original','받은 글 원문'))+'</summary><pre class="inbox-booking-original">'+esc(row.message||'')+'</pre></details><div id="inboxDentwebMsg" class="msg"></div>';
+  const badges=inboxDentwebMatchBadges(row);
+  if(row.dentweb_match?.checked_at)fields.push([T('inbox.kb_match_checked_at','최근 대조 시각'),hubFmtDateTime(row.dentweb_match.checked_at)]);
+  return '<div class="hint">'+esc(T('inbox.kb_title','📅 카카오 예약'))+' · '+esc(inboxStatusInfo(row.status).label)+'</div><dl class="inbox-booking-fields">'+fields.map(([label,value])=>'<dt>'+esc(label)+'</dt><dd>'+esc(value)+'</dd>').join('')+'</dl><div class="hint">'+entered+'</div>'+(badges?'<div class="inbox-booking-facts">'+badges+'</div>':'')+action+'<div class="hint">'+esc(T('inbox.kb_confirm_hint','예약확정은 파트너센터에서'))+'</div><details><summary>'+esc(T('inbox.kb_original','받은 글 원문'))+'</summary><pre class="inbox-booking-original">'+esc(row.message||'')+'</pre></details><div id="inboxDentwebMsg" class="msg"></div>';
 }
 function formatKakaoDentwebStamp(value){return hubFmtDateTime(value);}
 async function inboxSetDentwebEntered(){
   const row=INBOX_SELECTED;if(!row||!canWriteInbox())return;if(!INBOX_DENTWEB_FIELDS_AVAILABLE){const msg=$('#inboxDentwebMsg');if(msg)msg.textContent=inboxT('inbox.m_dentweb_unavailable','완료 기록은 DB 변경을 적용한 뒤 사용할 수 있습니다.');return;}
   const undo=!!row.dentweb_entered_at;if(undo&&!confirm(inboxT('inbox.confirm_undo_dentweb','덴트웹 입력 완료 표시를 되돌릴까요?')))return;
-  const {error}=await sb.rpc('consultation_inbox_set_dentweb_entered',{p_inbox_id:row.id,p_entered:!undo}),msg=$('#inboxDentwebMsg');if(error){if(msg)msg.textContent=inboxT('inbox.m_dentweb_fail','저장 실패: {msg}',{msg:error.message});return;}await inboxSelect(row.id);await inboxLoad();
+  const msg=$('#inboxDentwebMsg');
+  if(undo){
+    const {data,error}=await sb.from('consultation_inbox').update({dentweb_entered_at:null,dentweb_entered_by:null})
+      .eq('id',row.id).eq('source','kakao').like('external_event_id','kbook-%').is('journal_id',null)
+      .eq('dentweb_entered_at',row.dentweb_entered_at).eq('dentweb_entered_by',row.dentweb_entered_by).select('id').maybeSingle();
+    if(error||!data){
+      const failure=inboxT('inbox.m_dentweb_fail','저장 실패: {msg}',{msg:error?.message||'다른 화면에서 이미 바뀌었거나 변경 권한이 없어 되돌리지 못했습니다.'});
+      await inboxLoad();await inboxSelect(row.id);
+      const refreshedMsg=$('#inboxDentwebMsg');if(refreshedMsg)refreshedMsg.textContent=failure;
+      return;
+    }
+  }else{
+    const {error}=await sb.rpc('consultation_inbox_set_dentweb_entered',{p_inbox_id:row.id,p_entered:true});
+    if(error){if(msg)msg.textContent=inboxT('inbox.m_dentweb_fail','저장 실패: {msg}',{msg:error.message});return;}
+  }
+  await inboxSelect(row.id);await inboxLoad();
 }
 async function inboxRecordReply(){if(!INBOX_SELECTED)return;const reply=$('#inboxReply').value.trim();if(!reply){$('#inboxReplyMsg').textContent=inboxT('inbox.m_reply_empty','실제 답변 내용을 입력하세요.');return;}const saved=await inboxRecordReplyOnce(INBOX_SELECTED.id,reply);if(!saved.ok){$('#inboxReplyMsg').textContent=saved.unknown?inboxT('inbox.m_reply_unknown','답변이 기록됐는지 확인하지 못했습니다: {msg} — 문의를 다시 열어 아래 답변 이력에 없을 때만 다시 눌러 주세요',{msg:saved.error.message}):inboxT('inbox.m_reply_fail','기록 실패: {msg}',{msg:saved.error.message});return;}$('#inboxReply').value='';await inboxLoadHistory(INBOX_SELECTED.ids);if(await inboxFillEmptyAssignee(INBOX_SELECTED.processable))await inboxLoad();}async function inboxSave(){if(!INBOX_SELECTED?.ids.length)return;const assigned=$('#inboxAssigned').value||null;const {error}=await sb.from('consultation_inbox').update({status:$('#inboxStatus').value,assigned_to:assigned}).in('id',INBOX_SELECTED.ids);if(!error){await inboxLoad();setStatus('saved');}}
 async function inboxConvert(){const main=$('#main'),gen=INBOX_DETAIL_GENERATION;if(!INBOX_SELECTED?.ids.length)return;const rows=INBOX_SELECTED.messages||[],processable=inboxProcessableRows(rows);if(!processable.length)return;const latest=processable[processable.length-1],otherIds=processable.slice(0,-1).map(row=>row.id);const {error}=await sb.rpc('consultation_inbox_convert_to_journal',{p_inbox_id:latest.id});if(error){alert(inboxT('inbox.m_convert_fail','상담일지 전환 실패: {msg}',{msg:error.message}));return;}if(otherIds.length){const {error:closeError}=await sb.from('consultation_inbox').update({status:'closed'}).in('id',otherIds);if(closeError)alert(inboxT('inbox.m_convert_close_fail','상담일지 전환은 됐지만 나머지 문의를 처리됨으로 바꾸지 못했습니다: {msg}',{msg:closeError.message}));}await inboxFillEmptyAssignee(processable.slice(0,-1));setStatus('saved');if(gen!==INBOX_DETAIL_GENERATION)return;INBOX_SELECTED=null;if(main.isConnected===false)return;const el=$('#inboxDetail');if(el)el.innerHTML=esc(inboxT('inbox.m_converted','상담일지로 전환했습니다. 나머지 처리 대상 문의는 처리됨 상태로 보존했습니다.'));await inboxLoad();}
@@ -4699,6 +4786,7 @@ function exportBilling(kind,annual){
 }
 
 /* marketing-expenses:test-start */
+let MARKETING_PANEL_GENERATION=0;
 /* 허브 설정(차례 7): 글·숫자·이름 목록 읽기 — hub-texts.js가 없거나 시험이 이 구간만 따로 실행해도 기본 글 그대로 */
 function h7T(k,d,v){return typeof hubT==='function'?hubT(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
 function h7X(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -4717,9 +4805,18 @@ function marketingCategoryFor(row,rules){
   return hits[0]?.category||null;
 }
 function marketingEventCategoryFor(row,rules,events,links){
-  const sourceId=row.event_kind==='cancellation'?row.reversed_event_id:(links||[]).find(link=>link.krw_event_id===row.id)?.foreign_event_id;
-  const source=sourceId?(events||[]).find(item=>item.id===sourceId):null;
-  return marketingCategoryFor(source||row,rules);
+  const rows=events||[];let source=row;
+  if(row.event_kind==='cancellation'){
+    const reversed=rows.find(item=>item.id===row.reversed_event_id&&item.parse_status==='recorded');
+    if(reversed){
+      const link=reversed.currency==='KRW'?(links||[]).find(item=>item.krw_event_id===reversed.id):null;
+      source=(link&&rows.find(item=>item.id===link.foreign_event_id&&item.parse_status==='recorded'))||reversed;
+    }
+  }else if(row.currency==='KRW'){
+    const link=(links||[]).find(item=>item.krw_event_id===row.id);
+    source=(link&&rows.find(item=>item.id===link.foreign_event_id&&item.parse_status==='recorded'))||row;
+  }
+  return marketingCategoryFor(source,rules);
 }
 function marketingForeignEvents(events,rules,links){
   return (events||[]).filter(row=>row.parse_status==='recorded'&&row.currency!=='KRW'&&MARKETING_CHANNELS.some(item=>item[0]===marketingEventCategoryFor(row,rules,events,links)));
@@ -4732,6 +4829,26 @@ function marketingMonthSummary(events,rules,links,month){
     if(row.currency==='KRW'){const amount=Number(row.amount_krw||0);totalKrw+=amount;channels[category].amount+=amount;}
   }
   return {totalKrw,channels:Object.entries(channels).sort((a,b)=>b[1].amount-a[1].amount)};
+}
+function marketingFirstVisitSummary(rows,month,totalKrw){
+  const selected=(rows||[]).filter(row=>row.month===month+'-01');
+  if(!selected.length)return {count:null,costPerVisit:null};
+  const all=selected.find(row=>row.path==='all');
+  const count=all?all.first_visit_count:selected.reduce((sum,row)=>sum+row.first_visit_count,0);
+  return {count,costPerVisit:count>0?Math.round(totalKrw/count):null};
+}
+async function marketingLoadFirstVisits(month){
+  try{
+    const {data,error}=await sb.from('dentweb_monthly_first_visits').select('month,path,first_visit_count').eq('month',month+'-01');
+    return error?[]:data||[];
+  }catch{return [];}
+}
+function marketingFirstVisitsHtml(rows,month,totalKrw,foreignPending){
+  const {count,costPerVisit}=marketingFirstVisitSummary(rows,month,totalKrw);
+  const countText=count===null?hubT('mkt.first_visits_pending','덴트웹 첫 내원 집계 확인 필요'):hubT('mkt.first_visits_count','첫 내원 {n}명',{n:aicostMoney(count)});
+  const cost=costPerVisit===null?(count===null?'':hubT('mkt.first_visits_zero','첫 내원이 0명이라 계산할 수 없습니다.')):
+    foreignPending?hubT('mkt.first_visits_foreign_pending','외화 광고비 원화 확인 필요'):'₩'+aicostMoney(costPerVisit);
+  return `<section id="marketingFirstVisits" class="hint" style="margin-top:8px"><div>${esc(countText)}</div><div class="rowflex" style="justify-content:space-between;flex-wrap:wrap"><span>${esc(hubT('mkt.cost_per_first_visit','광고비 ÷ 첫 내원'))}</span>${cost?`<b>${esc(cost)}</b>`:''}</div></section>`;
 }
 function marketingCategoryOptions(value,includeDefault=false){return `${includeDefault?'<option value="">'+esc(h7T('mkt.opt_default','기본 분류 사용'))+'</option>':''}${marketingCategoryItems().map(([key,label])=>`<option value="${key}" ${value===key?'selected':''}>${h7X(label)}</option>`).join('')}`;}
 /* marketing-expenses:test-end */
@@ -4757,22 +4874,26 @@ async function saveMarketingForeignLink(foreignId){
   if(result.error){setStatus('error');return;}setStatus('saved');render();
 }
 async function renderMarketingExpensePanel(){
-  const isOwner=ME.role==='owner';
+  const generation=++MARKETING_PANEL_GENERATION,month=AICOST_MONTH,viewer=ME,isOwner=viewer.role==='owner';
+  const current=()=>generation===MARKETING_PANEL_GENERATION&&AICOST_MONTH===month&&ME===viewer;
   const denied=()=>{delete BILLING_EXPORT_DATA.marketing;return '<div class="card"><div class="empty">'+esc(hubT('mkt.view_unavailable','마케팅비 열람이 꺼져 있거나 사용할 수 없습니다.'))+'</div></div>';};
   if(!isOwner&&ME.role!=='manager')return '<div class="card"><div class="empty">'+esc(hubT('mkt.owner_only','원장 전용입니다.'))+'</div></div>';
   if(!isOwner){
-    try{const {data,error}=await sb.from('app_settings').select('key,value').eq('key','marketing.manager_view_enabled').maybeSingle();if(error||(data&&data.value!=='true'))return denied();}catch{return denied();}
+    try{const {data,error}=await sb.from('app_settings').select('key,value').eq('key','marketing.manager_view_enabled').maybeSingle();if(!current())return '';if(error||(data&&data.value!=='true'))return denied();}catch{return current()?denied():'';}
   }
   try{
-    const [{data:events,error:e1},{data:budgets,error:e2},{data:rules,error:e3},{data:links,error:e4}]=await Promise.all([
+    const [{data:events,error:e1},{data:budgets,error:e2},{data:rules,error:e3},{data:links,error:e4},firstVisits]=await Promise.all([
       billingFetchAll(()=>sb.from('marketing_expense_events').select('id,received_at,transaction_at,event_kind,parse_status,failure_code,currency,amount_native,amount_krw,merchant,merchant_key,category_override,reversed_event_id').order('transaction_at',{ascending:false}).order('id',{ascending:false})),
-      sb.from('marketing_month_budgets').select('month,amount_krw').lte('month',AICOST_MONTH+'-01').order('month',{ascending:false}).limit(1).maybeSingle(),
+      sb.from('marketing_month_budgets').select('month,amount_krw').lte('month',month+'-01').order('month',{ascending:false}).limit(1).maybeSingle(),
       billingFetchAll(()=>sb.from('marketing_merchant_rules').select('merchant_key,merchant_label,category').order('merchant_key')),
-      billingFetchAll(()=>sb.from('marketing_foreign_charge_links').select('foreign_event_id,krw_event_id').order('foreign_event_id'))
+      billingFetchAll(()=>sb.from('marketing_foreign_charge_links').select('foreign_event_id,krw_event_id').order('foreign_event_id')),
+      marketingLoadFirstVisits(month)
     ]);
+    if(!current())return '';
     if(e1||e2||e3||e4)return '<section class="card" id="marketingExpenses"><h2>'+esc(hubT('mkt.title','📣 마케팅비'))+' <span class="sub">'+esc(isOwner?hubT('mkt.sub','(원장 전용)'):hubT('mkt.manager_sub','(마케팅 분류 내역만 · 읽기 전용)'))+'</span></h2><div class="hint">'+esc(hubT('mkt.err_storage','마케팅비 저장 공간을 아직 불러오지 못했습니다.'))+'</div></section>';
-    const all=isOwner?(events||[]):(events||[]).filter(row=>row.parse_status==='recorded'&&MARKETING_CHANNELS.some(item=>item[0]===marketingEventCategoryFor(row,rules,events,links))),month=AICOST_MONTH,recorded=all.filter(row=>row.parse_status==='recorded'&&marketingMonthAt(row.transaction_at)===month),failed=all.filter(row=>row.parse_status==='failed'&&marketingMonthAt(row.received_at)===month),reviewCancellations=failed.filter(row=>row.event_kind==='cancellation'&&['unmatched_cancellation','ambiguous_cancellation','duplicate_cancellation'].includes(row.failure_code)),summary=marketingMonthSummary(all,rules,links,month),budget=budgets?.amount_krw;
+    const all=isOwner?(events||[]):(events||[]).filter(row=>row.parse_status==='recorded'&&MARKETING_CHANNELS.some(item=>item[0]===marketingEventCategoryFor(row,rules,events,links))),recorded=all.filter(row=>row.parse_status==='recorded'&&marketingMonthAt(row.transaction_at)===month),failed=all.filter(row=>row.parse_status==='failed'&&marketingMonthAt(row.received_at)===month),reviewCancellations=failed.filter(row=>row.event_kind==='cancellation'&&['unmatched_cancellation','ambiguous_cancellation','duplicate_cancellation'].includes(row.failure_code)),summary=marketingMonthSummary(all,rules,links,month),budget=budgets?.amount_krw;
     BILLING_EXPORT_DATA.marketing={month,rows:billingMarketingRows(all,rules,links,month),yearRows:Array.from({length:12},(_,i)=>billingMarketingRows(all,rules,links,month.slice(0,4)+'-'+String(i+1).padStart(2,'0'))).flat()};
+    const foreignPending=summary.channels.some(([,channel])=>channel.rows.some(row=>row.currency!=='KRW'));
     const foreign=marketingForeignEvents(recorded,rules,links);const foreignTotals={};foreign.forEach(row=>{foreignTotals[row.currency]||={amount:0,count:0};foreignTotals[row.currency].amount+=Number(row.amount_native||0);foreignTotals[row.currency].count++;});
     const noMarketing=recorded.filter(row=>marketingEventCategoryFor(row,rules,all,links)==='not_marketing');const unclassified=recorded.filter(row=>!marketingEventCategoryFor(row,rules,all,links));
     const krwRows=marketingKrwLinkCandidates(all);
@@ -4786,13 +4907,13 @@ async function renderMarketingExpensePanel(){
       ${billingMonthPicker(month,'marketing')}
       <div class="sub" style="margin-top:14px">${esc(hubT('mkt.sum_label','이번 달 원화 합계'))}</div><div style="font-size:28px;font-weight:800;color:var(--mint);text-align:right">₩${aicostMoney(summary.totalKrw)}</div>${typeof SpendUi==='undefined'?'':SpendUi.marketing(all,rules,links)}
       ${isOwner?`<div class="rowflex" style="justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:8px"><label>${esc(hubT('mkt.f_budget','월 예산'))} <input id="marketingBudget" class="mini" type="number" min="0" step="1" inputmode="numeric" placeholder="${esc(hubT('mkt.ph_budget','입력 안 함'))}" value="${budget==null?'':Number(budget)}" style="max-width:150px"> ${esc(hubT('mkt.unit_won','원'))}</label><button class="mini stamp" onclick="saveMarketingBudget()">${esc(hubT('mkt.btn_budget','예산 저장'))}</button></div>`:`<div class="hint">${esc(hubT('mkt.f_budget','월 예산'))} · ${budget==null?esc(hubT('mkt.ph_budget','입력 안 함')):'₩'+aicostMoney(budget)}</div>`}
-      ${billingBudgetHtml(budget,summary.totalKrw,'marketing')}${isOwner?billingExportButtons('marketing'):''}
+      ${billingBudgetHtml(budget,summary.totalKrw,'marketing')}${marketingFirstVisitsHtml(firstVisits,month,summary.totalKrw,foreignPending)}${isOwner?billingExportButtons('marketing'):''}
       <div style="margin-top:12px">${channelRows||'<div class="empty">'+esc(hubT('mkt.no_sum','이번 달 집계가 없습니다.'))+'</div>'}</div>
       ${Object.entries(foreignTotals).length?`<div class="hint" style="margin-top:10px"><b>${esc(hubT('mkt.foreign_title','외화'))}</b>${Object.entries(foreignTotals).map(([currency,value])=>`<div class="rowflex" style="justify-content:space-between"><span>${esc(currency)} · ${esc(hubT('mkt.count','{n}건',{n:value.count}))}</span><b>${value.amount.toLocaleString('ko-KR',{maximumFractionDigits:4})}</b></div>`).join('')}</div>${details(hubT('mkt.d_foreign','외화 결제'),foreign,{allowLink:true})}`:''}
       ${isOwner?`${details(hubT('mkt.unclassified','미분류'),unclassified)}${details(hubT('mkt.d_not_marketing','마케팅 아님'),noMarketing)}${reviewCancellations.length?`<details style="margin-top:8px"><summary style="cursor:pointer">${esc(hubT('mkt.d_cancel','취소 검토 {n}건',{n:reviewCancellations.length}))}</summary>${reviewCancellations.map(row=>`<div class="hint" style="border-top:1px solid var(--line);padding:8px 0">${esc(formatLeaveTimestamp(row.transaction_at)||hubT('mkt.time_unknown','시간 미확인'))} · ${esc(row.merchant)} · ₩${aicostMoney(row.amount_krw)} · ${row.failure_code==='ambiguous_cancellation'?esc(hubT('mkt.cancel_multi','승인 후보가 여러 건')):row.failure_code==='duplicate_cancellation'?esc(hubT('mkt.cancel_dup','이미 취소 처리된 승인')):esc(hubT('mkt.cancel_none','연결할 승인 없음'))}</div>`).join('')}</details>`:''}<div class="hint" style="margin-top:8px">${esc(hubT('mkt.unread','읽지 못한 문자 {n}건',{n:failed.length-reviewCancellations.length}))}</div>`:''}
       ${isOwner&&ruleRows.length?`<details style="margin-top:8px"><summary style="cursor:pointer">${esc(hubT('mkt.rules_title','가맹점 기본 분류 수정'))}</summary>${rulesHtml}<div class="sub">${esc(hubT('mkt.rules_hint','기본 분류를 바꾸면 같은 가맹점의 지난달 내역에도 반영됨. 개별 분류가 우선 적용됨.'))}</div></details>`:''}
     </section>`;
-  }catch{return '<section class="card" id="marketingExpenses"><h2>'+esc(hubT('mkt.title','📣 마케팅비'))+' <span class="sub">'+esc(isOwner?hubT('mkt.sub','(원장 전용)'):hubT('mkt.manager_sub','(마케팅 분류 내역만 · 읽기 전용)'))+'</span></h2><div class="hint">'+esc(hubT('mkt.err_load','마케팅비를 불러오지 못했습니다.'))+'</div></section>';}
+  }catch{if(!current())return '';return '<section class="card" id="marketingExpenses"><h2>'+esc(hubT('mkt.title','📣 마케팅비'))+' <span class="sub">'+esc(isOwner?hubT('mkt.sub','(원장 전용)'):hubT('mkt.manager_sub','(마케팅 분류 내역만 · 읽기 전용)'))+'</span></h2><div class="hint">'+esc(hubT('mkt.err_load','마케팅비를 불러오지 못했습니다.'))+'</div></section>';}
 }
 /* ── AI 사용량 현황판: PC가 올린 Codex 모델별 토큰(ai_model_usage_daily)과 PC 상황판 스냅샷(ai_usage_snapshots: 정가 환산 비용·대화 점검), 원장만 읽기 ── */
 /* ai-usage:test-start */
@@ -4960,7 +5081,7 @@ async function saveAicost(i){
   setStatus('saved');render();
 }
 async function renderAicost(m){
-  if(ME.role==='manager'){if(!AICOST_MONTH)AICOST_MONTH=today().slice(0,7);m.innerHTML=await renderMarketingExpensePanel();return;}
+  if(ME.role==='manager'){if(!AICOST_MONTH)AICOST_MONTH=today().slice(0,7);const html=await renderMarketingExpensePanel();if(m.isConnected!==false&&html)m.innerHTML=html;return;}
   if(ME.role!=='owner'){m.innerHTML='<div class="card"><div class="empty">'+esc(hubT('aic.owner_only','원장만 사용할 수 있습니다.'))+'</div></div>';return;}
   let config=null;try{if(SETTINGS.aicost_config)config=aicostConfig();}catch(e){m.innerHTML=`<div class="card"><div class="empty">${esc(e.message)}</div></div>`;return;}
   if(config)AICOST_PLATFORMS.splice(0,AICOST_PLATFORMS.length,...config.platforms.map(p=>p.key));
@@ -4973,6 +5094,7 @@ async function renderAicost(m){
     sb.from('ai_model_usage_daily').select('usage_date,model,tokens,turns,synced_at').gte('usage_date',usageWin.start).order('usage_date',{ascending:false}).limit(2000),
     sb.from('ai_usage_snapshots').select('kind,payload,synced_at').in('kind',['platform_cost','codex_sessions','external_ai'])
   ]);
+  if(m.isConnected===false)return;
   if(error||historyError||eventsError){setStatus('error');m.innerHTML=`<div class="card"><div class="empty">${esc(hubT('aic.load_err','AI 비용을 불러오지 못했습니다: {detail}',{detail:(((error||historyError||eventsError).message)??'')}))}</div></div>`;return;}
   const byPlatform={};(rows||[]).forEach(r=>{const k=aicostPlatformKey(r.platform,'',config),prev=byPlatform[k];byPlatform[k]={...r,amount_krw:Number(r.amount_krw||0)+Number(prev?prev.amount_krw:0),note:[prev?.note,r.note].filter(Boolean).join(' / ')};});
   // 자동감지(문자 웹훅 등) — 선택한 달의 이벤트만 플랫폼별 합산(이름은 대소문자·앞뒤 공백 무시로 목록 값에 맞추고, 목록 밖은 기타로 모음)
@@ -4991,6 +5113,7 @@ async function renderAicost(m){
   const marketingHtml=await renderMarketingExpensePanel();
   let spendData=null;
   if(typeof SpendUi!=='undefined'){try{spendData=await SpendUi.loadAi(sb,billingFetchAll);}catch{spendData={money:[],tokens:[],moneyError:true,tokensError:true};}}
+  if(m.isConnected===false)return;
   if(spendData){const excluded=new Set((events||[]).filter(isNaverAdBillingEvent).map(e=>e.id));spendData.money=spendData.money.filter(e=>!excluded.has(e.id));}
   m.innerHTML=`<div class="card" id="aiBillingMonthly"><h2>${esc(hubT('aic.title','💰 AI비용'))} <span class="sub">${esc(hubT('aic.sub','(원장 전용)'))}</span></h2>
     ${billingMonthPicker(AICOST_MONTH)}

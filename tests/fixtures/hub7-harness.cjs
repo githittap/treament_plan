@@ -350,6 +350,13 @@ async function renderAll(html,opts){
     const r=await asRole('staff');out['mkt.panel_staff']=await r.api.renderMarketingExpensePanel();
     const r2=await asRole('owner');r2.api.set('AICOST_MONTH','2026-10');const f0=r2.ctx.sb.from;r2.ctx.sb.from=function(t){if(t==='marketing_expense_events')throw new Error('연결<오류>');return f0(t);};out['mkt.panel_throw']=await r2.api.renderMarketingExpensePanel();
     const r3=await asRole('owner');r3.api.set('AICOST_MONTH','2026-10');out['mkt.panel_ok']=await r3.api.renderMarketingExpensePanel();
+    if(o.dentwebVisits){
+      for(const count of [0,4]){
+        const visit=await asRole('owner',null,{tables:{dentweb_monthly_first_visits:{list:[{month:'2026-10-01',path:'all',first_visit_count:count}]}}});
+        visit.api.set('AICOST_MONTH','2026-10');
+        out['mkt.visits_'+count]=await visit.api.renderMarketingExpensePanel();
+      }
+    }
   }
   for(const [name,fnName,args,role,sbOver,state] of [
     ['budget_bad','saveMarketingBudget',[],'owner',null,{budget:'-5'}],['budget_ok','saveMarketingBudget',[],'owner',null,{budget:'1000'}],['budget_dberr','saveMarketingBudget',[],'owner',{tables:{marketing_month_budgets:{error:{message:'x'}}}},{budget:'1000'}],
