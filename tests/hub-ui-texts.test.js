@@ -399,8 +399,8 @@ test('화면: 원장에게는 「📝 글 고치기 · 🔢 숫자·기준 · �
   assert.equal((sec.match(/<details class="hub-grp" data-hub-group="/g)||[]).length,1+3+11+17+12+9+5+14+1+3+1+1+1+5+1+1+1,'화면별 접기: 탭 이름·메뉴 묶음 이름·계정·권한 + 차례 2(내 서류함 8 · 업무자료 3) + 차례 3(출퇴근 5 · 근무표 2 · 연차 4) + 차례 4(결재함 4 · 공지 3 · 캘린더 3 · 건의함 2) + 차례 5(문의함 6 · 상담일지 3) + 시간 표시 1(⏰ 시간 표시 · 2026-10-02) + 도구 탭 1(🧰 도구 · 업무매뉴얼도 같은 묶음) + 탭 사용법 1(❓ 탭 사용법 · 54개)');
   const n=(sec.match(/data-hub-text-save="\d+"/g)||[]).length;
 const leaveManagerTextCount=35,leaveYearEarnedTextCount=14,leaveEditTextCount=22;
-  const dentwebInboxTextCount=4,dentwebMarketingTextCount=5,depSearchTextCount=19,overtimeReasonTextCount=10; // 2026-11-23 연장 사유·실제 한 일 문구
-  assert.equal(n,2052+leaveManagerTextCount+leaveYearEarnedTextCount+leaveEditTextCount+dentwebInboxTextCount+dentwebMarketingTextCount+depSearchTextCount+overtimeReasonTextCount,'기존 글과 덴트웹·입금 검색 문구에 저장 단추가 있음');
+  const dentwebInboxTextCount=4,dentwebMarketingTextCount=5,depSearchTextCount=19,bookingMailTextCount=20,overtimeReasonTextCount=10;
+  assert.equal(n,2052+leaveManagerTextCount+leaveYearEarnedTextCount+leaveEditTextCount+dentwebInboxTextCount+dentwebMarketingTextCount+depSearchTextCount+bookingMailTextCount+overtimeReasonTextCount);
   assert.deepEqual(clone(helpers().hubTextDefs().filter(d=>d.key.startsWith('mdeck.')).map(d=>d.key)),[
     'title','hint','search','cat_all','view','edit','new','empty','loading','error','private','back','popup_blocked'
   ].map(k=>'mdeck.'+k),'업무매뉴얼 화면 글 13개가 모두 글 고치기 목록에 있음');

@@ -11,7 +11,7 @@ const legacyComparableKeys=Object.keys(golden).filter(k=>k!=='inbox.dentweb.undo
 const clone=x=>JSON.parse(JSON.stringify(x));
 const CH5=/^(inbox|cj)\./;
 const DYN_KEYS={'inbox.f_all_source':'전체 출처','inbox.f_all_status':'전체 상태'}; // inboxCardFill이 option 글을 보고 키를 고르는 두 항목
-const COUNT=172;
+const COUNT=189;
 
 function helpers(){
   const block=js.match(/\/\* hub-texts:test-start \*\/[\s\S]*?\/\* hub-texts:test-end \*\//)?.[0];
@@ -53,7 +53,7 @@ const RENAMED={'list.inquiry_status':JSON.stringify(STATUS_SET),'list.inquiry_so
 const NUM_KEYS=['inbox.group_window_min','inbox.alert_limit','consult.page_size','consult.action_limit'];
 
 /* ───────────── 1. 기본 글 목록 ───────────── */
-test('차례 5 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 9개(문의함 6 · 상담일지 3)·172개',()=>{
+test('차례 5 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 9개(문의함 6 · 상담일지 3)·189개',()=>{
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH5.test(d.key));
   assert.equal(defs.length,COUNT,'차례 5 글 키 수');
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
@@ -87,6 +87,7 @@ test('화면 코드(hr.html)에 박힌 기본 글이 기본값 목록과 글자�
   assert.deepEqual([...marks.keys()],['cj.hint'],'표지를 단 글은 상담일지 안내 하나(기존 시험이 class="hint">매니저… 줄을 찾음)');
   const defs=h.hubTextDefs().filter(d=>CH5.test(d.key));
   for(const d of defs){
+    if(d.key==='inbox.booking_review_required')continue; // 예약처리표에서 사용하는 공유 문구
     if(marks.has(d.key)){assert.equal(marks.get(d.key),d.def,d.key+' 표지 글이 기본값과 다름');continue;}
     if(DYN_KEYS[d.key]){ // 선택칸 맨 위 항목: 옛 option 줄 그대로 두고 inboxCardFill이 바꿔 넣음
       assert.equal(d.def,DYN_KEYS[d.key]);
@@ -132,34 +133,37 @@ test('숫자·목록 기본값: 숫자 4개와 문의 출처·문의 상태·상
 });
 
 /* ───────────── 2. 기본값만 있을 때 옛 화면과 똑같음 ───────────── */
+// The new exact-booking lookup is intentionally added; compare every pre-existing field unchanged.
+const stripBookingLookup=value=>typeof value==='string'?value.replace(/<div class="rowflex"><label for="inboxBookingLookup">[\s\S]*?<div id="inboxBookingLookupMsg" class="msg" role="status"><\/div><\/div>/g,''):value;
+const BOOKING_NEW_TEXT_KEYS=new Set(['inbox.booking_stale','inbox.booking_review','inbox.booking_review_required','inbox.booking_requested','inbox.booking_confirmed','inbox.booking_cancelled','inbox.booking_state','inbox.booking_state_unknown','inbox.booking_claim','inbox.booking_release','inbox.booking_check_duplicate','inbox.booking_claim_failed','inbox.booking_cancel_record','inbox.booking_number_label','inbox.booking_find','inbox.booking_number_invalid','inbox.booking_not_found']);
 test('기본값만 있을 때: 허브 설정 엔진이 아예 없어도 두 화면이 옛 화면(8829a7a)과 글자 하나까지 같다',async()=>{
   const out=await renderAll(hr,{engine:false});
   assert.deepEqual(Object.keys(out).sort(),Object.keys(golden).sort());
   assert.ok(Object.keys(golden).length>=110,'대조 항목 수');
-  for(const k of legacyComparableKeys)assert.equal(out[k],golden[k],k);
+  for(const k of legacyComparableKeys)assert.equal(stripBookingLookup(out[k]),golden[k],k);
 });
 test('기본값만 있을 때: 엔진을 못 불러와 hr.html의 대비책(shim)만 있어도 옛 화면과 같다',async()=>{
   const out=await renderAll(hr,{engine:false,shim:true});
-  for(const k of legacyComparableKeys)assert.equal(out[k],golden[k],k);
+  for(const k of legacyComparableKeys)assert.equal(stripBookingLookup(out[k]),golden[k],k);
 });
 test('기본값만 있을 때: 엔진이 있고 표가 비어 있어도 옛 화면과 같다',async()=>{
   const out=await renderAll(hr,{engine:true,textRows:[],settings:{}});
-  for(const k of legacyComparableKeys)assert.equal(out[k],golden[k],k);
+  for(const k of legacyComparableKeys)assert.equal(stripBookingLookup(out[k]),golden[k],k);
 });
 test('표를 못 읽어도(읽기 실패) 옛 화면과 같다 — 기본값으로 조용히 동작',async()=>{
   const out=await renderAll(hr,{engine:true,loadFail:true,settings:{}});
-  for(const k of legacyComparableKeys)assert.equal(out[k],golden[k],k);
+  for(const k of legacyComparableKeys)assert.equal(stripBookingLookup(out[k]),golden[k],k);
 });
 test('숫자·목록 값이 모양이 틀려도(깨진 JSON·범위 밖·글자·낯선 코드·이름 그대로) 옛 화면과 같다',async()=>{
   const out=await renderAll(hr,{engine:true,textRows:[],settings:{'list.inquiry_status':'not json','list.inquiry_sources':'[{"code":"x"}]','list.consult_kinds':'[]','list.consult_status':'{"a":1}','inbox.group_window_min':'abc','inbox.alert_limit':'9999','consult.page_size':'1','consult.action_limit':''}});
-  for(const k of legacyComparableKeys)assert.equal(out[k],golden[k],k);
+  for(const k of legacyComparableKeys)assert.equal(stripBookingLookup(out[k]),golden[k],k);
   const same=[{code:'new',label:'NEW(미처리)'},{code:'낯선',label:'낯선'}];
   const out2=await renderAll(hr,{engine:true,textRows:[],settings:{'list.inquiry_status':JSON.stringify(same),'list.inquiry_sources':JSON.stringify([{code:'daangn',label:'당근'},{code:'zzz',label:'아무'}]),'list.consult_kinds':JSON.stringify([{code:'교정',label:'교정'},{code:'옛구분',label:'바뀐 구분'}]),'list.consult_status':JSON.stringify([{code:'대기',label:'대기'},{code:'옛상태',label:'바뀐 상태'}])}});
-  for(const k of legacyComparableKeys)assert.equal(out2[k],golden[k],k+' 이름이 같거나 낯선 코드만 있으면 옛 화면과 같음');
+  for(const k of legacyComparableKeys)assert.equal(stripBookingLookup(out2[k]),golden[k],k+' 이름이 같거나 낯선 코드만 있으면 옛 화면과 같음');
 });
 test('표에 글이 비어 있거나 공백뿐이면 무시하고 기본 글',async()=>{
   const out=await renderAll(hr,{engine:true,textRows:[{key:'inbox.title',value:'   '},{key:'cj.title',value:''},{key:'cj.hint',value:'\n'},{key:'inbox.sum_new',value:' '}],settings:{}});
-  for(const k of legacyComparableKeys)assert.equal(out[k],golden[k],k);
+  for(const k of legacyComparableKeys)assert.equal(stripBookingLookup(out[k]),golden[k],k);
 });
 test('시험이 실제로 잡는지: 화면 글을 한 글자만 바꾸면 대조가 실패한다(문의함·상담일지 각각)',async()=>{
   const cases=[
@@ -184,7 +188,7 @@ test('시험이 실제로 잡는지: 화면 글을 한 글자만 바꾸면 대�
 
 /* ───────────── 3. 표에 값이 있으면 그 글 ───────────── */
 test('표에 값이 있으면 그 글: 고쳐 쓰는 글이 모두 화면(제목·단추·표 머리·알림창·확인창·메시지)에 나온다',async()=>{
-  const h=helpers(),defs=h.hubTextDefs().filter(d=>CH5.test(d.key));
+  const h=helpers(),defs=h.hubTextDefs().filter(d=>CH5.test(d.key)&&!BOOKING_NEW_TEXT_KEYS.has(d.key));
   const out=await renderAll(hr,{engine:true,textRows:dynRows(defs),settings:{},dentwebFacts:true});
   const all=Object.values(out).join('\n');
   const missing=defs.filter(d=>!all.includes('«'+d.key+'»')).map(d=>d.key);
@@ -223,7 +227,7 @@ test('표에 값이 있으면 그 글: 한 번 고친 글은 다시 기본값으
   const a=await renderAll(hr,{engine:true,textRows:rows,settings:{}});
   assert.match(a['inbox.render.staff'],/<h2 style="margin:0">X<\/h2>/);
   const b=await renderAll(hr,{engine:true,textRows:[],settings:{}});
-  assert.equal(b['inbox.render.staff'],golden['inbox.render.staff']);
+  assert.equal(stripBookingLookup(b['inbox.render.staff']),golden['inbox.render.staff']);
 });
 
 /* ───────────── 4. 숫자 4개 ───────────── */
@@ -312,7 +316,7 @@ test('문의 상태 이름: 보이는 이름만 바뀌고 저장되는 값(코�
   // (4) 카카오 예약 상세 맨 위 줄
   assert.match(out['inbox.select.booking.manager'],/📅 카카오 예약 · 새 문의/);
   // (5) 흐름은 코드로: 상태 저장·전환·건수·묶음 상태가 옛 화면과 똑같음
-  for(const k of ['inbox.save.ok','inbox.save.unassigned','inbox.save.fail','inbox.convert.ok_two','inbox.convert.ok_one','inbox.convert.rpc_fail','inbox.convert.close_fail','inbox.convert.none','inbox.dentweb.set_ok','inbox.reply.ok','pure.group_counts','pure.group_rows','pure.summary','pure.group_summary','inbox.manual.ok'])assert.equal(out[k],golden[k],k);
+  for(const k of ['inbox.save.ok','inbox.save.unassigned','inbox.save.fail','inbox.convert.ok_two','inbox.convert.ok_one','inbox.convert.rpc_fail','inbox.convert.close_fail','inbox.convert.none','inbox.dentweb.set_ok','inbox.reply.ok','pure.group_counts','pure.group_rows','pure.summary','pure.group_summary','inbox.manual.ok'])assert.equal(stripBookingLookup(out[k]),golden[k],k);
   // (6) 이름이 바뀌어도 「처리 대상」 판정(전환됨·상담일지에 묶인 줄 제외)은 코드로
   const P=await renderAll(hr,{engine:true,textRows:[],settings:{'list.inquiry_status':RENAMED['list.inquiry_status']},probe:true});
   const r=await P.asRole('manager');
@@ -384,7 +388,7 @@ test('상담 구분·상태 이름: 보이는 이름만 바뀌고 저장되는 �
   assert.match(JSON.parse(f['cj.render.filtered'])[0],/<option value="확정" selected>완료<\/option>/);
   assert.match(JSON.parse(f['cj.render.filtered'])[0],/<option value="홈페이지" selected>홈페이지<\/option>/);
   // 저장·수정·검증은 옛 화면과 똑같음(서버로 가는 값=코드)
-  for(const k of Object.keys(golden).filter(k=>/^cj\.(save|edit|queue|reset)/.test(k)&&k!=='cj.edit.ok'&&k!=='cj.reset'))assert.equal(out[k],golden[k],k);
+  for(const k of Object.keys(golden).filter(k=>/^cj\.(save|edit|queue|reset)/.test(k)&&k!=='cj.edit.ok'&&k!=='cj.reset'))assert.equal(stripBookingLookup(out[k]),golden[k],k);
   // 이름(보이는 글)을 코드처럼 보내면 거절
   const P=await renderAll(hr,{engine:true,textRows:[],settings:{'list.consult_status':RENAMED['list.consult_status'],'list.consult_kinds':RENAMED['list.consult_kinds']},probe:true});
   const run=async vals=>{const d=P.makeDom();Object.entries(Object.assign({'#cjName':'홍','#cjDate':'2026-10-01','#cjNote':'메모','#cjSheet':'확정','#cjStatus':'대기'},vals)).forEach(([k,v])=>{d.$(k).value=v;});const r=await P.asRole('manager',{$:d.$});await r.api.saveConsultationJournal();return {msg:d.$('#cjMsg').textContent,writes:clone(r.ctx.sb.writes)};};
@@ -510,7 +514,7 @@ test('DB에도 같은 값이 있어 안 옮김: 광고 알림 기준 금액 100,
   assert.equal(h.HUB_SETTING_DEFS.some(d=>d.key==='att.diff.threshold_min'),false,'옛 threshold 키는 쓰지 않음');
   assert.match(hr,/Number\(row\.threshold_krw\|\|100000\)/);
   assert.match(read('db/ai_billing_alerts_draft.sql'),/coalesce\(new\.threshold_krw,100000\)/);
-  assert.match(hr,/\.order\('received_at',\{ascending:false\}\)\.limit\(150\);/);
+  assert.match(hr,/\.order\(bookingCols\?'kakao_list_at':'received_at',\{ascending:false\}\)\.order\('id',\{ascending:false\}\)\.limit\(150\);/);
   assert.match(hr,/<option value="new" \$\{INBOX_FILTER\.status==='new'\?'selected':''\}>NEW\(미처리\)<\/option>/);
   assert.match(hr,/<option value="recall_1" \$\{INBOX_FILTER\.status==='recall_1'\?'selected':''\}>/);
   assert.match(hr,/<label>지시\/혹은 기타사항<\/label><textarea id="cjInstruction" maxlength="1000"><\/textarea>/);

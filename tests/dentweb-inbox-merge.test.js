@@ -15,9 +15,10 @@ const timestamp=html.match(/function formatLeaveTimestamp\(value\)\{[\s\S]*?\n\}
 const esc=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 const book=(id='booking',extra={})=>({
   id,source:'kakao',external_event_id:'kbook-'+id,status:'closed',received_at:'2026-11-03T05:00:00Z',
+  kakao_booking_number:'123456789',kakao_booking_version:1,
   dentweb_entered_at:'2026-11-03T06:00:00Z',message:'예약 알림\n상품명: 원문 상품\n일정: 11/03 14:00\n예약자명: 원문 예약\n예약자 연락처: 010-0000-1234',...extra
 });
-const booked=(id,extra={})=>({inbox_id:id,appointment_found:true,visited:true,match_basis:'phone8_date',...extra});
+const booked=(id,extra={})=>({inbox_id:id,booking_version:1,appointment_found:true,visited:true,match_basis:'phone8_date',...extra});
 const ambiguous=id=>booked(id,{appointment_found:false,visited:false,match_basis:'ambiguous'});
 const ok=data=>({data,error:null});
 
@@ -85,7 +86,7 @@ test('list badges use only visible Kakao booking ids and retain the existing ent
   const h=boot(q=>q.table==='consultation_inbox'?(q.cols==='id'?{count:0}:ok([kakao,chat])):ok([booked(kakao.id),booked('never-visible')]));
   await h.ctx.inboxLoad();
   assert.deepEqual(Array.from(ids(matchQueries(h)[0])),[kakao.id]);
-  assert.match(matchQueries(h)[0].cols,/^inbox_id,appointment_found,visited,match_basis,checked_at$/);
+  assert.match(matchQueries(h)[0].cols,/^inbox_id,appointment_found,visited,match_basis,checked_at,booking_version$/);
   const markup=h.$('#inboxList').innerHTML;
   assert.equal((markup.match(/덴트웹 예약 있음/g)||[]).length,2);
   assert.equal((markup.match(/내원함/g)||[]).length,2);
@@ -122,6 +123,14 @@ test('booking detail shows when positive or insufficient evidence was checked',a
   assert.match(detail.innerHTML,/최근 대조 시각/);
   assert.match(detail.innerHTML,/확인 필요/);
   assert.doesNotMatch(detail.innerHTML,/덴트웹 예약 있음|내원함|일치 후보 없음/);
+});
+
+test('changed booking or unnumbered legacy row does not use a stale match',async()=>{
+  for(const row of [book('changed',{kakao_booking_version:2}),book('legacy',{kakao_booking_number:null})]){
+    const h=boot(q=>q.table==='consultation_inbox'?ok([row]):ok([booked(row.id)]));
+    await h.ctx.inboxSelect([row.id]);
+    assert.doesNotMatch(h.$('#inboxDetail').innerHTML,/덴트웹 예약 있음|내원함/);
+  }
 });
 
 test('unavailable normalization columns and matches leave the original list and detail usable',async()=>{
@@ -194,7 +203,7 @@ test('operations stale undo rereads the latest row and renders its notice in the
   const notice=operations.slice(operations.indexOf('function kakaoNoticeFor('),operations.indexOf('function kakaoBookingDetails('));
   const save=operations.slice(operations.indexOf('async function saveKakao('),operations.indexOf('function renderKakaoActions('));
   const render=operations.slice(operations.indexOf('function renderKakaoActions('),operations.indexOf('async function loadKakaoBookings('));
-  vm.runInContext(`const kakaoNotices=new Map();let kakaoWriting=false;let kakaoPeople=[];const inboxStatuses=${JSON.stringify({new:'미처리',in_progress:'진행중',recall_1:'리콜 1차',recall_2:'리콜 2차',recall_3:'리콜 3차',closed:'처리됨',converted:'상담일지 전환'})};let accessToken='synthetic-token';function canWriteKakao(){return true;}${notice}${save}${render}`,context);
+  vm.runInContext(`const kakaoNotices=new Map();let kakaoWriting=false;let kakaoPeople=[];let currentUserId='u1';const inboxStatuses=${JSON.stringify({new:'미처리',in_progress:'진행중',recall_1:'리콜 1차',recall_2:'리콜 2차',recall_3:'리콜 3차',closed:'처리됨',converted:'상담일지 전환'})};let accessToken='synthetic-token';function canWriteKakao(){return true;}${notice}${save}${render}`,context);
   let latestCell=null,refreshes=0;
   context.loadKakaoBookings=async()=>{
     refreshes++;

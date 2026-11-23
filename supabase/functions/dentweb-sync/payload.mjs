@@ -39,7 +39,9 @@ function visitsObservedByCheckedAt(visitedAt,checkedAt){
 }
 
 function validatedMatch(row){
-  if(!exactKeys(row,MATCH_KEYS) || typeof row.inbox_id!=='string' || !UUID.test(row.inbox_id)
+  const keys=Object.hasOwn(row||{},'booking_version')?[...MATCH_KEYS,'booking_version']:MATCH_KEYS;
+  if(!exactKeys(row,keys) || (Object.hasOwn(row,'booking_version')&&(!Number.isSafeInteger(row.booking_version)||row.booking_version<0))
+    || typeof row.inbox_id!=='string' || !UUID.test(row.inbox_id)
     || typeof row.appointment_found!=='boolean' || typeof row.visited!=='boolean'
     || !MATCH_BASIS.has(row.match_basis) || !validTimestamp(row.checked_at)
     || row.appointment_found!==(row.match_basis==='phone8_date')
@@ -85,6 +87,22 @@ export function validateDentwebPayload(kind,body){
   return {p_rows:checked};
 }
 
+function validateMailBatch(body){
+  if(!exactKeys(body,['kind','rows'])||!Array.isArray(body.rows)||body.rows.length<1||body.rows.length>MAX_ROWS)return null;
+  const fields=['booking_number','state','event_at','visit_at','name','contact_digits','product'];
+  const validText=(value,max)=>value==null||(typeof value==='string'&&value.length<=max&&!/[\r\n]/.test(value));
+  for(const row of body.rows){
+    if(!row||typeof row!=='object'||Array.isArray(row)||Object.keys(row).some(key=>!fields.includes(key))
+      ||typeof row.booking_number!=='string'||!/^[0-9]{6,24}$/.test(row.booking_number)
+      ||!['requested','confirmed','cancelled'].includes(row.state)||!validTimestamp(row.event_at)
+      ||Date.parse(row.event_at)>Date.now()+MAX_CLOCK_SKEW_MS
+      ||(row.visit_at!=null&&!validTimestamp(row.visit_at))
+      ||!validText(row.name,80)||!validText(row.product,120)
+      ||(row.contact_digits!=null&&(typeof row.contact_digits!=='string'||!/^0[0-9]{8,10}$/.test(row.contact_digits))))return null;
+  }
+  return {p_rows:body.rows};
+}
+
 function keysMatch(given,expected){
   const digest=value=>createHash('sha256').update(value).digest();
   return timingSafeEqual(digest(given),digest(expected));
@@ -125,6 +143,15 @@ export function createDentwebHandler({getSecret,save}){
 
     const {status,body}=await readDentwebBody(request);
     if(status===413)return Response.json({error:'body too large'},{status});
+    if(body?.kind==='kakao_booking_mail'){
+      const args=validateMailBatch(body);
+      if(!args)return Response.json({error:'invalid_booking_batch'},{status:400});
+      try{
+        const accepted=await save('consultation_inbox_ingest_kakao_bookings',args);
+        if(accepted!==args.p_rows.length)throw new Error('booking count mismatch');
+        return Response.json({ok:true,accepted});
+      }catch{return Response.json({error:'booking_batch_unconfirmed'},{status:502});}
+    }
     const args=validateDentwebPayload(body?.kind,body);
     if(!args)return Response.json({error:'invalid payload'},{status:400});
     try{

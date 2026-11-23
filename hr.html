@@ -3710,6 +3710,7 @@ function inboxKakaoBookingDetails(row){
   const scheduleMatch=lines.map(line=>line.match(/((?:20\d{2}[.\/-]\d{1,2}[.\/-]\d{1,2}|\d{1,2}[.\/-]\d{1,2})\s*(?:\([월화수목금토일]\))?\s*\d{1,2}:\d{2})/)).find(Boolean);
   const normalized=(key,readOriginal)=>row?.[key]===undefined?readOriginal():row[key]||'';
   let schedule=normalized('kakao_booking_schedule',()=>scheduleMatch?.[1]||valueFor('일정|예약일시|예약 일시|방문일시|예약일'));
+  if(schedule&&/T\d{2}:\d{2}.*(?:Z|[+-]\d{2}:\d{2})$/i.test(schedule))schedule=hubFmtDateTime(schedule);
   if(schedule){const m=schedule.match(/^(?:20\d{2}[.\/-])?(\d{1,2})[.\/-](\d{1,2})(\s*\([월화수목금토일]\))?\s*(\d{1,2}:\d{2})$/);if(m)schedule=`${Number(m[1])}/${String(m[2]).padStart(2,'0')}${m[3]||''} ${m[4]}`;}
   const product=normalized('kakao_booking_product',()=>valueFor('상품명|예약 상품|예약상품|상품'));
   const name=normalized('kakao_booking_name',()=>valueFor('예약자명|예약자'));
@@ -3724,8 +3725,10 @@ function inboxKakaoBookingListLines(row){
 }
 function inboxDentwebMatchBadges(row){
   const match=row?.dentweb_match;
-  if(!inboxIsKakaoBooking(row)||!match)return '';
+  if(!inboxIsKakaoBooking(row))return '';
   const badge=(style,label)=>'<span class="b '+style+'">'+esc(label)+'</span>';
+  if(row.kakao_booking_number===null)return badge('wait',inboxT('inbox.kb_match_review','❓ 확인 필요'));
+  if(!match)return '';
   if(match.match_basis==='ambiguous'||match.match_basis==='insufficient')
     return badge('wait',inboxT('inbox.kb_match_review','❓ 확인 필요'));
   return [
@@ -3810,8 +3813,8 @@ function inboxRenderList(rows){
   const detailBtn=esc(inboxT('inbox.btn_detail','상세')),unknownTime=inboxT('inbox.unknown_time','미상'),kbTitle=esc(inboxT('inbox.kb_title','📅 카카오 예약')),negKw=esc(inboxT('inbox.neg_kw','부정 키워드'));
   const bookings=(rows||[]).filter(inboxIsKakaoBooking),groups=inboxGroupRows((rows||[]).filter(row=>!inboxIsKakaoBooking(row))).slice(0,50);
   groups.forEach(group=>{const p=PROFILES.find(x=>x.user_id===group.assigned_to);group.assignee_name=p?.name||'-';});INBOX_LIST_GROUPS={};groups.forEach(group=>{INBOX_LIST_GROUPS[inboxGroupKey(group)]=group.messages.slice().sort((a,b)=>Date.parse(a.received_at)-Date.parse(b.received_at));});
-  const onlyReservations=typeof INBOX_ONLY_RESERVATIONS!=='undefined'&&INBOX_ONLY_RESERVATIONS,counts=inboxGroupCounts(groups),items=(onlyReservations?bookings:[...groups,...bookings]).sort((a,b)=>Date.parse(b.received_at)-Date.parse(a.received_at)).slice(0,100);
-  const bookingStatus=row=>row.dentweb_entered_at?'<span class="b ok">'+esc(inboxT('inbox.kb_entered','✅ 덴트웹 입력함'))+'</span>':'<span class="b wait">'+esc(inboxT('inbox.kb_not_entered','덴트웹 입력 전'))+'</span>';
+  const onlyReservations=typeof INBOX_ONLY_RESERVATIONS!=='undefined'&&INBOX_ONLY_RESERVATIONS,counts=inboxGroupCounts(groups),items=(onlyReservations?bookings:[...groups,...bookings]).sort((a,b)=>Date.parse(b.kakao_list_at||b.received_at)-Date.parse(a.kakao_list_at||a.received_at)||String(b.id||'').localeCompare(String(a.id||''))).slice(0,100);
+  const bookingStatus=row=>{const entered=row.dentweb_entered_at?'<span class="b ok">'+esc(inboxT('inbox.kb_entered','✅ 덴트웹 입력함'))+'</span>':'<span class="b wait">'+esc(inboxT('inbox.kb_not_entered','덴트웹 입력 전'))+'</span>',labels={requested:inboxT('inbox.booking_requested','신청'),confirmed:inboxT('inbox.booking_confirmed','확정'),cancelled:inboxT('inbox.booking_cancelled','취소'),review_required:inboxT('inbox.booking_review','확인 필요')};return (row.kakao_booking_number?'<span class="b wait">'+esc(labels[row.kakao_booking_state]||inboxT('inbox.booking_state_unknown','상태 미확인'))+'</span>':'')+entered;};
   const bookingFacts=row=>{const badges=inboxDentwebMatchBadges(row);return badges?'<div class="inbox-booking-facts">'+badges+'</div>':'';};
   const bookingLines=row=>{const lines=inboxKakaoBookingListLines(row);return {top:esc(lines.top),bottom:esc(lines.bottom)};};
   const owner=inboxRole()==='owner',handledMobile=row=>{const h=inboxHandledHtml(row);return h==='-'?'':'<div class="inbox-mobile-handled">'+h+'</div>';},viewsMobile=row=>{if(!owner)return '';const v=inboxViewsInfo(row);return '<div'+(v.title?' title="'+esc(v.title)+'"':'')+'>'+esc(inboxT('inbox.m_views','열람 {names}',{names:v.text}))+'</div>';},viewsCell=row=>{if(!owner)return '';const v=inboxViewsInfo(row);return '<td'+(v.title?' title="'+esc(v.title)+'"':'')+'>'+esc(v.text)+'</td>';};
@@ -3831,11 +3834,12 @@ async function inboxLoadDentwebMatches(rows){
   try{
     const queries=[];
     for(let offset=0;offset<ids.length;offset+=50){
-      queries.push(sb.from('dentweb_inbox_matches').select('inbox_id,appointment_found,visited,match_basis,checked_at').in('inbox_id',ids.slice(offset,offset+50)));
+      queries.push(sb.from('dentweb_inbox_matches').select('inbox_id,appointment_found,visited,match_basis,checked_at,booking_version').in('inbox_id',ids.slice(offset,offset+50)));
     }
     const results=await Promise.all(queries);
     if(results.some(result=>result.error))return new Map();
-    return new Map(results.flatMap(result=>result.data||[]).filter(match=>visible.has(match.inbox_id)).map(match=>[match.inbox_id,match]));
+    const versions=new Map(rows.filter(row=>row.kakao_booking_number).map(row=>[row.id,row.kakao_booking_version]));
+    return new Map(results.flatMap(result=>result.data||[]).filter(match=>visible.has(match.inbox_id)&&versions.has(match.inbox_id)&&match.booking_version===versions.get(match.inbox_id)).map(match=>[match.inbox_id,match]));
   }catch{return new Map();}
 }
 async function inboxLoad(){
@@ -3843,10 +3847,10 @@ async function inboxLoad(){
   if(!list)return;
   const current=()=>generation===INBOX_LOAD_GENERATION&&list===$('#inboxList');
   const columns='id,source,external_event_id,received_at,sender_name,contact,subject,message,status,assigned_to,journal_id';
-  const load=fields=>{let q=sb.from('consultation_inbox').select(fields).order('received_at',{ascending:false}).limit(150);if(INBOX_FILTER.source)q=q.eq('source',INBOX_FILTER.source);if(INBOX_FILTER.status)q=q.eq('status',INBOX_FILTER.status);if(INBOX_ONLY_RESERVATIONS)q=q.eq('source','kakao').like('external_event_id','kbook-%');return q;};
+  const load=fields=>{let q=sb.from('consultation_inbox').select(fields).order(bookingCols?'kakao_list_at':'received_at',{ascending:false}).order('id',{ascending:false}).limit(150);if(INBOX_FILTER.source)q=q.eq('source',INBOX_FILTER.source);if(INBOX_FILTER.status)q=q.eq('status',INBOX_FILTER.status);if(INBOX_ONLY_RESERVATIONS)q=q.eq('source','kakao').like('external_event_id','kbook-%');return q;};
   const missingColumn=e=>!!e&&(['42703','PGRST204'].includes(e.code)||/column .* does not exist|could not find .* column/i.test(e.message||''));
   const handledCols=',handled_by,handled_at',dentwebCols=',dentweb_entered_at,dentweb_entered_by';
-  let bookingCols=',kakao_booking_name,kakao_booking_contact_digits,kakao_booking_schedule,kakao_booking_product';
+  let bookingCols=',kakao_booking_name,kakao_booking_contact_digits,kakao_booking_schedule,kakao_booking_product,kakao_booking_number,kakao_booking_state,kakao_booking_version,kakao_list_at,dentweb_claimed_by';
   const loadWithBooking=async fields=>{
     const result=await load(fields+bookingCols);
     if(!bookingCols||!missingColumn(result.error)||/handled_|dentweb_entered_/.test(result.error.message||''))return result;
@@ -3957,16 +3961,42 @@ function inboxKakaoBookingDetailHtml(row){
   const scheduleFallback=row.kakao_booking_schedule===undefined?(receivedAt||receivedLabel):check;
   const fields=d.recognized?[[T('inbox.kb_f_schedule','일정'),d.schedule||scheduleFallback],[T('inbox.kb_f_product','상품'),d.product||check],[T('inbox.kb_f_option','옵션'),d.option||T('inbox.kb_none','없음')],[T('inbox.kb_f_name','예약자'),d.name||check],[T('inbox.kb_f_contact','연락처'),d.contact||check]]:[[T('inbox.kb_alert','예약 알림'),d.firstLine],[receivedLabel,receivedAt||T('inbox.unknown_time','미상')]];
   if(d.recognized&&row.kakao_booking_schedule===null)fields.push([receivedLabel,receivedAt||T('inbox.unknown_time','미상')]);
+  if(row.kakao_booking_number){const labels={requested:T('inbox.booking_requested','신청'),confirmed:T('inbox.booking_confirmed','확정'),cancelled:T('inbox.booking_cancelled','취소'),review_required:T('inbox.booking_review','확인 필요')};fields.push([T('inbox.booking_state','카카오 예약 상태'),labels[row.kakao_booking_state]||check]);}
   const entered=row.dentweb_entered_at?(esc(T('inbox.kb_entered','✅ 덴트웹 입력함'))+' · '+esc(formatKakaoDentwebStamp(row.dentweb_entered_at))+(actor?' · '+esc(actor):'')):esc(T('inbox.kb_not_yet','아직 덴트웹 입력 전'));
   const partner='https://partner-booking.kakao.com/',partnerLink='<a class="mini" href="'+partner+'" target="_blank" rel="noopener noreferrer">'+esc(T('inbox.kb_partner_open','카카오 파트너센터 열기'))+'</a>';
-  const action=canWriteInbox()?'<div class="inbox-booking-actions"><button class="mini stamp" onclick="inboxSetDentwebEntered()">'+esc(row.dentweb_entered_at?T('inbox.kb_btn_undo','↩️ 덴트웹 입력 표시 되돌리기'):T('inbox.kb_btn_set','✅ 덴트웹에 입력함'))+'</button>'+partnerLink+'</div>':'<div class="inbox-booking-actions">'+partnerLink+'</div>';
+  const mine=row.dentweb_claimed_by===ME?.id,numbered=!!row.kakao_booking_number;
+  const mayClaim=numbered&&!row.dentweb_entered_at&&!row.journal_id&&!row.dentweb_claimed_by&&row.kakao_booking_state==='confirmed'&&!row.dentweb_match?.appointment_found;
+  const mayRelease=numbered&&!row.dentweb_entered_at&&!!row.dentweb_claimed_by&&(mine||ME?.role==='owner');
+  const claimAction=canWriteInbox()?(mayClaim?'<button class="mini" onclick="inboxClaimBooking(true)">'+esc(T('inbox.booking_claim','덴트웹 등록 맡기'))+'</button>':mayRelease?'<button class="mini" onclick="inboxClaimBooking(false)">'+esc(T('inbox.booking_release','등록 맡기 해제'))+'</button>':''):'';
+  const mayStamp=!numbered||!!row.dentweb_entered_at||(mine&&row.kakao_booking_state!=='review_required');
+  const stamp=canWriteInbox()&&mayStamp?'<button class="mini stamp" onclick="inboxSetDentwebEntered()">'+esc(row.dentweb_entered_at?T('inbox.kb_btn_undo','↩️ 덴트웹 입력 표시 되돌리기'):T('inbox.kb_btn_set','✅ 덴트웹에 입력함'))+'</button>':'';
+  const action='<div class="inbox-booking-actions">'+claimAction+stamp+partnerLink+'</div>';
   const badges=inboxDentwebMatchBadges(row);
   if(row.dentweb_match?.checked_at)fields.push([T('inbox.kb_match_checked_at','최근 대조 시각'),hubFmtDateTime(row.dentweb_match.checked_at)]);
   return '<div class="hint">'+esc(T('inbox.kb_title','📅 카카오 예약'))+' · '+esc(inboxStatusInfo(row.status).label)+'</div><dl class="inbox-booking-fields">'+fields.map(([label,value])=>'<dt>'+esc(label)+'</dt><dd>'+esc(value)+'</dd>').join('')+'</dl><div class="hint">'+entered+'</div>'+(badges?'<div class="inbox-booking-facts">'+badges+'</div>':'')+action+'<div class="hint">'+esc(T('inbox.kb_confirm_hint','예약확정은 파트너센터에서'))+'</div><details><summary>'+esc(T('inbox.kb_original','받은 글 원문'))+'</summary><pre class="inbox-booking-original">'+esc(row.message||'')+'</pre></details><div id="inboxDentwebMsg" class="msg"></div>';
 }
 function formatKakaoDentwebStamp(value){return hubFmtDateTime(value);}
+let INBOX_BOOKING_LOOKUP_GENERATION=0;
+async function inboxFindBookingByNumber(value){
+  const number=String(value||'').trim(),msg=$('#inboxBookingLookupMsg'),generation=++INBOX_BOOKING_LOOKUP_GENERATION;
+  INBOX_DETAIL_GENERATION++;INBOX_SELECTED=null;const detail=$('#inboxDetail');if(detail)detail.innerHTML='';
+  if(!/^[0-9]{6,24}$/.test(number)){if(msg)msg.textContent=inboxT('inbox.booking_number_invalid','예약번호를 숫자로 입력하세요.');return;}
+  const {data,error}=await sb.from('consultation_inbox').select('id').eq('source','kakao').eq('external_event_id','kbook-r-'+number).maybeSingle();
+  if(generation!==INBOX_BOOKING_LOOKUP_GENERATION)return;
+  if(error||!data){if(msg)msg.textContent=inboxT('inbox.booking_not_found','예약을 찾지 못했습니다. 번호와 접근 권한을 확인하세요.');return;}
+  if(msg)msg.textContent='';
+  await inboxSelect(data.id);
+}
+async function inboxClaimBooking(claim){
+  const row=INBOX_SELECTED;if(!row||!canWriteInbox()||!row.kakao_booking_number)return;
+  if(claim&&!confirm(inboxT('inbox.booking_check_duplicate','덴트웹에 같은 예약이 없는지 확인했나요?')))return;
+  const {data,error}=await sb.rpc('consultation_inbox_claim_kakao_booking',{p_inbox_id:row.id,p_claim:claim});
+  if(error||data!==true){const msg=$('#inboxDentwebMsg');if(msg)msg.textContent=inboxT('inbox.booking_claim_failed','맡기 결과를 확인하지 못했습니다. 다시 불러와 확인하세요.');await inboxSelect(row.id);await inboxLoad();return;}
+  await inboxSelect(row.id);await inboxLoad();
+}
 async function inboxSetDentwebEntered(){
   const row=INBOX_SELECTED;if(!row||!canWriteInbox())return;if(!INBOX_DENTWEB_FIELDS_AVAILABLE){const msg=$('#inboxDentwebMsg');if(msg)msg.textContent=inboxT('inbox.m_dentweb_unavailable','완료 기록은 DB 변경을 적용한 뒤 사용할 수 있습니다.');return;}
+  if(row.kakao_booking_number&&row.kakao_booking_state==='cancelled'&&!row.dentweb_entered_at&&!confirm(inboxT('inbox.booking_cancel_record','취소 전에 실제 등록한 건만 기록합니다. 이미 등록했나요?')))return;
   const undo=!!row.dentweb_entered_at;if(undo&&!confirm(inboxT('inbox.confirm_undo_dentweb','덴트웹 입력 완료 표시를 되돌릴까요?')))return;
   const msg=$('#inboxDentwebMsg');
   if(undo){
@@ -3979,6 +4009,9 @@ async function inboxSetDentwebEntered(){
       const refreshedMsg=$('#inboxDentwebMsg');if(refreshedMsg)refreshedMsg.textContent=failure;
       return;
     }
+  }else if(row.kakao_booking_number){
+    const {data,error}=await sb.rpc('consultation_inbox_enter_kakao_booking',{p_inbox_id:row.id,p_version:row.kakao_booking_version,p_state:row.kakao_booking_state,p_cancel_confirmed:row.kakao_booking_state==='cancelled'});
+    if(error||data!==true){await inboxSelect(row.id);await inboxLoad();const refreshed=$('#inboxDentwebMsg');if(refreshed)refreshed.textContent=inboxT('inbox.booking_stale','예약이 바뀌었거나 권한이 없습니다. 새로 확인하고 다시 결정하세요.');return;}
   }else{
     const {error}=await sb.rpc('consultation_inbox_set_dentweb_entered',{p_inbox_id:row.id,p_entered:true});
     if(error){if(msg)msg.textContent=inboxT('inbox.m_dentweb_fail','저장 실패: {msg}',{msg:error.message});return;}
@@ -3996,7 +4029,7 @@ function aiBillingAlertCard(rows,totalOpen=rows.length){const open=rows||[];AI_B
 function aiBillingRecipientPanel(rows){if(AI_BILLING_RECIPIENT_ERROR)return `<div class="card"><h3>${esc(inboxT('inbox.rc_title','네이버 광고 푸시 받는 매니저'))}</h3><div class="cal-error">${esc(inboxT('inbox.rc_err','받는 사람 설정을 불러오지 못함: {msg}',{msg:AI_BILLING_RECIPIENT_ERROR}))}</div></div>`;const managers=(PROFILES||[]).filter(p=>p.role==='manager'&&p.active!==false&&p.approved!==false&&p.account_access_status!=='차단');const disabled=new Set((rows||[]).filter(r=>r.enabled===false).map(r=>r.user_id));return `<div class="card"><h3>${esc(inboxT('inbox.rc_title','네이버 광고 푸시 받는 매니저'))} <span class="sub">${esc(inboxT('inbox.rc_owner_always','원장은 항상 받음'))}</span></h3><div class="hint">${esc(inboxT('inbox.rc_hint','처음에는 활성 매니저 전원이 받음. 체크를 끄면 그 매니저만 제외됨.'))}</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:6px;margin:8px 0">${managers.map(p=>`<label class="rowflex" style="gap:8px"><input type="checkbox" data-ai-billing-recipient="${esc(p.user_id)}" ${disabled.has(p.user_id)?'':'checked'}><span>${esc(p.name||p.user_id)}</span></label>`).join('')||`<span class="sub">${esc(inboxT('inbox.rc_none','활성 매니저 없음'))}</span>`}</div><button class="mini stamp" onclick="saveAiBillingRecipients()">${esc(inboxT('inbox.rc_btn_save','받는 사람 저장'))}</button><span id="aiBillingRecipientsMsg" class="sub"></span></div>`;}
 async function saveAiBillingRecipients(){if(ME.role!=='owner'||AI_BILLING_RECIPIENT_ERROR)return;const inputs=[...document.querySelectorAll('[data-ai-billing-recipient]')];for(const input of inputs){const userId=input.getAttribute('data-ai-billing-recipient'),currentlyDisabled=AI_BILLING_RECIPIENT_SETTINGS.some(r=>r.user_id===userId&&r.enabled===false);let result;if(input.checked&&currentlyDisabled)result=await sb.from('ai_billing_alert_recipients').delete().eq('user_id',userId);else if(!input.checked&&!currentlyDisabled)result=await sb.from('ai_billing_alert_recipients').upsert({user_id:userId,enabled:false,updated_at:new Date().toISOString(),updated_by:ME.id},{onConflict:'user_id'});else continue;if(result?.error){alert(inboxT('inbox.rc_save_fail','받는 사람 저장 실패: {msg}',{msg:result.error.message}));return;}}setStatus('saved');await render();}
 async function markAiBillingCharged(id){const {error}=await sb.rpc('mark_ai_billing_event_charged',{p_event_id:Number(id)});if(error){alert(inboxT('inbox.ad_charged_fail','처리 실패: {msg}',{msg:error.message}));return;}render();}function inboxCardFill(h){return String(h).replace(/(<option value="(new|in_progress|recall_1|recall_2|recall_3|converted|closed)"[^>]*>)([^<]*)(<\/option>)/g,(m,a,c,t,z)=>a+esc(inboxStatusName(c,t))+z).replace(/(<option value="(daangn|kakao|naver_email|naver_talktalk|homepage|phone|manual|other)"[^>]*>)([^<]*)(<\/option>)/g,(m,a,c,t,z)=>a+esc(inboxSourceLabel(c))+z).replace(/(<option value="" [^>]*>)(전체 출처|전체 상태)(<\/option>)/g,(m,a,t,z)=>a+esc(inboxT(t==='전체 출처'?'inbox.f_all_source':'inbox.f_all_status',t))+z);} /* 선택칸 항목 글 바꿔 넣기: 이름을 안 고쳤으면 옛 글 그대로(옛 HTML과 같음) — 기존 시험이 찾는 option 줄 모양은 그대로 둠 */
-function inboxCardHtml(){return recallTabsHtml()+inboxCardFill(`${AI_BILLING_ALERT_HTML}${AI_BILLING_RECIPIENTS_HTML}<div class="card"><div class="rowflex" style="justify-content:space-between;align-items:center"><h2 style="margin:0">${esc(inboxT('inbox.title','📥 통합 문의함'))}</h2>${canManageConsultation()?`<button class="mini" onclick="go('consult')">${esc(inboxT('inbox.btn_consult','상담일지 열기'))}</button>`:''}</div><div class="hint">${esc(inboxT('inbox.hint','네이버 톡톡·당근·카카오·네이버메일·홈페이지·전화 문의를 한곳에서 확인합니다. 네이버 톡톡·홈페이지·카카오·당근은 자동 접수되고, 전화·기타 문의는 수기로 접수할 수 있습니다.'))}</div><div id="inboxFilterRow" class="rowflex inbox-filter-row"><select id="inboxFilterSource"><option value="" ${INBOX_FILTER.source===''?'selected':''}>전체 출처</option>${['daangn','kakao','naver_email','naver_talktalk','homepage','phone','manual','other'].map(x=>`<option value="${x}" ${INBOX_FILTER.source===x?'selected':''}>${inboxSourceLabel(x)}</option>`).join('')}</select><select id="inboxFilterStatus"><option value="" ${INBOX_FILTER.status===''?'selected':''}>전체 상태</option><option value="new" ${INBOX_FILTER.status==='new'?'selected':''}>NEW(미처리)</option><option value="in_progress" ${INBOX_FILTER.status==='in_progress'?'selected':''}>진행중</option><option value="recall_1" ${INBOX_FILTER.status==='recall_1'?'selected':''}>\uB9AC\uCF5C 1\uCC28</option><option value="recall_2" ${INBOX_FILTER.status==='recall_2'?'selected':''}>\uB9AC\uCF5C 2\uCC28</option><option value="recall_3" ${INBOX_FILTER.status==='recall_3'?'selected':''}>\uB9AC\uCF5C 3\uCC28</option><option value="converted" ${INBOX_FILTER.status==='converted'?'selected':''}>상담일지 전환</option><option value="closed" ${INBOX_FILTER.status==='closed'?'selected':''}>처리됨</option></select><button id="inboxReservationFilter" class="mini" aria-pressed="false" onclick="toggleInboxReservationFilter()">${esc(inboxT('inbox.btn_reservation','📅 예약 · 미입력 {n}건',{n:0}))}</button><button class="mini" onclick="INBOX_FILTER={source:$('#inboxFilterSource').value,status:$('#inboxFilterStatus').value};inboxLoad()">${esc(inboxT('inbox.btn_filter','필터'))}</button></div><div id="inboxList"></div><div id="inboxDetail"></div>${canWriteInbox()?`<h3>${esc(inboxT('inbox.q_title','빠른 수기 접수'))}</h3><div class="grid"><div class="fld"><label>${esc(inboxT('inbox.q_f_source','출처'))}</label><select id="inboxSource"><option value="phone">전화</option><option value="manual">수기</option><option value="other">기타</option></select></div><div class="fld"><label>${esc(inboxT('inbox.q_f_name','문의자 *'))}</label><input id="inboxName" maxlength="80"></div><div class="fld"><label>${esc(inboxT('inbox.q_f_contact','연락처'))}</label><input id="inboxContact" inputmode="tel" maxlength="40"></div><div class="fld"><label>${esc(inboxT('inbox.q_f_subject','제목'))}</label><input id="inboxSubject" maxlength="160"></div></div><div class="fld"><label>${esc(inboxT('inbox.q_f_message','문의 내용 *'))}</label><textarea id="inboxMessage" maxlength="4000"></textarea></div><button class="mini stamp" onclick="inboxManualCreate()">${esc(inboxT('inbox.q_btn','문의 접수'))}</button><div class="msg" id="inboxMsg"></div>`:''}</div>`);}
+function inboxCardHtml(){return recallTabsHtml()+inboxCardFill(`${AI_BILLING_ALERT_HTML}${AI_BILLING_RECIPIENTS_HTML}<div class="card"><div class="rowflex" style="justify-content:space-between;align-items:center"><h2 style="margin:0">${esc(inboxT('inbox.title','📥 통합 문의함'))}</h2>${canManageConsultation()?`<button class="mini" onclick="go('consult')">${esc(inboxT('inbox.btn_consult','상담일지 열기'))}</button>`:''}</div><div class="hint">${esc(inboxT('inbox.hint','네이버 톡톡·당근·카카오·네이버메일·홈페이지·전화 문의를 한곳에서 확인합니다. 네이버 톡톡·홈페이지·카카오·당근은 자동 접수되고, 전화·기타 문의는 수기로 접수할 수 있습니다.'))}</div><div id="inboxFilterRow" class="rowflex inbox-filter-row"><select id="inboxFilterSource"><option value="" ${INBOX_FILTER.source===''?'selected':''}>전체 출처</option>${['daangn','kakao','naver_email','naver_talktalk','homepage','phone','manual','other'].map(x=>`<option value="${x}" ${INBOX_FILTER.source===x?'selected':''}>${inboxSourceLabel(x)}</option>`).join('')}</select><select id="inboxFilterStatus"><option value="" ${INBOX_FILTER.status===''?'selected':''}>전체 상태</option><option value="new" ${INBOX_FILTER.status==='new'?'selected':''}>NEW(미처리)</option><option value="in_progress" ${INBOX_FILTER.status==='in_progress'?'selected':''}>진행중</option><option value="recall_1" ${INBOX_FILTER.status==='recall_1'?'selected':''}>\uB9AC\uCF5C 1\uCC28</option><option value="recall_2" ${INBOX_FILTER.status==='recall_2'?'selected':''}>\uB9AC\uCF5C 2\uCC28</option><option value="recall_3" ${INBOX_FILTER.status==='recall_3'?'selected':''}>\uB9AC\uCF5C 3\uCC28</option><option value="converted" ${INBOX_FILTER.status==='converted'?'selected':''}>상담일지 전환</option><option value="closed" ${INBOX_FILTER.status==='closed'?'selected':''}>처리됨</option></select><button id="inboxReservationFilter" class="mini" aria-pressed="false" onclick="toggleInboxReservationFilter()">${esc(inboxT('inbox.btn_reservation','📅 예약 · 미입력 {n}건',{n:0}))}</button><button class="mini" onclick="INBOX_FILTER={source:$('#inboxFilterSource').value,status:$('#inboxFilterStatus').value};inboxLoad()">${esc(inboxT('inbox.btn_filter','필터'))}</button></div><div class="rowflex"><label for="inboxBookingLookup">${esc(inboxT('inbox.booking_number_label','예약번호'))}</label><input id="inboxBookingLookup" inputmode="numeric" maxlength="24" autocomplete="off"><button class="mini" onclick="inboxFindBookingByNumber($('#inboxBookingLookup').value)">${esc(inboxT('inbox.booking_find','예약번호로 찾기'))}</button><div id="inboxBookingLookupMsg" class="msg" role="status"></div></div><div id="inboxList"></div><div id="inboxDetail"></div>${canWriteInbox()?`<h3>${esc(inboxT('inbox.q_title','빠른 수기 접수'))}</h3><div class="grid"><div class="fld"><label>${esc(inboxT('inbox.q_f_source','출처'))}</label><select id="inboxSource"><option value="phone">전화</option><option value="manual">수기</option><option value="other">기타</option></select></div><div class="fld"><label>${esc(inboxT('inbox.q_f_name','문의자 *'))}</label><input id="inboxName" maxlength="80"></div><div class="fld"><label>${esc(inboxT('inbox.q_f_contact','연락처'))}</label><input id="inboxContact" inputmode="tel" maxlength="40"></div><div class="fld"><label>${esc(inboxT('inbox.q_f_subject','제목'))}</label><input id="inboxSubject" maxlength="160"></div></div><div class="fld"><label>${esc(inboxT('inbox.q_f_message','문의 내용 *'))}</label><textarea id="inboxMessage" maxlength="4000"></textarea></div><button class="mini stamp" onclick="inboxManualCreate()">${esc(inboxT('inbox.q_btn','문의 접수'))}</button><div class="msg" id="inboxMsg"></div>`:''}</div>`);}
 function toggleInboxReservationFilter(){INBOX_ONLY_RESERVATIONS=!INBOX_ONLY_RESERVATIONS;inboxLoad();}
 /* recall-list:test-start */
 function recallCanAccess(me){return !!me&&( ['manager','chief','owner'].includes(me.role)|| (me.role==='staff'&&(me.department==='데스크'||me.dept==='데스크'||me.id==='212cef7e-8aab-4f72-b78d-4dfca59581e0')));}
