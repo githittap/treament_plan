@@ -177,3 +177,5 @@
 ## 2026-09-21 — Task7/8 portable semantic manifest
 - Task7/Task8 hardening: PGlite fixture가 same-name CHECK(true), helper body/trigger, private namespace, Task8 marker column/constraint/index/trigger drift를 reapply/rollback에서 fail-closed로 확인했다. 운영 적용 없음.
 - Task7 PGlite drift matrix와 Task8 apply/rollback PGlite PASS. 운영 변경 없음.
+
+- 2026-11-23 연장 사유 필수(Claude): 수기 출퇴근(하루·한 주)에서 추가근무를 적으면 「연장 사유」「연장 시간에 실제로 한 일」을 각각 5자 이상 적어야 저장. DB 함수 submit_manual_attendance_d가 같은 검사로 거부, 옛 _v2·submit_manual_attendance 직원 실행권한 회수. 검토표에 두 칸 표시. 운영 DB 반영함(db/attendance_manual_overtime_reason.sql).

@@ -7,7 +7,7 @@ const vm = require('node:vm');
 const html = fs.readFileSync(path.join(__dirname, '..', 'hr.html'), 'utf8');
 const ids = ['manualWorkDate','manualClockInHour','manualClockInMinute','manualClockOutHour','manualClockOutMinute',
   'manualClockInTime','manualClockOutTime','manualLate','manualEarly','manualLunchOvertimeRaw',
-  'manualClockoutOvertimeRaw','manualEveningOvertimeRaw','manualHalfDay','manualReasonRequired','manualReason','manualNote',
+  'manualClockoutOvertimeRaw','manualEveningOvertimeRaw','manualHalfDay','manualReasonRequired','manualReason','manualNote','manualOtPlanReason','manualOtActualWork','manualOtReasonHint',
   'manualWeekday','manualOvertimeTotal','manualAttMsg','manualAttendanceCalendar','manualAttendanceDayDetailText',
   'manualAttendanceDayDetail','manualAttendanceSubmit'];
 function harness(rows = [], width = 900) {
@@ -129,7 +129,9 @@ test('폰 원형 시계의 input 이벤트는 PC 칸과 동기화되고 HH:mm �
     }
     assert.equal(h.nodes.manualClockInHour.value,'09');assert.equal(h.nodes.manualClockOutMinute.value,'03');
     h.nodes.manualLunchOvertimeRaw.value='01:09';h.nodes.manualClockoutOvertimeRaw.value='19';
-    await h.context.submitManualAttendance();assert.equal(h.calls.length,1);
+    await h.context.submitManualAttendance();assert.equal(h.calls.length,0,'연장 사유 없이 제출되면 안 됨');
+    h.nodes.manualOtPlanReason.value='마지막 환자 진료 지연';h.nodes.manualOtActualWork.value='기구 소독과 진료실 정리';
+    await h.context.submitManualAttendance();assert.equal(h.calls.length,1);assert.equal(h.calls[0][1].p_overtime_plan_reason,'마지막 환자 진료 지연');
     const payload=h.calls[0][1];assert.equal(payload.p_clock_in,'09:07');assert.equal(payload.p_clock_out,'18:03');
     assert.equal(payload.p_lunch_overtime_raw_text,'01:09');assert.equal(payload.p_lunch_overtime_min,60);
     assert.equal(payload.p_clockout_overtime_raw_text,'19');assert.equal(payload.p_clockout_overtime_min,10);

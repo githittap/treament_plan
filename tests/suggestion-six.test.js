@@ -4,7 +4,7 @@ function setup(extra={}){
   assert.ok(block,'건의 구현 코드가 있어야 함');
   const c={ME:{id:'me',role:'staff'},SETTINGS:{'leave.manager_access_enabled':'true','leave.manager_can_approve':'true'},SETTINGS_LOAD_OK:true,today:()=> '2026-10-06',esc:s=>String(s??''),hubT:(k,d,v)=>Object.entries(v||{}).reduce((s,[k,x])=>s.replaceAll('{'+k+'}',x),d),...extra};
   const accessStart=html.indexOf('/* leave-manager-access-ui:test-start */'),accessEnd=html.indexOf('/* leave-manager-access-ui:test-end */');
-  vm.createContext(c);vm.runInContext(html.slice(accessStart,accessEnd)+';'+(html.match(/^function leaveLedgerTotals[^\r\n]+/m)?.[0]||'')+';'+block[0],c);return c;
+  vm.createContext(c);vm.runInContext(html.slice(accessStart,accessEnd)+';'+(html.match(/^function leaveLedgerTotals[^\r\n]+/m)?.[0]||'')+';'+html.slice(html.indexOf('function overtimeReasonLen'),html.indexOf('function manualAttendanceDetailText'))+';'+block[0],c);return c;
 }
 test('승인된 본인 미래 연차만 취소·반차 변경 요청 단추가 열린다',()=>{
   const c=setup(),r={id:1,user_id:'me',status:'승인',type:'연차',date_from:'2026-10-07',date_to:'2026-10-07'};
