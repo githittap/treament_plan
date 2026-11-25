@@ -209,7 +209,7 @@ tr.new td{background:var(--mint-dk)}
 .cal-tag.status.published{border-color:var(--mint);color:var(--mint)}
 .cal-tag a{color:inherit;opacity:.6;flex-shrink:0}
 .cal-error{margin:7px 0;padding:7px 9px;border:1px solid var(--red);border-radius:7px;background:var(--red-bg);color:var(--red);font-size:12px}
-.hgbp-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;align-items:end;margin-top:8px}.hgbp-form label{display:flex;flex-direction:column;gap:3px;font-size:12px;min-width:0}.hgbp-form input,.hgbp-form select{min-height:36px;max-width:100%;box-sizing:border-box}.hgbp-wide{grid-column:1/-1}.hgbp-check{flex-direction:row!important;align-items:center;gap:6px!important}.hgbp-check input{min-height:0}.hgbp-item{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;padding:7px 2px;border-bottom:1px solid var(--line);font-size:12.5px}.hgbp-main{min-width:0;flex:1 1 220px;overflow-wrap:anywhere}.hgbp-name{color:var(--gray);margin-top:2px}.hgbp-actions{display:flex;gap:6px}.hgbp-badge{display:inline-block;padding:0 6px;border-radius:9px;border:1px solid var(--line);font-size:11px;color:var(--gray)}.hgbp-badge.on{color:var(--green,#1a8f6a);border-color:currentColor}.hgbp-badge.bad{color:var(--red);border-color:currentColor}
+.hgbp-form [hidden]{display:none!important}.hgbp-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;align-items:end;margin-top:8px}.hgbp-form label{display:flex;flex-direction:column;gap:3px;font-size:12px;min-width:0}.hgbp-form input,.hgbp-form select{min-height:36px;max-width:100%;box-sizing:border-box}.hgbp-wide{grid-column:1/-1}.hgbp-check{flex-direction:row!important;align-items:center;gap:6px!important}.hgbp-check input{min-height:0}.hgbp-item{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;padding:7px 2px;border-bottom:1px solid var(--line);font-size:12.5px}.hgbp-main{min-width:0;flex:1 1 220px;overflow-wrap:anywhere}.hgbp-name{color:var(--gray);margin-top:2px}.hgbp-actions{display:flex;gap:6px}.hgbp-badge{display:inline-block;padding:0 6px;border-radius:9px;border:1px solid var(--line);font-size:11px;color:var(--gray)}.hgbp-badge.on{color:var(--green,#1a8f6a);border-color:currentColor}.hgbp-badge.bad{color:var(--red);border-color:currentColor}
 @media(max-width:640px){.calendar-layout{grid-template-columns:1fr}.calendar-day-panel{position:static;order:2}.cal-cell{min-height:56px;padding:3px 4px}.cal-cell .d{font-size:11px}.cal-tag{font-size:9px;padding:0 2px}.cal-cell:not(.expanded) .cal-names{display:none}.cal-cell.expanded .cal-names{display:inline}.calendar-day-detail{align-items:flex-end;padding:8px}.calendar-day-detail-card{max-height:88vh;padding:14px;border-radius:14px 14px 8px 8px}.calendar-day-detail-row{padding:7px 0;font-size:14px}}
 
 /* 모달 */
@@ -458,7 +458,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 <script src="payroll-reply.js?v=2026112301"></script>
 <script src="payroll-compare.js?v=2026101110"></script>
 <script src="hub-help.js?v=2026101202"></script>
-<script src="hub-texts.js?v=2026112502"></script>
+<script src="hub-texts.js?v=2026112503"></script>
 <script src="hub-activity.js?v=2026101110"></script>
 <script src="security-pledge.js?v=20261003p9d"></script>
 <script src="wage-hourly.js?v=2026101110"></script>
@@ -1957,7 +1957,7 @@ async function saveAttendance(){
   $('#xlMsg').textContent=hubT('att.xl.m_saving','저장 중…');setStatus('saving');
   const holi=new Set((await sb.from('holidays').select('date,kind')).data?.filter(h=>h.kind!=='단축').map(h=>h.date)||[]); /* 단축 진료일은 쉬는 날이 아니라 휴일근무로 안 셈 */
   const payload=rows.map(r=>{const c=calcRow(r);return {user_id:r.user_id,work_date:r.ds,clock_in:r.ci!=null?minToT(r.ci)+':00':null,clock_out:r.co!=null?minToT(r.co)+':00':null,
-    source:'fp',late_min:c.late,early_min:c.early,overtime_min:c.ot,evening:r.evening,is_holiday:holi.has(r.ds)};});
+    source:'fp',late_min:c.late,early_min:c.early,overtime_min:c.ot,evening:r.evening,is_holiday:holi.has(r.ds)};}).sort((a,b)=>a.work_date<b.work_date?-1:a.work_date>b.work_date?1:0); /* 날짜 오름차순 — DB 날짜 잠금 순서와 같게(휴진 입력과 동시에 저장해도 서로 막히지 않음) */
   const {error}=await sb.from('attendance').upsert(payload,{onConflict:'user_id,work_date'});
   if(error){$('#xlMsg').textContent=hubT('att.xl.m_fail','실패: {msg}',{msg:error.message});setStatus('error');return;}
   // 소명 자동 생성: 단일 인식(누락 의심)
@@ -3374,6 +3374,16 @@ function holidayGbpSaveErrKey(error){
   if(m.includes('holiday_public_lead_only'))return 'err_public_lead';
   return error&&error.code==='23505'?'err_exists':'err_save';
 }
+/* 반영 기록의 보낸 값(sent_value) → 사람이 읽는 글. T2 계약: {closed:true} 또는 {open_time,close_time}(openTime·closeTime도 받음). 모르는 꼴은 짧은 원문. */
+function holidayGbpSentText(v){
+  if(v==null||v==='')return '';
+  let o=v;if(typeof o==='string'){try{o=JSON.parse(o);}catch(e){return String(v).slice(0,120);}}
+  if(!o||typeof o!=='object')return String(o).slice(0,120);
+  if(o.closed===true)return hubT('hgbp.sent_closed','보낼 값: 휴무');
+  const op=o.open_time||o.openTime,cl=o.close_time||o.closeTime;
+  if(op&&cl)return hubT('hgbp.sent_hours','보낼 값: {open}~{close}',{open:holidayGbpTime(typeof op==='object'?[op.hours,op.minutes].map(x=>String(x||0).padStart(2,'0')).join(':'):op),close:holidayGbpTime(typeof cl==='object'?[cl.hours,cl.minutes].map(x=>String(x||0).padStart(2,'0')).join(':'):cl)});
+  try{return JSON.stringify(o).slice(0,120);}catch(e){return '';}
+}
 function holidayGbpSyncLive(){return typeof hubSettingBoolean==='function'&&hubSettingBoolean('gbp.sync_live',false)===true;}
 const HGBP_PAGE=60;
 function holidayGbpActionLabel(a){return a==='set'?hubT('hgbp.act_set','등록'):a==='clear'?hubT('hgbp.act_clear','삭제'):a==='noop'?hubT('hgbp.act_noop','변경 없음'):hubT('hgbp.act_error','오류');}
@@ -3394,7 +3404,7 @@ function holidayGbpRowHtml(h){
   return `<div class="hgbp-item"><div class="hgbp-main"><b>${esc(h.date)}</b> <span class="hgbp-kind">${esc(holidayGbpKindLabel(h.kind))}</span> <span>${esc(time)}</span> ${sync}<div class="hgbp-name">${esc(h.name)}</div></div><div class="hgbp-actions">${holidayGbpRowEditable(h)?`<button class="mini" onclick="editHolidayGbp('${esc(h.date)}')">${esc(hubT('hgbp.btn_edit','수정'))}</button>`:''}${holidayGbpRowDeletable(h)?`<button class="mini" onclick="deleteHolidayGbp('${esc(h.date)}')">${esc(hubT('hgbp.btn_del','삭제'))}</button>`:(h.kind==='공휴일'?`<span class="hint">${esc(hubT('hgbp.lead_only','공휴일은 진료 방식만 고칠 수 있음(삭제·이름은 실장·원장)'))}</span>`:'')}</div></div>`;
 }
 function holidayGbpLogHtml(l){
-  const detail=l.error?String(l.error):'';
+  const sent=holidayGbpSentText(l.sent_value),detail=[sent,l.error?String(l.error):''].filter(Boolean).join(' · ');
   return `<div class="hgbp-item hgbp-log"><div class="hgbp-main"><span>${esc(hubFmtDateTime(l.created_at))}</span> <b>${esc(l.holiday_date||'-')}</b> <span>${esc(holidayGbpActionLabel(l.action))}</span> <span class="hgbp-badge ${l.result==='ok'?'on':l.result==='failed'?'bad':''}">${esc(holidayGbpResultLabel(l.result))}</span>${detail?`<div class="hgbp-name">${esc(detail)}</div>`:''}</div></div>`;
 }
 async function renderHolidayGbpCard(box){
@@ -3403,7 +3413,7 @@ async function renderHolidayGbpCard(box){
   try{
     const [a,b]=await Promise.all([
       sb.from('holidays').select('date,name,kind,open_time,close_time,sync_gbp,note').gte('date',today()).order('date').limit(HGBP_LIMIT+1),
-      sb.from('gbp_special_hours_sync_log').select('id,holiday_date,action,result,error,created_at').order('created_at',{ascending:false}).order('id',{ascending:false}).limit(20)
+      sb.from('gbp_special_hours_sync_log').select('id,holiday_date,action,sent_value,result,error,created_at').order('created_at',{ascending:false}).order('id',{ascending:false}).limit(20)
     ]);
     rows=a.data||[];rowsErr=a.error;logs=b.data||[];logErr=b.error;
   }catch(e){rowsErr=e;logErr=e;}
@@ -3442,10 +3452,11 @@ async function saveHolidayGbp(){
   const msg=$('#hgbpMsg'),r=holidayGbpFormToRow({date:$('#hgbpDate').value,kind:$('#hgbpKind').value,name:$('#hgbpName').value,open:$('#hgbpOpen').value,close:$('#hgbpClose').value,sync:$('#hgbpSync').checked,mode:$('#hgbpMode')?$('#hgbpMode').value:'normal'});
   if(r.error){msg.textContent=holidayGbpErrText(r.error);return;}
   setStatus('saving');
-  const q=HGBP_EDIT?sb.from('holidays').update(r.row).eq('date',HGBP_EDIT).select('date'):sb.from('holidays').insert(r.row);
+  const editDate=HGBP_EDIT; /* 보낼 때의 수정 대상 — 응답을 기다리는 동안 「취소」를 눌러도 이 값으로 판정 */
+  const q=editDate?sb.from('holidays').update(r.row).eq('date',editDate).select('date'):sb.from('holidays').insert(r.row);
   const {data,error}=await q;
-  if(error){setStatus('error');msg.textContent=holidayGbpErrText(holidayGbpSaveErrKey(error),error.message);return;}
-  if(HGBP_EDIT&&!(data&&data.length)){HGBP_EDIT=null;setStatus('error');await renderHolidayGbpCard($('#hgbpBox'));const m2=$('#hgbpMsg');if(m2)m2.textContent=holidayGbpErrText('err_gone');return;} /* 0행 = 다른 사람이 먼저 바꿨거나 권한 밖 */
+  if(error){setStatus('error');const m1=$('#hgbpMsg');if(m1)m1.textContent=holidayGbpErrText(holidayGbpSaveErrKey(error),error.message);return;}
+  if(editDate&&!(data&&data.length)){HGBP_EDIT=null;setStatus('error');await renderHolidayGbpCard($('#hgbpBox'));const m2=$('#hgbpMsg');if(m2)m2.textContent=holidayGbpErrText('err_gone');return;} /* 0행 = 다른 사람이 먼저 바꿨거나 권한 밖 */
   HGBP_EDIT=null;setStatus('saved');render();
 }
 async function deleteHolidayGbp(date){
@@ -3491,7 +3502,7 @@ async function maybeShowHolidayGbpReminder(){
     show('hgbpRemindMask');
   }catch(e){console.warn('hgbp remind',e);}
 }
-function holidayGbpRemindGo(){hide('hgbpRemindMask');if(typeof CAL_VIEW!=='undefined')CAL_VIEW='all';go('calendar');setTimeout(()=>{const c=document.getElementById('hgbpCard');if(c&&c.scrollIntoView)c.scrollIntoView({behavior:'smooth',block:'start'});},800);}
+function holidayGbpRemindGo(){hide('hgbpRemindMask');if(typeof CAL_VIEW!=='undefined')CAL_VIEW='all';go('calendar');let n=0;const t=setInterval(()=>{const c=document.getElementById('hgbpCard');if(c||++n>50){clearInterval(t);if(c&&c.scrollIntoView)c.scrollIntoView({behavior:'smooth',block:'start'});}},200);} /* 카드가 그려질 때까지(최대 10초) 기다렸다가 이동 */
 function holidayGbpRemindDone(){try{localStorage.setItem(holidayGbpRemindKey(HGBP_REMIND_DAY||today()),'1');}catch(e){}hide('hgbpRemindMask');} /* 창을 띄운 날의 달로 저장(자정을 넘겨 눌러도 다음 달 알림이 꺼지지 않게) */
 
 /* ── 온보딩 ── */

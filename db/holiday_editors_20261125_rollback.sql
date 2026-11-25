@@ -1,6 +1,13 @@
 -- db/holiday_editors_20261125.sql 되돌리기: 휴진·단축 입력을 다시 실장·원장만, 구글 목록 기본 범위 30일.
 -- 매니저·데스크가 넣은 행은 지우지 않음(그대로 남고 실장·원장만 고칠 수 있게 됨). 알림 스위치 hgbp.remind_on 값도 남김.
 begin;
+do $off$
+begin
+  if to_regclass('public.app_settings') is not null then
+    update public.app_settings set value='false' where key='gbp.sync_live';
+    if not found then insert into public.app_settings(key,value) values('gbp.sync_live','false'); end if;
+  end if;
+end $off$;
 drop policy if exists holidays_insert_approvers on public.holidays;
 create policy holidays_insert_approvers on public.holidays for insert to authenticated
   with check (public.my_role() in ('chief','owner'));

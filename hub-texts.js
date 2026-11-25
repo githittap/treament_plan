@@ -2655,6 +2655,8 @@ function hubTextDefsHolidayGbp(add){
   add('hgbp.res_ok',HG,'반영 기록 — 결과 이름: 성공','성공');
   add('hgbp.res_failed',HG,'반영 기록 — 결과 이름: 실패','실패');
   add('hgbp.res_skipped',HG,'반영 기록 — 결과 이름: 건너뜀','건너뜀');
+  add('hgbp.sent_closed',HG,'반영 기록 — 구글에 보낸(미리보기면 보낼) 값이 하루 휴무일 때','보낼 값: 휴무');
+  add('hgbp.sent_hours',HG,'반영 기록 — 구글에 보낸(미리보기면 보낼) 값이 시간일 때({open}·{close}=시각)','보낼 값: {open}~{close}',['open','close']);
   add('hgbp.lead_only',HG,'매니저·데스크 화면 — 공휴일 줄 옆에 보이는 글(공휴일은 진료 방식만 고치고 삭제·이름 변경은 실장·원장)','공휴일은 진료 방식만 고칠 수 있음(삭제·이름은 실장·원장)');
   add('hgbp.f_mode',HG,'입력 줄 — 공휴일일 때만 보이는 「이날 병원은」 칸 이름(병원은 공휴일에도 진료)','이날 병원은');
   add('hgbp.mode_normal',HG,'공휴일 진료 방식 — 평소대로 진료(구글 영업시간을 바꾸지 않음) · 목록에도 이 글이 보임','평소대로 진료(구글 그대로)');
@@ -2812,7 +2814,7 @@ const HUB_SETTING_DEFS=[
   {key:'activity_log.exclude_owner',screen:'👁 사용 기록',label:'원장 행동 기록 제외',where:'켜면 원장 본인 행동은 사용 기록에 남기지 않음.',def:'true',kind:'bool'},
   ...HUB_TOOL_CARDS.map(function(c){return {key:'tools.who.'+c[0],screen:'🧰 도구',label:'「'+c[1]+'」 보는 사람',where:'도구 탭 — 이 카드를 볼 수 있는 사람. 원장은 항상 모두 보임. 바꾸면 그 사람이 허브를 다시 열 때부터 반영돼요.',def:c[3],kind:'enum',options:[{value:'all',label:'전 직원',labelKey:'tools.who_all'},{value:'lead',label:'실장·매니저·원장',labelKey:'tools.who_lead'},{value:'owner',label:'원장만',labelKey:'tools.who_owner'}]};}),
   ...((typeof globalThis!=='undefined'&&globalThis.HUB_CARD_LEDGER_SETTING_DEFS)||[]),
-  {key:'gbp.sync_live',screen:'📅 캘린더 › 병원 휴진·단축 진료(구글 특별 영업시간)',label:'구글 자동 연동 켬',where:'꺼짐(처음 상태)이면 휴진·단축 진료 카드가 「구글 자동 반영은 아직 연결 전 — 기록만 됩니다」라고 안내해요. 구글에 보내는 연동 작업(T2 · 매월 1일·원장 지시 때)이 실제로 돌고 첫 성공 기록이 남은 뒤에만 켜세요.',def:'false',kind:'bool'},
+  {key:'gbp.sync_live',screen:'📅 캘린더 › 병원 휴진·단축 진료(구글 특별 영업시간)',label:'구글 자동 연동 켬',where:'꺼짐(처음 상태)이면 구글 영업시간을 바꾸지 않고 허브에 기록만 해요. 켜는 순서: ① T2가 꺼진 채로 미리보기(구글에 안 씀)를 돌려 아래 「구글 반영 기록」에 「보낼 값」을 남김 → ② 원장이 그 값을 확인 → ③ 원장 지시로 켜면 그때부터 매월 1일·원장 지시 때 반영해요.',def:'false',kind:'bool'},
   {key:'hgbp.remind_on',screen:'📅 캘린더 › 병원 휴진·단축 진료(구글 특별 영업시간)',label:'월말 휴진·단축 입력 알림',where:'켜면 매달 마지막 주 월요일부터 그달 말일까지 실장·매니저·데스크·원장이 허브를 열 때 「다음 달 휴진·단축 진료 입력」 창이 떠요. 「다 넣었음」을 누른 사람에겐 그달엔 다시 안 떠요.',def:'true',kind:'bool'},
 ];
 // 리콜 명단을 포함하는 허브에서만 편집 목록을 추가한다. 기존 설정의 순서는 유지한다.

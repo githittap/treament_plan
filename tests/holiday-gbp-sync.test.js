@@ -10,7 +10,7 @@ const block = hr.match(/\/\* holiday-gbp:test-start \*\/[\s\S]*?\/\* holiday-gbp
 const ctx = {};
 vm.createContext(ctx);
 vm.runInContext('function hubT(k,d,v){return v?String(d).replace(/\\{([a-z_]+)\\}/g,(m,n)=>Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m):String(d);}' + block +
-  ';this.toRow=holidayGbpFormToRow;this.label=holidayGbpLabel;this.kindLabel=holidayGbpKindLabel;this.err=holidayGbpErrText;this.act=holidayGbpActionLabel;this.res=holidayGbpResultLabel;this.saveKey=holidayGbpSaveErrKey;this.live=holidayGbpSyncLive;', ctx);
+  ';this.toRow=holidayGbpFormToRow;this.label=holidayGbpLabel;this.kindLabel=holidayGbpKindLabel;this.err=holidayGbpErrText;this.act=holidayGbpActionLabel;this.res=holidayGbpResultLabel;this.saveKey=holidayGbpSaveErrKey;this.sent=holidayGbpSentText;this.live=holidayGbpSyncLive;', ctx);
 
 test('입력 검증: 날짜·사유 필수, 단축은 시각 둘 필수·여는 시각이 더 빨라야 하고 휴진류는 시각을 비움', () => {
   const ok = { date: '2026-12-01', kind: '지정휴일', name: ' 학회 ', open: '09:00', close: '13:00', sync: true };
@@ -58,7 +58,7 @@ test('화면에 쓰는 글은 전부 hub-texts.js에 같은 기본값으로 등�
   for (const m of hr.matchAll(/hubT\('(hgbp\.[a-z_]+)','((?:[^'\\]|\\.)*)'/g)) used.set(m[1], m[2]);
   const reg = new Map();
   for (const m of texts.matchAll(/add\('(hgbp\.[a-z_]+)',HG,'(?:[^'\\]|\\.)*','((?:[^'\\]|\\.)*)'/g)) reg.set(m[1], m[2]);
-  assert.equal(reg.size, 61);
+  assert.equal(reg.size, 63);
   assert.ok(used.size >= 30);
   for (const [k, d] of used) { assert.ok(reg.has(k), '미등록 키: ' + k); assert.equal(reg.get(k), d, '기본값 불일치: ' + k); }
   // 동작·결과 이름 등 화면 코드에서 간접으로 쓰는 키도 등록돼 있음
@@ -129,11 +129,31 @@ test('월말 입력 알림: 매달 마지막 월요일~말일에만, 다음 달 
 
 test('수정·삭제가 0행이면 「저장됨」이 아니라 다시 불러오고 알림(Sol 사후 B5)', () => {
   const save = hr.slice(hr.indexOf('async function saveHolidayGbp'), hr.indexOf('async function deleteHolidayGbp'));
-  assert.match(save, /\.update\(r\.row\)\.eq\('date',HGBP_EDIT\)\.select\('date'\)/);
-  assert.match(save, /if\(HGBP_EDIT&&!\(data&&data\.length\)\)\{[^\n]*holidayGbpErrText\('err_gone'\)/);
+  assert.match(save, /\.update\(r\.row\)\.eq\('date',editDate\)\.select\('date'\)/);
+  assert.match(save, /if\(editDate&&!\(data&&data\.length\)\)\{[^\n]*holidayGbpErrText\('err_gone'\)/);
   const del = hr.slice(hr.indexOf('async function deleteHolidayGbp'), hr.indexOf('async function deleteHolidayGbp') + 1200);
   assert.match(del, /\.delete\(\)\.eq\('date',date\)\.select\('date'\)/);
   assert.match(del, /if\(!\(data&&data\.length\)\)\{[^\n]*holidayGbpErrText\('err_gone'\)/);
+});
+
+test('Sol 2차 고침: 보낼 값 표시 · 공휴일 체크칸 숨김 · 취소 중 저장 · 근태 업로드 날짜 순서 · 카드 이동', () => {
+  assert.equal(ctx.sent({ closed: true }), '보낼 값: 휴무');
+  assert.equal(ctx.sent({ open_time: '10:00', close_time: '14:00:00' }), '보낼 값: 10:00~14:00');
+  assert.equal(ctx.sent({ openTime: { hours: 9, minutes: 30 }, closeTime: { hours: 13 } }), '보낼 값: 09:30~13:00');
+  assert.equal(ctx.sent('{"closed":true}'), '보낼 값: 휴무');
+  assert.equal(ctx.sent(null), '');
+  assert.equal(ctx.sent({ x: 1 }), '{"x":1}');
+  assert.match(hr, /\.hgbp-form \[hidden\]\{display:none!important\}/);
+  assert.match(hr, /select\('id,holiday_date,action,sent_value,result,error,created_at'\)/);
+  const save = hr.slice(hr.indexOf('async function saveHolidayGbp'), hr.indexOf('async function deleteHolidayGbp'));
+  assert.match(save, /const editDate=HGBP_EDIT;/);
+  assert.match(save, /if\(editDate&&!\(data&&data\.length\)\)/);
+  assert.ok(!/if\(HGBP_EDIT&&!\(data/.test(save), '응답 판정에 바뀔 수 있는 HGBP_EDIT를 쓰지 않음');
+  assert.match(hr, /is_holiday:holi\.has\(r\.ds\)\};\}\)\.sort\(\(a,b\)=>a\.work_date<b\.work_date\?-1:a\.work_date>b\.work_date\?1:0\);/);
+  assert.match(hr, /function holidayGbpRemindGo\(\)\{[^\n]*setInterval\(/);
+  const fixc = read('db/holiday_fix_20261125c.sql');
+  assert.match(fixc, /where y\.d is not null order by y\.d\n  loop\n    perform pg_advisory_xact_lock/);
+  assert.match(texts, /\{key:'gbp\.sync_live',[^\n]*미리보기/);
 });
 
 test('연동 주기 문구: 매일이 아니라 매월 1일·원장 지시 때(원장 11-25)', () => {
@@ -180,7 +200,7 @@ test('DB 초안: 마이그레이션·롤백·시드가 짝으로 있고 서비�
 test('PGlite: 단축 일수 계산·제약·RLS·기록 권한·2027 시드·롤백', { skip: !fs.existsSync(path.join(pkg, 'dist/index.js')) && 'PGLITE_PACKAGE_ROOT 없음' }, () => {
   const log = execFileSync(process.execPath, ['tests/sql/pglite-holiday-gbp-sync.mjs'], { cwd: root, env: { ...process.env, PGLITE_PACKAGE_ROOT: pkg }, encoding: 'utf8', timeout: 120000 });
   assert.match(log, /PGLITE_HOLIDAY_GBP_SYNC_PASS/);
-  assert.equal((log.match(/PGLITE_HOLIDAY_GBP_SCENARIO_PASS/g) || []).length, 7, 'B1·B2·B4·E1·F1·F2·F3 시나리오 7개 통과');
+  assert.equal((log.match(/PGLITE_HOLIDAY_GBP_SCENARIO_PASS/g) || []).length, 8, 'B1·B2·B4·E1·F1·F2·F3·F4 시나리오 8개 통과');
 });
 
 test('B1·B2 오류 코드는 화면 글로 바뀐다(저장·삭제 둘 다)', () => {

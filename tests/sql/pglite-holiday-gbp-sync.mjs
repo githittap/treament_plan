@@ -601,3 +601,33 @@ await scenario('F3 기반 롤백만 돌려도 매니저·데스크 권한이 남
   assert.equal(logs.filter(l => l.action === 'noop' && l.result === 'skipped').length, 1, '새 기록도 뒤 번호로 남음');
   assert.equal(logs.length, 2);
 });
+
+const fixc = read('db/holiday_fix_20261125c.sql');
+await scenario('F4 Sol 2차: 여러 번 되돌려 같은 번호에 쌓인 기록도 모두 복원 · 편집 권한 롤백도 스위치 끔 · 잠금 순서 고침 적용 · 2027 시드는 평소 진료', async (db, q) => {
+  await db.exec(`alter table profiles add column job_group text; alter table profiles add column dept text;`);
+  await db.exec(editors); await db.exec(fix); await db.exec(fixc); await db.exec(fixc);
+  await db.exec("insert into app_settings(key,value) values('gbp.sync_live','true') on conflict (key) do update set value='true'");
+  await db.exec(editorsRollback);
+  assert.equal((await q("select value from app_settings where key='gbp.sync_live'"))[0].value, 'false', '편집 권한 롤백도 스위치를 끔');
+  await db.exec(editors); await db.exec(fix); await db.exec(fixc);
+  // A(원래 1번) → 되돌림 → 재적용 → B(새 1번) → 복원 전에 다시 되돌림 → 넷 재적용 → 복원
+  await as(db, 'service'); await q("select gbp_special_hours_log_write('2026-03-02','set','{\"closed\":true}'::jsonb,'ok')"); await sup(db);
+  await db.exec(rollback);
+  await db.exec(sync);
+  await as(db, 'service'); await q("select gbp_special_hours_log_write(null,'noop','{\"open_time\":\"10:00\",\"close_time\":\"14:00\"}'::jsonb,'skipped')"); await sup(db);
+  await db.exec(rollback);
+  await db.exec(sync); await db.exec(editors); await db.exec(fix); await db.exec(fixc);
+  await db.exec(restoreSql); await db.exec(restoreSql);
+  const logs = await q("select id::int id, action, result from gbp_special_hours_sync_log order by id");
+  assert.deepEqual(logs[0], {id: 1, action: 'set', result: 'ok'}, 'A가 원래 번호');
+  assert.equal(logs.filter(l => l.action === 'noop').length, 1, 'B도 되살아남');
+  assert.equal(logs.length, 2);
+  // 잠금 고침 뒤에도 휴진 날짜 옮기기·근태 재분류 동작
+  await db.exec("insert into holidays(date,name,kind,sync_gbp) values('2026-02-17','휴진','지정휴일',true)");
+  await db.exec(`insert into attendance(user_id,work_date,clock_in,clock_out) values('${id(3)}','2026-02-17','09:00','13:00'),('${id(3)}','2026-02-18','09:00','13:00')`);
+  await db.exec("update holidays set date='2026-02-18' where date='2026-02-17'");
+  assert.deepEqual((await q("select work_date::text d, is_holiday h from attendance where work_date in ('2026-02-17','2026-02-18') order by 1")).map(r => [r.d, r.h]), [['2026-02-17', false], ['2026-02-18', true]]);
+  // 2027 시드: 공휴일 24일 · 모두 평소 진료(구글 안 보냄)
+  await db.exec(seed);
+  assert.deepEqual((await q("select count(*)::int n, bool_or(sync_gbp) s from holidays where date between '2027-01-01' and '2027-12-31'"))[0], {n: 24, s: false});
+});

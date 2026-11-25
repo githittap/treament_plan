@@ -1,8 +1,8 @@
 # 구글 특별 영업시간 연동 — 직원허브 데이터 계약 (T8 → T2)
 
-작성: 2026-11-23 · 고침 2026-11-25 · T8 9차 B · 상태: **운영 적용됨(2026-11-25)** — `db/holiday_gbp_sync.sql` → `db/holiday_editors_20261125.sql` → `db/holiday_fix_20261125b.sql` 순서로 운영 DB(texevhsxttfoqkrucfzl)에 적용, 허브 화면 main 배포.
+작성: 2026-11-23 · 고침 2026-11-25 · T8 9차 B · 상태: **운영 적용됨(2026-11-25)** — `db/holiday_gbp_sync.sql` → `db/holiday_editors_20261125.sql` → `db/holiday_fix_20261125b.sql` → `db/holiday_fix_20261125c.sql`(+ 2027 공휴일 시드) 순서로 운영 DB(texevhsxttfoqkrucfzl)에 적용, 허브 화면 main 배포.
 **T2 연동 작업이 아직 없음**: 허브는 지금 「구글에 보낼 대상」을 기록만 하고 구글 영업시간은 바뀌지 않음. 허브 화면은 설정 `gbp.sync_live`(허브 설정, 기본 꺼짐)가 꺼져 있는 동안 「구글 자동 반영은 아직 연결 전입니다 — 지금은 기록만 됩니다」라고 안내하고, 월말 알림 창도 「허브에 기록만 됩니다」로 안내함.
-**첫 가동 순서(스위치와 첫 반영이 서로 기다리지 않게)**: ① 스위치가 꺼진 상태에서 T2가 **미리보기 실행**(읽기·비교만, 구글에 쓰지 않음)을 하고 날짜마다 `p_action=noop, p_result=skipped`, `p_sent_value`에 보낼 값으로 기록 → ② 원장(또는 T8)이 허브 「구글 반영 기록」에서 확인 → ③ 원장 지시가 오면 T2가 `gbp.sync_live`를 `true`로 켜고(원장 설정 화면 또는 app_settings 한 줄) 바로 첫 실제 반영. 스위치가 꺼져 있는 동안에는 `set`·`clear`를 절대 하지 않음.
+**첫 가동 순서(스위치와 첫 반영이 서로 기다리지 않게)**: ① 스위치가 꺼진 상태에서 T2가 **미리보기 실행**(읽기·비교만, 구글에 쓰지 않음)을 하고 날짜마다 `p_action=noop, p_result=skipped`, `p_sent_value`에 보낼 값으로 기록(허브 「구글 반영 기록」에 「보낼 값: 휴무」 또는 「보낼 값: 10:00~14:00」으로 보임 — `p_sent_value`는 `{"closed":true}` 또는 `{"open_time":"10:00","close_time":"14:00"}` 꼴) → ② 원장(또는 T8)이 허브 「구글 반영 기록」에서 확인 → ③ 원장 지시가 오면 T2가 `gbp.sync_live`를 `true`로 켜고(원장 설정 화면 또는 app_settings 한 줄) 바로 첫 실제 반영. 스위치가 꺼져 있는 동안에는 `set`·`clear`를 절대 하지 않음.
 T2가 만들 일(**매월 1일 1회 + 원장이 「휴진 반영」이라고 지시할 때** — 원장 11-25 「매일 연동은 비효율, 매월 혹은 내가 지시시」 · 앞으로 60일, 구글 비즈니스 프로필 specialHours와 비교 후 패치)이 읽고 쓰는 약속만 적음. 구글 API 호출·n8n 작업은 T8이 안 만듦.
 
 ## 1. 한눈에
@@ -65,7 +65,7 @@ T2가 만들 일(**매월 1일 1회 + 원장이 「휴진 반영」이라고 지
 
 ## 4c. 되돌리기와 복원
 - `db/holiday_gbp_sync_rollback.sql`은 새 칸·기록 표를 지우기 **전에** `holidays_gbp_backup_20261123`(holidays 전 행의 새 칸 값)과 `gbp_special_hours_sync_log_backup_20261123`(기록 전체)에 복사하고, 백업 표는 되돌린 뒤에도 남김(RLS 켜고 직원·익명 접근 없음, 서비스 롤·SQL 편집기만 봄). 백업 삭제는 원장 승인 뒤에만.
-- 되살리기: `db/holiday_gbp_sync.sql` 다시 적용 → `db/holiday_gbp_sync_restore.sql` 실행(날짜·종류가 같은 행의 시각·전송 여부·메모·수정 기록과 반영 기록 전체를 되돌림, 여러 번 실행해도 같음).
+- 되살리기: 마이그레이션 넷(`db/holiday_gbp_sync.sql` → `db/holiday_editors_20261125.sql` → `db/holiday_fix_20261125b.sql` → `db/holiday_fix_20261125c.sql`) 다시 적용 → `db/holiday_gbp_sync_restore.sql` 실행(날짜·종류가 같은 행의 시각·전송 여부·메모·수정 기록과 반영 기록 전체를 되돌림, 여러 번 실행해도 같음).
 - 옛 「단축」 행의 시각이 롤백으로 사라진 채 다시 적용해도 막히지 않도록 시각 검사 제약은 `not valid`(이미 있던 행은 면제, 새로 넣거나 고치는 행은 검사)로 만듦.
 
 ## 5. 파일
@@ -79,6 +79,6 @@ T2가 만들 일(**매월 1일 1회 + 원장이 「휴진 반영」이라고 지
 되돌릴 때는 `hr.html` 먼저, 그다음 `db/holiday_gbp_sync_rollback.sql`. 달력·첫 화면은 새 칸이 없으면 옛 칸(`date,name,kind`)으로 다시 읽어 깨지지 않음.
 
 ## 되돌리기 순서(2026-11-25)
-1. `db/holiday_fix_20261125b_rollback.sql` → 2. `db/holiday_editors_20261125_rollback.sql` → 3. `db/holiday_gbp_sync_rollback.sql`. 기반 롤백(3)만 돌려도 1·2에서 더한 권한·트리거를 함께 걷음. 모든 롤백은 먼저 `gbp.sync_live`를 끔.
-- 다시 적용한 뒤 `db/holiday_gbp_sync_restore.sql`로 되살림 — 그 사이에 새로 쓴 기록이 백업과 같은 번호를 차지했으면 새 기록을 뒤 번호로 옮기고 백업 기록을 원래 번호로 넣음.
+1. `db/holiday_fix_20261125b_rollback.sql` → 2. `db/holiday_editors_20261125_rollback.sql` → 3. `db/holiday_gbp_sync_rollback.sql`(`holiday_fix_20261125c.sql`은 잠금 순서만 바꿔 되돌릴 것 없음). 기반 롤백(3)만 돌려도 1·2에서 더한 권한·트리거를 함께 걷음. 모든 롤백은 먼저 `gbp.sync_live`를 끔.
+- 다시 적용할 땐 **마이그레이션 넷 모두**(`holiday_gbp_sync.sql` → `holiday_editors_20261125.sql` → `holiday_fix_20261125b.sql` → `holiday_fix_20261125c.sql`)를 적용한 뒤 `db/holiday_gbp_sync_restore.sql`로 되살림(기반만 다시 적용하면 공휴일 진료 시각이 옛 제약에 걸림). 복원은 같은 번호에 쌓인 다른 기록도 모두 살림 — 그 사이에 새로 쓴 기록이 백업과 같은 번호를 차지했으면 새 기록을 뒤 번호로 옮기고 백업 기록을 원래 번호로 넣음.
 - 근태 `attendance.is_holiday`는 2026-11-25부터 DB가 holidays 표로 직접 정함(`attendance_set_is_holiday`) — 근태 업로드와 휴진 입력이 동시에 일어나도 같은 날짜 잠금으로 어긋나지 않음.
