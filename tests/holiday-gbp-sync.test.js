@@ -45,7 +45,7 @@ test('화면에 쓰는 글은 전부 hub-texts.js에 같은 기본값으로 등�
   for (const m of hr.matchAll(/hubT\('(hgbp\.[a-z_]+)','((?:[^'\\]|\\.)*)'/g)) used.set(m[1], m[2]);
   const reg = new Map();
   for (const m of texts.matchAll(/add\('(hgbp\.[a-z_]+)',HG,'(?:[^'\\]|\\.)*','((?:[^'\\]|\\.)*)'/g)) reg.set(m[1], m[2]);
-  assert.equal(reg.size, 48);
+  assert.equal(reg.size, 54);
   assert.ok(used.size >= 30);
   for (const [k, d] of used) { assert.ok(reg.has(k), '미등록 키: ' + k); assert.equal(reg.get(k), d, '기본값 불일치: ' + k); }
   // 동작·결과 이름 등 화면 코드에서 간접으로 쓰는 키도 등록돼 있음
@@ -54,12 +54,63 @@ test('화면에 쓰는 글은 전부 hub-texts.js에 같은 기본값으로 등�
   assert.match(texts, /hubTextDefsHolidayGbp\(add\);/);
 });
 
-test('실장·원장만: 카드·저장·삭제 모두 isLead 가드, 직원 화면에는 카드 없음', () => {
-  assert.match(hr, /async function renderHolidayGbpCard\(box\)\{\n  if\(!box\|\|!isLead\(\)\)return;/);
-  assert.match(hr, /async function saveHolidayGbp\(\)\{\n  if\(!isLead\(\)\)return;/);
-  assert.match(hr, /async function deleteHolidayGbp\(date\)\{\n  if\(!isLead\(\)\)return;/);
-  assert.match(hr, /if\(isLead\(\)&&m&&typeof m\.appendChild==='function'[^\n]*renderHolidayGbpCard\(hbox\)/);
+test('입력 권한(원장 11-25): 원장·실장·매니저·데스크 — 카드·저장·삭제 모두 canEditClinicHours 가드, 공휴일 행은 원장·실장만', () => {
+  assert.match(hr, /async function renderHolidayGbpCard\(box\)\{\n  if\(!box\|\|!canEditClinicHours\(\)\)return;/);
+  assert.match(hr, /async function saveHolidayGbp\(\)\{\n  if\(!canEditClinicHours\(\)\)return;/);
+  assert.match(hr, /async function deleteHolidayGbp\(date\)\{\n  if\(!canEditClinicHours\(\)\)return;/);
+  assert.match(hr, /if\(typeof canEditClinicHours==='function'&&canEditClinicHours\(\)&&m&&typeof m\.appendChild==='function'[^\n]*renderHolidayGbpCard\(hbox\)/);
   assert.match(hr, /const isLead=\(\)=>\['chief','owner'\]\.includes\(ME\.role\);/);
+  assert.match(hr, /ME\.department=p\?\.dept\|\|'';ME\.jobGroup=p\?\.job_group\|\|'';/);
+  const c = {};
+  vm.createContext(c);
+  vm.runInContext('var ME={};function isLead(){return ["chief","owner"].includes(ME.role);}' + block + ';this.can=canEditClinicHours;this.kinds=holidayGbpKindsForMe;this.rowOk=holidayGbpRowEditable;this.setMe=m=>{ME=m;};', c);
+  const can = me => { c.setMe(me); return c.can(); };
+  assert.deepEqual([
+    can({ role: 'owner' }), can({ role: 'chief' }), can({ role: 'manager' }),
+    can({ role: 'staff', jobGroup: 'desk' }), can({ role: 'staff', department: '데스크' }),
+    can({ role: 'staff', jobGroup: 'clinical_consult', department: '진료실' }), can({ role: 'deputy', jobGroup: 'desk' }), can({ role: 'staff' })
+  ], [true, true, true, true, true, false, false, false]);
+  c.setMe({ role: 'manager' });
+  assert.deepEqual(Array.from(c.kinds()), ['지정휴일', '단축']);
+  assert.equal(c.rowOk({ kind: '공휴일' }), false);
+  assert.equal(c.rowOk({ kind: '단축' }), true);
+  c.setMe({ role: 'chief' });
+  assert.deepEqual(Array.from(c.kinds()), ['지정휴일', '단축', '공휴일']);
+  assert.equal(c.rowOk({ kind: '공휴일' }), true);
+  assert.match(hr, /const kindOpts=holidayGbpKindsForMe\(\)\.map\(/);
+  assert.match(hr, /\$\{holidayGbpRowEditable\(h\)\?`<button class="mini" onclick="editHolidayGbp/);
+});
+
+test('월말 입력 알림: 매달 마지막 월요일~말일에만, 다음 달 범위, 설정으로 끔, 「다 넣었음」은 그달만', () => {
+  const src = ['holidayGbpRemindDue', 'holidayGbpNextMonthRange'].map(n => hr.match(new RegExp('function ' + n + '\\(day\\)\\{[\\s\\S]*?\\n\\}'))[0]).join('\n');
+  const c = {};
+  vm.createContext(c);
+  vm.runInContext(src + ';this.due=holidayGbpRemindDue;this.next=holidayGbpNextMonthRange;', c);
+  // 2026-11: 마지막 월요일 11-30 · 2026-12: 12-28 · 2027-02: 02-22 · 2026-08: 08-31(말일이 월요일)
+  assert.deepEqual(['2026-11-29', '2026-11-30'].map(c.due), [false, true]);
+  assert.deepEqual(['2026-12-27', '2026-12-28', '2026-12-31', '2027-01-01'].map(c.due), [false, true, true, false]);
+  assert.deepEqual(['2027-02-21', '2027-02-22', '2027-02-28'].map(c.due), [false, true, true]);
+  assert.deepEqual(['2026-08-30', '2026-08-31'].map(c.due), [false, true]);
+  assert.equal(c.due('엉터리'), false);
+  assert.deepEqual(JSON.parse(JSON.stringify(c.next('2026-12-28'))), { month: 1, from: '2027-01-01', to: '2027-02-01' });
+  assert.deepEqual(JSON.parse(JSON.stringify(c.next('2026-11-30'))), { month: 12, from: '2026-12-01', to: '2027-01-01' });
+  const fn = hr.slice(hr.indexOf('async function maybeShowHolidayGbpReminder'), hr.indexOf('function holidayGbpRemindGo'));
+  assert.match(fn, /if\(HGBP_REMIND_SHOWN\|\|!canEditClinicHours\(\)\)return;/);
+  assert.match(fn, /hubSettingBoolean\('hgbp\.remind_on',true\)/);
+  assert.match(fn, /localStorage\.getItem\(holidayGbpRemindKey\(day\)\)/);
+  assert.match(fn, /document\.getElementById\('hubIntro'\)/, '첫 화면(3D)이 닫힌 뒤에 띄움');
+  assert.match(fn, /\.neq\('kind','공휴일'\)/);
+  assert.match(hr, /renderNav\(\);await render\(\);await refreshBadges\(\);\n      if\(typeof maybeShowHolidayGbpReminder==='function'\)maybeShowHolidayGbpReminder\(\);/);
+  assert.match(hr, /function holidayGbpRemindDone\(\)\{try\{localStorage\.setItem\(holidayGbpRemindKey\(today\(\)\),'1'\);/);
+  assert.match(texts, /\{key:'hgbp\.remind_on',[^\n]*def:'true',kind:'bool'\}/);
+});
+
+test('연동 주기 문구: 매일이 아니라 매월 1일·원장 지시 때(원장 11-25)', () => {
+  const sec = texts.slice(texts.indexOf('function hubTextDefsHolidayGbp'), texts.indexOf('function hubTextDefs()'));
+  assert.ok(!/매일/.test(sec), 'hgbp 글에 「매일」이 남지 않음');
+  assert.match(sec, /매월 1일/);
+  assert.ok(!/매일/.test(hr.slice(hr.indexOf('async function renderHolidayGbpCard'), hr.indexOf('function moreHolidayGbp'))));
+  assert.ok(!/매일 1회|매일 `gbp_special_hours_due/.test(read('docs/gbp-special-hours-contract.md')));
 });
 
 test('「단축」은 쉬는 날이 아님: 연차 일수·휴일근무 표시·노무사 회신 공휴일 집합에서 뺀다', () => {
@@ -98,7 +149,7 @@ test('DB 초안: 마이그레이션·롤백·시드가 짝으로 있고 서비�
 test('PGlite: 단축 일수 계산·제약·RLS·기록 권한·2027 시드·롤백', { skip: !fs.existsSync(path.join(pkg, 'dist/index.js')) && 'PGLITE_PACKAGE_ROOT 없음' }, () => {
   const log = execFileSync(process.execPath, ['tests/sql/pglite-holiday-gbp-sync.mjs'], { cwd: root, env: { ...process.env, PGLITE_PACKAGE_ROOT: pkg }, encoding: 'utf8', timeout: 120000 });
   assert.match(log, /PGLITE_HOLIDAY_GBP_SYNC_PASS/);
-  assert.equal((log.match(/PGLITE_HOLIDAY_GBP_SCENARIO_PASS/g) || []).length, 3, 'B1·B2·B4 시나리오 3개 통과');
+  assert.equal((log.match(/PGLITE_HOLIDAY_GBP_SCENARIO_PASS/g) || []).length, 4, 'B1·B2·B4·E1 시나리오 4개 통과');
 });
 
 test('B1·B2 오류 코드는 화면 글로 바뀐다(저장·삭제 둘 다)', () => {
@@ -133,7 +184,7 @@ test('B3 구글 자동 반영을 약속하지 않음: gbp.sync_live 꺼짐이 �
   assert.equal(c2.live(), true);
   const doc = read('docs/gbp-special-hours-contract.md');
   assert.match(doc, /gbp\.sync_live/);
-  assert.match(doc, /T2는 매일 실행 작업이 실제로 돌고[^\n]*켬/);
+  assert.match(doc, /T2는 연동 작업\(매월 1일 \+ 원장 지시 때\)이 실제로 돌고[^\n]*켬/);
 });
 
 test('B4 롤백은 백업 표를 먼저 만들고 복원 SQL이 짝으로 있음', () => {

@@ -452,3 +452,53 @@ await scenario('B4 롤백은 운영에서 쓴 값을 백업 표에 남기고, �
   // 새 칸·기록 표가 이미 없는 상태에서 되돌려도 오류 없음
   await db.exec(rollback);
 });
+
+// ───────── 2026-11-25 원장 「실장·데스크·매니저 등이 입력 가능하게」 · 매월 연동(60일) ─────────
+const editors = read('db/holiday_editors_20261125.sql');
+const editorsRollback = read('db/holiday_editors_20261125_rollback.sql');
+await scenario('E1 매니저·데스크는 휴진·단축만 넣고 고침 · 공휴일은 원장·실장만 · 일반 직원·차단 계정 불가 · 기본 60일 · 롤백', async (db, q) => {
+  await db.exec(`alter table profiles add column job_group text; alter table profiles add column dept text;
+    insert into profiles(user_id,name,role,job_group,dept) values ('${id(5)}','데스크A','staff','desk',null),('${id(6)}','데스크B','staff',null,'데스크'),('${id(7)}','차단 매니저','manager',null,null),('${id(8)}','진료실','staff','clinical_consult','진료실');
+    update profiles set active=false where user_id='${id(7)}';
+    insert into holidays(date,name,kind,sync_gbp) values('2026-03-01','삼일절','공휴일',false);`);
+  await db.exec(editors);
+  await db.exec(editors); // 다시 적용해도 안전
+  const tryAs = async (who, sql) => { await as(db, who); try { await db.exec(sql); return 'ok'; } catch (e) { return String(e.message); } finally { await sup(db); } };
+  const n = async where => (await q(`select count(*)::int n from holidays where ${where}`))[0].n;
+  // 매니저(2)·데스크(직무 5 · 부서 6): 휴진·단축 넣기·고치기·지우기 가능
+  assert.equal(await tryAs(2, "insert into holidays(date,name,kind) values('2026-12-24','원장 학회','지정휴일')"), 'ok');
+  assert.equal(await tryAs(5, "insert into holidays(date,name,kind,open_time,close_time) values('2026-12-26','단축','단축','09:00','13:00')"), 'ok');
+  assert.equal(await tryAs(6, "update holidays set name='단축 진료' where date='2026-12-26'"), 'ok');
+  assert.equal(await n("date='2026-12-26' and name='단축 진료'"), 1);
+  assert.equal(await tryAs(6, "delete from holidays where date='2026-12-24'"), 'ok');
+  assert.equal(await n("date='2026-12-24'"), 0);
+  // 공휴일 행: 매니저·데스크는 못 넣고, 못 고치고(0행), 못 지움(0행), 휴진을 공휴일로 바꾸지도 못함
+  assert.match(await tryAs(2, "insert into holidays(date,name,kind) values('2026-12-25','성탄절','공휴일')"), /row-level security/);
+  await tryAs(5, "update holidays set name='바꿈' where date='2026-03-01'");
+  await tryAs(5, "delete from holidays where date='2026-03-01'");
+  assert.equal(await n("date='2026-03-01' and name='삼일절'"), 1, '공휴일 행은 그대로');
+  assert.match(await tryAs(2, "update holidays set kind='공휴일' where date='2026-12-26'"), /row-level security/);
+  // 일반 직원(3·8)·차단 매니저(7): 못 넣음
+  for (const who of [3, 8, 7]) assert.match(await tryAs(who, "insert into holidays(date,name,kind) values('2026-12-30','x','지정휴일')"), /row-level security/, `${who}`);
+  // 원장·실장: 공휴일도 고침
+  assert.equal(await tryAs(CHIEF, "update holidays set name='3.1절' where date='2026-03-01'"), 'ok');
+  assert.equal(await n("date='2026-03-01' and name='3.1절'"), 1);
+  // 구글 반영 기록 읽기: 매니저·데스크 가능, 일반 직원은 0행
+  await as(db, 'service'); await q("select gbp_special_hours_log_write(null,'noop')"); await sup(db);
+  const logCount = async who => { await as(db, who); try { return (await q('select count(*)::int n from gbp_special_hours_sync_log'))[0].n; } finally { await sup(db); } };
+  assert.equal(await logCount(5), 1); assert.equal(await logCount(2), 1); assert.equal(await logCount(3), 0);
+  // 화면 권한 함수
+  const can = async who => { await as(db, who); try { return (await q('select public.can_edit_clinic_hours() v'))[0].v; } finally { await sup(db); } };
+  assert.deepEqual([await can(OWNER), await can(CHIEF), await can(2), await can(5), await can(6), await can(3), await can(8), await can(7)], [true, true, true, true, true, false, false, false]);
+  // 기본 범위 60일
+  assert.match((await q("select pg_get_function_arguments('public.gbp_special_hours_due(int)'::regprocedure) a"))[0].a, /DEFAULT 60/);
+  // 롤백: 다시 실장·원장만, 기본 30일, 넣은 행은 남음
+  await db.exec(editorsRollback);
+  await db.exec(editorsRollback);
+  assert.match(await tryAs(2, "insert into holidays(date,name,kind) values('2026-12-31','x','지정휴일')"), /row-level security/);
+  assert.equal(await tryAs(CHIEF, "insert into holidays(date,name,kind) values('2026-12-31','x','지정휴일')"), 'ok');
+  assert.match((await q("select pg_get_function_arguments('public.gbp_special_hours_due(int)'::regprocedure) a"))[0].a, /DEFAULT 30/);
+  assert.equal(await n("date='2026-12-26'"), 1);
+  assert.equal((await q("select count(*)::int n from pg_proc where proname='can_edit_clinic_hours'"))[0].n, 0);
+  assert.equal((await q("select value from app_settings where key='hgbp.remind_on'"))[0].value, 'true');
+});

@@ -2610,7 +2610,7 @@ function hubTextDefsHolidayGbp(add){
   add('hgbp.title',HG,'카드 제목','🏥 병원 휴진·단축 진료');
   add('hgbp.hint',HG,'카드 제목 아래 설명(구글 연동 상태와 상관없는 공통 설명)','여기 올린 휴진·단축 진료 일정은 직원허브에 기록됩니다. 연차·근태 계산에서는 휴진·공휴일만 쉬는 날로 보고 단축 진료는 근무일로 봅니다. 이미 연차가 신청·승인된 날짜를 휴진으로 바꾸거나 되돌리려면 먼저 그 연차의 「날짜 바꾸기」로 조정해야 합니다.');
   add('hgbp.notice_off',HG,'설정 「구글 자동 연동 켬」이 꺼져 있는 동안(처음 상태) 카드 위에 뜨는 안내','구글 자동 반영은 아직 연결 전입니다 — 지금은 기록만 됩니다. 「구글에 보낼 대상으로 표시」한 날짜는 구글 영업시간이 바뀌지 않으니 구글 비즈니스 프로필에서는 직접 고쳐 주세요.');
-  add('hgbp.notice_on',HG,'설정 「구글 자동 연동 켬」이 켜져 있을 때 카드 위에 뜨는 안내','「구글에 보내기」를 켠 날짜는 앞으로 30일 안이 되면 매일 실행되는 연동 작업이 구글 비즈니스 프로필의 특별 영업시간에 반영합니다. 결과는 아래 「구글 반영 기록」에서 확인하세요.');
+  add('hgbp.notice_on',HG,'설정 「구글 자동 연동 켬」이 켜져 있을 때 카드 위에 뜨는 안내','「구글에 보내기」를 켠 날짜는 매월 1일과 원장 지시 때 실행되는 연동 작업이 앞으로 60일 안의 일정을 구글 비즈니스 프로필의 특별 영업시간에 반영합니다. 결과는 아래 「구글 반영 기록」에서 확인하세요.');
   add('hgbp.f_sync_off',HG,'「구글에 보낼 대상으로 표시」 체크 글(구글 자동 연동이 아직 꺼져 있을 때)','구글에 보낼 대상으로 표시');
   add('hgbp.del_confirm_off',HG,'일정을 지우려 할 때 뜨는 확인창(구글 자동 연동이 꺼져 있을 때 · {date}=날짜)','{date} 일정을 삭제할까요?',['date']);
   add('hgbp.err_leave_conflict',HG,'그날을 지나는 승인·대기 연차가 있어 휴진 변경이 막혔을 때 뜨는 글','이 날짜에 신청·승인된 연차가 있어 휴진 여부를 바꿀 수 없습니다. 먼저 그 연차의 「날짜 바꾸기」로 조정한 뒤 다시 저장하세요.');
@@ -2622,7 +2622,7 @@ function hubTextDefsHolidayGbp(add){
   add('hgbp.f_close',HG,'입력 줄 — 문 닫는 시각 칸 이름(단축 진료일 때만 입력)','문 닫는 시각');
   add('hgbp.f_reason',HG,'입력 줄 — 사유 칸 이름(달력에도 이 글이 보임)','사유');
   add('hgbp.ph_reason',HG,'사유 칸 안에 흐리게 보이는 글','예: 학회 참석 휴진');
-  add('hgbp.f_sync',HG,'「구글에 보내기」 체크 글(구글 자동 연동이 켜져 있을 때)','구글에 보내기(매일 자동 연동)');
+  add('hgbp.f_sync',HG,'「구글에 보내기」 체크 글(구글 자동 연동이 켜져 있을 때)','구글에 보내기(매월 1일·원장 지시 때 자동 연동)');
   add('hgbp.kind_closed',HG,'종류 이름 — 하루 종일 쉬는 날','휴진');
   add('hgbp.kind_short',HG,'종류 이름 — 시간을 줄여 진료하는 날','단축 진료');
   add('hgbp.kind_public',HG,'종류 이름 — 공휴일','공휴일');
@@ -2655,6 +2655,12 @@ function hubTextDefsHolidayGbp(add){
   add('hgbp.res_ok',HG,'반영 기록 — 결과 이름: 성공','성공');
   add('hgbp.res_failed',HG,'반영 기록 — 결과 이름: 실패','실패');
   add('hgbp.res_skipped',HG,'반영 기록 — 결과 이름: 건너뜀','건너뜀');
+  add('hgbp.lead_only',HG,'매니저·데스크 화면 — 공휴일 줄 옆에 보이는 글(공휴일은 실장·원장만 고침)','공휴일은 실장·원장만 고칠 수 있음');
+  add('hgbp.remind_title',HG,'월말 알림 창 제목(설정 「월말 휴진·단축 입력 알림」이 켜져 있을 때 매달 마지막 주 월요일부터 실장·매니저·데스크·원장에게 뜸 · {month}=다음 달)','📅 {month}월 휴진·단축 진료 입력',['month']);
+  add('hgbp.remind_body',HG,'월말 알림 창 본문({month}=다음 달 · {count}=그 달에 이미 넣은 일정 수)','다음 달({month}월) 병원 휴진·단축 진료 일정을 넣어 주세요. 지금 {count}건 들어가 있습니다. 넣은 일정은 매월 1일에 구글 특별 영업시간에 반영됩니다.',['month','count']);
+  add('hgbp.remind_go',HG,'월말 알림 창 — 입력하러 가는 단추','지금 입력하기');
+  add('hgbp.remind_done',HG,'월말 알림 창 — 이번 달 알림을 그만 띄우는 단추','다 넣었음(이번 달 그만 보기)');
+  add('hgbp.remind_later',HG,'월말 알림 창 — 닫기 단추(다음에 허브를 열면 다시 뜸)','나중에');
 }
 function hubTextDefs(){
   if(HUB_TEXT_DEFS_CACHE)return HUB_TEXT_DEFS_CACHE;
@@ -2799,7 +2805,8 @@ const HUB_SETTING_DEFS=[
   {key:'activity_log.exclude_owner',screen:'👁 사용 기록',label:'원장 행동 기록 제외',where:'켜면 원장 본인 행동은 사용 기록에 남기지 않음.',def:'true',kind:'bool'},
   ...HUB_TOOL_CARDS.map(function(c){return {key:'tools.who.'+c[0],screen:'🧰 도구',label:'「'+c[1]+'」 보는 사람',where:'도구 탭 — 이 카드를 볼 수 있는 사람. 원장은 항상 모두 보임. 바꾸면 그 사람이 허브를 다시 열 때부터 반영돼요.',def:c[3],kind:'enum',options:[{value:'all',label:'전 직원',labelKey:'tools.who_all'},{value:'lead',label:'실장·매니저·원장',labelKey:'tools.who_lead'},{value:'owner',label:'원장만',labelKey:'tools.who_owner'}]};}),
   ...((typeof globalThis!=='undefined'&&globalThis.HUB_CARD_LEDGER_SETTING_DEFS)||[]),
-  {key:'gbp.sync_live',screen:'📅 캘린더 › 병원 휴진·단축 진료(구글 특별 영업시간)',label:'구글 자동 연동 켬',where:'꺼짐(처음 상태)이면 휴진·단축 진료 카드가 「구글 자동 반영은 아직 연결 전 — 기록만 됩니다」라고 안내해요. 구글에 보내는 매일 작업(T2)이 실제로 돌고 첫 성공 기록이 남은 뒤에만 켜세요.',def:'false',kind:'bool'},
+  {key:'gbp.sync_live',screen:'📅 캘린더 › 병원 휴진·단축 진료(구글 특별 영업시간)',label:'구글 자동 연동 켬',where:'꺼짐(처음 상태)이면 휴진·단축 진료 카드가 「구글 자동 반영은 아직 연결 전 — 기록만 됩니다」라고 안내해요. 구글에 보내는 연동 작업(T2 · 매월 1일·원장 지시 때)이 실제로 돌고 첫 성공 기록이 남은 뒤에만 켜세요.',def:'false',kind:'bool'},
+  {key:'hgbp.remind_on',screen:'📅 캘린더 › 병원 휴진·단축 진료(구글 특별 영업시간)',label:'월말 휴진·단축 입력 알림',where:'켜면 매달 마지막 주 월요일부터 그달 말일까지 실장·매니저·데스크·원장이 허브를 열 때 「다음 달 휴진·단축 진료 입력」 창이 떠요. 「다 넣었음」을 누른 사람에겐 그달엔 다시 안 떠요.',def:'true',kind:'bool'},
 ];
 // 리콜 명단을 포함하는 허브에서만 편집 목록을 추가한다. 기존 설정의 순서는 유지한다.
 if(typeof globalThis!=='undefined'&&globalThis.HUB_RECALL_CATALOG===true)HUB_SETTING_DEFS.push(

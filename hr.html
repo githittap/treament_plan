@@ -3128,7 +3128,7 @@ async function renderCalendar(m){
     ${isLead()?`<div class="rowflex" style="margin-top:10px"><input class="mini" type="date" id="calDate" value="${today()}"><input class="mini" id="calTitle" placeholder="${esc(hubT('cal.ph_title','제목'))}"><select class="mini" id="calKind">${calendarKindItems().map(i=>hubOptionHtml(i.code,i.label)).join('')}</select><button class="mini" onclick="addCalendarEvent()">${esc(hubT('cal.btn_add','추가'))}</button></div>`:''}
   </div>${CAL_DETAIL_DATE?renderCalendarDayDetail(CAL_DETAIL_DATE,scheduleByDate[CAL_DETAIL_DATE]||emptyCalendarRoster(),leaveByDate[CAL_DETAIL_DATE]||[]):''}`);
   if(scheduleNamesVisible())m.innerHTML=m.innerHTML.replace('class="card" id="calendarCard"','class="card calendar-names-visible" id="calendarCard"');
-  if(isLead()&&m&&typeof m.appendChild==='function'&&typeof document!=='undefined'&&typeof document.createElement==='function'){const hbox=document.createElement('div');hbox.id='hgbpBox';m.appendChild(hbox);await renderHolidayGbpCard(hbox);} /* 병원 휴진·단축 진료 → 구글 특별 영업시간 */
+  if(typeof canEditClinicHours==='function'&&canEditClinicHours()&&m&&typeof m.appendChild==='function'&&typeof document!=='undefined'&&typeof document.createElement==='function'){const hbox=document.createElement('div');hbox.id='hgbpBox';m.appendChild(hbox);await renderHolidayGbpCard(hbox);} /* 병원 휴진·단축 진료 → 구글 특별 영업시간 */
   if(CAL_DETAIL_DATE)document.getElementById('calendarDayClose')?.focus();
 }
 /* ── 건의함 ── */
@@ -3332,6 +3332,10 @@ async function deleteCalendarEvent(id){
 /* ── 병원 휴진·단축 진료 (구글 비즈니스 프로필 특별 영업시간 연동 · 실장·원장) ── */
 /* holiday-gbp:test-start */
 const HGBP_KINDS=['지정휴일','단축','공휴일'];
+/* 휴진·단축 진료 입력: 원장·실장·매니저·데스크(원장 11-25). 공휴일 행은 연차·급여 기준이라 원장·실장만(DB 정책 can_edit_clinic_hours와 같음). */
+function canEditClinicHours(){if(isLead())return true;if(ME.role==='manager')return true;return ME.role==='staff'&&(ME.jobGroup==='desk'||ME.department==='데스크');}
+function holidayGbpKindsForMe(){return isLead()?HGBP_KINDS:HGBP_KINDS.filter(k=>k!=='공휴일');}
+function holidayGbpRowEditable(h){return isLead()||(canEditClinicHours()&&h&&h.kind!=='공휴일');}
 function holidayGbpTime(v){return v?String(v).slice(0,5):'';}
 function holidayGbpKindLabel(kind){return kind==='단축'?hubT('hgbp.kind_short','단축 진료'):kind==='공휴일'?hubT('hgbp.kind_public','공휴일'):hubT('hgbp.kind_closed','휴진');}
 function holidayGbpLabel(h){const name=String(h&&h.name||'');if(h&&h.kind==='단축'&&h.open_time&&h.close_time)return hubT('hgbp.cal_short','{name} {open}~{close}',{name,open:holidayGbpTime(h.open_time),close:holidayGbpTime(h.close_time)});return name;}
@@ -3373,14 +3377,14 @@ function holidayGbpKindChanged(){
 function holidayGbpRowHtml(h){
   const short=h.kind==='단축',time=short?holidayGbpTime(h.open_time)+'~'+holidayGbpTime(h.close_time):hubT('hgbp.time_closed','종일');
   const sync=h.sync_gbp?`<span class="hgbp-badge on">${esc(hubT('hgbp.sync_on','구글 보낼 대상'))}</span>`:`<span class="hgbp-badge">${esc(hubT('hgbp.sync_off','구글 대상 아님'))}</span>`;
-  return `<div class="hgbp-item"><div class="hgbp-main"><b>${esc(h.date)}</b> <span class="hgbp-kind">${esc(holidayGbpKindLabel(h.kind))}</span> <span>${esc(time)}</span> ${sync}<div class="hgbp-name">${esc(h.name)}</div></div><div class="hgbp-actions"><button class="mini" onclick="editHolidayGbp('${esc(h.date)}')">${esc(hubT('hgbp.btn_edit','수정'))}</button><button class="mini" onclick="deleteHolidayGbp('${esc(h.date)}')">${esc(hubT('hgbp.btn_del','삭제'))}</button></div></div>`;
+  return `<div class="hgbp-item"><div class="hgbp-main"><b>${esc(h.date)}</b> <span class="hgbp-kind">${esc(holidayGbpKindLabel(h.kind))}</span> <span>${esc(time)}</span> ${sync}<div class="hgbp-name">${esc(h.name)}</div></div><div class="hgbp-actions">${holidayGbpRowEditable(h)?`<button class="mini" onclick="editHolidayGbp('${esc(h.date)}')">${esc(hubT('hgbp.btn_edit','수정'))}</button><button class="mini" onclick="deleteHolidayGbp('${esc(h.date)}')">${esc(hubT('hgbp.btn_del','삭제'))}</button>`:`<span class="hint">${esc(hubT('hgbp.lead_only','공휴일은 실장·원장만 고칠 수 있음'))}</span>`}</div></div>`;
 }
 function holidayGbpLogHtml(l){
   const detail=l.error?String(l.error):'';
   return `<div class="hgbp-item hgbp-log"><div class="hgbp-main"><span>${esc(hubFmtDateTime(l.created_at))}</span> <b>${esc(l.holiday_date||'-')}</b> <span>${esc(holidayGbpActionLabel(l.action))}</span> <span class="hgbp-badge ${l.result==='ok'?'on':l.result==='failed'?'bad':''}">${esc(holidayGbpResultLabel(l.result))}</span>${detail?`<div class="hgbp-name">${esc(detail)}</div>`:''}</div></div>`;
 }
 async function renderHolidayGbpCard(box){
-  if(!box||!isLead())return;
+  if(!box||!canEditClinicHours())return;
   let rows=[],logs=[],rowsErr=null,logErr=null;
   try{
     const [a,b]=await Promise.all([
@@ -3392,19 +3396,19 @@ async function renderHolidayGbpCard(box){
   const hasMore=rows.length>HGBP_LIMIT;if(hasMore)rows=rows.slice(0,HGBP_LIMIT);
   const live=holidayGbpSyncLive();
   if(box.isConnected===false)return;
-  const ed=HGBP_EDIT?rows.find(r=>r.date===HGBP_EDIT):null;if(HGBP_EDIT&&!ed)HGBP_EDIT=null;
+  const ed=HGBP_EDIT?rows.find(r=>r.date===HGBP_EDIT&&holidayGbpRowEditable(r)):null;if(HGBP_EDIT&&!ed)HGBP_EDIT=null;
   const f=ed||{date:today(),kind:'지정휴일',name:'',open_time:'',close_time:'',sync_gbp:true},short=f.kind==='단축';
-  const kindOpts=HGBP_KINDS.map(k=>`<option value="${esc(k)}"${k===f.kind?' selected':''}>${esc(holidayGbpKindLabel(k))}</option>`).join('');
+  const kindOpts=holidayGbpKindsForMe().map(k=>`<option value="${esc(k)}"${k===f.kind?' selected':''}>${esc(holidayGbpKindLabel(k))}</option>`).join('');
   box.innerHTML=`<div class="card" id="hgbpCard"><h2>${esc(hubT('hgbp.title','🏥 병원 휴진·단축 진료'))}</h2>
     <div class="hint">${esc(hubT('hgbp.hint','여기 올린 휴진·단축 진료 일정은 직원허브에 기록됩니다. 연차·근태 계산에서는 휴진·공휴일만 쉬는 날로 보고 단축 진료는 근무일로 봅니다. 이미 연차가 신청·승인된 날짜를 휴진으로 바꾸거나 되돌리려면 먼저 그 연차의 「날짜 바꾸기」로 조정해야 합니다.'))}</div>
-    ${live?`<div class="hint">${esc(hubT('hgbp.notice_on','「구글에 보내기」를 켠 날짜는 앞으로 30일 안이 되면 매일 실행되는 연동 작업이 구글 비즈니스 프로필의 특별 영업시간에 반영합니다. 결과는 아래 「구글 반영 기록」에서 확인하세요.'))}</div>`:`<div class="cal-error">${esc(hubT('hgbp.notice_off','구글 자동 반영은 아직 연결 전입니다 — 지금은 기록만 됩니다. 「구글에 보낼 대상으로 표시」한 날짜는 구글 영업시간이 바뀌지 않으니 구글 비즈니스 프로필에서는 직접 고쳐 주세요.'))}</div>`}
+    ${live?`<div class="hint">${esc(hubT('hgbp.notice_on','「구글에 보내기」를 켠 날짜는 매월 1일과 원장 지시 때 실행되는 연동 작업이 앞으로 60일 안의 일정을 구글 비즈니스 프로필의 특별 영업시간에 반영합니다. 결과는 아래 「구글 반영 기록」에서 확인하세요.'))}</div>`:`<div class="cal-error">${esc(hubT('hgbp.notice_off','구글 자동 반영은 아직 연결 전입니다 — 지금은 기록만 됩니다. 「구글에 보낼 대상으로 표시」한 날짜는 구글 영업시간이 바뀌지 않으니 구글 비즈니스 프로필에서는 직접 고쳐 주세요.'))}</div>`}
     <div class="hgbp-form">
       <label>${esc(hubT('hgbp.f_date','날짜'))}<input type="date" id="hgbpDate" value="${esc(f.date)}"></label>
       <label>${esc(hubT('hgbp.f_kind','종류'))}<select id="hgbpKind" onchange="holidayGbpKindChanged()">${kindOpts}</select></label>
       <label>${esc(hubT('hgbp.f_open','문 여는 시각'))}<input type="time" id="hgbpOpen" value="${esc(holidayGbpTime(f.open_time))}"${short?'':' disabled'}></label>
       <label>${esc(hubT('hgbp.f_close','문 닫는 시각'))}<input type="time" id="hgbpClose" value="${esc(holidayGbpTime(f.close_time))}"${short?'':' disabled'}></label>
       <label class="hgbp-wide">${esc(hubT('hgbp.f_reason','사유'))}<input id="hgbpName" maxlength="100" value="${esc(f.name)}" placeholder="${esc(hubT('hgbp.ph_reason','예: 학회 참석 휴진'))}"></label>
-      <label class="hgbp-check"><input type="checkbox" id="hgbpSync"${f.sync_gbp?' checked':''}> ${esc(live?hubT('hgbp.f_sync','구글에 보내기(매일 자동 연동)'):hubT('hgbp.f_sync_off','구글에 보낼 대상으로 표시'))}</label>
+      <label class="hgbp-check"><input type="checkbox" id="hgbpSync"${f.sync_gbp?' checked':''}> ${esc(live?hubT('hgbp.f_sync','구글에 보내기(매월 1일·원장 지시 때 자동 연동)'):hubT('hgbp.f_sync_off','구글에 보낼 대상으로 표시'))}</label>
     </div>
     <div class="rowflex" style="margin-top:8px"><button class="mini stamp" onclick="saveHolidayGbp()">${esc(ed?hubT('hgbp.btn_update','수정 저장'):hubT('hgbp.btn_save','저장'))}</button>${ed?`<button class="mini" onclick="cancelHolidayGbpEdit()">${esc(hubT('hgbp.btn_cancel','취소'))}</button>`:''}<span id="hgbpMsg" class="hint"></span></div>
     <h3>${esc(hubT('hgbp.list_title','앞으로의 휴진·단축 일정'))}</h3>
@@ -3417,7 +3421,7 @@ function moreHolidayGbp(){HGBP_LIMIT+=HGBP_PAGE;renderHolidayGbpCard($('#hgbpBox
 function editHolidayGbp(date){HGBP_EDIT=date;renderHolidayGbpCard($('#hgbpBox'));}
 function cancelHolidayGbpEdit(){HGBP_EDIT=null;renderHolidayGbpCard($('#hgbpBox'));}
 async function saveHolidayGbp(){
-  if(!isLead())return;
+  if(!canEditClinicHours())return;
   const msg=$('#hgbpMsg'),r=holidayGbpFormToRow({date:$('#hgbpDate').value,kind:$('#hgbpKind').value,name:$('#hgbpName').value,open:$('#hgbpOpen').value,close:$('#hgbpClose').value,sync:$('#hgbpSync').checked});
   if(r.error){msg.textContent=holidayGbpErrText(r.error);return;}
   setStatus('saving');
@@ -3427,12 +3431,48 @@ async function saveHolidayGbp(){
   HGBP_EDIT=null;setStatus('saved');render();
 }
 async function deleteHolidayGbp(date){
-  if(!isLead())return;
+  if(!canEditClinicHours())return;
   if(!confirm(holidayGbpSyncLive()?hubT('hgbp.del_confirm','{date} 일정을 삭제할까요? 구글에 이미 반영된 날짜라면 다음 연동 때 구글에서도 지워집니다.',{date}):hubT('hgbp.del_confirm_off','{date} 일정을 삭제할까요?',{date})))return;
   setStatus('saving');const {error}=await sb.from('holidays').delete().eq('date',date);
   if(error){setStatus('error');const msg=$('#hgbpMsg');if(msg)msg.textContent=holidayGbpErrText(holidayGbpSaveErrKey(error),error.message);return;}
   if(HGBP_EDIT===date)HGBP_EDIT=null;setStatus('saved');render();
 }
+
+/* 월말 휴진·단축 입력 알림 — 원장 11-25 「매니저가 올리고(팝업, 월의 마지막 주 월요일에) → 구글 반영」.
+   매달 마지막 월요일부터 말일까지, 입력할 수 있는 사람(원장·실장·매니저·데스크)이 허브를 열면 한 번 뜸. 「다 넣었음」을 누르면 그 사람에겐 그달엔 다시 안 뜸.
+   설정 hgbp.remind_on(기본 켬)으로 원장이 끌 수 있음. */
+function holidayGbpRemindDue(day){
+  const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(day||''));if(!m)return false;
+  const y=+m[1],mo=+m[2],d=+m[3],last=new Date(Date.UTC(y,mo,0)),lastDay=last.getUTCDate(),lastMonday=lastDay-((last.getUTCDay()+6)%7);
+  return d>=lastMonday&&d<=lastDay;
+}
+function holidayGbpNextMonthRange(day){
+  const y=+String(day).slice(0,4),mo=+String(day).slice(5,7),p=n=>String(n).padStart(2,'0');
+  const ny=mo===12?y+1:y,nm=mo===12?1:mo+1,ay=nm===12?ny+1:ny,am=nm===12?1:nm+1;
+  return {month:nm,from:`${ny}-${p(nm)}-01`,to:`${ay}-${p(am)}-01`};
+}
+function holidayGbpRemindKey(day){return 'hgbpRemindDone:'+(ME.id||'me')+':'+String(day).slice(0,7);}
+let HGBP_REMIND_SHOWN=false;
+async function maybeShowHolidayGbpReminder(){
+  try{
+    if(HGBP_REMIND_SHOWN||!canEditClinicHours())return;
+    if(typeof hubSettingBoolean!=='function'||!hubSettingBoolean('hgbp.remind_on',true))return;
+    const day=today();if(!holidayGbpRemindDue(day))return;
+    try{if(localStorage.getItem(holidayGbpRemindKey(day)))return;}catch(e){}
+    for(let i=0;i<300&&document.getElementById('hubIntro');i++)await new Promise(r=>setTimeout(r,1000)); /* 첫 화면(3D)이 닫힌 뒤에 띄움 */
+    if(HGBP_REMIND_SHOWN)return;HGBP_REMIND_SHOWN=true;
+    const r=holidayGbpNextMonthRange(day);let count=0;
+    try{const res=await sb.from('holidays').select('date',{count:'exact',head:true}).gte('date',r.from).lt('date',r.to).neq('kind','공휴일');count=res.count||0;}catch(e){}
+    let mask=document.getElementById('hgbpRemindMask');
+    if(!mask){mask=document.createElement('div');mask.className='mask';mask.id='hgbpRemindMask';document.body.appendChild(mask);}
+    mask.innerHTML=`<div class="modal"><h3><span>${esc(hubT('hgbp.remind_title','📅 {month}월 휴진·단축 진료 입력',{month:r.month}))}</span><button class="x" onclick="hide('hgbpRemindMask')">✕</button></h3>
+      <p style="margin:10px 0;line-height:1.6">${esc(hubT('hgbp.remind_body','다음 달({month}월) 병원 휴진·단축 진료 일정을 넣어 주세요. 지금 {count}건 들어가 있습니다. 넣은 일정은 매월 1일에 구글 특별 영업시간에 반영됩니다.',{month:r.month,count}))}</p>
+      <div class="rowflex"><button class="mini stamp" onclick="holidayGbpRemindGo()">${esc(hubT('hgbp.remind_go','지금 입력하기'))}</button><button class="mini" onclick="holidayGbpRemindDone()">${esc(hubT('hgbp.remind_done','다 넣었음(이번 달 그만 보기)'))}</button><button class="mini" onclick="hide('hgbpRemindMask')">${esc(hubT('hgbp.remind_later','나중에'))}</button></div></div>`;
+    show('hgbpRemindMask');
+  }catch(e){console.warn('hgbp remind',e);}
+}
+function holidayGbpRemindGo(){hide('hgbpRemindMask');go('calendar');setTimeout(()=>{const c=document.getElementById('hgbpCard');if(c&&c.scrollIntoView)c.scrollIntoView({behavior:'smooth',block:'start'});},800);}
+function holidayGbpRemindDone(){try{localStorage.setItem(holidayGbpRemindKey(today()),'1');}catch(e){}hide('hgbpRemindMask');}
 
 /* ── 온보딩 ── */
 /* onboarding-guide:test-start */
@@ -5949,7 +5989,7 @@ async function onAuthed(session){
         try{await loadSchedulePeople();rosterLoaded=true;}catch(error){rosterLoaded=false;}
         p=PROFILES.find(x=>x.user_id===ME.id);
       }
-      ME.name=p?p.name:ME.email.split('@')[0];ME.role=p?p.role:'staff';ME.department=p?.dept||'';ME.stamp=p?p.stamp:null;
+      ME.name=p?p.name:ME.email.split('@')[0];ME.role=p?p.role:'staff';ME.department=p?.dept||'';ME.jobGroup=p?.job_group||'';ME.stamp=p?p.stamp:null;
       if(ME.role==='deputy')TAB='contract';
       ME.approved=p?p.approved===true:false; // 프로필이 없거나 approved가 참이 아니면 승인 대기 — fail closed
       if(!ME.approved){showPendingGate(profileError);_inited=rosterLoaded;return;}
@@ -5965,6 +6005,7 @@ async function onAuthed(session){
       $('#meName').textContent=ME.name;$('#meRole').textContent=ME.role;
       applyInboxFirst();applyTabFromUrl();
       renderNav();await render();await refreshBadges();
+      if(typeof maybeShowHolidayGbpReminder==='function')maybeShowHolidayGbpReminder(); /* 월말 휴진·단축 입력 알림(기다리지 않음) */
       // 결재선 표시(비동기)
       if(!_stepsClickBound){document.addEventListener('click',()=>setTimeout(loadSteps,300));_stepsClickBound=true;}
       _inited=rosterLoaded;
