@@ -31,8 +31,11 @@ begin
       create table public.gbp_special_hours_sync_log_backup_20261123 as select * from public.gbp_special_hours_sync_log with no data;
       alter table public.gbp_special_hours_sync_log_backup_20261123 add column backed_up_at timestamptz not null default now();
     end if;
-    insert into public.gbp_special_hours_sync_log_backup_20261123(id,holiday_date,action,sent_value,result,error,created_at,created_by)
-      select id,holiday_date,action,sent_value,result,error,created_at,created_by from public.gbp_special_hours_sync_log;
+    alter table public.gbp_special_hours_sync_log_backup_20261123 add column if not exists record_uid uuid;
+    -- 있는 칸을 이름대로 그대로 복사(record_uid가 있으면 같이) — 복원은 record_uid로 같은 기록을 알아봄.
+    insert into public.gbp_special_hours_sync_log_backup_20261123
+      select (jsonb_populate_record(null::public.gbp_special_hours_sync_log_backup_20261123, to_jsonb(l) || jsonb_build_object('backed_up_at', now()))).*
+        from public.gbp_special_hours_sync_log l;
   end if;
 end $bk$;
 alter table public.holidays_gbp_backup_20261123 enable row level security;
@@ -49,6 +52,8 @@ end $bk2$;
 drop trigger if exists holidays_editor_guard on public.holidays;
 drop function if exists public.holidays_editor_guard();
 drop trigger if exists attendance_set_is_holiday on public.attendance;
+drop trigger if exists leave_requests_days_check on public.leave_requests;
+drop function if exists public.leave_requests_days_check();
 drop function if exists public.attendance_set_is_holiday();
 drop policy if exists holidays_insert_approvers on public.holidays;
 create policy holidays_insert_approvers on public.holidays for insert to authenticated

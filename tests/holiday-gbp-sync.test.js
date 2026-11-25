@@ -58,7 +58,7 @@ test('화면에 쓰는 글은 전부 hub-texts.js에 같은 기본값으로 등�
   for (const m of hr.matchAll(/hubT\('(hgbp\.[a-z_]+)','((?:[^'\\]|\\.)*)'/g)) used.set(m[1], m[2]);
   const reg = new Map();
   for (const m of texts.matchAll(/add\('(hgbp\.[a-z_]+)',HG,'(?:[^'\\]|\\.)*','((?:[^'\\]|\\.)*)'/g)) reg.set(m[1], m[2]);
-  assert.equal(reg.size, 63);
+  assert.equal(reg.size, 64);
   assert.ok(used.size >= 30);
   for (const [k, d] of used) { assert.ok(reg.has(k), '미등록 키: ' + k); assert.equal(reg.get(k), d, '기본값 불일치: ' + k); }
   // 동작·결과 이름 등 화면 코드에서 간접으로 쓰는 키도 등록돼 있음
@@ -69,8 +69,8 @@ test('화면에 쓰는 글은 전부 hub-texts.js에 같은 기본값으로 등�
 
 test('입력 권한(원장 11-25): 원장·실장·매니저·데스크 — 카드·저장·삭제 모두 canEditClinicHours 가드, 공휴일 행은 원장·실장만', () => {
   assert.match(hr, /async function renderHolidayGbpCard\(box\)\{\n  if\(!box\|\|!canEditClinicHours\(\)\)return;/);
-  assert.match(hr, /async function saveHolidayGbp\(\)\{\n  if\(!canEditClinicHours\(\)\)return;/);
-  assert.match(hr, /async function deleteHolidayGbp\(date\)\{\n  if\(!canEditClinicHours\(\)\)return;/);
+  assert.match(hr, /async function saveHolidayGbp\(\)\{\n  if\(!canEditClinicHours\(\)\|\|HGBP_BUSY\)return;/);
+  assert.match(hr, /async function deleteHolidayGbp\(date\)\{\n  if\(!canEditClinicHours\(\)\|\|HGBP_BUSY\)return;/);
   assert.match(hr, /if\(typeof canEditClinicHours==='function'&&canEditClinicHours\(\)&&m&&typeof m\.appendChild==='function'[^\n]*renderHolidayGbpCard\(hbox\)/);
   assert.match(hr, /const isLead=\(\)=>\['chief','owner'\]\.includes\(ME\.role\);/);
   assert.match(hr, /ME\.department=p\?\.dept\|\|'';ME\.jobGroup=p\?\.job_group\|\|'';/);
@@ -146,7 +146,15 @@ test('Sol 2차 고침: 보낼 값 표시 · 공휴일 체크칸 숨김 · 취소
   assert.match(hr, /\.hgbp-form \[hidden\]\{display:none!important\}/);
   assert.match(hr, /select\('id,holiday_date,action,sent_value,result,error,created_at'\)/);
   const save = hr.slice(hr.indexOf('async function saveHolidayGbp'), hr.indexOf('async function deleteHolidayGbp'));
-  assert.match(save, /const editDate=HGBP_EDIT;/);
+  assert.match(save, /const form=document\.querySelector\('#hgbpCard \.hgbp-form'\);if\(!form\|\|String\(HGBP_GEN\)!==form\.dataset\.gen\)return;/, '새 폼이 그려지기 전엔 저장 안 함(Sol 3차 B1)');
+  assert.match(save, /const gen=HGBP_GEN,editDate=form\.dataset\.edit\|\|null;/, '고칠 날짜는 화면에 보이는 폼에서');
+  assert.match(save, /if\(gen!==HGBP_GEN\)\{setStatus\(error\?'error':'saved'\);return;\}/, '늦게 온 응답은 새 편집 화면을 건드리지 않음');
+  assert.match(hr, /<div class="hgbp-form" data-edit="\$\{ed\?esc\(ed\.date\):''\}" data-gen="\$\{gen\}">/);
+  assert.match(hr, /const gen=\+\+HGBP_GEN;\{const b0=box\.querySelector&&box\.querySelector\('#hgbpSaveBtn'\);if\(b0\)b0\.disabled=true;\}/);
+  assert.match(hr, /if\(box\.isConnected===false\|\|gen!==HGBP_GEN\)return;/);
+  const del = hr.slice(hr.indexOf('async function deleteHolidayGbp'), hr.indexOf('async function deleteHolidayGbp') + 1500);
+  assert.match(del, /const gen=HGBP_GEN;[^\n]*\n  if\(gen!==HGBP_GEN\)\{setStatus/);
+  assert.match(hr, /String\(error\.message\|\|''\)\.includes\('leave_days_stale'\)\?hubT\('hgbp\.err_leave_days_stale'/, '연차 일수 재계산 안내');
   assert.match(save, /if\(editDate&&!\(data&&data\.length\)\)/);
   assert.ok(!/if\(HGBP_EDIT&&!\(data/.test(save), '응답 판정에 바뀔 수 있는 HGBP_EDIT를 쓰지 않음');
   assert.match(hr, /is_holiday:holi\.has\(r\.ds\)\};\}\)\.sort\(\(a,b\)=>a\.work_date<b\.work_date\?-1:a\.work_date>b\.work_date\?1:0\);/);
@@ -200,7 +208,7 @@ test('DB 초안: 마이그레이션·롤백·시드가 짝으로 있고 서비�
 test('PGlite: 단축 일수 계산·제약·RLS·기록 권한·2027 시드·롤백', { skip: !fs.existsSync(path.join(pkg, 'dist/index.js')) && 'PGLITE_PACKAGE_ROOT 없음' }, () => {
   const log = execFileSync(process.execPath, ['tests/sql/pglite-holiday-gbp-sync.mjs'], { cwd: root, env: { ...process.env, PGLITE_PACKAGE_ROOT: pkg }, encoding: 'utf8', timeout: 120000 });
   assert.match(log, /PGLITE_HOLIDAY_GBP_SYNC_PASS/);
-  assert.equal((log.match(/PGLITE_HOLIDAY_GBP_SCENARIO_PASS/g) || []).length, 8, 'B1·B2·B4·E1·F1·F2·F3·F4 시나리오 8개 통과');
+  assert.equal((log.match(/PGLITE_HOLIDAY_GBP_SCENARIO_PASS/g) || []).length, 9, 'B1·B2·B4·E1·F1·F2·F3·F4·F5 시나리오 9개 통과');
 });
 
 test('B1·B2 오류 코드는 화면 글로 바뀐다(저장·삭제 둘 다)', () => {

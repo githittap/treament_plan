@@ -25,7 +25,7 @@ begin
       for select to authenticated using (public.my_role() in ('chief','owner'));
   end if;
 end $l$;
--- 30일 기본값으로 다시 만듦(본문 동일).
+-- 30일 기본값으로 다시 만듦. 시각 해석은 지금 방식(시각 있으면 단축) 그대로 — 공휴일 단축이 휴진으로 바뀌지 않게(Sol 3차 B4).
 create or replace function public.gbp_special_hours_due(p_days int default 30)
 returns table("date" date, closed boolean, open_time time, close_time time, name text, kind text, note text)
 language plpgsql stable security invoker set search_path = pg_catalog, public as $$
@@ -38,10 +38,12 @@ begin
     end if;
   end if;
   return query
-    select h.date, (coalesce(h.kind,'공휴일')<>'단축') as closed, h.open_time, h.close_time, h.name, h.kind, h.note
+    select h.date, (h.open_time is null) as closed, h.open_time, h.close_time, h.name, h.kind, h.note
     from public.holidays h
     where h.sync_gbp
-      and not (coalesce(h.kind,'공휴일')='단축' and (h.open_time is null or h.close_time is null or h.open_time>=h.close_time))
+      and not (coalesce(h.kind,'공휴일')='단축' and (h.open_time is null or h.close_time is null))
+      and not ((h.open_time is null) <> (h.close_time is null))
+      and not (h.open_time is not null and h.open_time>=h.close_time)
       and h.date between today_kst and today_kst + greatest(0, least(coalesce(p_days,30), 366))
     order by h.date;
 end $$;

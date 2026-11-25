@@ -597,7 +597,7 @@ await scenario('F3 기반 롤백만 돌려도 매니저·데스크 권한이 남
   assert.equal(newId, 1, '새 기록이 백업 번호 1을 차지함(재현)');
   await db.exec(restoreSql); await db.exec(restoreSql);
   const logs = await q("select id::int id, action, result from gbp_special_hours_sync_log order by id");
-  assert.deepEqual(logs[0], {id: 1, action: 'set', result: 'ok'}, '백업 기록이 원래 번호로 돌아옴');
+  assert.equal(logs.filter(l => l.action === 'set' && l.result === 'ok').length, 1, '백업 기록이 되살아남(번호는 새로 매김 — T2는 id에 기대지 않음)');
   assert.equal(logs.filter(l => l.action === 'noop' && l.result === 'skipped').length, 1, '새 기록도 뒤 번호로 남음');
   assert.equal(logs.length, 2);
 });
@@ -619,7 +619,7 @@ await scenario('F4 Sol 2차: 여러 번 되돌려 같은 번호에 쌓인 기록
   await db.exec(sync); await db.exec(editors); await db.exec(fix); await db.exec(fixc);
   await db.exec(restoreSql); await db.exec(restoreSql);
   const logs = await q("select id::int id, action, result from gbp_special_hours_sync_log order by id");
-  assert.deepEqual(logs[0], {id: 1, action: 'set', result: 'ok'}, 'A가 원래 번호');
+  assert.equal(logs.filter(l => l.action === 'set' && l.result === 'ok').length, 1, 'A가 되살아남');
   assert.equal(logs.filter(l => l.action === 'noop').length, 1, 'B도 되살아남');
   assert.equal(logs.length, 2);
   // 잠금 고침 뒤에도 휴진 날짜 옮기기·근태 재분류 동작
@@ -630,4 +630,49 @@ await scenario('F4 Sol 2차: 여러 번 되돌려 같은 번호에 쌓인 기록
   // 2027 시드: 공휴일 24일 · 모두 평소 진료(구글 안 보냄)
   await db.exec(seed);
   assert.deepEqual((await q("select count(*)::int n, bool_or(sync_gbp) s from holidays where date between '2027-01-01' and '2027-12-31'"))[0], {n: 24, s: false});
+});
+
+const fixd = read('db/holiday_fix_20261125d.sql');
+const fixdRollback = read('db/holiday_fix_20261125d_rollback.sql');
+await scenario('F5 Sol 3차 뿌리 고침: 복원한 기록을 다시 백업·복원해도 중복 없음 · 같은 순간 다른 값 기록도 모두 · 연차 일수는 DB가 다시 셈 · 편집 롤백 뒤에도 공휴일 단축은 단축', async (db, q) => {
+  await db.exec(`alter table profiles add column job_group text; alter table profiles add column dept text;`);
+  const all = async () => { await db.exec(editors); await db.exec(fix); await db.exec(fixc); await db.exec(fixd); };
+  await all(); await db.exec(fixd);
+  // 같은 트랜잭션(같은 created_at)에 보낸 값이 다른 기록 둘 + 일반 기록 하나
+  await as(db, 'service');
+  await db.exec("begin; select gbp_special_hours_log_write('2026-03-02','set','{\"closed\":true}'::jsonb,'ok'); select gbp_special_hours_log_write('2026-03-03','set','{\"open_time\":\"10:00\",\"close_time\":\"14:00\"}'::jsonb,'ok'); commit;");
+  await q("select gbp_special_hours_log_write(null,'noop',null,'skipped')");
+  await sup(db);
+  const snap = async () => (await q("select record_uid::text u, holiday_date::text d, action, result, sent_value::text v from gbp_special_hours_sync_log order by record_uid")).map(r => JSON.stringify(r));
+  const before = await snap();
+  assert.equal(before.length, 3);
+  // 1회: 되돌림 → 다섯 재적용 → 복원
+  await db.exec(rollback); await db.exec(sync); await all(); await db.exec(restoreSql); await db.exec(restoreSql);
+  assert.deepEqual(await snap(), before, '1회 복원 뒤 같은 기록 셋(중복·누락 없음)');
+  // 2회: 복원한 상태를 다시 되돌림 → 재적용 → 복원(백업에 같은 기록이 두 번 쌓여도 한 번만)
+  await db.exec(rollback); await db.exec(sync); await all(); await db.exec(restoreSql);
+  assert.deepEqual(await snap(), before, '2회 복원 뒤에도 그대로');
+  // 연차: 화면이 보낸 일수가 DB 계산과 다르면 막고, 같으면 저장
+  await db.exec("insert into holidays(date,name,kind,sync_gbp) values('2026-04-08','휴진','지정휴일',true)");
+  await db.exec(`grant insert on leave_requests to authenticated`);
+  await as(db, 3);
+  await assert.rejects(db.exec(`insert into leave_requests(user_id,type,date_from,date_to,days,status) values('${id(3)}','연차','2026-04-07','2026-04-09',3,'대기')`), /leave_days_stale/, '휴진 하루를 모르고 3일로 보내면 막힘');
+  await db.exec(`insert into leave_requests(user_id,type,date_from,date_to,days,status) values('${id(3)}','연차','2026-04-07','2026-04-09',2,'대기')`);
+  await sup(db);
+  // 결재(상태만 바뀜)는 다시 세지 않음 · 반차는 대상 아님
+  await db.exec("update leave_requests set status='승인' where date_from='2026-04-07'");
+  await db.exec(`insert into leave_requests(user_id,type,type_note,date_from,date_to,days,status) values('${id(3)}','반차','09:00~13:00','2026-04-10','2026-04-10',0.5,'대기')`);
+  // 같은 날짜 잠금 · 날짜 오름차순
+  const src = (await q("select prosrc from pg_proc where proname='leave_requests_days_check'"))[0].prosrc;
+  assert.match(src, /order by 1 loop\s+perform pg_advisory_xact_lock\(hashtext\('hub\.holiday:'\|\|d::text\)\)/);
+  // 편집 권한 롤백 뒤에도 공휴일 단축은 closed=false
+  const today = (await q("select (now() at time zone 'Asia/Seoul')::date::text d"))[0].d;
+  await db.exec(`insert into holidays(date,name,kind,open_time,close_time,sync_gbp) values ('${today}'::date+2,'공휴일 단축','공휴일','10:00','14:00',true)`);
+  await db.exec(fixdRollback); await db.exec(fixdRollback);
+  await db.exec(editorsRollback);
+  await as(db, 'service');
+  const r = await q(`select closed from gbp_special_hours_due(30) where date='${today}'::date+2`);
+  await sup(db);
+  assert.deepEqual(r.map(x => x.closed), [false]);
+  assert.equal((await q("select count(*)::int n from pg_trigger where tgname='leave_requests_days_check'"))[0].n, 0);
 });
