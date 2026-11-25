@@ -148,12 +148,23 @@ test('Sol 2차 고침: 보낼 값 표시 · 공휴일 체크칸 숨김 · 취소
   const save = hr.slice(hr.indexOf('async function saveHolidayGbp'), hr.indexOf('async function deleteHolidayGbp'));
   assert.match(save, /const form=document\.querySelector\('#hgbpCard \.hgbp-form'\);if\(!form\|\|String\(HGBP_GEN\)!==form\.dataset\.gen\)return;/, '새 폼이 그려지기 전엔 저장 안 함(Sol 3차 B1)');
   assert.match(save, /const gen=HGBP_GEN,editDate=form\.dataset\.edit\|\|null;/, '고칠 날짜는 화면에 보이는 폼에서');
-  assert.match(save, /if\(gen!==HGBP_GEN\)\{setStatus\(error\?'error':'saved'\);return;\}/, '늦게 온 응답은 새 편집 화면을 건드리지 않음');
+  assert.match(save, /const ok=!error&&\(!editDate\|\|!!\(data&&data\.length\)\);/, '성공 여부를 먼저 정함(0행은 실패)');
+  assert.match(save, /if\(gen!==HGBP_GEN\)\{holidayGbpLateResult\(ok,editDate\|\|r\.row\.date,error\);return;\}/, '늦게 온 응답은 새 편집 폼을 건드리지 않고 결과만 알림');
+  const late = hr.match(/function holidayGbpLateResult\(ok,date,error\)\{[\s\S]*?\n\}/)[0];
+  const c2 = { calls: [], msg: { textContent: '' } };
+  vm.createContext(c2);
+  vm.runInContext('function hubT(k,d,v){return v?String(d).replace(/\\{([a-z_]+)\\}/g,(m,n)=>String(v[n])):String(d);}' + block + ';function setStatus(s){calls.push(s);}function $(){return msg;}' + late + ';this.late=holidayGbpLateResult;', c2);
+  c2.late(false, '2027-01-01', null);
+  assert.deepEqual(Array.from(c2.calls), ['error']);
+  assert.match(c2.msg.textContent, /^2027-01-01 · 이미 바뀌었거나 지워진/);
+  c2.late(true, '2027-01-02', null);
+  assert.equal(c2.calls[1], 'saved');
   assert.match(hr, /<div class="hgbp-form" data-edit="\$\{ed\?esc\(ed\.date\):''\}" data-gen="\$\{gen\}">/);
   assert.match(hr, /const gen=\+\+HGBP_GEN;\{const b0=box\.querySelector&&box\.querySelector\('#hgbpSaveBtn'\);if\(b0\)b0\.disabled=true;\}/);
   assert.match(hr, /if\(box\.isConnected===false\|\|gen!==HGBP_GEN\)return;/);
   const del = hr.slice(hr.indexOf('async function deleteHolidayGbp'), hr.indexOf('async function deleteHolidayGbp') + 1500);
-  assert.match(del, /const gen=HGBP_GEN;[^\n]*\n  if\(gen!==HGBP_GEN\)\{setStatus/);
+  assert.match(del, /const gen=HGBP_GEN;[^\n]*\n  if\(gen!==HGBP_GEN\)\{holidayGbpLateResult\(!error&&!!\(data&&data\.length\),date,error\);return;\}/);
+  assert.match(hr, /function leaveEditError\(error\)\{const message=String\(error\?\.message\|\|''\);if\(message\.includes\('leave_days_stale'\)\)return hubT\('hgbp\.err_leave_days_stale'/, '승인 연차 「날짜 바꾸기」도 안내(Sol 4차 B3)');
   assert.match(hr, /String\(error\.message\|\|''\)\.includes\('leave_days_stale'\)\?hubT\('hgbp\.err_leave_days_stale'/, '연차 일수 재계산 안내');
   assert.match(save, /if\(editDate&&!\(data&&data\.length\)\)/);
   assert.ok(!/if\(HGBP_EDIT&&!\(data/.test(save), '응답 판정에 바뀔 수 있는 HGBP_EDIT를 쓰지 않음');
@@ -208,7 +219,7 @@ test('DB 초안: 마이그레이션·롤백·시드가 짝으로 있고 서비�
 test('PGlite: 단축 일수 계산·제약·RLS·기록 권한·2027 시드·롤백', { skip: !fs.existsSync(path.join(pkg, 'dist/index.js')) && 'PGLITE_PACKAGE_ROOT 없음' }, () => {
   const log = execFileSync(process.execPath, ['tests/sql/pglite-holiday-gbp-sync.mjs'], { cwd: root, env: { ...process.env, PGLITE_PACKAGE_ROOT: pkg }, encoding: 'utf8', timeout: 120000 });
   assert.match(log, /PGLITE_HOLIDAY_GBP_SYNC_PASS/);
-  assert.equal((log.match(/PGLITE_HOLIDAY_GBP_SCENARIO_PASS/g) || []).length, 9, 'B1·B2·B4·E1·F1·F2·F3·F4·F5 시나리오 9개 통과');
+  assert.equal((log.match(/PGLITE_HOLIDAY_GBP_SCENARIO_PASS/g) || []).length, 10, 'B1·B2·B4·E1·F1·F2·F3·F4·F5·F6 시나리오 10개 통과');
 });
 
 test('B1·B2 오류 코드는 화면 글로 바뀐다(저장·삭제 둘 다)', () => {

@@ -458,7 +458,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 <script src="payroll-reply.js?v=2026112301"></script>
 <script src="payroll-compare.js?v=2026101110"></script>
 <script src="hub-help.js?v=2026101202"></script>
-<script src="hub-texts.js?v=2026112504"></script>
+<script src="hub-texts.js?v=2026112505"></script>
 <script src="hub-activity.js?v=2026101110"></script>
 <script src="security-pledge.js?v=20261003p9d"></script>
 <script src="wage-hourly.js?v=2026101110"></script>
@@ -2103,7 +2103,7 @@ async function renderEmployeeLeaveStatus(){
   }).join('')}</table></div>`;
   return `<div class="card">${title}${earnedWarning}${candidateWarning}${leaveLedgerHistoryHtml(ledgerHistory.error,!LEAVE_HISTORY_ACTIONS_READY)}${leaveAccrualRunHistoryHtml(runHistory.error)}${table(main,0)}${other.length?`<details><summary>${esc(hubT('leave.status.other','그 밖의 계정 {n}개',{n:other.length}))}</summary>${table(other,main.length)}</details>`:''}</div>`;
 }
-function leaveEditError(error){const message=String(error?.message||'');if(message.includes('changed; reload'))return hubT('leave.edit.stale','다른 곳에서 변경되었습니다. 목록을 다시 열어 주세요.');if(message.includes('pending change request'))return hubT('leave.edit.pending','직원의 변경 요청이 대기 중입니다. 먼저 처리해 주세요.');return message;}
+function leaveEditError(error){const message=String(error?.message||'');if(message.includes('leave_days_stale'))return hubT('hgbp.err_leave_days_stale','휴진·근무표가 방금 바뀌어 연차 일수가 달라졌습니다. 한 번 더 저장(신청)해 주세요.');if(message.includes('changed; reload'))return hubT('leave.edit.stale','다른 곳에서 변경되었습니다. 목록을 다시 열어 주세요.');if(message.includes('pending change request'))return hubT('leave.edit.pending','직원의 변경 요청이 대기 중입니다. 먼저 처리해 주세요.');return message;}
 async function editApprovedLeaveDates(id){
   if(!canManageLeave())return;
   const {data:r,error}=await sb.from('leave_requests').select('*').eq('id',id).maybeSingle();
@@ -2409,7 +2409,7 @@ async function submitLeave(){
   let error=null;
   if(editId){const result=await sb.rpc('replace_pending_leave_request',{p_id:editId,p_type:type,p_type_note:payload.type_note,p_date_from:f,p_date_to:t,p_days:days,p_reason:payload.reason,p_contact:payload.contact,p_special:special,p_special_reason:payload.special_reason});error=result.error;}
   else{const created=await sb.from('leave_requests').insert({...payload,user_id:ME.id}).select('id').maybeSingle();error=created.error||(!created.data?{message:hubT('leave.m_save_unknown','신청 저장 결과를 확인하지 못했습니다.')}:null);}
-  if(error){$('#lvMsg').textContent=String(error.message||'').includes('leave_days_stale')?hubT('hgbp.err_leave_days_stale','휴진·근무표가 방금 바뀌어 연차 일수가 달라졌습니다. 「신청」을 한 번 더 눌러 주세요.'):hubT('leave.m_fail','실패: {msg}',{msg:error.message});return;}
+  if(error){$('#lvMsg').textContent=String(error.message||'').includes('leave_days_stale')?hubT('hgbp.err_leave_days_stale','휴진·근무표가 방금 바뀌어 연차 일수가 달라졌습니다. 한 번 더 저장(신청)해 주세요.'):hubT('leave.m_fail','실패: {msg}',{msg:error.message});return;}
   setStatus('saved');if(gen!==LEAVE_EDIT_GENERATION){refreshBadges();return;}LEAVE_EDIT_ID=null;LEAVE_EDIT_GENERATION++;hide('lvMask');render();refreshBadges();
 }
 function hubT(k,d,v){return typeof hubText==='function'?hubText(k,d,v):(v?String(d).replace(/\{([a-z_]+)\}/g,function(m,n){return Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m;}):String(d));}
@@ -3457,17 +3457,24 @@ async function saveHolidayGbp(){
   setStatus('saving');HGBP_BUSY=true;const btn=$('#hgbpSaveBtn');if(btn)btn.disabled=true;
   const q=editDate?sb.from('holidays').update(r.row).eq('date',editDate).select('date'):sb.from('holidays').insert(r.row);
   let data=null,error=null;try{({data,error}=await q);}catch(e){error=e;}finally{HGBP_BUSY=false;}
-  if(gen!==HGBP_GEN){setStatus(error?'error':'saved');return;} /* 그사이 다른 일정을 열었으면 그 화면은 건드리지 않음 */
+  const ok=!error&&(!editDate||!!(data&&data.length)); /* 성공 = 오류 없음 + (수정이면) 바뀐 행 1건 이상 */
+  if(gen!==HGBP_GEN){holidayGbpLateResult(ok,editDate||r.row.date,error);return;} /* 그사이 다른 일정을 열었으면 그 폼은 건드리지 않고 결과만 알림 */
   if(btn)btn.disabled=false;
   if(error){setStatus('error');const m1=$('#hgbpMsg');if(m1)m1.textContent=holidayGbpErrText(holidayGbpSaveErrKey(error),error.message);return;}
   if(editDate&&!(data&&data.length)){HGBP_EDIT=null;setStatus('error');await renderHolidayGbpCard($('#hgbpBox'));const m2=$('#hgbpMsg');if(m2)m2.textContent=holidayGbpErrText('err_gone');return;} /* 0행 = 다른 사람이 먼저 바꿨거나 권한 밖 */
   HGBP_EDIT=null;setStatus('saved');render();
 }
+/* 다른 일정을 연 뒤에 도착한 이전 저장·삭제 결과: 성공이면 「저장됨」, 실패면 지금 카드 메시지 칸에 그 날짜와 함께 알림(Sol 4차 B1) */
+function holidayGbpLateResult(ok,date,error){
+  if(ok){setStatus('saved');return;}
+  setStatus('error');const m=$('#hgbpMsg');
+  if(m)m.textContent=String(date||'')+' · '+holidayGbpErrText(error?holidayGbpSaveErrKey(error):'err_gone',error&&error.message);
+}
 async function deleteHolidayGbp(date){
   if(!canEditClinicHours()||HGBP_BUSY)return;
   if(!confirm(holidayGbpSyncLive()?hubT('hgbp.del_confirm','{date} 일정을 삭제할까요? 구글에 이미 반영된 날짜라면 다음 연동 때 구글에서도 지워집니다.',{date}):hubT('hgbp.del_confirm_off','{date} 일정을 삭제할까요?',{date})))return;
   const gen=HGBP_GEN;setStatus('saving');HGBP_BUSY=true;let data=null,error=null;try{({data,error}=await sb.from('holidays').delete().eq('date',date).select('date'));}catch(e){error=e;}finally{HGBP_BUSY=false;}
-  if(gen!==HGBP_GEN){setStatus(error?'error':'saved');return;}
+  if(gen!==HGBP_GEN){holidayGbpLateResult(!error&&!!(data&&data.length),date,error);return;}
   if(error){setStatus('error');const msg=$('#hgbpMsg');if(msg)msg.textContent=holidayGbpErrText(holidayGbpSaveErrKey(error),error.message);return;}
   if(!(data&&data.length)){if(HGBP_EDIT===date)HGBP_EDIT=null;setStatus('error');await renderHolidayGbpCard($('#hgbpBox'));const m2=$('#hgbpMsg');if(m2)m2.textContent=holidayGbpErrText('err_gone');return;}
   if(HGBP_EDIT===date)HGBP_EDIT=null;setStatus('saved');render();

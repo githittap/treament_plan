@@ -2655,7 +2655,7 @@ function hubTextDefsHolidayGbp(add){
   add('hgbp.res_ok',HG,'반영 기록 — 결과 이름: 성공','성공');
   add('hgbp.res_failed',HG,'반영 기록 — 결과 이름: 실패','실패');
   add('hgbp.res_skipped',HG,'반영 기록 — 결과 이름: 건너뜀','건너뜀');
-  add('hgbp.err_leave_days_stale',HG,'연차 신청 창 — 신청하는 사이 휴진·근무표가 바뀌어 DB가 다시 센 일수와 달라 저장이 막혔을 때 뜨는 글','휴진·근무표가 방금 바뀌어 연차 일수가 달라졌습니다. 「신청」을 한 번 더 눌러 주세요.');
+  add('hgbp.err_leave_days_stale',HG,'연차 신청 창·승인 연차 「날짜 바꾸기」 — 그사이 휴진·근무표가 바뀌어 DB가 다시 센 일수와 달라 저장이 막혔을 때 뜨는 글','휴진·근무표가 방금 바뀌어 연차 일수가 달라졌습니다. 한 번 더 저장(신청)해 주세요.');
   add('hgbp.sent_closed',HG,'반영 기록 — 구글에 보낸(미리보기면 보낼) 값이 하루 휴무일 때','보낼 값: 휴무');
   add('hgbp.sent_hours',HG,'반영 기록 — 구글에 보낸(미리보기면 보낼) 값이 시간일 때({open}·{close}=시각)','보낼 값: {open}~{close}',['open','close']);
   add('hgbp.lead_only',HG,'매니저·데스크 화면 — 공휴일 줄 옆에 보이는 글(공휴일은 진료 방식만 고치고 삭제·이름 변경은 실장·원장)','공휴일은 진료 방식만 고칠 수 있음(삭제·이름은 실장·원장)');

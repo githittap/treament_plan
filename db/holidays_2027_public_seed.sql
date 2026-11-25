@@ -7,8 +7,9 @@
 -- sync_gbp=false: 평소대로 진료(원장 11-25 「365치과, 빨간 날에도 안 쉼」). 단축·휴진인 날은 허브 「병원 휴진·단축 진료」 카드의 「이날 병원은」에서 고름.
 -- 이미 있는 날짜 행은 건드리지 않음(on conflict do nothing).
 begin;
-insert into public.holidays(date, name, kind, sync_gbp, note) values
-  ('2027-01-01','신정','공휴일',false,'2027 공휴일 시드'),
+insert into public.holidays(date, name, kind, sync_gbp, note)
+select v.* from (values
+  ('2027-01-01'::date,'신정','공휴일',false,'2027 공휴일 시드'),
   ('2027-02-06','설날 연휴','공휴일',false,'2027 공휴일 시드'),
   ('2027-02-07','설날','공휴일',false,'2027 공휴일 시드'),
   ('2027-02-08','설날 연휴','공휴일',false,'2027 공휴일 시드'),
@@ -32,5 +33,11 @@ insert into public.holidays(date, name, kind, sync_gbp, note) values
   ('2027-10-11','한글날 대체공휴일','공휴일',false,'2027 공휴일 시드'),
   ('2027-12-25','성탄절','공휴일',false,'2027 공휴일 시드'),
   ('2027-12-27','성탄절 대체공휴일','공휴일',false,'2027 공휴일 시드')
+) as v(date, name, kind, sync_gbp, note)
+-- 그날을 지나는 대기·승인 연차가 있으면 그 날짜만 건너뜀(보호 트리거가 문장 전체를 멈추지 않게 · 운영 2026-11-25에 2027-05-05가 이렇게 빠짐).
+-- 건너뛴 날짜는 실장이 연차 「날짜 바꾸기」로 조정한 뒤 허브 카드에서 공휴일로 추가(또는 이 파일을 다시 실행 — 이미 있는 날짜는 그대로).
+where not exists(select 1 from public.leave_requests lr
+                  where lr.status in ('대기','1차승인','승인') and lr.type in ('연차','기타')
+                    and v.date::date between lr.date_from and lr.date_to)
 on conflict (date) do nothing;
 commit;

@@ -15,19 +15,20 @@ do $rs$
 begin
   if to_regclass('public.gbp_special_hours_sync_log_backup_20261123') is not null then
     alter table public.gbp_special_hours_sync_log_backup_20261123 add column if not exists record_uid uuid;
+    -- 고유번호가 없던 옛 백업 기록: 내용(칸마다 구분되는 jsonb 배열)으로 정해지는 번호를 한 번 붙여 보존 — 여러 번 백업돼도 같은 번호(Sol 4차 B2).
+    update public.gbp_special_hours_sync_log_backup_20261123
+       set record_uid = md5(jsonb_build_array(id,holiday_date,action,result,created_at,sent_value,error,created_by)::text)::uuid
+     where record_uid is null;
     alter table public.gbp_special_hours_sync_log add column if not exists record_uid uuid not null default gen_random_uuid();
     create unique index if not exists uq_gbp_special_hours_sync_log_record_uid on public.gbp_special_hours_sync_log(record_uid);
-    -- 같은 기록 = 같은 record_uid(옛 백업에 없으면 내용 전체). 여러 번 되돌려 백업에 여러 번 들어가도 한 번만 되살림.
+    -- 같은 기록 = 같은 record_uid. 여러 번 되돌려 백업에 여러 번 들어가도 한 번만 되살림.
     -- 행 번호(id)는 새로 매김 — 순서는 만든 시각 순. T2는 id가 아니라 날짜·동작·결과로 기록을 읽음(계약서).
     insert into public.gbp_special_hours_sync_log(holiday_date,action,sent_value,result,error,created_at,created_by,record_uid)
-      select x.holiday_date,x.action,x.sent_value,x.result,x.error,x.created_at,x.created_by,coalesce(x.record_uid,gen_random_uuid())
-        from (select distinct on (coalesce(b.record_uid::text, md5(concat_ws('|',b.id,b.holiday_date,b.action,b.result,b.created_at,b.sent_value::text,b.error,b.created_by)))) b.*
+      select x.holiday_date,x.action,x.sent_value,x.result,x.error,x.created_at,x.created_by,x.record_uid
+        from (select distinct on (b.record_uid) b.*
                 from public.gbp_special_hours_sync_log_backup_20261123 b
-               order by coalesce(b.record_uid::text, md5(concat_ws('|',b.id,b.holiday_date,b.action,b.result,b.created_at,b.sent_value::text,b.error,b.created_by))), b.backed_up_at desc) x
-       where not exists(select 1 from public.gbp_special_hours_sync_log l
-                         where (x.record_uid is not null and l.record_uid=x.record_uid)
-                            or (x.record_uid is null and (l.holiday_date,l.action,l.result,l.created_at,l.sent_value::text,l.error,l.created_by)
-                                                         is not distinct from (x.holiday_date,x.action,x.result,x.created_at,x.sent_value::text,x.error,x.created_by)))
+               order by b.record_uid, b.backed_up_at desc) x
+       where not exists(select 1 from public.gbp_special_hours_sync_log l where l.record_uid=x.record_uid)
        order by x.created_at, x.id;
   end if;
 end $rs$;

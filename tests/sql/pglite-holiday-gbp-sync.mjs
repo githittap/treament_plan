@@ -346,13 +346,15 @@ await scenario('B1 휴진 변경은 연차가 걸린 날을 막고 안내 코드
   // 옮겨 간 날짜에 연차가 있어도 막힘
   await db.exec("insert into holidays(date,name,kind) values('2026-03-02','휴진','지정휴일')");
   await assert.rejects(db.exec("update holidays set date='2026-01-21' where date='2026-03-02'"), /holiday_conflicts_leave/, '옮겨 간 날짜가 새로 쉬는 날이 됨');
-  // 충돌 없는 시드는 그대로 적용, 충돌하면 시드가 멈추고 코드가 나옴
+  // 충돌 없는 시드는 그대로 적용, 연차가 걸린 날짜는 시드가 건너뜀(Sol 4차 B5 — 예전엔 문장 전체가 멈춤)
   await db.exec(seed);
   assert.equal((await q("select count(*)::int n from holidays where date between '2027-01-01' and '2027-12-31'"))[0].n, 24);
   await db.exec("delete from holidays where date between '2027-01-01' and '2027-12-31'");
   await db.exec(`insert into leave_requests(id,user_id,type,date_from,date_to,days,status) values (7,'${id(3)}','연차','2027-03-01','2027-03-01',1,'승인')`);
-  await assert.rejects(db.exec(seed), /holiday_conflicts_leave/);
-  await db.exec('rollback').catch(() => {});
+  await db.exec(seed);
+  assert.deepEqual((await q("select count(*)::int n, count(*) filter (where date='2027-03-01')::int m from holidays where date between '2027-01-01' and '2027-12-31'"))[0], {n: 23, m: 0});
+  // 휴진 직접 입력은 여전히 막힘
+  await assert.rejects(db.exec("insert into holidays(date,name,kind) values('2027-03-01','삼일절','공휴일')"), /holiday_conflicts_leave/);
 });
 
 await scenario('B2 휴진 변경 시 기존 근태 is_holiday 재분류 · 휴일근로 시간이 새로 계산한 값과 같음', async (db, q) => {
@@ -675,4 +677,27 @@ await scenario('F5 Sol 3차 뿌리 고침: 복원한 기록을 다시 백업·�
   await sup(db);
   assert.deepEqual(r.map(x => x.closed), [false]);
   assert.equal((await q("select count(*)::int n from pg_trigger where tgname='leave_requests_days_check'"))[0].n, 0);
+});
+
+await scenario('F6 Sol 4차: 고유번호 없던 옛 백업도 중복·누락 없이 · 시드는 연차 걸린 날만 건너뜀', async (db, q) => {
+  // 옛 백업 흉내: record_uid 칸이 없던 백업 표에 같은 번호의 다른 기록 둘(서로 다른 칸에 같은 글자)
+  await db.exec(`create table public.holidays_gbp_backup_20261123 (date date not null, name text, kind text, open_time time, close_time time, sync_gbp boolean, note text, updated_at timestamptz, updated_by uuid, backed_up_at timestamptz not null default now());`);
+  await db.exec(`create table public.gbp_special_hours_sync_log_backup_20261123 as select * from public.gbp_special_hours_sync_log with no data;
+    alter table public.gbp_special_hours_sync_log_backup_20261123 drop column if exists record_uid;
+    alter table public.gbp_special_hours_sync_log_backup_20261123 add column backed_up_at timestamptz not null default now();
+    insert into public.gbp_special_hours_sync_log_backup_20261123(id,holiday_date,action,sent_value,result,error,created_at,created_by)
+      values (1,'2026-03-02','set','"x"'::jsonb,'ok',null,'2026-11-20T00:00:00Z','gbp-sync'),
+             (1,'2026-03-02','set',null,'ok','"x"','2026-11-20T00:00:00Z','gbp-sync');`);
+  await db.exec(`alter table profiles add column job_group text; alter table profiles add column dept text;`);
+  await db.exec(editors); await db.exec(fix); await db.exec(fixc); await db.exec(fixd);
+  await db.exec(restoreSql);
+  assert.equal((await q('select count(*)::int n from gbp_special_hours_sync_log'))[0].n, 2, '칸이 다른 두 옛 기록이 둘 다 살아남(누락 없음)');
+  // 다시 되돌림 → 재적용 → 복원: 중복 없음
+  await db.exec(rollback); await db.exec(sync); await db.exec(editors); await db.exec(fix); await db.exec(fixc); await db.exec(fixd);
+  await db.exec(restoreSql); await db.exec(restoreSql);
+  assert.equal((await q('select count(*)::int n from gbp_special_hours_sync_log'))[0].n, 2, '두 번 복원해도 2건(중복 없음)');
+  // 시드: 2027-05-05를 지나는 연차가 있으면 그날만 건너뛰고 23일
+  await db.exec(`insert into leave_requests(id,user_id,type,date_from,date_to,days,status) values(99,'${id(3)}','연차','2027-05-04','2027-05-06',3,'대기')`);
+  await db.exec(seed);
+  assert.deepEqual((await q("select count(*)::int n, count(*) filter (where date='2027-05-05')::int m from holidays where date between '2027-01-01' and '2027-12-31'"))[0], {n: 23, m: 0});
 });
