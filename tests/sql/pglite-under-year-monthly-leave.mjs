@@ -13,7 +13,7 @@ try{
     create table leave_ledger(id bigint generated always as identity primary key,user_id uuid,kind text,days numeric,note text);
     create table schedule_weeks(week_start date primary key,status text);
     create table schedules(user_id uuid,week_start date,day int,shift text);
-    create table holidays(date date primary key);
+    create table holidays(date date primary key,kind text default '공휴일');
     create table attendance(user_id uuid,work_date date,clock_in time,clock_out time);
     create table attendance_manual_entries(user_id uuid,work_date date,status text);
     create table attendance_issue_resolutions(user_id uuid,work_date date);
@@ -68,7 +68,7 @@ try{
   const candidates=()=>q(`select work_date::text ds from monthly_leave_absence_candidates('${automatic}','2026-09-18','2026-10-18','auto')`);
   assert.equal((await candidates()).length,21);
   assert.equal((await candidates()).some(r=>['2026-09-19','2026-09-20'].includes(r.ds)),false);
-  await q("insert into holidays values('2026-09-21')");assert.equal((await candidates()).length,20);
+  await q("insert into holidays(date) values('2026-09-21')");assert.equal((await candidates()).length,20);
   await q(`insert into attendance values('${automatic}','2026-09-22','09:40','18:30')`);assert.equal((await candidates()).length,19);
   await q(`insert into attendance_issue_resolutions values('${automatic}','2026-09-23')`);assert.equal((await candidates()).length,18);
   await q(`insert into leave_requests values('${automatic}','2026-09-24','2026-09-24','승인','연차')`);assert.equal((await candidates()).length,17);

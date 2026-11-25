@@ -50,7 +50,7 @@ begin
     if p_type=r.type then n:=r.days; end if;
   else
     select count(*) into n from generate_series(p_date_from::timestamp,p_date_to::timestamp,interval '1 day') d
-      where not exists(select 1 from public.holidays h where h.date=d::date)
+      where not exists(select 1 from public.holidays h where h.date=d::date and h.kind is distinct from '단축')
       and not exists(select 1 from public.schedules s where s.user_id=r.user_id and s.week_start=date_trunc('week',d)::date and s.day=extract(dow from d)::integer and s.shift='off');
     if p_type='기타' then p_type_note:=r.type_note; else p_type_note:=null; end if;
   end if;

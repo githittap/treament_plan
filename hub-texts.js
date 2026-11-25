@@ -2604,6 +2604,58 @@ function hubTextDefsBonus(add){
  [["pay.reply.hourly_correction_basis", "시급 승인 정정"], ["pay.reply.hourly_fallback", "시급제 RPC 대상에 없는 과거 인원: 월근태 출퇴근 시각으로 시간 계산"], ["pay.reply.night_missing", "야간시간: 출퇴근 시각 근거 부족"], ["pay.reply.rule_overtime", "max(0, 허브 연장 분 − 포괄 포함 시간×60) + 휴일근로 분"], ["pay.reply.rule_holiday", "출퇴근 시각 구간; 휴게시간 미차감"], ["pay.reply.rule_inclusive", "직원별 wage_info 적용일 기준; 비어 있으면 전체 연장"], ["pay.reply.clock_review", "출퇴근 시각 확인 필요"], ["pay.reply.rule_calc_label", "계산"], ["pay.reply.rule_time_label", "시간"], ["pay.reply.rule_overtime_label", "연장"], ["pay.reply.rule_holiday_label", "휴일"], ["pay.reply.rule_public_label", "공휴일 연장"], ["pay.reply.rule_night_label", "야간"], ["pay.reply.rule_inclusive_label", "포괄"], ["pay.reply.rule_time", "분 ÷ 60; 소수 {digits}자리"], ["pay.reply.rule_public", "공휴일 하루 {hours}시간 초과분"], ["pay.reply.rule_night", "{start}분부터 다음 {end}분까지"]].forEach(d=>add(d[0],'💰 급여 › 노무사 회신',d[1],d[1],Array.from(d[1].matchAll(/\{([a-z_]+)\}/g),m=>m[1])));
  [["pay.compare.tab", "대조"], ["pay.compare.no_ledger", "급여대장을 먼저 올려 주세요"], ["pay.compare.overtime", "연장(포괄 초과분)"], ["pay.compare.attendance", "지각+조퇴 시간"], ["pay.compare.holiday", "휴일근로 시간"], ["pay.compare.holiday_overtime", "공휴일 휴일연장 시간"], ["pay.compare.bonus", "상여금(세후)"], ["pay.compare.weekday_work", "평일근무"], ["pay.compare.weekday_over", "평일오버"], ["pay.compare.weekend_work", "주말근무"], ["pay.compare.weekend_over", "주말오버"], ["pay.compare.missing", "근거 없음"], ["pay.compare.month", "대상 월"], ["pay.compare.loading", "불러오는 중…"], ["pay.compare.failed", "불러오기 실패: {detail}"], ["pay.compare.person", "직원"], ["pay.compare.item", "항목"], ["pay.compare.ledger", "노무사 대장"], ["pay.compare.hub", "허브"], ["pay.compare.diff", "차이"]].forEach(d=>add(d[0],'💰 급여 › 대조',d[1],d[1],Array.from(d[1].matchAll(/\{([a-z_]+)\}/g),m=>m[1])));
 }
+/* 병원 휴진·단축 진료 → 구글 특별 영업시간 연동 글(실장·원장 캘린더 아래 카드) */
+function hubTextDefsHolidayGbp(add){
+  const HG='📅 캘린더 › 병원 휴진·단축 진료(구글 특별 영업시간)';
+  add('hgbp.title',HG,'카드 제목','🏥 병원 휴진·단축 진료');
+  add('hgbp.hint',HG,'카드 제목 아래 설명(구글 연동 상태와 상관없는 공통 설명)','여기 올린 휴진·단축 진료 일정은 직원허브에 기록됩니다. 연차·근태 계산에서는 휴진·공휴일만 쉬는 날로 보고 단축 진료는 근무일로 봅니다. 이미 연차가 신청·승인된 날짜를 휴진으로 바꾸거나 되돌리려면 먼저 그 연차의 「날짜 바꾸기」로 조정해야 합니다.');
+  add('hgbp.notice_off',HG,'설정 「구글 자동 연동 켬」이 꺼져 있는 동안(처음 상태) 카드 위에 뜨는 안내','구글 자동 반영은 아직 연결 전입니다 — 지금은 기록만 됩니다. 「구글에 보낼 대상으로 표시」한 날짜는 구글 영업시간이 바뀌지 않으니 구글 비즈니스 프로필에서는 직접 고쳐 주세요.');
+  add('hgbp.notice_on',HG,'설정 「구글 자동 연동 켬」이 켜져 있을 때 카드 위에 뜨는 안내','「구글에 보내기」를 켠 날짜는 앞으로 30일 안이 되면 매일 실행되는 연동 작업이 구글 비즈니스 프로필의 특별 영업시간에 반영합니다. 결과는 아래 「구글 반영 기록」에서 확인하세요.');
+  add('hgbp.f_sync_off',HG,'「구글에 보낼 대상으로 표시」 체크 글(구글 자동 연동이 아직 꺼져 있을 때)','구글에 보낼 대상으로 표시');
+  add('hgbp.del_confirm_off',HG,'일정을 지우려 할 때 뜨는 확인창(구글 자동 연동이 꺼져 있을 때 · {date}=날짜)','{date} 일정을 삭제할까요?',['date']);
+  add('hgbp.err_leave_conflict',HG,'그날을 지나는 승인·대기 연차가 있어 휴진 변경이 막혔을 때 뜨는 글','이 날짜에 신청·승인된 연차가 있어 휴진 여부를 바꿀 수 없습니다. 먼저 그 연차의 「날짜 바꾸기」로 조정한 뒤 다시 저장하세요.');
+  add('hgbp.err_month_closed',HG,'그 달 근태가 이미 확정돼 휴진 변경이 막혔을 때 뜨는 글','이 날짜가 속한 달의 근태가 이미 확정되어 휴진 여부를 바꿀 수 없습니다. 근태 확정을 먼저 풀어 주세요.');
+  add('hgbp.btn_more',HG,'앞으로의 일정 목록 맨 아래 「더 보기」 단추 글(목록이 길 때만 보임)','더 보기');
+  add('hgbp.f_date',HG,'입력 줄 — 날짜 칸 이름','날짜');
+  add('hgbp.f_kind',HG,'입력 줄 — 종류 칸 이름','종류');
+  add('hgbp.f_open',HG,'입력 줄 — 문 여는 시각 칸 이름(단축 진료일 때만 입력)','문 여는 시각');
+  add('hgbp.f_close',HG,'입력 줄 — 문 닫는 시각 칸 이름(단축 진료일 때만 입력)','문 닫는 시각');
+  add('hgbp.f_reason',HG,'입력 줄 — 사유 칸 이름(달력에도 이 글이 보임)','사유');
+  add('hgbp.ph_reason',HG,'사유 칸 안에 흐리게 보이는 글','예: 학회 참석 휴진');
+  add('hgbp.f_sync',HG,'「구글에 보내기」 체크 글(구글 자동 연동이 켜져 있을 때)','구글에 보내기(매일 자동 연동)');
+  add('hgbp.kind_closed',HG,'종류 이름 — 하루 종일 쉬는 날','휴진');
+  add('hgbp.kind_short',HG,'종류 이름 — 시간을 줄여 진료하는 날','단축 진료');
+  add('hgbp.kind_public',HG,'종류 이름 — 공휴일','공휴일');
+  add('hgbp.btn_save',HG,'저장 단추 글','저장');
+  add('hgbp.btn_update',HG,'수정 중일 때 저장 단추 글','수정 저장');
+  add('hgbp.btn_cancel',HG,'수정 취소 단추 글','취소');
+  add('hgbp.btn_edit',HG,'목록 줄 — 수정 단추 글','수정');
+  add('hgbp.btn_del',HG,'목록 줄 — 삭제 단추 글','삭제');
+  add('hgbp.list_title',HG,'앞으로의 일정 목록 제목','앞으로의 휴진·단축 일정');
+  add('hgbp.list_empty',HG,'앞으로의 일정이 하나도 없을 때 뜨는 글','등록된 일정이 없습니다.');
+  add('hgbp.time_closed',HG,'목록 줄 — 하루 종일 쉬는 날의 시각 자리에 들어가는 글','종일');
+  add('hgbp.sync_on',HG,'목록 줄 — 구글로 보낼 대상으로 표시한 날 표시(자동 연동이 꺼져 있으면 실제로는 아직 안 보냄)','구글 보낼 대상');
+  add('hgbp.sync_off',HG,'목록 줄 — 구글로 보낼 대상이 아닌 날 표시','구글 대상 아님');
+  add('hgbp.cal_short',HG,'캘린더 날짜 칸의 단축 진료 표시({name}=사유 · {open}=여는 시각 · {close}=닫는 시각)','{name} {open}~{close}',['name','open','close']);
+  add('hgbp.err_load',HG,'일정 목록을 못 불러왔을 때 뜨는 글','일정을 불러오지 못했습니다.');
+  add('hgbp.err_date',HG,'날짜를 안 골랐을 때 뜨는 글','날짜를 고르세요.');
+  add('hgbp.err_reason',HG,'사유를 안 적었을 때 뜨는 글','사유를 적으세요.');
+  add('hgbp.err_time',HG,'단축 진료인데 시각이 비었거나 여는 시각이 닫는 시각보다 늦을 때 뜨는 글','단축 진료는 문 여는 시각과 닫는 시각을 넣어야 하고, 여는 시각이 닫는 시각보다 빨라야 합니다.');
+  add('hgbp.err_exists',HG,'같은 날짜에 이미 일정이 있을 때 뜨는 글(하루에 하나만 둘 수 있음)','이 날짜에는 이미 일정이 있습니다. 아래 목록에서 수정하세요.');
+  add('hgbp.err_save',HG,'저장을 못 했을 때 뜨는 글({msg}=서버 오류)','저장하지 못했습니다: {msg}',['msg']);
+  add('hgbp.del_confirm',HG,'일정을 지우려 할 때 뜨는 확인창({date}=날짜)','{date} 일정을 삭제할까요? 구글에 이미 반영된 날짜라면 다음 연동 때 구글에서도 지워집니다.',['date']);
+  add('hgbp.log_title',HG,'구글 반영 기록 제목','구글 반영 기록');
+  add('hgbp.log_hint',HG,'구글 반영 기록 제목 아래 설명','최근 20건 · 연동 작업이 구글에 보낸 결과입니다.');
+  add('hgbp.log_empty',HG,'구글 반영 기록이 하나도 없을 때 뜨는 글','아직 반영 기록이 없습니다.');
+  add('hgbp.log_err',HG,'구글 반영 기록을 못 불러왔을 때 뜨는 글','반영 기록을 불러오지 못했습니다.');
+  add('hgbp.act_set',HG,'반영 기록 — 동작 이름: 구글에 날짜를 넣음','등록');
+  add('hgbp.act_clear',HG,'반영 기록 — 동작 이름: 구글에서 날짜를 지움','삭제');
+  add('hgbp.act_noop',HG,'반영 기록 — 동작 이름: 이미 같아서 안 고침','변경 없음');
+  add('hgbp.act_error',HG,'반영 기록 — 동작 이름: 오류','오류');
+  add('hgbp.res_ok',HG,'반영 기록 — 결과 이름: 성공','성공');
+  add('hgbp.res_failed',HG,'반영 기록 — 결과 이름: 실패','실패');
+  add('hgbp.res_skipped',HG,'반영 기록 — 결과 이름: 건너뜀','건너뜀');
+}
 function hubTextDefs(){
   if(HUB_TEXT_DEFS_CACHE)return HUB_TEXT_DEFS_CACHE;
   const defs=[];
@@ -2637,6 +2689,7 @@ function hubTextDefs(){
   if(typeof globalThis!=='undefined'&&globalThis.HUB_RECALL_CATALOG===true)hubTextDefsRecall(add);
   hubTextDefsChapter6(add);
   hubTextDefsChapter7(add);
+  hubTextDefsHolidayGbp(add);
   const activityTexts={title:'👁 사용 기록',today:'오늘',week:'7일',month:'30일',custom:'직접',all_staff:'모든 직원',all_kind:'모든 종류',from:'시작일',to:'마지막 날',staff:'직원',kind:'종류',time:'날짜 시각',target:'대상',device:'기기',load:'조회',more:'200줄 더 보기',csv:'CSV 내려받기',summary:'직원별 요약',first:'오늘 들어온 시각',last:'마지막 활동',days:'이번 달 접속 일수',empty:'기록 없음',error:'기록을 불러오지 못했음',loading:'불러오는 중…',csv_error:'CSV를 만들지 못했음',enter:'접속',leave:'나감',tab:'탭 열람',click:'클릭',write:'작성·수정·삭제',view:'열람',download:'내려받기·인쇄',csv_name:'허브_사용기록',count:'{n}건 표시 중임',owner_only:'원장만 볼 수 있음',t_notice:'공지',t_consultation_inbox:'상담 문의',t_consultation_inbox_reply:'상담 문의 답변',t_consultation_inbox_handled:'상담 문의 처리',t_suggestions:'건의',t_suggestion_comments:'건의 댓글',t_approval_docs:'결재',t_employee_documents:'직원 서류',t_leave_requests:'연차 신청',t_leave_application_documents:'연차신청서',t_employment_certificates:'재직증명서',t_contracts:'근로계약서',t_consultation_journals:'상담일지',t_hub:'허브'};
   Object.entries(activityTexts).forEach(([key,text])=>add('actlog.'+key,'👁 사용 기록',text,text,key==='count'?['n']:[]));
   [["title", "내 출퇴근 · 월 표"], ["bad_month", "조회할 월을 확인하세요."], ["prev", "이전 달"], ["next", "다음 달"], ["print", "인쇄 / PDF 저장"], ["hint", "본인 기록만 표시합니다. 합계에는 표에 표시된 수기 대기 기록도 포함됩니다."], ["days", "근무일 수 {n}일"], ["total", "연장 합계 {n}분 (점심 포함)"], ["th_date", "날짜"], ["th_weekday", "요일"], ["th_in", "출근"], ["th_out", "퇴근"], ["th_overtime", "연장(분)"], ["th_lunch", "점심 연장(분)"], ["th_early", "조퇴(분)"], ["th_half", "반차"], ["th_leave", "연차"], ["th_reason", "사유"], ["th_status", "기준·상태"]].forEach(([key,text])=>add('att.staff_month.'+key,'🕘 본인 월 출퇴근',text,text,['days','total'].includes(key)?['n']:[]));
@@ -2746,6 +2799,7 @@ const HUB_SETTING_DEFS=[
   {key:'activity_log.exclude_owner',screen:'👁 사용 기록',label:'원장 행동 기록 제외',where:'켜면 원장 본인 행동은 사용 기록에 남기지 않음.',def:'true',kind:'bool'},
   ...HUB_TOOL_CARDS.map(function(c){return {key:'tools.who.'+c[0],screen:'🧰 도구',label:'「'+c[1]+'」 보는 사람',where:'도구 탭 — 이 카드를 볼 수 있는 사람. 원장은 항상 모두 보임. 바꾸면 그 사람이 허브를 다시 열 때부터 반영돼요.',def:c[3],kind:'enum',options:[{value:'all',label:'전 직원',labelKey:'tools.who_all'},{value:'lead',label:'실장·매니저·원장',labelKey:'tools.who_lead'},{value:'owner',label:'원장만',labelKey:'tools.who_owner'}]};}),
   ...((typeof globalThis!=='undefined'&&globalThis.HUB_CARD_LEDGER_SETTING_DEFS)||[]),
+  {key:'gbp.sync_live',screen:'📅 캘린더 › 병원 휴진·단축 진료(구글 특별 영업시간)',label:'구글 자동 연동 켬',where:'꺼짐(처음 상태)이면 휴진·단축 진료 카드가 「구글 자동 반영은 아직 연결 전 — 기록만 됩니다」라고 안내해요. 구글에 보내는 매일 작업(T2)이 실제로 돌고 첫 성공 기록이 남은 뒤에만 켜세요.',def:'false',kind:'bool'},
 ];
 // 리콜 명단을 포함하는 허브에서만 편집 목록을 추가한다. 기존 설정의 순서는 유지한다.
 if(typeof globalThis!=='undefined'&&globalThis.HUB_RECALL_CATALOG===true)HUB_SETTING_DEFS.push(

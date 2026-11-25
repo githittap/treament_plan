@@ -19,7 +19,7 @@ create or replace function public.monthly_leave_absence_candidates(
 language sql stable security invoker set search_path=pg_catalog,public as $$
   select d::date
   from generate_series(p_start,p_end-1,interval '1 day') d
-  where not exists(select 1 from public.holidays h where h.date=d::date)
+  where not exists(select 1 from public.holidays h where h.date=d::date and h.kind is distinct from '단축')
     and (
       (p_mode='published_schedule' and not exists(
         select 1 from public.schedules s join public.schedule_weeks w on w.week_start=s.week_start and w.status='공표'

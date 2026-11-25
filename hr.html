@@ -209,6 +209,7 @@ tr.new td{background:var(--mint-dk)}
 .cal-tag.status.published{border-color:var(--mint);color:var(--mint)}
 .cal-tag a{color:inherit;opacity:.6;flex-shrink:0}
 .cal-error{margin:7px 0;padding:7px 9px;border:1px solid var(--red);border-radius:7px;background:var(--red-bg);color:var(--red);font-size:12px}
+.hgbp-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;align-items:end;margin-top:8px}.hgbp-form label{display:flex;flex-direction:column;gap:3px;font-size:12px;min-width:0}.hgbp-form input,.hgbp-form select{min-height:36px;max-width:100%;box-sizing:border-box}.hgbp-wide{grid-column:1/-1}.hgbp-check{flex-direction:row!important;align-items:center;gap:6px!important}.hgbp-check input{min-height:0}.hgbp-item{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;padding:7px 2px;border-bottom:1px solid var(--line);font-size:12.5px}.hgbp-main{min-width:0;flex:1 1 220px;overflow-wrap:anywhere}.hgbp-name{color:var(--gray);margin-top:2px}.hgbp-actions{display:flex;gap:6px}.hgbp-badge{display:inline-block;padding:0 6px;border-radius:9px;border:1px solid var(--line);font-size:11px;color:var(--gray)}.hgbp-badge.on{color:var(--green,#1a8f6a);border-color:currentColor}.hgbp-badge.bad{color:var(--red);border-color:currentColor}
 @media(max-width:640px){.calendar-layout{grid-template-columns:1fr}.calendar-day-panel{position:static;order:2}.cal-cell{min-height:56px;padding:3px 4px}.cal-cell .d{font-size:11px}.cal-tag{font-size:9px;padding:0 2px}.cal-cell:not(.expanded) .cal-names{display:none}.cal-cell.expanded .cal-names{display:inline}.calendar-day-detail{align-items:flex-end;padding:8px}.calendar-day-detail-card{max-height:88vh;padding:14px;border-radius:14px 14px 8px 8px}.calendar-day-detail-row{padding:7px 0;font-size:14px}}
 
 /* 모달 */
@@ -454,10 +455,10 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 <script src="card-ledger-ui.js?v=2026101110"></script>
 <script src="payroll-bonus.js?v=2026101110"></script>
 <script src="payroll-ledger-extra.js?v=2026101004"></script>
-<script src="payroll-reply.js?v=2026101110"></script>
+<script src="payroll-reply.js?v=2026112301"></script>
 <script src="payroll-compare.js?v=2026101110"></script>
 <script src="hub-help.js?v=2026101202"></script>
-<script src="hub-texts.js?v=2026112310"></script>
+<script src="hub-texts.js?v=2026112501"></script>
 <script src="hub-activity.js?v=2026101110"></script>
 <script src="security-pledge.js?v=20261003p9d"></script>
 <script src="wage-hourly.js?v=2026101110"></script>
@@ -1954,7 +1955,7 @@ async function saveAttendance(){
   const rows=xlRows.filter(r=>r.user_id);
   if(!rows.length){$('#xlMsg').textContent=hubT('att.xl.m_no_rows','매핑된 행이 없습니다.');return;}
   $('#xlMsg').textContent=hubT('att.xl.m_saving','저장 중…');setStatus('saving');
-  const holi=new Set((await sb.from('holidays').select('date')).data?.map(h=>h.date)||[]);
+  const holi=new Set((await sb.from('holidays').select('date,kind')).data?.filter(h=>h.kind!=='단축').map(h=>h.date)||[]); /* 단축 진료일은 쉬는 날이 아니라 휴일근무로 안 셈 */
   const payload=rows.map(r=>{const c=calcRow(r);return {user_id:r.user_id,work_date:r.ds,clock_in:r.ci!=null?minToT(r.ci)+':00':null,clock_out:r.co!=null?minToT(r.co)+':00':null,
     source:'fp',late_min:c.late,early_min:c.early,overtime_min:c.ot,evening:r.evening,is_holiday:holi.has(r.ds)};});
   const {error}=await sb.from('attendance').upsert(payload,{onConflict:'user_id,work_date'});
@@ -1972,7 +1973,7 @@ let LEAVE_ARCHIVE_MONTH=null,LEAVE_EDIT_ID=null,LEAVE_EDIT_GENERATION=0;
 async function computeLeaveDays(uid,from,to,type){
   if(type==='반차'||type==='조퇴')return hubN('leave.half_day_value',0.5);
   const dates=[];for(let d=from;d<=to;d=addDays(d,1))dates.push(d);
-  const holiSet=new Set((await sb.from('holidays').select('date')).data?.map(h=>h.date)||[]);
+  const holiSet=new Set((await sb.from('holidays').select('date,kind')).data?.filter(h=>h.kind!=='단축').map(h=>h.date)||[]); /* 단축 진료일은 근무일 */
   const weekStarts=[...new Set(dates.map(d=>mondayStr(d)))];
   const {data:schRows}=await sb.from('schedules').select('week_start,day,shift').eq('user_id',uid).in('week_start',weekStarts);
   const schMap={};(schRows||[]).forEach(r=>schMap[r.week_start+'|'+r.day]=r.shift);
@@ -2974,7 +2975,7 @@ function calendarWeekRoleRows(roster,leaveItems){
 function renderCalendarWeekTable(dates,scheduleByDate,leaveByDate,byDate,weekByStart){
   const dayRows=dates.map(date=>calendarWeekRoleRows(scheduleByDate[date]||emptyCalendarRoster(),leaveByDate[date]||[])),rows=dayRows[0]||calendarWeekRoleRows(emptyCalendarRoster(),[]);
   const rowHtml=rows.map(([label,color],index)=>`<tr class="${color}"><th class="calendar-week-role">${esc(label)}</th>${dates.map((date,dayIndex)=>{const members=dayRows[dayIndex][index][2],count=members.length,names=typeof scheduleNamesVisible==='function'&&scheduleNamesVisible()?`<span class="calendar-cell-names">${members.map(item=>item.leave?calendarMemberHtml(item):esc(typeof item==='string'?item:item.label)).join('<br>')}</span>`:'';return `<td><button type="button" class="${count?'':'zero'}" aria-label="${esc(date)} ${esc(label)} ${esc(hubT('cal.week.aria_count','{n}명 상세 보기',{n:count}))}" onclick="selectCalendarDay('${date}',event)">${count}${names}</button></td>`;}).join('')}</tr>`).join('');
-  const headers=dates.map(date=>{const info=byDate[date]||{holidays:[],events:[]},week=weekByStart.get(mondayStr(date)),status=week&&week.status==='공표'?hubT('cal.status_pub','확정'):week&&week.status==='초안'?hubT('cal.status_draft','작성 중'):'';const notes=[...(info.holidays||[]).map(item=>item.name),...(info.events||[]).map(item=>item.title),status].filter(Boolean);const d=new Date(date+'T00:00:00'),label=['일','월','화','수','목','금','토'][d.getDay()];return `<th><button type="button" class="calendar-week-date" aria-label="${esc(hubT('cal.detail.title','{date} 상세',{date:date}))}" onclick="selectCalendarDay('${date}',event)">${label} ${Number(date.slice(-2))}</button>${notes.length?`<span class="calendar-week-note">${esc(notes.join(' · '))}</span>`:''}</th>`;}).join('');
+  const headers=dates.map(date=>{const info=byDate[date]||{holidays:[],events:[]},week=weekByStart.get(mondayStr(date)),status=week&&week.status==='공표'?hubT('cal.status_pub','확정'):week&&week.status==='초안'?hubT('cal.status_draft','작성 중'):'';const notes=[...(info.holidays||[]).map(item=>holidayGbpLabel(item)),...(info.events||[]).map(item=>item.title),status].filter(Boolean);const d=new Date(date+'T00:00:00'),label=['일','월','화','수','목','금','토'][d.getDay()];return `<th><button type="button" class="calendar-week-date" aria-label="${esc(hubT('cal.detail.title','{date} 상세',{date:date}))}" onclick="selectCalendarDay('${date}',event)">${label} ${Number(date.slice(-2))}</button>${notes.length?`<span class="calendar-week-note">${esc(notes.join(' · '))}</span>`:''}</th>`;}).join('');
   return `<div class="calendar-week-wrap"><table class="calendar-week-table"><thead><tr><th>${esc(hubT('cal.week.th_role','직무'))}</th>${headers}</tr></thead><tbody>${rowHtml}</tbody></table></div>`;
 }
 function calendarLeaveTags(items){
@@ -3064,6 +3065,7 @@ async function renderCalendar(m){
   const [cy,cm]=CAL_MONTH.split('-').map(Number),daysInMonth=new Date(cy,cm,0).getDate();
   const from=CAL_PERIOD==='week'?CAL_WEEK_START:CAL_MONTH+'-01',to=CAL_PERIOD==='week'?calendarAddDays(CAL_WEEK_START,6):CAL_MONTH+'-'+String(daysInMonth).padStart(2,'0');
   const weekFrom=mondayStr(from),weekTo=mondayStr(to);
+  const holidayRead=cols=>sb.from('holidays').select(cols).gte('date',from).lte('date',to);
   const [
     {data:holidays,error:holidaysError},
     {data:events,error:eventsError},
@@ -3071,7 +3073,7 @@ async function renderCalendar(m){
     {data:schedules,error:schedulesError},
     {data:weeks,error:weeksError}
   ]=await Promise.all([
-    sb.from('holidays').select('date,name').gte('date',from).lte('date',to),
+    holidayRead('date,name,kind,open_time,close_time').then(r=>r.error?holidayRead('date,name,kind'):r), /* 새 칸이 아직 없으면(배포 순서가 어긋나거나 되돌린 뒤) 옛 칸만으로 다시 읽어 달력이 깨지지 않게 함 */
     sb.from('calendar_events').select('id,date,title,kind').gte('date',from).lte('date',to),
     sb.from('leave_requests').select('user_id,type,type_note,status,date_from,date_to').eq('status','승인').lte('date_from',to).gte('date_to',from),
     sb.from('schedules').select('person_id,user_id,week_start,day,shift,note').gte('week_start',weekFrom).lte('week_start',weekTo),
@@ -3096,9 +3098,9 @@ async function renderCalendar(m){
     const roster=scheduleByDate[c.ds]||emptyCalendarRoster();
     const week=weekByStart.get(mondayStr(c.ds)),weekStatus=roster.weekStatus||(week&&week.status==='공표'?'published':week&&week.status==='초안'?'draft':null);
     const dowIdx=new Date(c.ds+'T00:00:00').getDay();
-    const dCls=info.holidays.length?'hol':(dowIdx===0?'sun':(dowIdx===6?'sat':''));
+    const dCls=info.holidays.some(h=>h.kind!=='단축')?'hol':(dowIdx===0?'sun':(dowIdx===6?'sat':''));
     const tags=[
-      ...info.holidays.map(h=>`<span class="cal-tag hol"><span title="${esc(h.name)}">${esc(h.name)}</span></span>`),
+      ...info.holidays.map(h=>`<span class="cal-tag hol"><span title="${esc(holidayGbpLabel(h))}">${esc(holidayGbpLabel(h))}</span></span>`),
       ...info.events.map(e=>`<span class="cal-tag ev"><span title="${esc(calendarKindLabel(e.kind))} ${esc(e.title)}">${esc(e.title)}</span>${isLead()?`<a href="javascript:void(0)" onclick="event.stopPropagation();deleteCalendarEvent(${e.id})">✕</a>`:''}</span>`),
       calendarRosterTag('Dr.',roster.departments['Dr.'],'dept dr'),
       ...EMPLOYEE_JOB_GROUPS.map((group,index)=>calendarRosterTag(group.label,roster.departments[group.label],'dept job-group job-'+index)),
@@ -3126,6 +3128,7 @@ async function renderCalendar(m){
     ${isLead()?`<div class="rowflex" style="margin-top:10px"><input class="mini" type="date" id="calDate" value="${today()}"><input class="mini" id="calTitle" placeholder="${esc(hubT('cal.ph_title','제목'))}"><select class="mini" id="calKind">${calendarKindItems().map(i=>hubOptionHtml(i.code,i.label)).join('')}</select><button class="mini" onclick="addCalendarEvent()">${esc(hubT('cal.btn_add','추가'))}</button></div>`:''}
   </div>${CAL_DETAIL_DATE?renderCalendarDayDetail(CAL_DETAIL_DATE,scheduleByDate[CAL_DETAIL_DATE]||emptyCalendarRoster(),leaveByDate[CAL_DETAIL_DATE]||[]):''}`);
   if(scheduleNamesVisible())m.innerHTML=m.innerHTML.replace('class="card" id="calendarCard"','class="card calendar-names-visible" id="calendarCard"');
+  if(isLead()&&m&&typeof m.appendChild==='function'&&typeof document!=='undefined'&&typeof document.createElement==='function'){const hbox=document.createElement('div');hbox.id='hgbpBox';m.appendChild(hbox);await renderHolidayGbpCard(hbox);} /* 병원 휴진·단축 진료 → 구글 특별 영업시간 */
   if(CAL_DETAIL_DATE)document.getElementById('calendarDayClose')?.focus();
 }
 /* ── 건의함 ── */
@@ -3324,6 +3327,111 @@ async function addCalendarEvent(){
 async function deleteCalendarEvent(id){
   if(!confirm(hubT('cal.del.confirm','삭제할까요?')))return;setStatus('saving');const {error}=await sb.from('calendar_events').delete().eq('id',id);
   if(error){setStatus('error');return;}setStatus('saved');render();
+}
+
+/* ── 병원 휴진·단축 진료 (구글 비즈니스 프로필 특별 영업시간 연동 · 실장·원장) ── */
+/* holiday-gbp:test-start */
+const HGBP_KINDS=['지정휴일','단축','공휴일'];
+function holidayGbpTime(v){return v?String(v).slice(0,5):'';}
+function holidayGbpKindLabel(kind){return kind==='단축'?hubT('hgbp.kind_short','단축 진료'):kind==='공휴일'?hubT('hgbp.kind_public','공휴일'):hubT('hgbp.kind_closed','휴진');}
+function holidayGbpLabel(h){const name=String(h&&h.name||'');if(h&&h.kind==='단축'&&h.open_time&&h.close_time)return hubT('hgbp.cal_short','{name} {open}~{close}',{name,open:holidayGbpTime(h.open_time),close:holidayGbpTime(h.close_time)});return name;}
+function holidayGbpFormToRow(f){
+  const kind=HGBP_KINDS.includes(f.kind)?f.kind:'지정휴일',date=String(f.date||''),name=String(f.name||'').trim(),open=holidayGbpTime(f.open),close=holidayGbpTime(f.close);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return {error:'err_date'};
+  if(!name)return {error:'err_reason'};
+  if(kind==='단축'&&!(open&&close&&open<close))return {error:'err_time'};
+  return {row:{date,name,kind,open_time:kind==='단축'?open:null,close_time:kind==='단축'?close:null,sync_gbp:!!f.sync}};
+}
+function holidayGbpErrText(key,msg){
+  if(key==='err_date')return hubT('hgbp.err_date','날짜를 고르세요.');
+  if(key==='err_reason')return hubT('hgbp.err_reason','사유를 적으세요.');
+  if(key==='err_time')return hubT('hgbp.err_time','단축 진료는 문 여는 시각과 닫는 시각을 넣어야 하고, 여는 시각이 닫는 시각보다 빨라야 합니다.');
+  if(key==='err_exists')return hubT('hgbp.err_exists','이 날짜에는 이미 일정이 있습니다. 아래 목록에서 수정하세요.');
+  if(key==='err_leave_conflict')return hubT('hgbp.err_leave_conflict','이 날짜에 신청·승인된 연차가 있어 휴진 여부를 바꿀 수 없습니다. 먼저 그 연차의 「날짜 바꾸기」로 조정한 뒤 다시 저장하세요.');
+  if(key==='err_month_closed')return hubT('hgbp.err_month_closed','이 날짜가 속한 달의 근태가 이미 확정되어 휴진 여부를 바꿀 수 없습니다. 근태 확정을 먼저 풀어 주세요.');
+  return hubT('hgbp.err_save','저장하지 못했습니다: {msg}',{msg:msg||hubT('lvs.unknown_error','알 수 없는 오류')});
+}
+/* DB 안전장치(holidays_guard_status_change)가 내는 고정 오류 문자열 → 화면 글 키. 모르는 오류는 일반 저장 실패 글. */
+function holidayGbpSaveErrKey(error){
+  const m=String(error&&error.message||'');
+  if(m.includes('holiday_conflicts_leave'))return 'err_leave_conflict';
+  if(m.includes('holiday_month_closed'))return 'err_month_closed';
+  return error&&error.code==='23505'?'err_exists':'err_save';
+}
+function holidayGbpSyncLive(){return typeof hubSettingBoolean==='function'&&hubSettingBoolean('gbp.sync_live',false)===true;}
+const HGBP_PAGE=60;
+function holidayGbpActionLabel(a){return a==='set'?hubT('hgbp.act_set','등록'):a==='clear'?hubT('hgbp.act_clear','삭제'):a==='noop'?hubT('hgbp.act_noop','변경 없음'):hubT('hgbp.act_error','오류');}
+function holidayGbpResultLabel(r){return r==='ok'?hubT('hgbp.res_ok','성공'):r==='skipped'?hubT('hgbp.res_skipped','건너뜀'):hubT('hgbp.res_failed','실패');}
+/* holiday-gbp:test-end */
+let HGBP_EDIT=null,HGBP_LIMIT=HGBP_PAGE;
+function holidayGbpKindChanged(){
+  const kind=$('#hgbpKind').value,short=kind==='단축';
+  $('#hgbpOpen').disabled=!short;$('#hgbpClose').disabled=!short;
+  if(!short){$('#hgbpOpen').value='';$('#hgbpClose').value='';}
+  $('#hgbpSync').checked=kind!=='공휴일';
+}
+function holidayGbpRowHtml(h){
+  const short=h.kind==='단축',time=short?holidayGbpTime(h.open_time)+'~'+holidayGbpTime(h.close_time):hubT('hgbp.time_closed','종일');
+  const sync=h.sync_gbp?`<span class="hgbp-badge on">${esc(hubT('hgbp.sync_on','구글 보낼 대상'))}</span>`:`<span class="hgbp-badge">${esc(hubT('hgbp.sync_off','구글 대상 아님'))}</span>`;
+  return `<div class="hgbp-item"><div class="hgbp-main"><b>${esc(h.date)}</b> <span class="hgbp-kind">${esc(holidayGbpKindLabel(h.kind))}</span> <span>${esc(time)}</span> ${sync}<div class="hgbp-name">${esc(h.name)}</div></div><div class="hgbp-actions"><button class="mini" onclick="editHolidayGbp('${esc(h.date)}')">${esc(hubT('hgbp.btn_edit','수정'))}</button><button class="mini" onclick="deleteHolidayGbp('${esc(h.date)}')">${esc(hubT('hgbp.btn_del','삭제'))}</button></div></div>`;
+}
+function holidayGbpLogHtml(l){
+  const detail=l.error?String(l.error):'';
+  return `<div class="hgbp-item hgbp-log"><div class="hgbp-main"><span>${esc(hubFmtDateTime(l.created_at))}</span> <b>${esc(l.holiday_date||'-')}</b> <span>${esc(holidayGbpActionLabel(l.action))}</span> <span class="hgbp-badge ${l.result==='ok'?'on':l.result==='failed'?'bad':''}">${esc(holidayGbpResultLabel(l.result))}</span>${detail?`<div class="hgbp-name">${esc(detail)}</div>`:''}</div></div>`;
+}
+async function renderHolidayGbpCard(box){
+  if(!box||!isLead())return;
+  let rows=[],logs=[],rowsErr=null,logErr=null;
+  try{
+    const [a,b]=await Promise.all([
+      sb.from('holidays').select('date,name,kind,open_time,close_time,sync_gbp,note').gte('date',today()).order('date').limit(HGBP_LIMIT+1),
+      sb.from('gbp_special_hours_sync_log').select('id,holiday_date,action,result,error,created_at').order('created_at',{ascending:false}).order('id',{ascending:false}).limit(20)
+    ]);
+    rows=a.data||[];rowsErr=a.error;logs=b.data||[];logErr=b.error;
+  }catch(e){rowsErr=e;logErr=e;}
+  const hasMore=rows.length>HGBP_LIMIT;if(hasMore)rows=rows.slice(0,HGBP_LIMIT);
+  const live=holidayGbpSyncLive();
+  if(box.isConnected===false)return;
+  const ed=HGBP_EDIT?rows.find(r=>r.date===HGBP_EDIT):null;if(HGBP_EDIT&&!ed)HGBP_EDIT=null;
+  const f=ed||{date:today(),kind:'지정휴일',name:'',open_time:'',close_time:'',sync_gbp:true},short=f.kind==='단축';
+  const kindOpts=HGBP_KINDS.map(k=>`<option value="${esc(k)}"${k===f.kind?' selected':''}>${esc(holidayGbpKindLabel(k))}</option>`).join('');
+  box.innerHTML=`<div class="card" id="hgbpCard"><h2>${esc(hubT('hgbp.title','🏥 병원 휴진·단축 진료'))}</h2>
+    <div class="hint">${esc(hubT('hgbp.hint','여기 올린 휴진·단축 진료 일정은 직원허브에 기록됩니다. 연차·근태 계산에서는 휴진·공휴일만 쉬는 날로 보고 단축 진료는 근무일로 봅니다. 이미 연차가 신청·승인된 날짜를 휴진으로 바꾸거나 되돌리려면 먼저 그 연차의 「날짜 바꾸기」로 조정해야 합니다.'))}</div>
+    ${live?`<div class="hint">${esc(hubT('hgbp.notice_on','「구글에 보내기」를 켠 날짜는 앞으로 30일 안이 되면 매일 실행되는 연동 작업이 구글 비즈니스 프로필의 특별 영업시간에 반영합니다. 결과는 아래 「구글 반영 기록」에서 확인하세요.'))}</div>`:`<div class="cal-error">${esc(hubT('hgbp.notice_off','구글 자동 반영은 아직 연결 전입니다 — 지금은 기록만 됩니다. 「구글에 보낼 대상으로 표시」한 날짜는 구글 영업시간이 바뀌지 않으니 구글 비즈니스 프로필에서는 직접 고쳐 주세요.'))}</div>`}
+    <div class="hgbp-form">
+      <label>${esc(hubT('hgbp.f_date','날짜'))}<input type="date" id="hgbpDate" value="${esc(f.date)}"></label>
+      <label>${esc(hubT('hgbp.f_kind','종류'))}<select id="hgbpKind" onchange="holidayGbpKindChanged()">${kindOpts}</select></label>
+      <label>${esc(hubT('hgbp.f_open','문 여는 시각'))}<input type="time" id="hgbpOpen" value="${esc(holidayGbpTime(f.open_time))}"${short?'':' disabled'}></label>
+      <label>${esc(hubT('hgbp.f_close','문 닫는 시각'))}<input type="time" id="hgbpClose" value="${esc(holidayGbpTime(f.close_time))}"${short?'':' disabled'}></label>
+      <label class="hgbp-wide">${esc(hubT('hgbp.f_reason','사유'))}<input id="hgbpName" maxlength="100" value="${esc(f.name)}" placeholder="${esc(hubT('hgbp.ph_reason','예: 학회 참석 휴진'))}"></label>
+      <label class="hgbp-check"><input type="checkbox" id="hgbpSync"${f.sync_gbp?' checked':''}> ${esc(live?hubT('hgbp.f_sync','구글에 보내기(매일 자동 연동)'):hubT('hgbp.f_sync_off','구글에 보낼 대상으로 표시'))}</label>
+    </div>
+    <div class="rowflex" style="margin-top:8px"><button class="mini stamp" onclick="saveHolidayGbp()">${esc(ed?hubT('hgbp.btn_update','수정 저장'):hubT('hgbp.btn_save','저장'))}</button>${ed?`<button class="mini" onclick="cancelHolidayGbpEdit()">${esc(hubT('hgbp.btn_cancel','취소'))}</button>`:''}<span id="hgbpMsg" class="hint"></span></div>
+    <h3>${esc(hubT('hgbp.list_title','앞으로의 휴진·단축 일정'))}</h3>
+    ${rowsErr?`<div class="cal-error">${esc(hubT('hgbp.err_load','일정을 불러오지 못했습니다.'))}</div>`:(rows.length?rows.map(holidayGbpRowHtml).join('')+(hasMore?`<div class="rowflex" style="margin-top:6px"><button class="mini" onclick="moreHolidayGbp()">${esc(hubT('hgbp.btn_more','더 보기'))}</button></div>`:''):`<div class="empty">${esc(hubT('hgbp.list_empty','등록된 일정이 없습니다.'))}</div>`)}
+    <h3>${esc(hubT('hgbp.log_title','구글 반영 기록'))}</h3><div class="hint">${esc(hubT('hgbp.log_hint','최근 20건 · 연동 작업이 구글에 보낸 결과입니다.'))}</div>
+    ${logErr?`<div class="cal-error">${esc(hubT('hgbp.log_err','반영 기록을 불러오지 못했습니다.'))}</div>`:(logs.length?logs.map(holidayGbpLogHtml).join(''):`<div class="empty">${esc(hubT('hgbp.log_empty','아직 반영 기록이 없습니다.'))}</div>`)}
+  </div>`;
+}
+function moreHolidayGbp(){HGBP_LIMIT+=HGBP_PAGE;renderHolidayGbpCard($('#hgbpBox'));}
+function editHolidayGbp(date){HGBP_EDIT=date;renderHolidayGbpCard($('#hgbpBox'));}
+function cancelHolidayGbpEdit(){HGBP_EDIT=null;renderHolidayGbpCard($('#hgbpBox'));}
+async function saveHolidayGbp(){
+  if(!isLead())return;
+  const msg=$('#hgbpMsg'),r=holidayGbpFormToRow({date:$('#hgbpDate').value,kind:$('#hgbpKind').value,name:$('#hgbpName').value,open:$('#hgbpOpen').value,close:$('#hgbpClose').value,sync:$('#hgbpSync').checked});
+  if(r.error){msg.textContent=holidayGbpErrText(r.error);return;}
+  setStatus('saving');
+  const q=HGBP_EDIT?sb.from('holidays').update(r.row).eq('date',HGBP_EDIT):sb.from('holidays').insert(r.row);
+  const {error}=await q;
+  if(error){setStatus('error');msg.textContent=holidayGbpErrText(holidayGbpSaveErrKey(error),error.message);return;}
+  HGBP_EDIT=null;setStatus('saved');render();
+}
+async function deleteHolidayGbp(date){
+  if(!isLead())return;
+  if(!confirm(holidayGbpSyncLive()?hubT('hgbp.del_confirm','{date} 일정을 삭제할까요? 구글에 이미 반영된 날짜라면 다음 연동 때 구글에서도 지워집니다.',{date}):hubT('hgbp.del_confirm_off','{date} 일정을 삭제할까요?',{date})))return;
+  setStatus('saving');const {error}=await sb.from('holidays').delete().eq('date',date);
+  if(error){setStatus('error');const msg=$('#hgbpMsg');if(msg)msg.textContent=holidayGbpErrText(holidayGbpSaveErrKey(error),error.message);return;}
+  if(HGBP_EDIT===date)HGBP_EDIT=null;setStatus('saved');render();
 }
 
 /* ── 온보딩 ── */
@@ -5875,6 +5983,7 @@ function hubIntroOptions(){
       const d=new Date(),ymd=x=>x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');
       const to=new Date(d);to.setDate(to.getDate()+14);const from=ymd(d),until=ymd(to);
       const safe=p=>p.then(r=>r,()=>({data:null,error:true}));
+      const holidayRead=cols=>sb.from('holidays').select(cols).gte('date',from).lte('date',until).order('date');
       const [bal,nt,rd,oi,oc,ev,hol,st]=await Promise.all([
         safe(sb.from('v_leave_balance').select('balance').eq('user_id',ME.id).maybeSingle()),
         safe(sb.from('notices').select('id')),
@@ -5882,11 +5991,11 @@ function hubIntroOptions(){
         safe(sb.from('onboarding_items').select('id').eq('active',true)),
         safe(sb.from('onboarding_checks').select('item_id,status').eq('user_id',ME.id)),
         safe(sb.from('calendar_events').select('date,title').gte('date',from).lte('date',until).order('date')),
-        safe(sb.from('holidays').select('date,name').gte('date',from).lte('date',until).order('date')),
+        safe(holidayRead('date,name,kind,open_time,close_time').then(r=>r.error?holidayRead('date,name,kind'):r)), /* 새 칸이 없어도(배포 순서) 옛 칸으로 다시 읽음 */
         isLead()?safe(sb.from('approval_steps').select('id').eq('status','대기').eq('approver_role',ME.role)):Promise.resolve(null)
       ]);
       const read=new Set((rd.data||[]).map(r=>r.notice_id)),done=new Set((oc.data||[]).filter(c=>c.status!=='미제출').map(c=>c.item_id));
-      const soon=[...(ev.data||[]).map(e=>({date:e.date,title:e.title})),...(hol.data||[]).map(h=>({date:h.date,title:h.name,holiday:true}))].sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+      const soon=[...(ev.data||[]).map(e=>({date:e.date,title:e.title})),...(hol.data||[]).map(h=>({date:h.date,title:holidayGbpLabel(h),holiday:h.kind!=='단축'}))].sort((a,b)=>String(a.date).localeCompare(String(b.date)));
       return {leave:bal.error?null:(bal.data?bal.data.balance:0),notice:nt.error||rd.error?null:(nt.data||[]).filter(n=>!read.has(n.id)).length,
         docs:oi.error||oc.error?null:(oi.data||[]).filter(i=>!done.has(i.id)).length,appr:st?(st.error?null:(st.data||[]).length):null,soon};
     },

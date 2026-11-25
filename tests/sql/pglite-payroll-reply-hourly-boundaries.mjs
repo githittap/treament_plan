@@ -64,7 +64,7 @@ try{
   }
   // 실제 회신 조회와 정정 RPC를 연결한다. 합성 자료만 사용한다.
   await db.exec('reset role');
-  await db.exec("alter table attendance add column evening boolean default false;alter table attendance add column is_holiday boolean default false;alter table attendance_manual_entries add column if not exists evening_overtime_min int default 0;create table att_months(month text primary key,status text);create table bonus_entries(month text,user_id uuid);create table holidays(date date,name text);grant select on attendance,att_months,wage_info,bonus_entries,holidays to authenticated;");
+  await db.exec("alter table attendance add column evening boolean default false;alter table attendance add column is_holiday boolean default false;alter table attendance_manual_entries add column if not exists evening_overtime_min int default 0;create table att_months(month text primary key,status text);create table bonus_entries(month text,user_id uuid);create table holidays(date date,name text,kind text default '공휴일');grant select on attendance,att_months,wage_info,bonus_entries,holidays to authenticated;");
   await q(`update profiles set active=true where user_id='${uid}'`);
   await q(`delete from attendance where user_id='${uid}'`);await q(`delete from wage_info where user_id='${uid}'`);
   await as('owner');await db.query('select wage_hourly_save_config($1::jsonb)',[JSON.stringify(originalConfig)]);
