@@ -28,6 +28,19 @@ test('입력 검증: 날짜·사유 필수, 단축은 시각 둘 필수·여는 
   assert.equal(ctx.toRow({ ...ok, kind: '엉터리' }).row.kind, '지정휴일', '모르는 종류는 휴진으로(DB 제약 위반 방지)');
 });
 
+test('공휴일 진료 방식(365치과): 평소=구글 안 보냄 · 단축=시각+보냄 · 휴진=시각 없음+보냄', () => {
+  const base = { date: '2026-12-25', kind: '공휴일', name: '성탄절', open: '10:00', close: '14:00', sync: true };
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.toRow({ ...base, mode: 'normal' }).row)), { date: '2026-12-25', name: '성탄절', kind: '공휴일', open_time: null, close_time: null, sync_gbp: false });
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.toRow({ ...base, mode: 'short' }).row)), { date: '2026-12-25', name: '성탄절', kind: '공휴일', open_time: '10:00', close_time: '14:00', sync_gbp: true });
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.toRow({ ...base, mode: 'closed' }).row)), { date: '2026-12-25', name: '성탄절', kind: '공휴일', open_time: null, close_time: null, sync_gbp: true });
+  assert.equal(ctx.toRow({ ...base, mode: 'short', open: '' }).error, 'err_time');
+  assert.equal(ctx.toRow({ ...base, mode: 'short', open: '15:00' }).error, 'err_time');
+  assert.equal(ctx.toRow({ ...base, mode: undefined }).row.sync_gbp, false, '모르는 방식은 평소 진료(안 보냄)');
+  assert.equal(ctx.label({ name: '성탄절', kind: '공휴일', open_time: '10:00:00', close_time: '14:00:00' }), '성탄절 10:00~14:00');
+  assert.equal(ctx.saveKey({ message: 'holiday_public_lead_only' }), 'err_public_lead');
+  assert.match(ctx.err('err_gone'), /이미 바뀌었거나 지워진/);
+});
+
 test('표시 글: 종류·동작·결과 이름, 캘린더 단축 표시', () => {
   assert.equal(ctx.kindLabel('지정휴일'), '휴진');
   assert.equal(ctx.kindLabel('단축'), '단축 진료');
@@ -45,7 +58,7 @@ test('화면에 쓰는 글은 전부 hub-texts.js에 같은 기본값으로 등�
   for (const m of hr.matchAll(/hubT\('(hgbp\.[a-z_]+)','((?:[^'\\]|\\.)*)'/g)) used.set(m[1], m[2]);
   const reg = new Map();
   for (const m of texts.matchAll(/add\('(hgbp\.[a-z_]+)',HG,'(?:[^'\\]|\\.)*','((?:[^'\\]|\\.)*)'/g)) reg.set(m[1], m[2]);
-  assert.equal(reg.size, 54);
+  assert.equal(reg.size, 61);
   assert.ok(used.size >= 30);
   for (const [k, d] of used) { assert.ok(reg.has(k), '미등록 키: ' + k); assert.equal(reg.get(k), d, '기본값 불일치: ' + k); }
   // 동작·결과 이름 등 화면 코드에서 간접으로 쓰는 키도 등록돼 있음
@@ -63,7 +76,7 @@ test('입력 권한(원장 11-25): 원장·실장·매니저·데스크 — 카�
   assert.match(hr, /ME\.department=p\?\.dept\|\|'';ME\.jobGroup=p\?\.job_group\|\|'';/);
   const c = {};
   vm.createContext(c);
-  vm.runInContext('var ME={};function isLead(){return ["chief","owner"].includes(ME.role);}' + block + ';this.can=canEditClinicHours;this.kinds=holidayGbpKindsForMe;this.rowOk=holidayGbpRowEditable;this.setMe=m=>{ME=m;};', c);
+  vm.runInContext('var ME={};function isLead(){return ["chief","owner"].includes(ME.role);}' + block + ';this.can=canEditClinicHours;this.kinds=holidayGbpKindsForMe;this.rowOk=holidayGbpRowEditable;this.rowDel=holidayGbpRowDeletable;this.mode=holidayGbpPublicMode;this.setMe=m=>{ME=m;};', c);
   const can = me => { c.setMe(me); return c.can(); };
   assert.deepEqual([
     can({ role: 'owner' }), can({ role: 'chief' }), can({ role: 'manager' }),
@@ -72,12 +85,18 @@ test('입력 권한(원장 11-25): 원장·실장·매니저·데스크 — 카�
   ], [true, true, true, true, true, false, false, false]);
   c.setMe({ role: 'manager' });
   assert.deepEqual(Array.from(c.kinds()), ['지정휴일', '단축']);
-  assert.equal(c.rowOk({ kind: '공휴일' }), false);
-  assert.equal(c.rowOk({ kind: '단축' }), true);
+  assert.equal(c.rowOk({ kind: '공휴일' }), true, '매니저도 공휴일의 진료 방식은 고침');
+  assert.equal(c.rowDel({ kind: '공휴일' }), false, '공휴일 삭제는 실장·원장만');
+  assert.equal(c.rowDel({ kind: '단축' }), true);
+  c.setMe({ role: 'staff', jobGroup: 'clinical_consult' });
+  assert.equal(c.rowOk({ kind: '단축' }), false);
   c.setMe({ role: 'chief' });
   assert.deepEqual(Array.from(c.kinds()), ['지정휴일', '단축', '공휴일']);
   assert.equal(c.rowOk({ kind: '공휴일' }), true);
-  assert.match(hr, /const kindOpts=holidayGbpKindsForMe\(\)\.map\(/);
+  assert.equal(c.rowDel({ kind: '공휴일' }), true);
+  assert.deepEqual([c.mode({ sync_gbp: false }), c.mode({ sync_gbp: true, open_time: '10:00:00', close_time: '14:00:00' }), c.mode({ sync_gbp: true })], ['normal', 'short', 'closed']);
+  assert.match(hr, /const kindOpts=\(lockPublic\?\['공휴일'\]:holidayGbpKindsForMe\(\)\)\.map\(/);
+  assert.match(hr, /const lockPublic=pub&&!isLead\(\);/);
   assert.match(hr, /\$\{holidayGbpRowEditable\(h\)\?`<button class="mini" onclick="editHolidayGbp/);
 });
 
@@ -99,10 +118,22 @@ test('월말 입력 알림: 매달 마지막 월요일~말일에만, 다음 달 
   assert.match(fn, /hubSettingBoolean\('hgbp\.remind_on',true\)/);
   assert.match(fn, /localStorage\.getItem\(holidayGbpRemindKey\(day\)\)/);
   assert.match(fn, /document\.getElementById\('hubIntro'\)/, '첫 화면(3D)이 닫힌 뒤에 띄움');
-  assert.match(fn, /\.neq\('kind','공휴일'\)/);
+  assert.match(fn, /\.or\('kind\.neq\.공휴일,sync_gbp\.eq\.true'\)/, '평소 진료 공휴일은 세지 않음');
+  assert.match(fn, /holidayGbpSyncLive\(\)\?hubT\('hgbp\.remind_body'[^\n]*:hubT\('hgbp\.remind_body_off'/, '연동이 꺼져 있으면 구글 반영을 약속하지 않음');
+  assert.match(fn, /if\(document\.getElementById\('hubIntro'\)\)return;/);
+  assert.match(hr, /function holidayGbpRemindGo\(\)\{hide\('hgbpRemindMask'\);if\(typeof CAL_VIEW!=='undefined'\)CAL_VIEW='all';go\('calendar'\);/);
   assert.match(hr, /renderNav\(\);await render\(\);await refreshBadges\(\);\n      if\(typeof maybeShowHolidayGbpReminder==='function'\)maybeShowHolidayGbpReminder\(\);/);
-  assert.match(hr, /function holidayGbpRemindDone\(\)\{try\{localStorage\.setItem\(holidayGbpRemindKey\(today\(\)\),'1'\);/);
+  assert.match(hr, /function holidayGbpRemindDone\(\)\{try\{localStorage\.setItem\(holidayGbpRemindKey\(HGBP_REMIND_DAY\|\|today\(\)\),'1'\);/);
   assert.match(texts, /\{key:'hgbp\.remind_on',[^\n]*def:'true',kind:'bool'\}/);
+});
+
+test('수정·삭제가 0행이면 「저장됨」이 아니라 다시 불러오고 알림(Sol 사후 B5)', () => {
+  const save = hr.slice(hr.indexOf('async function saveHolidayGbp'), hr.indexOf('async function deleteHolidayGbp'));
+  assert.match(save, /\.update\(r\.row\)\.eq\('date',HGBP_EDIT\)\.select\('date'\)/);
+  assert.match(save, /if\(HGBP_EDIT&&!\(data&&data\.length\)\)\{[^\n]*holidayGbpErrText\('err_gone'\)/);
+  const del = hr.slice(hr.indexOf('async function deleteHolidayGbp'), hr.indexOf('async function deleteHolidayGbp') + 1200);
+  assert.match(del, /\.delete\(\)\.eq\('date',date\)\.select\('date'\)/);
+  assert.match(del, /if\(!\(data&&data\.length\)\)\{[^\n]*holidayGbpErrText\('err_gone'\)/);
 });
 
 test('연동 주기 문구: 매일이 아니라 매월 1일·원장 지시 때(원장 11-25)', () => {
@@ -149,7 +180,7 @@ test('DB 초안: 마이그레이션·롤백·시드가 짝으로 있고 서비�
 test('PGlite: 단축 일수 계산·제약·RLS·기록 권한·2027 시드·롤백', { skip: !fs.existsSync(path.join(pkg, 'dist/index.js')) && 'PGLITE_PACKAGE_ROOT 없음' }, () => {
   const log = execFileSync(process.execPath, ['tests/sql/pglite-holiday-gbp-sync.mjs'], { cwd: root, env: { ...process.env, PGLITE_PACKAGE_ROOT: pkg }, encoding: 'utf8', timeout: 120000 });
   assert.match(log, /PGLITE_HOLIDAY_GBP_SYNC_PASS/);
-  assert.equal((log.match(/PGLITE_HOLIDAY_GBP_SCENARIO_PASS/g) || []).length, 4, 'B1·B2·B4·E1 시나리오 4개 통과');
+  assert.equal((log.match(/PGLITE_HOLIDAY_GBP_SCENARIO_PASS/g) || []).length, 7, 'B1·B2·B4·E1·F1·F2·F3 시나리오 7개 통과');
 });
 
 test('B1·B2 오류 코드는 화면 글로 바뀐다(저장·삭제 둘 다)', () => {
@@ -184,7 +215,8 @@ test('B3 구글 자동 반영을 약속하지 않음: gbp.sync_live 꺼짐이 �
   assert.equal(c2.live(), true);
   const doc = read('docs/gbp-special-hours-contract.md');
   assert.match(doc, /gbp\.sync_live/);
-  assert.match(doc, /T2는 연동 작업\(매월 1일 \+ 원장 지시 때\)이 실제로 돌고[^\n]*켬/);
+  assert.match(doc, /\*\*첫 가동 순서[^\n]*/);
+  assert.match(doc, /스위치가 꺼져 있는 동안에는 `set`·`clear`를 절대 하지 않음/);
 });
 
 test('B4 롤백은 백업 표를 먼저 만들고 복원 SQL이 짝으로 있음', () => {

@@ -502,3 +502,102 @@ await scenario('E1 매니저·데스크는 휴진·단축만 넣고 고침 · �
   assert.equal((await q("select count(*)::int n from pg_proc where proname='can_edit_clinic_hours'"))[0].n, 0);
   assert.equal((await q("select value from app_settings where key='hgbp.remind_on'"))[0].value, 'true');
 });
+
+// ───────── 2026-11-25 Sol 사후 검증 고침(B1 공휴일 진료 방식 · B3 근태 휴일 표시 · B4 롤백·복원) ─────────
+const fix = read('db/holiday_fix_20261125b.sql');
+const fixRollback = read('db/holiday_fix_20261125b_rollback.sql');
+const restoreSql = read('db/holiday_gbp_sync_restore.sql');
+await scenario('F1 공휴일 진료 방식은 매니저·데스크도 고침(날짜·이름·종류·삭제는 원장·실장) · 시각 있으면 단축으로 내보냄 · 기본 안 보냄', async (db, q) => {
+  await db.exec(`alter table profiles add column job_group text; alter table profiles add column dept text;
+    insert into profiles(user_id,name,role,job_group) values ('${id(5)}','데스크A','staff','desk');
+    insert into holidays(date,name,kind,sync_gbp) values('2099-01-01','신정','공휴일',false);`);
+  await db.exec(editors); await db.exec(fix); await db.exec(fix);
+  const tryAs = async (who, sql) => { await as(db, who); try { await db.exec(sql); return 'ok'; } catch (e) { return String(e.message); } finally { await sup(db); } };
+  // 매니저: 공휴일을 단축 진료로(시각+보냄) → 됨
+  assert.equal(await tryAs(2, "update holidays set open_time='10:00',close_time='14:00',sync_gbp=true where date='2099-01-01'"), 'ok');
+  // 데스크: 휴진으로(시각 없음+보냄) → 됨
+  assert.equal(await tryAs(5, "update holidays set open_time=null,close_time=null,sync_gbp=true where date='2099-01-01'"), 'ok');
+  // 이름·날짜·종류는 막힘, 삭제는 0행
+  assert.match(await tryAs(5, "update holidays set name='바꿈' where date='2099-01-01'"), /holiday_public_lead_only/);
+  assert.match(await tryAs(2, "update holidays set kind='지정휴일' where date='2099-01-01'"), /holiday_public_lead_only/);
+  assert.match(await tryAs(2, "update holidays set date='2099-01-02' where date='2099-01-01'"), /holiday_public_lead_only/);
+  await tryAs(2, "delete from holidays where date='2099-01-01'");
+  assert.equal((await q("select count(*)::int n from holidays where date='2099-01-01' and name='신정'"))[0].n, 1);
+  // 휴진 행을 공휴일로 바꾸기도 막힘
+  assert.equal(await tryAs(2, "insert into holidays(date,name,kind,sync_gbp) values('2099-01-05','학회','지정휴일',true)"), 'ok');
+  assert.match(await tryAs(2, "update holidays set kind='공휴일' where date='2099-01-05'"), /holiday_public_lead_only/);
+  // 실장은 공휴일 이름도 고침
+  assert.equal(await tryAs(CHIEF, "update holidays set name='새해 첫날' where date='2099-01-01'"), 'ok');
+  // 구글 목록: 공휴일+시각 → 단축(closed=false), 공휴일+시각 없음+보냄 → 휴진, 평소 진료 → 안 나옴
+  await tryAs(2, "update holidays set open_time='10:00',close_time='14:00',sync_gbp=true where date='2099-01-01'");
+  await tryAs(2, "insert into holidays(date,name,kind,open_time,close_time,sync_gbp) values('2099-01-06','단축','단축','09:00','13:00',true)");
+  await as(db, 'service');
+  const due = await q("select date::text d, closed, open_time::text o from gbp_special_hours_due(366) where date>='2099-01-01' order by date");
+  await sup(db);
+  // 366일 창 밖이면 0건 — 창 안 날짜로 다시 확인
+  const today = (await q("select (now() at time zone 'Asia/Seoul')::date::text d"))[0].d;
+  await db.exec(`insert into holidays(date,name,kind,open_time,close_time,sync_gbp) values ('${today}'::date+3,'공휴일 단축','공휴일','10:00','14:00',true), ('${today}'::date+4,'공휴일 휴진','공휴일',null,null,true), ('${today}'::date+5,'공휴일 평소','공휴일',null,null,false)`);
+  await as(db, 'service');
+  const d2 = await q(`select (date-'${today}'::date)::int k, closed, open_time::text o from gbp_special_hours_due(60) where date between '${today}'::date+3 and '${today}'::date+5 order by date`);
+  await sup(db);
+  assert.deepEqual(d2.map(r => [r.k, r.closed, r.o]), [[3, false, '10:00:00'], [4, true, null]]);
+  assert.ok(Array.isArray(due));
+  // 기본값: 전송 여부를 안 적으면 안 보냄
+  await db.exec("insert into holidays(date,name,kind) values('2099-02-01','x','지정휴일')");
+  assert.equal((await q("select sync_gbp from holidays where date='2099-02-01'"))[0].sync_gbp, false);
+  // 공휴일 시각 반쪽은 제약으로 막힘
+  await assert.rejects(db.exec("update holidays set open_time='10:00',close_time=null where date='2099-01-01'"), /holidays_gbp_times_chk/);
+  // 롤백: 보호 트리거·근태 트리거 걷고 스위치 끔
+  await db.exec(fixRollback); await db.exec(fixRollback);
+  assert.equal((await q("select count(*)::int n from pg_trigger where tgname in ('holidays_editor_guard','attendance_set_is_holiday')"))[0].n, 0);
+  assert.equal((await q("select value from app_settings where key='gbp.sync_live'"))[0].value, 'false');
+});
+
+await scenario('F2 근태 휴일 표시는 DB가 정함 — 휴진 저장 뒤 들어온 근태도, 휴진 지운 뒤 근태도 맞음(B3)', async (db, q) => {
+  await db.exec(`alter table profiles add column job_group text; alter table profiles add column dept text;`);
+  await db.exec(editors); await db.exec(fix);
+  // 업로드가 옛 휴일 목록으로 false를 보내도 DB가 휴진이면 true로 저장
+  await db.exec("insert into holidays(date,name,kind,sync_gbp) values('2026-02-11','휴진','지정휴일',true)");
+  await db.exec(`insert into attendance(user_id,work_date,clock_in,clock_out,is_holiday) values('${id(3)}','2026-02-11','09:00','13:00',false)`);
+  assert.equal((await q("select is_holiday from attendance where work_date='2026-02-11'"))[0].is_holiday, true);
+  // 단축 진료일은 휴일 아님 — true를 보내도 false
+  await db.exec("insert into holidays(date,name,kind,open_time,close_time,sync_gbp) values('2026-02-12','단축','단축','09:00','13:00',true)");
+  await db.exec(`insert into attendance(user_id,work_date,clock_in,clock_out,is_holiday) values('${id(3)}','2026-02-12','09:00','13:00',true)`);
+  assert.equal((await q("select is_holiday from attendance where work_date='2026-02-12'"))[0].is_holiday, false);
+  // 업서트로 고쳐 써도 같음
+  await db.exec(`update attendance set is_holiday=false where work_date='2026-02-11'`);
+  assert.equal((await q("select is_holiday from attendance where work_date='2026-02-11'"))[0].is_holiday, true);
+  // 휴진을 지우면 기존 근태가 false로 바뀜(보호 트리거 + 근태 트리거가 같은 답)
+  await db.exec("delete from holidays where date='2026-02-11'");
+  assert.equal((await q("select is_holiday from attendance where work_date='2026-02-11'"))[0].is_holiday, false);
+  // 출퇴근 시각만 고칠 땐 트리거가 안 돎(is_holiday·work_date 바뀔 때만) — 값은 그대로
+  await db.exec(`update attendance set clock_out='14:00' where work_date='2026-02-12'`);
+  assert.equal((await q("select is_holiday from attendance where work_date='2026-02-12'"))[0].is_holiday, false);
+  // 같은 날짜 잠금이 트리거 두 곳에 다 있음
+  const src = (await q("select string_agg(prosrc, ' ') s from pg_proc where proname in ('attendance_set_is_holiday','holidays_guard_status_change')"))[0].s;
+  assert.equal(src.split("pg_advisory_xact_lock(hashtext('hub.holiday:'").length - 1, 2);
+});
+
+await scenario('F3 기반 롤백만 돌려도 매니저·데스크 권한이 남지 않음 · 복원은 새 기록과 번호가 겹쳐도 백업을 되살림(B4)', async (db, q) => {
+  await db.exec(`alter table profiles add column job_group text; alter table profiles add column dept text;`);
+  await db.exec(editors); await db.exec(fix);
+  await as(db, 'service');
+  await q("select gbp_special_hours_log_write('2026-03-02','set','{\"closed\":true}'::jsonb,'ok')");
+  await sup(db);
+  await db.exec(rollback);
+  const pols = await q("select policyname, coalesce(qual,'')||coalesce(with_check,'') e from pg_policies where tablename='holidays' and policyname like 'holidays_%_approvers'");
+  assert.equal(pols.length, 3);
+  for (const p of pols) assert.ok(!/can_edit_clinic_hours/.test(p.e), p.policyname);
+  assert.equal((await q("select count(*)::int n from pg_proc where proname in ('can_edit_clinic_hours','holidays_editor_guard','attendance_set_is_holiday')"))[0].n, 0);
+  // 다시 적용 → 복원 전에 새 기록 1건(번호 1을 차지) → 복원
+  await db.exec(sync);
+  await as(db, 'service');
+  const newId = Number((await q("select gbp_special_hours_log_write(null,'noop',null,'skipped') id"))[0].id);
+  await sup(db);
+  assert.equal(newId, 1, '새 기록이 백업 번호 1을 차지함(재현)');
+  await db.exec(restoreSql); await db.exec(restoreSql);
+  const logs = await q("select id::int id, action, result from gbp_special_hours_sync_log order by id");
+  assert.deepEqual(logs[0], {id: 1, action: 'set', result: 'ok'}, '백업 기록이 원래 번호로 돌아옴');
+  assert.equal(logs.filter(l => l.action === 'noop' && l.result === 'skipped').length, 1, '새 기록도 뒤 번호로 남음');
+  assert.equal(logs.length, 2);
+});

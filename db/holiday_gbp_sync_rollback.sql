@@ -45,11 +45,27 @@ begin
   end if;
 end $bk2$;
 
+-- 0b) 나중에 더한 것(holiday_fix_20261125b · holiday_editors_20261125)도 함께 걷음 — 이 파일만 돌려도 입력 권한이 실장·원장으로 돌아감.
+drop trigger if exists holidays_editor_guard on public.holidays;
+drop function if exists public.holidays_editor_guard();
+drop trigger if exists attendance_set_is_holiday on public.attendance;
+drop function if exists public.attendance_set_is_holiday();
+drop policy if exists holidays_insert_approvers on public.holidays;
+create policy holidays_insert_approvers on public.holidays for insert to authenticated
+  with check (public.my_role() in ('chief','owner'));
+drop policy if exists holidays_update_approvers on public.holidays;
+create policy holidays_update_approvers on public.holidays for update to authenticated
+  using (public.my_role() in ('chief','owner')) with check (public.my_role() in ('chief','owner'));
+drop policy if exists holidays_delete_approvers on public.holidays;
+create policy holidays_delete_approvers on public.holidays for delete to authenticated
+  using (public.my_role() in ('chief','owner'));
+
 drop trigger if exists holidays_guard_status_change on public.holidays;
 drop function if exists public.holidays_guard_status_change();
 drop function if exists public.gbp_special_hours_due(int);
 drop function if exists public.gbp_special_hours_log_write(date,text,jsonb,text,text,text);
 drop table if exists public.gbp_special_hours_sync_log;
+drop function if exists public.can_edit_clinic_hours();
 
 -- 「단축」을 쉬는 날로 세지 않는 계산 수정(연차·결근 후보 함수 2개와 v_holiday_work)은 되돌리지 않음.
 -- kind '단축'은 이 마이그레이션 전부터 표에 허용된 값이라, 되돌린 뒤에도 단축 행을 휴일로 세면 계산이 틀림(Sol 2차 B1).
