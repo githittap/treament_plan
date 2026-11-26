@@ -88,7 +88,7 @@ test('AI 상위 안내는 설정의 위치와 도움말에서 화면에 나오�
  assert.ok(definition.where.includes('AI 탭은 자체 사용법을 써서 이 글은 화면에 나오지 않습니다'));
  const s=read('hub-texts.js');
  assert.ok(s.includes("d.key==='help.ai'?'<div class=\"sub\">AI 탭은 자체 사용법을 써서 이 글은 화면에 나오지 않습니다</div>'"));
- assert.equal(h.HUB_HELP_TABS.length,54);
+ assert.equal(h.HUB_HELP_TABS.length,55);
 });
 
 test('캘린더 상위 안내는 근무 화면의 주간 월간·상세·이름·내보내기를 구분한다',()=>{

@@ -83,6 +83,7 @@ const HUB_HELP_TARGETS={
   "calendar.leave.list":[{"labels":["연차 캘린더","목록 보기"]},{"selector":"input[type=\"month\"],input[type=\"date\"]"},null],
   "inbox.inbox":[{"labels":["상세"]},{"labels":["상태·담당 저장","상담일지로 전환","실제 답변 기록"]},{"labels":["✅ 처리"]}],
   "inbox.recall":[{"labels":["📞 리콜 명단"]},null,{"labels":["📞 연락함","예정일 바꾸기","저장"]},{"labels":["✅ 리콜 끝","새로 조회"]}],
+  "inbox.review":[{"labels":["⭐ 리뷰 요청"]},null,{"labels":["📨 리뷰 요청 보내기"]},{"labels":["새로 조회"]}],
   "deposit.today":[{"labels":["오늘"]},null,null],
   "deposit.week":[{"labels":["7일"]},null,null],
   "deposit.month":[{"labels":["이번달"]},null,null]

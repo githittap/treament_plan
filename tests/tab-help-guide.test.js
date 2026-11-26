@@ -6,7 +6,7 @@ const read=f=>fs.readFileSync(f,'utf8');
 function helpers(){const c={};vm.createContext(c);vm.runInContext(read('hub-help.js').match(/\/\* hub-help:test-start \*\/[\s\S]*?\/\* hub-help:test-end \*\//)[0]+';this.h={hubHelpParse,hubHelpCardHtml,hubHelpImagePaths,hubHelpFindTarget,HUB_HELP_TARGETS};',c);return c.h;}
 function texts(){const c={};vm.createContext(c);vm.runInContext(read('hub-texts.js').match(/\/\* hub-texts:test-start \*\/[\s\S]*?\/\* hub-texts:test-end \*\//)[0]+';this.h={HUB_HELP_TABS,hubTextDefs,hubText,hubTextSetOverrides,hubTextsSave,hubTextsReset};',c);return c.h;}
 test('54개 정의와 대상 표가 일치하며 DB에 늘어난 단계는 대상을 추측하지 않는다',()=>{
- const h=helpers(),t=texts();assert.equal(t.HUB_HELP_TABS.length,54);
+ const h=helpers(),t=texts();assert.equal(t.HUB_HELP_TABS.length,55);
  assert.deepEqual(Object.keys(h.HUB_HELP_TARGETS).sort(),Array.from(t.HUB_HELP_TABS,t=>t.key).sort());
  for(const tab of t.HUB_HELP_TABS)assert.equal(h.HUB_HELP_TARGETS[tab.key].length,h.hubHelpParse(tab.def).steps.length,tab.key);
  assert.equal(h.hubHelpFindTarget({querySelectorAll(){throw Error('추측 대상 검색 금지');}},'home',15),null);
