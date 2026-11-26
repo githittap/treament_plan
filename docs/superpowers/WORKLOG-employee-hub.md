@@ -179,3 +179,4 @@
 - Task7 PGlite drift matrix와 Task8 apply/rollback PGlite PASS. 운영 변경 없음.
 
 - 2026-11-23 연장 사유 필수(Claude): 수기 출퇴근(하루·한 주)에서 추가근무를 적으면 「연장 사유」「연장 시간에 실제로 한 일」을 각각 5자 이상 적어야 저장. DB 함수 submit_manual_attendance_d가 같은 검사로 거부, 옛 _v2·submit_manual_attendance 직원 실행권한 회수. 검토표에 두 칸 표시. 운영 DB 반영함(db/attendance_manual_overtime_reason.sql).
+- 2026-11-26 연장 사유 필수는 기공실만(Claude · 원장 지시 T0 전달): 직무별 켬/끔 설정 app_settings att.ot_reason_required.<lab|clinical_consult|desk|sterilization_admin|none>(기본 기공실만 켬)을 허브 설정 › 숫자·기준 › 🕘 근태 기준에 둠. DB 함수 attendance_ot_reason_required(직무 없으면 부서로 보완)로 submit_manual_attendance_d가 같은 규칙 적용, 화면은 필수/선택 안내가 갈림(att.manual.f_ot_opt). 마이그레이션 db/attendance_ot_reason_by_group_20261126.sql · 되돌리기 _rollback.sql.

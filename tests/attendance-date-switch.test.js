@@ -119,7 +119,7 @@ test('휴대폰 입력은 640px 이하에서만 기본 time 시계를 쓰고 PC 
 
 test('폰 원형 시계의 input 이벤트는 PC 칸과 동기화되고 HH:mm 값으로 저장된다',async()=>{
   for(const role of ['owner','staff']){
-    const h=harness([],390);h.context.ME.role=role;await h.context.loadManualAttendanceDate('2026-10-03');
+    const h=harness([],390);h.context.ME.role=role;h.context.ME.jobGroup='lab';await h.context.loadManualAttendanceDate('2026-10-03'); // 2026-11-26 사유 필수는 기공실(lab) — 진료실은 attendance-overtime-reason 시험
     const output=h.context.manualAttendanceFormHtml();
     await h.context.loadManualAttendanceDate('2026-10-03');
     for(const [kind,value] of [['In','09:07'],['Out','18:03']]){

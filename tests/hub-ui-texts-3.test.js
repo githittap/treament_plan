@@ -28,7 +28,7 @@ function attendanceLegacyLayout(value){return String(value)
   .replace(/<input type="time" class="manual-clock-mobile" id="manualClock(In|Out)Time"[^>]*>/g,'')
   .replace(/ id="manualAttendanceSubmit"/g,'')
   .replace(/<details class="hint"><summary>최근 연차 적립 실행 기록<\/summary>[\s\S]*?<\/details>/g,'');}
-const OVERTIME_REASON_TEXT_KEYS=new Set(['att.manual.m_ot_reason','att.manual.ot_plan_prefix','att.manual.ot_actual_prefix','att.review.ot_total','att.review.ot_none']); // 제출 오류·사유 있는 기록에서만 보임 — attendance-overtime-reason.test.js에서 확인
+const OVERTIME_REASON_TEXT_KEYS=new Set(['att.manual.f_ot_req','att.manual.f_ot_opt','att.manual.m_ot_reason','att.manual.ot_plan_prefix','att.manual.ot_actual_prefix','att.review.ot_total','att.review.ot_none']); // 제출 오류·사유 있는 기록에서만 보임 — attendance-overtime-reason.test.js에서 확인
 const P7_DATE_TEXT_KEYS=new Set(['att.manual.confirm_discard','att.manual.m_loading','att.manual.m_load_fail']);
 const MANAGER_ONLY_LEAVE_TEXT_KEYS=new Set(['leave.pend.btn_ok_manager','leave.m_ok_confirm_manager','leave.grant.manual',
   'leave.ledger.history_title','leave.ledger.history_load_fail','leave.ledger.history_th_name','leave.ledger.history_th_date','leave.ledger.history_th_kind','leave.ledger.history_th_days','leave.ledger.history_th_note','leave.ledger.history_empty',
@@ -75,7 +75,7 @@ const dynRows=defs=>defs.map(d=>({key:d.key,value:'«'+d.key+'»'+(d.vars?' '+d.
 /* ───────────── 1. 기본 글 목록 ───────────── */
 test('차례 3 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 14개(출퇴근·근태차이 8 · 근무표 2 · 연차 4)',()=>{
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
-  assert.equal(defs.length,490,'차례 3 글 키 수(올해 생긴 연차 문구 14개 · 2026-11-23 연장 사유 문구 10개 포함)');
+  assert.equal(defs.length,491,'차례 3 글 키 수(올해 생긴 연차 문구 14개 · 2026-11-23 연장 사유 문구 10개 · 11-26 사유 선택 안내 1개 포함)');
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
   for(const d of defs){
     assert.match(d.key,/^[a-z][a-z0-9_.]{1,80}$/,d.key);
@@ -187,7 +187,7 @@ test('표에 값이 있으면 그 글: 고쳐 쓰는 글이 화면(제목·표 �
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
   const stat=new Set([...hr.matchAll(/\bdata-hub(?:k|ph)="([a-z0-9_.]+)"/g)].map(m=>m[1]));
   const dyn=defs.filter(d=>!stat.has(d.key)&&!P7_DATE_TEXT_KEYS.has(d.key)); // 날짜 전환 글 3개는 attendance-date-switch.test.js의 실제 호출로 확인함
-  assert.equal(dyn.length,468); // 2026-11-23 연장 사유·실제 한 일 문구 10개 추가
+  assert.equal(dyn.length,469); // 2026-11-23 연장 사유·실제 한 일 문구 10개 추가 · 11-26 사유 선택 안내 1개
   const out=await renderAll(hr,{engine:true,textRows:dynRows(dyn),settings:{}});
   const b2Defs=defs.filter(d=>/^att\.issue\.p_date$|^att\.issueform\.|^att\.myissue\.|^att\.issue\.(?:evidence_|admin_evidence|awaiting_staff|auto_clock_)/.test(d.key));
   const b2Observed=await require('./fixtures/hub3-harness.cjs').observeAttendanceIssueB2(hr,{textRows:dynRows(b2Defs)});
@@ -447,7 +447,7 @@ test('화면: 🔢 숫자·기준 — 연차·소명 기준 5개가 더 있고(�
   await t.render(OWNER);
   await t.click('[hub-subtab]=settings');
   const sec=t.section.innerHTML;
-  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,6+12+2+4+1+8+1+1+6+1+7+3+11+1+1,'근태 7 + 연차·소명 5 + 차례 4 결재 건수 2 + 차례 5 문의함·상담일지 4 + 도구 카드 보는 사람 11(10-10 업무매뉴얼 카드 포함) + 병원 휴진 구글 연동 켬 1(11-23)');
+  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,6+12+2+4+1+8+1+1+6+1+7+3+11+1+1+5,'근태 7 + 연차·소명 5 + 차례 4 결재 건수 2 + 차례 5 문의함·상담일지 4 + 도구 카드 보는 사람 11(10-10 업무매뉴얼 카드 포함) + 병원 휴진 구글 연동 켬 1(11-23) + 연장 사유 필수 직무별 5(11-26)');
   assert.ok(sec.includes('🌿 연차 기준')&&sec.includes('🕘 근태 기준'));
   assert.match(sec,/id="hubSetIn_8" type="number" inputmode="numeric" min="1" max="30" value="2"/);
   assert.match(sec,/id="hubSetIn_10" type="number" inputmode="decimal" step="0\.1" min="0\.1" max="1" value="0\.5"/);

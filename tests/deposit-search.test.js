@@ -227,5 +227,5 @@ test('코드: 입금 화면의 새 문구는 hubT 기본값이고 권한 문(can
   assert.ok(/async function renderDeposit\(m\)\{\n  if\(!canViewDeposit\(ME\)\)/.test(hr));
   assert.equal((hr.match(/hubN\('dep\.list_limit',300\)/g)||[]).length,1);
   assert.ok(!/setDepRange\('custom'\)/.test(hr));
-  assert.match(hr,/hub-texts\.js\?v=2026112505/);
+  assert.match(hr,/hub-texts\.js\?v=2026112601/); // 2026-11-26 연장 사유 직무별 설정
 });

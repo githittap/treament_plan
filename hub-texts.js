@@ -880,7 +880,8 @@ function hubTextDefsChapter3(add){
   add('att.manual.m_loading','🕘 출퇴근 › 수기 출퇴근 입력','선택 날짜의 저장값을 읽는 동안 보이는 글','저장된 내용을 불러오는 중입니다.');
   add('att.manual.f_ot_plan','🕘 출퇴근 › 수기 출퇴근 입력','연장 사유 칸 이름 — 왜 연장하려 했는지(추가근무를 적으면 필수)','연장 사유 — 왜 연장하려 했나');
   add('att.manual.f_ot_actual','🕘 출퇴근 › 수기 출퇴근 입력','연장 시간에 실제로 한 일 칸 이름(추가근무를 적으면 필수)','연장 시간에 실제로 한 일');
-  add('att.manual.f_ot_req','🕘 출퇴근 › 수기 출퇴근 입력','연장 사유·실제 한 일 칸 이름 옆 작은 안내','(추가근무를 적으면 필수)');
+  add('att.manual.f_ot_req','🕘 출퇴근 › 수기 출퇴근 입력','연장 사유·실제 한 일 칸 이름 옆 작은 안내 — 사유 필수인 직무(허브 설정 › 숫자·기준 › 근태 기준)','(추가근무를 적으면 필수)');
+  add('att.manual.f_ot_opt','🕘 출퇴근 › 수기 출퇴근 입력','연장 사유·실제 한 일 칸 이름 옆 작은 안내 — 사유가 선택인 직무(예: 진료실)','(선택 — 안 적어도 저장됨)');
   add('att.manual.ph_ot_plan','🕘 출퇴근 › 수기 출퇴근 입력','연장 사유 칸 안에 흐리게 보이는 예시','예: 마지막 수술 환자 진료가 늦게 끝남');
   add('att.manual.ph_ot_actual','🕘 출퇴근 › 수기 출퇴근 입력','실제 한 일 칸 안에 흐리게 보이는 예시','예: 수술 어시스트 후 기구 세척·소독, 진료실 정리');
   add('att.manual.m_ot_reason','🕘 출퇴근 › 수기 출퇴근 입력','추가근무를 적었는데 연장 사유·실제 한 일이 비었거나 5자 미만일 때 뜨는 글(하루·한 주 입력 공통)','연장시간을 적었으면 「연장 사유」와 「연장 시간에 실제로 한 일」을 각각 5자 이상 적어야 저장됩니다.');
@@ -2817,6 +2818,11 @@ const HUB_SETTING_DEFS=[
   ...((typeof globalThis!=='undefined'&&globalThis.HUB_CARD_LEDGER_SETTING_DEFS)||[]),
   {key:'gbp.sync_live',screen:'📅 캘린더 › 병원 휴진·단축 진료(구글 특별 영업시간)',label:'구글 자동 연동 켬',where:'꺼짐(처음 상태)이면 구글 영업시간을 바꾸지 않고 허브에 기록만 해요. 켜는 순서: ① T2가 꺼진 채로 미리보기(구글에 안 씀)를 돌려 아래 「구글 반영 기록」에 「보낼 값」을 남김 → ② 원장이 그 값을 확인 → ③ 원장 지시로 켜면 그때부터 매월 1일·원장 지시 때 반영해요.',def:'false',kind:'bool'},
   {key:'hgbp.remind_on',screen:'📅 캘린더 › 병원 휴진·단축 진료(구글 특별 영업시간)',label:'월말 휴진·단축 입력 알림',where:'켜면 매달 마지막 주 월요일부터 그달 말일까지 실장·매니저·데스크·원장이 허브를 열 때 「다음 달 휴진·단축 진료 입력」 창이 떠요. 「다 넣었음」을 누른 사람에겐 그달엔 다시 안 떠요.',def:'true',kind:'bool'},
+  {key:'att.ot_reason_required.lab',screen:'🕘 근태 기준',label:'연장 사유 필수 — 기공실',where:'수기 출퇴근(하루·한 주)에서 추가근무를 적을 때 — 켬이면 「연장 사유」「연장 시간에 실제로 한 일」을 각각 5자 이상 적어야 저장되고, 끔이면 안 적어도 저장돼요. 직무는 직원의 직무 분류를 따라요.',def:'true',kind:'bool'},
+  {key:'att.ot_reason_required.clinical_consult',screen:'🕘 근태 기준',label:'연장 사유 필수 — 진료실',where:'수기 출퇴근(하루·한 주)에서 추가근무를 적을 때 — 켬이면 「연장 사유」「연장 시간에 실제로 한 일」을 각각 5자 이상 적어야 저장되고, 끔이면 안 적어도 저장돼요. 직무는 직원의 직무 분류를 따라요.',def:'false',kind:'bool'},
+  {key:'att.ot_reason_required.desk',screen:'🕘 근태 기준',label:'연장 사유 필수 — 데스크',where:'수기 출퇴근(하루·한 주)에서 추가근무를 적을 때 — 켬이면 「연장 사유」「연장 시간에 실제로 한 일」을 각각 5자 이상 적어야 저장되고, 끔이면 안 적어도 저장돼요. 직무는 직원의 직무 분류를 따라요.',def:'false',kind:'bool'},
+  {key:'att.ot_reason_required.sterilization_admin',screen:'🕘 근태 기준',label:'연장 사유 필수 — 소독·행정',where:'수기 출퇴근(하루·한 주)에서 추가근무를 적을 때 — 켬이면 「연장 사유」「연장 시간에 실제로 한 일」을 각각 5자 이상 적어야 저장되고, 끔이면 안 적어도 저장돼요. 직무는 직원의 직무 분류를 따라요.',def:'false',kind:'bool'},
+  {key:'att.ot_reason_required.none',screen:'🕘 근태 기준',label:'연장 사유 필수 — 직무 미지정(실장·원장 등)',where:'수기 출퇴근(하루·한 주)에서 추가근무를 적을 때 — 켬이면 「연장 사유」「연장 시간에 실제로 한 일」을 각각 5자 이상 적어야 저장되고, 끔이면 안 적어도 저장돼요. 직무는 직원의 직무 분류를 따라요.',def:'false',kind:'bool'},
 ];
 // 리콜 명단을 포함하는 허브에서만 편집 목록을 추가한다. 기존 설정의 순서는 유지한다.
 if(typeof globalThis!=='undefined'&&globalThis.HUB_RECALL_CATALOG===true)HUB_SETTING_DEFS.push(
