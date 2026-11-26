@@ -64,6 +64,10 @@ export function publicRows(rows,results){
   return (rows||[]).map(r=>{const x=byId.get(r.log_id);return {log_id:r.log_id,status:x?x.status:r.status,phone_tail:r.phone_tail,mode:r.mode,error:x?x.error:null};});
 }
 
+// 보내는 길: 'edge'일 때만 서버 함수가 솔라피로 바로 보낸다. 값이 없거나 읽지 못하면 병원 PC 중계(pc)로 본다
+// — 솔라피는 문자 발송을 고정 IP에서만 받아서 클라우드에서 바로 보내면 막힌다(db/review_sms_relay_20261127.sql).
+export function sendsDirect(transport){return transport==='edge';}
+
 // DB 함수가 낸 오류를 화면 안내로.
 export function mapPrepareError(message){
   const m=String(message||'');

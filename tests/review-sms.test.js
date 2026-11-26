@@ -3,7 +3,7 @@ const root=path.join(__dirname,'..'),read=f=>fs.readFileSync(path.join(root,f),'
 const html=read('hr.html'),texts=read('hub-texts.js'),sql=read('db/review_sms_20261127.sql');
 const pure=html.match(/\/\* review-sms:test-start \*\/([\s\S]*?)\/\* review-sms:test-end \*\//)[1];
 const recall=html.match(/\/\* recall-list:test-start \*\/([\s\S]*?)\/\* recall-list:test-end \*\//)[1];
-function context(extra={}){const c={inboxT:(k,d,v)=>String(d).replace(/\{([a-z_]+)\}/g,(m,k)=>v?.[k]??m),esc:s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'),inboxSourceLabel:x=>x,inboxFormatContact:x=>x,nameOf:x=>x,formatLeaveTimestamp:x=>x,canManageConsultation:()=>true,...extra};vm.createContext(c);vm.runInContext(recall+pure+';this.h={reviewSmsCanAccess,reviewSmsSettings,reviewSmsParsePhones,reviewSmsBuildText,reviewSmsForbidden,reviewSmsBytes,reviewSmsSummary,reviewSmsLogHtml,reviewSmsErrorText,REVIEW_SMS_TEMPLATE_DEFAULT,REVIEW_SMS_FORBIDDEN};',c);return c.h;}
+function context(extra={}){const c={inboxT:(k,d,v)=>String(d).replace(/\{([a-z_]+)\}/g,(m,k)=>v?.[k]??m),esc:s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'),inboxSourceLabel:x=>x,inboxFormatContact:x=>x,nameOf:x=>x,formatLeaveTimestamp:x=>x,canManageConsultation:()=>true,...extra};vm.createContext(c);vm.runInContext(recall+pure+';this.h={reviewSmsCanAccess,reviewSmsSettings,reviewSmsParsePhones,reviewSmsBuildText,reviewSmsForbidden,reviewSmsBytes,reviewSmsSummary,reviewSmsLogHtml,reviewSmsErrorText,reviewSmsRelayLine,REVIEW_SMS_TEMPLATE_DEFAULT,REVIEW_SMS_FORBIDDEN};',c);return c.h;}
 
 test('리뷰 요청은 문의함 하위 화면이고 리콜 명단과 같은 사람만 쓴다',()=>{
   const h=context();for(const role of ['owner','manager','chief'])assert.equal(h.reviewSmsCanAccess({role}),true);
@@ -64,4 +64,19 @@ const pkg=process.env.PGLITE_PACKAGE_ROOT||'Z:/09_claude-output/_tmp/pglite-0.5.
 test('PGlite: 권한·시험 모드·재발송 막기·문구·시간·결과 기록·롤백',{skip:!fs.existsSync(path.join(pkg,'dist/index.js'))&&'PGLITE_PACKAGE_ROOT 없음'},()=>{
   const log=execFileSync(process.execPath,['tests/sql/pglite-review-sms.mjs'],{cwd:root,env:{...process.env,PGLITE_PACKAGE_ROOT:pkg},encoding:'utf8',timeout:120000});
   assert.match(log,/PGLITE_REVIEW_SMS_PASS/);
+});
+
+test('병원 PC 중계 줄: 기록 없음·20분 넘게 소식 없음·오류·정상(잔액)',()=>{
+  const h=context(),now=Date.parse('2026-11-27T01:30:00Z');
+  assert.equal(h.reviewSmsRelayLine('',now).level,'none');assert.equal(h.reviewSmsRelayLine('not json',now).level,'none');
+  const stale=h.reviewSmsRelayLine(JSON.stringify({seen_at:'2026-11-27T01:00:00Z',balance:0,point:300}),now);assert.equal(stale.level,'stale');assert.match(stale.text,/30분째/);
+  assert.equal(h.reviewSmsRelayLine(JSON.stringify({seen_at:'2026-11-27T01:25:00Z',error:'IP 막힘'}),now).level,'warn');
+  const ok=h.reviewSmsRelayLine(JSON.stringify({seen_at:'2026-11-27T01:25:00Z',balance:12000,point:300}),now);assert.equal(ok.level,'ok');assert.match(ok.text,/잔액 12,000원 \+ 포인트 300/);
+  assert.match(html,/id="reviewSmsRelay"/);assert.match(html,/eq\('key','review_sms\.relay_status'\)/);
+  assert.match(html,/rows\.some\(r=>r\.status==='pending'\)/,'대기 중이면 병원 PC 안내 + 자동 새로 조회');
+});
+
+test('PGlite: 병원 PC 중계 — 대기함·한 번만 꺼냄·번호 지움·시간·만료·되돌리기',{skip:!fs.existsSync(path.join(pkg,'dist/index.js'))&&'PGLITE_PACKAGE_ROOT 없음'},()=>{
+  const log=execFileSync(process.execPath,['tests/sql/pglite-review-sms-relay.mjs'],{cwd:root,env:{...process.env,PGLITE_PACKAGE_ROOT:pkg},encoding:'utf8',timeout:120000});
+  assert.match(log,/PGLITE_REVIEW_SMS_RELAY_PASS/);
 });

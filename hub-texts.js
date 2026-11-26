@@ -2597,6 +2597,11 @@ function hubTextDefsReview(add){
   add("review.st_blocked_recent","⭐ 리뷰 요청 문자","⏸ 최근에 보낸 번호","⏸ 최근에 보낸 번호",[]);
   add("review.st_blocked_hours","⭐ 리뷰 요청 문자","⏸ 보낼 수 있는 시간 아님","⏸ 보낼 수 있는 시간 아님",[]);
   add("review.st_blocked_wording","⭐ 리뷰 요청 문자","⏸ 문구 확인 필요","⏸ 문구 확인 필요",[]);
+  add("review.relay_none","⭐ 리뷰 요청 문자","🖥️ 병원 PC 중계: 아직 연결 기록이 없습니다. 병원 PC가 켜져 있어야 문자가 나갑니다.","🖥️ 병원 PC 중계: 아직 연결 기록이 없습니다. 병원 PC가 켜져 있어야 문자가 나갑니다.",[]);
+  add("review.relay_stale","⭐ 리뷰 요청 문자","⚠️ 병원 PC 중계가 {min}분째 소식이 없습니다. 병원 PC가 꺼져 있으면 문자가 대기만 하다가 2시간 뒤 취소됩니다.","⚠️ 병원 PC 중계가 {min}분째 소식이 없습니다. 병원 PC가 꺼져 있으면 문자가 대기만 하다가 2시간 뒤 취소됩니다.",["min"]);
+  add("review.relay_error","⭐ 리뷰 요청 문자","⚠️ 병원 PC 중계 오류: {msg}","⚠️ 병원 PC 중계 오류: {msg}",["msg"]);
+  add("review.relay_ok","⭐ 리뷰 요청 문자","🖥️ 병원 PC 중계 정상 · {time} 확인 · 솔라피 잔액 {balance}원 + 포인트 {point}","🖥️ 병원 PC 중계 정상 · {time} 확인 · 솔라피 잔액 {balance}원 + 포인트 {point}",["time", "balance", "point"]);
+  add("review.relay_note","⭐ 리뷰 요청 문자","병원 PC가 1분 안에 보냅니다 — 잠시 뒤 결과가 「최근 보낸 기록」에 나옵니다.","병원 PC가 1분 안에 보냅니다 — 잠시 뒤 결과가 「최근 보낸 기록」에 나옵니다.",[]);
 }
 function hubTextDefsBonus(add){
   add('wh.reply_column','💰 시급제','시급 구분 · 회신 시간 칸','회신 시간 칸');

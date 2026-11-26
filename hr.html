@@ -458,7 +458,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 <script src="payroll-reply.js?v=2026112301"></script>
 <script src="payroll-compare.js?v=2026101110"></script>
 <script src="hub-help.js?v=2026112701"></script>
-<script src="hub-texts.js?v=2026112701"></script>
+<script src="hub-texts.js?v=2026112702"></script>
 <script src="hub-activity.js?v=2026101110"></script>
 <script src="security-pledge.js?v=20261003p9d"></script>
 <script src="wage-hourly.js?v=2026101110"></script>
@@ -4317,6 +4317,17 @@ function reviewSmsLogHtml(rows,nameOfFn,fmt){
   return '<div class="tblwrap"><table class="review-sms-log"><thead><tr><th>'+esc(reviewT('col_time','시각'))+'</th><th>'+esc(reviewT('col_by','보낸 사람'))+'</th><th>'+esc(reviewT('col_phone','번호 끝 4자리'))+'</th><th>'+esc(reviewT('col_name','이름'))+'</th><th>'+esc(reviewT('col_mode','모드'))+'</th><th>'+esc(reviewT('col_status','결과'))+'</th></tr></thead><tbody>'
     +rows.map(r=>'<tr><td>'+esc(fmt?fmt(r.created_at):r.created_at)+'</td><td>'+esc(nameOfFn?nameOfFn(r.sent_by):r.sent_by)+'</td><td>****'+esc(r.phone_tail)+'</td><td>'+esc(r.patient_label||'-')+'</td><td>'+esc(r.mode==='live'?reviewT('mode_live','실제'):reviewT('mode_test','시험'))+'</td><td>'+esc(reviewSmsStatusLabel(r.status))+(r.error?'<div class="hint">'+esc(String(r.error).slice(0,120))+'</div>':'')+'</td></tr>').join('')+'</tbody></table></div>';
 }
+// 병원 PC 중계 상태 줄(중계가 10분마다 review_sms.relay_status에 적음 · 20분 넘게 소식 없으면 경고).
+function reviewSmsRelayLine(raw,nowMs){
+  let st=null;try{st=raw?JSON.parse(raw):null;}catch(_e){st=null;}
+  const seen=st&&st.seen_at?Date.parse(st.seen_at):NaN;
+  if(!st||!Number.isFinite(seen))return {level:'none',text:reviewT('relay_none','🖥️ 병원 PC 중계: 아직 연결 기록이 없습니다. 병원 PC가 켜져 있어야 문자가 나갑니다.')};
+  const min=Math.max(0,Math.floor((nowMs-seen)/60000));
+  if(min>20)return {level:'stale',text:reviewT('relay_stale','⚠️ 병원 PC 중계가 {min}분째 소식이 없습니다. 병원 PC가 꺼져 있으면 문자가 대기만 하다가 2시간 뒤 취소됩니다.',{min})};
+  if(st.error)return {level:'warn',text:reviewT('relay_error','⚠️ 병원 PC 중계 오류: {msg}',{msg:String(st.error).slice(0,120)})};
+  const d=new Date(seen),hm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'),won=x=>Number.isFinite(Number(x))?Number(x).toLocaleString('ko-KR'):'-';
+  return {level:'ok',text:reviewT('relay_ok','🖥️ 병원 PC 중계 정상 · {time} 확인 · 솔라피 잔액 {balance}원 + 포인트 {point}',{time:hm,balance:won(st.balance),point:won(st.point)})};
+}
 function reviewSmsErrorText(code){return ({access_denied:reviewT('err_access','리뷰 요청 문자를 보낼 권한이 없습니다.'),invalid_phone:reviewT('err_phone','휴대폰 번호 형식이 맞지 않습니다.'),invalid_name:reviewT('err_name','이름은 20자 이하로, 중괄호 없이 적으세요.'),too_many:reviewT('err_many','한 번에 1~20명까지 보낼 수 있습니다.')})[code]||'';}
 /* review-sms:test-end */
 let REVIEW_SMS_BUSY=false,REVIEW_SMS_LOAD_SEQ=0;
@@ -4338,7 +4349,7 @@ function reviewSmsCardHtml(){
   const s=reviewSmsSettings(SETTINGS);
   const mode=s.live?'<div class="review-sms-mode review-sms-live-on">'+esc(reviewT('mode_live_banner','🟢 실제 발송 중 — 적은 번호로 바로 문자가 나갑니다.'))+'</div>':'<div class="review-sms-mode">'+esc(reviewT('mode_test_banner','🧪 시험 모드 — 원장이 등록한 내부 번호로만 보내집니다. 환자에게는 나가지 않습니다.'))+'</div>';
   const ready=s.sender?'':'<div class="cal-error">'+esc(reviewT('not_ready','발신번호가 아직 없어 문자를 보낼 수 없습니다. 원장이 솔라피 발신번호를 등록하면 보낼 수 있습니다.'))+'</div>';
-  return recallTabsHtml()+'<section class="card review-sms-card"><h2>'+esc(reviewT('title','⭐ 리뷰 요청 문자'))+'</h2><p class="hint">'+esc(reviewT('hint','진료를 마친 환자에게 구글 리뷰를 부탁하는 문자를 보냅니다. 대가(할인·선물)나 별점 부탁은 넣지 않습니다.'))+'</p>'+mode+ready
+  return recallTabsHtml()+'<section class="card review-sms-card"><h2>'+esc(reviewT('title','⭐ 리뷰 요청 문자'))+'</h2><p class="hint">'+esc(reviewT('hint','진료를 마친 환자에게 구글 리뷰를 부탁하는 문자를 보냅니다. 대가(할인·선물)나 별점 부탁은 넣지 않습니다.'))+'</p>'+mode+'<div id="reviewSmsRelay" class="hint review-sms-relay" role="status"></div>'+ready
     +'<div class="grid"><div class="fld"><label for="reviewSmsName">'+esc(reviewT('f_name','환자 이름(선택 · 문자에 들어감)'))+'</label><input id="reviewSmsName" maxlength="20" autocomplete="off" oninput="reviewSmsPreview()"></div>'
     +'<div class="fld"><label for="reviewSmsPhones">'+esc(reviewT('f_phones','휴대폰 번호(여러 명이면 한 줄에 한 명 · 최대 20명)'))+'</label><textarea id="reviewSmsPhones" rows="3" inputmode="tel" autocomplete="off" oninput="reviewSmsPreview()"></textarea></div></div>'
     +'<div class="hint">'+esc(reviewT('preview','보낼 문자 미리 보기'))+'</div><pre id="reviewSmsPreview" class="review-sms-preview"></pre><div id="reviewSmsCheck" class="hint" role="status"></div>'
@@ -4357,6 +4368,7 @@ function reviewSmsPreview(){
 async function reviewSmsLoad(){
   const seq=++REVIEW_SMS_LOAD_SEQ,box=$('#reviewSmsLog');if(!box||!reviewSmsEnabled())return;
   reviewSmsPreview();
+  sb.from('app_settings').select('value').eq('key','review_sms.relay_status').maybeSingle().then(({data})=>{const el=$('#reviewSmsRelay');if(seq!==REVIEW_SMS_LOAD_SEQ||!el)return;const line=reviewSmsRelayLine(data?.value||'',Date.now());el.textContent=line.text;el.dataset.level=line.level;}).catch(()=>{});
   try{const {data,error}=await sb.rpc('review_sms_recent',{p_limit:30});if(seq!==REVIEW_SMS_LOAD_SEQ||!box.isConnected)return;if(error)throw error;box.innerHTML=reviewSmsLogHtml(data||[],nameOf,formatLeaveTimestamp);}
   catch(e){if(seq===REVIEW_SMS_LOAD_SEQ&&box.isConnected)box.innerHTML='<div class="cal-error">'+esc(reviewT('load_error','보낸 기록을 불러오지 못했습니다: {msg}',{msg:e.message}))+'</div>';}
 }
@@ -4374,7 +4386,8 @@ async function reviewSmsSend(){
     const {data,error}=await sb.functions.invoke('review-sms',{body:{phones:parsed.phones,name:name||null}});
     if(error){let code='';try{const ctx=error.context;if(ctx&&typeof ctx.json==='function')code=(await ctx.json())?.error||'';}catch(_e){code='';}throw new Error(reviewSmsErrorText(code)||error.message);}
     const rows=Array.isArray(data?.rows)?data.rows:[];msg.textContent=reviewSmsSummary(rows);setStatus('saved');
-    if(rows.length&&rows.every(r=>r.status==='sent')){$('#reviewSmsPhones').value='';$('#reviewSmsName').value='';}
+    if(rows.some(r=>r.status==='pending')){msg.textContent+=' · '+reviewT('relay_note','병원 PC가 1분 안에 보냅니다 — 잠시 뒤 결과가 「최근 보낸 기록」에 나옵니다.');setTimeout(()=>{if(INBOX_SUBTAB==='review'&&$('#reviewSmsLog'))reviewSmsLoad();},70000);}
+    if(rows.length&&rows.every(r=>r.status==='sent'||r.status==='pending')){$('#reviewSmsPhones').value='';$('#reviewSmsName').value='';}
   }catch(e){msg.textContent=reviewT('send_error','보내기 결과를 확인해 주세요: {msg}. 「최근 보낸 기록」을 새로 조회한 뒤 다시 보내세요.',{msg:e.message});setStatus('error');}
   finally{REVIEW_SMS_BUSY=false;reviewSmsLock(false);}
   await reviewSmsLoad();

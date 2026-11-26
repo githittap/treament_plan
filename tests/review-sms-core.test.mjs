@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHmac} from 'node:crypto';
-import {corsHeaders,validateRequest,solapiAuthHeader,solapiRequestBody,mapSolapiResult,publicRows,mapPrepareError} from '../supabase/functions/review-sms/core.mjs';
+import {corsHeaders,validateRequest,solapiAuthHeader,solapiRequestBody,mapSolapiResult,publicRows,mapPrepareError,sendsDirect} from '../supabase/functions/review-sms/core.mjs';
 
 const pending=[{log_id:'a',status:'pending',phone_tail:'2222',to_number:'01011112222',message_text:'문구 https://g.page/r/x/review',sender:'0415551234',mode:'test'},{log_id:'b',status:'pending',phone_tail:'4444',to_number:'01033334444',message_text:'문구',sender:'0415551234',mode:'test'}];
 
@@ -45,4 +45,9 @@ test('허용 출처만 CORS를 열고 DB 오류를 화면 오류 코드로 옮�
   assert.equal(mapPrepareError('review sms access required').status,403);
   assert.equal(mapPrepareError('review sms invalid phone').error,'invalid_phone');
   assert.equal(mapPrepareError('boom').status,502);
+});
+
+test('보내는 길: edge일 때만 서버 함수가 바로 보내고, 없거나 다른 값이면 병원 PC 중계',()=>{
+  assert.equal(sendsDirect('edge'),true);
+  for(const v of ['pc','',null,undefined,'EDGE'])assert.equal(sendsDirect(v),false,String(v));
 });
