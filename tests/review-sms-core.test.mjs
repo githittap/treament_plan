@@ -51,3 +51,11 @@ test('보내는 길: edge일 때만 서버 함수가 바로 보내고, 없거나
   assert.equal(sendsDirect('edge'),true);
   for(const v of ['pc','',null,undefined,'EDGE'])assert.equal(sendsDirect(v),false,String(v));
 });
+
+test('솔라피 실제 응답처럼 접수 줄에 번호가 없으면 보낸 순서로 메시지 번호를 맞춘다',()=>{
+  const pending=[{log_id:'a',to_number:'01011112222'},{log_id:'b',to_number:'01033334444'}];
+  const out=mapSolapiResult(pending,200,{groupInfo:{_id:'G9'},failedMessageList:[],messageList:[{messageId:'M1',statusCode:'2000'},{messageId:'M2',statusCode:'2000'}]});
+  assert.deepEqual(out.map(x=>[x.status,x.provider_id]),[['sent','M1'],['sent','M2']]);
+  const part=mapSolapiResult(pending,200,{groupInfo:{_id:'G9'},failedMessageList:[{to:'01033334444',statusCode:'1062',statusMessage:'x'}],messageList:[{messageId:'M1'}]});
+  assert.deepEqual(part.map(x=>[x.status,x.provider_id]),[['sent','G9'],['failed',null]],'실패가 섞이면 순서로 맞추지 않고 그룹 번호');
+});

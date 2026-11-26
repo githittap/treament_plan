@@ -41,18 +41,19 @@ export function solapiRequestBody(pending){
 const short=s=>s==null?null:String(s).slice(0,500);
 
 // 솔라피 응답을 줄마다 sent/failed로. 응답이 실패(HTTP 2xx 아님)면 모두 failed.
+// 접수된 줄(messageList)에는 받는 번호가 없어서(2026-11-27 실제 응답) 실패가 없고 개수가 같으면 보낸 순서로 맞춘다.
 export function mapSolapiResult(pending,httpStatus,body){
   if(!(httpStatus>=200&&httpStatus<300)||!body||typeof body!=='object'){
     const why=short(body&&typeof body==='object'?[body.errorCode,body.errorMessage].filter(Boolean).join(' '):`HTTP ${httpStatus}`)||`HTTP ${httpStatus}`;
     return pending.map(r=>({log_id:r.log_id,status:'failed',provider_id:null,error:why}));
   }
   const failed=Array.isArray(body.failedMessageList)?body.failedMessageList:[],sent=Array.isArray(body.messageList)?body.messageList:[];
-  const groupId=body.groupInfo&&typeof body.groupInfo.groupId==='string'?body.groupInfo.groupId:null;
-  const used=new Set();
-  return pending.map(r=>{
+  const gi=body.groupInfo&&typeof body.groupInfo==='object'?body.groupInfo:{},groupId=typeof gi.groupId==='string'?gi.groupId:typeof gi._id==='string'?gi._id:null;
+  const byOrder=!failed.length&&sent.length===pending.length,used=new Set();
+  return pending.map((r,idx)=>{
     const f=failed.find((x,i)=>!used.has('f'+i)&&x&&x.to===r.to_number&&used.add('f'+i));
     if(f)return {log_id:r.log_id,status:'failed',provider_id:typeof f.messageId==='string'?f.messageId.slice(0,120):null,error:short([f.statusCode,f.statusMessage].filter(Boolean).join(' '))||'failed'};
-    const m=sent.find((x,i)=>!used.has('m'+i)&&x&&x.to===r.to_number&&used.add('m'+i));
+    const m=sent.find((x,i)=>!used.has('m'+i)&&x&&x.to===r.to_number&&used.add('m'+i))||(byOrder&&!used.has('m'+idx)&&used.add('m'+idx)?sent[idx]:null);
     const id=m&&typeof m.messageId==='string'?m.messageId:groupId;
     return {log_id:r.log_id,status:'sent',provider_id:id?String(id).slice(0,120):null,error:null};
   });

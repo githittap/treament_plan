@@ -94,7 +94,8 @@ def short(x, n: int = 500):
 
 
 def map_solapi_result(pending: list[dict], status: int, body) -> list[dict]:
-    """supabase/functions/review-sms/core.mjs mapSolapiResult와 같은 규칙."""
+    """supabase/functions/review-sms/core.mjs mapSolapiResult와 같은 규칙.
+    접수된 줄(messageList)에는 받는 번호가 없어서(2026-11-27 실제 응답) 실패가 없고 개수가 같으면 보낸 순서로 맞춘다."""
     if not (200 <= status < 300) or not isinstance(body, dict):
         why = f"HTTP {status}"
         if isinstance(body, dict):
@@ -103,10 +104,11 @@ def map_solapi_result(pending: list[dict], status: int, body) -> list[dict]:
     failed = body.get("failedMessageList") if isinstance(body.get("failedMessageList"), list) else []
     sent = body.get("messageList") if isinstance(body.get("messageList"), list) else []
     gi = body.get("groupInfo") if isinstance(body.get("groupInfo"), dict) else {}
-    group_id = gi.get("groupId") if isinstance(gi.get("groupId"), str) else None
+    group_id = gi.get("groupId") if isinstance(gi.get("groupId"), str) else gi.get("_id") if isinstance(gi.get("_id"), str) else None
+    by_order = not failed and len(sent) == len(pending)
     used: set[str] = set()
     out = []
-    for r in pending:
+    for idx, r in enumerate(pending):
         f = next((x for i, x in enumerate(failed) if f"f{i}" not in used and isinstance(x, dict) and x.get("to") == r["to_number"] and not used.add(f"f{i}")), None)
         if f:
             out.append({"log_id": r["log_id"], "status": "failed",
@@ -114,6 +116,9 @@ def map_solapi_result(pending: list[dict], status: int, body) -> list[dict]:
                         "error": short(" ".join(str(x) for x in (f.get("statusCode"), f.get("statusMessage")) if x)) or "failed"})
             continue
         m = next((x for i, x in enumerate(sent) if f"m{i}" not in used and isinstance(x, dict) and x.get("to") == r["to_number"] and not used.add(f"m{i}")), None)
+        if m is None and by_order and f"m{idx}" not in used and isinstance(sent[idx], dict):
+            used.add(f"m{idx}")
+            m = sent[idx]
         mid = m.get("messageId") if m and isinstance(m.get("messageId"), str) else group_id
         out.append({"log_id": r["log_id"], "status": "sent", "provider_id": short(mid, 120) if mid else None, "error": None})
     return out
