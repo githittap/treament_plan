@@ -11,6 +11,7 @@ test('리뷰 요청은 문의함 하위 화면이고 리콜 명단과 같은 사
   assert.match(html,/if\(INBOX_SUBTAB==='review'&&typeof reviewSmsEnabled==='function'&&reviewSmsEnabled\(\)\)\{m\.innerHTML=reviewSmsCardHtml\(\);await reviewSmsLoad\(\);return;\}/);
   assert.match(html,/onclick="inboxSetSubtab\(\\'review\\'\)"/);
   assert.match(html,/SETTINGS\['review_sms\.enabled'\]==='true'/);
+  assert.match(html,/function reviewSmsEnabled\(\)\{return !!ME&&ME\.role==='owner'&&/,'환자 발송 영구 중지(11-27) 뒤 화면은 원장만');
   assert.match(sql,/public\.recall_user_allowed\(auth\.uid\(\)\)/,'DB도 리콜 명단과 같은 사람');
 });
 
@@ -48,7 +49,7 @@ test('보내기는 서버 함수만 부르고 확인 창을 거치며, 설정 �
   const send=html.slice(html.indexOf('async function reviewSmsSend(){'),html.indexOf('async function reviewSmsSaveSettings(){'));
   assert.match(send,/confirm\(/);assert.match(send,/sb\.functions\.invoke\('review-sms',\{body:\{phones:parsed\.phones,name:name\|\|null\}\}\)/);assert.doesNotMatch(send,/from\('review_sms_log'\)/);
   const save=html.slice(html.indexOf('async function reviewSmsSaveSettings(){'),html.indexOf('async function renderInbox(m){'));
-  assert.match(save,/if\(ME\.role!=='owner'/);assert.match(save,/from\('app_settings'\)\.upsert/);assert.match(save,/live_confirm/);
+  assert.match(save,/if\(ME\.role!=='owner'/);assert.match(save,/from\('app_settings'\)\.upsert/);assert.doesNotMatch(save,/review_sms\.live_enabled|live_confirm/,'환자 실제 발송 켜기는 저장하지 않음');
   assert.match(read('supabase/config.toml'),/\[functions\.review-sms\]\nverify_jwt = true/);
 });
 
@@ -69,7 +70,8 @@ test('PGlite: 권한·시험 모드·재발송 막기·문구·시간·결과 �
 test('병원 PC 중계 줄: 기록 없음·20분 넘게 소식 없음·오류·정상(잔액)',()=>{
   const h=context(),now=Date.parse('2026-11-27T01:30:00Z');
   assert.equal(h.reviewSmsRelayLine('',now).level,'none');assert.equal(h.reviewSmsRelayLine('not json',now).level,'none');
-  const stale=h.reviewSmsRelayLine(JSON.stringify({seen_at:'2026-11-27T01:00:00Z',balance:0,point:300}),now);assert.equal(stale.level,'stale');assert.match(stale.text,/30분째/);
+  assert.equal(h.reviewSmsRelayLine(JSON.stringify({seen_at:'2026-11-27T01:00:00Z',balance:0,point:300}),now).level,'ok','30분 소식 없음은 정상(30분마다 살아 있음 신호)');
+  const stale=h.reviewSmsRelayLine(JSON.stringify({seen_at:'2026-11-27T00:10:00Z',balance:0,point:300}),now);assert.equal(stale.level,'stale');assert.match(stale.text,/80분째/);
   assert.equal(h.reviewSmsRelayLine(JSON.stringify({seen_at:'2026-11-27T01:25:00Z',error:'IP 막힘'}),now).level,'warn');
   const ok=h.reviewSmsRelayLine(JSON.stringify({seen_at:'2026-11-27T01:25:00Z',balance:12000,point:300}),now);assert.equal(ok.level,'ok');assert.match(ok.text,/잔액 12,000원 \+ 포인트 300/);
   assert.match(html,/id="reviewSmsRelay"/);assert.match(html,/eq\('key','review_sms\.relay_status'\)/);
@@ -79,4 +81,26 @@ test('병원 PC 중계 줄: 기록 없음·20분 넘게 소식 없음·오류·�
 test('PGlite: 병원 PC 중계 — 대기함·한 번만 꺼냄·번호 지움·시간·만료·되돌리기',{skip:!fs.existsSync(path.join(pkg,'dist/index.js'))&&'PGLITE_PACKAGE_ROOT 없음'},()=>{
   const log=execFileSync(process.execPath,['tests/sql/pglite-review-sms-relay.mjs'],{cwd:root,env:{...process.env,PGLITE_PACKAGE_ROOT:pkg},encoding:'utf8',timeout:120000});
   assert.match(log,/PGLITE_REVIEW_SMS_RELAY_PASS/);
+});
+
+test('환자 리뷰 문자 영구 중지(원장 11-27): 화면에 켜는 칸 없음 · 안내 줄 · DB가 막음',()=>{
+  assert.doesNotMatch(html,/id="reviewSmsLive"/,'켜는 칸 없앰');assert.match(html,/reviewT\('mode_stopped_banner'/);assert.match(html,/reviewT\('set_live_stopped'/);
+  assert.doesNotMatch(html,/mode_live_banner/,'실제 발송 중 안내는 안 씀');
+  const stop=read('db/review_sms_stop_20261127.sql');assert.match(stop,/create trigger review_sms_live_guard/);assert.match(stop,/'review_sms\.live_enabled','false'/);
+  assert.match(read('db/review_sms_stop_20261127_rollback.sql'),/drop trigger if exists review_sms_live_guard/);
+});
+
+test('중계 상태 「기타 알파」 줄: 발신번호·잔액 알림·자동 충전·카카오·최근 문자·마지막 신호 · 새로 확인 단추',()=>{
+  const h=context(),now=Date.parse('2026-11-27T01:30:00Z');
+  const st={seen_at:'2026-11-27T01:25:00Z',checked_at:'2026-11-27T00:05:00Z',balance:45000,point:255,sender_ok:true,sender_tail:'1852',low_alert:{on:true,at:200},auto_recharge:false,kakao:{channels:1,approved:0,inspecting:1,other:0},last_msg:{at:'2026-11-26T22:22:36Z',type:'LMS',tail:'1852',status:'수신 완료'}};
+  const r=h.reviewSmsRelayLine(JSON.stringify(st),now);assert.equal(r.level,'ok');assert.match(r.text,/잔액 45,000원 \+ 포인트 255/);
+  const d=Array.from(r.details).join(' | ');
+  for(const re of [/발신번호 \*\*\*\*1852 · 솔라피 등록됨/,/200원 이하면 문자 알림 켜짐/,/자동 충전 꺼짐/,/카카오 채널 1개 연결 · 알림톡 템플릿 승인 0 · 검수 중 1/,/최근 보낸 문자 .* · LMS · \*\*\*\*1852 · 수신 완료/,/중계 마지막 신호/])assert.match(d,re);
+  assert.equal(Array.from(h.reviewSmsRelayLine(JSON.stringify({seen_at:'2026-11-27T01:25:00Z'}),now).details).length,1,'없는 칸은 안 보임');
+  assert.match(html,/onclick="reviewSmsRelayRefresh\(\)"/);assert.match(html,/upsert\(\[\{key:'review_sms\.relay_refresh_req'/);
+});
+
+test('PGlite: 환자 발송 영구 중지 — 끔·켜기 거절(update·upsert)·다른 칸 자유·되돌리기',{skip:!fs.existsSync(path.join(pkg,'dist/index.js'))&&'PGLITE_PACKAGE_ROOT 없음'},()=>{
+  const log=execFileSync(process.execPath,['tests/sql/pglite-review-sms-stop.mjs'],{cwd:root,env:{...process.env,PGLITE_PACKAGE_ROOT:pkg},encoding:'utf8',timeout:120000});
+  assert.match(log,/PGLITE_REVIEW_SMS_STOP_PASS/);
 });

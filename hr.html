@@ -4669,21 +4669,36 @@ function reviewSmsLogHtml(rows,nameOfFn,fmt){
   return '<div class="tblwrap"><table class="review-sms-log"><thead><tr><th>'+esc(reviewT('col_time','시각'))+'</th><th>'+esc(reviewT('col_by','보낸 사람'))+'</th><th>'+esc(reviewT('col_phone','번호 끝 4자리'))+'</th><th>'+esc(reviewT('col_name','이름'))+'</th><th>'+esc(reviewT('col_mode','모드'))+'</th><th>'+esc(reviewT('col_status','결과'))+'</th></tr></thead><tbody>'
     +rows.map(r=>'<tr><td>'+esc(fmt?fmt(r.created_at):r.created_at)+'</td><td>'+esc(nameOfFn?nameOfFn(r.sent_by):r.sent_by)+'</td><td>****'+esc(r.phone_tail)+'</td><td>'+esc(r.patient_label||'-')+'</td><td>'+esc(r.mode==='live'?reviewT('mode_live','실제'):reviewT('mode_test','시험'))+'</td><td>'+esc(reviewSmsStatusLabel(r.status))+(r.error?'<div class="hint">'+esc(String(r.error).slice(0,120))+'</div>':'')+'</td></tr>').join('')+'</tbody></table></div>';
 }
-// 병원 PC 중계 상태 줄(중계가 10분마다 review_sms.relay_status에 적음 · 20분 넘게 소식 없으면 경고).
+// 병원 PC 중계 상태 줄(2026-11-27 원장 「10분마다 갱신은 오바다」 뒤: 중계는 30분마다 살아 있음만 적고(솔라피 조회 없음),
+// 솔라피 조회(잔액·발신번호·알림톡 등)는 중계 시작·발송 뒤·매일 09시·원장 「새로 확인」 단추 때만 · 70분 넘게 소식 없으면 경고).
+const REVIEW_SMS_RELAY_STALE_MIN=70;
 function reviewSmsRelayLine(raw,nowMs){
   let st=null;try{st=raw?JSON.parse(raw):null;}catch(_e){st=null;}
   const seen=st&&st.seen_at?Date.parse(st.seen_at):NaN;
-  if(!st||!Number.isFinite(seen))return {level:'none',text:reviewT('relay_none','🖥️ 병원 PC 중계: 아직 연결 기록이 없습니다. 병원 PC가 켜져 있어야 문자가 나갑니다.')};
-  const min=Math.max(0,Math.floor((nowMs-seen)/60000));
-  if(min>20)return {level:'stale',text:reviewT('relay_stale','⚠️ 병원 PC 중계가 {min}분째 소식이 없습니다. 병원 PC가 꺼져 있으면 문자가 대기만 하다가 2시간 뒤 취소됩니다.',{min})};
-  if(st.error)return {level:'warn',text:reviewT('relay_error','⚠️ 병원 PC 중계 오류: {msg}',{msg:String(st.error).slice(0,120)})};
-  const d=new Date(seen),hm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'),won=x=>Number.isFinite(Number(x))?Number(x).toLocaleString('ko-KR'):'-';
-  return {level:'ok',text:reviewT('relay_ok','🖥️ 병원 PC 중계 정상 · {time} 확인 · 솔라피 잔액 {balance}원 + 포인트 {point}',{time:hm,balance:won(st.balance),point:won(st.point)})};
+  if(!st||!Number.isFinite(seen))return {level:'none',text:reviewT('relay_none','🖥️ 병원 PC 중계: 아직 연결 기록이 없습니다. 병원 PC가 켜져 있어야 문자가 나갑니다.'),details:[]};
+  const min=Math.max(0,Math.floor((nowMs-seen)/60000)),details=reviewSmsRelayDetails(st);
+  if(min>REVIEW_SMS_RELAY_STALE_MIN)return {level:'stale',text:reviewT('relay_stale','⚠️ 병원 PC 중계가 {min}분째 소식이 없습니다. 병원 PC가 꺼져 있으면 문자가 대기만 하다가 2시간 뒤 취소됩니다.',{min}),details};
+  if(st.error)return {level:'warn',text:reviewT('relay_error','⚠️ 병원 PC 중계 오류: {msg}',{msg:String(st.error).slice(0,120)}),details};
+  const checked=Date.parse(st.checked_at||''),won=x=>Number.isFinite(Number(x))?Number(x).toLocaleString('ko-KR'):'-';
+  return {level:'ok',text:reviewT('relay_ok','🖥️ 병원 PC 중계 정상 · 솔라피 {time} 확인 · 잔액 {balance}원 + 포인트 {point}',{time:reviewSmsWhen(Number.isFinite(checked)?checked:seen),balance:won(st.balance),point:won(st.point)}),details};
+}
+function reviewSmsWhen(ms){const d=new Date(ms);if(!Number.isFinite(d.getTime()))return '-';const p=n=>String(n).padStart(2,'0');return p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());}
+// 「기타 알파」 줄: 중계가 솔라피에서 읽어 온 값만(없는 칸은 안 보임).
+function reviewSmsRelayDetails(st){
+  const out=[],won=x=>Number.isFinite(Number(x))?Number(x).toLocaleString('ko-KR'):'-',onoff=b=>b?reviewT('relay_on','켜짐'):reviewT('relay_off','꺼짐'),n=x=>Number.isFinite(Number(x))?Number(x):0;
+  if(st.sender_tail)out.push(reviewT('relay_d_sender','발신번호 ****{tail} · {state}',{tail:String(st.sender_tail).slice(-4),state:st.sender_ok?reviewT('relay_d_sender_ok','솔라피 등록됨 ✅'):reviewT('relay_d_sender_bad','솔라피에 없음 ⚠️')}));
+  if(st.low_alert&&typeof st.low_alert==='object')out.push(reviewT('relay_d_low','잔액 부족 알림: {won}원 이하면 문자 알림 {state}',{won:won(st.low_alert.at),state:onoff(st.low_alert.on)}));
+  if(st.auto_recharge!=null)out.push(reviewT('relay_d_auto','자동 충전 {state}',{state:onoff(st.auto_recharge)}));
+  if(st.kakao&&typeof st.kakao==='object')out.push(reviewT('relay_d_kakao','카카오 채널 {ch}개 연결 · 알림톡 템플릿 승인 {ok} · 검수 중 {wait} · 그 밖 {etc}',{ch:n(st.kakao.channels),ok:n(st.kakao.approved),wait:n(st.kakao.inspecting),etc:n(st.kakao.other)}));
+  if(st.last_msg&&typeof st.last_msg==='object')out.push(reviewT('relay_d_last','최근 보낸 문자 {time} · {type} · ****{tail} · {status}',{time:reviewSmsWhen(Date.parse(st.last_msg.at||'')),type:String(st.last_msg.type||'-').slice(0,10),tail:String(st.last_msg.tail||'').slice(-4),status:String(st.last_msg.status||'-').slice(0,40)}));
+  const seen=Date.parse(st.seen_at||'');if(Number.isFinite(seen))out.push(reviewT('relay_d_seen','중계 마지막 신호 {time}',{time:reviewSmsWhen(seen)}));
+  return out;
 }
 function reviewSmsErrorText(code){return ({access_denied:reviewT('err_access','리뷰 요청 문자를 보낼 권한이 없습니다.'),invalid_phone:reviewT('err_phone','휴대폰 번호 형식이 맞지 않습니다.'),invalid_name:reviewT('err_name','이름은 20자 이하로, 중괄호 없이 적으세요.'),too_many:reviewT('err_many','한 번에 1~20명까지 보낼 수 있습니다.')})[code]||'';}
 /* review-sms:test-end */
 let REVIEW_SMS_BUSY=false,REVIEW_SMS_LOAD_SEQ=0;
-function reviewSmsEnabled(){return reviewSmsCanAccess(ME)&&typeof SETTINGS!=='undefined'&&SETTINGS['review_sms.enabled']==='true';}
+/* 2026-11-27 원장 「환자에게 리뷰 문자 보내기는 영구적으로 취소한다」: 환자 발송은 DB가 막고(review_sms_live_guard), 이 화면은 원장만(중계 상태·내부 번호 시험). */
+function reviewSmsEnabled(){return !!ME&&ME.role==='owner'&&reviewSmsCanAccess(ME)&&typeof SETTINGS!=='undefined'&&SETTINGS['review_sms.enabled']==='true';}
 function reviewSmsOwnerPanel(s){
   if(ME.role!=='owner')return '';
   const [start,end]=s.hours.split('-');
@@ -4694,18 +4709,20 @@ function reviewSmsOwnerPanel(s){
     +'<div class="fld"><label for="reviewSmsCooldown">'+esc(reviewT('set_cooldown','같은 번호에 다시 보내지 않는 기간(일)'))+'</label><input id="reviewSmsCooldown" type="number" min="1" max="3650" value="'+esc(s.cooldown)+'"></div>'
     +'<div class="fld"><label for="reviewSmsStart">'+esc(reviewT('set_hours','보낼 수 있는 시간'))+'</label><span class="rowflex"><input id="reviewSmsStart" type="time" value="'+esc(start)+'"> ~ <input id="reviewSmsEnd" type="time" value="'+esc(end)+'"></span></div></div>'
     +'<div class="fld"><label for="reviewSmsTests">'+esc(reviewT('set_tests','시험 모드에서 받을 내부 번호(한 줄에 하나)'))+'</label><textarea id="reviewSmsTests" rows="2" inputmode="tel">'+esc(s.tests.join('\n'))+'</textarea></div>'
-    +'<label class="review-sms-live"><input id="reviewSmsLive" type="checkbox" '+(s.live?'checked':'')+'> '+esc(reviewT('set_live','환자에게 실제 발송 켬(끄면 시험 모드)'))+'</label>'
+    +'<div class="hint review-sms-live">'+esc(reviewT('set_live_stopped','환자 실제 발송: 원장 결정(2026-11-27)으로 영구 중지 — 켤 수 없습니다(DB가 막음).'))+'</div>'
     +'<div><button class="mini stamp" onclick="reviewSmsSaveSettings()">'+esc(reviewT('set_save','설정 저장'))+'</button><div id="reviewSmsSetMsg" class="msg" role="status"></div></div></details>';
 }
 function reviewSmsCardHtml(){
   const s=reviewSmsSettings(SETTINGS);
-  const mode=s.live?'<div class="review-sms-mode review-sms-live-on">'+esc(reviewT('mode_live_banner','🟢 실제 발송 중 — 적은 번호로 바로 문자가 나갑니다.'))+'</div>':'<div class="review-sms-mode">'+esc(reviewT('mode_test_banner','🧪 시험 모드 — 원장이 등록한 내부 번호로만 보내집니다. 환자에게는 나가지 않습니다.'))+'</div>';
+  const mode='<div class="review-sms-mode review-sms-stopped">'+esc(reviewT('mode_stopped_banner','⛔ 환자에게 보내는 리뷰 문자는 원장 결정(2026-11-27)으로 영구 중지했습니다. 아래 보내기는 원장이 등록한 내부 번호로만 가는 시험 발송입니다.'))+'</div>';
   const ready=s.sender?'':'<div class="cal-error">'+esc(reviewT('not_ready','발신번호가 아직 없어 문자를 보낼 수 없습니다. 원장이 솔라피 발신번호를 등록하면 보낼 수 있습니다.'))+'</div>';
-  return recallTabsHtml()+'<section class="card review-sms-card"><h2>'+esc(reviewT('title','⭐ 리뷰 요청 문자'))+'</h2><p class="hint">'+esc(reviewT('hint','진료를 마친 환자에게 구글 리뷰를 부탁하는 문자를 보냅니다. 대가(할인·선물)나 별점 부탁은 넣지 않습니다.'))+'</p>'+mode+'<div id="reviewSmsRelay" class="hint review-sms-relay" role="status"></div>'+ready
+  const relay='<div id="reviewSmsRelay" class="hint review-sms-relay" role="status"></div><ul id="reviewSmsRelayDetails" class="hint review-sms-relay-details"></ul>'
+    +'<div class="rowflex" style="align-items:center"><button class="mini" onclick="reviewSmsRelayRefresh()">'+esc(reviewT('relay_refresh','🔄 솔라피 상태 새로 확인'))+'</button><span id="reviewSmsRelayMsg" class="msg" role="status"></span></div>';
+  return recallTabsHtml()+'<section class="card review-sms-card"><h2>'+esc(reviewT('title','⭐ 리뷰 요청 문자'))+'</h2><p class="hint">'+esc(reviewT('hint_stopped','병원 PC 중계(솔라피 문자·알림톡)의 상태를 보고, 원장이 등록한 내부 번호로 시험 문자를 보내 볼 수 있습니다.'))+'</p>'+mode+relay+ready
     +'<div class="grid"><div class="fld"><label for="reviewSmsName">'+esc(reviewT('f_name','환자 이름(선택 · 문자에 들어감)'))+'</label><input id="reviewSmsName" maxlength="20" autocomplete="off" oninput="reviewSmsPreview()"></div>'
     +'<div class="fld"><label for="reviewSmsPhones">'+esc(reviewT('f_phones','휴대폰 번호(여러 명이면 한 줄에 한 명 · 최대 20명)'))+'</label><textarea id="reviewSmsPhones" rows="3" inputmode="tel" autocomplete="off" oninput="reviewSmsPreview()"></textarea></div></div>'
     +'<div class="hint">'+esc(reviewT('preview','보낼 문자 미리 보기'))+'</div><pre id="reviewSmsPreview" class="review-sms-preview"></pre><div id="reviewSmsCheck" class="hint" role="status"></div>'
-    +'<button class="mini stamp" onclick="reviewSmsSend()">'+esc(reviewT('send','📨 리뷰 요청 보내기'))+'</button><div id="reviewSmsMsg" class="msg" role="status"></div>'
+    +'<button class="mini stamp" onclick="reviewSmsSend()">'+esc(reviewT('send_test','📨 내부 번호로 시험 보내기'))+'</button><div id="reviewSmsMsg" class="msg" role="status"></div>'
     +'<div class="rowflex" style="justify-content:space-between;align-items:center"><h3>'+esc(reviewT('log_title','최근 보낸 기록'))+'</h3><button class="mini" onclick="reviewSmsLoad()">'+esc(reviewT('refresh','새로 조회'))+'</button></div><div id="reviewSmsLog" class="hint">'+esc(reviewT('loading','불러오는 중…'))+'</div>'
     +reviewSmsOwnerPanel(s)+'</section>';
 }
@@ -4720,7 +4737,7 @@ function reviewSmsPreview(){
 async function reviewSmsLoad(){
   const seq=++REVIEW_SMS_LOAD_SEQ,box=$('#reviewSmsLog');if(!box||!reviewSmsEnabled())return;
   reviewSmsPreview();
-  sb.from('app_settings').select('value').eq('key','review_sms.relay_status').maybeSingle().then(({data})=>{const el=$('#reviewSmsRelay');if(seq!==REVIEW_SMS_LOAD_SEQ||!el)return;const line=reviewSmsRelayLine(data?.value||'',Date.now());el.textContent=line.text;el.dataset.level=line.level;}).catch(()=>{});
+  sb.from('app_settings').select('value').eq('key','review_sms.relay_status').maybeSingle().then(({data})=>{const el=$('#reviewSmsRelay');if(seq!==REVIEW_SMS_LOAD_SEQ||!el)return;const line=reviewSmsRelayLine(data?.value||'',Date.now());el.textContent=line.text;el.dataset.level=line.level;const ul=$('#reviewSmsRelayDetails');if(ul)ul.innerHTML=(line.details||[]).map(t=>'<li>'+esc(t)+'</li>').join('');}).catch(()=>{});
   try{const {data,error}=await sb.rpc('review_sms_recent',{p_limit:30});if(seq!==REVIEW_SMS_LOAD_SEQ||!box.isConnected)return;if(error)throw error;box.innerHTML=reviewSmsLogHtml(data||[],nameOf,formatLeaveTimestamp);}
   catch(e){if(seq===REVIEW_SMS_LOAD_SEQ&&box.isConnected)box.innerHTML='<div class="cal-error">'+esc(reviewT('load_error','보낸 기록을 불러오지 못했습니다: {msg}',{msg:e.message}))+'</div>';}
 }
@@ -4746,7 +4763,7 @@ async function reviewSmsSend(){
 }
 async function reviewSmsSaveSettings(){
   if(ME.role!=='owner'||REVIEW_SMS_BUSY)return;
-  const msg=$('#reviewSmsSetMsg'),template=$('#reviewSmsTemplate').value.trim(),url=$('#reviewSmsUrl').value.trim(),sender=$('#reviewSmsSender').value.replace(/[^0-9]/g,''),cooldown=$('#reviewSmsCooldown').value.trim(),start=$('#reviewSmsStart').value,end=$('#reviewSmsEnd').value,live=$('#reviewSmsLive').checked,tests=reviewSmsParsePhones($('#reviewSmsTests').value);
+  const msg=$('#reviewSmsSetMsg'),template=$('#reviewSmsTemplate').value.trim(),url=$('#reviewSmsUrl').value.trim(),sender=$('#reviewSmsSender').value.replace(/[^0-9]/g,''),cooldown=$('#reviewSmsCooldown').value.trim(),start=$('#reviewSmsStart').value,end=$('#reviewSmsEnd').value,tests=reviewSmsParsePhones($('#reviewSmsTests').value);
   if(!template||!template.includes('{link}')){msg.textContent=reviewT('set_need_link','문구에 {link}(리뷰 주소 자리)를 넣으세요.');return;}
   if(reviewSmsForbidden(template)){msg.textContent=reviewT('forbidden','문구에 대가·별점 부탁 낱말이 있어 보내지 않습니다. 원장 설정에서 문구를 고치세요.');return;}
   if(!/^https:\/\/\S+$/.test(url)){msg.textContent=reviewT('set_bad_url','구글 리뷰 주소는 https://로 시작해야 합니다.');return;}
@@ -4754,13 +4771,23 @@ async function reviewSmsSaveSettings(){
   if(tests.bad.length){msg.textContent=reviewT('set_bad_tests','내부 번호를 확인하세요: {list}',{list:tests.bad.join(', ')});return;}
   if(!/^[0-9]{1,4}$/.test(cooldown)||Number(cooldown)<1||Number(cooldown)>3650){msg.textContent=reviewT('set_bad_cooldown','기간은 1~3650일로 적으세요.');return;}
   if(!/^\d{2}:\d{2}$/.test(start)||!/^\d{2}:\d{2}$/.test(end)||start>=end){msg.textContent=reviewT('set_bad_hours','보낼 수 있는 시간을 확인하세요(시작이 끝보다 빨라야 함).');return;}
-  if(live&&SETTINGS['review_sms.live_enabled']!=='true'&&!confirm(reviewT('live_confirm','실제 발송을 켜면 직원이 적은 환자 번호로 바로 문자가 나갑니다. 켤까요?')))return;
-  const rows=[{key:'review_sms.template',value:template},{key:'review_sms.review_url',value:url},{key:'review_sms.sender',value:sender},{key:'review_sms.cooldown_days',value:String(Number(cooldown))},{key:'review_sms.hours',value:start+'-'+end},{key:'review_sms.test_numbers',value:JSON.stringify(tests.phones)},{key:'review_sms.live_enabled',value:live?'true':'false'}];
+  const rows=[{key:'review_sms.template',value:template},{key:'review_sms.review_url',value:url},{key:'review_sms.sender',value:sender},{key:'review_sms.cooldown_days',value:String(Number(cooldown))},{key:'review_sms.hours',value:start+'-'+end},{key:'review_sms.test_numbers',value:JSON.stringify(tests.phones)}];
   REVIEW_SMS_BUSY=true;setStatus('saving');
   try{const {error}=await sb.from('app_settings').upsert(rows,{onConflict:'key'});if(error)throw error;rows.forEach(r=>{SETTINGS[r.key]=r.value;});setStatus('saved');}
   catch(e){msg.textContent=reviewT('set_fail','저장 실패: {msg}',{msg:e.message});setStatus('error');return;}
   finally{REVIEW_SMS_BUSY=false;}
   await render();
+}
+
+// 원장 「솔라피 상태 새로 확인」: 요청 시각만 적고, 병원 PC 중계가 다음 바퀴(1~5분)에 솔라피를 조회해 상태 줄을 갱신한다.
+async function reviewSmsRelayRefresh(){
+  if(ME.role!=='owner'||REVIEW_SMS_BUSY)return;
+  const msg=$('#reviewSmsRelayMsg');REVIEW_SMS_BUSY=true;
+  try{const {error}=await sb.from('app_settings').upsert([{key:'review_sms.relay_refresh_req',value:new Date().toISOString()}],{onConflict:'key'});if(error)throw error;
+    if(msg)msg.textContent=reviewT('relay_refresh_sent','병원 PC가 몇 분 안에 솔라피 상태를 새로 확인합니다. 잠시 뒤 이 줄이 바뀝니다.');
+    setTimeout(()=>{if(INBOX_SUBTAB==='review'&&$('#reviewSmsRelay'))reviewSmsLoad();},90000);}
+  catch(e){if(msg)msg.textContent=reviewT('set_fail','저장 실패: {msg}',{msg:e.message});}
+  finally{REVIEW_SMS_BUSY=false;}
 }
 
 async function renderInbox(m){

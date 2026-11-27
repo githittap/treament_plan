@@ -2656,8 +2656,24 @@ function hubTextDefsReview(add){
   add("review.relay_none","⭐ 리뷰 요청 문자","🖥️ 병원 PC 중계: 아직 연결 기록이 없습니다. 병원 PC가 켜져 있어야 문자가 나갑니다.","🖥️ 병원 PC 중계: 아직 연결 기록이 없습니다. 병원 PC가 켜져 있어야 문자가 나갑니다.",[]);
   add("review.relay_stale","⭐ 리뷰 요청 문자","⚠️ 병원 PC 중계가 {min}분째 소식이 없습니다. 병원 PC가 꺼져 있으면 문자가 대기만 하다가 2시간 뒤 취소됩니다.","⚠️ 병원 PC 중계가 {min}분째 소식이 없습니다. 병원 PC가 꺼져 있으면 문자가 대기만 하다가 2시간 뒤 취소됩니다.",["min"]);
   add("review.relay_error","⭐ 리뷰 요청 문자","⚠️ 병원 PC 중계 오류: {msg}","⚠️ 병원 PC 중계 오류: {msg}",["msg"]);
-  add("review.relay_ok","⭐ 리뷰 요청 문자","🖥️ 병원 PC 중계 정상 · {time} 확인 · 솔라피 잔액 {balance}원 + 포인트 {point}","🖥️ 병원 PC 중계 정상 · {time} 확인 · 솔라피 잔액 {balance}원 + 포인트 {point}",["time", "balance", "point"]);
+  add("review.relay_ok","⭐ 리뷰 요청 문자","🖥️ 병원 PC 중계 정상 · 솔라피 {time} 확인 · 잔액 {balance}원 + 포인트 {point}","🖥️ 병원 PC 중계 정상 · 솔라피 {time} 확인 · 잔액 {balance}원 + 포인트 {point}",["balance", "point", "time"]);
   add("review.relay_note","⭐ 리뷰 요청 문자","병원 PC가 1분 안에 보냅니다 — 잠시 뒤 결과가 「최근 보낸 기록」에 나옵니다.","병원 PC가 1분 안에 보냅니다 — 잠시 뒤 결과가 「최근 보낸 기록」에 나옵니다.",[]);
+  add("review.mode_stopped_banner","⭐ 리뷰 요청 문자","⛔ 환자에게 보내는 리뷰 문자는 원장 결정(2026-11-27)으로 영구 중지했습니다. 아래 보내기는 원장이 등록한 내부 번호로만 가는 시험 발송입니다.","⛔ 환자에게 보내는 리뷰 문자는 원장 결정(2026-11-27)으로 영구 중지했습니다. 아래 보내기는 원장이 등록한 내부 번호로만 가는 시험 발송입니다.",[]);
+  add("review.hint_stopped","⭐ 리뷰 요청 문자","병원 PC 중계(솔라피 문자·알림톡)의 상태를 보고, 원장이 등록한 내부 번호로 시험 문자를 보내 볼 수 있습니다.","병원 PC 중계(솔라피 문자·알림톡)의 상태를 보고, 원장이 등록한 내부 번호로 시험 문자를 보내 볼 수 있습니다.",[]);
+  add("review.send_test","⭐ 리뷰 요청 문자","📨 내부 번호로 시험 보내기","📨 내부 번호로 시험 보내기",[]);
+  add("review.set_live_stopped","⭐ 리뷰 요청 문자","환자 실제 발송: 원장 결정(2026-11-27)으로 영구 중지 — 켤 수 없습니다(DB가 막음).","환자 실제 발송: 원장 결정(2026-11-27)으로 영구 중지 — 켤 수 없습니다(DB가 막음).",[]);
+  add("review.relay_refresh","⭐ 리뷰 요청 문자","🔄 솔라피 상태 새로 확인","🔄 솔라피 상태 새로 확인",[]);
+  add("review.relay_refresh_sent","⭐ 리뷰 요청 문자","병원 PC가 몇 분 안에 솔라피 상태를 새로 확인합니다. 잠시 뒤 이 줄이 바뀝니다.","병원 PC가 몇 분 안에 솔라피 상태를 새로 확인합니다. 잠시 뒤 이 줄이 바뀝니다.",[]);
+  add("review.relay_on","⭐ 리뷰 요청 문자","켜짐","켜짐",[]);
+  add("review.relay_off","⭐ 리뷰 요청 문자","꺼짐","꺼짐",[]);
+  add("review.relay_d_sender","⭐ 리뷰 요청 문자","발신번호 ****{tail} · {state}","발신번호 ****{tail} · {state}",["state", "tail"]);
+  add("review.relay_d_sender_ok","⭐ 리뷰 요청 문자","솔라피 등록됨 ✅","솔라피 등록됨 ✅",[]);
+  add("review.relay_d_sender_bad","⭐ 리뷰 요청 문자","솔라피에 없음 ⚠️","솔라피에 없음 ⚠️",[]);
+  add("review.relay_d_low","⭐ 리뷰 요청 문자","잔액 부족 알림: {won}원 이하면 문자 알림 {state}","잔액 부족 알림: {won}원 이하면 문자 알림 {state}",["state", "won"]);
+  add("review.relay_d_auto","⭐ 리뷰 요청 문자","자동 충전 {state}","자동 충전 {state}",["state"]);
+  add("review.relay_d_kakao","⭐ 리뷰 요청 문자","카카오 채널 {ch}개 연결 · 알림톡 템플릿 승인 {ok} · 검수 중 {wait} · 그 밖 {etc}","카카오 채널 {ch}개 연결 · 알림톡 템플릿 승인 {ok} · 검수 중 {wait} · 그 밖 {etc}",["ch", "etc", "ok", "wait"]);
+  add("review.relay_d_last","⭐ 리뷰 요청 문자","최근 보낸 문자 {time} · {type} · ****{tail} · {status}","최근 보낸 문자 {time} · {type} · ****{tail} · {status}",["status", "tail", "time", "type"]);
+  add("review.relay_d_seen","⭐ 리뷰 요청 문자","중계 마지막 신호 {time}","중계 마지막 신호 {time}",["time"]);
 }
 function hubTextDefsBonus(add){
   add('wh.reply_column','💰 시급제','시급 구분 · 회신 시간 칸','회신 시간 칸');

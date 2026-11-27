@@ -2,11 +2,14 @@
 
 왜: 솔라피는 문자(SMS·LMS·MMS) 발송 권한을 고정 IP를 지정한 키에서만 쓰게 하고, 클라우드 공급사 대역은 고정 IP로 치지 않는다.
     그래서 직원허브 서버 함수(Supabase 클라우드)는 솔라피에 바로 못 보낸다. 키의 허용 IP인 병원 PC에서 이 프로그램이 돈다.
-하는 일(20초마다, 보낼 수 있는 시간 밖에는 2분마다):
+하는 일(1분마다, 보낼 수 있는 시간 밖에는 5분마다 — 11-27 원장 「10분마다 갱신은 오바다」 뒤 줄임):
   ① review_sms_relay_claim — 허브 대기함(review_sms_outbox)에서 보낼 줄을 꺼냄(한 번 꺼낸 줄은 다시 안 꺼냄)
   ② 솔라피 send-many/detail로 발송
   ③ review_sms_relay_done — 결과를 기록하고 대기함에서 번호를 지움
-  ④ 10분마다 review_sms_relay_heartbeat — 잔액·발신번호 상태를 허브에 적음(허브 「병원 PC 중계」 줄)
+  ④ 솔라피 상태 조회(잔액·포인트·발신번호·잔액 부족 알림·자동 충전·카카오 채널·알림톡 템플릿·최근 문자)는
+     중계 시작 · 발송 뒤 · 매일 09시 · 원장 화면 「솔라피 상태 새로 확인」 단추(review_sms.relay_refresh_req) 때만
+  ⑤ 30분마다 살아 있음만 허브에 적음(솔라피 조회 없음 · 마지막 조회 값 그대로) — 허브 「병원 PC 중계」 줄
+환자 리뷰 문자는 원장 결정(11-27)으로 영구 중지 — 허브 DB가 막아서 대기함에는 원장 내부 번호 시험만 들어옴.
 비밀값: C:\\Users\\elusi\\.secrets\\api-keys.env 의 SOLAPI_API_KEY · SOLAPI_API_SECRET_KEY · SUPABASE_ACCESS_TOKEN_CODEX
         (Supabase 서비스 키는 이 토큰으로 그때그때 받아 메모리에만 둠 · 어떤 값도 화면·기록에 쓰지 않음).
 기록: 이 파일 옆 logs\\relay_YYYYMM.log (번호는 끝 4자리만).
@@ -44,7 +47,8 @@ SEND_PATH = "messages/v4/send-many/detail"
 ENV_FILE = r"C:\Users\elusi\.secrets\api-keys.env"
 HERE = os.path.dirname(os.path.abspath(__file__))
 LOG_DIR = os.path.join(HERE, "logs")
-POLL_SEC, IDLE_SEC, HEARTBEAT_SEC = 20, 120, 600
+POLL_SEC, IDLE_SEC, ALIVE_SEC = 60, 300, 1800
+DAILY_CHECK = dt.time(9, 0)    # 매일 이 시각 뒤 첫 바퀴에 솔라피 상태 한 번
 KST = dt.timezone(dt.timedelta(hours=9))
 UA = "hub-review-sms-relay/1"
 ALERT_AFTER_FAILS = 2          # 솔라피 호출이 이만큼 연속 실패하면 알림
@@ -229,7 +233,11 @@ class Relay:
         self._env_mtime: float | None = None
         self.load_env()
         self._service = ""
-        self.last_heartbeat = 0.0
+        self.last_alive = 0.0
+        self.last_info: dict = {}
+        self.force_check = True        # 시작하면 솔라피 상태 한 번
+        self.refresh_seen: str | None = None
+        self.daily_done: dt.date | None = None
         self.last_error: str | None = None
         self.balance_ok: bool | None = None
         self.alerter = alerter
@@ -256,7 +264,7 @@ class Relay:
         if self.pat != old_pat:
             self._service = ""
         log("env reloaded (비밀값 파일 저장 시각이 바뀜 — 값은 기록 안 함)")
-        self.last_heartbeat = 0.0  # 바로 다음 바퀴에 잔액 조회로 새 값 확인
+        self.force_check = True  # 바로 다음 바퀴에 잔액 조회로 새 값 확인
         return True
 
     def _note(self, ok: bool, error: str | None = None) -> None:
@@ -330,7 +338,8 @@ class Relay:
 
     # --- 한 바퀴 -------------------------------------------------------------
     def status(self) -> dict:
-        info: dict = {"relay": "pc", "host": socket.gethostname(), "error": None}
+        info: dict = {"relay": "pc", "host": socket.gethostname(), "error": None,
+                      "checked_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")}
         try:
             st, bal = self.solapi("GET", "cash/v1/balance")
         except Exception as e:  # 연결 실패도 솔라피 호출 실패로 셈
@@ -338,26 +347,86 @@ class Relay:
         self.balance_ok = st == 200 and isinstance(bal, dict)
         if self.balance_ok:
             info["balance"], info["point"] = bal.get("balance"), bal.get("point")
+            la = bal.get("lowBalanceAlert") if isinstance(bal.get("lowBalanceAlert"), dict) else None
+            if la:
+                lst = la.get("balances") if isinstance(la.get("balances"), list) else []
+                info["low_alert"] = {"on": bool(la.get("enabled")), "at": lst[0] if lst else la.get("notificationBalance")}
+            if "autoRecharge" in bal:
+                info["auto_recharge"] = bool(bal.get("autoRecharge"))
         else:
             info["error"] = f"솔라피 잔액 조회 실패 HTTP {st} {short((bal or {}).get('errorMessage') if isinstance(bal, dict) else bal, 120)}"
         st, senders = self.solapi("GET", "senderid/v1/numbers/active")
         sender = "".join(ch for ch in self.setting("review_sms.sender") if ch.isdigit())
+        if sender:
+            info["sender_tail"] = sender[-4:]
         if st == 200 and isinstance(senders, list):
             info["sender_ok"] = bool(sender) and sender in senders
             if sender and sender not in senders and not info["error"]:
                 info["error"] = "허브 발신번호가 솔라피에 등록된 번호가 아님"
+        info.update(self.extras())
         return info
 
-    def heartbeat(self, force: bool = False) -> None:
-        if not force and time.monotonic() - self.last_heartbeat < HEARTBEAT_SEC:
+    def extras(self) -> dict:
+        """원장 「기타 알파」 — 카카오 채널·알림톡 템플릿·최근 문자. 하나가 실패해도 나머지는 적고, 알림 횟수에는 안 셈."""
+        out: dict = {}
+        try:
+            st, ch = self.solapi("GET", "kakao/v2/channels?limit=20")
+            st2, tp = self.solapi("GET", "kakao/v2/templates?limit=100")
+            if st == 200 and isinstance(ch, dict) and st2 == 200 and isinstance(tp, dict):
+                tl = [t for t in (tp.get("templateList") or []) if isinstance(t, dict)]
+                ok = sum(1 for t in tl if t.get("status") == "APPROVED")
+                wait = sum(1 for t in tl if t.get("status") in ("INSPECTING", "PENDING"))
+                out["kakao"] = {"channels": len(ch.get("channelList") or []), "approved": ok, "inspecting": wait, "other": len(tl) - ok - wait}
+        except Exception:
+            pass
+        try:
+            st, ml = self.solapi("GET", "messages/v4/list?limit=1")
+            items = ml.get("messageList") if isinstance(ml, dict) else None
+            first = next(iter(items.values()), None) if isinstance(items, dict) else (items[0] if isinstance(items, list) and items else None)
+            if st == 200 and isinstance(first, dict):
+                out["last_msg"] = {"at": first.get("dateCreated"), "type": first.get("type"), "tail": str(first.get("to") or "")[-4:],
+                                   "status": short(first.get("reason") or first.get("status") or first.get("statusCode"), 40)}
+        except Exception:
+            pass
+        return out
+
+    def heartbeat(self, force: bool = False, why: str = "") -> None:
+        """솔라피 상태 조회 + 허브에 적기. force가 아니면 정해진 때(시작·새로 확인 요청·매일 09시)만."""
+        if not force and not self.check_due():
             return
         info = self.status()
         self._note(bool(self.balance_ok), info.get("error"))
         if self.last_error and not info.get("error"):
             info["error"] = self.last_error
         self.rpc("review_sms_relay_heartbeat", {"p_status": info})
-        self.last_heartbeat = time.monotonic()
-        log(f"heartbeat balance={info.get('balance')} point={info.get('point')} sender_ok={info.get('sender_ok')} error={info.get('error')}")
+        self.last_info, self.last_alive, self.force_check = info, time.monotonic(), False
+        if now_kst().time() >= DAILY_CHECK:
+            self.daily_done = now_kst().date()   # 오늘 09시 뒤에 이미 조회했으면 매일 조회는 건너뜀
+        log(f"heartbeat{(' ' + why) if why else ''} balance={info.get('balance')} point={info.get('point')} sender_ok={info.get('sender_ok')} "
+            f"kakao={info.get('kakao')} error={info.get('error')}")
+
+    def check_due(self) -> bool:
+        if self.force_check:
+            return True
+        req = self.setting("review_sms.relay_refresh_req").strip()
+        if self.refresh_seen is None:
+            self.refresh_seen = req           # 시작 전에 있던 요청은 시작 조회로 갈음
+        elif req and req != self.refresh_seen:
+            self.refresh_seen = req
+            log("refresh requested (원장 화면 「솔라피 상태 새로 확인」)")
+            return True
+        now = now_kst()
+        if now.time() >= DAILY_CHECK and self.daily_done != now.date():
+            self.daily_done = now.date()
+            return True
+        return False
+
+    def alive(self) -> None:
+        """30분마다 살아 있음만(솔라피 조회 없음) — 마지막 조회 값에 seen_at만 새로."""
+        if time.monotonic() - self.last_alive < ALIVE_SEC or not self.last_info:
+            return
+        self.rpc("review_sms_relay_heartbeat", {"p_status": self.last_info})
+        self.last_alive = time.monotonic()
 
     def tick(self) -> int:
         rows = self.rpc("review_sms_relay_claim", {"p_limit": 10}) or []
@@ -371,7 +440,7 @@ class Relay:
         bad = [x for x in results if x["status"] != "sent"]
         self.last_error = short(f"최근 발송 실패: {bad[0].get('error')}", 200) if bad else None
         log(f"done {n}/{len(rows)}")
-        self.heartbeat(force=True)
+        self.heartbeat(force=True, why="after-send")
         return len(rows)
 
 
@@ -413,6 +482,7 @@ def main(argv: list[str]) -> int:
             relay.reload_env_if_changed()
             relay.tick()
             relay.heartbeat()
+            relay.alive()
         except Exception as e:  # 한 바퀴 실패는 기록만 하고 다음 바퀴에 다시
             log(f"error {type(e).__name__}: {short(e, 300)}")
         if "--once" in argv:
