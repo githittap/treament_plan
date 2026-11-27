@@ -399,7 +399,7 @@ test('화면: 원장에게는 「📝 글 고치기 · 🔢 숫자·기준 · �
   assert.equal((sec.match(/<details class="hub-grp" data-hub-group="/g)||[]).length,1+3+11+17+12+9+5+14+1+3+1+1+1+5+1+1+1+1,/* 마지막 +1 = 병원 휴진·단축 진료(구글 연동 · 2026-11-23) */'화면별 접기: 탭 이름·메뉴 묶음 이름·계정·권한 + 차례 2(내 서류함 8 · 업무자료 3) + 차례 3(출퇴근 5 · 근무표 2 · 연차 4) + 차례 4(결재함 4 · 공지 3 · 캘린더 3 · 건의함 2) + 차례 5(문의함 6 · 상담일지 3) + 시간 표시 1(⏰ 시간 표시 · 2026-10-02) + 도구 탭 1(🧰 도구 · 업무매뉴얼도 같은 묶음) + 탭 사용법 1(❓ 탭 사용법 · 54개)');
   const n=(sec.match(/data-hub-text-save="\d+"/g)||[]).length;
 const leaveManagerTextCount=35,leaveYearEarnedTextCount=14,leaveEditTextCount=22;
-  const dentwebInboxTextCount=4,dentwebMarketingTextCount=5,depSearchTextCount=19,bookingMailTextCount=20,overtimeReasonTextCount=11,holidayGbpTextCount=64,reviewSmsHelpTextCount=1,attRuleTextCount=41+16,attCloseBtnRemoved=1; // 2026-11-27 근무조·관리자 표시·월 마감 결재 글 41개 추가 · 옛 「이번 달 확정」 단추 글(att.close.btn) 1개 삭제 · 근태 규칙 2·3차 글 16개 추가(수기 연장 안내·배지 2 · 근무표 요약·자동 OFF·월간 공표·연차 겹침 14)
+  const dentwebInboxTextCount=4,dentwebMarketingTextCount=5,depSearchTextCount=19,bookingMailTextCount=20,overtimeReasonTextCount=11,holidayGbpTextCount=64+11,/* 휴진 안내 창·입력 창 단추 12개 추가 − 「다 넣었음」 1개 삭제(2026-11-28) */reviewSmsHelpTextCount=1,attRuleTextCount=41+16,attCloseBtnRemoved=1; // 2026-11-27 근무조·관리자 표시·월 마감 결재 글 41개 추가 · 옛 「이번 달 확정」 단추 글(att.close.btn) 1개 삭제 · 근태 규칙 2·3차 글 16개 추가(수기 연장 안내·배지 2 · 근무표 요약·자동 OFF·월간 공표·연차 겹침 14)
   assert.equal(n,2052+leaveManagerTextCount+leaveYearEarnedTextCount+leaveEditTextCount+dentwebInboxTextCount+dentwebMarketingTextCount+depSearchTextCount+bookingMailTextCount+overtimeReasonTextCount+holidayGbpTextCount+reviewSmsHelpTextCount+attRuleTextCount-attCloseBtnRemoved,'기존 글과 덴트웹·입금 검색·예약메일·연장 사유·병원 휴진 단축·리뷰 요청 안내 문구에 저장 단추가 있음');
   assert.deepEqual(clone(helpers().hubTextDefs().filter(d=>d.key.startsWith('mdeck.')).map(d=>d.key)),[
     'title','hint','search','cat_all','view','edit','new','empty','loading','error','private','back','popup_blocked'
@@ -459,7 +459,7 @@ test('화면: 🔢 숫자·기준 — 근태 기준 7개, 잘못된 값은 DB �
   await t.render({id:'o1',role:'owner'});
   await t.click('[hub-subtab]=settings');
   const sec=t.section.innerHTML;
-  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,6+7+5+2+4+1+8+1+1+6+1+7+3+11+1+1+5+3+4); // +4 = 휴게시간 점심·저녁 시작·끝(2026-11-27 2차) // +3 = 근무조별 지각 기준 A·B·C(2026-11-27) // +5 = 연장 사유 필수 직무별 켬/끔(2026-11-26)
+  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,6+7+5+2+4+1+8+1+1+6+1+7+3+11+1+1+5+3+4+2); // +2 = 휴진·단축 진료 안내 창 켬/끔·띄우는 기간(2026-11-28) // +4 = 휴게시간 점심·저녁 시작·끝(2026-11-27 2차) // +3 = 근무조별 지각 기준 A·B·C(2026-11-27) // +5 = 연장 사유 필수 직무별 켬/끔(2026-11-26)
   assert.match(sec,/id="hubSetIn_0" type="time" value="09:50"/,'지금 값(표에서 읽음)');
   assert.match(sec,/처음 값 09:40/);
   assert.match(sec,/<span id="hubSetBadge_0"><span class="b ok">고침<\/span><\/span>/);

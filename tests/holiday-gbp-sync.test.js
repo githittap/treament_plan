@@ -58,7 +58,7 @@ test('화면에 쓰는 글은 전부 hub-texts.js에 같은 기본값으로 등�
   for (const m of hr.matchAll(/hubT\('(hgbp\.[a-z_]+)','((?:[^'\\]|\\.)*)'/g)) used.set(m[1], m[2]);
   const reg = new Map();
   for (const m of texts.matchAll(/add\('(hgbp\.[a-z_]+)',HG,'(?:[^'\\]|\\.)*','((?:[^'\\]|\\.)*)'/g)) reg.set(m[1], m[2]);
-  assert.equal(reg.size, 64);
+  assert.equal(reg.size, 75);
   assert.ok(used.size >= 30);
   for (const [k, d] of used) { assert.ok(reg.has(k), '미등록 키: ' + k); assert.equal(reg.get(k), d, '기본값 불일치: ' + k); }
   // 동작·결과 이름 등 화면 코드에서 간접으로 쓰는 키도 등록돼 있음
@@ -71,7 +71,9 @@ test('입력 권한(원장 11-25): 원장·실장·매니저·데스크 — 카�
   assert.match(hr, /async function renderHolidayGbpCard\(box\)\{\n  if\(!box\|\|!canEditClinicHours\(\)\)return;/);
   assert.match(hr, /async function saveHolidayGbp\(\)\{\n  if\(!canEditClinicHours\(\)\|\|HGBP_BUSY\)return;/);
   assert.match(hr, /async function deleteHolidayGbp\(date\)\{\n  if\(!canEditClinicHours\(\)\|\|HGBP_BUSY\)return;/);
-  assert.match(hr, /if\(typeof canEditClinicHours==='function'&&canEditClinicHours\(\)&&m&&typeof m\.appendChild==='function'[^\n]*renderHolidayGbpCard\(hbox\)/);
+  assert.ok(!/hbox\.id='hgbpBox';m\.appendChild\(hbox\)/.test(hr), '캘린더 아래에 입력 칸을 붙이지 않음(원장 11-28 「아래에 넣지말고」)');
+  assert.match(hr, /\$\{typeof canEditClinicHours==='function'&&canEditClinicHours\(\)\?`<button class="mini" onclick="openHolidayGbpEditor\(\)">/, '입력 권한자에게만 캘린더 위 단추');
+  assert.match(hr, /async function openHolidayGbpEditor\(\)\{\n  if\(!canEditClinicHours\(\)\)return;/);
   assert.match(hr, /const isLead=\(\)=>\['chief','owner'\]\.includes\(ME\.role\);/);
   assert.match(hr, /ME\.department=p\?\.dept\|\|'';ME\.jobGroup=p\?\.job_group\|\|'';/);
   const c = {};
@@ -100,7 +102,7 @@ test('입력 권한(원장 11-25): 원장·실장·매니저·데스크 — 카�
   assert.match(hr, /\$\{holidayGbpRowEditable\(h\)\?`<button class="mini" onclick="editHolidayGbp/);
 });
 
-test('월말 입력 알림: 매달 마지막 월요일~말일에만, 다음 달 범위, 설정으로 끔, 「다 넣었음」은 그달만', () => {
+test('월말 입력 알림: 매달 마지막 월요일~말일에만, 다음 달 범위, 설정으로 끔, 기간 안에는 들어올 때마다(원장 11-28 「계속」)', () => {
   const src = ['holidayGbpRemindDue', 'holidayGbpNextMonthRange'].map(n => hr.match(new RegExp('function ' + n + '\\(day\\)\\{[\\s\\S]*?\\n\\}'))[0]).join('\n');
   const c = {};
   vm.createContext(c);
@@ -116,14 +118,16 @@ test('월말 입력 알림: 매달 마지막 월요일~말일에만, 다음 달 
   const fn = hr.slice(hr.indexOf('async function maybeShowHolidayGbpReminder'), hr.indexOf('function holidayGbpRemindGo'));
   assert.match(fn, /if\(HGBP_REMIND_SHOWN\|\|!canEditClinicHours\(\)\)return;/);
   assert.match(fn, /hubSettingBoolean\('hgbp\.remind_on',true\)/);
-  assert.match(fn, /localStorage\.getItem\(holidayGbpRemindKey\(day\)\)/);
+  assert.ok(!/localStorage/.test(fn), '「이번 달 그만 보기」 없음 — 들어올 때마다 뜸');
+  assert.match(fn, /mask\.className='mask hgbp-alert'/, '화면을 가리는 창(닫아야 허브가 보임)');
+  assert.match(fn, /HGBP_NOTICE_PENDING\|\|holidayGbpMaskOpen\('hgbpNoticeMask'\)/, '휴진 안내 창을 먼저 띄우고 닫은 뒤에');
+  assert.ok(!/holidayGbpRemindDone/.test(hr) && !/remind_done/.test(texts), '「다 넣었음(그만 보기)」 단추·글 없앰');
   assert.match(fn, /document\.getElementById\('hubIntro'\)/, '첫 화면(3D)이 닫힌 뒤에 띄움');
   assert.match(fn, /\.or\('kind\.neq\.공휴일,sync_gbp\.eq\.true'\)/, '평소 진료 공휴일은 세지 않음');
   assert.match(fn, /holidayGbpSyncLive\(\)\?hubT\('hgbp\.remind_body'[^\n]*:hubT\('hgbp\.remind_body_off'/, '연동이 꺼져 있으면 구글 반영을 약속하지 않음');
   assert.match(fn, /if\(document\.getElementById\('hubIntro'\)\)return;/);
-  assert.match(hr, /function holidayGbpRemindGo\(\)\{hide\('hgbpRemindMask'\);if\(typeof CAL_VIEW!=='undefined'\)CAL_VIEW='all';go\('calendar'\);/);
-  assert.match(hr, /renderNav\(\);await render\(\);await refreshBadges\(\);\n      if\(typeof maybeShowHolidayGbpReminder==='function'\)maybeShowHolidayGbpReminder\(\);/);
-  assert.match(hr, /function holidayGbpRemindDone\(\)\{try\{localStorage\.setItem\(holidayGbpRemindKey\(HGBP_REMIND_DAY\|\|today\(\)\),'1'\);/);
+  assert.match(hr, /function holidayGbpRemindGo\(\)\{hide\('hgbpRemindMask'\);openHolidayGbpEditor\(\);\}/, '창 안에서 바로 입력');
+  assert.match(hr, /renderNav\(\);await render\(\);await refreshBadges\(\);\n      if\(typeof maybeShowHolidayGbpNotice==='function'\)maybeShowHolidayGbpNotice\(\);[^\n]*\n      if\(typeof maybeShowHolidayGbpReminder==='function'\)maybeShowHolidayGbpReminder\(\);/, '안내 창 먼저(대기 표시를 먼저 세움), 월말 알림은 그 뒤');
   assert.match(texts, /\{key:'hgbp\.remind_on',[^\n]*def:'true',kind:'bool'\}/);
 });
 
@@ -169,7 +173,7 @@ test('Sol 2차 고침: 보낼 값 표시 · 공휴일 체크칸 숨김 · 취소
   assert.match(save, /if\(editDate&&!\(data&&data\.length\)\)/);
   assert.ok(!/if\(HGBP_EDIT&&!\(data/.test(save), '응답 판정에 바뀔 수 있는 HGBP_EDIT를 쓰지 않음');
   assert.match(hr, /is_holiday:holi\.has\(r\.ds\)\};\}\)\.sort\(\(a,b\)=>a\.work_date<b\.work_date\?-1:a\.work_date>b\.work_date\?1:0\);/);
-  assert.match(hr, /function holidayGbpRemindGo\(\)\{[^\n]*setInterval\(/);
+  assert.match(hr, /HGBP_EDIT=null;setStatus\('saved'\);render\(\);renderHolidayGbpCard\(\$\('#hgbpBox'\)\);/, '저장 뒤 창 안의 목록도 다시 그림');
   const fixc = read('db/holiday_fix_20261125c.sql');
   assert.match(fixc, /where y\.d is not null order by y\.d\n  loop\n    perform pg_advisory_xact_lock/);
   assert.match(texts, /\{key:'gbp\.sync_live',[^\n]*미리보기/);
@@ -273,4 +277,39 @@ test('B5 목록 「더 보기」: 60줄 상한을 넘는 일정도 끝까지 열
   assert.match(hr, /function moreHolidayGbp\(\)\{HGBP_LIMIT\+=HGBP_PAGE;/);
   assert.match(hr, /onclick="moreHolidayGbp\(\)"/);
   assert.ok(!/\.limit\(60\)/.test(hr.slice(hr.indexOf('async function renderHolidayGbpCard'), hr.indexOf('function moreHolidayGbp'))));
+});
+
+test('휴진·단축 진료 안내 창(원장 11-28 캡처 23): N일 전~그날 · 평소 진료 공휴일 뺌 · 한 줄 글 · 들어올 때마다 · 화면 가림', () => {
+  const c = {};
+  vm.createContext(c);
+  vm.runInContext('function hubT(k,d,v){return v?String(d).replace(/\\{([a-z_]+)\\}/g,(m,n)=>Object.prototype.hasOwnProperty.call(v,n)?String(v[n]):m):String(d);}' + block + ';this.range=holidayGbpNoticeRange;this.rows=holidayGbpNoticeRows;this.line=holidayGbpNoticeLine;', c);
+  const j = x => JSON.parse(JSON.stringify(x));
+  assert.deepEqual(j(c.range('2026-11-28', 3)), { from: '2026-11-28', to: '2026-12-01' }, '달 넘김');
+  assert.deepEqual(j(c.range('2026-12-30', 3)), { from: '2026-12-30', to: '2027-01-02' }, '해 넘김');
+  assert.deepEqual(j(c.range('2026-11-28', 0)), { from: '2026-11-28', to: '2026-11-28' }, '0이면 그날만');
+  assert.deepEqual(j(c.range('2026-11-28', 99)).to, '2026-12-28', '최대 30일');
+  assert.deepEqual(j(c.range('2026-11-28', 'x')).to, '2026-11-28');
+  assert.equal(c.range('엉터리', 3), null);
+  const rows = j(c.rows([
+    { date: '2026-12-01', kind: '공휴일', name: '평소', sync_gbp: false },
+    { date: '2026-11-30', kind: '단축', name: '학회', open_time: '10:00:00', close_time: '14:00:00', sync_gbp: true },
+    { date: '2026-11-29', kind: '지정휴일', name: '워크숍', sync_gbp: false },
+    { date: '2026-12-01', kind: '공휴일', name: '휴진 공휴일', sync_gbp: true },
+    null, { date: 'x', kind: '지정휴일' }
+  ]));
+  assert.deepEqual(rows.map(r => r.name), ['워크숍', '학회', '휴진 공휴일'], '날짜순 · 평소 진료 공휴일 뺌 · 구글 안 보내는 휴진도 안내');
+  assert.equal(c.line(rows[0], '2026-11-28'), '내일 · 11월 29일(일) 휴진 — 워크숍');
+  assert.equal(c.line(rows[1], '2026-11-28'), '2일 뒤 · 11월 30일(월) 단축 진료 10:00~14:00 — 학회');
+  assert.equal(c.line(rows[2], '2026-12-01'), '오늘 · 12월 1일(화) 휴진 — 휴진 공휴일');
+  assert.equal(c.line({ date: '2026-12-25', kind: '공휴일', name: '성탄절', open_time: '10:00', close_time: '13:00', sync_gbp: true }, '2026-12-25'), '오늘 · 12월 25일(금) 단축 진료 10:00~13:00 — 성탄절');
+  const fn = hr.slice(hr.indexOf('async function maybeShowHolidayGbpNotice'), hr.indexOf('/* 월말 휴진·단축 입력 알림'));
+  assert.match(fn, /hubSettingBoolean\('hgbp\.notice_on',true\)/);
+  assert.match(fn, /hubSettingChecked\('hgbp\.notice_days',3\)/);
+  assert.ok(!/localStorage/.test(fn), '그만 보기 없음 — 그날이 지날 때까지 들어올 때마다');
+  assert.ok(!/canEditClinicHours\(\)\)return/.test(fn), '전 직원에게 뜸(입력 권한과 상관없음)');
+  assert.match(fn, /mask\.className='mask hgbp-alert'/);
+  assert.match(fn, /finally\{HGBP_NOTICE_PENDING=false;\}/);
+  assert.match(hr, /\.mask\.hgbp-alert\{background:rgba\(12,22,32,\.94\)\}/, '닫아야 허브가 보임');
+  assert.match(texts, /\{key:'hgbp\.notice_on',[^\n]*def:'true',kind:'bool'\}/);
+  assert.match(texts, /\{key:'hgbp\.notice_days',[^\n]*def:'3',kind:'int',min:0,max:30,unit:'일'\}/);
 });

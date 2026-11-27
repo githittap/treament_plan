@@ -2821,8 +2821,19 @@ function hubTextDefsHolidayGbp(add){
   add('hgbp.remind_body',HG,'월말 알림 창 본문 — 설정 「구글 자동 연동 켬」이 켜져 있을 때({month}=다음 달 · {count}=그 달에 이미 넣은 일정 수)','다음 달({month}월) 병원 휴진·단축 진료 일정을 넣어 주세요. 지금 {count}건 들어가 있습니다. 「구글에 보내기」를 켠 일정은 매월 1일에 구글 특별 영업시간에 반영됩니다.',['month','count']);
   add('hgbp.remind_body_off',HG,'월말 알림 창 본문 — 설정 「구글 자동 연동 켬」이 꺼져 있을 때({month}=다음 달 · {count}=그 달에 이미 넣은 일정 수)','다음 달({month}월) 병원 휴진·단축 진료 일정을 넣어 주세요. 지금 {count}건 들어가 있습니다. 구글 자동 반영은 아직 연결 전이라 허브에 기록만 됩니다.',['month','count']);
   add('hgbp.remind_go',HG,'월말 알림 창 — 입력하러 가는 단추','지금 입력하기');
-  add('hgbp.remind_done',HG,'월말 알림 창 — 이번 달 알림을 그만 띄우는 단추','다 넣었음(이번 달 그만 보기)');
-  add('hgbp.remind_later',HG,'월말 알림 창 — 닫기 단추(다음에 허브를 열면 다시 뜸)','나중에');
+  add('hgbp.remind_later',HG,'월말 알림 창 — 닫기 단추(그만 보기는 없음 · 기간 안에는 허브를 열 때마다 다시 뜸 · 원장 11-28)','닫기(다음에 허브를 열면 다시 뜸)');
+  add('hgbp.btn_open',HG,'캘린더 위 — 휴진·단축 입력 창을 여는 단추(원장·실장·매니저·데스크에게만 보임 · 캘린더 아래 칸은 없앰, 원장 11-28)','🏥 휴진·단축 입력');
+  add('hgbp.edit_close',HG,'휴진·단축 입력 창 — 오른쪽 위 ✕ 단추의 이름(화면 읽기용)','닫기');
+  add('hgbp.notice_title',HG,'휴진·단축 진료 안내 창 제목(설정 「휴진·단축 진료 안내 창」이 켜져 있을 때, 그날 며칠 전부터 전 직원에게 허브에 들어올 때마다 뜸)','📢 병원 휴진·단축 진료 안내');
+  add('hgbp.notice_body',HG,'휴진·단축 진료 안내 창 — 날짜 목록 위 설명','아래 날짜는 병원 진료가 평소와 다릅니다. 예약을 잡거나 환자분께 안내할 때 꼭 확인하세요.');
+  add('hgbp.notice_line',HG,'휴진·단축 진료 안내 창 — 날짜 한 줄({when}=오늘·내일·N일 뒤 · {month}·{day}=날짜 · {wd}=요일 · {kind}=휴진/단축 진료 · {time}=단축 진료 시각 · {name}=사유)','{when} · {month}월 {day}일({wd}) {kind}{time} — {name}',['when','month','day','wd','kind','time','name']);
+  add('hgbp.weekdays',HG,'휴진·단축 진료 안내 창 — 요일 이름 7글자(일요일부터 토요일까지 붙여 씀)','일월화수목금토');
+  add('hgbp.when_today',HG,'휴진·단축 진료 안내 창 — 그날이 오늘일 때 앞에 붙는 글','오늘');
+  add('hgbp.when_tomorrow',HG,'휴진·단축 진료 안내 창 — 그날이 내일일 때 앞에 붙는 글','내일');
+  add('hgbp.when_days',HG,'휴진·단축 진료 안내 창 — 그날이 이틀 이상 뒤일 때 앞에 붙는 글({n}=며칠 뒤)','{n}일 뒤',['n']);
+  add('hgbp.notice_ok',HG,'휴진·단축 진료 안내 창 — 닫기 단추','확인했습니다(닫기)');
+  add('hgbp.notice_edit',HG,'휴진·단축 진료 안내 창 — 입력 창을 여는 단추(원장·실장·매니저·데스크에게만 보임)','휴진·단축 고치기');
+  add('hgbp.notice_hint',HG,'휴진·단축 진료 안내 창 — 맨 아래 작은 글','이 창은 그날이 지날 때까지 허브에 들어올 때마다 다시 뜹니다.');
 }
 function hubTextDefs(){
   if(HUB_TEXT_DEFS_CACHE)return HUB_TEXT_DEFS_CACHE;
@@ -2969,7 +2980,9 @@ const HUB_SETTING_DEFS=[
   ...HUB_TOOL_CARDS.map(function(c){return {key:'tools.who.'+c[0],screen:'🧰 도구',label:'「'+c[1]+'」 보는 사람',where:'도구 탭 — 이 카드를 볼 수 있는 사람. 원장은 항상 모두 보임. 바꾸면 그 사람이 허브를 다시 열 때부터 반영돼요.',def:c[3],kind:'enum',options:[{value:'all',label:'전 직원',labelKey:'tools.who_all'},{value:'lead',label:'실장·매니저·원장',labelKey:'tools.who_lead'},{value:'owner',label:'원장만',labelKey:'tools.who_owner'}]};}),
   ...((typeof globalThis!=='undefined'&&globalThis.HUB_CARD_LEDGER_SETTING_DEFS)||[]),
   {key:'gbp.sync_live',screen:'📅 캘린더 › 병원 휴진·단축 진료(구글 특별 영업시간)',label:'구글 자동 연동 켬',where:'꺼짐(처음 상태)이면 구글 영업시간을 바꾸지 않고 허브에 기록만 해요. 켜는 순서: ① T2가 꺼진 채로 미리보기(구글에 안 씀)를 돌려 아래 「구글 반영 기록」에 「보낼 값」을 남김 → ② 원장이 그 값을 확인 → ③ 원장 지시로 켜면 그때부터 매월 1일·원장 지시 때 반영해요.',def:'false',kind:'bool'},
-  {key:'hgbp.remind_on',screen:'📅 캘린더 › 병원 휴진·단축 진료(구글 특별 영업시간)',label:'월말 휴진·단축 입력 알림',where:'켜면 매달 마지막 주 월요일부터 그달 말일까지 실장·매니저·데스크·원장이 허브를 열 때 「다음 달 휴진·단축 진료 입력」 창이 떠요. 「다 넣었음」을 누른 사람에겐 그달엔 다시 안 떠요.',def:'true',kind:'bool'},
+  {key:'hgbp.remind_on',screen:'📅 캘린더 › 병원 휴진·단축 진료(구글 특별 영업시간)',label:'월말 휴진·단축 입력 알림',where:'켜면 매달 마지막 주 월요일부터 그달 말일까지 실장·매니저·데스크·원장이 허브를 열 때마다 「다음 달 휴진·단축 진료 입력」 창이 화면을 가리고 떠요(닫아야 허브가 보임 · 그만 보기 없음 · 원장 11-28 「계속 주의」).',def:'true',kind:'bool'},
+  {key:'hgbp.notice_on',screen:'📅 캘린더 › 병원 휴진·단축 진료(구글 특별 영업시간)',label:'휴진·단축 진료 안내 창',where:'켜면 휴진·단축 진료일 며칠 전부터 그날까지 전 직원이 허브에 들어올 때마다 날짜·사유를 적은 안내 창이 화면을 가리고 떠요(닫아야 허브가 보임 · 원장 11-28). 평소대로 진료하는 공휴일은 안 떠요. 며칠 전부터인지는 「안내 창 띄우는 기간」.',def:'true',kind:'bool'},
+  {key:'hgbp.notice_days',screen:'📅 캘린더 › 병원 휴진·단축 진료(구글 특별 영업시간)',label:'안내 창 띄우는 기간',where:'휴진·단축 진료일 이 일수 전부터 그날까지 안내 창이 떠요. 0이면 그날만.',def:'3',kind:'int',min:0,max:30,unit:'일'},
   {key:'att.ot_reason_required.lab',screen:'🕘 근태 기준',label:'연장 사유 필수 — 기공실',where:'수기 출퇴근(하루·한 주)에서 추가근무를 적을 때 — 켬이면 「연장 사유」「연장 시간에 실제로 한 일」을 각각 5자 이상 적어야 저장되고, 끔이면 안 적어도 저장돼요. 직무는 직원의 직무 분류를 따라요.',def:'true',kind:'bool'},
   {key:'att.ot_reason_required.clinical_consult',screen:'🕘 근태 기준',label:'연장 사유 필수 — 진료실',where:'수기 출퇴근(하루·한 주)에서 추가근무를 적을 때 — 켬이면 「연장 사유」「연장 시간에 실제로 한 일」을 각각 5자 이상 적어야 저장되고, 끔이면 안 적어도 저장돼요. 직무는 직원의 직무 분류를 따라요.',def:'false',kind:'bool'},
   {key:'att.ot_reason_required.desk',screen:'🕘 근태 기준',label:'연장 사유 필수 — 데스크',where:'수기 출퇴근(하루·한 주)에서 추가근무를 적을 때 — 켬이면 「연장 사유」「연장 시간에 실제로 한 일」을 각각 5자 이상 적어야 저장되고, 끔이면 안 적어도 저장돼요. 직무는 직원의 직무 분류를 따라요.',def:'false',kind:'bool'},

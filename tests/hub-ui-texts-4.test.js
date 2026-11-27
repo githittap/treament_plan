@@ -16,6 +16,9 @@ golden['static.modal.apMask']=golden['static.modal.apMask'].replace('보고 소�
 // 탭사용법 A4: 연차의 달력·목록 버튼 줄 분리만 새 기준에 반영하며 글·권한 대조는 유지합니다.
 for(const key of Object.keys(golden))if(typeof golden[key]==='string'&&golden[key].includes("LVSTATUS_VIEW='calendar'"))
  golden[key]=golden[key].replace('render()"></label><button class="mini ','render()"></label></div><div class="rowflex"><button class="mini ');
+// 원장 11-28 「휴진 입력 칸을 캘린더 아래에 넣지 말고 팝업」: 입력 권한자(실장 등) 캘린더 단추 줄에 「🏥 휴진·단축 입력」 단추만 더해짐 — 다른 글·권한 대조는 그대로.
+for(const key of Object.keys(golden))if(/^cal\.(.*\.chief|week_detail.*|month_detail.*)$/.test(key)&&typeof golden[key]==='string') /* 실장으로 그린 화면만 — 일반 직원 화면(staff)엔 단추가 없어야 함 */
+ golden[key]=golden[key].replace('<button class="mini" onclick="saveCalendarPng()">','<button class="mini" onclick="openHolidayGbpEditor()">🏥 휴진·단축 입력</button><button class="mini" onclick="saveCalendarPng()">');
 const clone=x=>JSON.parse(JSON.stringify(x));
 const CH4=/^(?!sug\.cmt\.)(appr|notice|cal|lvs|sug)\./;
 const STATIC_PART=hr.slice(0,hr.indexOf('<script src="hub-texts.js')); // 고정 HTML(모달)은 이 앞쪽에 있음
@@ -397,7 +400,7 @@ test('화면: 🔢 숫자·기준 — 결재 건수 2개가 더 있고 잘못된
   await t.render(OWNER);
   await t.click('[hub-subtab]=settings');
   const sec=t.section.innerHTML;
-  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,6+14+4+1+8+1+1+6+1+7+3+11+1+1+5+3+4,'차례 5의 문의함·상담일지 숫자 4개가 더 있음(+4 = 휴게시간 4개 · 2026-11-27 2차)');
+  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,6+14+4+1+8+1+1+6+1+7+3+11+1+1+5+3+4+2,'차례 5의 문의함·상담일지 숫자 4개가 더 있음(+4 = 휴게시간 4개 · 2026-11-27 2차)');
   assert.ok(sec.includes('🖊 결재 기준'));
   assert.match(sec,/id="hubSetIn_12" type="number" inputmode="numeric" min="5" max="100" value="20"/);
   assert.match(sec,/id="hubSetIn_13" type="number" inputmode="numeric" min="10" max="200" value="50"/);

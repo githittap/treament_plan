@@ -227,5 +227,5 @@ test('코드: 입금 화면의 새 문구는 hubT 기본값이고 권한 문(can
   assert.ok(/async function renderDeposit\(m\)\{\n  if\(!canViewDeposit\(ME\)\)/.test(hr));
   assert.equal((hr.match(/hubN\('dep\.list_limit',300\)/g)||[]).length,1);
   assert.ok(!/setDepRange\('custom'\)/.test(hr));
-  assert.match(hr,/hub-texts\.js\?v=2026112711/); // 2026-11-27 휴게시간 설정·수기 연장 인정·근무표 요약 글(근무조 지각 기준·월 마감 결재 글 뒤 · 리뷰 요청 문자 글 · 병원 PC 중계 줄 뒤)
+  assert.match(hr,/hub-texts\.js\?v=2026112801/); // 2026-11-28 휴진 안내 창·입력 창 글 · 2026-11-27 휴게시간 설정·수기 연장 인정·근무표 요약 글(근무조 지각 기준·월 마감 결재 글 뒤 · 리뷰 요청 문자 글 · 병원 PC 중계 줄 뒤)
 });
