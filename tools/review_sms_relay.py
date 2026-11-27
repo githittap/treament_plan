@@ -10,9 +10,14 @@
 비밀값: C:\\Users\\elusi\\.secrets\\api-keys.env 의 SOLAPI_API_KEY · SOLAPI_API_SECRET_KEY · SUPABASE_ACCESS_TOKEN_CODEX
         (Supabase 서비스 키는 이 토큰으로 그때그때 받아 메모리에만 둠 · 어떤 값도 화면·기록에 쓰지 않음).
 기록: 이 파일 옆 logs\\relay_YYYYMM.log (번호는 끝 4자리만).
+비밀값 파일이 바뀌면(저장 시각이 달라지면) 다음 바퀴에 다시 읽음 — 11-27 사고: 07:23에 읽은 옛 SECRET을 콘솔 재생성 뒤에도 7시간 씀.
+알림(11-27 추가): 솔라피 호출(잔액 조회·발송)이 2번 연속 실패하면 원장 폰(매크로드로이드 웹훅 — 잔액 알림과 같은 통로)과
+      T0 우편함(ai_mail, 깨우지 않음)에 한 줄. 같은 오류는 1시간에 1번만. 알린 뒤 정상으로 돌아오면 「복구됨」 한 줄.
+      상태 파일 logs\\alert_state.json(값 없음).
 실행: pythonw review_sms_relay.py          계속 돎(작업 스케줄러 「HubReviewSmsRelay」가 로그인 때·10분마다 살아 있는지 확인)
       python review_sms_relay.py --once   한 번만 돌고 끝(점검용)
       python review_sms_relay.py --status 솔라피 잔액·발신번호·허브 연결만 확인(보내지 않음)
+      python review_sms_relay.py --test-alert  알림 통로(폰·T0 우편함) 시험 한 줄만 보냄
 정본: 저장소 githittap/treament_plan tools/review_sms_relay.py · 병원 PC 사본: Z:\\09_claude-output\\03_병원운영·전산\\T8_인프라\\review_sms_relay\\
 끄기: 작업 스케줄러에서 HubReviewSmsRelay 사용 안 함 + 실행 중인 pythonw(review_sms_relay.py) 종료. 끄면 허브 대기함 줄은 2시간 뒤 「보내지 않음」으로 닫힘.
 """
@@ -25,9 +30,11 @@ import json
 import os
 import secrets
 import socket
+import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 REF = "texevhsxttfoqkrucfzl"
@@ -40,6 +47,11 @@ LOG_DIR = os.path.join(HERE, "logs")
 POLL_SEC, IDLE_SEC, HEARTBEAT_SEC = 20, 120, 600
 KST = dt.timezone(dt.timedelta(hours=9))
 UA = "hub-review-sms-relay/1"
+ALERT_AFTER_FAILS = 2          # 솔라피 호출이 이만큼 연속 실패하면 알림
+ALERT_REPEAT_SEC = 3600        # 같은 오류는 1시간에 1번만
+AI_MAIL = r"C:\Users\elusi\.claude\scripts\ai_mail.py"
+T0_SESSION = "fee6f1ba"        # T0 총괄 7차(우편함 받는 대화 앞 8자리)
+NO_WINDOW = 0x08000000         # 창 안 띄움(CREATE_NO_WINDOW)
 
 
 def now_kst() -> dt.datetime:
@@ -124,15 +136,135 @@ def map_solapi_result(pending: list[dict], status: int, body) -> list[dict]:
     return out
 
 
+def send_phone(text: str) -> str:
+    """원장 폰 — 잔액 알림들과 같은 매크로드로이드 웹훅(주소는 비밀값 파일, 기록에 안 남김)."""
+    env = read_env(("MACRODROID_WEBHOOK_URL_BALANCE", "MACRODROID_WEBHOOK_URL"))
+    url, channel = env.get("MACRODROID_WEBHOOK_URL_BALANCE", ""), "macrodroid_balance"
+    if url.startswith("https://"):
+        url += ("&" if "?" in url else "?") + "msg=" + urllib.parse.quote(text)
+    else:
+        url, channel = env.get("MACRODROID_WEBHOOK_URL", ""), "macrodroid_fixed_ping"
+    if not url.startswith("https://"):
+        return "폰 통로 없음"
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": UA}), timeout=20) as r:
+            r.read()
+        return channel
+    except Exception as e:
+        return f"{channel} 실패({type(e).__name__})"
+
+
+def send_t0_mail(subject: str, body: str) -> str:
+    """T0 우편함(ai_mail) — 깨우지 않음. 창 안 띄움.
+    ai_mail은 같은 이름끼리(claude→claude) 못 보내서, 초인종 멈춤 알림(doorbell_stall_alert.py)처럼
+    claude 받는 칸에는 codex 이름으로 보냄(보낸 쪽은 이 중계 프로그램 — 본문 머리에 적음)."""
+    exe = sys.executable
+    py = exe[:-len("pythonw.exe")] + "python.exe" if exe.lower().endswith("pythonw.exe") else exe
+    if not os.path.exists(py):
+        py = exe
+    cmd = [py, AI_MAIL, "send", "--from", "codex", "--to", "claude", "--session", T0_SESSION,
+           "--no-wake", "--subject", subject, "--body", "[보낸 곳: 병원 PC 리뷰문자 중계 프로그램] " + body]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                           timeout=60, creationflags=NO_WINDOW)
+        return "mail ok" if r.returncode == 0 else f"mail 실패 rc={r.returncode}"
+    except Exception as e:
+        return f"mail 실패({type(e).__name__})"
+
+
+class Alerter:
+    """솔라피 호출 연속 실패 알림. 상태 파일에는 횟수·오류 요지·시각만(값 없음)."""
+
+    def __init__(self, state_path: str | None = None, phone=None, mail=None) -> None:
+        self.path = state_path or os.path.join(LOG_DIR, "alert_state.json")
+        self.phone = phone or send_phone
+        self.mail = mail or send_t0_mail
+        try:
+            with open(self.path, encoding="utf-8") as f:
+                self.state = json.load(f)
+            if not isinstance(self.state, dict):
+                self.state = {}
+        except Exception:
+            self.state = {}
+        self.state.setdefault("fails", 0)
+        self.state.setdefault("last", {})
+        self.state.setdefault("alerted", False)
+
+    def _save(self) -> None:
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
+        tmp = self.path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(self.state, f, ensure_ascii=False)
+        os.replace(tmp, self.path)
+
+    def failure(self, error: str, now: float | None = None) -> str | None:
+        now = time.time() if now is None else now
+        self.state["fails"] = int(self.state.get("fails") or 0) + 1
+        sent = None
+        if self.state["fails"] >= ALERT_AFTER_FAILS:
+            k = str(error)[:80]
+            if now - float(self.state["last"].get(k) or 0) >= ALERT_REPEAT_SEC:
+                text = (f"[리뷰문자 중계] 솔라피 호출 {self.state['fails']}번 연속 실패 — {str(error)[:120]} "
+                        f"(병원 PC {socket.gethostname()}) · 지금 리뷰 문자가 안 나감")
+                sent = f"phone={self.phone(text)} mail={self.mail('리뷰문자 중계 솔라피 연속 실패', text)}"
+                self.state["last"][k] = now
+                self.state["alerted"] = True
+        self._save()
+        return sent
+
+    def success(self) -> str | None:
+        sent = None
+        if self.state.get("alerted"):
+            text = (f"[리뷰문자 중계] 솔라피 호출 복구됨 — {self.state.get('fails')}번 연속 실패 뒤 정상 "
+                    f"(병원 PC {socket.gethostname()})")
+            sent = f"phone={self.phone(text)} mail={self.mail('리뷰문자 중계 복구', text)}"
+        if self.state.get("fails") or self.state.get("alerted"):
+            self.state["fails"], self.state["alerted"] = 0, False
+            self._save()
+        return sent
+
+
 class Relay:
-    def __init__(self) -> None:
+    def __init__(self, alerter: Alerter | None = None) -> None:
+        self._env_mtime: float | None = None
+        self.load_env()
+        self._service = ""
+        self.last_heartbeat = 0.0
+        self.last_error: str | None = None
+        self.balance_ok: bool | None = None
+        self.alerter = alerter
+
+    def load_env(self) -> None:
         env = read_env(("SOLAPI_API_KEY", "SOLAPI_API_SECRET_KEY", "SUPABASE_ACCESS_TOKEN_CODEX"))
         self.key = env.get("SOLAPI_API_KEY", "")
         self.secret = env.get("SOLAPI_API_SECRET_KEY", "")
         self.pat = env.get("SUPABASE_ACCESS_TOKEN_CODEX", "")
-        self._service = ""
-        self.last_heartbeat = 0.0
-        self.last_error: str | None = None
+        try:
+            self._env_mtime = os.path.getmtime(ENV_FILE)
+        except OSError:
+            self._env_mtime = None
+
+    def reload_env_if_changed(self) -> bool:
+        try:
+            m = os.path.getmtime(ENV_FILE)
+        except OSError:
+            return False
+        if m == self._env_mtime:
+            return False
+        old_pat = self.pat
+        self.load_env()
+        if self.pat != old_pat:
+            self._service = ""
+        log("env reloaded (비밀값 파일 저장 시각이 바뀜 — 값은 기록 안 함)")
+        self.last_heartbeat = 0.0  # 바로 다음 바퀴에 잔액 조회로 새 값 확인
+        return True
+
+    def _note(self, ok: bool, error: str | None = None) -> None:
+        if not self.alerter:
+            return
+        r = self.alerter.success() if ok else self.alerter.failure(error or "솔라피 호출 실패")
+        if r:
+            log(f"alert {'recovered' if ok else 'sent'} {r}")
 
     # --- Supabase ---------------------------------------------------------
     def service_key(self, refresh: bool = False) -> str:
@@ -187,14 +319,24 @@ class Relay:
         try:
             st, data = self.solapi("POST", SEND_PATH, body)
         except Exception as e:  # 네트워크 오류 등 — 보냈는지 모르면 다시 보내지 않고 실패로 적음(두 번 가는 것 막기)
+            self._note(False, short(f"발송 호출 오류 {type(e).__name__}", 120))
             return [{"log_id": r["log_id"], "status": "failed", "provider_id": None, "error": short(f"중계 발송 오류: {e}")} for r in rows]
+        if 200 <= st < 300:
+            self._note(True)
+        else:
+            msg = data.get("errorMessage") if isinstance(data, dict) else None
+            self._note(False, short(f"솔라피 발송 실패 HTTP {st} {msg or ''}".strip(), 120))
         return map_solapi_result(rows, st, data)
 
     # --- 한 바퀴 -------------------------------------------------------------
     def status(self) -> dict:
         info: dict = {"relay": "pc", "host": socket.gethostname(), "error": None}
-        st, bal = self.solapi("GET", "cash/v1/balance")
-        if st == 200 and isinstance(bal, dict):
+        try:
+            st, bal = self.solapi("GET", "cash/v1/balance")
+        except Exception as e:  # 연결 실패도 솔라피 호출 실패로 셈
+            st, bal = 0, {"errorMessage": f"연결 오류 {type(e).__name__}"}
+        self.balance_ok = st == 200 and isinstance(bal, dict)
+        if self.balance_ok:
             info["balance"], info["point"] = bal.get("balance"), bal.get("point")
         else:
             info["error"] = f"솔라피 잔액 조회 실패 HTTP {st} {short((bal or {}).get('errorMessage') if isinstance(bal, dict) else bal, 120)}"
@@ -210,6 +352,7 @@ class Relay:
         if not force and time.monotonic() - self.last_heartbeat < HEARTBEAT_SEC:
             return
         info = self.status()
+        self._note(bool(self.balance_ok), info.get("error"))
         if self.last_error and not info.get("error"):
             info["error"] = self.last_error
         self.rpc("review_sms_relay_heartbeat", {"p_status": info})
@@ -250,11 +393,15 @@ def acquire_lock():
 
 
 def main(argv: list[str]) -> int:
-    relay = Relay()
+    if "--test-alert" in argv:
+        text = f"[시험] 리뷰문자 중계 알림 통로 시험 — 무시해도 됨 (병원 PC {socket.gethostname()})"
+        print(f"phone={send_phone(text)} mail={send_t0_mail('리뷰문자 중계 알림 시험', text)}")
+        return 0
     if "--status" in argv:
-        info = relay.status()
+        info = Relay().status()
         print(json.dumps(info, ensure_ascii=False))
         return 0 if not info.get("error") else 1
+    relay = Relay(alerter=Alerter())
     lock = acquire_lock()
     if lock is None:
         if "--once" in argv:
@@ -263,6 +410,7 @@ def main(argv: list[str]) -> int:
     log(f"start pid={os.getpid()} {'once' if '--once' in argv else 'loop'}")
     while True:
         try:
+            relay.reload_env_if_changed()
             relay.tick()
             relay.heartbeat()
         except Exception as e:  # 한 바퀴 실패는 기록만 하고 다음 바퀴에 다시
