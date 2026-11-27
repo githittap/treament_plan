@@ -100,7 +100,8 @@ test('schedule cells mark selected names and keep empty and leave summaries', ()
     esc: value => String(value),
     leaveDisplayText: value => value
   };
-  vm.runInNewContext(`${hr.match(/\/\* schedule-half:test-start \*\/([\s\S]*?)\/\* schedule-half:test-end \*\//)[1]}\n${hr.slice(start, end)};this.render=scheduleRoleCell;`, context);
+  // 2026-11-27 3차: scheduleRoleCell이 자동 OFF·연차 겹침 도우미(schedule-auto-off 블록)를 부름
+  vm.runInNewContext(`${hr.match(/\/\* schedule-half:test-start \*\/([\s\S]*?)\/\* schedule-half:test-end \*\//)[1]}\n${hr.match(/\/\* schedule-auto-off:test-start \*\/([\s\S]*?)\/\* schedule-auto-off:test-end \*\//)[1]}\n${hr.slice(start, end)};this.render=scheduleRoleCell;`, context);
   const people = [
     { id: 1, name: '가상 Dr 정원장', department: 'Dr.', active: true, included_in_schedule: true },
     { id: 2, name: '가상 미선택 Dr', department: 'Dr.', active: true, included_in_schedule: true }

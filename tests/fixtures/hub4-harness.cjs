@@ -52,10 +52,12 @@ const PROFILES=[
   {user_id:'u2',name:'이매니저',role:'manager',active:true,approved:true,hire_date:'2026-09-01',dept:'데스크'},
   {user_id:'u3',name:'박<신입>',role:'staff',active:true,approved:true,hire_date:null,dept:'기공팀',employment_status:'재직'}
 ];
+// 2026-11-27 근태 규칙 3차: 달력 OFF 모음의 「자동 OFF」(체크 안 한 날)는 active===true인 직원에게만 붙음.
+// 이 대조 시험은 옛 화면(3d4b91e)과 글자 하나까지 같음을 보는 것이라, 달력 OFF 숫자가 옛 규칙 그대로 나오도록 active를 비워 둠. 자동 OFF 동작은 attendance-rules2-20261127 시험에서 확인.
 const PEOPLE=[
-  {id:'p1',profile_user_id:'u1',name:'김직원',department:'진료실',active:true,included_in_schedule:true},
-  {id:'p2',profile_user_id:'u2',name:'이매니저',department:'데스크',active:true,included_in_schedule:true},
-  {id:'p3',profile_user_id:null,name:'원장Dr',department:'Dr.',active:true,included_in_schedule:true}
+  {id:'p1',profile_user_id:'u1',name:'김직원',department:'진료실',included_in_schedule:true},
+  {id:'p2',profile_user_id:'u2',name:'이매니저',department:'데스크',included_in_schedule:true},
+  {id:'p3',profile_user_id:null,name:'원장Dr',department:'Dr.',included_in_schedule:true}
 ];
 const NOTICES=[
   {id:1,title:'<중요> 공지',body:'본문1\n[[notice-image:u1/tmp/a.png]]\n[[notice-image:u1/tmp/none.png]]',pinned:true,created_at:'2026-09-30T02:00:00Z',author:'원장',notion_url:'https://n.so/x?a=1&b=2',attachments:[{path:'u1/tmp/a.png',name:'a.png',type:'image/png'},{path:'u1/tmp/b.pdf',name:'b<1>.pdf',type:'application/pdf'},{path:'u1/tmp/c',type:''}]},

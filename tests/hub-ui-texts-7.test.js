@@ -131,7 +131,7 @@ test('화면 코드(hr.html)에 박힌 기본 글이 기본값 목록과 글자�
 });
 test('숫자 8개·이름 목록 7개: 기본값이 화면 코드와 같고, 화면 표시용 숫자만(계산식 숫자는 없음) · 캐시 번호',()=>{
   const h=helpers();
-  assert.equal(h.HUB_SETTING_DEFS.length,73); // 52 + 도구 카드 보는 사람 11(10-10 업무매뉴얼 카드 포함) + 휴진 2 + 연장 사유 필수 직무별 5(2026-11-26)
+  assert.equal(h.HUB_SETTING_DEFS.length,77); // 52 + 도구 카드 보는 사람 11(10-10 업무매뉴얼 카드 포함) + 휴진 2 + 연장 사유 필수 직무별 5(2026-11-26) + 근무조 지각 기준 3(11-27 1차) + 휴게시간 4(11-27 2차)
   const S=k=>h.HUB_SETTING_DEFS.find(d=>d.key===k);
   const expect={'home.payslip_limit':['12',1,36,'개월'],'dep.list_limit':['300',50,1000,'건'],'aic.history_months':['6',1,24,'개월'],'aic.auto_limit':['20',5,100,'건'],'aiu.model_days':['7',3,30,'일'],'aiu.cost_months':['6',2,24,'개월'],'aiu.external_days':['14',3,60,'일'],'aiu.session_limit':['8',3,30,'건']};
   for(const k of NUM_KEYS){
@@ -419,7 +419,7 @@ test('상태·종류 이름 목록: 급여형태·마케팅 분류·AI 플랫폼
 /* ───────────── 6. 계산·원본 보존 ───────────── */
 test('급여 계산·산출식·엑셀 열 이름은 한 글자도 안 바뀜: 계산 구간·항목표·열 이름표의 해시가 옛 화면(f95b951)과 같고, 글을 모두 고쳐도 금액은 그대로',async()=>{
   const blk=hr.match(/\/\* payroll-payslip:test-start \*\/[\s\S]*?\/\* payroll-payslip:test-end \*\//)[0];
-  assert.equal(sha(blk),'09d049e66207a8f41c02c36b80cc589eb53e215e75b7e4f482a5912d11ffe1af','세율·절사·검산·근태 집계 구간');
+  assert.equal(sha(blk),'fc0909c504706055d213e5f796e6751b77ad57dae9d13cce67f082d060c2b228','세율·절사·검산·근태 집계 구간(2026-11-27 근태 규칙 2차: 수기 연장 인정·휴게시간 차감 함수가 이 구간에 들어가 해시를 새로 잡음 — 세율·절사·검산 식은 그대로)');
   assert.equal(sha(hr.match(/const PAYSLIP_PAY_ITEMS=\[[\s\S]*?\];\nconst PAYSLIP_DEDUCT_ITEMS=\[[\s\S]*?\];/)[0]),'884dc86498ef28de52a0e956e630956570c3433eda5aafa3a2f30ac529c568db','급여·공제 항목 이름과 산출식 설명');
   assert.equal(sha(hr.match(/const PAY_ALIASES=\[[\s\S]*?\]\.sort\(\(a,b\)=>b\[0\]\.length-a\[0\]\.length\);/)[0]),'6c4a0fb7fe1e80857737c7a48dc410755da9ec8e65eb855593db764f731dce54','엑셀 열 이름 매핑');
   assert.ok(!/hubT|h7T|hubN|h7N/.test(blk),'계산 구간에는 허브 설정 읽기가 없음');
@@ -534,7 +534,7 @@ test('화면: 🔢 숫자·기준에 새 숫자 8개(27개)가 있고 잘못된 
   await t.render(OWNER);
   await t.click('[hub-subtab]=settings');
   const sec=t.section.innerHTML;
-  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,6+36+7+3+11+1+1+5+3); // +3 = 근무조별 지각 기준 A·B·C(2026-11-27) // +5 = 연장 사유 필수 직무별 켬/끔(2026-11-26) // +11 = 도구 카드 보는 사람(10-10 업무매뉴얼 카드 포함)
+  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,6+36+7+3+11+1+1+5+3+4); // +4 = 휴게시간 점심·저녁 시작·끝(2026-11-27 2차) // +3 = 근무조별 지각 기준 A·B·C(2026-11-27) // +5 = 연장 사유 필수 직무별 켬/끔(2026-11-26) // +11 = 도구 카드 보는 사람(10-10 업무매뉴얼 카드 포함)
   for(const s of ['🏠 홈·입금 기준','💰 AI비용 기준'])assert.ok(sec.includes(s),s);
   for(const k of NUM_KEYS)assert.ok(sec.includes('이름표: '+k),k);
   const idx=k=>t.ctx.window&&helpers().HUB_SETTING_DEFS.findIndex(d=>d.key===k);

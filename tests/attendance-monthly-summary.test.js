@@ -25,7 +25,7 @@ function fixture(){return {month:'2026-09',status:'집계중',employees:[employe
 test('월 요약은 직원·날짜별 승인 보정과 일치하는 확정 저녁 분만 합산한다',()=>{
  const c=ctx();assert.equal(typeof c.attMonthlyModel,'function','월 요약 기능이 있어야 한다');const f=fixture(),before=JSON.stringify(f),m=c.attMonthlyModel(f),a=m.employees.find(x=>x.userId==='a'),b=m.employees.find(x=>x.userId==='b');
  assert.deepEqual(plain(a.summary),{recordedDays:2,workedDays:2,lateCount:0,lateMinutes:0,earlyCount:2,earlyMinutes:23,overtimeMinutes:65,holidayMinutes:480,clockSpanMinutes:1050,clockReviewDays:0,pendingManualDays:1,adjustedDays:1});
- assert.equal(b.summary.lateMinutes,7);assert.equal(b.summary.overtimeMinutes,4,'다른 직원 또는 보정 없는 지문에 저녁 분을 붙이지 않는다');assert.equal(JSON.stringify(f),before,'원본과 확정 자료를 수정하지 않는다');
+ assert.equal(b.summary.lateMinutes,7);assert.equal(b.summary.overtimeMinutes,44,'2차 ③: 지문과 출퇴근이 같은 수기는 연장(4)+저녁(40)을 인정하고 지문 자동 연장(4)은 쓰지 않음 — 옛 기대값 4는 보정 없는 지문에 저녁 분을 안 붙이던 규칙');assert.equal(JSON.stringify(f),before,'원본과 확정 자료를 수정하지 않는다');
 });
 test('자료가 없으면 근무·결근을 추측하지 않고 시각 누락은 검토 건으로 표시한다',()=>{
  const c=ctx();assert.equal(typeof c.attMonthlyModel,'function');const m=c.attMonthlyModel({month:'2026-09',employees:[employee('a'),employee('z')],rows:[{user_id:'a',work_date:'2026-09-01',source:'fp',clock_in:'09:00',clock_out:null,overtime_min:10}]});

@@ -103,7 +103,7 @@ test('지문 원본은 보존하고 승인 보정값과 확정 저녁 분만 집
     {id:7,work_date:'2026-09-04',status:'원장확정',clock_in:'09:00',clock_out:'18:00',overtime_min:15,evening_overtime_min:45}
   ],resolutions=[{work_date:'2026-09-03',source:'issue_adjustment',approved_at:'2026-09-05T00:00:00Z',clock_in:'10:00',clock_out:'19:00',overtime_min:20}];
   const effective=h.payslipAttendanceRows(att,manual,resolutions),sum=h.aggregateAttendanceForPayslip(effective);
-  assert.deepEqual(JSON.parse(JSON.stringify(sum)),{workedDays:2,totalWorkMinutes:1080,overtimeMinutes:65,nightMinutes:0,holidayMinutes:0});
+  assert.deepEqual(JSON.parse(JSON.stringify(sum)),{workedDays:2,totalWorkMinutes:1080,overtimeMinutes:110,nightMinutes:0,holidayMinutes:0}); // 2차 ③: 09-04 지문과 출퇴근이 같은 수기(연장 15 + 저녁 45)를 인정 → 15+45=60(옛 기대값은 지문 자동 연장 15만) · 09-03은 보정 50 그대로 → 합계 65→110
   assert.equal(att[0].overtime_min,10,'지문 원본의 연장시간을 덮어쓰지 않음');
   assert.equal(att[0].clock_in,'09:00','지문 원본의 출근시각을 덮어쓰지 않음');
 });
@@ -117,7 +117,7 @@ test('확정 수기와 실제 근태 또는 승인 보정의 출퇴근·기본 �
     {id:9,work_date:'2026-09-07',status:'원장확정',clock_in:'09:00',clock_out:'18:00',overtime_min:30,evening_overtime_min:40}
   ],resolutions=[{work_date:'2026-09-07',source:'issue_adjustment',approved_at:'2026-09-08T00:00:00Z',clock_in:'09:00',clock_out:'18:00',overtime_min:25}];
   const sum=h.aggregateAttendanceForPayslip(h.payslipAttendanceRows(rows,manual,resolutions));
-  assert.equal(sum.overtimeMinutes,45,'저녁 30+40분은 다른 근태에 붙이지 않음');
+  assert.equal(sum.overtimeMinutes,90,'2차 ③: 09-07은 승인 보정과 출퇴근이 같은 수기라 수기 연장(30)+저녁(40)=70 인정(옛 기대값 45는 저녁 분을 안 붙이던 규칙) · 09-06은 확정 수기 시각이 달라 그대로 20');
 });
 
 test('원장확정 수기만 있고 attendance 원본이 없는 날짜는 근로시간을 임의 생성하지 않는다',()=>{
@@ -127,7 +127,7 @@ test('원장확정 수기만 있고 attendance 원본이 없는 날짜는 근로
 
 test('명세서는 같은 직원·월의 확정 수기와 승인 보정만 조회하며 금액 입력값을 집계함수에 넘기지 않는다',()=>{
   const block=html.match(/async function renderPaySlip\(m\)\{[\s\S]*?\r?\n\}\r?\nfunction setPaySlipMonth/)?.[0]||'';
-  assert.match(block,/from\('attendance_manual_entries'\).*?eq\('status','원장확정'\)/s);
+  assert.match(block,/from\('attendance_manual_entries'\).*?in\('status',\['대기','실장승인','원장확정'\]\)/s); // 2차 ③: 지문과 같은 수기는 대기여도 연장을 인정해야 해서 대기·실장승인 줄도 읽음(인정 판단은 payslipAttendanceRows)
   assert.match(block,/from\('attendance_issue_resolutions'\)/);
   assert.match(block,/payslipAttendanceRows\(att\|\|\[\],manualRows\|\|\[\],issueResolutions\|\|\[\]\)/);
   assert.match(block,/const items=prow\.items\|\|\{\}/);

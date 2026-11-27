@@ -5,7 +5,8 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const root=path.join(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p),'utf8');
 const js=read('hub-texts.js'),hrRaw=read('hr.html'),hr=hrRaw.replace(/\r\n/g,'\n');
 const {renderAll,tablesFor}=require('./fixtures/hub3-harness.cjs');
-const golden={...JSON.parse(read('tests/fixtures/hub3-golden-84053a7.json')),...JSON.parse(read('tests/fixtures/p7-leave-golden.json')),...JSON.parse(read('tests/fixtures/schedule-halfday-golden.json'))}; // 승인된 반차만 보이는 근무표·P7 연차 원장 카드는 새 기준, 나머지는 옛 기준 유지
+const golden={...JSON.parse(read('tests/fixtures/hub3-golden-84053a7.json')),...JSON.parse(read('tests/fixtures/p7-leave-golden.json')),...JSON.parse(read('tests/fixtures/schedule-halfday-golden.json'))};
+golden['static.modal.xlMask']=golden['static.modal.xlMask'].replace('공표된 근무표','근무표(초안 포함)'); // 2026-11-27 3차: 엑셀 올리기 창 안내 「공표된 근무표가 기준」→「근무표(초안 포함)가 기준」(실제 기준이 초안 포함이라 글만 바로잡음) // 승인된 반차만 보이는 근무표·P7 연차 원장 카드는 새 기준, 나머지는 옛 기준 유지
 const clone=x=>JSON.parse(JSON.stringify(x));
 // 반차 전용 다섯 키는 schedule-halfday.test.js에서 실제 설정 엔진·세 화면으로 확인함.
 const CH3=/^(?!sched\.half\.)(?!(?:att\.(?:week|staff_month)\.|leave\.(?:edit\.|change\.|my\.(?:used|pending|unit)$)))(att|sched|leave)\./;
@@ -23,12 +24,23 @@ function attendanceLegacyLayout(value){return String(value)
   .replace(/\n    \n(?=    <div class="card"><h2>📝 수기 출퇴근 입력)/g,'\n') // 시급제 카드가 없는 역할에서 생기는 빈 줄만 제외함
   .replace(/<div class="fld w4" id="manualOtReasonBox">[\s\S]*?<div class="msg" id="manualOtReasonHint" aria-live="polite"><\/div><\/div>/g,'') // 2026-11-23 연장 사유·실제 한 일 칸은 attendance-overtime-reason 시험에서 확인함
   .replace(/<div class="sub">추가근무 \d+분<br>연장 사유: [^<]*<br>실제 한 일: [^<]*<\/div>/g,'')
+  .replace(/<details class="schedule-role-cell"><summary>OFF · (\d+)명<\/summary>([\s\S]*?)<\/details>/g,(_m,count,body)=>{ // 2026-11-27 3차: 체크 안 한 날은 OFF 칸에 「자동」(회색)으로 보임 — 옛 화면(체크 안 됨·인원수에 안 셈)으로 되돌려 대조. 자동 OFF 동작은 attendance-rules2-20261127 시험에서 확인
+    const autos=(body.match(/ schedule-auto-off"/g)||[]).length,fixed=body.replace(/ schedule-selected schedule-auto-off"><input (disabled )?type="checkbox" checked disabled /g,'"><input $1type="checkbox" ').replace(/ · 자동<\/span>/g,'</span>');
+    return '<details class="schedule-role-cell"><summary>OFF · '+(Number(count)-autos)+'명</summary>'+fixed+'</details>';})
+  .replace(/<summary>([^<]*?) · (\d+)명 · 연차 (\d+)<\/summary>/g,(_m,role,a,b)=>'<summary>'+role+' · '+(Number(a)+Number(b))+'명</summary>').replace(/ schedule-leave-overlap"/g,'"') // 2026-11-27 3차: 이미 근무 체크된 사람에게 하루 연차가 승인되면 겹침 표시(옛 화면은 인원수에 그대로 셈)
+  .replace(/<div class="schedule-leave-list">([\s\S]*?)<\/div>/g,(_m,body)=>'<div class="schedule-leave-list">'+body.split('<br>').map(x=>x.replace(/^[^<]*? · /,'')).join('<br>')+'</div>') // 2026-11-27 3차: 연차·반차 행은 「이름 보기」와 상관없이 늘 이름을 보임(옛 화면은 이름 없이 종류만)
+  .replace(/<section class="schedule-month-summary">[\s\S]*?<\/section>/g,'') // 2026-11-27 3차: 월간 보기 맨 아래 「이번 달 직원별 요약」
+  .replace(/ <button class="mini stamp" onclick="publishSched\('[\d-]+'\)">이 주 공표<\/button>/g,'') // 2026-11-27 3차: 월간 보기 주마다 붙는 「이 주 공표」 단추(실장·원장)
+  .replace(/<div class="hint">수기 연장은 지문 출퇴근과 같으면 자동으로 인정되고[^<]*<\/div>/g,'') // 2026-11-27 2차 ③: 수기 검토 목록 위 안내 한 줄
+  .replace(/<div class="sub"><span class="b ok">지문 일치 — 연장 자동 인정<\/span><\/div>/g,'') // 2026-11-27 2차 ③: 지문과 같은 수기 줄 배지
+  .replace('<b data-hubk="att.xl.hint_b">근무표(초안 포함)</b>','<b data-hubk="att.xl.hint_b">공표된 근무표</b>')
   .replace(/ class="rowflex manual-clock-desktop"/g,' class="rowflex"')
   .replace(/ onchange="syncManualClock\('(In|Out)',false\)"/g,'')
   .replace(/<input type="time" class="manual-clock-mobile" id="manualClock(In|Out)Time"[^>]*>/g,'')
   .replace(/ id="manualAttendanceSubmit"/g,'')
   .replace(/<details class="hint"><summary>최근 연차 적립 실행 기록<\/summary>[\s\S]*?<\/details>/g,'');}
 const OVERTIME_REASON_TEXT_KEYS=new Set(['att.manual.f_ot_req','att.manual.f_ot_opt','att.manual.m_ot_reason','att.manual.ot_plan_prefix','att.manual.ot_actual_prefix','att.review.ot_total','att.review.ot_none']); // 제출 오류·사유 있는 기록에서만 보임 — attendance-overtime-reason.test.js에서 확인
+const MANUAL_MATCH_TEXT_KEYS=new Set(['att.review.fp_match']); // 2026-11-27 2차 ③: 지문과 출퇴근이 같은 수기 줄에만 붙는 배지 — attendance-rules2-20261127 시험에서 실제 렌더로 확인
 const P7_DATE_TEXT_KEYS=new Set(['att.manual.confirm_discard','att.manual.m_loading','att.manual.m_load_fail']);
 const MANAGER_ONLY_LEAVE_TEXT_KEYS=new Set(['leave.pend.btn_ok_manager','leave.m_ok_confirm_manager','leave.grant.manual',
   'leave.ledger.history_title','leave.ledger.history_load_fail','leave.ledger.history_th_name','leave.ledger.history_th_date','leave.ledger.history_th_kind','leave.ledger.history_th_days','leave.ledger.history_th_note','leave.ledger.history_empty',
@@ -75,7 +87,7 @@ const dynRows=defs=>defs.map(d=>({key:d.key,value:'«'+d.key+'»'+(d.vars?' '+d.
 /* ───────────── 1. 기본 글 목록 ───────────── */
 test('차례 3 글 목록: 키 모양·중복 없음·{자리표시자} 일치·화면 묶음 14개(출퇴근·근태차이 8 · 근무표 2 · 연차 4)',()=>{
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
-  assert.equal(defs.length,490,'차례 3 글 키 수(올해 생긴 연차 문구 14개 · 2026-11-23 연장 사유 문구 10개 · 11-26 사유 선택 안내 1개 포함)');
+  assert.equal(defs.length,506,'차례 3 글 키 수(올해 생긴 연차 문구 14개 · 2026-11-23 연장 사유 문구 10개 · 11-26 사유 선택 안내 1개 · 11-27 근태 규칙 2·3차 문구 16개 포함)');
   assert.equal(new Set(defs.map(d=>d.key)).size,defs.length);
   for(const d of defs){
     assert.match(d.key,/^[a-z][a-z0-9_.]{1,80}$/,d.key);
@@ -187,7 +199,7 @@ test('표에 값이 있으면 그 글: 고쳐 쓰는 글이 화면(제목·표 �
   const h=helpers(),defs=h.hubTextDefs().filter(d=>CH3.test(d.key));
   const stat=new Set([...hr.matchAll(/\bdata-hub(?:k|ph)="([a-z0-9_.]+)"/g)].map(m=>m[1]));
   const dyn=defs.filter(d=>!stat.has(d.key)&&!P7_DATE_TEXT_KEYS.has(d.key)); // 날짜 전환 글 3개는 attendance-date-switch.test.js의 실제 호출로 확인함
-  assert.equal(dyn.length,468); // 2026-11-23 연장 사유·실제 한 일 문구 10개 추가 · 11-26 사유 선택 안내 1개
+  assert.equal(dyn.length,484); // 2026-11-23 연장 사유·실제 한 일 문구 10개 추가 · 11-26 사유 선택 안내 1개 · 11-27 근태 규칙 2·3차 문구 16개
   const out=await renderAll(hr,{engine:true,textRows:dynRows(dyn),settings:{}});
   const b2Defs=defs.filter(d=>/^att\.issue\.p_date$|^att\.issueform\.|^att\.myissue\.|^att\.issue\.(?:evidence_|admin_evidence|awaiting_staff|auto_clock_)/.test(d.key));
   const b2Observed=await require('./fixtures/hub3-harness.cjs').observeAttendanceIssueB2(hr,{textRows:dynRows(b2Defs)});
@@ -219,7 +231,7 @@ test('표에 값이 있으면 그 글: 고쳐 쓰는 글이 화면(제목·표 �
   });
   const failedEarnedHtml=await earnedReadFail.api.renderEmployeeLeaveStatus();
   const all=[...Object.values(out),b2Observed,cObservedText,earnedHtml,failedEarnedHtml,...earned.log].join('\n');
-  const legacyMissing=dyn.filter(d=>!MANAGER_ONLY_LEAVE_TEXT_KEYS.has(d.key)&&!OVERTIME_REASON_TEXT_KEYS.has(d.key)&&!b2Defs.some(x=>x.key===d.key)&&!all.includes('«'+d.key+'»')).map(d=>d.key);
+  const legacyMissing=dyn.filter(d=>!MANAGER_ONLY_LEAVE_TEXT_KEYS.has(d.key)&&!OVERTIME_REASON_TEXT_KEYS.has(d.key)&&!MANUAL_MATCH_TEXT_KEYS.has(d.key)&&!b2Defs.some(x=>x.key===d.key)&&!all.includes('«'+d.key+'»')).map(d=>d.key);
   const visibleMissing=b2Defs.filter(d=>d.key!=='att.myissue.th_evidence'&&!MANAGER_ONLY_LEAVE_TEXT_KEYS.has(d.key)&&!all.includes('«'+d.key+'»')).map(d=>d.key);
   assert.equal(legacyMissing.length,0,'기존 화면 글은 기존 관측 그대로 검사: '+legacyMissing.join(', '));
   assert.equal(visibleMissing.length,0,'B2 양식·카드·관리자 표·증거 목록은 실제 관측 렌더로 검사: '+visibleMissing.join(', '));
@@ -447,7 +459,7 @@ test('화면: 🔢 숫자·기준 — 연차·소명 기준 5개가 더 있고(�
   await t.render(OWNER);
   await t.click('[hub-subtab]=settings');
   const sec=t.section.innerHTML;
-  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,6+12+2+4+1+8+1+1+6+1+7+3+11+1+1+5+3,'근태 7 + 연차·소명 5 + 차례 4 결재 건수 2 + 차례 5 문의함·상담일지 4 + 도구 카드 보는 사람 11(10-10 업무매뉴얼 카드 포함) + 병원 휴진 구글 연동 켬 1(11-23) + 연장 사유 필수 직무별 5(11-26)');
+  assert.equal((sec.match(/data-hub-set-save="\d+"/g)||[]).length,6+12+2+4+1+8+1+1+6+1+7+3+11+1+1+5+3+4,'근태 7 + 연차·소명 5 + 차례 4 결재 건수 2 + 차례 5 문의함·상담일지 4 + 도구 카드 보는 사람 11(10-10 업무매뉴얼 카드 포함) + 병원 휴진 구글 연동 켬 1(11-23) + 연장 사유 필수 직무별 5(11-26)');
   assert.ok(sec.includes('🌿 연차 기준')&&sec.includes('🕘 근태 기준'));
   assert.match(sec,/id="hubSetIn_8" type="number" inputmode="numeric" min="1" max="30" value="2"/);
   assert.match(sec,/id="hubSetIn_10" type="number" inputmode="decimal" step="0\.1" min="0\.1" max="1" value="0\.5"/);
