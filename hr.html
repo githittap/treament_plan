@@ -21,6 +21,7 @@
 
 .att-monthly-table{min-width:900px}.att-monthly-table th,.att-monthly-table td{white-space:nowrap}.att-monthly-sheet{background:#fff;color:#182d37;padding:18px;font-size:12px}.att-monthly-sheet table{width:100%;border-collapse:collapse;font-size:11px}.att-monthly-sheet th,.att-monthly-sheet td{border:1px solid #ccd6db;padding:5px}.att-monthly-sheet h2{font-size:19px}.att-monthly-sheet th{background:#eef3f5;color:#182d37}.att-monthly-sheet .hint{margin:10px 0;font-size:11px;color:#526b78}
 @media print{body.att-monthly-printing{background:#fff!important;color:#182d37!important}body.att-monthly-printing>*{display:none!important}body.att-monthly-printing>#attMonthlyMask{display:block!important;position:static!important;background:white!important;padding:0!important}body.att-monthly-printing #attMonthlyMask .modal{margin:0!important;background:#fff!important;color:#182d37!important;width:100%!important;max-width:none!important;max-height:none!important;overflow:visible!important;border:0!important;box-shadow:none!important;padding:0!important}body.att-monthly-printing #attMonthlyMask .att-monthly-actions{display:none!important}body.att-monthly-printing .att-monthly-sheet{padding:0}body.att-monthly-printing .att-monthly-sheet th,body.att-monthly-printing .att-monthly-sheet td{padding:3px;font-size:11px;line-height:1.3}body.att-monthly-printing .att-monthly-sheet h2{margin:0 0 8px}body.att-monthly-printing .att-monthly-sheet p{margin:8px 0}body.att-monthly-printing .att-monthly-sheet tr{break-inside:avoid}}
+@media print{.att-mark-ctl{display:none!important}}
 .wage-hourly-days table{min-width:550px}.wage-hourly-days th,.wage-hourly-days td{white-space:nowrap}.wage-hourly-summary th,.wage-hourly-summary td{white-space:nowrap}.wage-hourly-summary table{min-width:490px}
 .job-group-admin{border:1px solid var(--line);border-radius:10px;padding:12px;margin:12px 0;min-width:0;overflow:hidden}.job-group-doctors{display:flex;gap:8px;flex-wrap:wrap;padding:8px;background:var(--panel);border-radius:8px}.job-group-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}.job-group-summary-card{display:flex;justify-content:space-between;gap:6px;min-width:0;padding:9px;background:var(--panel);border-radius:7px;overflow-wrap:anywhere}.job-group-unassigned-warning{display:flex;flex-direction:column;gap:3px;margin-top:8px;padding:9px;border-left:4px solid var(--gold);background:var(--gold-bg);color:var(--ink);overflow-wrap:anywhere}.job-group-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(180px,.5fr);gap:10px;margin-top:10px}.job-group-form fieldset{min-width:0}.job-group-form label{display:flex;flex-direction:column;gap:6px}.job-group-people{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.job-group-person{display:flex;align-items:center;gap:8px;min-width:0;padding:6px;border:1px solid var(--line);border-radius:6px}.job-group-person span{overflow-wrap:anywhere}.job-group-person span:last-child{margin-left:auto;color:var(--gray)}.job-group-preview{width:100%;box-sizing:border-box;margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:8px;overflow-wrap:anywhere}.job-group-preview ul{margin:6px 0;padding-left:22px}.job-group-actions{position:sticky;bottom:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;background:var(--card);border-top:1px solid var(--line)}.job-group-actions #jobGroupMessage{min-width:0;overflow-wrap:anywhere}
 @media(max-width:640px){.job-group-form{grid-template-columns:1fr}.job-group-people{grid-template-columns:1fr}.job-group-summary{grid-template-columns:1fr}.job-group-preview{width:100%}.job-group-actions{position:sticky;bottom:0;flex-direction:column;align-items:stretch}.job-group-actions button{width:100%}.job-group-admin{max-width:100%;box-sizing:border-box}}
@@ -458,7 +459,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
 <script src="payroll-reply.js?v=2026112301"></script>
 <script src="payroll-compare.js?v=2026101110"></script>
 <script src="hub-help.js?v=2026112701"></script>
-<script src="hub-texts.js?v=2026112702"></script>
+<script src="hub-texts.js?v=2026112710"></script>
 <script src="hub-activity.js?v=2026101110"></script>
 <script src="security-pledge.js?v=20261003p9d"></script>
 <script src="wage-hourly.js?v=2026101110"></script>
@@ -472,6 +473,7 @@ footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:10.5px
    아래는 표를 못 불러왔을 때의 안전 기본값. */
 let SETTINGS = {
   late_cut:'09:40', ot_unit_min:'10',
+  'att.shift_group.B.late_cut':'10:00', 'att.shift_group.C.late_cut':'09:30', /* A조는 값이 없으면 위 late_cut을 이어받음 */
   siueop:'10:00', absence_confirm_after_minutes:'0', absence_confirm_after_days:'1', absence_exclude_pending_manual:'true',
   jongeop_weekday_evening:'20:00', jongeop_weekday_day:'18:30',
   jongeop_sat:'17:00', jongeop_sun:'14:00'
@@ -1486,6 +1488,131 @@ function attendanceStaffDiffHtml(result){const show=attDiffSetting('att.diff.sho
 async function fetchStaffAttDiff(){if(ME.role==='owner'||attDiffSetting('att.diff.show_staff',1)!==1)return [];const current=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit'}).format(new Date()),[y,m]=current.split('-').map(Number),prevDate=new Date(Date.UTC(y,m-2,1)),start=`${prevDate.getUTCFullYear()}-${String(prevDate.getUTCMonth()+1).padStart(2,'0')}-01`,next=attendanceMonthBounds(current).next;const [mr,fr,ir]=await Promise.all([fetchAttendancePages(()=>sb.from('attendance_manual_entries').select('*').eq('user_id',ME.id).gte('work_date',start).lt('work_date',next)),fetchAttendancePages(()=>sb.from('attendance').select('user_id,work_date,clock_in,clock_out,source').eq('user_id',ME.id).eq('source','fp').gte('work_date',start).lt('work_date',next)),fetchAttendancePages(()=>sb.from('attendance_issues').select('id,user_id,work_date,status,staff_reason,reason').eq('user_id',ME.id).gte('work_date',start).lt('work_date',next))]);const error=mr.error||fr.error||ir.error;if(error)return {rows:[],error:error.message||String(error)};return attDiffRows({manualRows:mr.data,fpRows:fr.data,issueRows:ir.data,thresholdMin:attDiffSetting('att.diff.gap_min',1),coverageEnd:null});}
 /* attendance-monthly-summary:start */
 let ATT_MONTHLY_LAST=null,ATT_MONTHLY_REQUEST=0;
+/* ── 근태 규칙(2026-11-27 매니저 의견 1차): 근무조별 지각 · 반차·연차 자동 반영 · 관리자 표시 ── */
+const ATT_GROUP_CUT_DEFAULT={A:'09:40',B:'10:00',C:'09:30'};
+const ATT_MARKS={annual:'연차',am_half:'오전 반차',pm_half:'오후 반차',early_ok:'조퇴 인정',late_ok:'지각 인정',official:'공가'};
+let ATT_RULE_CTX={hourlyIds:new Set(),leaveMap:new Map(),markMap:new Map(),error:''};
+function attMonthlyAllowed(){return ['manager','chief','owner'].includes(ME.role);}
+function attGroupLateCut(g){
+  const ok=v=>/^([01]\d|2[0-3]):[0-5]\d$/.test(String(v==null?'':v).trim());
+  const v=SETTINGS['att.shift_group.'+g+'.late_cut'];
+  if(ok(v))return String(v).trim();
+  if(g==='A'&&ok(SETTINGS.late_cut))return String(SETTINGS.late_cut).trim(); /* 옛 설정 late_cut = A조 기준 */
+  return ATT_GROUP_CUT_DEFAULT[g]||ATT_GROUP_CUT_DEFAULT.A;
+}
+function attGroupName(g){return g==='A'?hubT('attrule.group_a','A조(진료실·데스크)'):g==='B'?hubT('attrule.group_b','B조(기공·행정·실장)'):g==='C'?hubT('attrule.group_c','C조(시간제)'):String(g||'');}
+/* 조가 비어 있을 때 자동: 시간제 → C · 실장 → B · 기공(직무 lab·부서 기공실/기공팀) → B · 소독·행정 → B · 그 밖 → A */
+function attShiftGroupAuto(p,hourlyIds){
+  const id=p.user_id||p.id,dept=String(p.dept||'').trim();
+  if(hourlyIds&&id&&hourlyIds.has(id))return 'C';
+  if(p.role==='chief')return 'B';
+  if(p.job_group==='lab'||dept==='기공실'||dept==='기공팀')return 'B';
+  if(p.job_group==='sterilization_admin')return 'B';
+  return 'A';
+}
+function attShiftGroupOf(p,hourlyIds){const g=p&&p.att_shift_group;return g==='A'||g==='B'||g==='C'?g:attShiftGroupAuto(p||{},hourlyIds);}
+function attGroupForUser(uid){const p=(PROFILES||[]).find(x=>(x.user_id||x.id)===uid)||{user_id:uid};return attShiftGroupOf({...p,user_id:uid},ATT_RULE_CTX.hourlyIds);}
+function attDateList(from,to){
+  const out=[];if(!from)return out;const a=Date.parse(String(from).slice(0,10)+'T00:00:00Z'),b=Date.parse(String(to||from).slice(0,10)+'T00:00:00Z');
+  if(!(a<=b))return out;for(let t=a,i=0;t<=b&&i<400;t+=86400000,i++)out.push(new Date(t).toISOString().slice(0,10));return out;
+}
+/* 반차 쉬는 시간대(예 「10:00~13:00」): 시작이 12:00 전이면 오전(지각 0), 끝이 17:00 이후면 오후(조퇴 0). 시간대가 비거나 못 읽으면 둘 다 0 */
+function attHalfSides(note){
+  const t=String(note||''),m=t.match(/(\d{1,2}):(\d{2})\s*[~\-–—]\s*(\d{1,2}):(\d{2})/);
+  if(m){const s=Number(m[1])*60+Number(m[2]),e=Number(m[3])*60+Number(m[4]);return {am:s<720,pm:e>=1020};}
+  if(/오전/.test(t)&&!/오후/.test(t))return {am:true,pm:false};
+  if(/오후/.test(t)&&!/오전/.test(t))return {am:false,pm:true};
+  return {am:true,pm:true};
+}
+/* 승인된 연차·반차를 날짜별로 펼침 → Map('직원|날짜' → {annual,half,am,pm}) */
+function attLeaveMap(leaves){
+  const map=new Map();
+  for(const r of leaves||[]){
+    if(r.status!=='승인'||!r.user_id)continue;
+    const annual=r.type==='연차',half=r.type==='반차';if(!annual&&!half)continue;
+    const sides=half?attHalfSides(r.type_note):null;
+    for(const d of attDateList(r.date_from,r.date_to||r.date_from)){
+      const k=r.user_id+'|'+d,cur=map.get(k)||{};
+      if(annual)cur.annual=true;else{cur.half=true;if(sides.am)cur.am=true;if(sides.pm)cur.pm=true;}
+      map.set(k,cur);
+    }
+  }
+  return map;
+}
+/* 관리자 표시(지운 것 제외) → Map('직원|날짜' → {mark:true}) */
+function attMarkMap(marks){
+  const map=new Map();
+  for(const m of marks||[]){
+    if(m.removed_at||!m.user_id||!ATT_MARKS[m.mark])continue;
+    const k=m.user_id+'|'+String(m.work_date).slice(0,10),cur=map.get(k)||{};cur[m.mark]=true;map.set(k,cur);
+  }
+  return map;
+}
+/* 그날 지각·조퇴를 0으로 만드는 조건: 연차·공가 → 둘 다 · 오전 반차·지각 인정 → 지각 · 오후 반차·조퇴 인정 → 조퇴 */
+function attDayFlags(userId,date,leaveMap,markMap){
+  const l=(leaveMap&&leaveMap.get(userId+'|'+date))||{},m=(markMap&&markMap.get(userId+'|'+date))||{},labels=[];
+  if(l.annual)labels.push('연차');
+  if(l.half)labels.push(l.am&&!l.pm?'오전 반차':l.pm&&!l.am?'오후 반차':'반차');
+  for(const k of Object.keys(ATT_MARKS))if(m[k])labels.push(ATT_MARKS[k]);
+  return {noLate:!!(l.annual||l.am||m.annual||m.official||m.am_half||m.late_ok),noEarly:!!(l.annual||l.pm||m.annual||m.official||m.pm_half||m.early_ok),labels};
+}
+/* 하루 계산 하나 — 엑셀 올리기 미리보기·저장(calcRow) · 이 달 다시 계산 · 월 요약이 모두 이 함수를 씀 */
+function attCalcDay({ci,co,ds,evening,group,flags}){
+  const unit=parseInt(SETTINGS.ot_unit_min)||10;
+  let late=ci!=null?Math.max(0,ci-toMin(attGroupLateCut(group||'A'))):0,ot=0,early=0;
+  if(co!=null){const je=toMin(jongeop(ds,evening));if(co>=je){ot=Math.floor((co-je)/unit)*unit;}else{early=je-co;}}
+  if(flags&&flags.noLate)late=0;
+  if(flags&&flags.noEarly)early=0;
+  return {late,ot,early};
+}
+/* 이 달 연차(일)·반차(회): 승인 휴가 + 관리자 표시, 같은 날 겹치면 한 번. 달 경계에 걸친 연차는 이 달 날짜만(공휴일 뺀 날수, 신청 일수를 넘지 않게) */
+function attLeaveCounts({leaves=[],marks=[],month,holidays}){
+  const {start,next}=attendanceMonthBounds(month),inM=d=>d>=start&&d<next,out=new Map(),get=u=>{if(!out.has(u))out.set(u,{annual:0,half:0});return out.get(u);};
+  const annualCover=new Set(),anyCover=new Set();
+  for(const r of leaves){
+    if(r.status!=='승인'||!r.user_id)continue;
+    const dates=attDateList(r.date_from,r.date_to||r.date_from),inMonth=dates.filter(inM);
+    if(r.type==='연차'){
+      dates.forEach(d=>{annualCover.add(r.user_id+'|'+d);anyCover.add(r.user_id+'|'+d);});
+      if(!inMonth.length)continue;
+      const days=Number(r.days),hasDays=Number.isFinite(days)&&days>0;
+      let n=inMonth.length===dates.length&&hasDays?days:inMonth.filter(d=>!(holidays&&holidays.has(d))).length;
+      if(inMonth.length!==dates.length&&hasDays)n=Math.min(n,days);
+      get(r.user_id).annual+=n;
+    }else if(r.type==='반차'){
+      for(const d of dates){anyCover.add(r.user_id+'|'+d);if(inM(d))get(r.user_id).half+=1;}
+    }
+  }
+  const halfSeen=new Set();
+  for(const m of marks){
+    if(m.removed_at||!m.user_id||!ATT_MARKS[m.mark])continue;
+    const d=String(m.work_date).slice(0,10),k=m.user_id+'|'+d;if(!inM(d))continue;
+    if(m.mark==='annual'&&!annualCover.has(k)){annualCover.add(k);anyCover.add(k);get(m.user_id).annual+=1;}
+    else if((m.mark==='am_half'||m.mark==='pm_half')&&!anyCover.has(k)&&!halfSeen.has(k)){halfSeen.add(k);get(m.user_id).half+=1;}
+  }
+  return out;
+}
+function attRuleContext(rules,month){
+  const hourlyIds=rules.hourlyIds instanceof Set?rules.hourlyIds:new Set(rules.hourlyIds||[]);
+  return {hourlyIds,leaves:rules.leaves||[],marks:(rules.marks||[]).filter(m=>!m.removed_at),leaveMap:attLeaveMap(rules.leaves),markMap:attMarkMap(rules.marks),counts:attLeaveCounts({leaves:rules.leaves||[],marks:rules.marks||[],month,holidays:rules.holidays})};
+}
+/* 규칙에 필요한 자료(승인 휴가·관리자 표시·시간제 명단)를 읽음 — 날짜는 포함 범위 */
+async function loadAttRuleData(startDate,endDate){
+  const [hr,lv,mk,hd]=await Promise.all([
+    sb.rpc('att_hourly_user_ids',{p_date:endDate}),
+    fetchAttendancePages(()=>sb.from('leave_requests').select('user_id,type,type_note,date_from,date_to,days,status').eq('status','승인').lte('date_from',endDate).gte('date_to',startDate).order('id',{ascending:true})),
+    fetchAttendancePages(()=>sb.from('attendance_day_marks').select('id,user_id,work_date,mark,note,created_at,removed_at').is('removed_at',null).gte('work_date',startDate).lte('work_date',endDate).order('id',{ascending:true})),
+    fetchAttendancePages(()=>sb.from('holidays').select('date,kind').gte('date',startDate).lte('date',endDate).order('date',{ascending:true}))
+  ]);
+  const err=hr.error||lv.error||mk.error||hd.error;if(err)throw new Error(err.message||String(err));
+  return {hourlyIds:new Set((hr.data||[]).map(x=>typeof x==='string'?x:Object.values(x||{})[0])),leaves:lv.data||[],marks:mk.data||[],holidays:new Set((hd.data||[]).filter(h=>h.kind!=='단축').map(h=>String(h.date).slice(0,10)))};
+}
+/* 엑셀 올리기 화면이 쓰는 전역 자료(calcRow가 읽음). 못 읽어도 업로드는 계속하고 이유를 돌려줌 */
+async function loadAttRuleContext(startDate,endDate){
+  try{const d=await loadAttRuleData(startDate,endDate);ATT_RULE_CTX={hourlyIds:d.hourlyIds,leaveMap:attLeaveMap(d.leaves),markMap:attMarkMap(d.marks),error:''};}
+  catch(e){ATT_RULE_CTX={hourlyIds:new Set(),leaveMap:new Map(),markMap:new Map(),error:e.message||String(e)};}
+  return ATT_RULE_CTX;
+}
 function attReplyHourlyDays(originals,days,manual,resolutions){
   const latest=new Map(),stamp=r=>r.created_at??r.approved_at;
   // DB의 시각 내림차순·ID 내림차순과 맞춘다. null 시각은 DB처럼 먼저 온다.
@@ -1496,79 +1623,226 @@ function attReplyHourlyDays(originals,days,manual,resolutions){
   }
   return originals.map(r=>{const correction=latest.get(r.work_date),base=days.find(d=>d.date===r.work_date)||{date:r.work_date};return {...base,clockIn:(correction?correction.clock_in:r.clock_in)||'',clockOut:(correction?correction.clock_out:r.clock_out)||'',...(correction?{basis:hubT('pay.reply.hourly_correction_basis','시급 승인 정정')}:{})};});
 }
-function attMonthlyModel({month,rows=[],manualRows=[],resolutions=[],employees=[],status='미집계',forReply=false}){
+function attMonthlyModel({month,rows=[],manualRows=[],resolutions=[],employees=[],status='미집계',forReply=false,rules=null}){
   if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month||''))throw new Error('조회할 월을 확인하세요.');
   const {start,next}=attendanceMonthBounds(month),inMonth=r=>r.work_date>=start&&r.work_date<next;
   rows=rows.filter(inMonth);manualRows=manualRows.filter(inMonth);resolutions=resolutions.filter(inMonth);
   const people=new Map(employees.filter(p=>p.role!=='owner').map(p=>[p.user_id||p.id,p]));
   for(const r of rows.concat(manualRows))if(r.user_id&&!people.has(r.user_id))people.set(r.user_id,employees.find(p=>(p.user_id||p.id)===r.user_id)||{});
-  const result=[];
+  const result=[],ruleCtx=rules?attRuleContext(rules,month):null;
   for(const [userId,p] of people){
     if(!userId)continue;
     const originals=rows.filter(r=>r.user_id===userId),manual=manualRows.filter(r=>r.user_id===userId),approved=resolutions.filter(r=>r.user_id===userId);
     const adjusted=new Map(applyAttendanceResolutions(originals.filter(r=>r.source==='fp'),approved).map(r=>[r.work_date,r]));
     const effective=payslipAttendanceRows(originals.map(r=>adjusted.get(r.work_date)||{...r,is_issue_adjustment:false}),manual,approved).sort((a,b)=>a.work_date.localeCompare(b.work_date));
     const agg=aggregateAttendanceForPayslip(effective),summary={recordedDays:effective.length,workedDays:agg.workedDays,lateCount:0,lateMinutes:0,earlyCount:0,earlyMinutes:0,overtimeMinutes:agg.overtimeMinutes,holidayMinutes:agg.holidayMinutes,clockSpanMinutes:agg.totalWorkMinutes,clockReviewDays:0,pendingManualDays:new Set(manual.filter(r=>['대기','실장승인'].includes(r.status)).map(r=>r.work_date)).size,adjustedDays:0};
+    const group=ruleCtx?attShiftGroupOf({...p,user_id:userId},ruleCtx.hourlyIds):'';
+    if(ruleCtx){const c=ruleCtx.counts.get(userId)||{annual:0,half:0};summary.annualDays=c.annual;summary.halfDays=c.half;summary.staleDays=0;}
     const days=effective.map(r=>{
-      const ci=timeToMin(r.clock_in),co=timeToMin(r.clock_out),valid=ci!=null&&co!=null&&co>ci,late=Number(r.late_min)||0,early=Number(r.early_min)||0;
+      const ci=timeToMin(r.clock_in),co=timeToMin(r.clock_out),valid=ci!=null&&co!=null&&co>ci;
+      let late=Number(r.late_min)||0,early=Number(r.early_min)||0,flags=null;
+      if(ruleCtx){
+        flags=attDayFlags(userId,r.work_date,ruleCtx.leaveMap,ruleCtx.markMap);
+        if(r.source==='fp'&&!r.is_issue_adjustment&&ci!=null){const c=attCalcDay({ci,co,ds:r.work_date,evening:!!r.evening,group,flags});if(c.late!==late||c.early!==early)summary.staleDays++;late=c.late;early=c.early;}
+        else{if(flags.noLate)late=0;if(flags.noEarly)early=0;}
+      }
       summary.lateCount+=late>0?1:0;summary.lateMinutes+=late;summary.earlyCount+=early>0?1:0;summary.earlyMinutes+=early;
       summary.clockReviewDays+=valid?0:1;summary.adjustedDays+=r.is_issue_adjustment?1:0;
-      return {date:r.work_date,clockIn:r.clock_in||'',clockOut:r.clock_out||'',lateMinutes:late,earlyMinutes:early,overtimeMinutes:(Number(r.overtime_min)||0)+(valid?(Number(r.evening_overtime_min)||0):0),holidayMinutes:valid&&r.is_holiday?co-ci:0,clockSpanMinutes:valid?co-ci:0,needsClockReview:!valid,basis:r.is_issue_adjustment?'승인 보정':r.source==='manual'?'확정 수기':r.source==='fp'?'지문':'저장 기록'};
+      return {date:r.work_date,clockIn:r.clock_in||'',clockOut:r.clock_out||'',lateMinutes:late,earlyMinutes:early,overtimeMinutes:(Number(r.overtime_min)||0)+(valid?(Number(r.evening_overtime_min)||0):0),holidayMinutes:valid&&r.is_holiday?co-ci:0,clockSpanMinutes:valid?co-ci:0,needsClockReview:!valid,basis:(r.is_issue_adjustment?'승인 보정':r.source==='manual'?'확정 수기':r.source==='fp'?'지문':'저장 기록')+(flags&&flags.labels.length?' · '+flags.labels.join(' · '):'')};
     });
-    result.push({userId,name:p.name||p.full_name||userId,dept:p.dept||'',summary,days,...(forReply?{replyDays:attReplyHourlyDays(originals,days,manual,approved)}:{})});
+    const ruleInfo=ruleCtx?{group,groupExplicit:p.att_shift_group==='A'||p.att_shift_group==='B'||p.att_shift_group==='C'?p.att_shift_group:'',groupAuto:attShiftGroupAuto({...p,user_id:userId},ruleCtx.hourlyIds),lateCut:attGroupLateCut(group),leaves:ruleCtx.leaves.filter(l=>l.user_id===userId&&(l.type==='연차'||l.type==='반차')).map(l=>({from:String(l.date_from).slice(0,10),to:String(l.date_to||l.date_from).slice(0,10),type:l.type,days:l.days,note:l.type_note||''})),marks:ruleCtx.marks.filter(m=>m.user_id===userId).map(m=>({id:m.id,date:String(m.work_date).slice(0,10),mark:m.mark,note:m.note||''})).sort((a,b)=>a.date.localeCompare(b.date))}:{};
+    result.push({userId,name:p.name||p.full_name||userId,dept:p.dept||'',summary,days,...ruleInfo,...(forReply?{replyDays:attReplyHourlyDays(originals,days,manual,approved)}:{})});
   }
   return {month,status:status||'미집계',employees:result};
 }
 async function fetchAttMonthlyData(month,options=false){
   const includeCarry=typeof options==='boolean'?options:!!options.includeCarry,forReply=typeof options==='object'&&!!options.forReply;
-  if(ME.role!=='owner')throw new Error('원장만 월 근태 요약을 조회할 수 있습니다.');
+  if(!attMonthlyAllowed())throw new Error('매니저·실장·원장만 월 근태 요약을 조회할 수 있습니다.');
   if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month||''))throw new Error('조회할 월을 확인하세요.');
   const {start,next}=attendanceMonthBounds(month),previousDay=new Date(Date.parse(start+'T00:00:00Z')-86400000).toISOString().slice(0,10),query=(table,fields)=>sb.from(table).select(fields).gte('work_date',includeCarry?previousDay:start).lt('work_date',next);
-  const [att,manual,resolutions,state]=await Promise.all([
+  const [att,manual,resolutions,state,ruleResult]=await Promise.all([
     fetchAttendancePages(()=>query('attendance','user_id,work_date,source,clock_in,clock_out,late_min,early_min,overtime_min,evening,is_holiday').order('work_date',{ascending:true}).order('user_id',{ascending:true})),
     fetchAttendancePages(()=>query('attendance_manual_entries','id,user_id,work_date,status,clock_in,clock_out,overtime_min,evening_overtime_min'+(forReply?',hourly_correction,created_at':'')).order('id',{ascending:true})),
     fetchAttendancePages(()=>query('attendance_issue_resolutions','id,user_id,work_date,clock_in,clock_out,late_min,early_min,overtime_min,source,approved_at').order('id',{ascending:true})),
-    sb.from('att_months').select('status').eq('month',month).maybeSingle()
+    sb.from('att_months').select('status').eq('month',month).maybeSingle(),
+    forReply||includeCarry?Promise.resolve(null):loadAttRuleData(start,new Date(Date.parse(next+'T00:00:00Z')-86400000).toISOString().slice(0,10)).then(data=>({data,error:null}),error=>({data:null,error}))
   ]);
-  for(const r of [att,manual,resolutions,state])if(r.error)throw new Error(r.error.message||String(r.error));
+  for(const r of [att,manual,resolutions,state,ruleResult||{}])if(r.error)throw new Error(r.error.message||String(r.error));
   if([att,manual,resolutions].some(r=>(r.data||[]).length>=10000))throw new Error('월 자료가 조회 상한에 도달해 전체 합계를 만들지 못했습니다.');
-  const input={rows:att.data||[],manualRows:manual.data||[],resolutions:resolutions.data||[],employees:PROFILES||[],status:state.data?.status,forReply},model=attMonthlyModel({month,...input});
+  const input={rows:att.data||[],manualRows:manual.data||[],resolutions:resolutions.data||[],employees:PROFILES||[],status:state.data?.status,forReply},model=attMonthlyModel({month,...input,rules:ruleResult?ruleResult.data:null});
   if(includeCarry){const carry=attMonthlyModel({month:previousDay.slice(0,7),...input});for(const p of carry.employees){if(!p.days.length)continue;const current=model.employees.find(e=>e.userId===p.userId);if(current){current.carryDays=p.days;if(forReply)current.replyCarryDays=p.replyDays;}else model.employees.push({...p,days:[],summary:{},carryDays:p.days,...(forReply?{replyDays:[],replyCarryDays:p.replyDays}:{})});}}
   return model;
 }
 function attMonthlyCardHtml(){
-  if(ME.role!=='owner')return '';
+  if(!attMonthlyAllowed())return '';
   const month=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit'}).format(new Date());
   ATT_MONTHLY_LAST=null;ATT_MONTHLY_REQUEST++;
   return `<div class="card"><h2>📊 직원별 월 근태 요약</h2><div class="rowflex"><label>달 <input type="month" id="attMonthlyMonth" value="${esc(month)}" onchange="resetAttMonthly()"></label><button class="mini" onclick="loadAttMonthly()">요약 보기</button><button class="mini" id="attMonthlyExport" onclick="exportAttMonthly()" disabled>엑셀로 받기</button></div><div class="hint">지문·확정 수기와 승인 보정을 읽어 직원별 횟수와 분을 함께 보여줍니다. 수기 대기는 합계에 포함하지 않습니다.</div><div id="attMonthlyResult"></div></div>`;
 }
 function resetAttMonthly(){ATT_MONTHLY_LAST=null;ATT_MONTHLY_REQUEST++;const box=$('#attMonthlyResult'),button=$('#attMonthlyExport');if(box)box.innerHTML='';if(button)button.disabled=true;hide('attMonthlyMask');}
-function attMonthlySummaryCells(s){return [s.recordedDays,s.workedDays,`${s.lateCount}회 / ${s.lateMinutes}분`,`${s.earlyCount}회 / ${s.earlyMinutes}분`,`${s.overtimeMinutes}분`,`${s.holidayMinutes}분`,s.clockReviewDays,s.pendingManualDays];}
+function attMonthlySummaryCells(s){return [s.recordedDays,s.workedDays,`${s.lateCount}회 / ${s.lateMinutes}분`,`${s.earlyCount}회 / ${s.earlyMinutes}분`,`${s.overtimeMinutes}분`,`${s.holidayMinutes}분`,s.clockReviewDays,s.pendingManualDays,...(s.annualDays!==undefined?[s.annualDays,s.halfDays]:[])];}
+function attGroupSelectHtml(p){
+  const cur=p.groupExplicit||'',opt=(v,l)=>`<option value="${v}"${cur===v?' selected':''}>${esc(l)}</option>`;
+  return `<select class="mini" onchange="changeAttShiftGroup('${esc(p.userId)}',this.value)">${opt('',hubT('attrule.group_auto','자동')+' → '+p.groupAuto)}${['A','B','C'].map(g=>opt(g,attGroupName(g))).join('')}</select><div class="sub">${esc(hubT('attrule.group_cut_label','지각 기준'))} ${esc(p.lateCut)}</div>`;
+}
 function attMonthlyRowsHtml(model){
-  const heads=['직원','기록일','출퇴근 완료일','지각','조퇴','연장(저녁 포함)','휴일 시각 구간','시각 검토일','수기 대기일','개인 자료'];
-  return `<div class="hint">${esc(model.month)} · 월 마감 상태: ${esc(model.status)} · 휴일 시각 구간은 출퇴근 차이이며 휴게시간을 차감하지 않았습니다.</div>${model.employees.length?`<div class="tblwrap"><table class="att-monthly-table"><tr>${heads.map(h=>`<th>${esc(h)}</th>`).join('')}</tr>${model.employees.map((p,i)=>`<tr><td>${esc(p.name)}${p.dept?`<div class="sub">${esc(p.dept)}</div>`:''}</td>${attMonthlySummaryCells(p.summary).map(v=>`<td>${esc(v)}</td>`).join('')}<td><button class="mini" onclick="openAttMonthlyPerson(${i})">확인용 보기</button></td></tr>`).join('')}</table></div>`:'<div class="empty">직원 자료가 없습니다.</div>'}<div class="hint">기록이 없는 날을 결근으로 판정하지 않습니다. 지각·조퇴·연장은 저장된 판정 분이고 시급 지급액은 별도 시급제 화면에서 확인합니다.</div>`;
+  const rules=model.employees.some(p=>p.group!==undefined),extra=model.employees.some(p=>p.summary.annualDays!==undefined);
+  const heads=['직원',...(rules?['근무조']:[]),'기록일','출퇴근 완료일','지각','조퇴','연장(저녁 포함)','휴일 시각 구간','시각 검토일','수기 대기일',...(extra?['연차(일)','반차(회)']:[]),'개인 자료'];
+  const stale=model.employees.reduce((n,p)=>n+(p.summary.staleDays||0),0);
+  return `<div class="hint">${esc(model.month)} · 월 마감 상태: ${esc(model.status)} · 휴일 시각 구간은 출퇴근 차이이며 휴게시간을 차감하지 않았습니다.</div>${stale?`<div class="hint" style="color:var(--gold)">⚠ ${esc(hubT('attrule.monthly_stale','저장된 지각·조퇴와 지금 기준이 다른 날이 {n}일 있어요. 화면 숫자는 지금 기준이고, 저장값은 「이 달 다시 계산」을 눌러야 맞춰져요.',{n:stale}))}</div>`:''}${model.employees.length?`<div class="tblwrap"><table class="att-monthly-table"><tr>${heads.map(h=>`<th>${esc(h)}</th>`).join('')}</tr>${model.employees.map((p,i)=>`<tr><td>${esc(p.name)}${p.dept?`<div class="sub">${esc(p.dept)}</div>`:''}</td>${rules?`<td>${attGroupSelectHtml(p)}</td>`:''}${attMonthlySummaryCells(p.summary).map(v=>`<td>${esc(v)}</td>`).join('')}<td><button class="mini" onclick="openAttMonthlyPerson(${i})">확인용 보기</button></td></tr>`).join('')}</table></div>`:'<div class="empty">직원 자료가 없습니다.</div>'}<div class="hint">기록이 없는 날을 결근으로 판정하지 않습니다. 지각·조퇴·연장은 저장된 판정 분이고 시급 지급액은 별도 시급제 화면에서 확인합니다. ${esc(hubT('attrule.monthly_holiday_note','휴일근무 = 법정공휴일만(주말·근무표 휴무는 휴일근무가 아님).'))}</div>`;
 }
 async function loadAttMonthly(){
-  if(ME.role!=='owner')return null;
+  if(!attMonthlyAllowed())return null;
   const month=$('#attMonthlyMonth')?.value,box=$('#attMonthlyResult'),button=$('#attMonthlyExport');if(!box)return null;
   const request=++ATT_MONTHLY_REQUEST;ATT_MONTHLY_LAST=null;hide('attMonthlyMask');if(button)button.disabled=true;box.innerHTML='<div class="hint">월 자료를 읽는 중…</div>';
-  try{const model=await fetchAttMonthlyData(month);if(request!==ATT_MONTHLY_REQUEST||ME.role!=='owner'||$('#attMonthlyResult')!==box||$('#attMonthlyMonth')?.value!==month)return null;ATT_MONTHLY_LAST=model;box.innerHTML=attMonthlyRowsHtml(model);if(button)button.disabled=!model.employees.length;return model;}
+  try{const model=await fetchAttMonthlyData(month);if(request!==ATT_MONTHLY_REQUEST||!attMonthlyAllowed()||$('#attMonthlyResult')!==box||$('#attMonthlyMonth')?.value!==month)return null;ATT_MONTHLY_LAST=model;box.innerHTML=attMonthlyRowsHtml(model);if(button)button.disabled=!model.employees.length;return model;}
   catch(error){if(request!==ATT_MONTHLY_REQUEST||$('#attMonthlyResult')!==box)return null;box.innerHTML=`<div class="cal-error">월 요약을 불러오지 못했습니다: ${esc(error.message||String(error))}</div>`;return null;}
 }
-function attMonthlyPersonHtml(model,index){
-  const p=model.employees[index];if(!p)return '';const s=p.summary;
-  const heads=['날짜','출근','퇴근','지각(분)','조퇴(분)','연장(분)','휴일 구간(분)','기준'];
-  return `<div class="att-monthly-sheet"><h2>월 근태 확인용 자료</h2><p><b>${esc(p.name)}</b> · ${esc(p.dept)} · ${esc(model.month)}<br>월 마감 상태: ${esc(model.status)}</p><table><tr><th>기록일 / 출퇴근 완료일</th><th>지각 횟수 / 분</th><th>조퇴 횟수 / 분</th><th>연장(저녁 포함)</th></tr><tr><td>${s.recordedDays} / ${s.workedDays}</td><td>${s.lateCount}회 / ${s.lateMinutes}분</td><td>${s.earlyCount}회 / ${s.earlyMinutes}분</td><td>${s.overtimeMinutes}분</td></tr></table><p class="hint">시각 검토 ${s.clockReviewDays}일 · 수기 대기 ${s.pendingManualDays}일 · 승인 보정 ${s.adjustedDays}일</p><table><tr>${heads.map(h=>`<th>${esc(h)}</th>`).join('')}</tr>${p.days.length?p.days.map(d=>`<tr><td>${esc(d.date)}</td><td>${esc(d.clockIn||'-')}</td><td>${esc(d.clockOut||'-')}</td><td>${d.lateMinutes}</td><td>${d.earlyMinutes}</td><td>${d.overtimeMinutes}</td><td>${d.holidayMinutes}</td><td>${esc(d.basis)}${d.needsClockReview?' · 시각 검토':''}</td></tr>`).join(''):'<tr><td colspan="8">저장된 출퇴근 기록 없음</td></tr>'}</table><p class="hint">출퇴근 시각 구간 합계 ${s.clockSpanMinutes}분 · 휴일 시각 구간 ${s.holidayMinutes}분 (휴게시간 미차감). 지각·조퇴·연장은 저장된 판정 분입니다. 수기 대기는 합계에서 제외하며 기록이 없는 날은 결근으로 확정하지 않습니다. 이 자료는 확인용 조회·출력이며 급여나 근태를 새로 확정하지 않습니다.</p></div>`;
+function attMonthlyPersonHtml(model,index,opts={}){
+  const p=model.employees[index];if(!p)return '';const s=p.summary,hasRules=p.group!==undefined,edit=!!opts.edit&&hasRules&&model.status!=='확정';
+  const heads=['날짜','출근','퇴근','지각(분)','조퇴(분)','연장(분)','휴일 구간(분)','기준'],markOpts=Object.entries(ATT_MARKS).map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join('');
+  const dayCtl=d=>{
+    const mine=(p.marks||[]).filter(m=>m.date===d.date),chips=mine.map(m=>`<span class="b wait">${esc(ATT_MARKS[m.mark]||m.mark)} <button class="mini" onclick="removeAttMark(${Number(m.id)},${index})">✕</button></span>`).join(' ');
+    return `<td class="att-mark-ctl">${chips} <select class="mini" id="attMarkSel_${index}_${esc(d.date)}"><option value="">표시…</option>${markOpts}</select> <button class="mini" onclick="addAttMark(${index},'${esc(d.date)}')">추가</button></td>`;
+  };
+  const leaveLines=(p.leaves||[]).map(l=>`${esc(l.from)}${l.to!==l.from?'~'+esc(l.to):''} ${esc(l.type)}${l.note?' ('+esc(l.note)+')':''}${l.days!=null?' '+esc(l.days)+'일':''}`),markLines=(p.marks||[]).map(m=>`${esc(m.date)} ${esc(ATT_MARKS[m.mark]||m.mark)}${m.note?' ('+esc(m.note)+')':''}${edit?` <button class="mini att-mark-ctl" onclick="removeAttMark(${Number(m.id)},${index})">✕</button>`:''}`);
+  const ruleBlock=hasRules?`<p class="hint">${esc(hubT('attrule.group_label','근무조'))} ${esc(attGroupName(p.group))} · ${esc(hubT('attrule.group_cut_label','지각 기준'))} ${esc(p.lateCut)} · 연차 ${esc(s.annualDays)}일 · 반차 ${esc(s.halfDays)}회</p><p class="hint">승인 휴가: ${leaveLines.length?leaveLines.join(' / '):'없음'}<br>관리자 표시: ${markLines.length?markLines.join(' / '):'없음'}</p>${edit?`<div class="rowflex att-mark-ctl"><label>날짜 <input type="date" id="attMarkDate_${index}" min="${esc(model.month)}-01" max="${esc(model.month)}-31"></label> <select class="mini" id="attMarkDateSel_${index}"><option value="">표시…</option>${markOpts}</select> <button class="mini" onclick="addAttMark(${index})">표시 추가</button></div>`:''}`:'';
+  return `<div class="att-monthly-sheet"><h2>월 근태 확인용 자료</h2><p><b>${esc(p.name)}</b> · ${esc(p.dept)} · ${esc(model.month)}<br>월 마감 상태: ${esc(model.status)}</p><table><tr><th>기록일 / 출퇴근 완료일</th><th>지각 횟수 / 분</th><th>조퇴 횟수 / 분</th><th>연장(저녁 포함)</th></tr><tr><td>${s.recordedDays} / ${s.workedDays}</td><td>${s.lateCount}회 / ${s.lateMinutes}분</td><td>${s.earlyCount}회 / ${s.earlyMinutes}분</td><td>${s.overtimeMinutes}분</td></tr></table><p class="hint">시각 검토 ${s.clockReviewDays}일 · 수기 대기 ${s.pendingManualDays}일 · 승인 보정 ${s.adjustedDays}일</p>${ruleBlock}<table><tr>${heads.map(h=>`<th>${esc(h)}</th>`).join('')}${edit?'<th class="att-mark-ctl">관리자 표시</th>':''}</tr>${p.days.length?p.days.map(d=>`<tr><td>${esc(d.date)}</td><td>${esc(d.clockIn||'-')}</td><td>${esc(d.clockOut||'-')}</td><td>${d.lateMinutes}</td><td>${d.earlyMinutes}</td><td>${d.overtimeMinutes}</td><td>${d.holidayMinutes}</td><td>${esc(d.basis)}${d.needsClockReview?' · 시각 검토':''}</td>${edit?dayCtl(d):''}</tr>`).join(''):`<tr><td colspan="${edit?9:8}">저장된 출퇴근 기록 없음</td></tr>`}</table><p class="hint">출퇴근 시각 구간 합계 ${s.clockSpanMinutes}분 · 휴일 시각 구간 ${s.holidayMinutes}분 (휴게시간 미차감). 지각·조퇴·연장은 저장된 판정 분입니다. 수기 대기는 합계에서 제외하며 기록이 없는 날은 결근으로 확정하지 않습니다. 이 자료는 확인용 조회·출력이며 급여나 근태를 새로 확정하지 않습니다.</p></div>`;
 }
-function openAttMonthlyPerson(index){if(ME.role!=='owner'||!ATT_MONTHLY_LAST||ATT_MONTHLY_LAST.month!==$('#attMonthlyMonth')?.value)return;const html=attMonthlyPersonHtml(ATT_MONTHLY_LAST,index);if(!html)return;$('#attMonthlyPersonBody').innerHTML=html;show('attMonthlyMask');}
-function printAttMonthlyPerson(){if(ME.role!=='owner'||!ATT_MONTHLY_LAST||ATT_MONTHLY_LAST.month!==$('#attMonthlyMonth')?.value)return;document.body.classList.add('att-monthly-printing');const done=()=>{document.body.classList.remove('att-monthly-printing');window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);window.print();}
+function openAttMonthlyPerson(index){if(!attMonthlyAllowed()||!ATT_MONTHLY_LAST||ATT_MONTHLY_LAST.month!==$('#attMonthlyMonth')?.value)return;const html=attMonthlyPersonHtml(ATT_MONTHLY_LAST,index,{edit:true});if(!html)return;$('#attMonthlyPersonBody').innerHTML=html;show('attMonthlyMask');}
+function printAttMonthlyPerson(){if(!attMonthlyAllowed()||!ATT_MONTHLY_LAST||ATT_MONTHLY_LAST.month!==$('#attMonthlyMonth')?.value)return;document.body.classList.add('att-monthly-printing');const done=()=>{document.body.classList.remove('att-monthly-printing');window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);window.print();}
 function attMonthlyExportModel(model){
-  const summaryHead=['직원','부서','기록일','출퇴근 완료일','지각(회)','지각(분)','조퇴(회)','조퇴(분)','연장(분,저녁 포함)','휴일 시각 구간(분)','출퇴근 시각 구간(분)','시각 검토일','수기 대기일','승인 보정일'];
-  const summaries=model.employees.map(p=>{const s=p.summary;return [p.name,p.dept,s.recordedDays,s.workedDays,s.lateCount,s.lateMinutes,s.earlyCount,s.earlyMinutes,s.overtimeMinutes,s.holidayMinutes,s.clockSpanMinutes,s.clockReviewDays,s.pendingManualDays,s.adjustedDays];});
-  const details=model.employees.flatMap(p=>p.days.map(d=>[p.name,p.dept,d.date,d.clockIn,d.clockOut,d.lateMinutes,d.earlyMinutes,d.overtimeMinutes,d.holidayMinutes,d.clockSpanMinutes,d.basis,d.needsClockReview?'시각 검토':'']));
-  return {filename:`월근태요약_${model.month}.xlsx`,sheets:[{name:'기준',rows:[['항목','값'],['조회 월',model.month],['월 마감 상태',model.status],['집계 근거','지문·확정 수기·승인 보정'],['연장','저장 연장 분과 일치하는 확정 저녁 분'],['시각 구간','출퇴근 차이; 휴게시간 미차감'],['수기 대기','합계 제외; 날짜별 별도 표시'],['미기록','결근으로 자동 판정하지 않음'],['용도','확인용 조회 자료; 급여·근태 신규 확정 없음']]},{name:'직원별요약',rows:[summaryHead,...summaries]},{name:'일별근거',rows:[['직원','부서','날짜','출근','퇴근','지각(분)','조퇴(분)','연장(분)','휴일 시각 구간(분)','출퇴근 시각 구간(분)','기준','검토'],...details]}]};
+  const summaryHead=['직원','부서','기록일','출퇴근 완료일','지각(회)','지각(분)','조퇴(회)','조퇴(분)','연장(분,저녁 포함)','휴일 시각 구간(분)','출퇴근 시각 구간(분)','시각 검토일','수기 대기일','승인 보정일','근무조','연차(일)','반차(회)'];
+  const summaries=model.employees.map(p=>{const s=p.summary;return [p.name,p.dept,s.recordedDays,s.workedDays,s.lateCount,s.lateMinutes,s.earlyCount,s.earlyMinutes,s.overtimeMinutes,s.holidayMinutes,s.clockSpanMinutes,s.clockReviewDays,s.pendingManualDays,s.adjustedDays,p.group??'',s.annualDays??0,s.halfDays??0];});
+  const blank=['','','','','','',''],extraRows=p=>[...(p.leaves||[]).map(l=>[p.name,p.dept,l.from+(l.to!==l.from?'~'+l.to:''),...blank,'승인 휴가: '+l.type+(l.note?' ('+l.note+')':'')+(l.days!=null?' '+l.days+'일':''),'']),...(p.marks||[]).map(m=>[p.name,p.dept,m.date,...blank,'관리자 표시: '+(ATT_MARKS[m.mark]||m.mark)+(m.note?' ('+m.note+')':''),''])];
+  const details=model.employees.flatMap(p=>[...p.days.map(d=>[p.name,p.dept,d.date,d.clockIn,d.clockOut,d.lateMinutes,d.earlyMinutes,d.overtimeMinutes,d.holidayMinutes,d.clockSpanMinutes,d.basis,d.needsClockReview?'시각 검토':'']),...extraRows(p)]);
+  return {filename:`월근태요약_${model.month}.xlsx`,sheets:[{name:'기준',rows:[['항목','값'],['조회 월',model.month],['월 마감 상태',model.status],['집계 근거','지문·확정 수기·승인 보정'],['연장','저장 연장 분과 일치하는 확정 저녁 분'],['시각 구간','출퇴근 차이; 휴게시간 미차감'],['수기 대기','합계 제외; 날짜별 별도 표시'],['미기록','결근으로 자동 판정하지 않음'],['용도','확인용 조회 자료; 급여·근태 신규 확정 없음'],['휴일근무','법정공휴일만(주말·근무표 휴무 제외)'],['연차·반차','승인 휴가 + 관리자 표시, 같은 날 겹치면 한 번'],['지각 기준','근무조별(허브 설정 › 근태 기준) · 연차·반차·관리자 표시 날은 해당 지각·조퇴 0']]},{name:'직원별요약',rows:[summaryHead,...summaries]},{name:'일별근거',rows:[['직원','부서','날짜','출근','퇴근','지각(분)','조퇴(분)','연장(분)','휴일 시각 구간(분)','출퇴근 시각 구간(분)','기준','검토'],...details]}]};
 }
-async function exportAttMonthly(){const model=await loadAttMonthly();if(!model||!model.employees.length||ME.role!=='owner')return;const x=attMonthlyExportModel(model),book=XLSX.utils.book_new();x.sheets.forEach(s=>XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet(s.rows),s.name));XLSX.writeFile(book,x.filename);}
+async function exportAttMonthly(){const model=await loadAttMonthly();if(!model||!model.employees.length||!attMonthlyAllowed())return;const x=attMonthlyExportModel(model),book=XLSX.utils.book_new();x.sheets.forEach(s=>XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet(s.rows),s.name));XLSX.writeFile(book,x.filename);}
+/* ── 근태 규칙 동작: 근무조 바꾸기 · 관리자 표시 · 이 달 다시 계산 · 월 마감 결재 · 수정 기록(원장) ── */
+const ATT_STEPS=[['manager_check','manager','매니저확인'],['chief_check','chief','실장확인'],['owner_confirm','owner','확정']];
+const ATT_STATUS_ORDER={'집계중':0,'매니저확인':1,'실장확인':2,'확정':3};
+let ATT_CLOSE_REQUEST=0;
+function attMonthKey(date){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit'}).format(date||new Date());}
+/* 월 마감 달 기본값: 오늘이 10일 이하면 지난달, 아니면 이번 달 */
+function attCloseDefaultMonth(now){
+  const d=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now||new Date()),[y,m,day]=d.split('-').map(Number);
+  if(day>10)return `${y}-${String(m).padStart(2,'0')}`;
+  return m===1?`${y-1}-12`:`${y}-${String(m-1).padStart(2,'0')}`;
+}
+async function changeAttShiftGroup(userId,value){
+  if(!attMonthlyAllowed())return false;
+  const g=value||null,{error}=await sb.rpc('att_set_shift_group',{p_user:userId,p_group:g});
+  if(error){alert(hubT('attrule.group_fail','근무조를 바꾸지 못했습니다: {msg}',{msg:error.message||String(error)}));await loadAttMonthly();return false;}
+  const p=(PROFILES||[]).find(x=>(x.user_id||x.id)===userId);if(p)p.att_shift_group=g;
+  setStatus('saved');await loadAttMonthly();return true;
+}
+async function reloadAttMonthlyPerson(index,userId){await loadAttMonthly();const i=ATT_MONTHLY_LAST?ATT_MONTHLY_LAST.employees.findIndex(e=>e.userId===userId):-1;if(i>=0)openAttMonthlyPerson(i);}
+async function addAttMark(index,date){
+  const p=ATT_MONTHLY_LAST&&ATT_MONTHLY_LAST.employees[index];if(!attMonthlyAllowed()||!p)return false;
+  const mark=$('#'+(date?`attMarkSel_${index}_${date}`:`attMarkDateSel_${index}`))?.value,day=date||$('#attMarkDate_'+index)?.value;
+  if(!mark||!day){alert(hubT('attrule.mark_pick','날짜와 표시를 골라 주세요.'));return false;}
+  const {error}=await sb.rpc('att_mark_add',{p_user:p.userId,p_date:day,p_mark:mark,p_note:null});
+  if(error){alert(hubT('attrule.mark_fail','관리자 표시를 저장하지 못했습니다: {msg}',{msg:error.message||String(error)}));return false;}
+  setStatus('saved');await reloadAttMonthlyPerson(index,p.userId);return true;
+}
+async function removeAttMark(id,index){
+  const p=ATT_MONTHLY_LAST&&ATT_MONTHLY_LAST.employees[index];if(!attMonthlyAllowed()||!p)return false;
+  const {error}=await sb.rpc('att_mark_remove',{p_id:id});
+  if(error){alert(hubT('attrule.mark_fail','관리자 표시를 저장하지 못했습니다: {msg}',{msg:error.message||String(error)}));return false;}
+  setStatus('saved');await reloadAttMonthlyPerson(index,p.userId);return true;
+}
+/* 이 달 다시 계산: 지문(source='fp') 줄의 지각·조퇴·연장을 지금 설정·근무조·반차·관리자 표시로 다시 계산해 저장(지문 시각·수기 줄은 그대로) */
+async function attRecalcMonth(month){
+  if(!attMonthlyAllowed())throw new Error(hubT('attrule.need_mgr','매니저·실장·원장만 쓸 수 있습니다.'));
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month||''))throw new Error('조회할 월을 확인하세요.');
+  const {start,next}=attendanceMonthBounds(month),end=new Date(Date.parse(next+'T00:00:00Z')-86400000).toISOString().slice(0,10);
+  const state=await sb.from('att_months').select('status').eq('month',month).maybeSingle();
+  if(state.error)throw new Error(state.error.message||String(state.error));
+  if(state.data&&state.data.status==='확정')throw new Error(hubT('attrule.recalc_final','원장 확정된 달은 다시 계산할 수 없습니다. 원장이 「되돌리기」를 한 뒤 다시 계산하세요.'));
+  const [att,data]=await Promise.all([
+    fetchAttendancePages(()=>sb.from('attendance').select('user_id,work_date,clock_in,clock_out,source,late_min,early_min,overtime_min,evening,is_holiday').eq('source','fp').gte('work_date',start).lt('work_date',next).order('work_date',{ascending:true}).order('user_id',{ascending:true})),
+    loadAttRuleData(start,end)
+  ]);
+  if(att.error)throw new Error(att.error.message||String(att.error));
+  if((att.data||[]).length>=10000)throw new Error('월 자료가 조회 상한에 도달해 다시 계산하지 못했습니다.');
+  const leaveMap=attLeaveMap(data.leaves),markMap=attMarkMap(data.marks),changes=[],payload=[];
+  for(const r of att.data||[]){
+    const p=(PROFILES||[]).find(x=>(x.user_id||x.id)===r.user_id)||{},group=attShiftGroupOf({...p,user_id:r.user_id},data.hourlyIds),flags=attDayFlags(r.user_id,r.work_date,leaveMap,markMap);
+    const c=attCalcDay({ci:timeToMin(r.clock_in),co:timeToMin(r.clock_out),ds:r.work_date,evening:!!r.evening,group,flags}),from={late:Number(r.late_min)||0,early:Number(r.early_min)||0,ot:Number(r.overtime_min)||0};
+    if(c.late!==from.late||c.early!==from.early||c.ot!==from.ot){changes.push({user_id:r.user_id,date:r.work_date,group,from,to:c});payload.push({...r,late_min:c.late,early_min:c.early,overtime_min:c.ot});}
+  }
+  for(let i=0;i<payload.length;i+=200){
+    const {error}=await sb.from('attendance').upsert(payload.slice(i,i+200),{onConflict:'user_id,work_date'});
+    if(error)throw new Error(error.message||String(error));
+  }
+  let logError='';
+  const log=await sb.rpc('att_log_recalc',{p_month:month,p_total:(att.data||[]).length,p_changed:changes.length,p_detail:{sample:changes.slice(0,100)}});
+  if(log.error)logError=log.error.message||String(log.error);
+  return {month,total:(att.data||[]).length,changed:changes.length,changes,logError};
+}
+async function runAttRecalc(){
+  const month=$('#attCloseMonth')?.value,box=$('#attRecalcMsg');if(!month||!box)return null;
+  if(!confirm(hubT('attrule.recalc_confirm','{month} 지문 기록의 지각·조퇴·연장을 지금 설정·근무조·반차·관리자 표시로 다시 계산해 저장할까요? (지문 시각은 그대로, 수기 기록은 건드리지 않음)',{month})))return null;
+  box.textContent=hubT('attrule.recalc_busy','계산 중…');
+  try{const r=await attRecalcMonth(month);box.textContent=hubT('attrule.recalc_done','{total}줄 중 {changed}줄이 바뀌었습니다.',{total:r.total,changed:r.changed})+(r.logError?' '+hubT('attrule.recalc_log_fail','(수정 기록 저장 실패: {msg})',{msg:r.logError}):'');setStatus('saved');return r;}
+  catch(e){box.textContent=hubT('attrule.recalc_fail','다시 계산하지 못했습니다: {msg}',{msg:e.message||String(e)});return null;}
+}
+/* 월 마감 결재 카드(달 선택 · 단계 단추 · 다시 계산) */
+function attCloseCardHtml(){
+  if(!attMonthlyAllowed())return '';
+  return `<div class="card" id="attCloseCard"><h2>${esc(hubT('attrule.close_title','✅ 월 마감 결재'))}</h2><div class="rowflex"><label>${esc(hubT('attrule.close_month','달'))} <input type="month" id="attCloseMonth" value="${esc(attCloseDefaultMonth())}" onchange="loadAttClose()"></label></div><div id="attCloseBox"></div><div class="rowflex"><button class="mini" onclick="runAttRecalc()">${esc(hubT('attrule.recalc_btn','🔁 이 달 다시 계산'))}</button><span class="hint" id="attRecalcMsg"></span></div><div class="hint">${esc(hubT('attrule.close_hint','순서: 매니저 확인 → 실장 확인 → 원장 확정. 앞 단계가 끝나야 다음 단추가 눌려요. 원장은 「되돌리기」로 한 단계씩 풀 수 있어요.'))}</div></div>`;
+}
+function attCloseStateHtml(month,row){
+  const status=row&&row.status?row.status:'집계중',order=ATT_STATUS_ORDER[status]??0,names={manager_check:hubT('attrule.step_manager','매니저 확인'),chief_check:hubT('attrule.step_chief','실장 확인'),owner_confirm:hubT('attrule.step_owner','원장 확정')};
+  const who=[[row&&row.manager_checked_by,row&&row.manager_checked_at],[row&&row.chief_checked_by,row&&row.chief_checked_at],[row&&row.closed_by,row&&row.closed_at]];
+  const stages=ATT_STEPS.map(([action,role,after],i)=>{
+    const done=order>=i+1,can=!done&&order===i&&ME.role===role,w=who[i];
+    return `<span style="margin-right:10px">${done?'✅':'⬜'} <button class="mini${done?'':' stamp'}" ${can?'':'disabled'} onclick="attCloseStep('${action}')">${esc(names[action])}</button>${done&&w[0]?` <span class="sub">${esc(w[0])}${w[1]?' · '+esc(hubFmtDate(w[1])):''}</span>`:''}</span>`;
+  }).join('');
+  const revert=ME.role==='owner'&&order>0?`<button class="mini rej" onclick="attCloseStep('revert')">${esc(hubT('attrule.step_revert','되돌리기'))}</button>`:'';
+  return `<div class="sub">${esc(hubT('attrule.close_state','상태:'))} <b class="${status==='확정'?'':'b wait'}">${esc(row&&row.status?row.status:hubT('att.close.state_none','미집계'))}</b></div><div class="rowflex" style="margin:6px 0">${stages}${revert}</div>`;
+}
+async function loadAttClose(){
+  const month=$('#attCloseMonth')?.value,box=$('#attCloseBox');if(!month||!box)return null;
+  const request=++ATT_CLOSE_REQUEST,{data,error}=await sb.from('att_months').select('*').eq('month',month).maybeSingle();
+  if(request!==ATT_CLOSE_REQUEST||$('#attCloseMonth')?.value!==month)return null;
+  if(error){box.innerHTML=`<div class="cal-error">${esc(error.message||String(error))}</div>`;return null;}
+  box.innerHTML=attCloseStateHtml(month,data);return data;
+}
+async function attCloseStep(action){
+  const month=$('#attCloseMonth')?.value;if(!month||!attMonthlyAllowed())return false;
+  const label={manager_check:hubT('attrule.step_manager','매니저 확인'),chief_check:hubT('attrule.step_chief','실장 확인'),owner_confirm:hubT('attrule.step_owner','원장 확정'),revert:hubT('attrule.step_revert','되돌리기')}[action];
+  const ask=action==='owner_confirm'?hubT('att.close.confirm','{month} 근태를 확정할까요? (이후 수정은 소명/정정으로)',{month}):hubT('attrule.step_confirm','{month} 근태를 「{step}」 처리할까요?',{month,step:label});
+  if(!confirm(ask))return false;
+  const {error}=await sb.rpc('att_month_step',{p_month:month,p_action:action});
+  if(error){alert(hubT('attrule.step_fail','처리하지 못했습니다: {msg}',{msg:error.message||String(error)}));await loadAttClose();return false;}
+  setStatus('saved');await loadAttClose();if(typeof loadAttEditLog==='function')await loadAttEditLog();return true;
+}
+/* 근태 수정 기록(원장만) — 이번 달·지난달 */
+function attEditLogCardHtml(){
+  if(ME.role!=='owner')return '';
+  return `<div class="card" id="attEditLogCard"><h2>${esc(hubT('attrule.log_title','🧾 근태 수정 기록'))} <span class="sub">${esc(hubT('attrule.log_sub','(이번 달·지난달)'))}</span></h2><div id="attEditLogBox"><div class="hint">…</div></div></div>`;
+}
+function attEditLogRowText(r){
+  const d=r.detail||{},mark=k=>ATT_MARKS[k]||k,person=nameOf(r.user_id);
+  switch(r.action){
+    case 'mark_add':return hubT('attrule.log_mark_add','{who} 표시 추가 — {date} {name} · {mark}',{who:r.actor_name||'',date:r.work_date||'',name:person,mark:mark(d.mark)});
+    case 'mark_remove':return hubT('attrule.log_mark_remove','{who} 표시 삭제 — {date} {name} · {mark}',{who:r.actor_name||'',date:r.work_date||'',name:person,mark:mark(d.mark)});
+    case 'group_change':return hubT('attrule.log_group_change','{who} 근무조 변경 — {name} · {from} → {to}',{who:r.actor_name||'',name:person,from:d.from||'자동',to:d.to||'자동'});
+    case 'recalc':return hubT('attrule.log_recalc','{who} 이 달 다시 계산 — {month} · {total}줄 중 {changed}줄 바뀜',{who:r.actor_name||'',month:r.month||'',total:d.total??'',changed:d.changed??''});
+    case 'month_step':return hubT('attrule.log_month_step','{who} 월 마감 {action} — {month} · {from} → {to}',{who:r.actor_name||'',action:{manager_check:'매니저 확인',chief_check:'실장 확인',owner_confirm:'원장 확정',revert:'되돌리기'}[d.action]||d.action||'',month:r.month||'',from:d.from||'',to:d.to||''});
+    default:return String(r.action||'');
+  }
+}
+async function loadAttEditLog(now){
+  const box=$('#attEditLogBox');if(!box||ME.role!=='owner')return null;
+  const cur=attMonthKey(now),[y,m]=cur.split('-').map(Number),since=(m===1?`${y-1}-12`:`${y}-${String(m-1).padStart(2,'0')}`)+'-01T00:00:00+09:00';
+  const {data,error}=await sb.from('attendance_edit_log').select('*').gte('created_at',since).order('created_at',{ascending:false}).limit(200);
+  if(error){box.innerHTML=`<div class="cal-error">${esc(error.message||String(error))}</div>`;return null;}
+  box.innerHTML=(data||[]).length?`<div class="tblwrap"><table><tr><th>${esc(hubT('attrule.log_th_when','언제'))}</th><th>${esc(hubT('attrule.log_th_role','역할'))}</th><th>${esc(hubT('attrule.log_th_what','무엇을'))}</th></tr>${data.map(r=>`<tr><td>${esc(hubFmtDateTime(r.created_at))}</td><td>${esc(r.actor_role||'')}</td><td>${esc(attEditLogRowText(r))}</td></tr>`).join('')}</table></div>`:`<div class="empty">${esc(hubT('attrule.log_empty','수정 기록 없음'))}</div>`;
+  return data;
+}
 /* attendance-monthly-summary:end */
 async function renderAtt(m){
   const month=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit'}).format(new Date()),bounds=attendanceMonthBounds(month);
@@ -1592,9 +1866,9 @@ async function renderAtt(m){
       <p class="sub">${esc(hubT('att.close.hint','지문인식기 엑셀(.xls/.xlsx)을 올리면 출근·퇴근·지각·연장을 자동 판정합니다. (하루 최초 인식=출근, 최후=퇴근)'))}</p>
       <div style="margin:10px 0"><input type="file" id="xlFile" accept=".xls,.xlsx" onchange="parseXls(event)"></div>
       <div class="sub">${esc(hubT('att.close.state','이번 달 상태:'))} <b class="${mrow&&mrow.status==='확정'?'':'b wait'}">${mrow?mrow.status:esc(hubT('att.close.state_none','미집계'))}</b>
-        ${ME.role==='owner'?`<button class="mini" style="margin-left:8px" onclick="closeMonth('${month}')">${esc(hubT('att.close.btn','이번 달 확정'))}</button>`:''}</div>
+        </div>
     </div>
-    ${attMonthlyCardHtml()}
+    ${attMonthlyCardHtml()}${attCloseCardHtml()}${attEditLogCardHtml()}
     ${manualAttendanceFormHtml(manualRows||[])}
     ${manualWeekCard()}
     <div class="card"><h2>${esc(hubT('att.resol.title','🧾 지문 오류 승인 인정 근태'))} <span class="sub">(${month})</span></h2>${(issueResolutions||[]).length?`<div class="tblwrap"><table><tr><th>${esc(hubT('att.th.person','직원'))}</th><th>${esc(hubT('att.th.date','날짜'))}</th><th>${esc(hubT('att.resol.th_time','인정 출퇴근'))}</th><th>${esc(hubT('att.th.status','상태'))}</th><th>${esc(hubT('att.resol.th_at','승인일'))}</th></tr>${issueResolutions.map(r=>`<tr><td>${esc(nameOf(r.user_id))}</td><td>${md(r.work_date)}</td><td>${esc(hubFmtTime(r.clock_in)||'-')} ~ ${esc(hubFmtTime(r.clock_out)||'-')}</td><td>${r.late_min||0}분 / ${r.early_min||0}분 / ${r.overtime_min||0}분</td><td>${r.approved_at?esc(hubFmtDate(r.approved_at)):'-'}</td></tr>`).join('')}</table></div>`:'<div class="empty">'+esc(hubT('att.resol.empty','별도 인정 근태 없음'))+'</div>'}</div>
@@ -1608,6 +1882,7 @@ async function renderAtt(m){
       ${(iss||[]).length?`<div class="tblwrap att-issue-wrap"><table class="att-issue-table"><tr><th>${esc(hubT('att.th.person','직원'))}</th><th>${esc(hubT('att.th.date','날짜'))}</th><th>${esc(hubT('att.issue.th_type','유형'))}</th><th>${esc(hubT('att.issue.th_reason','사유'))}</th><th>${esc(hubT('att.issue.admin_evidence','증거'))}</th><th>${esc(hubT('att.th.status','상태'))}</th><th></th></tr>
       ${(iss||[]).map(i=>{const files=ATT_ISSUE_EVIDENCE[Number(i.id)]||[],evidenceFailed=ATT_ISSUE_EVIDENCE_FAILED_IDS.has(Number(i.id)),waiting=attendanceIssueIsAuto(i)&&!i.staff_responded_at;const kind=attendanceIssueIsAuto(i)?hubT(i.type==='종업누락'?'att.issue.auto_clock_out':'att.issue.auto_clock_in',i.type==='종업누락'?'퇴근 지문 없음(자동 감지)':'출근 지문 없음(자동 감지)')+(i.rule_label&&i.rule_label!==String.fromCharCode(51088,46041)?String.fromCharCode(183)+attendanceIssueDisplayKind(i):''):attendanceIssueDisplayKind(i),reason=attendanceIssueStaffReason(i);return `<tr><td>${esc(nameOf(i.user_id))}</td><td>${md(i.work_date)}</td><td>${esc(kind)}</td><td>${reason?esc(reason):waiting?`<span class="b wait">${esc(hubT('att.issue.awaiting_staff','직원 답 기다림'))}</span>`:'-'}</td><td>${ME.role==='chief'||ME.role==='owner'?evidenceFailed?esc(hubT('att.issue.evidence_load_fail','증거 파일 조회 실패')):files.length?`<button class="mini" onclick="openAttendanceIssueEvidence(${Number(i.id)})">${esc(hubT('att.issue.evidence_count','📎 {n}',{n:files.length}))}</button>`:hubN('att.issue.evidence_required',1)?`<span class="b no">${esc(hubT('att.issue.evidence_none','증거 없음'))}</span>`:'-':'-'}</td><td><span class="b ${i.status==='원장확정'?'ok':(i.status==='반려'?'no':'wait')}">${esc(i.status)}</span></td><td>${issueBtns(i)}</td></tr>`;}).join('')}</table></div>`:'<div class="empty">'+esc(hubT('att.issue.empty','소명 없음'))+'</div>'}
     </div>${attendanceIssueMyCardHtml(myIssueRows||[],ME.role==='owner'?[]:await fetchStaffAttDiff())}`;
+    await loadAttClose();await loadAttEditLog();
   } else {
     const {data:att}=await sb.from('attendance').select('*').eq('user_id',ME.id).gte('work_date',bounds.start).lt('work_date',bounds.next).order('work_date',{ascending:false});
     const {data:manualRows,error:manualError}=await sb.from('attendance_manual_entries').select('*').eq('user_id',ME.id).gte('work_date',bounds.start).lt('work_date',bounds.next).order('work_date',{ascending:false});
@@ -1653,10 +1928,6 @@ async function openIssue(idOrDate,mode='new'){
   let existingFiles=[];if(issue){const {data,error}=await sb.from('attendance_issue_evidence').select('*').eq('issue_id',issue.id).order('uploaded_at',{ascending:true});if(error){alert(hubT('att.issue.evidence_load_fail','증거 파일 조회 실패'));return;}existingFiles=data||[];}
   ATT_ISSUE_FORM={mode:issue?mode:'new',issue,existingFiles,presetDate,busy:false};
   $('#attIssueFormTitle').textContent=hubT('att.issueform.title','🙋 지문누락 소명');$('#attIssueFormBody').innerHTML=attendanceIssueFormHtml();$('#attIssueFormMsg').textContent='';$('#attIssueSaveBtn').textContent=hubT('att.issueform.btn_submit','저장');$('#attIssueSaveBtn').disabled=false;$('#attIssueCloseBtn').title=hubT('att.issueform.btn_cancel','닫기');show('attIssueMask');
-}
-async function closeMonth(month){
-  if(!confirm(hubT('att.close.confirm','{month} 근태를 확정할까요? (이후 수정은 소명/정정으로)',{month:month})))return;
-  await sb.from('att_months').upsert({month,status:'확정',closed_by:ME.name,closed_at:new Date().toISOString()},{onConflict:'month'});setStatus('saved');render();
 }
 async function checkAbsent(month){
   const el=$('#absentBox');el.innerHTML=esc(hubT('att.absent.loading','확인 중…'));
@@ -1913,6 +2184,8 @@ async function buildPreview(aoa){
     const prof=resolve(g.tok);
     return {tok:g.tok, user_id:prof?prof.user_id:null, name:prof?prof.name:g.tok, ds:g.ds, ci, co, evening:false, sched:null, single:g.times.length<2};
   }).sort((a,b)=>a.ds<b.ds?-1:1);
+  // 근무조·승인 휴가·관리자 표시 읽기(지각·조퇴 계산에 씀). 못 읽으면 기본 기준으로 계속하고 아래에 알림
+  if(xlRows.length){await loadAttRuleContext(xlRows[0].ds,xlRows[xlRows.length-1].ds);}
   // 근무표 연동: 야간·근무표 시프트 자동 반영
   try{
     const weeks=[...new Set(xlRows.map(r=>mondayStr(r.ds)))];
@@ -1923,7 +2196,7 @@ async function buildPreview(aoa){
     }
   }catch(e){}
   const um=[...unmapped];
-  $('#xlSummary').innerHTML=`${esc(hubT('att.xl.sum_a','총'))} <b>${xlRows.length}</b>${esc(hubT('att.xl.sum_b','행 · 직원 매핑'))} <b>${xlRows.filter(r=>r.user_id).length}</b> ${esc(hubT('att.xl.sum_c','/ 미매핑'))} <b style="color:var(--red)">${xlRows.filter(r=>!r.user_id).length}</b>`;
+  $('#xlSummary').innerHTML=`${esc(hubT('att.xl.sum_a','총'))} <b>${xlRows.length}</b>${esc(hubT('att.xl.sum_b','행 · 직원 매핑'))} <b>${xlRows.filter(r=>r.user_id).length}</b> ${esc(hubT('att.xl.sum_c','/ 미매핑'))} <b style="color:var(--red)">${xlRows.filter(r=>!r.user_id).length}</b>${ATT_RULE_CTX.error?` <span class="b no">${esc(hubT('attrule.xl_ctx_fail','시간제·휴가·관리자 표시를 못 읽어 그 반영 없이 계산했어요: {msg}',{msg:ATT_RULE_CTX.error}))}</span>`:''}`;
   $('#xlUnmapped').innerHTML=um.length?`<div class="hint" style="color:var(--gold)">⚠ ${esc(hubT('att.xl.unmapped_a','미매핑 (직원 명부에 없음):'))} ${um.map(f=>`<b>${esc(f)}</b> <select class="mini" onchange="mapToken('${esc(f)}',this.value)"><option value="">${esc(hubT('att.xl.map_pick','이 직원으로'))}</option>${PROFILES.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select>`).join(' &nbsp; ')}</div>`:'';
   renderXlTable();
   show('xlMask');
@@ -1934,14 +2207,8 @@ window.mapToken=async(tok,uid)=>{if(!uid)return;const prof=PROFILES.find(p=>p.us
   renderXlTable();buildUnmappedAfter();setStatus('saved');};
 function buildUnmappedAfter(){const um=[...new Set(xlRows.filter(r=>!r.user_id).map(r=>r.tok))];
   $('#xlUnmapped').innerHTML=um.length?`<div class="hint" style="color:var(--gold)">⚠ ${esc(hubT('att.xl.unmapped_b','미매핑:'))} ${um.map(f=>`<b>${esc(f)}</b> <select class="mini" onchange="mapToken('${esc(f)}',this.value)"><option value="">${esc(hubT('att.xl.map_pick','이 직원으로'))}</option>${PROFILES.map(p=>`<option value="${p.user_id}">${esc(p.name)}</option>`).join('')}</select>`).join(' &nbsp; ')}</div>`:'<div class="hint" style="color:var(--mint)">✓ '+esc(hubT('att.xl.all_mapped','전원 매핑됨'))+'</div>';}
-function calcRow(r){
-  const unit = parseInt(SETTINGS.ot_unit_min)||10;
-  const late = r.ci!=null ? Math.max(0, r.ci - toMin(SETTINGS.late_cut)) : 0;
-  let ot=0, early=0;
-  if(r.co!=null){const je=toMin(jongeop(r.ds,r.evening));
-    if(r.co>=je){ ot=Math.floor((r.co-je)/unit)*unit; } else { early=je-r.co; } // 정시보다 일찍=조퇴
-  }
-  return {late,ot,early};
+function calcRow(r){ // 지각은 직원 근무조 기준 · 연차·반차·관리자 표시 날은 해당 지각·조퇴 0 (attCalcDay 한 곳에서 계산)
+  return attCalcDay({ci:r.ci,co:r.co,ds:r.ds,evening:r.evening,group:r.user_id?attGroupForUser(r.user_id):'A',flags:r.user_id?attDayFlags(r.user_id,r.ds,ATT_RULE_CTX.leaveMap,ATT_RULE_CTX.markMap):null});
 }
 function renderXlTable(){
   $('#xlTable').innerHTML=`<tr><th>${esc(hubT('att.th.date','날짜'))}</th><th>${esc(hubT('att.th.person','직원'))}</th><th>${esc(hubT('att.xl.th_sched','근무표'))}</th><th>${esc(hubT('att.my.th_in','출근'))}</th><th>${esc(hubT('att.my.th_out','퇴근'))}</th><th>${esc(hubT('att.my.th_late','지각'))}</th><th>${esc(hubT('att.xl.th_early','조퇴'))}</th><th>${esc(hubT('att.my.th_ot','연장'))}</th><th>${esc(hubT('att.xl.th_evening','야간'))}</th><th>${esc(hubT('att.xl.th_note','비고'))}</th></tr>`+

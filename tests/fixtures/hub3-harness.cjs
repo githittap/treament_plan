@@ -212,7 +212,7 @@ async function renderAll(html,opts){
         await ctx.HubUi.load({from(){const api={select(){return api;},then(res,rej){return Promise.resolve(o.loadFail?{data:null,error:{message:'x'}}:{data:o.textRows,error:null}).then(res,rej);}};return api;}});
       }
     }else if(o.settings)Object.assign(ctx.SETTINGS,o.settings);
-    vm.runInContext(timeSrc+'\n'+helperSrc+'\n'+bigSrc+'\n;this.api={renderAtt,checkAbsent,issueBtns,issueAct,openIssue,closeMonth,reviewManualAttendance,manualAttendanceFormHtml,manualAttendanceDetailText,renderManualAttendanceDayDetail,submitManualAttendance,submitAttendanceIssueForm,saveAbsenceSettings,absenceSettingsHtml,attendanceIssueFormHtml,attendanceIssueMyCardHtml,openAttendanceIssueEvidence,openAttendanceIssueEvidenceFile,buildPreview,parseXls,saveAttendance,renderXlTable,'
+    vm.runInContext(timeSrc+'\n'+helperSrc+'\n'+bigSrc+'\n;this.api={renderAtt,checkAbsent,issueBtns,issueAct,openIssue,attCloseStep,reviewManualAttendance,manualAttendanceFormHtml,manualAttendanceDetailText,renderManualAttendanceDayDetail,submitManualAttendance,submitAttendanceIssueForm,saveAbsenceSettings,absenceSettingsHtml,attendanceIssueFormHtml,attendanceIssueMyCardHtml,openAttendanceIssueEvidence,openAttendanceIssueEvidenceFile,buildPreview,parseXls,saveAttendance,renderXlTable,'
       +'renderSched,renderScheduleMonth,scheduleRosterAdminCard,scheduleRoleCell,saveSchedulePerson,setSchedulePersonDepartment,setSchedulePersonIncluded,setSchedulePersonActive,copyPrevWeek,'
       +'renderEmployeeLeaveStatus,openLeaveBalanceEditor,updateLeaveBalancePreview,saveLeaveBalance,renderLeave,openLeaveForm,openLeaveEdit,openLeave,cancelPendingLeave,checkClash,submitLeave,leaveAct,cancelApprovedLeave,grantLeave,previewLeaveAccrual,applyLeaveAccrual,computeLeaveDays,leaveDisplayText,appStamp,'
       +'setState:(k,v)=>{if(k==="MANUAL_DETAIL_OPEN")MANUAL_DETAIL_OPEN=v;if(k==="SCHED_VIEW")SCHED_VIEW=v;if(k==="SCHED_WEEK")SCHED_WEEK=v;if(k==="SCHED_MONTH")SCHED_MONTH=v;if(k==="xlRows")xlRows=v;if(k==="LEAVE_EDIT_ID")LEAVE_EDIT_ID=v;if(k==="LEAVE_ARCHIVE_MONTH")LEAVE_ARCHIVE_MONTH=v;if(k==="ATT_ISSUE_FORM")ATT_ISSUE_FORM=v;if(k==="ATT_ISSUE_EVIDENCE")ATT_ISSUE_EVIDENCE=v;},getState:k=>k==="xlRows"?xlRows:undefined};'
@@ -269,7 +269,7 @@ async function renderAll(html,opts){
     r.ctx.__prompts=[null];await r.api.openIssue();
     const r2=await asMgr('chief',null,{rpc:{submit_attendance_issue:{error:null}}});
     r2.ctx.__prompts=['2026-09-30','기타','사유'];await r2.api.openIssue();
-    r2.ctx.__confirm=false;await r2.api.closeMonth('2026-10');
+    r2.dom.$('#attCloseMonth').value='2026-10';r2.ctx.__confirm=false;await r2.api.attCloseStep('owner_confirm');
     out['att.msgs.owner_chief_flows']=JSON.stringify([r.log,r2.log]);
   }
   {

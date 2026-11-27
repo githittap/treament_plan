@@ -905,7 +905,47 @@ function hubTextDefsChapter3(add){
   add('att.close.hint','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 마감 카드 설명','지문인식기 엑셀(.xls/.xlsx)을 올리면 출근·퇴근·지각·연장을 자동 판정합니다. (하루 최초 인식=출근, 최후=퇴근)');
   add('att.close.state','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 마감 카드 — 이번 달 상태 앞 글','이번 달 상태:');
   add('att.close.state_none','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 마감 카드 — 아직 집계 전일 때 상태 글','미집계');
-  add('att.close.btn','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 마감 카드 — 원장 전용 확정 단추','이번 달 확정');
+  add('attrule.group_a','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 근태 요약 — A조 이름','A조(진료실·데스크)');
+  add('attrule.group_b','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 근태 요약 — B조 이름','B조(기공·행정·실장)');
+  add('attrule.group_c','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 근태 요약 — C조 이름','C조(시간제)');
+  add('attrule.group_auto','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 근태 요약 — 근무조 선택칸의 「자동」 글(뒤에 자동으로 정해진 조가 붙음)','자동');
+  add('attrule.group_cut_label','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 근태 요약 — 지각 기준 시각 앞 글','지각 기준');
+  add('attrule.monthly_stale','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 근태 요약 — 저장된 지각·조퇴가 지금 기준과 다른 날이 있을 때 뜨는 글({n}은 그 날수)','저장된 지각·조퇴와 지금 기준이 다른 날이 {n}일 있어요. 화면 숫자는 지금 기준이고, 저장값은 「이 달 다시 계산」을 눌러야 맞춰져요.',['n']);
+  add('attrule.monthly_holiday_note','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 근태 요약 아래 안내 — 휴일근무 기준 한 줄','휴일근무 = 법정공휴일만(주말·근무표 휴무는 휴일근무가 아님).');
+  add('attrule.group_label','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 근태 확인용 자료 — 근무조 앞 글','근무조');
+  add('attrule.group_fail','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','근무조를 바꾸다 실패했을 때({msg}는 서버 오류)','근무조를 바꾸지 못했습니다: {msg}',['msg']);
+  add('attrule.mark_pick','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','관리자 표시를 추가할 때 날짜나 표시를 안 골랐을 때','날짜와 표시를 골라 주세요.');
+  add('attrule.mark_fail','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','관리자 표시를 넣거나 지우다 실패했을 때({msg}는 서버 오류)','관리자 표시를 저장하지 못했습니다: {msg}',['msg']);
+  add('attrule.need_mgr','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','매니저·실장·원장이 아닌 사람이 이 달 다시 계산을 시도했을 때','매니저·실장·원장만 쓸 수 있습니다.');
+  add('attrule.recalc_final','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','원장 확정된 달에서 이 달 다시 계산을 눌렀을 때','원장 확정된 달은 다시 계산할 수 없습니다. 원장이 「되돌리기」를 한 뒤 다시 계산하세요.');
+  add('attrule.recalc_confirm','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','이 달 다시 계산을 누르면 뜨는 확인창({month}는 달)','{month} 지문 기록의 지각·조퇴·연장을 지금 설정·근무조·반차·관리자 표시로 다시 계산해 저장할까요? (지문 시각은 그대로, 수기 기록은 건드리지 않음)',['month']);
+  add('attrule.recalc_busy','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','이 달 다시 계산 — 계산 중 글','계산 중…');
+  add('attrule.recalc_done','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','이 달 다시 계산 끝 — 몇 줄 바뀌었는지({total}은 전체 줄 수, {changed}는 바뀐 줄 수)','{total}줄 중 {changed}줄이 바뀌었습니다.',['total','changed']);
+  add('attrule.recalc_log_fail','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','이 달 다시 계산 — 수정 기록 저장이 실패했을 때 덧붙는 글({msg}는 서버 오류)','(수정 기록 저장 실패: {msg})',['msg']);
+  add('attrule.recalc_fail','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','이 달 다시 계산이 실패했을 때({msg}는 원인)','다시 계산하지 못했습니다: {msg}',['msg']);
+  add('attrule.close_title','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 마감 결재 카드 제목','✅ 월 마감 결재');
+  add('attrule.close_month','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 마감 결재 카드 — 달 선택 앞 글','달');
+  add('attrule.recalc_btn','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 마감 결재 카드 — 이 달 다시 계산 단추','🔁 이 달 다시 계산');
+  add('attrule.close_hint','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 마감 결재 카드 — 순서 안내','순서: 매니저 확인 → 실장 확인 → 원장 확정. 앞 단계가 끝나야 다음 단추가 눌려요. 원장은 「되돌리기」로 한 단계씩 풀 수 있어요.');
+  add('attrule.step_manager','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 마감 결재 — 매니저 단추','매니저 확인');
+  add('attrule.step_chief','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 마감 결재 — 실장 단추','실장 확인');
+  add('attrule.step_owner','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 마감 결재 — 원장 확정 단추','원장 확정');
+  add('attrule.step_revert','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 마감 결재 — 원장 되돌리기 단추','되돌리기');
+  add('attrule.close_state','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 마감 결재 — 상태 앞 글','상태:');
+  add('attrule.step_confirm','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 마감 결재 단추를 누르면 뜨는 확인창({month}는 달, {step}은 단추 이름)','{month} 근태를 「{step}」 처리할까요?',['month','step']);
+  add('attrule.step_fail','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','월 마감 결재 처리 실패({msg}는 서버 오류)','처리하지 못했습니다: {msg}',['msg']);
+  add('attrule.log_title','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','근태 수정 기록 카드 제목(원장만 보임)','🧾 근태 수정 기록');
+  add('attrule.log_sub','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','근태 수정 기록 카드 제목 옆 작은 글','(이번 달·지난달)');
+  add('attrule.log_mark_add','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','근태 수정 기록 한 줄 — 관리자 표시 추가({who}는 한 사람, {date}·{name}·{mark}는 날짜·직원·표시)','{who} 표시 추가 — {date} {name} · {mark}',['who','date','name','mark']);
+  add('attrule.log_mark_remove','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','근태 수정 기록 한 줄 — 관리자 표시 삭제({who}는 한 사람, {date}·{name}·{mark}는 날짜·직원·표시)','{who} 표시 삭제 — {date} {name} · {mark}',['who','date','name','mark']);
+  add('attrule.log_group_change','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','근태 수정 기록 한 줄 — 근무조 변경({who}는 한 사람, {name}은 직원, {from}→{to}는 바뀐 조)','{who} 근무조 변경 — {name} · {from} → {to}',['who','name','from','to']);
+  add('attrule.log_recalc','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','근태 수정 기록 한 줄 — 이 달 다시 계산({who}는 한 사람, {month}는 달, {total}·{changed}는 줄 수)','{who} 이 달 다시 계산 — {month} · {total}줄 중 {changed}줄 바뀜',['who','month','total','changed']);
+  add('attrule.log_month_step','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','근태 수정 기록 한 줄 — 월 마감 결재({who}는 한 사람, {action}은 단계 이름, {month}는 달, {from}→{to}는 바뀐 상태)','{who} 월 마감 {action} — {month} · {from} → {to}',['who','action','month','from','to']);
+  add('attrule.log_th_when','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','근태 수정 기록 표 머리 — 언제','언제');
+  add('attrule.log_th_role','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','근태 수정 기록 표 머리 — 한 사람의 역할','역할');
+  add('attrule.log_th_what','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','근태 수정 기록 표 머리 — 무엇을','무엇을');
+  add('attrule.log_empty','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','근태 수정 기록이 없을 때','수정 기록 없음');
+  add('attrule.xl_ctx_fail','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','근태 엑셀 올리기 — 시간제·휴가·관리자 표시를 못 읽었을 때({msg}는 원인)','시간제·휴가·관리자 표시를 못 읽어 그 반영 없이 계산했어요: {msg}',['msg']);
   add('att.resol.title','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','인정 근태 카드 제목','🧾 지문 오류 승인 인정 근태');
   add('att.resol.th_time','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','인정 근태 표 머리 — 인정 출퇴근','인정 출퇴근');
   add('att.resol.th_at','🕘 출퇴근 › 월 마감·인정 근태·수기 검토(실장·원장)','인정 근태 표 머리 — 승인일','승인일');
@@ -2842,7 +2882,7 @@ const HUB_SETTING_DEFS=[
   ...((typeof globalThis!=='undefined'&&globalThis.HUB_BONUS_CATALOG===true)?[{"key": "pay.compare.time_tolerance", "screen": "💰 급여 대조 기준", "label": "시간 차이 허용치", "where": "노무사 대장과 허브 시간 비교 허용치", "def": "0.1", "kind": "dec", "min": 0, "max": 24, "unit": "시간"}, {"key": "pay.compare.money_tolerance", "screen": "💰 급여 대조 기준", "label": "금액 차이 허용치", "where": "노무사 대장과 상여 금액 비교 허용치", "def": "0", "kind": "int", "min": 0, "max": 9999, "unit": "원"}]:[]),
   ...((typeof globalThis!=='undefined'&&globalThis.HUB_BONUS_CATALOG===true)?[{"key": "pay.reply.digits", "screen": "💰 급여 회신 기준", "label": "시간 소수 자리", "where": "시간 소수 자리", "def": "2", "kind": "int", "min": 0, "max": 4, "unit": ""}, {"key": "pay.reply.night_start", "screen": "💰 급여 회신 기준", "label": "야간 시작(0시부터 분)", "where": "야간 시작(0시부터 분)", "def": "1320", "kind": "int", "min": 0, "max": 1439, "unit": ""}, {"key": "pay.reply.night_end", "screen": "💰 급여 회신 기준", "label": "야간 끝(0시부터 분)", "where": "야간 끝(0시부터 분)", "def": "360", "kind": "int", "min": 0, "max": 1439, "unit": ""}, {"key": "pay.reply.holiday_hours", "screen": "💰 급여 회신 기준", "label": "공휴일 하루 기준시간", "where": "공휴일 하루 기준시간", "def": "8", "kind": "dec", "min": 0, "max": 24, "unit": ""}, {"key": "pay.reply.hourly_day_hours", "screen": "💰 급여 회신 기준", "label": "시급제 하루 기준시간", "where": "시급제 하루 기준시간", "def": "8", "kind": "dec", "min": 0, "max": 24, "unit": ""}, {"key": "pay.reply.deadline", "screen": "💰 급여 회신 기준", "label": "회신 기한일", "where": "회신 기한일", "def": "3", "kind": "int", "min": 1, "max": 28, "unit": ""}, {"key": "pay.reply.payday", "screen": "💰 급여 회신 기준", "label": "급여일", "where": "급여일", "def": "10", "kind": "int", "min": 1, "max": 28, "unit": ""}]:[]),
   ...((typeof globalThis!=='undefined'&&globalThis.HUB_BONUS_CATALOG===true)?[{key:'pay.bonus.months',screen:'💰 급여 기준',label:'상여 직전 달 보기',where:'상여 오른쪽에 표시할 지난 개월 수',def:'3',kind:'int',min:1,max:12,unit:'개월'}]:[]),
-  {key:'late_cut',screen:'🕘 근태 기준',label:'지각 판정 시각',where:'출퇴근 — 이 시각을 넘겨 출근하면 지각으로 계산(예 09:40이면 09:41부터 지각)',def:'09:40',kind:'time'},
+  {key:'late_cut',screen:'🕘 근태 기준',label:'지각 판정 시각(옛 기준)',where:'출퇴근 — 지금 지각은 근무조별 「지각 기준 — A·B·C조」로 계산해요. 이 값은 A조 값이 비어 있을 때만 대신 쓰여요',def:'09:40',kind:'time'},
   {key:'siueop',screen:'🕘 근태 기준',label:'시업(공식 출근) 시각',where:'출퇴근 — 화면에 보여 주는 공식 출근 시각',def:'10:00',kind:'time'},
   {key:'jongeop_weekday_evening',screen:'🕘 근태 기준',label:'평일 야간조 종업 시각',where:'출퇴근 — 월~금 야간조의 종업 시각(연장근무 계산 기준)',def:'20:00',kind:'time'},
   {key:'jongeop_weekday_day',screen:'🕘 근태 기준',label:'평일 비야간 종업 시각',where:'출퇴근 — 월~금 야간조가 아닌 사람의 종업 시각',def:'18:30',kind:'time'},
@@ -2903,6 +2943,9 @@ const HUB_SETTING_DEFS=[
   {key:'att.ot_reason_required.desk',screen:'🕘 근태 기준',label:'연장 사유 필수 — 데스크',where:'수기 출퇴근(하루·한 주)에서 추가근무를 적을 때 — 켬이면 「연장 사유」「연장 시간에 실제로 한 일」을 각각 5자 이상 적어야 저장되고, 끔이면 안 적어도 저장돼요. 직무는 직원의 직무 분류를 따라요.',def:'false',kind:'bool'},
   {key:'att.ot_reason_required.sterilization_admin',screen:'🕘 근태 기준',label:'연장 사유 필수 — 소독·행정',where:'수기 출퇴근(하루·한 주)에서 추가근무를 적을 때 — 켬이면 「연장 사유」「연장 시간에 실제로 한 일」을 각각 5자 이상 적어야 저장되고, 끔이면 안 적어도 저장돼요. 직무는 직원의 직무 분류를 따라요.',def:'false',kind:'bool'},
   {key:'att.ot_reason_required.none',screen:'🕘 근태 기준',label:'연장 사유 필수 — 직무 미지정(실장·원장 등)',where:'수기 출퇴근(하루·한 주)에서 추가근무를 적을 때 — 켬이면 「연장 사유」「연장 시간에 실제로 한 일」을 각각 5자 이상 적어야 저장되고, 끔이면 안 적어도 저장돼요. 직무는 직원의 직무 분류를 따라요.',def:'false',kind:'bool'},
+  {key:'att.shift_group.A.late_cut',screen:'🕘 근태 기준',label:'지각 기준 — A조(진료실·데스크)',where:'출퇴근 — A조 직원은 이 시각을 넘겨 출근하면 지각(예 09:40이면 09:41부터). 직원 조는 근태 월 요약 표에서 바꿔요. 조를 안 정한 직원은 직무에 따라 자동으로 정해져요(시간제 C · 실장·기공·소독·행정 B · 그 밖 A)',def:'09:40',kind:'time'},
+  {key:'att.shift_group.B.late_cut',screen:'🕘 근태 기준',label:'지각 기준 — B조(기공·행정·실장)',where:'출퇴근 — B조 직원은 이 시각을 넘겨 출근하면 지각(예 10:00이면 10:01부터)',def:'10:00',kind:'time'},
+  {key:'att.shift_group.C.late_cut',screen:'🕘 근태 기준',label:'지각 기준 — C조(시간제)',where:'출퇴근 — C조(시간제) 직원은 이 시각을 넘겨 출근하면 지각(예 09:30이면 09:31부터)',def:'09:30',kind:'time'},
 ];
 // 리콜 명단을 포함하는 허브에서만 편집 목록을 추가한다. 기존 설정의 순서는 유지한다.
 if(typeof globalThis!=='undefined'&&globalThis.HUB_RECALL_CATALOG===true)HUB_SETTING_DEFS.push(
