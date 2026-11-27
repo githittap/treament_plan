@@ -77,11 +77,13 @@ drop policy if exists attendance_edit_log_select_owner on public.attendance_edit
 create policy attendance_edit_log_select_owner on public.attendance_edit_log for select to authenticated
   using (public.my_role()='owner');
 
--- 운영의 「직원허브 접근 차단」 관문(있을 때만)
+-- 운영의 「직원허브 접근 차단」 관문 — 기존 표(attendance 등)와 같은 RESTRICTIVE 정책을 새 표에도 직접 붙임
+-- (운영에 _install_employee_hub_access_gate 함수가 없어 직접 만듦 · 주 대화 검토 11-27)
 do $$ declare t text; begin
-  if to_regprocedure('public._install_employee_hub_access_gate(regclass)') is not null then
+  if to_regprocedure('public.employee_hub_access_allowed()') is not null then
     foreach t in array array['attendance_day_marks','attendance_edit_log'] loop
-      perform public._install_employee_hub_access_gate(to_regclass('public.'||t));
+      execute format('drop policy if exists employee_hub_access_gate on public.%I',t);
+      execute format('create policy employee_hub_access_gate on public.%I as restrictive for all to authenticated using (public.employee_hub_access_allowed()) with check (public.employee_hub_access_allowed())',t);
     end loop;
   end if;
 end $$;
@@ -137,7 +139,7 @@ create or replace function public.att_set_shift_group(p_user uuid,p_group text)
 returns text language plpgsql security definer set search_path='' as $$
 declare g text:=nullif(pg_catalog.btrim(coalesce(p_group,'')),''); old text;
 begin
-  if public.my_role() not in ('manager','chief','owner') then raise exception 'manager, chief or owner required'; end if;
+  if public.my_role() not in ('manager','chief','owner') or not public.employee_hub_access_allowed() then raise exception 'manager, chief or owner required'; end if;
   if g is not null and g not in ('A','B','C') then raise exception 'invalid shift group'; end if;
   select p.att_shift_group into old from public.profiles p where p.user_id=p_user for update;
   if not found then raise exception 'profile not found'; end if;
@@ -155,7 +157,7 @@ create or replace function public.att_mark_add(p_user uuid,p_date date,p_mark te
 returns public.attendance_day_marks language plpgsql security definer set search_path='' as $$
 declare r public.attendance_day_marks; m text;
 begin
-  if public.my_role() not in ('manager','chief','owner') then raise exception 'manager, chief or owner required'; end if;
+  if public.my_role() not in ('manager','chief','owner') or not public.employee_hub_access_allowed() then raise exception 'manager, chief or owner required'; end if;
   if p_mark is null or p_mark not in ('annual','am_half','pm_half','early_ok','late_ok','official') then raise exception 'invalid mark'; end if;
   if p_date is null or not exists(select 1 from public.profiles p where p.user_id=p_user) then raise exception 'invalid user or date'; end if;
   m:=to_char(p_date,'YYYY-MM');
@@ -175,7 +177,7 @@ create or replace function public.att_mark_remove(p_id bigint)
 returns public.attendance_day_marks language plpgsql security definer set search_path='' as $$
 declare r public.attendance_day_marks; m text;
 begin
-  if public.my_role() not in ('manager','chief','owner') then raise exception 'manager, chief or owner required'; end if;
+  if public.my_role() not in ('manager','chief','owner') or not public.employee_hub_access_allowed() then raise exception 'manager, chief or owner required'; end if;
   select * into r from public.attendance_day_marks where id=p_id for update;
   if not found then raise exception 'mark not found'; end if;
   if r.removed_at is not null then return r; end if;
@@ -192,7 +194,7 @@ grant execute on function public.att_mark_remove(bigint) to authenticated;
 create or replace function public.att_log_recalc(p_month text,p_total int,p_changed int,p_detail jsonb default '{}'::jsonb)
 returns void language plpgsql security definer set search_path='' as $$
 begin
-  if public.my_role() not in ('manager','chief','owner') then raise exception 'manager, chief or owner required'; end if;
+  if public.my_role() not in ('manager','chief','owner') or not public.employee_hub_access_allowed() then raise exception 'manager, chief or owner required'; end if;
   if p_month is null or p_month !~ '^\d{4}-(0[1-9]|1[0-2])$' then raise exception 'invalid month'; end if;
   perform public.att_edit_log_write('recalc',null,null,p_month,
     coalesce(p_detail,'{}'::jsonb)||jsonb_build_object('total',p_total,'changed',p_changed));
@@ -206,7 +208,7 @@ returns public.att_months language plpgsql security definer set search_path='' a
 declare rl text:=public.my_role(); nm text; r public.att_months; st text; nx text;
 begin
   if p_month is null or p_month !~ '^\d{4}-(0[1-9]|1[0-2])$' then raise exception 'invalid month'; end if;
-  if rl not in ('manager','chief','owner') then raise exception 'manager, chief or owner required'; end if;
+  if rl not in ('manager','chief','owner') or not public.employee_hub_access_allowed() then raise exception 'manager, chief or owner required'; end if;
   select p.name into nm from public.profiles p where p.user_id=auth.uid();
   insert into public.att_months(month,status) values(p_month,'집계중') on conflict (month) do nothing;
   select * into r from public.att_months where month=p_month for update;

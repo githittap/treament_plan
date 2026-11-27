@@ -17,6 +17,7 @@ try{
     create table public.profiles(user_id uuid primary key,name text,active boolean default true,approved boolean default true,role text,dept text,job_group text);
     create table public.app_settings(key text primary key,value text not null,label text,updated_at timestamptz default now());
     create function public.my_role() returns text language sql stable as $$select coalesce((select role from public.profiles where user_id=auth.uid()),'')$$;
+    create function public.employee_hub_access_allowed() returns boolean language sql stable as $$select true$$;
     create table public.att_months(month text primary key,status text not null default '집계중' check (status in ('집계중','확정')),closed_by text,closed_at timestamptz);
     alter table public.att_months enable row level security;
     create policy att_months_select_authenticated on public.att_months for select to authenticated using (true);
